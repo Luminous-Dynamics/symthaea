@@ -194,6 +194,7 @@ pub enum ClockGovernedHardwareReauthorizationError {
     StatementDigestMismatch,
     InvalidSigner,
     TrustSnapshotInvalid(String),
+    TrustSnapshotPostdatesStatement,
     TrustSnapshotNotValidAcrossEnvelope(ClockGovernanceTimeError),
     SignerUnknown(String),
     SignerNotActive(String),
@@ -403,6 +404,9 @@ pub fn qualify_clock_governed_hardware_reauthorization_v1(
             "{error:?}"
         )));
     }
+    if trust_snapshot.issued_at_unix_s > signed.statement.issued_at_unix_s {
+        violations.push(ClockGovernedHardwareReauthorizationError::TrustSnapshotPostdatesStatement);
+    }
     if let Err(reason) = current_clock.require_valid_across_seconds_window(
         trust_snapshot.issued_at_unix_s,
         trust_snapshot.expires_at_unix_s,
@@ -530,6 +534,11 @@ pub fn qualify_clock_governed_hardware_reauthorization_v1(
     let verifier_set_digest =
         hash_serializable(HARDWARE_VERIFIER_SET_DOMAIN, &verifier_commitments)
             .map_err(|error| vec![error])?;
+    let clock_hop_count = if current_basis.id() == clearance_basis.id() {
+        0
+    } else {
+        clock_bridge.len() + 1
+    };
 
     let commitment = HardwareAuthorityCommitment {
         schema: CLOCK_GOVERNED_HARDWARE_REAUTHORIZATION_SCHEMA,
@@ -545,7 +554,7 @@ pub fn qualify_clock_governed_hardware_reauthorization_v1(
         verifier_set_digest: verifier_set_digest.to_hex(),
         current_clock_envelope_id: current_clock.id().to_hex(),
         current_operational_basis_id: current_basis.id().to_hex(),
-        clock_hop_count: clock_bridge.len() + usize::from(current_basis.id() != clearance_basis.id()),
+        clock_hop_count,
     };
     let id = ClockGovernedHardwareReauthorizationIdV1(
         hash_serializable(HARDWARE_AUTHORITY_DOMAIN, &commitment).map_err(|error| vec![error])?,
@@ -566,7 +575,7 @@ pub fn qualify_clock_governed_hardware_reauthorization_v1(
         verifier_set_digest,
         current_clock_envelope_id: current_clock.id(),
         current_operational_basis_id: current_basis.id(),
-        clock_hop_count: commitment.clock_hop_count,
+        clock_hop_count,
     })
 }
 
