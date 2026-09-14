@@ -8,6 +8,10 @@ on:
       - '.github/workflows/manifold-006n-bq1-exact-subject-requalification.yml'
   workflow_dispatch:
 
+concurrency:
+  group: manifold-006n-bq1-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -64,12 +68,11 @@ jobs:
           path: parent
           persist-credentials: false
 
-      - name: Bind control plane, frozen subject, parent, and prior evidence
+      - name: Bind exact control, subject, parent, and prior evidence
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
           mkdir -p "$out"
-
           test "$(git -C control rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
           test "$(git -C subject rev-parse HEAD^)" = "$BASE_SHA"
@@ -77,23 +80,17 @@ jobs:
           test -z "$(git -C control status --porcelain)"
           test -z "$(git -C subject status --porcelain)"
           test -z "$(git -C parent status --porcelain)"
-
-          control_tree="$(git -C control rev-parse HEAD^{tree})"
-          subject_tree="$(git -C subject rev-parse HEAD^{tree})"
-          parent_tree="$(git -C parent rev-parse HEAD^{tree})"
-          workflow_sha256="$(sha256sum control/.github/workflows/manifold-006n-bq1-exact-subject-requalification.yml | awk '{print $1}')"
-
           {
-            echo "schema=symthaea.manifold-006n-bq1.environment.v1"
+            echo "schema=symthaea.manifold-006n-bq1.environment.v2"
             echo "authority=exact-subject-requalification"
-            echo "qualification_contract=matched-differential-lint-plus-full-replay-v1"
+            echo "qualification_contract=matched-differential-lint-plus-full-replay-v2"
             echo "control_sha=$GITHUB_SHA"
-            echo "control_tree_sha=$control_tree"
-            echo "workflow_sha256=$workflow_sha256"
+            echo "control_tree_sha=$(git -C control rev-parse HEAD^{tree})"
+            echo "workflow_sha256=$(sha256sum control/.github/workflows/manifold-006n-bq1-exact-subject-requalification.yml | awk '{print $1}')"
             echo "subject_sha=$SUBJECT_SHA"
-            echo "subject_tree_sha=$subject_tree"
+            echo "subject_tree_sha=$(git -C subject rev-parse HEAD^{tree})"
             echo "parent_sha=$BASE_SHA"
-            echo "parent_tree_sha=$parent_tree"
+            echo "parent_tree_sha=$(git -C parent rev-parse HEAD^{tree})"
             echo "a1_run=$A1_RUN"
             echo "a1_artifact_id=$A1_ARTIFACT_ID"
             echo "a1_artifact_sha256=$A1_ARTIFACT_SHA256"
@@ -110,7 +107,7 @@ jobs:
             echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
           } > "$out/environment.txt"
 
-      - name: Install exact Rust toolchain
+      - name: Install and bind exact Rust toolchain
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
@@ -129,19 +126,16 @@ jobs:
             echo "image_version=${ImageVersion:-unknown}"
           } >> "$out/environment.txt"
 
-      - name: Bind unchanged A1 kernel bytes and exact N-B migration surface
+      - name: Bind A1 kernel bytes and exact N-B migration surface
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
-
           test "$(sha256sum subject/crates/core/symthaea-core/src/certified_interval.rs | awk '{print $1}')" = "$A1_KERNEL_SOURCE_SHA256"
           test "$(sha256sum subject/scripts/qualification/manifold_006n_kernel_harness.rs | awk '{print $1}')" = "$A1_KERNEL_HARNESS_SHA256"
           test "$(sha256sum subject/scripts/qualification/manifold_006n_kernel_oracle.py | awk '{print $1}')" = "$A1_KERNEL_ORACLE_SHA256"
-
           python3 - <<'PY'
           import json, os, re, subprocess
           from pathlib import Path
-
           base = os.environ['BASE_SHA']
           subject = os.environ['SUBJECT_SHA']
           changed = subprocess.check_output(
@@ -153,28 +147,20 @@ jobs:
               'crates/core/symthaea-core/tests/manifold_006n_b_production_boundary.rs',
           }
           assert set(changed) == expected, (changed, expected)
-
           robust = Path('subject/crates/core/symthaea-core/src/robust_reachability.rs').read_text()
           lib = Path('subject/crates/core/symthaea-core/src/lib.rs').read_text()
           assert 'crate::certified_interval' in robust
           assert 'impl From<CertifiedIntervalError> for RobustReachabilityError' in robust
           for forbidden in (
-              'struct OutwardInterval',
-              'fn outward_add(',
-              'fn outward_sub(',
-              'fn outward_mul(',
-              'fn outward_div(',
-              'fn next_up(',
-              'fn next_down(',
-              'fn is_normal_power_of_two(',
-              'fn canonical_zero(',
+              'struct OutwardInterval', 'fn outward_add(', 'fn outward_sub(',
+              'fn outward_mul(', 'fn outward_div(', 'fn next_up(', 'fn next_down(',
+              'fn is_normal_power_of_two(', 'fn canonical_zero(',
           ):
-              assert forbidden not in robust, f'duplicate arithmetic authority remains: {forbidden}'
+              assert forbidden not in robust, forbidden
           assert re.search(r'(?m)^mod certified_interval;$', lib)
           assert not re.search(r'(?m)^pub(?:\([^)]*\))?\s+mod certified_interval;$', lib)
-
-          audit = {
-              'schema': 'symthaea.manifold-006n-bq1.source-audit.v1',
+          payload = {
+              'schema': 'symthaea.manifold-006n-bq1.source-audit.v2',
               'subject_sha': subject,
               'parent_sha': base,
               'changed_files': changed,
@@ -185,10 +171,9 @@ jobs:
               'verdict': 'PASS',
           }
           Path('artifacts/manifold-006n-bq1/source-audit.json').write_text(
-              json.dumps(audit, indent=2, sort_keys=True) + '\n'
+              json.dumps(payload, indent=2, sort_keys=True) + '\n'
           )
           PY
-
           {
             echo "subject_cargo_lock_sha256=$(sha256sum subject/Cargo.lock | awk '{print $1}')"
             echo "parent_cargo_lock_sha256=$(sha256sum parent/Cargo.lock | awk '{print $1}')"
@@ -205,39 +190,22 @@ jobs:
             subject/crates/core/symthaea-core/src/robust_reachability.rs \
             subject/crates/core/symthaea-core/tests/manifold_006n_b_production_boundary.rs
 
-      - name: Check exact core crate
+      - name: Replay core compile and theorem suites
         run: |
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-target" \
-            cargo check --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features
-
-      - name: Run existing 006C robust theorem suite unchanged
-        run: |
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-target" \
-            cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features \
-              --test manifold_006c_robust_reachability
-
-      - name: Run existing 006C1 existential theorem suite unchanged
-        run: |
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-target" \
-            cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features \
-              --test manifold_006c1_existential_reachability
-
-      - name: Run N-B production boundary regressions
-        run: |
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-target" \
-            cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features \
-              --test manifold_006n_b_production_boundary
+          set -euo pipefail
+          target="$RUNNER_TEMP/manifold-006n-bq1-subject-target"
+          CARGO_TARGET_DIR="$target" cargo check --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features
+          CARGO_TARGET_DIR="$target" cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --test manifold_006c_robust_reachability
+          CARGO_TARGET_DIR="$target" cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --test manifold_006c1_existential_reachability
+          CARGO_TARGET_DIR="$target" cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --test manifold_006n_b_production_boundary
 
       - name: Re-run A1 exact-rational kernel qualification unchanged
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
-          rustc --edition=2024 subject/scripts/qualification/manifold_006n_kernel_harness.rs \
-            -o "$out/kernel-harness"
+          rustc --edition=2024 subject/scripts/qualification/manifold_006n_kernel_harness.rs -o "$out/kernel-harness"
           "$out/kernel-harness" "$out/kernel-vectors.tsv"
-          python3 subject/scripts/qualification/manifold_006n_kernel_oracle.py \
-            "$out/kernel-vectors.tsv" \
-            "$out/kernel-oracle.json"
+          python3 subject/scripts/qualification/manifold_006n_kernel_oracle.py "$out/kernel-vectors.tsv" "$out/kernel-oracle.json"
           python3 - <<'PY'
           import json, os
           from pathlib import Path
@@ -250,40 +218,23 @@ jobs:
           assert d['normal_interior_power2_fast_paths_exact'] is True
           PY
 
-      - name: Emit child frozen 006C1 theorem vectors
+      - name: Replay exact parent and child frozen 006C1 theorem vectors
         run: |
           set -euo pipefail
           out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
           MANIFOLD_006C1_VECTOR_PATH="$out/child-vectors.json" \
           CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-target" \
-            cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features \
-              --test manifold_006c1_exact_oracle_vectors
-          python3 subject/scripts/qualification/manifold_006c1_exact_oracle.py \
-            "$out/child-vectors.json" \
-            "$out/child-oracle.json"
-
-      - name: Emit exact-parent frozen 006C1 theorem vectors under same toolchain
-        run: |
-          set -euo pipefail
-          out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
+            cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --test manifold_006c1_exact_oracle_vectors
+          python3 subject/scripts/qualification/manifold_006c1_exact_oracle.py "$out/child-vectors.json" "$out/child-oracle.json"
           MANIFOLD_006C1_VECTOR_PATH="$out/parent-vectors.json" \
           CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-parent-target" \
-            cargo test --manifest-path parent/Cargo.toml --locked -p symthaea-core --no-default-features \
-              --test manifold_006c1_exact_oracle_vectors
-          python3 parent/scripts/qualification/manifold_006c1_exact_oracle.py \
-            "$out/parent-vectors.json" \
-            "$out/parent-oracle.json"
-
-      - name: Require byte-identical frozen parent/child theorem corpus
-        run: |
-          set -euo pipefail
-          out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
+            cargo test --manifest-path parent/Cargo.toml --locked -p symthaea-core --no-default-features --test manifold_006c1_exact_oracle_vectors
+          python3 parent/scripts/qualification/manifold_006c1_exact_oracle.py "$out/parent-vectors.json" "$out/parent-oracle.json"
           cmp -s "$out/parent-vectors.json" "$out/child-vectors.json"
           cmp -s "$out/parent-oracle.json" "$out/child-oracle.json"
           python3 - <<'PY'
           import hashlib, json, os
           from pathlib import Path
-
           root = Path('artifacts/manifold-006n-bq1')
           parent = root.joinpath('parent-vectors.json').read_bytes()
           child = root.joinpath('child-vectors.json').read_bytes()
@@ -294,8 +245,8 @@ jobs:
           assert po['verdict'] == 'PASS'
           assert po['vector_set_identity'] == os.environ['QUALIFIED_006C1_VECTOR_IDENTITY']
           assert co['vector_set_identity'] == os.environ['QUALIFIED_006C1_VECTOR_IDENTITY']
-          comparison = {
-              'schema': 'symthaea.manifold-006n-bq1.parent-child-comparison.v1',
+          payload = {
+              'schema': 'symthaea.manifold-006n-bq1.parent-child-comparison.v2',
               'parent_vector_sha256': hashlib.sha256(parent).hexdigest(),
               'child_vector_sha256': hashlib.sha256(child).hexdigest(),
               'byte_identical_vectors': True,
@@ -303,36 +254,39 @@ jobs:
               'semantic_vector_identity': po['vector_set_identity'],
               'verdict': 'PASS',
           }
-          root.joinpath('comparison.json').write_text(
-              json.dumps(comparison, indent=2, sort_keys=True) + '\n'
-          )
+          root.joinpath('comparison.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
           PY
 
-      - name: Replay identical strict Clippy on subject and parent
+      - name: Replay strict Clippy from exact subject and parent working directories
         run: |
           set -uo pipefail
           out="$GITHUB_WORKSPACE/artifacts/manifold-006n-bq1"
-
           set +e
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-clippy-exact" \
-            cargo clippy --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --lib -- -D warnings \
-            > "$out/subject-clippy-exact.stdout.txt" 2> "$out/subject-clippy-exact.stderr.txt"
+          (
+            cd subject
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-clippy-exact" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings
+          ) > "$out/subject-clippy-exact.stdout.txt" 2> "$out/subject-clippy-exact.stderr.txt"
           subject_exact_status=$?
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-parent-clippy-exact" \
-            cargo clippy --manifest-path parent/Cargo.toml --locked -p symthaea-core --no-default-features --lib -- -D warnings \
-            > "$out/parent-clippy-exact.stdout.txt" 2> "$out/parent-clippy-exact.stderr.txt"
+          (
+            cd parent
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-parent-clippy-exact" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings
+          ) > "$out/parent-clippy-exact.stdout.txt" 2> "$out/parent-clippy-exact.stderr.txt"
           parent_exact_status=$?
-
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-clippy-json" \
-            cargo clippy --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings \
-            > "$out/subject-clippy-json.stdout.jsonl" 2> "$out/subject-clippy-json.stderr.txt"
+          (
+            cd subject
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-subject-clippy-json" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings
+          ) > "$out/subject-clippy-json.stdout.jsonl" 2> "$out/subject-clippy-json.stderr.txt"
           subject_json_status=$?
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-parent-clippy-json" \
-            cargo clippy --manifest-path parent/Cargo.toml --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings \
-            > "$out/parent-clippy-json.stdout.jsonl" 2> "$out/parent-clippy-json.stderr.txt"
+          (
+            cd parent
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bq1-parent-clippy-json" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings
+          ) > "$out/parent-clippy-json.stdout.jsonl" 2> "$out/parent-clippy-json.stderr.txt"
           parent_json_status=$?
           set -e
-
           printf '%s\n' "$subject_exact_status" > "$out/subject-clippy-exact.exit-code.txt"
           printf '%s\n' "$parent_exact_status" > "$out/parent-clippy-exact.exit-code.txt"
           printf '%s\n' "$subject_json_status" > "$out/subject-clippy-json.exit-code.txt"
@@ -345,9 +299,7 @@ jobs:
           import hashlib, json, os
           from collections import Counter
           from pathlib import Path
-
           root = Path('artifacts/manifold-006n-bq1')
-
           def normalize(path):
               records = []
               for raw in path.read_text(errors='replace').splitlines():
@@ -360,27 +312,18 @@ jobs:
                   msg = event.get('message') or {}
                   if msg.get('level') not in {'error', 'warning'}:
                       continue
-                  spans = msg.get('spans') or []
-                  primary = next((s for s in spans if s.get('is_primary')), None) or {}
-                  code = (msg.get('code') or {}).get('code')
+                  primary = next((s for s in (msg.get('spans') or []) if s.get('is_primary')), {})
                   records.append({
-                      'code': code,
+                      'code': (msg.get('code') or {}).get('code'),
                       'message': msg.get('message'),
                       'primary_file': primary.get('file_name'),
                   })
               return records
-
           def signature(record):
               return (record.get('code'), record.get('message'), record.get('primary_file'))
-
           def canonical_hash(records):
-              sigs = sorted(
-                  [signature(r) for r in records],
-                  key=lambda row: tuple('' if item is None else item for item in row),
-              )
-              encoded = json.dumps(sigs, separators=(',', ':'), ensure_ascii=False).encode()
-              return hashlib.sha256(encoded).hexdigest()
-
+              sigs = sorted([signature(r) for r in records], key=lambda row: tuple('' if x is None else x for x in row))
+              return hashlib.sha256(json.dumps(sigs, separators=(',', ':'), ensure_ascii=False).encode()).hexdigest()
           subject = normalize(root / 'subject-clippy-json.stdout.jsonl')
           parent = normalize(root / 'parent-clippy-json.stdout.jsonl')
           subject_counter = Counter(signature(r) for r in subject)
@@ -389,7 +332,6 @@ jobs:
           removed = list((parent_counter - subject_counter).elements())
           subject_hash = canonical_hash(subject)
           parent_hash = canonical_hash(parent)
-
           expected_count = int(os.environ['EXPECTED_BASELINE_DIAGNOSTIC_COUNT'])
           expected_hash = os.environ['EXPECTED_BASELINE_DIAGNOSTIC_SET_SHA256']
           assert len(subject) == expected_count, (len(subject), expected_count)
@@ -398,19 +340,18 @@ jobs:
           assert parent_hash == expected_hash, (parent_hash, expected_hash)
           assert not added, added
           assert not removed, removed
-
           exact_subject = int((root / 'subject-clippy-exact.exit-code.txt').read_text().strip())
           exact_parent = int((root / 'parent-clippy-exact.exit-code.txt').read_text().strip())
           json_subject = int((root / 'subject-clippy-json.exit-code.txt').read_text().strip())
           json_parent = int((root / 'parent-clippy-json.exit-code.txt').read_text().strip())
           assert exact_subject != 0 and exact_parent != 0
           assert json_subject != 0 and json_parent != 0
-
           payload = {
-              'schema': 'symthaea.manifold-006n-bq1.differential-lint.v1',
+              'schema': 'symthaea.manifold-006n-bq1.differential-lint.v2',
               'subject_sha': os.environ['SUBJECT_SHA'],
               'parent_sha': os.environ['BASE_SHA'],
-              'command': 'cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings',
+              'exact_command': 'cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings',
+              'execution_directory_rule': 'run the exact command from each exact checkout root',
               'subject_global_strict_clippy_clean': False,
               'parent_global_strict_clippy_clean': False,
               'inherited_baseline_diagnostic_count': expected_count,
@@ -419,44 +360,37 @@ jobs:
               'added_subject_diagnostic_count': len(added),
               'removed_subject_diagnostic_count': len(removed),
               'candidate_introduced_new_strict_lint_diagnostics': False,
-              'qualification_rule': 'candidate diagnostic multiset must equal frozen qualified-parent baseline under identical toolchain and command',
               'verdict': 'PASS',
           }
-          root.joinpath('differential-lint.json').write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + '\n'
-          )
+          root.joinpath('differential-lint.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
           PY
 
       - name: Prove post-execution subject and parent checkout immutability
         run: |
           set -euo pipefail
+          subject_tree="$(awk -F= '$1=="subject_tree_sha" {print $2}' artifacts/manifold-006n-bq1/environment.txt)"
+          parent_tree="$(awk -F= '$1=="parent_tree_sha" {print $2}' artifacts/manifold-006n-bq1/environment.txt)"
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
-          test "$(git -C subject rev-parse HEAD^{tree})" = "$(awk -F= '$1=="subject_tree_sha" {print $2}' artifacts/manifold-006n-bq1/environment.txt)"
+          test "$(git -C subject rev-parse HEAD^{tree})" = "$subject_tree"
           test -z "$(git -C subject status --porcelain)"
           git -C subject diff --exit-code --
           git -C subject diff --cached --exit-code --
-
           test "$(git -C parent rev-parse HEAD)" = "$BASE_SHA"
-          test "$(git -C parent rev-parse HEAD^{tree})" = "$(awk -F= '$1=="parent_tree_sha" {print $2}' artifacts/manifold-006n-bq1/environment.txt)"
+          test "$(git -C parent rev-parse HEAD^{tree})" = "$parent_tree"
           test -z "$(git -C parent status --porcelain)"
           git -C parent diff --exit-code --
           git -C parent diff --cached --exit-code --
-
           python3 - <<'PY'
           import json, os, subprocess
           from pathlib import Path
           root = Path('artifacts/manifold-006n-bq1')
-          env = dict(
-              line.split('=', 1)
-              for line in root.joinpath('environment.txt').read_text().splitlines()
-              if '=' in line
-          )
+          env = dict(line.split('=', 1) for line in root.joinpath('environment.txt').read_text().splitlines() if '=' in line)
           subject_head = subprocess.check_output(['git','-C','subject','rev-parse','HEAD'], text=True).strip()
           subject_tree = subprocess.check_output(['git','-C','subject','rev-parse','HEAD^{tree}'], text=True).strip()
           parent_head = subprocess.check_output(['git','-C','parent','rev-parse','HEAD'], text=True).strip()
           parent_tree = subprocess.check_output(['git','-C','parent','rev-parse','HEAD^{tree}'], text=True).strip()
           payload = {
-              'schema': 'symthaea.manifold-006n-bq1.execution-integrity.v1',
+              'schema': 'symthaea.manifold-006n-bq1.execution-integrity.v2',
               'subject_head_unchanged': subject_head == os.environ['SUBJECT_SHA'],
               'subject_tree_identity_unchanged': subject_tree == env['subject_tree_sha'],
               'subject_worktree_and_index_clean_including_untracked': True,
@@ -466,9 +400,7 @@ jobs:
               'verdict': 'PASS',
           }
           assert all(v is True for k, v in payload.items() if k not in {'schema','verdict'})
-          root.joinpath('execution-integrity.json').write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + '\n'
-          )
+          root.joinpath('execution-integrity.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
           PY
 
       - name: Emit N-BQ1 exact-subject qualification receipt
@@ -477,22 +409,20 @@ jobs:
           python3 - <<'PY'
           import json, os
           from pathlib import Path
-
           root = Path('artifacts/manifold-006n-bq1')
           source = json.loads(root.joinpath('source-audit.json').read_text())
           kernel = json.loads(root.joinpath('kernel-oracle.json').read_text())
           comparison = json.loads(root.joinpath('comparison.json').read_text())
           lint = json.loads(root.joinpath('differential-lint.json').read_text())
           integrity = json.loads(root.joinpath('execution-integrity.json').read_text())
-
           receipt = {
               'schema': 'symthaea.manifold-006n-b.qualification.v2',
               'phase': 'production-certified-interval-authority-migration',
               'qualification_control_sha': os.environ['GITHUB_SHA'].lower(),
               'source_subject': os.environ['SUBJECT_SHA'].lower(),
               'exact_parent_a1_subject': os.environ['BASE_SHA'].lower(),
-              'qualification_contract': 'matched-differential-lint-plus-full-replay-v1',
-              'contract_change_reason': 'original global strict-Clippy gate was impossible relative to the qualified parent baseline; matched diagnostic control proved zero candidate-specific diagnostic delta',
+              'qualification_contract': 'matched-differential-lint-plus-full-replay-v2',
+              'contract_change_reason': 'matched Rust-1.96 control proved the original global strict-Clippy failure is entirely inherited from exact qualified A1; candidate-specific qualification therefore requires exact baseline equality rather than impossible baseline cleanliness',
               'original_red_run': os.environ['ORIGINAL_NB_RED_RUN'],
               'original_red_artifact_id': os.environ['ORIGINAL_NB_RED_ARTIFACT_ID'],
               'original_red_artifact_sha256': os.environ['ORIGINAL_NB_RED_ARTIFACT_SHA256'].lower(),
@@ -521,52 +451,24 @@ jobs:
               'production_robust_reachability_consumes_hardened_kernel': True,
               'new_reachability_claim': False,
               'claim_scope': 'certified-numerics implementation-locus migration plus boundary soundness hardening only',
-              'qualification_scope_note': 'PASS establishes no regression relative to the exact qualified A1 lint baseline; it does not claim repository-wide or crate-wide zero-warning cleanliness',
+              'qualification_scope_note': 'PASS establishes no candidate-specific regression relative to exact qualified A1 and does not claim crate-wide zero-warning cleanliness',
               'verdict': 'PASS',
           }
-          root.joinpath('report.json').write_text(
-              json.dumps(receipt, indent=2, sort_keys=True) + '\n'
-          )
+          root.joinpath('report.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
           PY
 
-      - name: Hash N-BQ1 qualification capsule
+      - name: Hash qualification capsule
         if: always()
         run: |
           set -euo pipefail
           cd artifacts/manifold-006n-bq1
           rm -f kernel-harness
           : > SHA256SUMS
-          for file in \
-            environment.txt \
-            source-audit.json \
-            kernel-vectors.tsv \
-            kernel-oracle.json \
-            child-vectors.json \
-            child-oracle.json \
-            parent-vectors.json \
-            parent-oracle.json \
-            comparison.json \
-            subject-clippy-exact.stdout.txt \
-            subject-clippy-exact.stderr.txt \
-            subject-clippy-exact.exit-code.txt \
-            parent-clippy-exact.stdout.txt \
-            parent-clippy-exact.stderr.txt \
-            parent-clippy-exact.exit-code.txt \
-            subject-clippy-json.stdout.jsonl \
-            subject-clippy-json.stderr.txt \
-            subject-clippy-json.exit-code.txt \
-            parent-clippy-json.stdout.jsonl \
-            parent-clippy-json.stderr.txt \
-            parent-clippy-json.exit-code.txt \
-            differential-lint.json \
-            execution-integrity.json \
-            report.json; do
-            if [ -f "$file" ]; then
-              sha256sum "$file" >> SHA256SUMS
-            fi
+          for file in environment.txt source-audit.json kernel-vectors.tsv kernel-oracle.json child-vectors.json child-oracle.json parent-vectors.json parent-oracle.json comparison.json subject-clippy-exact.stdout.txt subject-clippy-exact.stderr.txt subject-clippy-exact.exit-code.txt parent-clippy-exact.stdout.txt parent-clippy-exact.stderr.txt parent-clippy-exact.exit-code.txt subject-clippy-json.stdout.jsonl subject-clippy-json.stderr.txt subject-clippy-json.exit-code.txt parent-clippy-json.stdout.jsonl parent-clippy-json.stderr.txt parent-clippy-json.exit-code.txt differential-lint.json execution-integrity.json report.json; do
+            if [ -f "$file" ]; then sha256sum "$file" >> SHA256SUMS; fi
           done
 
-      - name: Upload N-BQ1 qualification capsule
+      - name: Upload qualification capsule
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
