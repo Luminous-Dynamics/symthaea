@@ -651,7 +651,7 @@ impl Default for OutputCollector {
 }
 
 /// Result of integrating all subsystem outputs for a single cycle.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct IntegratedOutput {
     /// Consensus-averaged confidence delta.
     pub confidence_delta: f64,
@@ -667,6 +667,20 @@ pub struct IntegratedOutput {
     pub flags: u32,
     /// Number of subsystems that contributed non-neutral outputs.
     pub n_contributors: usize,
+}
+
+impl Default for IntegratedOutput {
+    fn default() -> Self {
+        Self {
+            confidence_delta: 0.0,
+            lr_modulation: 1.0,
+            exploration_delta: 0.0,
+            arousal_delta: 0.0,
+            valence_delta: 0.0,
+            flags: 0,
+            n_contributors: 0,
+        }
+    }
 }
 
 impl IntegratedOutput {
@@ -1029,14 +1043,48 @@ mod tests {
         );
     }
 
-    /// Empty collector returns default integrated output.
+    /// Empty collector returns default integrated output with explicit multiplicative LR identity (1.0).
     #[test]
     fn test_collector_empty() {
         let collector = OutputCollector::new();
         let result = collector.integrate();
         assert_eq!(result.n_contributors, 0);
         assert_eq!(result.confidence_delta, 0.0);
-        assert_eq!(result.lr_modulation, 0.0); // default f64
+        assert_eq!(result.lr_modulation, 1.0); // Explicit multiplicative LR identity (SPINE-000B-P0)
+    }
+
+    /// Single confidence-only proposal modifies confidence while preserving multiplicative LR identity (1.0).
+    #[test]
+    fn test_collector_single_confidence_only_preserves_lr_identity() {
+        let mut collector = OutputCollector::new();
+        collector.record(
+            "confidence_manager",
+            SubsystemOutput {
+                confidence_delta: 0.2,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
+        let result = collector.integrate();
+        assert_eq!(result.n_contributors, 1);
+        assert_eq!(result.confidence_delta, 0.2);
+        assert_eq!(result.lr_modulation, 1.0);
+    }
+
+    /// Single LR-only proposal modulates learning rate while preserving additive defaults.
+    #[test]
+    fn test_collector_single_lr_only_modulates_lr() {
+        let mut collector = OutputCollector::new();
+        collector.record(
+            "lr_manager",
+            SubsystemOutput {
+                lr_modulation: 1.5,
+                ..SubsystemOutput::NEUTRAL
+            },
+        );
+        let result = collector.integrate();
+        assert_eq!(result.n_contributors, 1);
+        assert_eq!(result.confidence_delta, 0.0);
+        assert!((result.lr_modulation - 1.5).abs() < 1e-6);
     }
 
     /// Neutral outputs are filtered out.
