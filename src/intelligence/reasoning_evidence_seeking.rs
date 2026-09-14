@@ -434,7 +434,7 @@ mod tests {
         };
         assert_eq!(requests.len(), 1);
         assert!(matches!(
-            requests[0].kind,
+            &requests[0].kind,
             EvidenceRequestKind::ContextHypotheses { .. }
         ));
     }
@@ -456,7 +456,7 @@ mod tests {
             panic!("expected NeedEvidence");
         };
         assert!(matches!(
-            requests[0].kind,
+            &requests[0].kind,
             EvidenceRequestKind::ContextSupport { .. }
         ));
     }
@@ -519,7 +519,7 @@ mod tests {
         assert_eq!(requests.len(), 4);
         assert_eq!(requests[0].decision_relevance, 0.60);
         assert!(matches!(
-            requests[0].kind,
+            &requests[0].kind,
             EvidenceRequestKind::ObjectiveMeasurement {
                 objective: ObjectiveKind::EpistemicGrounding,
                 ..
