@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-fabrication-policy-exact-evidence"
+version = "0.1.0"
+edition = "2024"
+description = "Exact raw signature evidence binding for witnessed policy-head authority"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-policy-head-observation = { path = "../symthaea-fabrication-policy-head-observation" }
+symthaea-fabrication-witness-authority = { path = "../symthaea-fabrication-witness-authority" }
+serde = { workspace = true }
+serde_json = { workspace = true }
