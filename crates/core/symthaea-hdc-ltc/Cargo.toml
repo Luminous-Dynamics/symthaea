@@ -40,3 +40,7 @@ path = "examples/irregular_timestep_replay.rs"
 [[example]]
 name = "validity_capacity_evidence"
 path = "examples/validity_capacity_evidence.rs"
+
+[[example]]
+name = "validity_capacity_evidence_v2"
+path = "examples/validity_capacity_evidence_v2.rs"
