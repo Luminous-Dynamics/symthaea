@@ -1,0 +1,163 @@
+{
+  "$schema": "./spore-migration-manifest-v1.schema.json",
+  "schema": "spore-migration-manifest-v1",
+  "destination_repository": "Luminous-Dynamics/spore",
+  "destination_repository_status": "not-created",
+  "qualification_transfer_policy": "never-inherit",
+  "lineages": [
+    {
+      "id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_repository": "Tristan-Stoltz-ERC/nixos-config",
+      "source_branch": "spore/runtime-expendability-v1.3.2-proof",
+      "source_commit": "5d80360768ee329c50756e71fbce4692ac3a8e45",
+      "source_tree": "51c04910b3a97586ecf88a46699b7de22e3e1b0b",
+      "commit_verification": "unsigned",
+      "qualification_boundary": "transformed-candidate",
+      "source_mutation_in_qualification": true,
+      "notes": "The v1.3.2 proof workflow checks out the exact source head but materializes/transforms candidate product source in its disposable workspace before qualification. This lineage is provenance for migration and MUST NOT be relabeled as exact committed-source qualification."
+    },
+    {
+      "id": "symthaea-clean-host-rehydration-v1",
+      "source_repository": "Luminous-Dynamics/symthaea",
+      "source_branch": "feat/spore-clean-host-rehydration-v1",
+      "source_commit": "937b2247e95c766e44cb2c0cbc2038019e671f92",
+      "source_tree": "16c3a737decc394da9219f0fb749c8c55a8f6356",
+      "commit_verification": "unsigned",
+      "qualification_boundary": "not-assessed",
+      "source_mutation_in_qualification": false,
+      "notes": "The branch head commit message says it qualifies an exact repaired source head, but destination migration does not inherit that claim. The commit/tree distinction is explicit here: 937b... is the commit and 16c3... is its tree."
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "host-nixos-module",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "modules/system/symthaea-boot.nix",
+      "source_blob_sha1": "6a2c415e776139d202f0d44d719fa1d242186ad1",
+      "source_role": "product-source",
+      "authority_class": "recovery",
+      "target_owner": "spore",
+      "migration_kind": "extract",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Generic recovery semantics should be extracted; machine-specific policy remains in nixos-config."
+    },
+    {
+      "id": "systemd-authority-checker",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "scripts/check_spore_systemd_authority.py",
+      "source_blob_sha1": "7b587682011939479d6db6d903d62f3187d6fedd",
+      "source_role": "qualification-tool",
+      "authority_class": "qualification",
+      "target_owner": "spore",
+      "migration_kind": "move",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Preserve the effective-systemd authority proof as an independent destination qualification gate."
+    },
+    {
+      "id": "runtime-expendability-transform",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "scripts/spore_runtime_expendability_v13.py",
+      "source_blob_sha1": "fc45908f5f32a258c4e79cf87862b630e9ef385a",
+      "source_role": "migration-tool",
+      "authority_class": "migration-tooling",
+      "target_owner": "spore",
+      "migration_kind": "reference",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Historical transformation evidence only. The destination steady state should materialize stabilized implementation as committed source rather than mutate product bytes in qualification."
+    },
+    {
+      "id": "fail-open-vm",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "tests/spore-boot-fail-open.nix",
+      "source_blob_sha1": "4fcc1618b2e993ca38f0c7a988a7afae65dd9ede",
+      "source_role": "test-fixture",
+      "authority_class": "test-evidence",
+      "target_owner": "spore",
+      "migration_kind": "move",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Golden parity input for fail-open boot semantics."
+    },
+    {
+      "id": "helper-expendability-vm",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "tests/spore-boot-helper-expendability.nix",
+      "source_blob_sha1": "0fc089e9677d0398d79028baf65ddfe0682a4493",
+      "source_role": "test-fixture",
+      "authority_class": "test-evidence",
+      "target_owner": "spore",
+      "migration_kind": "move",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Golden parity input for hung-helper and sandbox-denial expendability semantics."
+    },
+    {
+      "id": "ovmf-recovery-vm",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "tests/spore-boot-ovmf-recovery.nix",
+      "source_blob_sha1": "b2f645694c53c579d43b2b8f8781b0e6b8a4fbd8",
+      "source_role": "test-fixture",
+      "authority_class": "test-evidence",
+      "target_owner": "spore",
+      "migration_kind": "move",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Golden parity input for firmware/VM recovery behavior; historical infrastructure failures remain evidence context rather than product-failure claims."
+    },
+    {
+      "id": "systemd-authority-tests",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": "tests/test_spore_systemd_authority.py",
+      "source_blob_sha1": "4db5d9af7f942a978c2c786ffcbb8f6b1ad35e26",
+      "source_role": "test-fixture",
+      "authority_class": "test-evidence",
+      "target_owner": "spore",
+      "migration_kind": "move",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Regression corpus for the effective systemd authority checker."
+    },
+    {
+      "id": "runtime-autopatch-workflow",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": ".github/workflows/spore-runtime-v13-autopatch.yml",
+      "source_blob_sha1": "43d902c0fb0a763fad14d37d0727ebd76f8eac30",
+      "source_role": "workflow",
+      "authority_class": "workflow",
+      "target_owner": "spore",
+      "migration_kind": "reference",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Historical workflow evidence. Do not carry CI source mutation forward as the canonical qualification design."
+    },
+    {
+      "id": "runtime-v132-proof-workflow",
+      "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
+      "source_path": ".github/workflows/spore-runtime-v132-proof.yml",
+      "source_blob_sha1": "4b4f9f1d9db9a67bf3cc7d4e9d36694726eb93be",
+      "source_role": "workflow",
+      "authority_class": "workflow",
+      "target_owner": "spore",
+      "migration_kind": "reference",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Historical transformed-candidate proof workflow. Destination qualification must exercise exact committed product bytes."
+    },
+    {
+      "id": "symthaea-rehydration-workflow",
+      "lineage_id": "symthaea-clean-host-rehydration-v1",
+      "source_path": ".github/workflows/spore-rehydration.yml",
+      "source_blob_sha1": "fa8bfae9eeb4090557f35fad0ef1165465441ddf",
+      "source_role": "workflow",
+      "authority_class": "workflow",
+      "target_owner": "undecided",
+      "migration_kind": "reference",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Seed provenance only. Ownership and migration relevance should be decided after the rehydration boundary is inspected independently."
+    }
+  ]
+}
