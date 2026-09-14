@@ -1,0 +1,113 @@
+name: Butlin GWT-1 Unified Evidence Root Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-unified-evidence-root-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify exact unified GWT-1 evidence root
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact unified evidence root R
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 726d2be515e52eeff6c3f32a137e42a2648e35c7
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact convergence topology and frozen objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "726d2be515e52eeff6c3f32a137e42a2648e35c7"
+          test "$(git rev-parse HEAD^{tree})" = "aaf09d0a35825baa82fadd274c74608b6a69c83e"
+          read -r commit parent1 parent2 extra <<<"$(git rev-list --parents -n 1 HEAD)"
+          test "$commit" = "726d2be515e52eeff6c3f32a137e42a2648e35c7"
+          test "$parent1" = "21f83eece23c8ee9c2f8fa3c1fc1ab3f555c40e7"
+          test "$parent2" = "6eaf73a20047b99120e59eb96f48ae0e194e2c80"
+          test -z "${extra:-}"
+
+          test "$(git rev-parse HEAD:.github/scripts/evidence_archive_admission.py)" = "4a7228ab25fcd512d3b038bab29d5f10e0f22eaa"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-direct-evidence-v1.json)" = "24115fe59f40600eb6d2a445994aea80db72af82"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-causal-evidence-v1.json)" = "d251f39460d9cb187e98381a9c786f1073e5d8c1"
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-trusted-builder.yml)" = "ddb46fa0fc52318d73a1bd63cc367fe1db2080ef"
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-causal-trusted-builder.yml)" = "b77d3bc869d0b91cb1bb8fc7c8b2f0d4a6d7fced"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/bin/gwt1_qualification.rs)" = "993f81adcac59c6f4b17c240030338257d39cd8a"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/bin/gwt1_verify_evidence.rs)" = "fc464223eca2428c19726f42c6ab1e7240a964b6"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs)" = "1e1a68a05235b043255a9e3ae690f7193708b9d7"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Audit joint lineage theorem without executing evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+
+          allowed = {
+              "src/cognitive_loop/managers/drive_manager.rs",
+              "src/cognitive_loop/managers/memory_manager.rs",
+              "src/cognitive_loop/managers/learning_manager.rs",
+              "src/cognitive_loop/managers/perception_manager.rs",
+          }
+          direct = Path(".github/workflows/butlin-gwt1-trusted-builder.yml").read_text()
+          causal = Path(".github/workflows/butlin-gwt1-causal-trusted-builder.yml").read_text()
+          workflow_sha_token = "$" + "{{ job.workflow_sha }}"
+
+          for name, text in (("direct", direct), ("causal", causal)):
+              assert workflow_sha_token in text, name
+              assert "git merge-base --is-ancestor" in text, name
+              assert "git diff --name-only --diff-filter=ACDMRTUXB" in text, name
+              assert "runs-on: ubuntu-24.04" in text, name
+              assert "ubuntu-latest" not in text, name
+              assert "actions/cache" not in text, name
+              assert "cargo run --locked" in text, name
+              assert "--deny-self-hosted-runners" in text, name
+              observed = {path for path in allowed if path in text}
+              assert observed == allowed, (name, observed)
+
+          adapter = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs").read_text()
+          body = adapter.split("fn changed_specialists(", 1)[1].split("\nfn derive_receipt(", 1)[0]
+          assert body.count(".get(**id)") == 2, body
+          assert ".get(*id)" not in body, body
+          PY
+          test -z "$(git diff --name-only HEAD HEAD)"
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Compile direct producer and verifier at exact R
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-unified-root-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-unified-root-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_qualification
+          cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_verify_evidence
+
+      - name: Compile causal producer and verifier at exact R
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-unified-root-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-unified-root-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_causal_qualification
+          cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_verify_causal_evidence
+
+      - name: Run repaired end-to-end adapter tests at exact R
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-unified-root-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-unified-root-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --features symthaea-backend gwt1_end_to_end::tests
