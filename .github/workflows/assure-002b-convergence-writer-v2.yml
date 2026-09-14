@@ -27,7 +27,7 @@ jobs:
       github.event.pull_request.head.ref == 'staging/assure-002b-convergence-writer-v2' &&
       github.event.pull_request.base.ref == 'feat/assure-002-preregistration' &&
       github.actor == 'Tristan-Stoltz-ERC'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
