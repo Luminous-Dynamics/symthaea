@@ -26,6 +26,7 @@
 //! - Append-only evidence acquisition sessions with hash-chained deterministic replanning
 //! - Direct ActivePrimitive evidence preservation with HDC identity auditing
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
+//! - Candidate-specific typed epistemic grounding bound to exact primitive identity
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -37,6 +38,7 @@ pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
 pub mod reasoning_context_competition;
 pub mod reasoning_episode_emitter;
+pub mod reasoning_epistemic_grounding;
 pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
@@ -89,6 +91,13 @@ pub use reasoning_context_competition::{
 pub use reasoning_episode_emitter::{
     emit_reasoning_episode, EmittedReasoningEpisode, EpisodeEmissionError,
     ReasoningEpisodePublicationInput, CANONICAL_RQ_EMITTER_VERSION,
+};
+pub use reasoning_epistemic_grounding::{
+    apply_epistemic_grounding_measurements, plan_active_primitive_with_epistemic_grounding,
+    AppliedEpistemicGroundingMeasurement, CandidateEpistemicGroundingMeasurement,
+    EmpiricalGroundingBasis, EpistemicGroundingApplicationReport,
+    EpistemicGroundingMeasurementError, MaterialityGroundingBasis, NormativeGroundingBasis,
+    EPISTEMIC_GROUNDING_MEASUREMENT_VERSION,
 };
 pub use reasoning_evaluator::{
     aggregate_receipts, evaluate_episode, wilson_interval_95, CapabilitySlice, EpisodeJudgment,
