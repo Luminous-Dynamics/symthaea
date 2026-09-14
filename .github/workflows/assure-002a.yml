@@ -46,6 +46,12 @@ jobs:
           git diff --exit-code
       - name: Format
         run: cargo fmt --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml -- --check
+      - name: Independent Python semantic vectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          python3 crates/core/symthaea-assurance-semantics/tools/verify_vectors.py
       - name: Check and expose lock reconciliation
         shell: bash
         run: |
@@ -66,6 +72,7 @@ jobs:
             printf 'lock_sha256=%s\n' "$LOCK_SHA256"
             rustc --version
             cargo --version
+            python3 --version
           } > target/assure-002a-lock/MANIFEST.txt
           cat target/assure-002a-lock/MANIFEST.txt
       - name: Upload reconciled lock evidence
