@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Same-view currentness for interval-safe evidence-retention authority.
 //!
-//! The retention authority itself proves one policy was valid, effective and threshold-authorized,
-//! but not that no later sequence exists. This bridge requires that authority to have been created
-//! under the exact trust snapshot and highest opaque containment state already established by the
-//! composite registry/containment view, then publishes its sequence into that same transparency log.
+//! The retention authority proves one policy was valid, definitely effective and threshold-
+//! authorized, but not that no later policy sequence exists. This bridge binds one exact opaque
+//! retention authority to the same authenticated registry/containment checkpoint view, requires
+//! that it was authorized under the exact trust snapshot and highest opaque containment state in
+//! that view, and proves that no higher retention sequence is published in that exact log.
 
 #![deny(unsafe_code)]
 
@@ -23,6 +24,9 @@ use symthaea_fabrication_kernel::trust::{TrustSnapshot, digest_trust_snapshot};
 use symthaea_fabrication_trust_bridge::ClockGovernedThresholdCeremonyV1;
 use symthaea_fabrication_witness_registry_containment_bound::{
     ContainmentCurrentWitnessRegistryHeadIdV1, ContainmentCurrentWitnessRegistryHeadV1,
+};
+use symthaea_fabrication_witness_registry_head::{
+    QuorumObservedWitnessRegistryHeadIdV1, QuorumObservedWitnessRegistryHeadV1,
 };
 use symthaea_trust_kernel::{
     ClockGovernanceEvaluationEnvelopeIdV1, ClockGovernanceTimeError, OperationalClockBasisIdV1,
@@ -43,6 +47,7 @@ const CLOCK_LINEAGE_DOMAIN: &[u8] =
 const CURRENT_HEAD_DOMAIN: &[u8] =
     b"symthaea.fabrication.current-evidence-retention-head.v1\0";
 
+/// Portable publication bytes. Live authority is minted only from the opaque retention capability.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EvidenceRetentionHeadPublicationV1 {
     pub schema_version: String,
@@ -69,16 +74,21 @@ impl CurrentEvidenceRetentionHeadIdV1 {
     pub fn as_digest(self) -> Sha256Digest {
         self.0
     }
+
     pub fn to_hex(self) -> String {
         self.0.to_hex()
     }
 }
 
+/// Opaque proof that one exact retention authority is the highest retention sequence published in
+/// the same authenticated log/checkpoint view used for registry + containment currentness.
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct CurrentEvidenceRetentionHeadV1 {
     id: CurrentEvidenceRetentionHeadIdV1,
     governance_view_id: ContainmentCurrentWitnessRegistryHeadIdV1,
+    registry_head_id: QuorumObservedWitnessRegistryHeadIdV1,
+    governance_checkpoint_digest: Sha256Digest,
     retention_authority_id: ClockGovernedEvidenceRetentionPolicyIdV1,
     policy_digest: Sha256Digest,
     sequence: u64,
@@ -105,36 +115,63 @@ impl CurrentEvidenceRetentionHeadV1 {
     pub fn id(&self) -> CurrentEvidenceRetentionHeadIdV1 {
         self.id
     }
+
     pub fn governance_view_id(&self) -> ContainmentCurrentWitnessRegistryHeadIdV1 {
         self.governance_view_id
     }
+
+    pub fn registry_head_id(&self) -> QuorumObservedWitnessRegistryHeadIdV1 {
+        self.registry_head_id
+    }
+
+    pub fn governance_checkpoint_digest(&self) -> Sha256Digest {
+        self.governance_checkpoint_digest
+    }
+
     pub fn retention_authority_id(&self) -> ClockGovernedEvidenceRetentionPolicyIdV1 {
         self.retention_authority_id
     }
+
     pub fn policy_digest(&self) -> Sha256Digest {
         self.policy_digest
     }
+
     pub fn sequence(&self) -> u64 {
         self.sequence
     }
+
+    pub fn effective_at_unix_s(&self) -> u64 {
+        self.effective_at_unix_s
+    }
+
+    pub fn trust_snapshot_digest(&self) -> Sha256Digest {
+        self.trust_snapshot_digest
+    }
+
     pub fn containment_authority_id(&self) -> ClockGovernedContainmentStateIdV1 {
         self.containment_authority_id
     }
+
     pub fn containment_state_digest(&self) -> Sha256Digest {
         self.containment_state_digest
     }
+
     pub fn compromise_tracker_digest(&self) -> Sha256Digest {
         self.compromise_tracker_digest
     }
+
     pub fn containment_generation(&self) -> u64 {
         self.containment_generation
     }
+
     pub fn transparency_log_digest(&self) -> Sha256Digest {
         self.transparency_log_digest
     }
+
     pub fn observation_clock_envelope_id(&self) -> ClockGovernanceEvaluationEnvelopeIdV1 {
         self.observation_clock_envelope_id
     }
+
     pub fn observation_operational_basis_id(&self) -> OperationalClockBasisIdV1 {
         self.observation_operational_basis_id
     }
@@ -144,10 +181,12 @@ impl CurrentEvidenceRetentionHeadV1 {
 pub enum EvidenceRetentionHeadError {
     InvalidPublication,
     PublicationMismatch,
+    RegistryHeadMismatch,
     GovernanceContainmentMismatch,
     RetentionContainmentMismatch,
     TrustSnapshotInvalid(String),
     TrustSnapshotMismatch,
+    TrustSnapshotNotValidAcrossObservationEnvelope(ClockGovernanceTimeError),
     CeremonyMismatch,
     CeremonyPurposeMismatch,
     CeremonyPayloadMismatch,
@@ -159,7 +198,10 @@ pub enum EvidenceRetentionHeadError {
     AuthorizationEnvelopeMismatch,
     ObservationBasisMismatch,
     ObservationEnvelopeMismatch,
-    TooManyClockHops { actual: usize, maximum: usize },
+    TooManyClockHops {
+        actual: usize,
+        maximum: usize,
+    },
     BrokenClockLineage {
         hop: usize,
         expected_predecessor: String,
@@ -171,10 +213,16 @@ pub enum EvidenceRetentionHeadError {
     TransparencyLogInvalid(String),
     TransparencyLogMismatch,
     MalformedRetentionHeadKind(String),
-    RetentionSequenceRegressed { previous: u64, current: u64 },
+    RetentionSequenceRegressed {
+        previous: u64,
+        current: u64,
+    },
     DuplicateRetentionSequence(u64),
     PublicationNotFound,
-    HigherRetentionSequencePublished { candidate: u64, latest: u64 },
+    HigherRetentionSequencePublished {
+        candidate: u64,
+        latest: u64,
+    },
     PublicationDigestMismatch,
     PublicationBeforeAuthorization,
     PublicationMayBeFuture,
@@ -185,6 +233,8 @@ pub enum EvidenceRetentionHeadError {
 struct CurrentRetentionCommitment {
     schema: &'static str,
     governance_view_id: String,
+    registry_head_id: String,
+    governance_checkpoint_digest: String,
     retention_authority_id: String,
     policy_digest: String,
     sequence: u64,
@@ -238,7 +288,9 @@ pub fn digest_evidence_retention_head_publication_v1(
     hash_serializable(PUBLICATION_DOMAIN, publication)
 }
 
-pub fn evidence_retention_head_log_kind(sequence: u64) -> Result<String, EvidenceRetentionHeadError> {
+pub fn evidence_retention_head_log_kind(
+    sequence: u64,
+) -> Result<String, EvidenceRetentionHeadError> {
     if sequence == 0 {
         return Err(EvidenceRetentionHeadError::InvalidPublication);
     }
@@ -248,6 +300,7 @@ pub fn evidence_retention_head_log_kind(sequence: u64) -> Result<String, Evidenc
 #[allow(clippy::too_many_arguments)]
 pub fn bind_current_evidence_retention_head_v1(
     governance_view: &ContainmentCurrentWitnessRegistryHeadV1,
+    registry_head: &QuorumObservedWitnessRegistryHeadV1,
     retention: &ClockGovernedEvidenceRetentionPolicyV1,
     ceremony: &ClockGovernedThresholdCeremonyV1,
     current_containment_authority: &ClockGovernedContainmentStateV1,
@@ -260,6 +313,15 @@ pub fn bind_current_evidence_retention_head_v1(
 ) -> Result<CurrentEvidenceRetentionHeadV1, Vec<EvidenceRetentionHeadError>> {
     let mut violations = Vec::new();
 
+    if governance_view.registry_head_id() != registry_head.id()
+        || governance_view.registry_digest() != registry_head.registry_digest()
+        || governance_view.registry_sequence() != registry_head.sequence()
+        || governance_view.transparency_log_digest() != registry_head.transparency_log_digest()
+        || governance_view.checkpoint_digest() != registry_head.checkpoint_digest()
+    {
+        violations.push(EvidenceRetentionHeadError::RegistryHeadMismatch);
+    }
+
     if current_containment_authority.id() != governance_view.containment_authority_id()
         || current_containment_authority.state_digest() != governance_view.containment_state_digest()
         || current_containment_authority.generation() != governance_view.containment_generation()
@@ -268,6 +330,7 @@ pub fn bind_current_evidence_retention_head_v1(
     {
         violations.push(EvidenceRetentionHeadError::GovernanceContainmentMismatch);
     }
+
     if retention.containment_state_digest() != current_containment_authority.state_digest()
         || retention.containment_generation() != current_containment_authority.generation()
         || retention.compromise_tracker_digest()
@@ -291,7 +354,8 @@ pub fn bind_current_evidence_retention_head_v1(
         )));
     }
     if trust_snapshot_digest != retention.trust_snapshot_digest()
-        || trust_snapshot_digest != governance_view.trust_snapshot_digest()
+        || trust_snapshot_digest != registry_head.trust_snapshot_digest()
+        || trust_snapshot.sequence != registry_head.trust_snapshot_sequence()
     {
         violations.push(EvidenceRetentionHeadError::TrustSnapshotMismatch);
     }
@@ -333,6 +397,7 @@ pub fn bind_current_evidence_retention_head_v1(
     if authorization_clock.id() != retention.clock_envelope_id() {
         violations.push(EvidenceRetentionHeadError::AuthorizationEnvelopeMismatch);
     }
+
     if observation_basis.id() != governance_view.observation_operational_basis_id() {
         violations.push(EvidenceRetentionHeadError::ObservationBasisMismatch);
     }
@@ -346,6 +411,15 @@ pub fn bind_current_evidence_retention_head_v1(
     if observation_clock.id() != governance_view.observation_clock_envelope_id() {
         violations.push(EvidenceRetentionHeadError::ObservationEnvelopeMismatch);
     }
+    if let Err(reason) = observation_clock.require_valid_across_seconds_window(
+        trust_snapshot.issued_at_unix_s,
+        trust_snapshot.expires_at_unix_s,
+    ) {
+        violations.push(
+            EvidenceRetentionHeadError::TrustSnapshotNotValidAcrossObservationEnvelope(reason),
+        );
+    }
+
     if clock_bridge.len() > MAX_EVIDENCE_RETENTION_HEAD_CLOCK_HOPS {
         violations.push(EvidenceRetentionHeadError::TooManyClockHops {
             actual: clock_bridge.len(),
@@ -397,19 +471,20 @@ pub fn bind_current_evidence_retention_head_v1(
             Sha256Digest([0; 32])
         }
     };
-    if transparency_log_digest != governance_view.transparency_log_digest() {
+    if transparency_log_digest != governance_view.transparency_log_digest()
+        || transparency_log_digest != registry_head.transparency_log_digest()
+    {
         violations.push(EvidenceRetentionHeadError::TransparencyLogMismatch);
     }
-    let (latest_sequence, publication_entry) = match inspect_retention_log(
-        log,
-        retention.policy().sequence,
-    ) {
-        Ok(value) => value,
-        Err(errors) => {
-            violations.extend(errors);
-            (None, None)
-        }
-    };
+
+    let (latest_sequence, publication_entry) =
+        match inspect_retention_log(log, retention.policy().sequence) {
+            Ok(value) => value,
+            Err(errors) => {
+                violations.extend(errors);
+                (None, None)
+            }
+        };
     if let Some(latest) = latest_sequence {
         if latest > retention.policy().sequence {
             violations.push(EvidenceRetentionHeadError::HigherRetentionSequencePublished {
@@ -425,6 +500,7 @@ pub fn bind_current_evidence_retention_head_v1(
     if publication_entry.1 != publication_digest {
         violations.push(EvidenceRetentionHeadError::PublicationDigestMismatch);
     }
+
     let publication_recorded_at_ms = match seconds_to_millis(publication_entry.2) {
         Ok(value) => value,
         Err(error) => {
@@ -443,15 +519,15 @@ pub fn bind_current_evidence_retention_head_v1(
         return Err(violations);
     }
 
-    let (clock_lineage_digest, clock_hop_count) = digest_clock_lineage(
-        authorization_basis,
-        clock_bridge,
-        observation_basis,
-    )
-    .map_err(|error| vec![error])?;
+    let (clock_lineage_digest, clock_hop_count) =
+        digest_clock_lineage(authorization_basis, clock_bridge, observation_basis)
+            .map_err(|error| vec![error])?;
+
     let commitment = CurrentRetentionCommitment {
         schema: CURRENT_EVIDENCE_RETENTION_HEAD_SCHEMA,
         governance_view_id: governance_view.id().to_hex(),
+        registry_head_id: registry_head.id().to_hex(),
+        governance_checkpoint_digest: governance_view.checkpoint_digest().to_hex(),
         retention_authority_id: retention.id().to_hex(),
         policy_digest: retention.policy_digest().to_hex(),
         sequence: retention.policy().sequence,
@@ -464,7 +540,9 @@ pub fn bind_current_evidence_retention_head_v1(
         trust_snapshot_digest: trust_snapshot_digest.to_hex(),
         containment_authority_id: current_containment_authority.id().to_hex(),
         containment_state_digest: current_containment_authority.state_digest().to_hex(),
-        compromise_tracker_digest: current_containment_authority.compromise_tracker_digest().to_hex(),
+        compromise_tracker_digest: current_containment_authority
+            .compromise_tracker_digest()
+            .to_hex(),
         containment_generation: current_containment_authority.generation(),
         authorization_clock_envelope_id: authorization_clock.id().to_hex(),
         authorization_operational_basis_id: authorization_basis.id().to_hex(),
@@ -480,6 +558,8 @@ pub fn bind_current_evidence_retention_head_v1(
     Ok(CurrentEvidenceRetentionHeadV1 {
         id,
         governance_view_id: governance_view.id(),
+        registry_head_id: registry_head.id(),
+        governance_checkpoint_digest: governance_view.checkpoint_digest(),
         retention_authority_id: retention.id(),
         policy_digest: retention.policy_digest(),
         sequence: retention.policy().sequence,
@@ -537,6 +617,7 @@ fn inspect_retention_log(
     let mut previous_sequence = None;
     let mut latest_sequence = None;
     let mut candidate_entry = None;
+
     for entry in &log.entries {
         let sequence = match parse_retention_sequence(&entry.kind) {
             Ok(Some(value)) => value,
@@ -549,7 +630,9 @@ fn inspect_retention_log(
         if let Some(previous) = previous_sequence {
             if sequence <= previous {
                 if sequence == previous {
-                    violations.push(EvidenceRetentionHeadError::DuplicateRetentionSequence(sequence));
+                    violations.push(EvidenceRetentionHeadError::DuplicateRetentionSequence(
+                        sequence,
+                    ));
                 } else {
                     violations.push(EvidenceRetentionHeadError::RetentionSequenceRegressed {
                         previous,
@@ -562,7 +645,9 @@ fn inspect_retention_log(
         latest_sequence = Some(latest_sequence.map_or(sequence, |latest: u64| latest.max(sequence)));
         if sequence == candidate_sequence {
             if candidate_entry.is_some() {
-                violations.push(EvidenceRetentionHeadError::DuplicateRetentionSequence(sequence));
+                violations.push(EvidenceRetentionHeadError::DuplicateRetentionSequence(
+                    sequence,
+                ));
             } else {
                 candidate_entry = Some((
                     entry.sequence,
@@ -572,6 +657,7 @@ fn inspect_retention_log(
             }
         }
     }
+
     if violations.is_empty() {
         Ok((latest_sequence, candidate_entry))
     } else {
@@ -583,9 +669,9 @@ fn parse_retention_sequence(kind: &str) -> Result<Option<u64>, EvidenceRetention
     let Some(suffix) = kind.strip_prefix(EVIDENCE_RETENTION_HEAD_LOG_KIND_PREFIX) else {
         return Ok(None);
     };
-    let sequence = suffix.parse::<u64>().map_err(|_| {
-        EvidenceRetentionHeadError::MalformedRetentionHeadKind(kind.to_string())
-    })?;
+    let sequence = suffix
+        .parse::<u64>()
+        .map_err(|_| EvidenceRetentionHeadError::MalformedRetentionHeadKind(kind.to_string()))?;
     if sequence == 0 || suffix != sequence.to_string() {
         return Err(EvidenceRetentionHeadError::MalformedRetentionHeadKind(
             kind.to_string(),
@@ -611,6 +697,7 @@ fn verify_clock_lineage(
                 .map(|value| value.to_hex()),
         });
     }
+
     let mut expected = prior_basis_id;
     for (index, basis) in bridge.iter().enumerate() {
         let actual = basis.predecessor_operational_basis_id();
@@ -623,6 +710,7 @@ fn verify_clock_lineage(
         }
         expected = basis.id();
     }
+
     let actual = current_basis.predecessor_operational_basis_id();
     if actual != Some(expected) {
         return Err(EvidenceRetentionHeadError::BrokenClockLineage {
@@ -680,10 +768,18 @@ mod tests {
     #[test]
     fn retention_log_rejects_sequence_regression() {
         let mut log = TransparencyLog::default();
-        log.append(100, evidence_retention_head_log_kind(3).unwrap(), sha256(b"three"))
-            .unwrap();
-        log.append(101, evidence_retention_head_log_kind(2).unwrap(), sha256(b"two"))
-            .unwrap();
+        log.append(
+            100,
+            evidence_retention_head_log_kind(3).unwrap(),
+            sha256(b"three"),
+        )
+        .unwrap();
+        log.append(
+            101,
+            evidence_retention_head_log_kind(2).unwrap(),
+            sha256(b"two"),
+        )
+        .unwrap();
         let errors = inspect_retention_log(&log, 3).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
@@ -697,10 +793,18 @@ mod tests {
     #[test]
     fn retention_log_rejects_duplicate_sequence() {
         let mut log = TransparencyLog::default();
-        log.append(100, evidence_retention_head_log_kind(2).unwrap(), sha256(b"a"))
-            .unwrap();
-        log.append(101, evidence_retention_head_log_kind(2).unwrap(), sha256(b"b"))
-            .unwrap();
+        log.append(
+            100,
+            evidence_retention_head_log_kind(2).unwrap(),
+            sha256(b"a"),
+        )
+        .unwrap();
+        log.append(
+            101,
+            evidence_retention_head_log_kind(2).unwrap(),
+            sha256(b"b"),
+        )
+        .unwrap();
         let errors = inspect_retention_log(&log, 2).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
