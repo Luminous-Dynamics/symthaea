@@ -210,7 +210,10 @@ impl IdentityCostModel {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FalseNameDeviationWitness {
     pub principal: PrincipalId,
+    pub baseline_registry: IdentityRegistry,
+    pub counterfactual_registry: IdentityRegistry,
     pub added_bindings: Vec<IdentityBinding>,
+    pub cost_model: IdentityCostModel,
     pub baseline_utility: f64,
     pub counterfactual_utility: f64,
     pub gross_gain: f64,
@@ -293,7 +296,10 @@ pub fn evaluate_false_name_counterfactual(
 
     Ok(FalseNameDeviationWitness {
         principal,
+        baseline_registry: baseline.clone(),
+        counterfactual_registry: counterfactual.clone(),
         added_bindings,
+        cost_model,
         baseline_utility,
         counterfactual_utility,
         gross_gain,
@@ -318,6 +324,7 @@ pub struct BoundedFalseNameReport {
     pub max_additional_identities: usize,
     pub candidates_evaluated: usize,
     pub coverage: FalseNameSearchCoverage,
+    pub cost_model: IdentityCostModel,
     pub best_profitable_witness: Option<FalseNameDeviationWitness>,
 }
 
@@ -327,14 +334,21 @@ impl BoundedFalseNameReport {
         max_additional_identities: usize,
         candidates_evaluated: usize,
         coverage: FalseNameSearchCoverage,
+        cost_model: IdentityCostModel,
         best_profitable_witness: Option<FalseNameDeviationWitness>,
     ) -> Result<Self, String> {
         if max_additional_identities == 0 {
             return Err("false-name search bound must permit at least one added identity".to_string());
         }
         if let Some(witness) = &best_profitable_witness {
+            if candidates_evaluated == 0 {
+                return Err("a false-name witness requires at least one evaluated candidate".to_string());
+            }
             if witness.principal != principal {
                 return Err("false-name report witness principal mismatch".to_string());
+            }
+            if witness.cost_model != cost_model {
+                return Err("false-name report witness cost-model mismatch".to_string());
             }
             if witness.added_bindings.len() > max_additional_identities {
                 return Err("false-name witness exceeds declared identity bound".to_string());
@@ -348,6 +362,7 @@ impl BoundedFalseNameReport {
             max_additional_identities,
             candidates_evaluated,
             coverage,
+            cost_model,
             best_profitable_witness,
         })
     }
@@ -475,12 +490,13 @@ mod tests {
                 agent("a"),
             ))
             .unwrap();
+        let cost_model = IdentityCostModel::new(2.0).unwrap();
 
         let witness = evaluate_false_name_counterfactual(
             &base,
             &counterfactual,
             p,
-            IdentityCostModel::new(2.0).unwrap(),
+            cost_model,
             10.0,
             11.0,
             "mechanism-v1",
@@ -490,6 +506,9 @@ mod tests {
         assert_eq!(witness.gross_gain, 1.0);
         assert_eq!(witness.identity_cost, 2.0);
         assert_eq!(witness.net_gain, -1.0);
+        assert_eq!(witness.baseline_registry, base);
+        assert_eq!(witness.counterfactual_registry, counterfactual);
+        assert_eq!(witness.cost_model, cost_model);
         assert!(!witness.is_profitable());
     }
 
@@ -529,20 +548,23 @@ mod tests {
 
     #[test]
     fn truncated_search_report_is_explicitly_incomplete() {
+        let cost_model = IdentityCostModel::new(0.1).unwrap();
         let report = BoundedFalseNameReport::new(
             principal("p"),
             4,
             10,
             FalseNameSearchCoverage::Truncated,
+            cost_model,
             None,
         )
         .unwrap();
         assert_eq!(report.coverage, FalseNameSearchCoverage::Truncated);
+        assert_eq!(report.cost_model, cost_model);
         assert!(report.best_profitable_witness.is_none());
     }
 
     #[test]
-    fn profitable_report_retains_mechanism_action_witness() {
+    fn profitable_report_retains_mechanism_action_witness_and_snapshots() {
         let p = principal("p");
         let base = IdentityRegistry::new(vec![IdentityBinding::active(
             p.clone(),
@@ -557,11 +579,12 @@ mod tests {
                 agent("a"),
             ))
             .unwrap();
+        let cost_model = IdentityCostModel::new(0.1).unwrap();
         let witness = evaluate_false_name_counterfactual(
             &base,
             &counterfactual,
             p.clone(),
-            IdentityCostModel::new(0.1).unwrap(),
+            cost_model,
             1.0,
             2.0,
             "vote-rule-v7",
@@ -571,12 +594,15 @@ mod tests {
         assert!(witness.is_profitable());
         assert_eq!(witness.mechanism_profile_id, "vote-rule-v7");
         assert_eq!(witness.action_witness, "base=yes; fake=yes; allocation flips");
+        assert_eq!(witness.baseline_registry, base);
+        assert_eq!(witness.counterfactual_registry, counterfactual);
 
         let report = BoundedFalseNameReport::new(
             p,
             2,
             8,
             FalseNameSearchCoverage::ExhaustiveWithinDeclaredBound,
+            cost_model,
             Some(witness),
         )
         .unwrap();
@@ -584,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    fn report_rejects_non_profitable_or_out_of_bound_witnesses() {
+    fn report_rejects_non_profitable_or_mismatched_witnesses() {
         let p = principal("p");
         let base = IdentityRegistry::new(vec![IdentityBinding::active(
             p.clone(),
@@ -599,11 +625,35 @@ mod tests {
                 agent("a"),
             ))
             .unwrap();
+        let witness_cost = IdentityCostModel::new(2.0).unwrap();
         let non_profitable = evaluate_false_name_counterfactual(
             &base,
             &counterfactual,
             p.clone(),
-            IdentityCostModel::new(2.0).unwrap(),
+            witness_cost,
+            1.0,
+            2.0,
+            "mechanism",
+            "witness",
+        )
+        .unwrap();
+        assert!(
+            BoundedFalseNameReport::new(
+                p.clone(),
+                2,
+                1,
+                FalseNameSearchCoverage::ExhaustiveWithinDeclaredBound,
+                witness_cost,
+                Some(non_profitable),
+            )
+            .is_err()
+        );
+
+        let profitable = evaluate_false_name_counterfactual(
+            &base,
+            &counterfactual,
+            p.clone(),
+            IdentityCostModel::new(0.0).unwrap(),
             1.0,
             2.0,
             "mechanism",
@@ -616,7 +666,8 @@ mod tests {
                 2,
                 1,
                 FalseNameSearchCoverage::ExhaustiveWithinDeclaredBound,
-                Some(non_profitable),
+                IdentityCostModel::new(0.5).unwrap(),
+                Some(profitable),
             )
             .is_err()
         );
