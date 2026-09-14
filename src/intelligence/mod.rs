@@ -28,6 +28,8 @@
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 //! - Candidate-specific typed epistemic grounding bound to exact primitive identity
 //! - Verified reasoning-chain transition history isolated from legacy feedback aggregates
+//! - Exact live candidate identity binding without changing legacy scoring inputs
+//! - Matched transition-geometry diagnostics that do not mutate canonical objective evidence
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -56,6 +58,7 @@ pub mod reasoning_objective_evidence;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
+pub mod reasoning_transition_geometry_shadow;
 pub mod reasoning_transition_history;
 #[cfg(test)]
 mod reasoning_transition_history_negative_controls;
@@ -178,8 +181,16 @@ pub use reasoning_qualification::{
     ResourceUsage, REASONING_EPISODE_SCHEMA_VERSION,
 };
 pub use reasoning_shadow_meta::{
-    ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner,
-    V3ShadowObservation, V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
+    ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, V3ShadowObservation,
+    V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
+};
+pub use reasoning_transition_geometry_shadow::{
+    measure_transition_geometry, CandidateIdentityBindingReport, CandidateTransitionGeometry,
+    TransitionGeometryError, TransitionGeometryReport, TransitionGeometryShadowObservation,
+    TransitionGeometryShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner,
+    TransitionGeometryShadowStats, TransitionOperatorObservation, LIVE_META_IDENTITY_BINDING_VERSION,
+    TRANSITION_GEOMETRY_PANEL, TRANSITION_GEOMETRY_PANEL_VERSION, TRANSITION_GEOMETRY_SCALE,
+    TRANSITION_GEOMETRY_SHADOW_VERSION,
 };
 pub use reasoning_transition_history::{
     inspect_active_primitive_transition_history, inspect_verified_transition_history,
