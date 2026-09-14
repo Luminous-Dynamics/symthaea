@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-tpm2-checkquote-adapter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Pinned tpm2_checkquote adapter with independent TPMS_ATTEST and PCR verification"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "attestation", "assurance", "security"]
+categories = ["hardware-support", "authentication"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+sha2 = "0.10"
+symthaea-assurance-tpm2-attestation-possession = { path = "../../domains/symthaea-assurance-tpm2-attestation-possession" }
