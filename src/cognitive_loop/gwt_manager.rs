@@ -10,6 +10,8 @@ use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 
+mod experiment_gate;
+
 /// Consolidated GWT manager.
 ///
 /// Groups the GWT workspace, memory consolidation flag, and perception
