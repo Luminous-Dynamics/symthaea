@@ -46,7 +46,7 @@ fn new_registry_itself_governs_post_cutover_witness_identity() {
     assert!(source.contains("WitnessNotInActivatedRegistry"));
     assert!(source.contains("WitnessOrganizationMismatch"));
     assert!(source.contains("WitnessFailureDomainMismatch"));
-    assert!(!source.contains("WitnessAuthorityRegistryV1"));
+    assert!(!source.contains("symthaea_fabrication_witness_authority"));
 }
 
 #[test]
