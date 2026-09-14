@@ -1,0 +1,129 @@
+name: ARC Process Isolation Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/bin/arc_solver_view_projector.rs'
+      - 'src/bin/arc_process_isolated_evaluator.rs'
+      - 'src/bin/arc_isolated_exhaustive_verifier.rs'
+      - '.github/reasoning/qualify-arc-process-isolated.sh'
+      - '.github/workflows/arc-process-isolation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-process-isolation-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  process-isolated-target-boundary:
+    name: Process-isolated ARC target boundary
+    runs-on: ubuntu-latest
+    env:
+      SYMTHAEA_SUBJECT_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      SYMTHAEA_ARC_DATASET_REPOSITORY: arcprize/ARC-AGI-2
+      SYMTHAEA_ARC_DATASET_REVISION: f3283f727488ad98fe575ea6a5ac981e4a188e49
+      SYMTHAEA_ARC_DATASET_TREE: afab62b97f29dd2341f401d4af70491e14da35c2
+      SYMTHAEA_ARC_DATASET_ROOT: target/rq-006z/arc-agi-2
+      SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-training-manifest.json
+      SYMTHAEA_ARC_DATASET_MANIFEST_BIN: ${{ github.workspace }}/target/debug/arc_dataset_manifest
+      SYMTHAEA_ARC_SOLVER_VIEW_ROOT: target/rq-006z/solver-view
+      SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH: target/rq-006z/solver-view-manifest.json
+      SYMTHAEA_ARC_TARGET_BUNDLE_PATH: target/rq-006z/evaluator-target-bundle.json
+      SYMTHAEA_ARC_POLICY_RESULTS_PATH: target/rq-006z/process-isolated-policy-report.json
+      SYMTHAEA_ARC_ISOLATED_EVALUATION_PATH: target/rq-006z/process-isolated-evaluation.json
+      SYMTHAEA_ARC_EXHAUSTIVE_VERIFY_PATH: target/rq-006z/process-isolated-exhaustive.json
+      SYMTHAEA_ARC_PROJECTOR_BIN: ${{ github.workspace }}/target/debug/arc_solver_view_projector
+      SYMTHAEA_ARC_POLICY_BIN: ${{ github.workspace }}/target/debug/arc_budgeted_policy
+      SYMTHAEA_ARC_ISOLATED_EVALUATOR_BIN: ${{ github.workspace }}/target/debug/arc_process_isolated_evaluator
+      SYMTHAEA_ARC_EXHAUSTIVE_VERIFY_BIN: ${{ github.workspace }}/target/debug/arc_isolated_exhaustive_verifier
+      SYMTHAEA_ARC_SMOKE_TASK_FILES: '5'
+      SYMTHAEA_ARC_CANDIDATE_BUDGET: '128'
+      SYMTHAEA_ARC_POLICY_SEED: '2797608998'
+      RQ006Z_FROZEN_POLICY_BLOB: a851557cc44db11cddf584690c7cd671a86e0ef4
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Prove frozen policy source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object src/bin/arc_budgeted_policy.rs)" = "$RQ006Z_FROZEN_POLICY_BLOB"
+
+      - name: Qualify process-isolation source surface
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            src/bin/arc_solver_view_projector.rs \
+            src/bin/arc_process_isolated_evaluator.rs \
+            src/bin/arc_isolated_exhaustive_verifier.rs
+          cargo check --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_budgeted_policy \
+            --bin arc_solver_view_projector \
+            --bin arc_process_isolated_evaluator \
+            --bin arc_isolated_exhaustive_verifier
+          cargo test --locked --bin arc_solver_view_projector
+          cargo test --locked --bin arc_process_isolated_evaluator
+          cargo test --locked --bin arc_isolated_exhaustive_verifier
+          cargo clippy --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_budgeted_policy \
+            --bin arc_solver_view_projector \
+            --bin arc_process_isolated_evaluator \
+            --bin arc_isolated_exhaustive_verifier \
+            -- -D warnings
+          cargo build --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_budgeted_policy \
+            --bin arc_solver_view_projector \
+            --bin arc_process_isolated_evaluator \
+            --bin arc_isolated_exhaustive_verifier
+
+      - name: Acquire exact public ARC-AGI-2 subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$SYMTHAEA_ARC_DATASET_ROOT"
+          mkdir -p "$SYMTHAEA_ARC_DATASET_ROOT"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" init -q
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" remote add origin https://github.com/arcprize/ARC-AGI-2.git
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" fetch --depth=1 origin "$SYMTHAEA_ARC_DATASET_REVISION"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" checkout --detach -q FETCH_HEAD
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse HEAD)" = "$SYMTHAEA_ARC_DATASET_REVISION"
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse 'HEAD^{tree}')" = "$SYMTHAEA_ARC_DATASET_TREE"
+
+      - name: Qualify exact full public-training manifest
+        env:
+          SYMTHAEA_ARC_SPLIT: training
+          SYMTHAEA_ARC_EXPECTED_TASKS: '1000'
+        run: bash .github/reasoning/qualify-arc-dataset.sh
+
+      - name: Execute process-isolated ARC qualification
+        run: bash .github/reasoning/qualify-arc-process-isolated.sh
+
+      - name: Upload process-isolated evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: arc-process-isolated-${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          path: |
+            target/rq-006z/arc-agi-2-training-manifest.json
+            target/rq-006z/solver-view-manifest.json
+            target/rq-006z/evaluator-target-bundle.json
+            target/rq-006z/process-isolated-policy-report.json
+            target/rq-006z/process-isolated-evaluation.json
+            target/rq-006z/process-isolated-exhaustive.json
+            target/rq-006z/solver-view/training/*.json
+          if-no-files-found: error
+          retention-days: 30
