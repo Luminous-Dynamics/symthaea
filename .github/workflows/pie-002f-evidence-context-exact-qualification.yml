@@ -1,0 +1,163 @@
+name: PIE-002F Evidence Context Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002f-context-391619e9
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-002F evidence-bearing context oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SUBJECT_SHA: 391619e9822ad5367dc80a538a9cfa76620366e4
+      PARENT_SHA: 89a86bdb3d80cfbc83ce5399317686079484c903
+      SUBJECT_TREE: 8bc1093a5476c0c85cd29a7b2e4b6f4e66da4496
+      ORACLE: scripts/pie-evidence-bearing-utility-context-oracle.py
+      EVIDENCE_DOC: docs/release/evidence/PIE_002F_EVIDENCE_BEARING_CONTEXT_ORACLE.md
+      RECEIPT: pie-002f-evidence-context-qualification.json
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        id: identity
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t changed < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "$EVIDENCE_DOC"
+          test "${changed[1]}" = "$ORACLE"
+
+      - name: Record subject file digests
+        id: digests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum "$ORACLE" "$EVIDENCE_DOC" | tee pie-002f-subject-sha256.txt
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13.5'
+
+      - name: Record Python identity
+        id: python
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(python -c 'import platform; print(platform.python_version())')" = "3.13.5"
+          python --version
+
+      - name: Syntax compile
+        id: syntax
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile "$ORACLE"
+
+      - name: Run evidence-context self-test
+        id: selftest
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(python "$ORACLE" --self-test)" = "ok"
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        shell: bash
+        env:
+          IDENTITY_OUTCOME: ${{ steps.identity.outcome }}
+          DIGESTS_OUTCOME: ${{ steps.digests.outcome }}
+          PYTHON_OUTCOME: ${{ steps.python.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.syntax.outcome }}
+          SELFTEST_OUTCOME: ${{ steps.selftest.outcome }}
+        run: |
+          set -euo pipefail
+          ORACLE_SHA256="$(sha256sum "$ORACLE" | awk '{print $1}')"
+          DOC_SHA256="$(sha256sum "$EVIDENCE_DOC" | awk '{print $1}')"
+          cat > "$RECEIPT" <<EOF
+          {
+            "program": "PIE-002F",
+            "theorem": "evidence-bearing external electrical supply/recovery context",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "subject_tree": "$SUBJECT_TREE",
+            "python": "3.13.5",
+            "oracle_sha256": "$ORACLE_SHA256",
+            "evidence_doc_sha256": "$DOC_SHA256",
+            "bounds": {
+              "max_evidence_refs_per_fact": 64,
+              "max_text_utf8_bytes": 4096
+            },
+            "scope": "all nine external PIE-002D facts are numerically valid and carry explicit validated EvidenceRef lineage; shared evidence across fields remains shared rather than independent",
+            "non_claims": [
+              "truth",
+              "freshness",
+              "source independence",
+              "scenario applicability",
+              "calibration validity",
+              "process-content currentness",
+              "utility feasibility",
+              "storage dispatch",
+              "thermodynamic closure",
+              "economics",
+              "execution authority"
+            ],
+            "gates": {
+              "identity_scope": "$IDENTITY_OUTCOME",
+              "file_digests": "$DIGESTS_OUTCOME",
+              "python_identity": "$PYTHON_OUTCOME",
+              "syntax_compile": "$SYNTAX_OUTCOME",
+              "self_test": "$SELFTEST_OUTCOME"
+            }
+          }
+          EOF
+          cat "$RECEIPT"
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002f-evidence-context-qualification
+          path: |
+            ${{ env.RECEIPT }}
+            pie-002f-subject-sha256.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce all oracle gates
+        if: always()
+        shell: bash
+        env:
+          IDENTITY_OUTCOME: ${{ steps.identity.outcome }}
+          DIGESTS_OUTCOME: ${{ steps.digests.outcome }}
+          PYTHON_OUTCOME: ${{ steps.python.outcome }}
+          SYNTAX_OUTCOME: ${{ steps.syntax.outcome }}
+          SELFTEST_OUTCOME: ${{ steps.selftest.outcome }}
+        run: |
+          set -euo pipefail
+          test "$IDENTITY_OUTCOME" = success
+          test "$DIGESTS_OUTCOME" = success
+          test "$PYTHON_OUTCOME" = success
+          test "$SYNTAX_OUTCOME" = success
+          test "$SELFTEST_OUTCOME" = success
