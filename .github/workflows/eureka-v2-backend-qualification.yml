@@ -5,9 +5,8 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/domains/symthaea-psych-bench/**"
-      - "crates/domains/symthaea-fep/**"
-      - "src/cognitive_loop/**"
+      - "src/**"
+      - "crates/**"
       - ".github/workflows/eureka-v2-backend-qualification.yml"
   workflow_dispatch:
 
@@ -23,7 +22,9 @@ env:
   RUST_BACKTRACE: 1
   RUSTC_WRAPPER: ""
   SCCACHE_DISABLE: "1"
-  EUREKA_V2_QUALIFICATION_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION.v1"
+  EUREKA_V2_QUALIFICATION_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"
+  EUREKA_V2_RECEIPT_SCHEMA_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"
+  EUREKA_V2_COMMAND_CONTRACT_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v1"
   EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
 jobs:
@@ -61,10 +62,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev libclang-dev cmake libasound2-dev
 
-      - name: Capture exact qualification subject
+      - name: Capture exact qualification subject and contract
         shell: bash
         run: |
           set -euo pipefail
+
           dirty="$(git status --porcelain=v1 --untracked-files=all)"
           if [[ -n "$dirty" ]]; then
             echo "Checkout is dirty before qualification:" >&2
@@ -82,33 +84,51 @@ jobs:
 
           subject_tree="$(git rev-parse 'HEAD^{tree}')"
           cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
-          receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.txt"
+          workflow_path=".github/workflows/eureka-v2-backend-qualification.yml"
+          workflow_sha256="$(sha256sum "$workflow_path" | awk '{print $1}')"
+          receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.env"
+          contract="${RUNNER_TEMP}/eureka-v2-backend-qualification-contract.txt"
+
+          cat > "$contract" <<'EOF'
+          cargo check -p symthaea-psych-bench --features symthaea-backend --lib --tests
+          cargo test -p symthaea-psych-bench --features symthaea-backend --lib benchmarks::eureka -- --nocapture
+          cargo clippy -p symthaea-psych-bench --features symthaea-backend --lib --tests -- -D warnings
+          EOF
+          command_contract_sha256="$(sha256sum "$contract" | awk '{print $1}')"
+          rustc_version="$(rustc --version)"
+          cargo_version="$(cargo --version)"
 
           echo "EUREKA_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
           echo "EUREKA_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
           echo "EUREKA_CARGO_LOCK_SHA256=$cargo_lock_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_WORKFLOW_SHA256=$workflow_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_COMMAND_CONTRACT_SHA256=$command_contract_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_QUALIFICATION_RECEIPT=$receipt" >> "$GITHUB_ENV"
+          echo "EUREKA_QUALIFICATION_CONTRACT=$contract" >> "$GITHUB_ENV"
 
           {
-            echo "qualification_revision=${EUREKA_V2_QUALIFICATION_REVISION}"
-            echo "repository=${GITHUB_REPOSITORY}"
-            echo "event=${GITHUB_EVENT_NAME}"
-            echo "expected_subject_head=${EXPECTED_SUBJECT_SHA}"
-            echo "subject_head=$subject_head"
-            echo "subject_tree=$subject_tree"
-            echo "cargo_lock_sha256=$cargo_lock_sha256"
-            echo "checkout_clean_before=true"
-            echo "rustc_begin"
-            rustc --version --verbose
-            echo "rustc_end"
-            echo "cargo_begin"
-            cargo --version --verbose
-            echo "cargo_end"
-            echo "commands_begin"
-            echo "cargo check -p symthaea-psych-bench --features symthaea-backend --lib --tests"
-            echo "cargo test -p symthaea-psych-bench --features symthaea-backend --lib benchmarks::eureka -- --nocapture"
-            echo "cargo clippy -p symthaea-psych-bench --features symthaea-backend --lib --tests -- -D warnings"
-            echo "commands_end"
+            printf 'receipt_schema_revision=%s\n' "$EUREKA_V2_RECEIPT_SCHEMA_REVISION"
+            printf 'qualification_revision=%s\n' "$EUREKA_V2_QUALIFICATION_REVISION"
+            printf 'command_contract_revision=%s\n' "$EUREKA_V2_COMMAND_CONTRACT_REVISION"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'event=%s\n' "$GITHUB_EVENT_NAME"
+            printf 'github_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'github_workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'expected_subject_head=%s\n' "$EXPECTED_SUBJECT_SHA"
+            printf 'subject_head=%s\n' "$subject_head"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'cargo_lock_sha256=%s\n' "$cargo_lock_sha256"
+            printf 'workflow_sha256=%s\n' "$workflow_sha256"
+            printf 'command_contract_sha256=%s\n' "$command_contract_sha256"
+            printf 'rustc_version=%s\n' "$rustc_version"
+            printf 'cargo_version=%s\n' "$cargo_version"
+            printf 'checkout_clean_before=true\n'
+            printf 'claim_scope=backend-build-test-lint-only\n'
+            printf 'execution_authority_granted=false\n'
+            printf 'real_canary_executed=false\n'
+            printf 'heldout_executed=false\n'
+            printf 'confirmatory_evidence_minted=false\n'
           } > "$receipt"
 
       - name: Check backend-feature compilation
@@ -126,14 +146,17 @@ jobs:
           set -euo pipefail
           cargo clippy -p symthaea-psych-bench --features symthaea-backend --lib --tests -- -D warnings
 
-      - name: Verify exact-subject checkout immutability
+      - name: Verify exact-subject postflight and seal PASS receipt
         shell: bash
         run: |
           set -euo pipefail
 
+          workflow_path=".github/workflows/eureka-v2-backend-qualification.yml"
           current_head="$(git rev-parse HEAD)"
           current_tree="$(git rev-parse 'HEAD^{tree}')"
           current_lock="$(sha256sum Cargo.lock | awk '{print $1}')"
+          current_workflow="$(sha256sum "$workflow_path" | awk '{print $1}')"
+          current_contract="$(sha256sum "$EUREKA_QUALIFICATION_CONTRACT" | awk '{print $1}')"
 
           [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
             echo "HEAD no longer equals intended qualification subject" >&2
@@ -151,6 +174,14 @@ jobs:
             echo "Cargo.lock changed during qualification" >&2
             exit 1
           }
+          [[ "$current_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || {
+            echo "Qualifier workflow changed during qualification" >&2
+            exit 1
+          }
+          [[ "$current_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]] || {
+            echo "Qualification command contract changed during qualification" >&2
+            exit 1
+          }
 
           dirty="$(git status --porcelain=v1 --untracked-files=all)"
           if [[ -n "$dirty" ]]; then
@@ -160,21 +191,66 @@ jobs:
           fi
 
           {
-            echo "postflight_head=$current_head"
-            echo "postflight_tree=$current_tree"
-            echo "postflight_cargo_lock_sha256=$current_lock"
-            echo "checkout_clean_after=true"
-            echo "qualification_result=PASS"
-            echo "claim_scope=backend-build-test-lint-only"
-            echo "real_canary_executed=false"
-            echo "heldout_executed=false"
+            printf 'postflight_head=%s\n' "$current_head"
+            printf 'postflight_tree=%s\n' "$current_tree"
+            printf 'postflight_cargo_lock_sha256=%s\n' "$current_lock"
+            printf 'postflight_workflow_sha256=%s\n' "$current_workflow"
+            printf 'postflight_command_contract_sha256=%s\n' "$current_contract"
+            printf 'checkout_clean_after=true\n'
           } >> "$EUREKA_QUALIFICATION_RECEIPT"
 
-      - name: Upload exact qualification receipt
+          required_keys=(
+            receipt_schema_revision
+            qualification_revision
+            command_contract_revision
+            repository
+            event
+            github_run_id
+            github_run_attempt
+            github_workflow_ref
+            expected_subject_head
+            subject_head
+            subject_tree
+            cargo_lock_sha256
+            workflow_sha256
+            command_contract_sha256
+            rustc_version
+            cargo_version
+            checkout_clean_before
+            claim_scope
+            execution_authority_granted
+            real_canary_executed
+            heldout_executed
+            confirmatory_evidence_minted
+            postflight_head
+            postflight_tree
+            postflight_cargo_lock_sha256
+            postflight_workflow_sha256
+            postflight_command_contract_sha256
+            checkout_clean_after
+          )
+          for key in "${required_keys[@]}"; do
+            count="$(grep -c "^${key}=" "$EUREKA_QUALIFICATION_RECEIPT" || true)"
+            if [[ "$count" != "1" ]]; then
+              echo "Receipt key must occur exactly once: $key (count=$count)" >&2
+              exit 1
+            fi
+          done
+
+          if grep -q '^qualification_result=' "$EUREKA_QUALIFICATION_RECEIPT"; then
+            echo "qualification_result appeared before final receipt sealing" >&2
+            exit 1
+          fi
+
+          printf 'qualification_result=PASS\n' >> "$EUREKA_QUALIFICATION_RECEIPT"
+
+      - name: Upload exact qualification receipt and contract
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eureka-v2-backend-qualification-${{ github.run_id }}
-          path: ${{ runner.temp }}/eureka-v2-backend-qualification.txt
+          name: eureka-v2-backend-qualification-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/eureka-v2-backend-qualification.env
+            ${{ runner.temp }}/eureka-v2-backend-qualification-contract.txt
           if-no-files-found: error
           retention-days: 90
