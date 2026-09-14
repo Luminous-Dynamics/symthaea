@@ -59,14 +59,11 @@ COMMAND_GATES: list[tuple[str, list[str], bool]] = [
     ),
 ]
 
-SUBJECT_ROOT = Path(
-    os.environ.get(
-        "LQCD_SUBJECT_DIR",
-        subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip(),
-    )
-).resolve()
-VERIFIER_ROOT = Path(os.environ.get("LQCD_VERIFIER_DIR", str(SUBJECT_ROOT))).resolve()
-os.chdir(SUBJECT_ROOT)
+# Hosted qualification checks out verifier and subject as sibling directories
+# below a workspace parent that is not itself a Git repository. Root discovery
+# must therefore be side-effect-free: never execute Git as an eager env fallback.
+SUBJECT_ROOT = Path(os.environ.get("LQCD_SUBJECT_DIR") or os.getcwd()).resolve()
+VERIFIER_ROOT = Path(os.environ.get("LQCD_VERIFIER_DIR") or str(SUBJECT_ROOT)).resolve()
 
 OUT = Path(os.environ.get("LQCD_QUALIFICATION_DIR", "/tmp/symthaea-lqcd-qualification-v2"))
 OUT.mkdir(parents=True, exist_ok=True)
@@ -74,28 +71,17 @@ ATTEMPT = OUT / "attempt.json"
 POSITIVE = OUT / "positive-receipt.json"
 SUBJECT_INPUTS = OUT / "subject-inputs.tsv"
 VERIFIER_INPUTS = OUT / "verifier-inputs.tsv"
-POSITIVE.unlink(missing_ok=True)
-Path(str(POSITIVE) + ".sha256").unlink(missing_ok=True)
 
-EXPECTED_SHA = os.environ.get("QUALIFIED_SHA") or subprocess.check_output(
-    ["git", "rev-parse", "HEAD"], text=True, cwd=SUBJECT_ROOT
-).strip()
+# Identity discovery is intentionally deferred into main(), inside the receipt
+# exception boundary. Defaults remain serializable if discovery itself fails.
+EXPECTED_SHA = os.environ.get("QUALIFIED_SHA", "").strip()
 EXPECTED_BASE = os.environ.get("QUALIFICATION_BASE_SHA", "").strip()
-ACTUAL_SHA = subprocess.check_output(
-    ["git", "rev-parse", "HEAD"], text=True, cwd=SUBJECT_ROOT
-).strip()
-ACTUAL_TREE = subprocess.check_output(
-    ["git", "rev-parse", "HEAD^{tree}"], text=True, cwd=SUBJECT_ROOT
-).strip()
-
-VERIFIER_SHA = subprocess.check_output(
-    ["git", "rev-parse", "HEAD"], text=True, cwd=VERIFIER_ROOT
-).strip()
-VERIFIER_TREE = subprocess.check_output(
-    ["git", "rev-parse", "HEAD^{tree}"], text=True, cwd=VERIFIER_ROOT
-).strip()
-EXPECTED_VERIFIER_SHA = os.environ.get("VERIFIER_AUTHORITY_SHA", VERIFIER_SHA).strip()
-EXPECTED_VERIFIER_TREE = os.environ.get("VERIFIER_AUTHORITY_TREE", VERIFIER_TREE).strip()
+ACTUAL_SHA = "unavailable"
+ACTUAL_TREE = "unavailable"
+VERIFIER_SHA = "unavailable"
+VERIFIER_TREE = "unavailable"
+EXPECTED_VERIFIER_SHA = os.environ.get("VERIFIER_AUTHORITY_SHA", "").strip()
+EXPECTED_VERIFIER_TREE = os.environ.get("VERIFIER_AUTHORITY_TREE", "").strip()
 
 GATES: dict[str, str] = {}
 SUBJECT_STATE = "unverified"
@@ -115,6 +101,35 @@ def capture(argv: list[str], *, cwd: Path = SUBJECT_ROOT, default: str = "unavai
         return subprocess.check_output(argv, text=True, stderr=subprocess.DEVNULL, cwd=cwd).strip()
     except Exception:
         return default
+
+
+def bootstrap_git_identity() -> None:
+    global EXPECTED_SHA, ACTUAL_SHA, ACTUAL_TREE
+    global VERIFIER_SHA, VERIFIER_TREE, EXPECTED_VERIFIER_SHA, EXPECTED_VERIFIER_TREE
+
+    actual_sha = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True, cwd=SUBJECT_ROOT
+    ).strip()
+    actual_tree = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], text=True, cwd=SUBJECT_ROOT
+    ).strip()
+    verifier_sha = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], text=True, cwd=VERIFIER_ROOT
+    ).strip()
+    verifier_tree = subprocess.check_output(
+        ["git", "rev-parse", "HEAD^{tree}"], text=True, cwd=VERIFIER_ROOT
+    ).strip()
+
+    ACTUAL_SHA = actual_sha
+    ACTUAL_TREE = actual_tree
+    VERIFIER_SHA = verifier_sha
+    VERIFIER_TREE = verifier_tree
+    if not EXPECTED_SHA:
+        EXPECTED_SHA = ACTUAL_SHA
+    if not EXPECTED_VERIFIER_SHA:
+        EXPECTED_VERIFIER_SHA = VERIFIER_SHA
+    if not EXPECTED_VERIFIER_TREE:
+        EXPECTED_VERIFIER_TREE = VERIFIER_TREE
 
 
 def sha256(path: Path) -> str:
@@ -304,6 +319,10 @@ def attempt_object(
 
 def main() -> int:
     global SUBJECT_STATE, VERIFIER_STATE
+
+    POSITIVE.unlink(missing_ok=True)
+    Path(str(POSITIVE) + ".sha256").unlink(missing_ok=True)
+    bootstrap_git_identity()
 
     subject_digest = subject_inputs_digest()
     verifier_digest = verifier_inputs_digest()
