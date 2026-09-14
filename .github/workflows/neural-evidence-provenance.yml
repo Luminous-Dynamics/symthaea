@@ -1,0 +1,43 @@
+name: Neural Evidence Provenance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/tribe_v2_bridge.py"
+      - "scripts/test_tribe_v2_bridge.py"
+      - "docs/neuroscience/NEURAL_EVIDENCE_PROVENANCE_V1.md"
+      - ".github/workflows/neural-evidence-provenance.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/tribe_v2_bridge.py"
+      - "scripts/test_tribe_v2_bridge.py"
+      - "docs/neuroscience/NEURAL_EVIDENCE_PROVENANCE_V1.md"
+      - ".github/workflows/neural-evidence-provenance.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: neural-evidence-provenance-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify-bridge:
+    name: Qualify TRIBE evidence boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install qualification dependency
+        run: python -m pip install --disable-pip-version-check numpy
+
+      - name: Run provenance contract tests
+        run: python -m unittest scripts/test_tribe_v2_bridge.py
+
+      - name: Syntax-check bridge and tests
+        run: python -m py_compile scripts/tribe_v2_bridge.py scripts/test_tribe_v2_bridge.py
