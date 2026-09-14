@@ -50,14 +50,6 @@ impl SelfDescribingSemanticCommitmentV1 {
         &self.semantic_id
     }
 
-    pub fn definition_schema(&self) -> &StableId {
-        &self.definition_schema
-    }
-
-    pub fn definition_digest(&self) -> &DigestSha256 {
-        &self.definition_digest
-    }
-
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = String::from("symthaea-assurance-semantic-commitment-v1\n");
         field(&mut out, "schema", SEMANTIC_COMMITMENT_SCHEMA);
@@ -118,18 +110,6 @@ impl OrderingLineageIdentityV1 {
             validation_profile,
             epoch,
         }
-    }
-
-    pub fn source(&self) -> &StableId {
-        &self.source
-    }
-
-    pub fn validation_profile(&self) -> &SelfDescribingSemanticCommitmentV1 {
-        &self.validation_profile
-    }
-
-    pub fn epoch(&self) -> u64 {
-        self.epoch
     }
 
     pub fn is_comparable_with(&self, other: &Self) -> bool {
