@@ -7,6 +7,7 @@ on:
       - psych-bench/typed-claim-class
       - psych-bench/direction-aware-regression
       - psych-bench/regression-policy-manifest
+      - psych-bench/migrate-runner-regression-policy
     paths:
       - '.github/workflows/psych-bench-claim-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
@@ -14,6 +15,7 @@ on:
       - 'crates/domains/symthaea-psych-bench/src/regression_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs'
       - 'crates/domains/symthaea-psych-bench/tests/regression_guard.rs'
+      - 'crates/domains/symthaea-psych-bench/examples/policy_regression_compare.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/security/**'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
@@ -27,7 +29,7 @@ jobs:
   claim-contract:
     name: Exact-subject evidence contracts
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout exact PR subject
@@ -66,7 +68,8 @@ jobs:
             crates/domains/symthaea-psych-bench/src/claim_contract.rs \
             crates/domains/symthaea-psych-bench/src/regression_contract.rs \
             crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs \
-            crates/domains/symthaea-psych-bench/tests/regression_guard.rs
+            crates/domains/symthaea-psych-bench/tests/regression_guard.rs \
+            crates/domains/symthaea-psych-bench/examples/policy_regression_compare.rs
 
       - name: Compile evidence contracts
         shell: bash
@@ -74,6 +77,7 @@ jobs:
           set -euo pipefail
           cargo check --locked -p symthaea-psych-bench --lib
           cargo test --locked -p symthaea-psych-bench --test regression_guard --no-run
+          cargo check --locked -p symthaea-psych-bench --example policy_regression_compare
 
       - name: Execute claim-contract regressions
         shell: bash
@@ -98,6 +102,122 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --test regression_guard -- --nocapture
+
+      - name: Execute explicit-policy comparator fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/policy-regression-fixtures"
+          mkdir -p "$root"
+          export POLICY_FIXTURE_ROOT="$root"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["POLICY_FIXTURE_ROOT"])
+
+          def metric(mean, lower, upper):
+              return {
+                  "mean": mean,
+                  "std_dev": 0.01,
+                  "n": 20,
+                  "ci_lower": lower,
+                  "ci_upper": upper,
+              }
+
+          def snapshot(name, metrics):
+              return {
+                  "name": name,
+                  "timestamp": "2026-09-14T00:00:00Z",
+                  "git_hash": None,
+                  "config_summary": "policy comparator qualification fixture",
+                  "schema_version": "1.1",
+                  "metrics": {"Bench": metrics},
+              }
+
+          baseline = snapshot(
+              "baseline",
+              {
+                  "accuracy": metric(0.80, 0.78, 0.82),
+                  "error": metric(0.20, 0.19, 0.21),
+              },
+          )
+          current = snapshot(
+              "current",
+              {
+                  "accuracy": metric(0.85, 0.83, 0.87),
+                  "error": metric(0.15, 0.14, 0.16),
+              },
+          )
+          missing_current = snapshot(
+              "missing-current",
+              {"accuracy": metric(0.85, 0.83, 0.87)},
+          )
+
+          def entry(metric_name, policy_id, objective):
+              return {
+                  "key": {"benchmark": "Bench", "metric": metric_name},
+                  "policy": {
+                      "policy_id": policy_id,
+                      "version": 1,
+                      "objective": {"kind": objective},
+                  },
+              }
+
+          manifest = {
+              "schema_version": "psych-regression-policy-manifest-v1",
+              "manifest_id": "qualification-fixture-v1",
+              "revision": 1,
+              "entries": [
+                  entry("accuracy", "fixture.accuracy", "higher_is_better"),
+                  entry("error", "fixture.error", "lower_is_better"),
+              ],
+          }
+          incomplete_manifest = {
+              **manifest,
+              "manifest_id": "qualification-fixture-incomplete-v1",
+              "entries": [entry("accuracy", "fixture.accuracy", "higher_is_better")],
+          }
+
+          for name, value in {
+              "baseline.json": baseline,
+              "current.json": current,
+              "missing-current.json": missing_current,
+              "manifest.json": manifest,
+              "manifest-incomplete.json": incomplete_manifest,
+          }.items():
+              (root / name).write_text(json.dumps(value, indent=2) + "\n")
+          PY
+
+          cargo run --quiet --locked -p symthaea-psych-bench \
+            --example policy_regression_compare -- \
+            "$root/baseline.json" "$root/current.json" "$root/manifest.json" 0.05 0.10 \
+            > "$root/pass.json"
+          grep -F '"blocking_integrity_failure": false' "$root/pass.json"
+          grep -F '"semantic_manifest_digest"' "$root/pass.json"
+          grep -F '"manifest_id": "qualification-fixture-v1"' "$root/pass.json"
+
+          set +e
+          cargo run --quiet --locked -p symthaea-psych-bench \
+            --example policy_regression_compare -- \
+            "$root/baseline.json" "$root/current.json" "$root/manifest-incomplete.json" 0.05 0.10 \
+            > "$root/incomplete.out" 2>&1
+          incomplete_status=$?
+          set -e
+          test "$incomplete_status" -eq 2
+          grep -F 'POLICY_REGRESSION_SETUP_ERROR kind=comparison_contract' "$root/incomplete.out"
+
+          set +e
+          cargo run --quiet --locked -p symthaea-psych-bench \
+            --example policy_regression_compare -- \
+            "$root/baseline.json" "$root/missing-current.json" "$root/manifest.json" 0.05 0.10 \
+            > "$root/blocking.json" 2>&1
+          blocking_status=$?
+          set -e
+          test "$blocking_status" -eq 1
+          grep -F '"blocking_integrity_failure": true' "$root/blocking.json"
+          grep -F '"disposition": "missing_current_metric"' "$root/blocking.json"
 
       - name: Strict focused library Clippy
         shell: bash
@@ -129,6 +249,21 @@ jobs:
           python3 scripts/ci/strict_clippy_paths.py \
             "$report" \
             crates/domains/symthaea-psych-bench/tests/regression_guard.rs
+          test "$cargo_status" -eq 0
+
+      - name: Strict comparator CLI Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/policy-regression-cli-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --example policy_regression_compare --no-deps \
+            --message-format=json > "$report"
+          cargo_status=$?
+          set -e
+          python3 scripts/ci/strict_clippy_paths.py \
+            "$report" \
+            crates/domains/symthaea-psych-bench/examples/policy_regression_compare.rs
           test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
