@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-tpm2-platform-qualification"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Platform and runtime-closure qualification for Symthaea TPM2 assurance evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "safety", "assurance", "attestation"]
+categories = ["hardware-support", "development-tools"]
+
+[dependencies]
+symthaea-assurance-tpm2-tools-adapter = { path = "../../bridges/symthaea-assurance-tpm2-tools-adapter" }
+serde = { workspace = true }
+blake3 = { workspace = true }

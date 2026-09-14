@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-trust-store"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Hardware-agnostic monotonic trust-store contract for Symthaea assurance anchors"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "rollback", "trust-store"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+symthaea-assurance-policy-lineage-anchor = { path = "../symthaea-assurance-policy-lineage-anchor" }
+serde = { workspace = true }
+blake3 = { workspace = true }
