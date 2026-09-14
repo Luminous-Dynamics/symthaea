@@ -139,10 +139,8 @@ impl VerifiedReasoningHistory {
         // Preflight every count before mutating any bucket. A chain is all-or-nothing evidence.
         let mut increments: HashMap<&VerifiedReasoningHistoryKey, u64> = HashMap::new();
         for observation in &verified.observations {
-            *increments.entry(&observation.key).or_default() = increments
-                .get(&observation.key)
-                .copied()
-                .unwrap_or(0)
+            let increment = increments.entry(&observation.key).or_default();
+            *increment = increment
                 .checked_add(1)
                 .ok_or(VerifiedReasoningHistoryError::ObservationCountOverflow)?;
         }
@@ -156,14 +154,15 @@ impl VerifiedReasoningHistory {
                 .checked_add(*increment)
                 .ok_or(VerifiedReasoningHistoryError::ObservationCountOverflow)?;
         }
-        self.admitted_chains
+        let execution_increment = u64::try_from(verified.observations.len())
+            .map_err(|_| VerifiedReasoningHistoryError::ObservationCountOverflow)?;
+        let next_admitted_chains = self
+            .admitted_chains
             .checked_add(1)
             .ok_or(VerifiedReasoningHistoryError::ObservationCountOverflow)?;
-        self.admitted_executions
-            .checked_add(
-                u64::try_from(verified.observations.len())
-                    .map_err(|_| VerifiedReasoningHistoryError::ObservationCountOverflow)?,
-            )
+        let next_admitted_executions = self
+            .admitted_executions
+            .checked_add(execution_increment)
             .ok_or(VerifiedReasoningHistoryError::ObservationCountOverflow)?;
 
         let mut touched = HashSet::new();
@@ -186,9 +185,8 @@ impl VerifiedReasoningHistory {
             );
             touched.insert(observation.key.clone());
         }
-        self.admitted_chains += 1;
-        self.admitted_executions += u64::try_from(verified.observations.len())
-            .map_err(|_| VerifiedReasoningHistoryError::ObservationCountOverflow)?;
+        self.admitted_chains = next_admitted_chains;
+        self.admitted_executions = next_admitted_executions;
 
         Ok(VerifiedChainAdmission {
             chain_commitment: verified.chain_commitment,
