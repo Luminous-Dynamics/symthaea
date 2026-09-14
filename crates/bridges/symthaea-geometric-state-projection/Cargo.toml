@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-geometric-state-projection"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Preregistered projection of Symthaea's native 32D thought vector onto probability-simplex coordinates for geometric-emergence experiments"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["information-geometry", "projection", "cognition", "research"]
+categories = ["science", "algorithms"]
