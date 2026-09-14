@@ -20,6 +20,7 @@ on:
       - 'docs/compliance/adr/ADR-036-rsk-lockfile-repair-intent-freeze.md'
       - 'docs/compliance/adr/ADR-037-rsk-lockfile-repair-action-pins.md'
       - 'docs/compliance/adr/ADR-038-rsk-lockfile-repair-runner-provenance.md'
+      - 'docs/compliance/adr/ADR-040-rsk-lockfile-metadata-evidence-binding.md'
   workflow_dispatch:
 
 permissions:
@@ -87,6 +88,8 @@ jobs:
           echo 'A committed candidate must be byte-idempotent under the pinned Cargo toolchain.'
           echo 'A committed candidate may not change dependency-intent inputs relative to the PR base.'
           echo 'No repository path other than Cargo.lock may change.'
+          echo 'Cargo metadata must be passed explicitly and is bound by raw-byte SHA-256 and byte length.'
+          echo 'Cargo metadata identity is provenance evidence, not an authority grant.'
           echo 'Hosted-runner image identity is recorded as provenance, not treated as a trust grant.'
           echo 'Normal RSK qualification must still pass later with --locked.'
 
@@ -156,6 +159,7 @@ jobs:
             'Commit-verification mode requires the committed head to remain byte-identical after Cargo.' \
             'Commit-verification mode also requires dependency-intent inputs to match the PR base.' \
             'No repository path other than Cargo.lock may change.' \
+            'Cargo metadata is explicit, raw-byte identity-bound provenance only.' \
             'Hosted-runner image metadata is provenance only.' \
             > "${out}/README.txt"
 
@@ -227,11 +231,15 @@ jobs:
         run: |
           set -euo pipefail
           out="${RUNNER_TEMP}/rsk-lockfile-repair"
+          test -s "${out}/cargo-metadata.json"
           python3 scripts/rsk_lockfile_repair_lineage.py \
             "${out}/Cargo.lock.base" \
             "${out}/Cargo.lock.head" \
             "${out}/Cargo.lock.post-cargo" \
+            --cargo-metadata "${out}/cargo-metadata.json" \
             --json-out "${out}/lineage-report.json"
+          sha256sum "${out}/cargo-metadata.json" \
+            > "${out}/cargo-metadata-sha256.txt"
           sha256sum \
             "${out}/Cargo.lock.base" \
             "${out}/Cargo.lock.head" \

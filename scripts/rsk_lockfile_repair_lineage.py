@@ -7,6 +7,10 @@ The committed Cargo.lock remains the authority boundary. Cargo metadata may
 justify only narrowly bounded pre-existing dependency-edge additions; it never
 permits package identity, source, version, checksum, removal, or new external
 package drift.
+
+When Cargo metadata bytes are supplied, the lineage receipt binds the exact raw
+bytes by SHA-256 and byte length. The CLI never discovers metadata implicitly;
+metadata-backed proof must name its evidence path explicitly.
 """
 
 from __future__ import annotations
@@ -21,6 +25,9 @@ from typing import Any
 import rsk_lockfile_delta as delta
 
 
+LINEAGE_SCHEMA = "symthaea.rsk.lockfile-repair-lineage.v3"
+
+
 class LockfileLineageError(ValueError):
     def __init__(self, message: str, *, code: str = "lockfile_lineage_rejected") -> None:
         super().__init__(message)
@@ -31,12 +38,28 @@ def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _metadata_evidence(cargo_metadata: bytes | None) -> dict[str, object]:
+    if cargo_metadata is None:
+        return {
+            "present": False,
+            "sha256": None,
+            "bytes": 0,
+        }
+    return {
+        "present": True,
+        "sha256": _sha256(cargo_metadata),
+        "bytes": len(cargo_metadata),
+    }
+
+
 def qualify_repair_lineage(
     base_lock: bytes,
     head_lock: bytes,
     cargo_lock: bytes,
     cargo_metadata: bytes | None = None,
 ) -> dict[str, object]:
+    metadata_evidence = _metadata_evidence(cargo_metadata)
+
     if base_lock == head_lock:
         candidate_report = delta.qualify_lockfile_delta(
             base_lock, cargo_lock, cargo_metadata
@@ -47,7 +70,7 @@ def qualify_repair_lineage(
             else "generated-candidate"
         )
         return {
-            "schema": "symthaea.rsk.lockfile-repair-lineage.v2",
+            "schema": LINEAGE_SCHEMA,
             "status": "accepted",
             "mode": mode,
             "base_sha256": _sha256(base_lock),
@@ -55,6 +78,7 @@ def qualify_repair_lineage(
             "post_cargo_sha256": _sha256(cargo_lock),
             "head_equals_base": True,
             "post_cargo_equals_head": cargo_lock == head_lock,
+            "cargo_metadata_evidence": metadata_evidence,
             "candidate_delta": candidate_report,
         }
 
@@ -71,7 +95,7 @@ def qualify_repair_lineage(
         head_lock, cargo_lock, cargo_metadata
     )
     return {
-        "schema": "symthaea.rsk.lockfile-repair-lineage.v2",
+        "schema": LINEAGE_SCHEMA,
         "status": "accepted",
         "mode": "committed-candidate-verified",
         "base_sha256": _sha256(base_lock),
@@ -79,13 +103,10 @@ def qualify_repair_lineage(
         "post_cargo_sha256": _sha256(cargo_lock),
         "head_equals_base": False,
         "post_cargo_equals_head": True,
+        "cargo_metadata_evidence": metadata_evidence,
         "committed_delta": committed_report,
         "post_cargo_idempotence": idempotent_report,
     }
-
-
-def _read_optional(path: str | None) -> bytes | None:
-    return Path(path).read_bytes() if path is not None else None
 
 
 def _rejection_report(
@@ -94,13 +115,15 @@ def _rejection_report(
     base_lock: bytes | None,
     head_lock: bytes | None,
     cargo_lock: bytes | None,
+    cargo_metadata: bytes | None,
 ) -> dict[str, Any]:
     reason_code = getattr(exc, "code", "io_or_unclassified_failure")
     report: dict[str, Any] = {
-        "schema": "symthaea.rsk.lockfile-repair-lineage.v2",
+        "schema": LINEAGE_SCHEMA,
         "status": "rejected",
         "reason_code": reason_code,
         "reason": str(exc),
+        "cargo_metadata_evidence": _metadata_evidence(cargo_metadata),
     }
     if base_lock is not None:
         report["base_sha256"] = _sha256(base_lock)
@@ -124,27 +147,23 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("base_lock")
     parser.add_argument("head_lock")
     parser.add_argument("post_cargo_lock")
-    parser.add_argument("--cargo-metadata")
+    parser.add_argument(
+        "--cargo-metadata",
+        help="explicit Cargo metadata JSON evidence path; never discovered implicitly",
+    )
     parser.add_argument("--json-out")
     args = parser.parse_args(argv)
 
     base_lock: bytes | None = None
     head_lock: bytes | None = None
     cargo_lock: bytes | None = None
+    cargo_metadata: bytes | None = None
     try:
         base_lock = Path(args.base_lock).read_bytes()
         head_lock = Path(args.head_lock).read_bytes()
         cargo_lock = Path(args.post_cargo_lock).read_bytes()
-        metadata_path = (
-            Path(args.cargo_metadata)
-            if args.cargo_metadata is not None
-            else Path(args.post_cargo_lock).with_name("cargo-metadata.json")
-        )
-        cargo_metadata = (
-            metadata_path.read_bytes()
-            if metadata_path.exists()
-            else None
-        )
+        if args.cargo_metadata is not None:
+            cargo_metadata = Path(args.cargo_metadata).read_bytes()
         report = qualify_repair_lineage(
             base_lock, head_lock, cargo_lock, cargo_metadata
         )
@@ -154,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
             base_lock=base_lock,
             head_lock=head_lock,
             cargo_lock=cargo_lock,
+            cargo_metadata=cargo_metadata,
         )
         try:
             _write_report(args.json_out, report)
