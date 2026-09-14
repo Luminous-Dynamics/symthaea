@@ -1,6 +1,6 @@
 # REL — Relational Invariance Program
 
-**Status:** frozen research contract for REL-000 through REL-003.  This document does not change production cognition.
+**Status:** frozen research contract for REL-000 through REL-003. This document does not change production cognition.
 
 ## Purpose
 
@@ -8,7 +8,9 @@ REL asks one narrow question before any architectural or consciousness claim:
 
 > Which transformations of a Symthaea internal representation change only its description, and which change admitted cognitive content?
 
-The first tranche treats that as a representation-specific algebra/geometry question.  It does **not** assume that Symthaea has a field-theoretic gauge symmetry.
+The first tranche treats that as a representation-specific algebra/geometry question. It does **not** assume that Symthaea has a field-theoretic gauge symmetry.
+
+The analytic companion `REL_AUTOMORPHISM_CENSUS_2026-09-14.md` states the stronger group-theoretic target under explicit assumptions. Executable qualification remains separate from that derivation.
 
 ## Terminology
 
@@ -30,7 +32,7 @@ An isometry need not be an algebra automorphism.
 
 ### Representation covariance
 
-A coordinate/frame change is covariant when states **and the operators that act on them** transform consistently.  For an operator `rho`, a frame transformation `g` induces
+A coordinate/frame change is covariant when states **and the operators that act on them** transform consistently. For an operator `rho`, a frame transformation `g` induces
 
 `rho' = g rho g^-1`.
 
@@ -38,7 +40,7 @@ Covariance is weaker than the claim that `g` commutes with a fixed `rho`.
 
 ### Representational redundancy
 
-A redundancy requires more than covariance: multiple internal descriptions must induce the same declared observables or computation.  REL reserves the word **gauge** for a demonstrated redundancy rather than using it as a synonym for symmetry, isometry, or covariance.
+A redundancy requires more than covariance: multiple internal descriptions must induce the same declared observables or computation. REL reserves the word **gauge** for a demonstrated redundancy rather than using it as a synonym for symmetry, isometry, or covariance.
 
 ## Representation-specific contracts
 
@@ -46,13 +48,21 @@ There is no universal `G_Sym` assumed across Symthaea.
 
 ### BinaryHV
 
-Production binding is XOR and the metric is Hamming-derived similarity.  Coordinate permutations are candidate full automorphisms/isometries because a common permutation preserves both XOR coordinatewise structure and Hamming matches.
+Production binding is XOR and the metric is Hamming-derived similarity.
 
-A generic invertible linear transformation over `F_2` may preserve XOR algebra while changing Hamming geometry.  Such transformations are therefore negative controls for the stronger full-algebra-plus-metric claim.
+For XOR algebra alone, the analytic automorphism family is much larger than coordinate permutations: invertible `F_2`-linear maps preserve XOR composition. Once Hamming geometry is also required, the linear isometry intersection reduces to coordinate permutations.
+
+Therefore REL explicitly distinguishes:
+
+- XOR automorphism;
+- Hamming isometry;
+- their intersection.
+
+A generic invertible linear transformation over `F_2` is a negative control for the stronger full-algebra-plus-metric claim when it changes Hamming geometry.
 
 ### ContinuousHV
 
-Production binding is Hadamard/element-wise multiplication and similarity is cosine.  Coordinate permutations are candidate full automorphisms/isometries.
+Production binding is Hadamard/element-wise multiplication and similarity is cosine. Under the declared **linear unital** real-coordinate algebra, coordinate permutations are the analytic automorphism target and also preserve cosine geometry.
 
 Generic orthogonal transforms preserve cosine geometry but do not, in general, preserve Hadamard binding:
 
@@ -60,28 +70,47 @@ Generic orthogonal transforms preserve cosine geometry but do not, in general, p
 
 Orthogonal mixing is therefore a negative control for the invalid inference "metric isometry implies full HDC automorphism".
 
+REL does not claim to classify arbitrary nonlinear transformations.
+
+### Bundling
+
+Core HDC superposition is also part of the admitted representation surface:
+
+- BinaryHV: coordinatewise majority vote;
+- ContinuousHV: coordinatewise averaging.
+
+A common coordinate permutation should commute with these operations as well. The executable tranche therefore tests bundle covariance in addition to binding and metric preservation.
+
 ### Sequence operator
 
-Cyclic permutation `rho` carries position/sequence semantics.  REL distinguishes:
+Cyclic permutation `rho` carries position/sequence semantics. REL distinguishes:
 
 1. **fixed-operator invariance:** `g rho = rho g`; from
 2. **covariant frame change:** `rho' = g rho g^-1`.
 
-The second can hold even when the first does not.  Tests must not collapse these claims.
+For a fixed full cyclic shift, the coordinate permutations that commute with it form the cyclic subgroup generated by the shift itself. A general coordinate permutation can fail fixed-operator commutation while remaining a valid covariant frame change when `rho` is conjugated with the frame.
+
+Tests must not collapse these claims.
 
 ## REL-001 — automorphism theorem surface
 
 The first theorem tranche must establish, with deterministic fixtures:
 
-- BinaryHV common-coordinate permutations preserve binding and similarity;
-- ContinuousHV common-coordinate permutations preserve binding and similarity to narrow floating-point tolerance;
-- sequence encodings are tested separately for fixed-operator commutation and covariant conjugation.
+- a family of full coordinate permutations, not only one hand-picked reversal;
+- BinaryHV common-coordinate permutations preserve XOR binding, Hamming geometry, and odd-count majority bundling;
+- ContinuousHV common-coordinate permutations preserve Hadamard binding, cosine geometry to narrow floating-point tolerance, and averaging bundle structure;
+- permutation inverse and composition laws act consistently on both representations;
+- powers of the production cyclic shift provide positive fixed-operator commutation controls;
+- a non-commuting coordinate permutation provides a negative fixed-operator control;
+- conjugated sequence operators provide a positive covariance control.
+
+The executable surface samples deterministic permutations; it does not claim exhaustive enumeration of `S_n` at production dimension.
 
 ## REL-002 — independent oracle boundary
 
-Transformation/oracle code belongs outside production HDC methods.  It may call the public production operations being tested, but it must not add a new production representation or modify cognition paths.
+Transformation/oracle code belongs outside production HDC methods. It may call the public production operations being tested, but it must not add a new production representation or modify cognition paths.
 
-A positive result supports only the declared identity for the tested representation and fixture family.
+A positive result supports only the declared identity for the tested representation and fixture family. Analytic classification and implementation qualification remain separate evidence types.
 
 ## REL-003 — negative controls
 
@@ -101,8 +130,12 @@ These controls prevent a trivially insensitive test surface from being mistaken 
 3. Floating-point tests use narrow, stated tolerances and report the quantity compared.
 4. Negative controls must mechanically falsify the stronger invalid claim for their fixture.
 5. Nulls, unexpectedly small symmetry groups, and failed candidate transformations count as results.
-6. No claim about improved reasoning, memory, efficiency, intelligence, or consciousness follows from REL-001 through REL-003.
-7. Quotient/reduced representations are downstream experiments; equivariance/covariance is retained when reduction would discard task-relevant information.
+6. Analytic group classification does not substitute for execution against production implementations.
+7. Sampled implementation tests do not substitute for an exhaustive mathematical proof.
+8. Qualification binds the exact subject head, tree, theorem documents, test source, command contract, and workflow source.
+9. Source-formatting failures remain failures and are preserved separately from theorem execution.
+10. No claim about improved reasoning, memory, efficiency, intelligence, or consciousness follows from REL-001 through REL-003.
+11. Quotient/reduced representations are downstream experiments; equivariance/covariance is retained when reduction would discard task-relevant information.
 
 ## Downstream gates
 
