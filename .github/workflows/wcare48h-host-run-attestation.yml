@@ -1,0 +1,149 @@
+name: WCARE-48H Host Run Attestation
+
+on:
+  push:
+    branches:
+      - wcare-48h-host-run-attestation
+    paths:
+      - .github/workflows/wcare48h-host-run-attestation.yml
+      - scripts/wcare48h_attest.py
+      - scripts/wcare48h_selftest.py
+      - docs/release/evidence/WCARE48H_HOST_RUN_ATTESTATION_PROTOCOL_V1.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qualify:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact host-attestation subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify sibling lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "wcare-48h-host-run-attestation"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test "$(git merge-base HEAD 52d1d9fb741250ab8bcab205113689a8cc9431bb)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Compile and adversarially self-test verifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/wcare48h_attest.py scripts/wcare48h_selftest.py
+          python3 scripts/wcare48h_selftest.py
+
+      - name: Retrieve exact GitHub-host run state
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_JSON="$RUNNER_TEMP/wcare48-run.json"
+          JOBS_JSON="$RUNNER_TEMP/wcare48-jobs.json"
+          JOB_LOG="$RUNNER_TEMP/wcare48-job.log"
+          WCARE48V_RESULT="$RUNNER_TEMP/wcare48v-result.json"
+          WCARE48H_RESULT="$RUNNER_TEMP/wcare48h-result.json"
+
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/Luminous-Dynamics/symthaea/actions/runs/34836223949" \
+            > "$RUN_JSON"
+
+          STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["status"])' "$RUN_JSON")"
+          printf '%s\n' "EXACT_GENERATION_RUN_STATUS=$STATUS"
+
+          if [[ "$STATUS" != "completed" ]]; then
+            set +e
+            OUTPUT="$(python3 scripts/wcare48h_attest.py --run-json "$RUN_JSON" 2>&1)"
+            RC=$?
+            set -e
+            test "$RC" -eq 3
+            grep -Fq '"classification":"HOST_RUN_INDETERMINATE"' <<<"$OUTPUT"
+            grep -Fq '"detail":"exact_run_not_completed"' <<<"$OUTPUT"
+            grep -Fq '"github_host_run_attested":false' <<<"$OUTPUT"
+            grep -Fq '"lock_admitted":false' <<<"$OUTPUT"
+            grep -Fq '"runtime_authority_granted":false' <<<"$OUTPUT"
+            printf '%s\n' "$OUTPUT"
+            printf '%s\n' 'PASS_WCARE48H_PREREGISTERED_INDETERMINATE'
+            exit 0
+          fi
+
+          CONCLUSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("conclusion"))' "$RUN_JSON")"
+          if [[ "$CONCLUSION" != "success" ]]; then
+            set +e
+            OUTPUT="$(python3 scripts/wcare48h_attest.py --run-json "$RUN_JSON" 2>&1)"
+            RC=$?
+            set -e
+            printf '%s\n' "$OUTPUT"
+            test "$RC" -eq 1
+            grep -Fq '"classification":"HOST_RUN_FAILED"' <<<"$OUTPUT"
+            exit 1
+          fi
+
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/Luminous-Dynamics/symthaea/actions/runs/34836223949/jobs?per_page=100" \
+            > "$JOBS_JSON"
+
+          JOB_ID="$(python3 -c 'import json,sys; jobs=json.load(open(sys.argv[1], encoding="utf-8")).get("jobs", []); found=[j for j in jobs if j.get("name")=="generate"]; len(found)==1 or (_ for _ in ()).throw(SystemExit(f"expected one generate job, got {len(found)}")); print(found[0]["id"])' "$JOBS_JSON")"
+
+          curl -fsSL -L \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/Luminous-Dynamics/symthaea/actions/jobs/$JOB_ID/logs" \
+            > "$JOB_LOG"
+
+          git fetch --no-tags origin \
+            "+refs/heads/wcare-48-observed-lock-generation:refs/remotes/origin/wcare-48-observed-lock-generation" \
+            "+refs/heads/wcare-48v-final-child-verifier:refs/remotes/origin/wcare-48v-final-child-verifier"
+
+          CANDIDATE="$(git rev-parse refs/remotes/origin/wcare-48-observed-lock-generation)"
+          WCARE48V_HEAD="$(git rev-parse refs/remotes/origin/wcare-48v-final-child-verifier)"
+          test "$WCARE48V_HEAD" = "890ab746618f0a57853db1e38cedb7c1b500a89d"
+          test "$CANDIDATE" != "52d1d9fb741250ab8bcab205113689a8cc9431bb"
+
+          mkdir -p "$RUNNER_TEMP/wcare48v/scripts"
+          git show "890ab746618f0a57853db1e38cedb7c1b500a89d:scripts/wcare48v_verify_final.py" \
+            > "$RUNNER_TEMP/wcare48v/scripts/wcare48v_verify_final.py"
+          git show "890ab746618f0a57853db1e38cedb7c1b500a89d:scripts/wcare48v_verify_bound_final.py" \
+            > "$RUNNER_TEMP/wcare48v/scripts/wcare48v_verify_bound_final.py"
+
+          python3 "$RUNNER_TEMP/wcare48v/scripts/wcare48v_verify_bound_final.py" "$CANDIDATE" \
+            > "$WCARE48V_RESULT"
+          grep -Fq '"classification":"FINAL_CHILD_VALID"' "$WCARE48V_RESULT"
+          grep -Fq '"receipt_run_identity_bound":true' "$WCARE48V_RESULT"
+          grep -Fq '"github_host_run_attested":false' "$WCARE48V_RESULT"
+
+          python3 scripts/wcare48h_attest.py \
+            --run-json "$RUN_JSON" \
+            --jobs-json "$JOBS_JSON" \
+            --log "$JOB_LOG" \
+            --candidate "$CANDIDATE" \
+            --branch-head "$CANDIDATE" \
+            --wcare48v-json "$WCARE48V_RESULT" \
+            > "$WCARE48H_RESULT"
+
+          grep -Fq '"classification":"HOST_RUN_ATTESTED"' "$WCARE48H_RESULT"
+          grep -Fq '"github_host_run_attested":true' "$WCARE48H_RESULT"
+          grep -Fq '"lock_admitted":false' "$WCARE48H_RESULT"
+          grep -Fq '"runtime_authority_granted":false' "$WCARE48H_RESULT"
+          cat "$WCARE48H_RESULT"
+          printf '%s\n' 'PASS_WCARE48H_EXACT_HOST_ATTESTATION'
