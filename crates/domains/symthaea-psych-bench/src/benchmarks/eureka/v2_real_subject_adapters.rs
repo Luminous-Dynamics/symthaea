@@ -4,32 +4,37 @@
 //! Source-only adapters from sealed real subjects into the qualified V2
 //! prospective prediction protocol.
 //!
-//! This module deliberately defines no row loop and no evaluator reveal. It
-//! proves only that already-sealed production subjects can produce canonical
-//! `ConsequencePrediction` values from pre-outcome `V2ProspectiveTicket` values
-//! while preserving exact campaign, subject, action, domain, and adapter-source
-//! lineage.
+//! A real-subject prediction is not returned as loose bytes. Each adapter mints
+//! a role-specific, move-only receipt binding the exact prospective ticket,
+//! sealed subject, adapter implementation, and canonical prediction content.
+//! This module defines no row loop, evaluator reveal, scoring, or learning path.
 
 #![allow(dead_code)]
 
 use symthaea_fep::{FepHeldOutSubject, FepPredictionSessionError, FrozenPredictionCommitment};
 
-use super::consequence::ConsequencePrediction;
+use super::consequence::{ConsequencePrediction, PredictionOutcome};
+use super::hidden_world::PublicValue;
 use super::v2_preheldout_custody::{
     V2PreHeldOutCampaignCapability, V2PreHeldOutManifest,
 };
-use super::v2_prospective_ticket::V2ProspectiveTicket;
+use super::v2_prospective_ticket::{V2ProspectiveTicket, V2ProspectiveTicketDomain};
+use super::v2_public_schema::action_index;
 use super::v2_selected_comparator::V2SelectedComparatorSubject;
 use super::v2_target_contract::{V2FepAdapter, V2TargetContractError};
 
 pub(super) const V2_REAL_TARGET_ADAPTER_REVISION: &str =
-    "EUREKA.002.V2.REAL_TARGET_ADAPTER.v2";
+    "EUREKA.002.V2.REAL_TARGET_ADAPTER.v3";
 pub(super) const V2_REAL_COMPARATOR_ADAPTER_REVISION: &str =
-    "EUREKA.002.V2.REAL_COMPARATOR_ADAPTER.v2";
+    "EUREKA.002.V2.REAL_COMPARATOR_ADAPTER.v3";
 pub(super) const V2_REAL_ADAPTER_SOURCE_COMMITMENT_REVISION: &str =
-    "EUREKA.002.V2.REAL_ADAPTER_SOURCE.v2";
+    "EUREKA.002.V2.REAL_ADAPTER_SOURCE.v3";
 pub(super) const V2_REAL_ADAPTER_PAIR_REVISION: &str =
-    "EUREKA.002.V2.REAL_ADAPTER_PAIR.v2";
+    "EUREKA.002.V2.REAL_ADAPTER_PAIR.v3";
+pub(super) const V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION: &str =
+    "EUREKA.002.V2.REAL_TARGET_PREDICTION_RECEIPT.v1";
+pub(super) const V2_REAL_COMPARATOR_PREDICTION_RECEIPT_REVISION: &str =
+    "EUREKA.002.V2.REAL_COMPARATOR_PREDICTION_RECEIPT.v1";
 
 #[derive(Debug)]
 pub(super) enum V2RealSubjectAdapterError {
@@ -54,11 +59,88 @@ impl From<V2TargetContractError> for V2RealSubjectAdapterError {
     }
 }
 
-/// Narrow prediction adapter over one sealed FEP subject.
-///
-/// The adapter borrows the subject, so it cannot outlive campaign custody and
-/// cannot recover any trainable snapshot/session from it. Construction is
-/// private to the paired binding below.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct V2RealTargetPredictionReceipt {
+    prospective_ticket_commitment: [u8; 32],
+    domain: V2ProspectiveTicketDomain,
+    campaign_manifest_commitment: [u8; 32],
+    subject_commitment: FrozenPredictionCommitment,
+    adapter_source_commitment: [u8; 32],
+    prediction: ConsequencePrediction,
+    commitment: [u8; 32],
+}
+
+impl V2RealTargetPredictionReceipt {
+    pub(super) const fn prospective_ticket_commitment(&self) -> [u8; 32] {
+        self.prospective_ticket_commitment
+    }
+
+    pub(super) const fn domain(&self) -> V2ProspectiveTicketDomain {
+        self.domain
+    }
+
+    pub(super) const fn campaign_manifest_commitment(&self) -> [u8; 32] {
+        self.campaign_manifest_commitment
+    }
+
+    pub(super) const fn subject_commitment(&self) -> FrozenPredictionCommitment {
+        self.subject_commitment
+    }
+
+    pub(super) const fn adapter_source_commitment(&self) -> [u8; 32] {
+        self.adapter_source_commitment
+    }
+
+    pub(super) const fn commitment(&self) -> [u8; 32] {
+        self.commitment
+    }
+
+    pub(super) fn into_prediction(self) -> ConsequencePrediction {
+        self.prediction
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct V2RealComparatorPredictionReceipt {
+    prospective_ticket_commitment: [u8; 32],
+    domain: V2ProspectiveTicketDomain,
+    campaign_manifest_commitment: [u8; 32],
+    subject_commitment: [u8; 32],
+    adapter_source_commitment: [u8; 32],
+    prediction: ConsequencePrediction,
+    commitment: [u8; 32],
+}
+
+impl V2RealComparatorPredictionReceipt {
+    pub(super) const fn prospective_ticket_commitment(&self) -> [u8; 32] {
+        self.prospective_ticket_commitment
+    }
+
+    pub(super) const fn domain(&self) -> V2ProspectiveTicketDomain {
+        self.domain
+    }
+
+    pub(super) const fn campaign_manifest_commitment(&self) -> [u8; 32] {
+        self.campaign_manifest_commitment
+    }
+
+    pub(super) const fn subject_commitment(&self) -> [u8; 32] {
+        self.subject_commitment
+    }
+
+    pub(super) const fn adapter_source_commitment(&self) -> [u8; 32] {
+        self.adapter_source_commitment
+    }
+
+    pub(super) const fn commitment(&self) -> [u8; 32] {
+        self.commitment
+    }
+
+    pub(super) fn into_prediction(self) -> ConsequencePrediction {
+        self.prediction
+    }
+}
+
 pub(super) struct V2RealTargetAdapter<'a> {
     subject: &'a FepHeldOutSubject,
     campaign_manifest_commitment: [u8; 32],
@@ -83,7 +165,7 @@ impl<'a> V2RealTargetAdapter<'a> {
     pub(super) fn predict_ticket(
         &self,
         ticket: V2ProspectiveTicket,
-    ) -> Result<ConsequencePrediction, V2RealSubjectAdapterError> {
+    ) -> Result<V2RealTargetPredictionReceipt, V2RealSubjectAdapterError> {
         if ticket.campaign_manifest_commitment() != self.campaign_manifest_commitment {
             return Err(V2RealSubjectAdapterError::TicketCampaignMismatch);
         }
@@ -102,7 +184,23 @@ impl<'a> V2RealTargetAdapter<'a> {
         if prediction.action != ticket.action() {
             return Err(V2RealSubjectAdapterError::TargetActionMismatch);
         }
-        Ok(prediction)
+        let adapter_source_commitment = real_subject_adapter_source_commitment();
+        let commitment = prediction_receipt_commitment(
+            V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+            ticket,
+            self.expected_subject_commitment.as_bytes(),
+            adapter_source_commitment,
+            &prediction,
+        );
+        Ok(V2RealTargetPredictionReceipt {
+            prospective_ticket_commitment: ticket.commitment(),
+            domain: ticket.domain(),
+            campaign_manifest_commitment: ticket.campaign_manifest_commitment(),
+            subject_commitment: self.expected_subject_commitment,
+            adapter_source_commitment,
+            prediction,
+            commitment,
+        })
     }
 
     pub(super) const fn campaign_manifest_commitment(&self) -> [u8; 32] {
@@ -114,8 +212,6 @@ impl<'a> V2RealTargetAdapter<'a> {
     }
 }
 
-/// Narrow prediction adapter over the single comparator selected on Calibration.
-/// No comparator-kind selector is exposed.
 pub(super) struct V2RealComparatorAdapter<'a> {
     subject: &'a V2SelectedComparatorSubject,
     campaign_manifest_commitment: [u8; 32],
@@ -140,7 +236,7 @@ impl<'a> V2RealComparatorAdapter<'a> {
     pub(super) fn predict_ticket(
         &self,
         ticket: V2ProspectiveTicket,
-    ) -> Result<ConsequencePrediction, V2RealSubjectAdapterError> {
+    ) -> Result<V2RealComparatorPredictionReceipt, V2RealSubjectAdapterError> {
         if ticket.campaign_manifest_commitment() != self.campaign_manifest_commitment {
             return Err(V2RealSubjectAdapterError::TicketCampaignMismatch);
         }
@@ -153,7 +249,23 @@ impl<'a> V2RealComparatorAdapter<'a> {
         if prediction.action != ticket.action() {
             return Err(V2RealSubjectAdapterError::ComparatorActionMismatch);
         }
-        Ok(prediction)
+        let adapter_source_commitment = real_subject_adapter_source_commitment();
+        let commitment = prediction_receipt_commitment(
+            V2_REAL_COMPARATOR_PREDICTION_RECEIPT_REVISION,
+            ticket,
+            &self.expected_subject_commitment,
+            adapter_source_commitment,
+            &prediction,
+        );
+        Ok(V2RealComparatorPredictionReceipt {
+            prospective_ticket_commitment: ticket.commitment(),
+            domain: ticket.domain(),
+            campaign_manifest_commitment: ticket.campaign_manifest_commitment(),
+            subject_commitment: self.expected_subject_commitment,
+            adapter_source_commitment,
+            prediction,
+            commitment,
+        })
     }
 
     pub(super) const fn campaign_manifest_commitment(&self) -> [u8; 32] {
@@ -165,8 +277,6 @@ impl<'a> V2RealComparatorAdapter<'a> {
     }
 }
 
-/// One typed binding of both real prediction-only subjects to one exact
-/// non-Clone pre-HeldOut campaign capability and exact adapter semantics.
 pub(super) struct V2RealSubjectAdapterPair<'a> {
     target: V2RealTargetAdapter<'a>,
     comparator: V2RealComparatorAdapter<'a>,
@@ -256,6 +366,54 @@ fn real_subject_adapter_pair_commitment(
     *blake3::hash(&bytes).as_bytes()
 }
 
+fn prediction_receipt_commitment(
+    revision: &str,
+    ticket: V2ProspectiveTicket,
+    subject_commitment: &[u8; 32],
+    adapter_source_commitment: [u8; 32],
+    prediction: &ConsequencePrediction,
+) -> [u8; 32] {
+    let mut bytes = Vec::new();
+    encode_bytes(&mut bytes, revision.as_bytes());
+    bytes.extend_from_slice(&ticket.commitment());
+    encode_bytes(&mut bytes, ticket.domain().fep_modality().as_bytes());
+    bytes.extend_from_slice(&ticket.campaign_manifest_commitment());
+    bytes.extend_from_slice(subject_commitment);
+    bytes.extend_from_slice(&adapter_source_commitment);
+    encode_prediction(&mut bytes, prediction);
+    *blake3::hash(&bytes).as_bytes()
+}
+
+fn encode_prediction(bytes: &mut Vec<u8>, prediction: &ConsequencePrediction) {
+    let action = action_index(prediction.action)
+        .expect("real V2 prediction action must belong to the canonical action vocabulary");
+    bytes.extend_from_slice(&(action as u64).to_le_bytes());
+    match &prediction.outcome {
+        PredictionOutcome::Predicted { fields } => {
+            bytes.push(1);
+            bytes.extend_from_slice(&(fields.len() as u64).to_le_bytes());
+            for field in fields {
+                encode_public_value(bytes, *field);
+            }
+        }
+        PredictionOutcome::AbstainInsufficientEvidence => bytes.push(2),
+        PredictionOutcome::OutOfQualifiedDomain => bytes.push(3),
+    }
+}
+
+fn encode_public_value(bytes: &mut Vec<u8>, value: PublicValue) {
+    match value {
+        PublicValue::Bit(value) => {
+            bytes.push(1);
+            bytes.push(u8::from(value));
+        }
+        PublicValue::Count(value) => {
+            bytes.push(2);
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+    }
+}
+
 fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
     bytes.extend_from_slice(&(value.len() as u64).to_le_bytes());
     bytes.extend_from_slice(value);
@@ -264,9 +422,170 @@ fn encode_bytes(bytes: &mut Vec<u8>, value: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::v2_development_order::materialize_development_plan;
+
+    const MANIFEST: [u8; 32] = [0x81; 32];
+    const SUBJECT_A: [u8; 32] = [0x91; 32];
+    const SUBJECT_B: [u8; 32] = [0x92; 32];
+    const ADAPTER_A: [u8; 32] = [0xA1; 32];
+    const ADAPTER_B: [u8; 32] = [0xA2; 32];
+
+    fn sample_ticket(domain: V2ProspectiveTicketDomain) -> V2ProspectiveTicket {
+        let plan = materialize_development_plan().unwrap();
+        let row = plan.ordered_rows()[0];
+        V2ProspectiveTicket::new(
+            domain,
+            MANIFEST,
+            0,
+            row.row_identity(),
+            row.family(),
+            row.pre(),
+            row.action(),
+        )
+        .unwrap()
+    }
+
+    fn sample_prediction(ticket: V2ProspectiveTicket) -> ConsequencePrediction {
+        ConsequencePrediction {
+            action: ticket.action(),
+            outcome: PredictionOutcome::Predicted {
+                fields: ticket
+                    .pre()
+                    .fields()
+                    .into_iter()
+                    .map(PublicValue::Count)
+                    .collect(),
+            },
+        }
+    }
 
     #[test]
-    fn source_defines_no_campaign_loop_or_reveal_authority() {
+    fn receipt_identity_binds_ticket_domain_subject_adapter_and_prediction() {
+        let heldout = sample_ticket(V2ProspectiveTicketDomain::HeldOutEvaluation);
+        let canary = sample_ticket(V2ProspectiveTicketDomain::DevelopmentPlumbingCanary);
+        let prediction = sample_prediction(heldout);
+        let canonical = prediction_receipt_commitment(
+            V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+            heldout,
+            &SUBJECT_A,
+            ADAPTER_A,
+            &prediction,
+        );
+        assert_ne!(
+            canonical,
+            prediction_receipt_commitment(
+                V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+                canary,
+                &SUBJECT_A,
+                ADAPTER_A,
+                &prediction,
+            )
+        );
+        assert_ne!(
+            canonical,
+            prediction_receipt_commitment(
+                V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+                heldout,
+                &SUBJECT_B,
+                ADAPTER_A,
+                &prediction,
+            )
+        );
+        assert_ne!(
+            canonical,
+            prediction_receipt_commitment(
+                V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+                heldout,
+                &SUBJECT_A,
+                ADAPTER_B,
+                &prediction,
+            )
+        );
+        let changed_prediction = ConsequencePrediction {
+            action: heldout.action(),
+            outcome: PredictionOutcome::AbstainInsufficientEvidence,
+        };
+        assert_ne!(
+            canonical,
+            prediction_receipt_commitment(
+                V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+                heldout,
+                &SUBJECT_A,
+                ADAPTER_A,
+                &changed_prediction,
+            )
+        );
+    }
+
+    #[test]
+    fn target_and_comparator_receipt_roles_are_commitment_separated() {
+        let ticket = sample_ticket(V2ProspectiveTicketDomain::HeldOutEvaluation);
+        let prediction = sample_prediction(ticket);
+        assert_ne!(
+            prediction_receipt_commitment(
+                V2_REAL_TARGET_PREDICTION_RECEIPT_REVISION,
+                ticket,
+                &SUBJECT_A,
+                ADAPTER_A,
+                &prediction,
+            ),
+            prediction_receipt_commitment(
+                V2_REAL_COMPARATOR_PREDICTION_RECEIPT_REVISION,
+                ticket,
+                &SUBJECT_A,
+                ADAPTER_A,
+                &prediction,
+            )
+        );
+    }
+
+    #[test]
+    fn public_adapter_api_returns_role_receipts_not_raw_predictions() {
+        let source = include_str!("v2_real_subject_adapters.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        assert!(source.contains("Result<V2RealTargetPredictionReceipt, V2RealSubjectAdapterError>"));
+        assert!(source.contains(
+            "Result<V2RealComparatorPredictionReceipt, V2RealSubjectAdapterError>"
+        ));
+        assert!(!source.contains("Result<ConsequencePrediction, V2RealSubjectAdapterError>"));
+        assert!(source.contains("pub(super) fn into_prediction(self)"));
+    }
+
+    #[test]
+    fn role_receipts_are_move_only_by_source_contract() {
+        let source = include_str!("v2_real_subject_adapters.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        let target_start = source.find("struct V2RealTargetPredictionReceipt").unwrap();
+        let comparator_start = source
+            .find("struct V2RealComparatorPredictionReceipt")
+            .unwrap();
+        let target_prefix = &source[target_start.saturating_sub(80)..target_start];
+        let comparator_prefix = &source[comparator_start.saturating_sub(80)..comparator_start];
+        assert!(!target_prefix.contains("Clone"));
+        assert!(!target_prefix.contains("Copy"));
+        assert!(!comparator_prefix.contains("Clone"));
+        assert!(!comparator_prefix.contains("Copy"));
+    }
+
+    #[test]
+    fn receipt_encoding_uses_no_debug_or_display_strings() {
+        let source = include_str!("v2_real_subject_adapters.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        assert!(!source.contains("format!("));
+        assert!(!source.contains("{:?}"));
+        assert!(source.contains("action_index(prediction.action)"));
+        assert!(source.contains("encode_public_value(bytes, *field)"));
+        assert!(source.contains("ticket.domain().fep_modality().as_bytes()"));
+    }
+
+    #[test]
+    fn source_defines_no_campaign_loop_reveal_scoring_or_learning_authority() {
         let source = include_str!("v2_real_subject_adapters.rs")
             .split("#[cfg(test)]")
             .next()
@@ -277,19 +596,21 @@ mod tests {
             "0..128",
             ".reveal(",
             "score_consequence(",
-            "V2HeldOutRevealProtocol::synthetic_canonical",
-            "V2ShadowCampaignReport",
             "materialize_heldout_plan",
+            "learn_from_actual(",
+            "freeze_for_evaluation(",
+            "FepEvaluationSnapshot",
+            "ActiveInferenceAgent",
         ] {
             assert!(
                 !source.contains(forbidden),
-                "adapter layer must not become a campaign runner: {forbidden}"
+                "adapter receipt layer must not gain execution authority: {forbidden}"
             );
         }
     }
 
     #[test]
-    fn prediction_surface_is_partition_neutral() {
+    fn prediction_surface_is_partition_neutral_and_one_shot() {
         let source = include_str!("v2_real_subject_adapters.rs")
             .split("#[cfg(test)]")
             .next()
@@ -297,28 +618,7 @@ mod tests {
         assert!(source.contains("V2ProspectiveTicket"));
         assert!(!source.contains("V2HeldOutTicket"));
         assert!(source.contains("ticket.domain().fep_modality()"));
-    }
-
-    #[test]
-    fn target_adapter_has_only_one_shot_prediction_reachability() {
-        let source = include_str!("v2_real_subject_adapters.rs")
-            .split("#[cfg(test)]")
-            .next()
-            .unwrap();
-        assert!(source.contains(".trial()"));
-        assert!(source.contains(".predict_once("));
-        for forbidden in [
-            "FepPredictionSession::",
-            "FepEvaluationSnapshot",
-            "learn_from_actual(",
-            "freeze_for_evaluation(",
-            "ActiveInferenceAgent",
-        ] {
-            assert!(
-                !source.contains(forbidden),
-                "real target adapter must not reach trainable FEP authority: {forbidden}"
-            );
-        }
+        assert!(source.contains(".trial().predict_once("));
     }
 
     #[test]
@@ -344,18 +644,6 @@ mod tests {
         assert!(source.contains("campaign.selected_comparator()"));
         assert!(source.contains("campaign.manifest()"));
         assert_eq!(source.matches("pub(super) fn bind(").count(), 0);
-    }
-
-    #[test]
-    fn both_adapters_bind_typed_manifest_not_raw_expected_ids() {
-        let source = include_str!("v2_real_subject_adapters.rs")
-            .split("#[cfg(test)]")
-            .next()
-            .unwrap();
-        assert!(source.contains("manifest.learned_subject_commitment()"));
-        assert!(source.contains("manifest.selected_comparator_commitment()"));
-        assert!(source.matches("TicketCampaignMismatch").count() >= 3);
-        assert!(source.contains("V2RealSubjectAdapterPair"));
     }
 
     #[test]
