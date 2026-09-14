@@ -24,11 +24,13 @@
 //! - Evidence-seeking V3 planning with Select / NeedEvidence / Abstain outcomes
 //! - Live primitive identity recovery with explicit objective-evidence gaps
 //! - Append-only evidence acquisition sessions with hash-chained deterministic replanning
+//! - Direct ActivePrimitive evidence preservation with HDC identity auditing
 
 pub mod athena;
 pub mod causal_consciousness;
 pub mod causal_discovery;
 pub mod nixos_causal;
+pub mod reasoning_active_primitive_evidence;
 pub mod reasoning_capability_artifact;
 pub mod reasoning_capability_bundle;
 pub mod reasoning_capability_matrix;
@@ -57,6 +59,12 @@ pub use causal_consciousness::{
 };
 pub use causal_discovery::{CausalDirection, CausalDiscoveryEngine, MetaFeatures};
 pub use nixos_causal::NixOSCausalAnalyzer;
+pub use reasoning_active_primitive_evidence::{
+    adapt_active_primitive_evidence, plan_active_primitive_evidence,
+    ActivePrimitiveActivationEvidence, ActivePrimitiveEvidenceError, ActivePrimitiveEvidenceProfile,
+    ActivePrimitiveEvidenceReport, ActivePrimitiveIdentityAudit, ObservedPrimitiveMetadata,
+    ACTIVE_PRIMITIVE_EVIDENCE_ADAPTER_VERSION,
+};
 pub use reasoning_capability_artifact::{
     CapabilityArtifactError, ReasoningCapabilityArtifact,
     REASONING_CAPABILITY_ARTIFACT_SCHEMA_VERSION, REASONING_CAPABILITY_ARTIFACT_SERIALIZATION,
