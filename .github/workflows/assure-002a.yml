@@ -1,0 +1,93 @@
+name: ASSURE-002A Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-assurance-semantics/**'
+      - 'crates/core/symthaea-assurance-core/**'
+      - 'Cargo.lock'
+      - '.github/workflows/assure-002a.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-002a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+      - name: Prove exact candidate subject
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\n' "$EXPECTED_HEAD" "$ACTUAL_HEAD"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          git diff --exit-code
+      - name: Format
+        run: cargo fmt --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml -- --check
+      - name: Check and expose lock reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml
+          git diff -- Cargo.lock || true
+      - name: Capture reconciled lock evidence
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/assure-002a-lock
+          cp Cargo.lock target/assure-002a-lock/Cargo.lock
+          LOCK_SHA256="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          {
+            printf 'candidate_head=%s\n' "$EXPECTED_HEAD"
+            printf 'lock_sha256=%s\n' "$LOCK_SHA256"
+            rustc --version
+            cargo --version
+          } > target/assure-002a-lock/MANIFEST.txt
+          cat target/assure-002a-lock/MANIFEST.txt
+      - name: Upload reconciled lock evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-002a-lock-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/assure-002a-lock/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Test
+        run: cargo test --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml --all-targets -- -D warnings
+      - name: Require committed lock parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
+      - name: Prove tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
