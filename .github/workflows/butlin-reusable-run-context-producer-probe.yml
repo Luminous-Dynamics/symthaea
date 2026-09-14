@@ -25,11 +25,13 @@ permissions: {}
 
 jobs:
   produce:
-    name: Produce exact-run context probe artifact
+    name: Produce and attest exact-run context probe artifact
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     permissions:
       contents: read
+      id-token: write
+      attestations: write
     outputs:
       observed_run_id: ${{ steps.observe.outputs.observed_run_id }}
       observed_run_attempt: ${{ steps.observe.outputs.observed_run_attempt }}
@@ -63,13 +65,13 @@ jobs:
           rm -rf "$out"
           mkdir -p "$out"
           /usr/bin/jq -n \
-            --arg schema butlin-reusable-run-context-producer-v1 \
+            --arg schema butlin-reusable-run-context-producer-v2 \
             --arg run_id "$GITHUB_RUN_ID" \
             --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
             --arg workflow_sha "$OBSERVED_WORKFLOW_SHA" \
             --arg workflow_repository "$OBSERVED_WORKFLOW_REPOSITORY" \
             --arg workflow_path "$OBSERVED_WORKFLOW_PATH" \
-            '{schema:$schema,run_id:$run_id,run_attempt:$run_attempt,workflow_sha:$workflow_sha,workflow_repository:$workflow_repository,workflow_path:$workflow_path,payload:"fixed-platform-probe-v1"}' \
+            '{schema:$schema,run_id:$run_id,run_attempt:$run_attempt,workflow_sha:$workflow_sha,workflow_repository:$workflow_repository,workflow_path:$workflow_path,payload:"fixed-attested-platform-probe-v2"}' \
             > "$out/payload.json"
           test -s "$out/payload.json"
 
@@ -79,10 +81,28 @@ jobs:
           echo "observed_workflow_path=$OBSERVED_WORKFLOW_PATH" >> "$GITHUB_OUTPUT"
           echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
 
-      - name: Upload exact-run probe artifact
+      - name: Attest exact producer probe payload
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ runner.temp }}/butlin-reusable-run-context-producer/payload.json
+
+      - name: Preserve exact attestation bundle
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test -f "$BUNDLE_PATH"
+          test -s "$BUNDLE_PATH"
+          cp "$BUNDLE_PATH" "$RUNNER_TEMP/butlin-reusable-run-context-producer/attestation.json"
+
+      - name: Upload exact-run attested probe artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.observe.outputs.artifact_name }}
-          path: ${{ runner.temp }}/butlin-reusable-run-context-producer/payload.json
+          path: |
+            ${{ runner.temp }}/butlin-reusable-run-context-producer/payload.json
+            ${{ runner.temp }}/butlin-reusable-run-context-producer/attestation.json
           if-no-files-found: error
           retention-days: 1
