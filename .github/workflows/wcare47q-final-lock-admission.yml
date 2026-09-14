@@ -1,0 +1,109 @@
+name: WCARE-47Q Exact FINAL Lock Admission
+
+on:
+  push:
+    branches:
+      - wcare-47q-final-lock-admission
+    paths:
+      - .github/workflows/wcare47q-final-lock-admission.yml
+      - scripts/wcare47q_assert_result.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact qualification harness
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify one-commit sibling qualification lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "wcare-47q-final-lock-admission"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test "$(git rev-list --count 0321a22986e5c6bf1a6b099d30dc75ccc33d9deb..HEAD)" = "1"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test ! -e tools/wcare42_builder_attestation_verifier/Cargo.lock
+          python3 -m py_compile scripts/wcare47q_assert_result.py
+          printf '%s\n' 'PASS_WCARE47Q_SIBLING_LINEAGE'
+
+      - name: Checkout exact WCARE-48 FINAL candidate
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 5bc23735f545b1b82044820f0e02ece59be04b4a
+          fetch-depth: 0
+          persist-credentials: false
+          path: candidate
+
+      - name: Bind frozen verifier and exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd candidate
+          FINAL="5bc23735f545b1b82044820f0e02ece59be04b4a"
+          PREPARED="52d1d9fb741250ab8bcab205113689a8cc9431bb"
+          W47="0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          LOCK="tools/wcare42_builder_attestation_verifier/Cargo.lock"
+
+          test "$(git rev-parse HEAD)" = "$FINAL"
+          test "$(git rev-parse HEAD^)" = "$PREPARED"
+          git merge-base --is-ancestor "$W47" HEAD
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+          test "$(git rev-parse HEAD:docs/release/evidence/WCARE47_STANDALONE_LOCK_ADMISSION_PROTOCOL_V1.md)" = "331d911cb60a0e9e899a4f9ca359381702090b66"
+          test "$(git rev-parse HEAD:docs/release/evidence/WCARE47_LOCK_ADMISSION_RESULT_SCHEMA_V1.json)" = "e16c822c4b41bf2cede04745ad4f0cefdab973d9"
+          test "$(git rev-parse HEAD:scripts/wcare47_lock_admit.py)" = "0456dd638b11d17efdc64ce3d64cbcebab060308"
+          test "$(git rev-parse HEAD:scripts/wcare47_selftest.py)" = "1fe7dbbee0ec9d3336410d12ab521a77efd7211c"
+          test "$(git rev-parse HEAD:scripts/wcare47-integrity.sh)" = "015c43cdc4cd726df212739401c0e0f0cbc62950"
+
+          test "$(git rev-parse HEAD:tools/wcare42_builder_attestation_verifier/Cargo.toml)" = "5410040e5616241dd4ba581af8f297675d083830"
+          test "$(git rev-parse HEAD:tools/wcare42_builder_attestation_verifier/src/main.rs)" = "1c300a455f054d118e55556aac81b623824629bc"
+          test "$(git rev-parse HEAD:tools/wcare42_builder_attestation_verifier/tests/golden.rs)" = "666242f74fb302f9be2b62fa4b3050f3ee9ffefd"
+          test "$(git rev-parse HEAD:rust-toolchain.toml)" = "4f0430eac96d545bcfaa0df23ce475faf4aee96a"
+          test "$(git rev-parse HEAD:$LOCK)" = "1a9b126e3d5062bd3be5290bfa5930d189760ceb"
+          test "$(sha256sum "$LOCK" | awk '{print $1}')" = "7288b7dd64b533a4e08ae9a66ff120fb69d5885effd80b0e3b7f51455028d976"
+          printf '%s\n' 'PASS_WCARE47Q_EXACT_SUBJECT_BINDING'
+
+      - name: Install exact Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          cd candidate
+          rustup override set 1.96.0
+          rustc --version | grep -Eq '^rustc 1\.96\.0 '
+          cargo --version | grep -Eq '^cargo 1\.96\.0 '
+          rustc -Vv
+          cargo -Vv
+
+      - name: Execute frozen WCARE-47 admission theorem
+        shell: bash
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/wcare47q-target
+        run: |
+          set -euo pipefail
+          unset RUSTC_WRAPPER RUSTC_WORKSPACE_WRAPPER RUSTFLAGS CARGO_ENCODED_RUSTFLAGS || true
+          rm -rf "$CARGO_TARGET_DIR"
+          cd candidate
+
+          bash scripts/wcare47-integrity.sh | tee "$RUNNER_TEMP/wcare47q-output.log"
+          cd ..
+          python3 scripts/wcare47q_assert_result.py "$RUNNER_TEMP/wcare47q-output.log" \
+            | tee "$RUNNER_TEMP/wcare47q-result.json"
+
+          grep -Fq 'PASS_PROTOCOL_INTEGRITY' "$RUNNER_TEMP/wcare47q-output.log"
+          grep -Fq 'PASS_WCARE47_CURRENT_STATE:LOCK_ADMITTED' "$RUNNER_TEMP/wcare47q-output.log"
+          test -z "$(git -C candidate status --porcelain=v1 --untracked-files=no)"
+          printf 'WCARE47Q_RESULT_SHA256=%s\n' "$(sha256sum "$RUNNER_TEMP/wcare47q-result.json" | awk '{print $1}')"
+          printf '%s\n' 'PASS_WCARE47Q_EXACT_FINAL_LOCK_ADMISSION'
