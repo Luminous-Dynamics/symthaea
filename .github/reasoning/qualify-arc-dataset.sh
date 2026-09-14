@@ -39,6 +39,9 @@ if [[ ! "$SYMTHAEA_ARC_EXPECTED_TASKS" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
+export SYMTHAEA_ARC_DATASET_REPOSITORY="${SYMTHAEA_ARC_DATASET_REPOSITORY:-arcprize/ARC-AGI-2}"
+expected_remote="https://github.com/${SYMTHAEA_ARC_DATASET_REPOSITORY}.git"
+
 repo_root="$(git rev-parse --show-toplevel)"
 subject_head_before="$(git rev-parse HEAD)"
 subject_tree_before="$(git rev-parse 'HEAD^{tree}')"
@@ -54,10 +57,30 @@ if [[ -n "$subject_status_before" ]]; then
   exit 2
 fi
 
+if [[ -L "$SYMTHAEA_ARC_DATASET_ROOT" ]]; then
+  echo "ARC dataset root must not be a symlink: $SYMTHAEA_ARC_DATASET_ROOT" >&2
+  exit 2
+fi
 if [[ ! -d "$SYMTHAEA_ARC_DATASET_ROOT/.git" ]]; then
   echo "ARC dataset root is not a Git checkout: $SYMTHAEA_ARC_DATASET_ROOT" >&2
   exit 2
 fi
+
+origin_url="$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" remote get-url origin)"
+if [[ "$origin_url" != "$expected_remote" ]]; then
+  echo "ARC dataset origin $origin_url does not equal qualified repository $expected_remote" >&2
+  exit 2
+fi
+
+python3 - "$SYMTHAEA_ARC_DATASET_ROOT" "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" <<'PY'
+import os
+import sys
+
+root = os.path.realpath(sys.argv[1])
+output = os.path.realpath(os.path.abspath(sys.argv[2]))
+if os.path.commonpath([root, output]) == root:
+    raise SystemExit("dataset manifest output must be outside the dataset checkout")
+PY
 
 dataset_head_before="$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse HEAD)"
 dataset_tree_before="$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse 'HEAD^{tree}')"
@@ -83,7 +106,6 @@ if [[ ! -x "$manifest_bin" ]]; then
   exit 2
 fi
 
-export SYMTHAEA_ARC_DATASET_REPOSITORY="${SYMTHAEA_ARC_DATASET_REPOSITORY:-arcprize/ARC-AGI-2}"
 "$manifest_bin"
 
 if [[ ! -s "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" ]]; then
@@ -92,11 +114,14 @@ if [[ ! -s "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" ]]; then
 fi
 
 python3 - "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" <<'PY'
+import hashlib
 import json
+import os
 import re
 import sys
 
 path = sys.argv[1]
+root = os.path.realpath(os.environ["SYMTHAEA_ARC_DATASET_ROOT"])
 with open(path, "r", encoding="utf-8") as handle:
     manifest = json.load(handle)
 
@@ -123,30 +148,57 @@ if manifest["manifest_domain"] != "symthaea/reasoning/arc-dataset-manifest/v1":
     raise SystemExit("unexpected dataset manifest domain")
 if manifest["canonical_encoding"] != "length-prefixed-le64-v1":
     raise SystemExit("unexpected canonical encoding")
+if manifest["repository"] != os.environ["SYMTHAEA_ARC_DATASET_REPOSITORY"]:
+    raise SystemExit("manifest repository identity does not match qualified repository")
+if manifest["revision"] != os.environ["SYMTHAEA_ARC_DATASET_REVISION"]:
+    raise SystemExit("manifest revision does not match qualified revision")
+if manifest["tree"] != os.environ["SYMTHAEA_ARC_DATASET_TREE"]:
+    raise SystemExit("manifest tree does not match qualified tree")
+if manifest["split"] != os.environ["SYMTHAEA_ARC_SPLIT"]:
+    raise SystemExit("manifest split does not match qualified split")
+expected_tasks = int(os.environ["SYMTHAEA_ARC_EXPECTED_TASKS"])
+if manifest["task_count"] != expected_tasks:
+    raise SystemExit(
+        f"manifest task count {manifest['task_count']} does not equal expected {expected_tasks}"
+    )
 if manifest["task_count"] != len(manifest["files"]):
     raise SystemExit("task_count does not match file list")
-if manifest["task_count"] <= 0:
-    raise SystemExit("dataset manifest is empty")
+if manifest["canonical_byte_length"] <= 0:
+    raise SystemExit("canonical manifest encoding is empty")
+
 hex64 = re.compile(r"^[0-9a-f]{64}$")
 if not hex64.fullmatch(manifest["manifest_blake3"]):
     raise SystemExit("invalid manifest BLAKE3 digest")
 if not hex64.fullmatch(manifest["manifest_sha256"]):
     raise SystemExit("invalid manifest SHA-256 digest")
+
 paths = [entry["relative_path"] for entry in manifest["files"]]
 if paths != sorted(paths):
     raise SystemExit("manifest paths are not sorted")
 if len(paths) != len(set(paths)):
     raise SystemExit("manifest contains duplicate paths")
+
 expected_prefix = f"data/{manifest['split']}/"
 for entry in manifest["files"]:
-    if not entry["relative_path"].startswith(expected_prefix):
-        raise SystemExit(f"task path escaped selected split: {entry['relative_path']}")
+    relative = entry["relative_path"]
+    if not relative.startswith(expected_prefix):
+        raise SystemExit(f"task path escaped selected split: {relative}")
     if entry["byte_length"] <= 0:
-        raise SystemExit(f"empty ARC task: {entry['relative_path']}")
+        raise SystemExit(f"empty ARC task: {relative}")
     if not hex64.fullmatch(entry["blake3"]):
-        raise SystemExit(f"invalid BLAKE3 for {entry['relative_path']}")
+        raise SystemExit(f"invalid BLAKE3 for {relative}")
     if not hex64.fullmatch(entry["sha256"]):
-        raise SystemExit(f"invalid SHA-256 for {entry['relative_path']}")
+        raise SystemExit(f"invalid SHA-256 for {relative}")
+
+    task_path = os.path.realpath(os.path.join(root, relative))
+    if os.path.commonpath([root, task_path]) != root:
+        raise SystemExit(f"task path escapes dataset checkout: {relative}")
+    with open(task_path, "rb") as handle:
+        payload = handle.read()
+    if len(payload) != entry["byte_length"]:
+        raise SystemExit(f"byte length mismatch for {relative}")
+    if hashlib.sha256(payload).hexdigest() != entry["sha256"]:
+        raise SystemExit(f"independent SHA-256 mismatch for {relative}")
 PY
 
 subject_head_after="$(git rev-parse HEAD)"
