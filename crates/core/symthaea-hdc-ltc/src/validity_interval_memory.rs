@@ -16,18 +16,39 @@
 //! sampled uniformly from `[-pi, pi)`, distinct integer checkpoint offsets are
 //! orthogonal in expectation. Finite-dimensional cleanup error is therefore a
 //! measurable crosstalk question rather than an implicit timestamp heuristic.
+//!
+//! ## Finite-precision causal-time contract
+//!
+//! Discrete checkpoint `n` is mapped to the binary64 coordinate `n + 1/2`.
+//! That half-integer is represented exactly only while `n < 2^52`, because the
+//! odd numerator `2n + 1` must fit the 53-bit binary64 significand. Public
+//! checkpoint queries therefore reject `n >= 2^52`; closed spans may end at
+//! `2^52` but may not contain a checkpoint at or beyond that boundary.
+//!
+//! This is a coordinate-representation guarantee only. It does not claim exact
+//! trigonometric argument reduction or unlimited-duration historical memory.
 
 use crate::continuous_hv::UnitaryRole;
 use crate::temporal_phasor::{TemporalAlgebraError, TemporalAxis, TemporalPhasor};
 use std::fmt;
 
-const SERIES_EPSILON: f64 = 1e-12;
+/// Exclusive upper bound for a discrete checkpoint whose center `n + 1/2` is
+/// exactly representable as a binary64 value.
+pub const EXACT_CAUSAL_CHECKPOINT_LIMIT: u64 = 1_u64 << 52;
+
+const SINC_TAYLOR_THRESHOLD: f64 = 1.0e-4;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValidityMemoryError {
     ZeroDimension,
     DimensionMismatch { expected: usize, actual: usize },
     InvalidCheckpointInterval { start: u64, end_exclusive: u64 },
+    CheckpointOutOfExactRange { checkpoint: u64, limit_exclusive: u64 },
+    CheckpointIntervalOutOfExactRange {
+        start: u64,
+        end_exclusive: u64,
+        limit_exclusive: u64,
+    },
     TooFewCandidates { count: usize },
     Temporal(TemporalAlgebraError),
     NonFiniteScore,
@@ -44,6 +65,21 @@ impl fmt::Display for ValidityMemoryError {
             Self::InvalidCheckpointInterval { start, end_exclusive } => write!(
                 f,
                 "validity interval must satisfy start < end_exclusive, got [{start}, {end_exclusive})"
+            ),
+            Self::CheckpointOutOfExactRange {
+                checkpoint,
+                limit_exclusive,
+            } => write!(
+                f,
+                "checkpoint {checkpoint} is outside the exact binary64 causal-coordinate domain 0..{limit_exclusive}"
+            ),
+            Self::CheckpointIntervalOutOfExactRange {
+                start,
+                end_exclusive,
+                limit_exclusive,
+            } => write!(
+                f,
+                "validity interval [{start}, {end_exclusive}) exceeds the exact binary64 causal-coordinate domain 0..={limit_exclusive} for interval boundaries"
             ),
             Self::TooFewCandidates { count } => write!(
                 f,
@@ -112,6 +148,10 @@ impl ValidityIntervalMemory {
     /// The association role is `key * value`. Because both operands are bipolar
     /// unitary roles, cleanup with the same key and candidate value is an exact
     /// sign unbinding before temporal correlation.
+    ///
+    /// `start` must be a valid checkpoint and `end_exclusive` may be at most
+    /// [`EXACT_CAUSAL_CHECKPOINT_LIMIT`], so every represented checkpoint center
+    /// remains an exactly representable half-integer before phase evaluation.
     pub fn write_span(
         &mut self,
         axis: &TemporalAxis,
@@ -122,25 +162,16 @@ impl ValidityIntervalMemory {
     ) -> Result<(), ValidityMemoryError> {
         self.check_axis_and_role(axis, key)?;
         self.check_role(value)?;
-        if start >= end_exclusive {
-            return Err(ValidityMemoryError::InvalidCheckpointInterval {
-                start,
-                end_exclusive,
-            });
-        }
+        validate_checkpoint_interval(start, end_exclusive)?;
 
         let association = key.compose(value);
         let count = end_exclusive - start;
-        let midpoint = start as f64 + count as f64 / 2.0;
+        // Both boundaries are exact integers in the declared domain; their sum
+        // is at most 2^53 and therefore still exactly representable in binary64.
+        let midpoint = 0.5 * (start as f64 + end_exclusive as f64);
 
         for (i, &omega) in axis.frequencies().iter().enumerate() {
-            let half_omega = 0.5 * omega;
-            let denominator = half_omega.sin();
-            let amplitude = if denominator.abs() <= SERIES_EPSILON {
-                count as f64
-            } else {
-                (0.5 * count as f64 * omega).sin() / denominator
-            };
+            let amplitude = dirichlet_amplitude(count, omega);
             let phase = omega * midpoint;
             let (sin, cos) = phase.sin_cos();
             let sign = association.as_slice()[i] as f64;
@@ -156,7 +187,7 @@ impl ValidityIntervalMemory {
     ///
     /// Checkpoint `n` is represented at `n + 1/2`, safely inside its half-open
     /// validity cell. The score is the mean real correlation after sign-unbinding
-    /// the key/value association.
+    /// the key/value association. `n` must satisfy `n < 2^52`.
     pub fn score_candidate(
         &self,
         axis: &TemporalAxis,
@@ -166,6 +197,7 @@ impl ValidityIntervalMemory {
     ) -> Result<f64, ValidityMemoryError> {
         self.check_axis_and_role(axis, key)?;
         self.check_role(value)?;
+        validate_checkpoint(checkpoint)?;
         let point = axis.at(checkpoint as f64 + 0.5)?;
         self.score_candidate_at_point(key, value, &point)
     }
@@ -191,6 +223,7 @@ impl ValidityIntervalMemory {
         for candidate in candidates {
             self.check_role(candidate)?;
         }
+        validate_checkpoint(checkpoint)?;
         let point = axis.at(checkpoint as f64 + 0.5)?;
 
         let mut best_index = 0usize;
@@ -269,14 +302,113 @@ impl ValidityIntervalMemory {
     }
 }
 
+#[inline]
+fn validate_checkpoint(checkpoint: u64) -> Result<(), ValidityMemoryError> {
+    if checkpoint < EXACT_CAUSAL_CHECKPOINT_LIMIT {
+        Ok(())
+    } else {
+        Err(ValidityMemoryError::CheckpointOutOfExactRange {
+            checkpoint,
+            limit_exclusive: EXACT_CAUSAL_CHECKPOINT_LIMIT,
+        })
+    }
+}
+
+fn validate_checkpoint_interval(start: u64, end_exclusive: u64) -> Result<(), ValidityMemoryError> {
+    if start >= end_exclusive {
+        return Err(ValidityMemoryError::InvalidCheckpointInterval {
+            start,
+            end_exclusive,
+        });
+    }
+    if start >= EXACT_CAUSAL_CHECKPOINT_LIMIT || end_exclusive > EXACT_CAUSAL_CHECKPOINT_LIMIT {
+        return Err(ValidityMemoryError::CheckpointIntervalOutOfExactRange {
+            start,
+            end_exclusive,
+            limit_exclusive: EXACT_CAUSAL_CHECKPOINT_LIMIT,
+        });
+    }
+    Ok(())
+}
+
+/// Stable `sin(x) / x` with an even Taylor series around zero.
+///
+/// The x^6 truncation is far below binary64 rounding error at the selected
+/// threshold. Outside the threshold the direct quotient is well conditioned.
+#[inline]
+fn stable_sinc(value: f64) -> f64 {
+    if value.abs() <= SINC_TAYLOR_THRESHOLD {
+        let x2 = value * value;
+        1.0 + x2 * (-1.0 / 6.0 + x2 * (1.0 / 120.0 - x2 / 5040.0))
+    } else {
+        value.sin() / value
+    }
+}
+
+/// Dirichlet amplitude for `count` consecutive checkpoint centers.
+///
+/// Algebraically this is `sin(count*x) / sin(x)` for `x = omega / 2`, but the
+/// sinc ratio avoids the invalid denominator-only near-zero shortcut: both the
+/// numerator and denominator receive their correct small-angle treatment.
+#[inline]
+fn dirichlet_amplitude(count: u64, omega: f64) -> f64 {
+    let count_f64 = count as f64;
+    let half_omega = 0.5 * omega;
+    count_f64 * stable_sinc(count_f64 * half_omega) / stable_sinc(half_omega)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SPAN_SUM_TOL: f64 = 1e-6;
 
     fn roles(count: usize, dim: usize, seed: u64) -> Vec<UnitaryRole> {
         (0..count)
             .map(|index| UnitaryRole::new(dim, seed + index as u64))
             .collect()
+    }
+
+    fn explicit_span_components(
+        axis: &TemporalAxis,
+        key: &UnitaryRole,
+        value: &UnitaryRole,
+        start: u64,
+        end_exclusive: u64,
+    ) -> (Vec<f64>, Vec<f64>) {
+        let association = key.compose(value);
+        let mut real = vec![0.0; axis.dim()];
+        let mut imag = vec![0.0; axis.dim()];
+        for checkpoint in start..end_exclusive {
+            let time = checkpoint as f64 + 0.5;
+            for (index, &omega) in axis.frequencies().iter().enumerate() {
+                let phase = omega * time;
+                let (sin, cos) = phase.sin_cos();
+                let sign = association.as_slice()[index] as f64;
+                real[index] += sign * cos;
+                imag[index] += sign * sin;
+            }
+        }
+        (real, imag)
+    }
+
+    fn max_component_error(
+        memory: &ValidityIntervalMemory,
+        expected_real: &[f64],
+        expected_imag: &[f64],
+    ) -> f64 {
+        memory
+            .real
+            .iter()
+            .zip(&memory.imag)
+            .zip(expected_real.iter().zip(expected_imag))
+            .flat_map(|((&actual_real, &actual_imag), (&expected_real, &expected_imag))| {
+                [
+                    (actual_real - expected_real).abs(),
+                    (actual_imag - expected_imag).abs(),
+                ]
+            })
+            .fold(0.0_f64, f64::max)
     }
 
     #[test]
@@ -334,43 +466,130 @@ mod tests {
     }
 
     #[test]
-    fn analytic_span_matches_explicit_checkpoint_sum_at_large_offset() {
-        let dim = 1024;
+    fn sinc_taylor_matches_direct_formula_across_threshold() {
+        for multiplier in [-1.001_f64, -1.0, -0.999, 0.0, 0.999, 1.0, 1.001] {
+            let value = SINC_TAYLOR_THRESHOLD * multiplier;
+            let expected = if value == 0.0 {
+                1.0
+            } else {
+                value.sin() / value
+            };
+            let error = (stable_sinc(value) - expected).abs();
+            assert!(error <= 2.0e-15, "value={value:e}, error={error:e}");
+        }
+    }
+
+    #[test]
+    fn tiny_frequency_large_span_does_not_collapse_to_count() {
+        let count = 1_000_000_000_000_u64;
+        let omega = 1.0e-13_f64;
+        let half_omega = 0.5 * omega;
+        let expected = (count as f64 * half_omega).sin() / half_omega.sin();
+        let actual = dirichlet_amplitude(count, omega);
+        let relative_error = ((actual - expected) / expected).abs();
+        assert!(relative_error < 2.0e-15, "relative_error={relative_error:e}");
+        assert!(
+            (actual - count as f64).abs() > 1.0e8,
+            "large-span tiny-frequency amplitude was incorrectly collapsed to count"
+        );
+    }
+
+    #[test]
+    fn analytic_spans_match_independent_direct_sums_across_log_offsets() {
+        let dim = 512;
         let axis = TemporalAxis::new(dim, 15).unwrap();
         let key = UnitaryRole::new(dim, 16);
         let value = UnitaryRole::new(dim, 17);
-        let start = 1_000_000u64;
-        let end = start + 257;
+        let offsets = [0_u64, 10, 1_000, 100_000, 1_000_000];
+        let lengths = [1_u64, 7, 31, 257];
+        let mut global_max_error = 0.0_f64;
 
-        let mut analytic = ValidityIntervalMemory::new(dim).unwrap();
-        analytic.write_span(&axis, &key, &value, start, end).unwrap();
-
-        let mut explicit = ValidityIntervalMemory::new(dim).unwrap();
-        for checkpoint in start..end {
-            explicit
-                .write_span(&axis, &key, &value, checkpoint, checkpoint + 1)
-                .unwrap();
+        for start in offsets {
+            for length in lengths {
+                let end = start + length;
+                let mut analytic = ValidityIntervalMemory::new(dim).unwrap();
+                analytic.write_span(&axis, &key, &value, start, end).unwrap();
+                let (expected_real, expected_imag) =
+                    explicit_span_components(&axis, &key, &value, start, end);
+                let error = max_component_error(&analytic, &expected_real, &expected_imag);
+                global_max_error = global_max_error.max(error);
+                assert!(
+                    error < SPAN_SUM_TOL,
+                    "analytic/direct-sum divergence at start={start}, length={length}: {error:e}"
+                );
+                assert_eq!(analytic.spans_written(), 1);
+            }
         }
 
-        let max_abs_error = analytic
-            .real
-            .iter()
-            .zip(&analytic.imag)
-            .zip(explicit.real.iter().zip(&explicit.imag))
-            .flat_map(|((&analytic_real, &analytic_imag), (&explicit_real, &explicit_imag))| {
-                [
-                    (analytic_real - explicit_real).abs(),
-                    (analytic_imag - explicit_imag).abs(),
-                ]
-            })
-            .fold(0.0_f64, f64::max);
+        eprintln!("max analytic/direct-sum component error={global_max_error:.17e}");
+    }
 
+    #[test]
+    fn exact_causal_coordinate_boundary_is_fail_closed() {
+        let dim = 64;
+        let axis = TemporalAxis::new(dim, 18).unwrap();
+        let key = UnitaryRole::new(dim, 19);
+        let values = roles(2, dim, 20);
+        let mut memory = ValidityIntervalMemory::new(dim).unwrap();
+
+        memory
+            .write_span(
+                &axis,
+                &key,
+                &values[0],
+                EXACT_CAUSAL_CHECKPOINT_LIMIT - 2,
+                EXACT_CAUSAL_CHECKPOINT_LIMIT,
+            )
+            .unwrap();
         assert!(
-            max_abs_error < 1e-6,
-            "analytic Dirichlet span diverged from explicit checkpoint sum: {max_abs_error}"
+            memory
+                .score_candidate(
+                    &axis,
+                    &key,
+                    &values[0],
+                    EXACT_CAUSAL_CHECKPOINT_LIMIT - 1,
+                )
+                .unwrap()
+                .is_finite()
         );
-        assert_eq!(analytic.spans_written(), 1);
-        assert_eq!(explicit.spans_written(), 257);
+        assert!(matches!(
+            memory.score_candidate(
+                &axis,
+                &key,
+                &values[0],
+                EXACT_CAUSAL_CHECKPOINT_LIMIT,
+            ),
+            Err(ValidityMemoryError::CheckpointOutOfExactRange { .. })
+        ));
+        assert!(matches!(
+            memory.cleanup(
+                &axis,
+                &key,
+                &values,
+                EXACT_CAUSAL_CHECKPOINT_LIMIT,
+            ),
+            Err(ValidityMemoryError::CheckpointOutOfExactRange { .. })
+        ));
+        assert!(matches!(
+            memory.write_span(
+                &axis,
+                &key,
+                &values[0],
+                EXACT_CAUSAL_CHECKPOINT_LIMIT - 1,
+                EXACT_CAUSAL_CHECKPOINT_LIMIT + 1,
+            ),
+            Err(ValidityMemoryError::CheckpointIntervalOutOfExactRange { .. })
+        ));
+        assert!(matches!(
+            memory.write_span(
+                &axis,
+                &key,
+                &values[0],
+                EXACT_CAUSAL_CHECKPOINT_LIMIT,
+                EXACT_CAUSAL_CHECKPOINT_LIMIT + 1,
+            ),
+            Err(ValidityMemoryError::CheckpointIntervalOutOfExactRange { .. })
+        ));
     }
 
     #[test]

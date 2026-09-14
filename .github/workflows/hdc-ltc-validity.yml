@@ -1,0 +1,96 @@
+name: HDC-LTC Validity Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-hdc-ltc/**"
+      - "scripts/run_hls_validity_evidence_v2.sh"
+      - ".github/workflows/hdc-ltc-validity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hdc-ltc-validity-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: HDC-LTC validity theorem + oracle + evidence smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Cache Cargo inputs
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/hdc-ltc-validity
+          key: ${{ runner.os }}-hdc-ltc-validity-${{ hashFiles('Cargo.lock', 'crates/core/symthaea-hdc-ltc/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-hdc-ltc-validity-
+
+      - name: Test all HDC-LTC targets
+        env:
+          CARGO_TARGET_DIR: target/hdc-ltc-validity
+        run: cargo test --locked -p symthaea-hdc-ltc --all-targets
+
+      - name: Clippy all HDC-LTC targets
+        env:
+          CARGO_TARGET_DIR: target/hdc-ltc-validity
+        run: cargo clippy --locked -p symthaea-hdc-ltc --all-targets -- -D warnings
+
+      - name: Execute source-bound evidence-v2 smoke qualification
+        run: |
+          subject_sha="$(git rev-parse HEAD)"
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          receipt="$RUNNER_TEMP/qualification-receipt.txt"
+          {
+            printf 'qualification=hdc-ltc-validity-v1\n'
+            printf 'subject_sha=%s\n' "$subject_sha"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'protocol=smoke\n'
+          } > "$receipt"
+
+          scripts/run_hls_validity_evidence_v2.sh \
+            --subject-sha "$subject_sha" \
+            --protocol smoke \
+            --base-evidence-out "$RUNNER_TEMP/validity-capacity-v1.jsonl" \
+            --supplement-out "$RUNNER_TEMP/validity-capacity-v2.jsonl" \
+            | tee -a "$receipt"
+
+      - name: Verify qualification did not mutate subject
+        run: |
+          expected_sha="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$expected_sha"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          {
+            printf 'postflight_subject_sha=%s\n' "$actual_sha"
+            printf 'postflight_checkout_clean=true\n'
+          } >> "$RUNNER_TEMP/qualification-receipt.txt"
+
+      - name: Retain exact-head qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdc-ltc-validity-${{ github.event.pull_request.head.sha || github.sha }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            ${{ runner.temp }}/qualification-receipt.txt
+            ${{ runner.temp }}/validity-capacity-v1.jsonl
+            ${{ runner.temp }}/validity-capacity-v2.jsonl
