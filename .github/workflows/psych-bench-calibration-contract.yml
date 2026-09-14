@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - psych-bench/calibration-manifest-contract
+      - psych-bench/calibration-frozen-receipt
     paths:
       - '.github/workflows/psych-bench-calibration-contract.yml'
       - 'crates/domains/symthaea-psych-bench/src/calibration_contract.rs'
