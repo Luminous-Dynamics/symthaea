@@ -112,7 +112,6 @@ jobs:
               if re.search(pattern, executable):
                   raise SystemExit(f"forbidden CORE-ID production authority: {pattern}")
 
-          # Runtime dependency surface is deliberately tiny.
           deps = manifest.split("[dependencies]", 1)[1].split("[dev-dependencies]", 1)[0]
           dep_lines = [
               line.strip() for line in deps.splitlines()
@@ -157,6 +156,7 @@ jobs:
           mkdir -p crates/core/symthaea-identity/tests
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           vectors = Path('/tmp/core-id-qualified-vectors.tsv')
           out = Path('crates/core/symthaea-identity/tests/core_id_qualified_vectors.rs')
@@ -172,11 +172,13 @@ jobs:
               if not raw or raw.startswith('#'):
                   continue
               name, max_bytes, hex_utf8, expected = raw.split('\t')
+              if not re.fullmatch(r'[A-Za-z0-9_]+', name):
+                  raise SystemExit(f'unsafe vector name: {name!r}')
               data = bytes.fromhex(hex_utf8)
               byte_list = ', '.join(f'0x{byte:02X}' for byte in data)
               want = 'true' if expected == 'accept' else 'false'
               lines.append(
-                  f'    assert_eq!(CanonicalIdentifier::<{int(max_bytes)}>::from_utf8_bytes(vec![{byte_list}]).is_ok(), {want}, {name!r});'
+                  f'    assert_eq!(CanonicalIdentifier::<{int(max_bytes)}>::from_utf8_bytes(vec![{byte_list}]).is_ok(), {want}, "{name}");'
               )
               count += 1
           if count != 71:
