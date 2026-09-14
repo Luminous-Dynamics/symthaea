@@ -498,10 +498,7 @@ pub fn apply_epistemic_grounding_measurements(
                     found: measurement.primitive_encoding_digest.clone(),
                 });
             }
-            if matches!(
-                &candidate.epistemic_grounding.status,
-                ObjectiveEvidenceStatus::Observed { .. }
-            ) {
+            if candidate.epistemic_grounding.is_observed() {
                 return Err(EpistemicGroundingMeasurementError::AxisAlreadyObserved(
                     profile.candidate_id.clone(),
                 ));

@@ -1,12 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Evidence-bearing objective selection with explicit unknowns.
+//! Evidence-bearing objective selection with explicit unknowns and bounded measurements.
 //!
-//! Numeric defaults are not evidence. This module separates observed objective values from
-//! unknown/unavailable ones and propagates that uncertainty as score intervals. A candidate is
-//! selected only when its conservative lower bound is strictly above every competitor's possible
-//! upper bound. Otherwise the result is explicitly underdetermined.
+//! Numeric defaults are not evidence. This module separates exact observed points, bounded
+//! observed intervals, and unknown/unavailable objectives. Those bounds propagate through the
+//! context-weighted robust selector without being collapsed to a midpoint. A candidate is selected
+//! only when its conservative lower bound is strictly above every competitor's possible upper
+//! bound. Otherwise the result is explicitly underdetermined.
+//!
+//! An observed interval is only a bounded measurement claim. It is not called a confidence or
+//! credible interval unless the producing adapter independently establishes that stronger meaning.
 
 use super::reasoning_context_competition::ContextAssessmentReport;
 use super::reasoning_objective_core::{ObjectiveKind, ObjectiveWeights};
@@ -14,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 
-pub const OBJECTIVE_EVIDENCE_SELECTOR_VERSION: &str = "rq-006-objective-evidence-v1";
+pub const OBJECTIVE_EVIDENCE_SELECTOR_VERSION: &str = "rq-006-objective-evidence-v2";
 const SELECTION_EPSILON: f64 = 1.0e-12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,16 +28,20 @@ pub enum ObjectiveUnknownReason {
     Invalidated,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ObjectiveEvidenceStatus {
+    /// The producer claims an exact point value under its declared measurement semantics.
     Observed { value: f64 },
+    /// The producer can bound the objective but cannot justify collapsing it to an exact point.
+    ObservedInterval { lower: f64, upper: f64 },
     Unknown { reason: ObjectiveUnknownReason },
 }
 
 /// Evidence for one objective axis.
 ///
-/// `source` identifies the measuring adapter. Observed values require at least one evidence ref.
-/// Unknown values may have zero refs when the point is precisely that no measurement exists.
+/// `source` identifies the measuring adapter. Observed points and intervals require at least one
+/// evidence ref. Unknown values may have zero refs when the point is precisely that no measurement
+/// exists.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveEvidence {
     pub source: String,
@@ -51,6 +59,21 @@ impl ObjectiveEvidence {
             source: source.into(),
             evidence_refs,
             status: ObjectiveEvidenceStatus::Observed { value },
+        };
+        evidence.validate()?;
+        Ok(evidence)
+    }
+
+    pub fn observed_interval(
+        source: impl Into<String>,
+        evidence_refs: Vec<String>,
+        lower: f64,
+        upper: f64,
+    ) -> Result<Self, ObjectiveEvidenceError> {
+        let evidence = Self {
+            source: source.into(),
+            evidence_refs,
+            status: ObjectiveEvidenceStatus::ObservedInterval { lower, upper },
         };
         evidence.validate()?;
         Ok(evidence)
@@ -88,9 +111,15 @@ impl ObjectiveEvidence {
         match self.status {
             ObjectiveEvidenceStatus::Observed { value } => {
                 validate_unit("objective.value", value)?;
-                if self.evidence_refs.is_empty() {
-                    return Err(ObjectiveEvidenceError::ObservedWithoutEvidence);
+                require_observed_evidence_refs(&self.evidence_refs)?;
+            }
+            ObjectiveEvidenceStatus::ObservedInterval { lower, upper } => {
+                validate_unit("objective.interval.lower", lower)?;
+                validate_unit("objective.interval.upper", upper)?;
+                if lower > upper {
+                    return Err(ObjectiveEvidenceError::InvalidIntervalBounds { lower, upper });
                 }
+                require_observed_evidence_refs(&self.evidence_refs)?;
             }
             ObjectiveEvidenceStatus::Unknown { .. } => {}
         }
@@ -100,6 +129,9 @@ impl ObjectiveEvidence {
     pub fn interval(&self) -> ScoreInterval {
         match self.status {
             ObjectiveEvidenceStatus::Observed { value } => ScoreInterval::point(value),
+            ObjectiveEvidenceStatus::ObservedInterval { lower, upper } => {
+                ScoreInterval { lower, upper }
+            }
             ObjectiveEvidenceStatus::Unknown { .. } => ScoreInterval {
                 lower: 0.0,
                 upper: 1.0,
@@ -108,7 +140,25 @@ impl ObjectiveEvidence {
     }
 
     pub fn is_observed(&self) -> bool {
+        matches!(
+            self.status,
+            ObjectiveEvidenceStatus::Observed { .. }
+                | ObjectiveEvidenceStatus::ObservedInterval { .. }
+        )
+    }
+
+    pub fn is_exact_point(&self) -> bool {
         matches!(self.status, ObjectiveEvidenceStatus::Observed { .. })
+    }
+}
+
+fn require_observed_evidence_refs(
+    evidence_refs: &[String],
+) -> Result<(), ObjectiveEvidenceError> {
+    if evidence_refs.is_empty() {
+        Err(ObjectiveEvidenceError::ObservedWithoutEvidence)
+    } else {
+        Ok(())
     }
 }
 
@@ -135,7 +185,7 @@ impl CandidateObjectiveEvidence {
         Ok(())
     }
 
-    fn axis(&self, kind: ObjectiveKind) -> &ObjectiveEvidence {
+    pub fn axis(&self, kind: ObjectiveKind) -> &ObjectiveEvidence {
         match kind {
             ObjectiveKind::IntegrationProxy => &self.integration_proxy,
             ObjectiveKind::HarmonicAlignment => &self.harmonic_alignment,
@@ -213,8 +263,8 @@ pub struct ObjectiveEvidenceSelectionReport {
 }
 
 /// Select only when the available objective evidence proves one candidate strictly better under
-/// the conservative robust interval. Unknown axes therefore widen uncertainty rather than becoming
-/// fabricated neutral measurements.
+/// the conservative robust interval. Unknown axes and bounded observations therefore widen
+/// uncertainty rather than becoming fabricated neutral or exact measurements.
 pub fn select_from_objective_evidence(
     assessment: &ContextAssessmentReport,
     candidates: &[CandidateObjectiveEvidence],
@@ -355,8 +405,14 @@ fn weighted_interval(candidate: &CandidateObjectiveEvidence, weights: ObjectiveW
     ];
 
     ScoreInterval {
-        lower: axes.iter().map(|(weight, interval)| weight * interval.lower).sum(),
-        upper: axes.iter().map(|(weight, interval)| weight * interval.upper).sum(),
+        lower: axes
+            .iter()
+            .map(|(weight, interval)| weight * interval.lower)
+            .sum(),
+        upper: axes
+            .iter()
+            .map(|(weight, interval)| weight * interval.upper)
+            .sum(),
     }
 }
 
@@ -366,7 +422,14 @@ pub enum ObjectiveEvidenceError {
     EmptyEvidenceRef,
     DuplicateEvidenceRef(String),
     ObservedWithoutEvidence,
-    InvalidUnitValue { field: &'static str, value: f64 },
+    InvalidUnitValue {
+        field: &'static str,
+        value: f64,
+    },
+    InvalidIntervalBounds {
+        lower: f64,
+        upper: f64,
+    },
     EmptyActiveContextSet,
     EmptyCandidateSet,
     DuplicateActiveContext(crate::consciousness::context_aware_evolution::ReasoningContext),
@@ -387,7 +450,13 @@ impl fmt::Display for ObjectiveEvidenceError {
             Self::InvalidUnitValue { field, value } => {
                 write!(f, "`{field}` must be finite and within [0, 1], got {value}")
             }
-            Self::EmptyActiveContextSet => write!(f, "objective evidence selection requires active contexts"),
+            Self::InvalidIntervalBounds { lower, upper } => write!(
+                f,
+                "objective interval lower bound {lower} must not exceed upper bound {upper}"
+            ),
+            Self::EmptyActiveContextSet => {
+                write!(f, "objective evidence selection requires active contexts")
+            }
             Self::EmptyCandidateSet => write!(f, "objective evidence selection requires candidates"),
             Self::DuplicateActiveContext(context) => {
                 write!(f, "active context {:?} is duplicated", context)
@@ -436,6 +505,16 @@ mod tests {
 
     fn observed(value: f64, id: &str) -> ObjectiveEvidence {
         ObjectiveEvidence::observed("fixture-objective-source", vec![id.into()], value).unwrap()
+    }
+
+    fn observed_interval(lower: f64, upper: f64, id: &str) -> ObjectiveEvidence {
+        ObjectiveEvidence::observed_interval(
+            "fixture-objective-source",
+            vec![id.into()],
+            lower,
+            upper,
+        )
+        .unwrap()
     }
 
     fn unknown(reason: ObjectiveUnknownReason) -> ObjectiveEvidence {
@@ -514,6 +593,76 @@ mod tests {
     }
 
     #[test]
+    fn separated_observed_intervals_can_identify_winner() {
+        let report = select_from_objective_evidence(
+            &assessment(&[(ReasoningContext::GeneralReasoning, 0.9)]),
+            &[
+                candidate(
+                    "weak",
+                    observed_interval(0.10, 0.20, "w-i"),
+                    observed_interval(0.10, 0.20, "w-h"),
+                    observed_interval(0.10, 0.20, "w-e"),
+                ),
+                candidate(
+                    "strong",
+                    observed_interval(0.70, 0.80, "s-i"),
+                    observed_interval(0.70, 0.80, "s-h"),
+                    observed_interval(0.70, 0.80, "s-e"),
+                ),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            report.outcome,
+            ObjectiveEvidenceSelection::Selected { ref candidate_id, .. } if candidate_id == "strong"
+        ));
+    }
+
+    #[test]
+    fn overlapping_observed_intervals_remain_underdetermined() {
+        let report = select_from_objective_evidence(
+            &assessment(&[(ReasoningContext::GeneralReasoning, 0.9)]),
+            &[
+                candidate(
+                    "a",
+                    observed_interval(0.40, 0.70, "a-i"),
+                    observed(0.5, "a-h"),
+                    observed(0.5, "a-e"),
+                ),
+                candidate(
+                    "b",
+                    observed_interval(0.45, 0.65, "b-i"),
+                    observed(0.5, "b-h"),
+                    observed(0.5, "b-e"),
+                ),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            report.outcome,
+            ObjectiveEvidenceSelection::Underdetermined { .. }
+        ));
+    }
+
+    #[test]
+    fn malformed_observed_interval_fails_closed() {
+        assert!(matches!(
+            ObjectiveEvidence::observed_interval("fixture", vec!["e".into()], 0.8, 0.2),
+            Err(ObjectiveEvidenceError::InvalidIntervalBounds {
+                lower: 0.8,
+                upper: 0.2
+            })
+        ));
+        assert!(matches!(
+            ObjectiveEvidence::observed_interval("fixture", vec!["e".into()], -0.1, 0.2),
+            Err(ObjectiveEvidenceError::InvalidUnitValue {
+                field: "objective.interval.lower",
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn exact_known_tie_is_underdetermined_not_arbitrary() {
         let report = select_from_objective_evidence(
             &assessment(&[(ReasoningContext::GeneralReasoning, 0.9)]),
@@ -573,6 +722,9 @@ mod tests {
     fn observed_value_without_provenance_is_rejected() {
         let err = ObjectiveEvidence::observed("fixture", Vec::new(), 0.5).unwrap_err();
         assert_eq!(err, ObjectiveEvidenceError::ObservedWithoutEvidence);
+        let interval_err =
+            ObjectiveEvidence::observed_interval("fixture", Vec::new(), 0.4, 0.6).unwrap_err();
+        assert_eq!(interval_err, ObjectiveEvidenceError::ObservedWithoutEvidence);
     }
 
     #[test]

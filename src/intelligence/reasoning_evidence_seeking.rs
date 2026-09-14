@@ -3,15 +3,16 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Evidence-seeking canonical reasoning planner V3.
 //!
-//! V2 can preserve context ambiguity, but it still assumes every candidate objective is already
-//! represented by a point value. This planner composes context competition with the evidence-
-//! interval selector so that missing measurements become explicit requests rather than fabricated
-//! neutral values.
+//! The planner composes context competition with interval-valued objective evidence. It preserves
+//! three distinct epistemic states:
+//! - missing evidence -> request an initial measurement;
+//! - bounded but still decision-relevant uncertainty -> request refinement;
+//! - exact represented evidence that still cannot identify a winner -> abstain.
 //!
 //! The planner has three legitimate outcomes:
 //! - `Selected`: available evidence strictly identifies one candidate;
-//! - `NeedEvidence`: missing context/objective evidence could change the decision;
-//! - `Abstained`: the represented evidence is complete but still does not identify a winner.
+//! - `NeedEvidence`: additional measurement or refinement could change the decision;
+//! - `Abstained`: exact represented evidence is complete but still does not identify a winner.
 //!
 //! Evidence-request ranking is a deterministic decision-relevance heuristic, not expected value of
 //! information and not a calibrated probability of usefulness.
@@ -22,16 +23,17 @@ use super::reasoning_context_competition::{
 };
 use super::reasoning_objective_core::{ObjectiveKind, ObjectiveWeights};
 use super::reasoning_objective_evidence::{
-    select_from_objective_evidence, CandidateObjectiveEvidence, ObjectiveEvidenceError,
-    ObjectiveEvidenceSelection, ObjectiveEvidenceSelectionReport, ObjectiveEvidenceStatus,
-    ObjectiveUnknownReason,
+    select_from_objective_evidence, CandidateObjectiveEvidence, ObjectiveEvidence,
+    ObjectiveEvidenceError, ObjectiveEvidenceSelection, ObjectiveEvidenceSelectionReport,
+    ObjectiveEvidenceStatus, ObjectiveUnknownReason, ScoreInterval,
 };
 use crate::consciousness::context_aware_evolution::ReasoningContext;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 
-pub const EVIDENCE_SEEKING_PLANNER_VERSION: &str = "rq-006-evidence-seeking-v3";
+pub const EVIDENCE_SEEKING_PLANNER_VERSION: &str = "rq-006-evidence-seeking-v3.1";
+const REFINEMENT_WIDTH_EPSILON: f64 = 1.0e-12;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum EvidenceRequestKind {
@@ -52,6 +54,14 @@ pub enum EvidenceRequestKind {
         reason: ObjectiveUnknownReason,
         source: String,
     },
+    /// A bounded objective measurement exists, but its remaining width can still affect the
+    /// decision. A producer may answer by narrowing the interval; it need not claim an exact point.
+    ObjectiveRefinement {
+        candidate_id: String,
+        objective: ObjectiveKind,
+        source: String,
+        current_interval: ScoreInterval,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -69,9 +79,9 @@ pub struct EvidenceRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidenceSeekingAbstention {
-    /// All represented contender objective axes are observed, but the conservative robust scores
-    /// still do not strictly identify one winner. Repeating the same measurements cannot resolve
-    /// the decision without adding a new discriminating objective/model.
+    /// All decision-relevant contender objective axes are represented as exact points, but the
+    /// conservative robust scores still do not strictly identify one winner. Repeating the same
+    /// measurements cannot resolve the decision without adding a discriminating model/objective.
     FullyObservedUnderdetermination { contender_ids: Vec<String> },
 }
 
@@ -99,9 +109,11 @@ pub struct EvidenceSeekingPlanReport {
     pub outcome: EvidenceSeekingOutcome,
 }
 
-/// Plan a reasoning decision without inventing missing evidence.
+/// Plan a reasoning decision without inventing missing evidence or collapsing bounded evidence to
+/// a point.
 ///
-/// Malformed evidence remains an error. Missing-but-well-formed evidence becomes `NeedEvidence`.
+/// Malformed evidence remains an error. Missing or refinable well-formed evidence becomes
+/// `NeedEvidence`.
 pub fn plan_with_evidence(
     hypotheses: &[ContextHypothesis],
     context_policy: ContextCompetitionPolicy,
@@ -257,21 +269,21 @@ fn objective_requests(
         let Some(candidate) = candidates.get(*source_index) else {
             continue;
         };
-        push_unknown_axis_request(
+        push_axis_request(
             &mut requests,
             assessment,
             candidate,
             ObjectiveKind::IntegrationProxy,
             &candidate.integration_proxy,
         );
-        push_unknown_axis_request(
+        push_axis_request(
             &mut requests,
             assessment,
             candidate,
             ObjectiveKind::HarmonicAlignment,
             &candidate.harmonic_alignment,
         );
-        push_unknown_axis_request(
+        push_axis_request(
             &mut requests,
             assessment,
             candidate,
@@ -289,42 +301,78 @@ fn objective_requests(
     requests
 }
 
-fn push_unknown_axis_request(
+fn push_axis_request(
     requests: &mut Vec<EvidenceRequest>,
     assessment: &ContextAssessmentReport,
     candidate: &CandidateObjectiveEvidence,
     objective: ObjectiveKind,
-    evidence: &super::reasoning_objective_evidence::ObjectiveEvidence,
+    evidence: &ObjectiveEvidence,
 ) {
-    let ObjectiveEvidenceStatus::Unknown { reason } = &evidence.status else {
-        return;
-    };
-    let decision_relevance = assessment
+    let max_weight = assessment
         .active_contexts
         .iter()
         .map(|context| objective_weight(ObjectiveWeights::for_context(*context), objective))
         .fold(0.0_f64, f64::max);
-    requests.push(EvidenceRequest {
-        request_id: format!(
-            "objective:{}:{}",
-            candidate.candidate_id,
-            objective_slug(objective)
-        ),
-        kind: EvidenceRequestKind::ObjectiveMeasurement {
-            candidate_id: candidate.candidate_id.clone(),
-            objective,
-            reason: *reason,
-            source: evidence.source.clone(),
-        },
-        decision_relevance,
-        evidence_refs: evidence.evidence_refs.clone(),
-        rationale: format!(
-            "Candidate `{}` has no observed {} value; this axis carries up to {:.3} policy weight across the active contexts",
-            candidate.candidate_id,
-            objective.label(),
-            decision_relevance
-        ),
-    });
+
+    match evidence.status {
+        ObjectiveEvidenceStatus::Unknown { reason } => {
+            requests.push(EvidenceRequest {
+                request_id: format!(
+                    "objective:{}:{}",
+                    candidate.candidate_id,
+                    objective_slug(objective)
+                ),
+                kind: EvidenceRequestKind::ObjectiveMeasurement {
+                    candidate_id: candidate.candidate_id.clone(),
+                    objective,
+                    reason,
+                    source: evidence.source.clone(),
+                },
+                decision_relevance: max_weight,
+                evidence_refs: evidence.evidence_refs.clone(),
+                rationale: format!(
+                    "Candidate `{}` has no observed {} value; this axis carries up to {:.3} policy weight across the active contexts",
+                    candidate.candidate_id,
+                    objective.label(),
+                    max_weight
+                ),
+            });
+        }
+        ObjectiveEvidenceStatus::ObservedInterval { lower, upper } => {
+            let interval = ScoreInterval { lower, upper };
+            let width = interval.width();
+            if width <= REFINEMENT_WIDTH_EPSILON {
+                return;
+            }
+            let decision_relevance = (max_weight * width).clamp(0.0, 1.0);
+            requests.push(EvidenceRequest {
+                request_id: format!(
+                    "objective-refine:{}:{}",
+                    candidate.candidate_id,
+                    objective_slug(objective)
+                ),
+                kind: EvidenceRequestKind::ObjectiveRefinement {
+                    candidate_id: candidate.candidate_id.clone(),
+                    objective,
+                    source: evidence.source.clone(),
+                    current_interval: interval,
+                },
+                decision_relevance,
+                evidence_refs: evidence.evidence_refs.clone(),
+                rationale: format!(
+                    "Candidate `{}` {} remains bounded in [{:.6}, {:.6}]; interval width {:.6} × max policy weight {:.3} leaves decision relevance {:.6}",
+                    candidate.candidate_id,
+                    objective.label(),
+                    lower,
+                    upper,
+                    width,
+                    max_weight,
+                    decision_relevance
+                ),
+            });
+        }
+        ObjectiveEvidenceStatus::Observed { .. } => {}
+    }
 }
 
 const fn objective_weight(weights: ObjectiveWeights, objective: ObjectiveKind) -> f64 {
@@ -382,7 +430,6 @@ impl From<ObjectiveEvidenceError> for EvidenceSeekingPlannerError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::reasoning_objective_evidence::{ObjectiveEvidence, ObjectiveUnknownReason};
 
     fn hypothesis(context: ReasoningContext, support: f64, id: &str) -> ContextHypothesis {
         ContextHypothesis {
@@ -395,6 +442,16 @@ mod tests {
 
     fn observed(value: f64, id: &str) -> ObjectiveEvidence {
         ObjectiveEvidence::observed("fixture-objective-adapter", vec![id.into()], value).unwrap()
+    }
+
+    fn observed_interval(lower: f64, upper: f64, id: &str) -> ObjectiveEvidence {
+        ObjectiveEvidence::observed_interval(
+            "fixture-objective-adapter",
+            vec![id.into()],
+            lower,
+            upper,
+        )
+        .unwrap()
     }
 
     fn unknown(reason: ObjectiveUnknownReason) -> ObjectiveEvidence {
@@ -523,6 +580,100 @@ mod tests {
             EvidenceRequestKind::ObjectiveMeasurement {
                 objective: ObjectiveKind::EpistemicGrounding,
                 ..
+            }
+        ));
+    }
+
+    #[test]
+    fn overlapping_intervals_request_refinement_instead_of_abstaining() {
+        let report = plan_with_evidence(
+            &[hypothesis(ReasoningContext::GeneralReasoning, 0.9, "query")],
+            ContextCompetitionPolicy::development_v1(),
+            &[
+                candidate(
+                    "a",
+                    observed_interval(0.40, 0.70, "a-i"),
+                    observed(0.5, "a-h"),
+                    observed(0.5, "a-e"),
+                ),
+                candidate(
+                    "b",
+                    observed_interval(0.45, 0.65, "b-i"),
+                    observed(0.5, "b-h"),
+                    observed(0.5, "b-e"),
+                ),
+            ],
+        )
+        .unwrap();
+        let EvidenceSeekingOutcome::NeedEvidence { requests, .. } = report.outcome else {
+            panic!("expected NeedEvidence refinement");
+        };
+        assert_eq!(requests.len(), 2);
+        assert!(matches!(
+            &requests[0].kind,
+            EvidenceRequestKind::ObjectiveRefinement {
+                objective: ObjectiveKind::IntegrationProxy,
+                ..
+            }
+        ));
+        assert!((requests[0].decision_relevance - 0.12).abs() < 1.0e-12);
+        assert!((requests[1].decision_relevance - 0.08).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn refinement_relevance_shrinks_with_interval_width() {
+        let report = plan_with_evidence(
+            &[hypothesis(ReasoningContext::GeneralReasoning, 0.9, "query")],
+            ContextCompetitionPolicy::development_v1(),
+            &[
+                candidate(
+                    "wide",
+                    observed_interval(0.30, 0.70, "wide-i"),
+                    observed(0.5, "wide-h"),
+                    observed(0.5, "wide-e"),
+                ),
+                candidate(
+                    "narrow",
+                    observed_interval(0.45, 0.55, "narrow-i"),
+                    observed(0.5, "narrow-h"),
+                    observed(0.5, "narrow-e"),
+                ),
+            ],
+        )
+        .unwrap();
+        let EvidenceSeekingOutcome::NeedEvidence { requests, .. } = report.outcome else {
+            panic!("expected NeedEvidence refinement");
+        };
+        assert!(requests[0].decision_relevance > requests[1].decision_relevance);
+        assert_eq!(requests[0].request_id, "objective-refine:wide:integration");
+        assert_eq!(requests[1].request_id, "objective-refine:narrow:integration");
+    }
+
+    #[test]
+    fn zero_width_interval_does_not_request_redundant_refinement() {
+        let report = plan_with_evidence(
+            &[hypothesis(ReasoningContext::GeneralReasoning, 0.9, "query")],
+            ContextCompetitionPolicy::development_v1(),
+            &[
+                candidate(
+                    "a",
+                    observed_interval(0.5, 0.5, "a-i"),
+                    observed(0.5, "a-h"),
+                    observed(0.5, "a-e"),
+                ),
+                candidate(
+                    "b",
+                    observed_interval(0.5, 0.5, "b-i"),
+                    observed(0.5, "b-h"),
+                    observed(0.5, "b-e"),
+                ),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            report.outcome,
+            EvidenceSeekingOutcome::Abstained {
+                reason: EvidenceSeekingAbstention::FullyObservedUnderdetermination { .. }
             }
         ));
     }
