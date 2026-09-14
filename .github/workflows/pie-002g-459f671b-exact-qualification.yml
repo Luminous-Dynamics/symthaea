@@ -1,0 +1,209 @@
+name: PIE-002G Opaque Witness Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002g-459f671b
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-002G opaque subject-bound witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: 459f671be180871b7dce9b508bdaa971d087f35a
+      PARENT_SHA: c796ec0df10f8f5d240b54bebcea1a4fc0272aa0
+      SUBJECT_TREE: 10e81e4f4afb9106f07dcb82bdd5dc402f5fbc76
+      PACKAGE: symthaea-planetary-industry
+      SOURCE: crates/domains/symthaea-planetary-industry/src/utility_composition.rs
+      BINDING_SOURCE: crates/domains/symthaea-planetary-industry/src/utility_binding.rs
+      EVIDENCE_DOC: docs/release/evidence/PIE_002G_OPAQUE_BOUND_WITNESS.md
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        id: identity_scope
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "$SOURCE"
+          test "${files[1]}" = "$EVIDENCE_DOC"
+
+      - name: Record subject and dependency digests
+        id: digests
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          sha256sum "$SOURCE" "$EVIDENCE_DOC" "$BINDING_SOURCE" | tee pie-002g-files.sha256
+
+      - name: Enforce preferred-path and opaque-witness source boundary
+        id: source_boundary
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path("crates/domains/symthaea-planetary-industry/src/utility_composition.rs").read_text()
+          binding = Path("crates/domains/symthaea-planetary-industry/src/utility_binding.rs").read_text()
+
+          # Remove full-line Rust comments/doc comments before executable-source checks.
+          executable = "\n".join(
+              line for line in source.splitlines()
+              if not re.match(r"^\s*//", line)
+          )
+
+          required = [
+              "pub struct SubjectBoundElectricalAccountingCase",
+              "bound: BoundElectricalAccountingCase",
+              "process: &ProcessDefinition",
+              "context: &ElectricalSupplyRecoveryContext",
+              "Result<SubjectBoundElectricalAccountingCase, UtilityCompositionError>",
+              "let projection = project_process_utilities(process)?;",
+              "let bound = bind_electrical_accounting_case(&projection, context)?;",
+              "Ok(SubjectBoundElectricalAccountingCase { bound })",
+          ]
+          for needle in required:
+              if needle not in executable:
+                  raise SystemExit(f"missing required PIE-002G boundary: {needle}")
+
+          forbidden = [
+              r"\bProcessUtilityProjection\b",
+              r"\bevaluate_electrical_utility\b",
+              r"\bpub\s+bound\s*:",
+              r"derive\([^\n)]*Deserialize",
+              r"impl\s*<[^>]*>\s*Deserialize",
+              r"impl\s+Deserialize",
+              r"pub\s+fn\s+(?:new|from_bound|from_case|unchecked|new_unchecked)\b",
+          ]
+          for pattern in forbidden:
+              if re.search(pattern, executable):
+                  raise SystemExit(f"forbidden PIE-002G authority surface: {pattern}")
+
+          if "#[derive(Debug, Clone, PartialEq, Serialize)]" not in source:
+              raise SystemExit("witness must retain one-way Serialize evidence surface")
+          if source.count("```compile_fail") < 2:
+              raise SystemExit("expected external compile-fail opacity contracts")
+
+          # Compatibility: the lower-level PIE-002D DTO remains public and ordinary
+          # Serialize+Deserialize; G adds authority rather than silently retyping it.
+          dto_match = re.search(
+              r"#\[derive\(Debug, Clone, PartialEq, Serialize, Deserialize\)\]\s*"
+              r"pub struct BoundElectricalAccountingCase",
+              binding,
+              re.S,
+          )
+          if not dto_match:
+              raise SystemExit("lower-level BoundElectricalAccountingCase compatibility changed")
+          PY
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Record toolchain
+        run: |
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
+      - name: Package rustfmt
+        id: fmt
+        continue-on-error: true
+        run: cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Package check
+        id: check
+        continue-on-error: true
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Package tests
+        id: test
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+
+      - name: External API doctests
+        id: doctest
+        continue-on-error: true
+        run: cargo test -p "$PACKAGE" --doc --locked
+
+      - name: Package clippy
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Diff hygiene
+        id: diff
+        continue-on-error: true
+        run: git diff --check "$PARENT_SHA" "$SUBJECT_SHA"
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > pie-002g-production-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v1",
+            "program": "PIE-002G",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "package": "$PACKAGE",
+            "rust_toolchain": "1.96.0",
+            "gates": {
+              "identity_scope": "${{ steps.identity_scope.outcome }}",
+              "subject_and_dependency_digests": "${{ steps.digests.outcome }}",
+              "preferred_path_and_opaque_witness_source_boundary": "${{ steps.source_boundary.outcome }}",
+              "rustfmt": "${{ steps.fmt.outcome }}",
+              "check_all_targets_locked": "${{ steps.check.outcome }}",
+              "test_all_targets_locked": "${{ steps.test.outcome }}",
+              "external_api_doctests": "${{ steps.doctest.outcome }}",
+              "clippy_all_targets_deny_warnings_locked": "${{ steps.clippy.outcome }}",
+              "git_diff_check": "${{ steps.diff.outcome }}"
+            },
+            "scope": "Rust construction integrity for the preferred invocation-subject-bound PIE-002E/D result only; private witness state, no unrestricted Deserialize, lower-level DTO compatibility preserved; not provenance, applicability, persistence currentness, feasibility, dispatch, thermodynamic closure, economics, or execution authority."
+          }
+          EOF
+          cat pie-002g-production-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002g-opaque-witness-exact-subject-qualification
+          path: |
+            pie-002g-production-qualification.json
+            pie-002g-files.sha256
+          if-no-files-found: error
+
+      - name: Enforce all qualification gates
+        if: always()
+        run: |
+          test "${{ steps.identity_scope.outcome }}" = success
+          test "${{ steps.digests.outcome }}" = success
+          test "${{ steps.source_boundary.outcome }}" = success
+          test "${{ steps.fmt.outcome }}" = success
+          test "${{ steps.check.outcome }}" = success
+          test "${{ steps.test.outcome }}" = success
+          test "${{ steps.doctest.outcome }}" = success
+          test "${{ steps.clippy.outcome }}" = success
+          test "${{ steps.diff.outcome }}" = success
