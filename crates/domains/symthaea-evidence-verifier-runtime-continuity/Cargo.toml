@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-evidence-verifier-runtime-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Measured-launch and signed runtime-lineage assurance for verifier computations"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "attestation", "runtime"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
