@@ -16,7 +16,7 @@
 #![deny(unsafe_code)]
 
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use symthaea_fabrication_kernel::attestation::SignatureAlgorithm;
 use symthaea_fabrication_kernel::containment_state::{
     FabricationContainmentState, digest_containment_state,
@@ -403,7 +403,7 @@ pub fn qualify_exact_probation_telemetry_bundle_v1(
         let (verified_algorithm, verified_key_id) = frame.verified.signer();
         if frame.verified.payload() != payload
             || verified_algorithm != &signed.algorithm
-            || verified_key_id != signed.key_id
+            || verified_key_id != signed.key_id.as_str()
             || frame.verified.telemetry_digest() != telemetry_digest
         {
             violations.push(ProbationTelemetryBindingError::VerifiedTelemetryMismatch(
@@ -674,7 +674,7 @@ pub fn bind_probation_clearance_to_exact_telemetry_v1(
         if !seen_observations.insert(signed.observation_digest) {
             violations.push(ProbationTelemetryBindingError::DuplicateObservation);
         }
-        if !seen_bundles.insert(binding.telemetry_bundle.id()) {
+        if !seen_bundles.insert(binding.telemetry_bundle.id().as_digest()) {
             violations.push(ProbationTelemetryBindingError::DuplicateTelemetryBundle);
         }
         if observation.telemetry_evidence_digest != binding.telemetry_bundle.evidence_digest() {
