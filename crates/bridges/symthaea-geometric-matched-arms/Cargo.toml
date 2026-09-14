@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-geometric-matched-arms"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Preregistered matched-arm equivalence sealing for Symthaea geometric-emergence experiments"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["experiments", "ablation", "reproducibility", "research"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+symthaea = { path = "../../..", default-features = false }
+symthaea-geometric-environment-preflight = { path = "../symthaea-geometric-environment-preflight" }
+symthaea-geometric-run-seal = { path = "../symthaea-geometric-run-seal" }
