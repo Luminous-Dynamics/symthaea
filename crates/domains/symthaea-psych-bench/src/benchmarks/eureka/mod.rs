@@ -84,6 +84,8 @@ mod v2_qualification_receipt;
 mod v2_qualification_contract_tests;
 #[cfg(test)]
 mod v2_qualifier_authority;
+#[cfg(test)]
+mod v2_qualifier_currentness;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
