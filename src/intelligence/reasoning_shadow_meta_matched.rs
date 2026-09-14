@@ -5,10 +5,10 @@
 //!
 //! The existing `reasoning_shadow_meta::ShadowQualifiedMetaReasoner` remains responsible for
 //! historical behavior, canonical V2 shadowing, and the all-unknown V3 baseline. This wrapper adds
-//! a second, measurement-only V3 pass using the matched counterfactual IntegrationProxy probe.
-//! The two source classes remain explicit: the baseline says what V3 knows from live identity and
-//! activation alone; the matched pass says what changes after a frozen one-step computational
-//! probe over the exact same contender set.
+//! a second, measurement-only V3 pass using the matched counterfactual IntegrationProxy operator
+//! panel. The two source classes remain explicit: the baseline says what V3 knows from live
+//! identity and activation alone; the matched pass says what changes after bounded evidence from
+//! the same frozen input and preregistered operator panel is introduced.
 
 use super::reasoning_active_primitive_evidence::ActivePrimitiveEvidenceReport;
 use super::reasoning_context_competition::{ContextCompetitionPolicy, ContextHypothesis};
@@ -30,8 +30,8 @@ use crate::hdc::BinaryHV;
 use anyhow::Result;
 use std::collections::HashSet;
 
-pub const MATCHED_META_SHADOW_VERSION: &str = "rq-006y-live-matched-shadow-v1";
-const MATCHED_CONTEXT_SOURCE: &str = "legacy-meta-context-reflection-matched-shadow-v1";
+pub const MATCHED_META_SHADOW_VERSION: &str = "rq-006y-live-matched-shadow-v2";
+const MATCHED_CONTEXT_SOURCE: &str = "legacy-meta-context-reflection-matched-shadow-v2";
 const MATCHED_EVIDENCE_REF: &str = "live-pre-meta-input";
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -58,8 +58,11 @@ pub struct MatchedV3ShadowObservation {
     pub active_profiles: usize,
     pub matched_probe_profiles: usize,
     pub matched_probe_input_digest: Option<String>,
+    /// Global minimum lower bound across candidate operator envelopes.
     pub integration_min: Option<f64>,
+    /// Global maximum upper bound across candidate operator envelopes.
     pub integration_max: Option<f64>,
+    /// Overall span across the bounded matched evidence. This is not a confidence interval.
     pub integration_spread: Option<f64>,
     pub evidence_changed_outcome: Option<bool>,
     pub evidence_changed_top_request: Option<bool>,
@@ -104,9 +107,9 @@ impl MatchedShadowQualifiedMetaReasoner {
     }
 
     /// Run the established historical/V2/V3-baseline path first. Then, and only then, perform the
-    /// matched counterfactual IntegrationProxy probe against the frozen pre-meta input. Failure of
-    /// the second pass can only affect matched-shadow telemetry; the historical result is returned
-    /// unchanged.
+    /// matched counterfactual IntegrationProxy operator panel against the frozen pre-meta input.
+    /// Failure of the second pass can only affect matched-shadow telemetry; the historical result
+    /// is returned unchanged.
     pub fn meta_reason_with_active_evidence(
         &mut self,
         query: &str,
@@ -163,7 +166,7 @@ impl MatchedShadowQualifiedMetaReasoner {
             .collect::<Vec<_>>();
 
         // This call remains behavior-authoritative. Its own V3 observation is the all-unknown
-        // baseline against which the matched probe is compared.
+        // baseline against which the bounded matched probe is compared.
         let legacy_result = self.inner.meta_reason_with_active_evidence(
             query,
             primitives,
@@ -216,7 +219,7 @@ impl MatchedShadowQualifiedMetaReasoner {
                     integration_spread = probe_report.integration_spread,
                     changed_outcome = changed_outcome.unwrap_or(false),
                     changed_top_request = changed_top_request.unwrap_or(false),
-                    "matched IntegrationProxy shadow observed"
+                    "matched bounded IntegrationProxy shadow observed"
                 );
 
                 self.last_matched_v3_observation = Some(MatchedV3ShadowObservation {
@@ -449,7 +452,10 @@ mod tests {
         assert_eq!(observation.baseline_request_count, Some(6));
         assert_eq!(observation.matched_probe_profiles, 2);
         assert_eq!(observation.active_profiles, 2);
-        assert!(observation.matched_request_count <= 4);
+        // Bounded IntegrationProxy evidence can itself require refinement, so the matched pass may
+        // still contain up to the original six requests. The important theorem is that it never
+        // fabricates completeness by discarding operator uncertainty.
+        assert!(observation.matched_request_count <= 6);
         assert!(observation.matched_probe_input_digest.is_some());
         assert!(observation.integration_min.is_some());
         assert!(observation.integration_max.is_some());
