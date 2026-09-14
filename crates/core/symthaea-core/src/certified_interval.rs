@@ -4,8 +4,10 @@
 
 //! Crate-private outward-certified binary64 interval arithmetic.
 //!
-//! This module is a semantics-preserving extraction target for the arithmetic already
-//! qualified by MANIFOLD-006C/006C1. It deliberately exposes no public API.
+//! This module is the hardened shared kernel for MANIFOLD-006 certified numerics.
+//! It deliberately exposes no public API. Exact fast paths are admitted only when
+//! their real-valued exactness follows from the input representation, never from
+//! the classification of an already-rounded result.
 
 use core::fmt;
 
@@ -63,8 +65,8 @@ impl OutwardInterval {
                 "{operation} produced invalid enclosure [{lower}, {upper}]"
             )));
         }
-        // Preserve the qualified 006C implementation exactly: unlike point(),
-        // ordered() does not canonicalize signed-zero endpoint bits.
+        // Preserve the qualified 006C distinction: unlike point(), ordered()
+        // retains supplied signed-zero endpoint bits.
         Ok(Self { lower, upper })
     }
 
@@ -173,9 +175,7 @@ pub(crate) fn outward_mul(
     }
 
     let product = finite("outward multiplication nearest result", left * right)?;
-    if (is_normal_power_of_two(left.abs()) || is_normal_power_of_two(right.abs()))
-        && product.is_normal()
-    {
+    if exact_normal_power_of_two_product(left, right) {
         return OutwardInterval::point(product);
     }
 
@@ -209,7 +209,7 @@ pub(crate) fn outward_div(
     }
 
     let quotient = finite("outward division nearest result", left / right)?;
-    if is_normal_power_of_two(right.abs()) && quotient.is_normal() {
+    if exact_normal_power_of_two_quotient(left, right) {
         return OutwardInterval::point(quotient);
     }
 
@@ -260,6 +260,7 @@ pub(crate) fn next_down(value: f64) -> Result<f64, CertifiedIntervalError> {
     finite("next-down result", stepped)
 }
 
+/// Whether `value` is a finite normal exact power of two.
 pub(crate) fn is_normal_power_of_two(value: f64) -> bool {
     if !value.is_normal() || value <= 0.0 {
         return false;
@@ -267,8 +268,65 @@ pub(crate) fn is_normal_power_of_two(value: f64) -> bool {
     value.to_bits() & ((1_u64 << 52) - 1) == 0
 }
 
+/// Canonicalize either signed zero to positive zero.
 pub(crate) fn canonical_zero(value: f64) -> f64 {
     if value == 0.0 { 0.0 } else { value }
+}
+
+/// Return the unbiased exponent of a finite normal value.
+fn normal_unbiased_exponent(value: f64) -> Option<i32> {
+    let magnitude = value.abs();
+    if !magnitude.is_normal() {
+        return None;
+    }
+    let raw = ((magnitude.to_bits() >> 52) & 0x7ff) as i32;
+    Some(raw - 1023)
+}
+
+/// Return the unbiased exponent when `value` is a finite normal exact power of two.
+fn normal_power_of_two_exponent(value: f64) -> Option<i32> {
+    let magnitude = value.abs();
+    if !is_normal_power_of_two(magnitude) {
+        return None;
+    }
+    normal_unbiased_exponent(magnitude)
+}
+
+/// Prove that multiplication by a power of two is exact and remains normal.
+///
+/// This intentionally reasons from the *input exponents*. A rounded product that
+/// happens to be normal is not evidence that the exact product was normal: the
+/// exact real value may lie just below `MIN_POSITIVE` and round upward to it.
+fn exact_normal_power_of_two_product(left: f64, right: f64) -> bool {
+    if let (Some(scale), Some(other)) = (
+        normal_power_of_two_exponent(left),
+        normal_unbiased_exponent(right),
+    ) {
+        let shifted = scale + other;
+        if (-1022..=1023).contains(&shifted) {
+            return true;
+        }
+    }
+    if let (Some(other), Some(scale)) = (
+        normal_unbiased_exponent(left),
+        normal_power_of_two_exponent(right),
+    ) {
+        let shifted = other + scale;
+        return (-1022..=1023).contains(&shifted);
+    }
+    false
+}
+
+/// Prove that division by a power of two is exact and remains normal.
+fn exact_normal_power_of_two_quotient(numerator: f64, denominator: f64) -> bool {
+    let Some(numerator_exponent) = normal_unbiased_exponent(numerator) else {
+        return false;
+    };
+    let Some(scale_exponent) = normal_power_of_two_exponent(denominator) else {
+        return false;
+    };
+    let shifted = numerator_exponent - scale_exponent;
+    (-1022..=1023).contains(&shifted)
 }
 
 fn finite(operation: &str, value: f64) -> Result<f64, CertifiedIntervalError> {

@@ -1,4 +1,4 @@
-// Standalone qualification harness for MANIFOLD-006N.
+// Standalone qualification harness for MANIFOLD-006N-A1.
 // Intentionally std-only so it can be compiled directly with rustc.
 
 #[path = "../../crates/core/symthaea-core/src/certified_interval.rs"]
@@ -78,8 +78,11 @@ fn main() {
         std::fs::create_dir_all(parent).unwrap();
     }
     let mut out = File::create(output).unwrap();
-    writeln!(out, "schema\tsymthaea.manifold-006n.kernel-vectors.v3").unwrap();
+    writeln!(out, "schema\tsymthaea.manifold-006n-a1.kernel-vectors.v1").unwrap();
     writeln!(out, "encoding\tieee754-binary64-u64-hex").unwrap();
+
+    let one_down = f64::from_bits(1.0_f64.to_bits() - 1);
+    let twice_min_normal_down = f64::from_bits(0x001f_ffff_ffff_ffff);
 
     for (op, left, right) in [
         ("add-decimal", 0.1, 0.2),
@@ -88,9 +91,11 @@ fn main() {
         ("mul-decimal", 0.1, 0.3),
         ("mul-underflow", f64::MIN_POSITIVE, f64::MIN_POSITIVE),
         ("mul-power2", 0.5, 2.0),
+        ("mul-power2-normal-boundary", f64::MIN_POSITIVE, one_down),
         ("mul-negative-one", 0.125, -1.0),
         ("div-decimal", 1.0, 10.0),
         ("div-power2", 1.0, 2.0),
+        ("div-power2-normal-boundary", twice_min_normal_down, 2.0),
     ] {
         let result = match op {
             name if name.starts_with("add") => outward_add(left, right),
@@ -122,13 +127,13 @@ fn main() {
     );
 
     // Deterministic adversarial scalar corpus. It spans signed zero, both sides of
-    // the subnormal/normal boundary, mantissa neighbors around 1, exact powers of
-    // two, non-dyadic decimal inputs, very large/small normal magnitudes, and the
-    // finite binary64 extrema. Every ordered pair is exercised for +, -, *, and /.
+    // the subnormal/normal boundary, exact values just below 2*MIN_POSITIVE,
+    // mantissa neighbors around 1, powers of two, non-dyadic decimals, very
+    // large/small normal magnitudes, and the finite binary64 extrema. Every ordered
+    // pair is exercised for +, -, *, and /.
     let min_subnormal = f64::from_bits(1);
     let max_subnormal = f64::from_bits(f64::MIN_POSITIVE.to_bits() - 1);
     let next_normal = f64::from_bits(f64::MIN_POSITIVE.to_bits() + 1);
-    let one_down = f64::from_bits(1.0_f64.to_bits() - 1);
     let one_up = f64::from_bits(1.0_f64.to_bits() + 1);
     let tiny_normal = 2.0_f64.powi(-500);
     let huge_normal = 2.0_f64.powi(500);
@@ -143,6 +148,8 @@ fn main() {
         -f64::MIN_POSITIVE,
         next_normal,
         -next_normal,
+        twice_min_normal_down,
+        -twice_min_normal_down,
         tiny_normal,
         -tiny_normal,
         0.1,
@@ -208,10 +215,31 @@ fn main() {
     assert!(outward_mul(f64::MAX, 2.0).is_err());
     assert!(outward_div(f64::MAX, f64::MIN_POSITIVE).is_err());
 
-    // Critical fast-path regression from qualified 006C.
+    // Previously qualified nonzero-underflow regression remains outward-enclosed.
     let underflow = outward_mul(f64::MIN_POSITIVE, f64::MIN_POSITIVE).unwrap();
     assert!(underflow.lower <= 0.0);
     assert!(underflow.upper > 0.0);
+
+    // A1 counterexample: exact product is subnormal but nearest rounding is MIN_POSITIVE.
+    let mul_boundary = outward_mul(f64::MIN_POSITIVE, one_down).unwrap();
+    assert!(mul_boundary.lower < f64::MIN_POSITIVE);
+    assert!(mul_boundary.upper > f64::MIN_POSITIVE);
+    assert_ne!(mul_boundary.lower.to_bits(), mul_boundary.upper.to_bits());
+
+    // Division analogue: exact quotient is half a subnormal ulp below MIN_POSITIVE,
+    // but nearest ties-to-even rounding lands on MIN_POSITIVE.
+    let div_boundary = outward_div(twice_min_normal_down, 2.0).unwrap();
+    assert!(div_boundary.lower < f64::MIN_POSITIVE);
+    assert!(div_boundary.upper > f64::MIN_POSITIVE);
+    assert_ne!(div_boundary.lower.to_bits(), div_boundary.upper.to_bits());
+
+    // Interior normal scaling retains the exact fast path.
+    let mul_interior = outward_mul(0.5, 2.0).unwrap();
+    assert_eq!(mul_interior.lower.to_bits(), 1.0_f64.to_bits());
+    assert_eq!(mul_interior.lower.to_bits(), mul_interior.upper.to_bits());
+    let div_interior = outward_div(1.0, 2.0).unwrap();
+    assert_eq!(div_interior.lower.to_bits(), 0.5_f64.to_bits());
+    assert_eq!(div_interior.lower.to_bits(), div_interior.upper.to_bits());
 
     writeln!(out, "gate\tsigned-zero-canonical\tPASS").unwrap();
     writeln!(out, "gate\tordered-signed-zero-preserved\tPASS").unwrap();
@@ -221,4 +249,7 @@ fn main() {
     writeln!(out, "gate\tprecondition-rejection\tPASS").unwrap();
     writeln!(out, "gate\tqualified-error-text-preserved\tPASS").unwrap();
     writeln!(out, "gate\tnonzero-underflow-enclosure\tPASS").unwrap();
+    writeln!(out, "gate\tpower2-mul-normal-boundary-widened\tPASS").unwrap();
+    writeln!(out, "gate\tpower2-div-normal-boundary-widened\tPASS").unwrap();
+    writeln!(out, "gate\tpower2-normal-interior-exact\tPASS").unwrap();
 }
