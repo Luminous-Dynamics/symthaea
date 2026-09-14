@@ -69,10 +69,13 @@ impl std::error::Error for ObservationError {}
 
 /// Normalized evidence support retained independently for a proposition and its
 /// explicit negation/incompatible counterpart.
+///
+/// Fields are private so external callers cannot bypass the validating
+/// constructor and inject non-finite or out-of-range evidence values.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct EvidenceSupport {
-    pub proposition: f64,
-    pub negation: f64,
+    proposition: f64,
+    negation: f64,
 }
 
 impl EvidenceSupport {
@@ -83,6 +86,14 @@ impl EvidenceSupport {
             proposition,
             negation,
         })
+    }
+
+    pub const fn proposition(self) -> f64 {
+        self.proposition
+    }
+
+    pub const fn negation(self) -> f64 {
+        self.negation
     }
 
     /// Classifies only exact absence versus presence of support.
@@ -99,21 +110,24 @@ impl EvidenceSupport {
 }
 
 /// Explicit normalized inputs to the observatory.
+///
+/// Fields are private so every externally constructible value has passed the
+/// normalized-input validation contract.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StructuredInconsistencyInput {
-    pub kind: InconsistencyKind,
+    kind: InconsistencyKind,
     /// Model/world mismatch. Kept independent from internal disagreement.
-    pub external_surprise: f64,
+    external_surprise: f64,
     /// Disagreement among simultaneously admitted internal models/evidence.
-    pub internal_disagreement: f64,
+    internal_disagreement: f64,
     /// Uncertainty under the experiment's separately declared semantics.
-    pub uncertainty: f64,
+    uncertainty: f64,
     /// Persistence of the disagreement over the experiment's declared window.
-    pub persistence: f64,
+    persistence: f64,
     /// Relevance of the inconsistency to the system's own state/model.
-    pub self_referential_relevance: f64,
-    pub evidence_support: EvidenceSupport,
-    pub resolution: ResolutionState,
+    self_referential_relevance: f64,
+    evidence_support: EvidenceSupport,
+    resolution: ResolutionState,
 }
 
 impl StructuredInconsistencyInput {
@@ -369,6 +383,13 @@ mod tests {
             support(0.3, 0.4).polarity(),
             EvidencePolarity::SupportsBoth
         );
+    }
+
+    #[test]
+    fn evidence_support_getters_preserve_validated_values() {
+        let evidence = support(0.25, 0.75);
+        assert_eq!(evidence.proposition(), 0.25);
+        assert_eq!(evidence.negation(), 0.75);
     }
 
     #[test]
