@@ -87,8 +87,7 @@ fn rel_001_binary_coordinate_permutation_preserves_binding_and_hamming_geometry(
 
     // Algebra automorphism: g(a XOR b) = g(a) XOR g(b).
     let transformed_bound = reverse_binary_coordinates(&a.bind(&b));
-    let bound_transformed =
-        reverse_binary_coordinates(&a).bind(&reverse_binary_coordinates(&b));
+    let bound_transformed = reverse_binary_coordinates(&a).bind(&reverse_binary_coordinates(&b));
     assert!(transformed_bound == bound_transformed);
 
     // Metric isometry: a common coordinate permutation preserves every
@@ -118,8 +117,7 @@ fn rel_001_continuous_coordinate_permutation_preserves_binding_and_cosine_geomet
     // The implementation accumulates floating-point dot products/norms in
     // coordinate order, so reversing that order can change only roundoff.
     let before = a.similarity(&b);
-    let after = reverse_continuous_coordinates(&a)
-        .similarity(&reverse_continuous_coordinates(&b));
+    let after = reverse_continuous_coordinates(&a).similarity(&reverse_continuous_coordinates(&b));
     assert!(
         (before - after).abs() <= 2.0e-6,
         "coordinate permutation changed cosine beyond roundoff: before={before}, after={after}"
@@ -128,9 +126,7 @@ fn rel_001_continuous_coordinate_permutation_preserves_binding_and_cosine_geomet
 
 #[test]
 fn rel_001_sequence_fixed_operator_and_covariant_operator_are_distinct_claims() {
-    let x = ContinuousHV::from_vec(vec![
-        0.11, -0.23, 0.37, -0.41, 0.59, -0.61, 0.73, -0.89,
-    ]);
+    let x = ContinuousHV::from_vec(vec![0.11, -0.23, 0.37, -0.41, 0.59, -0.61, 0.73, -0.89]);
 
     // For the chosen frame change g (coordinate reversal), g and the fixed
     // cyclic production shift rho do not commute on this non-degenerate fixture.
@@ -148,12 +144,8 @@ fn rel_001_sequence_fixed_operator_and_covariant_operator_are_distinct_claims() 
 
 #[test]
 fn rel_003_continuous_metric_isometry_does_not_imply_hadamard_automorphism() {
-    let a = ContinuousHV::from_vec(vec![
-        0.21, -0.74, 0.43, 0.88, -0.52, 0.17, 0.69, -0.31,
-    ]);
-    let b = ContinuousHV::from_vec(vec![
-        -0.63, 0.28, 0.91, -0.36, 0.44, -0.82, 0.13, 0.57,
-    ]);
+    let a = ContinuousHV::from_vec(vec![0.21, -0.74, 0.43, 0.88, -0.52, 0.17, 0.69, -0.31]);
+    let b = ContinuousHV::from_vec(vec![-0.63, 0.28, 0.91, -0.36, 0.44, -0.82, 0.13, 0.57]);
 
     // Positive control for the partial claim: the pairwise transform is
     // orthogonal, so cosine is preserved up to narrow f32 roundoff.
@@ -194,8 +186,7 @@ fn rel_003_binary_xor_automorphism_does_not_imply_hamming_isometry() {
 
     assert_eq!(zero.hamming_distance(&one_bit), 1);
     assert_eq!(
-        binary_xor_linear_shear(&zero)
-            .hamming_distance(&binary_xor_linear_shear(&one_bit)),
+        binary_xor_linear_shear(&zero).hamming_distance(&binary_xor_linear_shear(&one_bit)),
         2
     );
     assert_ne!(
