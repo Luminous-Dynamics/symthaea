@@ -1,0 +1,125 @@
+name: Experiment Discrimination Coverage
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/experiment-discrimination-coverage.yml'
+      - 'patches/science/experiment-discrimination-coverage-v1.patch'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine.rs'
+      - 'crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PATCH: patches/science/experiment-discrimination-coverage-v1.patch
+
+jobs:
+  qualify:
+    name: Prove sparse/non-finite gap and qualify coverage-aware selector
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only scope
+        run: |
+          test -f "$PATCH"
+          BASE="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$BASE" ]; then BASE="HEAD^"; fi
+          git diff --exit-code "$BASE" -- Cargo.toml Cargo.lock crates/core/symthaea-core/src || {
+            echo 'experiment-discrimination qualification branch must not materialize product source'
+            exit 1
+          }
+
+      - name: Prove current variance-only failure modes
+        run: |
+          mkdir -p crates/core/symthaea-core/tests
+          cat > crates/core/symthaea-core/tests/experiment_selection_negative_control.rs <<'RS'
+          use symthaea_core::hdc::conjecture_engine::{
+              epistemic_value, select_most_informative_experiment,
+          };
+
+          #[test]
+          fn current_non_finite_prediction_poisoning_is_executable() {
+              let hypotheses = ["left", "nan", "right"];
+              let predict = |h: &&str, _: &f64| match *h {
+                  "left" => Some(1.0),
+                  "nan" => Some(f64::NAN),
+                  "right" => Some(3.0),
+                  _ => None,
+              };
+              assert!(epistemic_value(&0.0, &hypotheses, predict).is_nan());
+          }
+
+          #[test]
+          fn current_selector_can_prefer_sparse_extreme_disagreement() {
+              let hypotheses = ["h1", "h2", "h3", "h4"];
+              let predict = |h: &&str, x: &f64| {
+                  if *x == 10.0 {
+                      match *h {
+                          "h1" => Some(-100.0),
+                          "h2" => Some(100.0),
+                          _ => None,
+                      }
+                  } else {
+                      match *h {
+                          "h1" => Some(0.0),
+                          "h2" => Some(1.0),
+                          "h3" => Some(2.0),
+                          "h4" => Some(3.0),
+                          _ => None,
+                      }
+                  }
+              };
+              let candidates = [10.0, 1.0];
+              let (chosen, _) =
+                  select_most_informative_experiment(&candidates, &hypotheses, predict).unwrap();
+              assert_eq!(*chosen, 10.0);
+          }
+          RS
+          cargo test --locked -p symthaea-core --test experiment_selection_negative_control
+          rm crates/core/symthaea-core/tests/experiment_selection_negative_control.rs
+
+      - name: Validate and apply exact candidate patch
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet coverage-aware semantics
+        run: |
+          FILE=crates/core/symthaea-core/src/hdc/conjecture_engine/experiment_selection.rs
+          grep -F 'pub struct ExperimentDiscrimination' "$FILE"
+          grep -F 'pub fn prediction_coverage(&self) -> f64' "$FILE"
+          grep -F 'value.is_finite()' "$FILE"
+          grep -F 'select_most_informative_experiment_with_min_coverage' "$FILE"
+          grep -F 'score.valid_predictions < 2' "$FILE"
+          grep -F 'not expected information gain' "$FILE"
+          grep -F 'select_most_informative_experiment_with_min_coverage' crates/core/symthaea-core/src/hdc/conjecture_engine.rs
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Run focused experiment-selection regressions
+        run: |
+          cargo fmt --check -p symthaea-core
+          cargo test --locked -p symthaea-core experiment_selection -- --nocapture
+          cargo check --locked -p symthaea-core
+          cargo clippy --locked -p symthaea-core --lib -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes finite-prediction accounting, an explicit prediction-coverage diagnostic, a minimum-coverage selector, and first-tie stability for the qualified implementation.'
+          echo 'It does not establish expected information gain, Bayesian optimal design, calibrated hypothesis probabilities, measurement-noise modeling, intervention feasibility, cost, safety, or scientific truth.'
