@@ -39,12 +39,17 @@ jobs:
           assert 'trusted-resolution-consumer = ["trusted-resolution-authority"]' in manifest
           assert '#[cfg(feature = "trusted-resolution-consumer")]' in mod
           assert "pub struct VerifiedGwt1ResolvedArtifactV1" in source
-          assert "pub(crate) fn verify_gwt1_final_reconstruction_v1" in source
+          assert "fn verify_gwt1_final_reconstruction_v1" in source
+          assert "pub(crate) fn verify_gwt1_final_reconstruction_v1" not in source
           assert "pub fn verify_gwt1_final_reconstruction_v1" not in source
-          assert "derive(Debug, Clone)]\npub struct VerifiedGwt1ResolvedArtifactV1" in source
-          assert "Serialize" not in source.split("pub struct VerifiedGwt1ResolvedArtifactV1", 1)[0].split("#[derive", 1)[-1]
+          assert "#[derive(Debug)]\npub struct VerifiedGwt1ResolvedArtifactV1" in source
+          token_prefix = source.split("pub struct VerifiedGwt1ResolvedArtifactV1", 1)[0].split("#[derive", 1)[-1]
+          assert "Clone" not in token_prefix
+          assert "Serialize" not in token_prefix
+          assert "Deserialize" not in token_prefix
           assert "FunctionallySupportedForbidden" in source
           assert "InternalPromotionVerificationMismatch" in source
+          assert "EmptyRecomputedPromotionVerification" in source
           assert "classify_gwt1_evidence_disposition_v1" in source
 
           forbidden = [
