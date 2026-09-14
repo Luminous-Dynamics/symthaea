@@ -1,0 +1,41 @@
+name: ARC Streaming Verifier
+
+on:
+  pull_request:
+    paths:
+      - 'src/bin/arc_streaming_verifier.rs'
+      - '.github/workflows/arc-streaming-verifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-streaming-verifier-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  independent-stream-verifier:
+    name: Independent streaming replay
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact proposed subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Qualify independent verifier source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/bin/arc_streaming_verifier.rs
+          cargo check --locked --bin arc_streaming_policy --bin arc_streaming_verifier
+          cargo test --locked --bin arc_streaming_policy
+          cargo test --locked --bin arc_streaming_verifier
+          cargo clippy --locked --bin arc_streaming_policy --bin arc_streaming_verifier -- -D warnings
