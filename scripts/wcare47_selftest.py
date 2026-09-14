@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Pre-lock fail-closed campaign for WCARE-47."""
+"""Hermetic fail-closed negative campaign for WCARE-47."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+LOCK = Path("tools/wcare42_builder_attestation_verifier/Cargo.lock")
 
 
 def require(condition: bool, message: str) -> None:
@@ -15,17 +17,41 @@ def require(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
-def main() -> int:
-    proc = subprocess.run(
-        [sys.executable, "scripts/wcare47_lock_admit.py"],
-        cwd=ROOT,
+def run(*argv: str, cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        argv,
+        cwd=cwd,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
     )
-    require(proc.returncode == 3, f"expected pre-lock exit 3, got {proc.returncode}: {proc.stderr}")
-    result = json.loads(proc.stdout)
+
+
+def main() -> int:
+    with tempfile.TemporaryDirectory(prefix="wcare47-negative-") as tmp:
+        worktree = Path(tmp) / "repo"
+        add = run("git", "worktree", "add", "--detach", str(worktree), "HEAD", cwd=ROOT)
+        require(add.returncode == 0, f"git worktree add failed: {add.stderr}")
+        try:
+            candidate = worktree / LOCK
+            if candidate.exists():
+                candidate.unlink()
+
+            proc = run(
+                sys.executable,
+                "scripts/wcare47_lock_admit.py",
+                cwd=worktree,
+            )
+            require(
+                proc.returncode == 3,
+                f"expected missing-lock exit 3, got {proc.returncode}: {proc.stderr}",
+            )
+            result = json.loads(proc.stdout)
+        finally:
+            remove = run("git", "worktree", "remove", "--force", str(worktree), cwd=ROOT)
+            require(remove.returncode == 0, f"git worktree remove failed: {remove.stderr}")
+
     require(result["classification"] == "INFRASTRUCTURE_INDETERMINATE", "wrong classification")
     require(result["detail"] == "candidate_lock_missing", "wrong blocker")
     require(result["exact_source_subject_bound"] is True, "exact WCARE-42 source not bound")
@@ -45,6 +71,7 @@ def main() -> int:
         require(result[key] is False, f"unexpected promotion: {key}")
 
     print("PASS_WCARE47_PRELOCK_FAIL_CLOSED")
+    print("PASS_WCARE47_NEGATIVE_FIXTURE")
     print(json.dumps({
         "authority": "MeasurementOnly",
         "classification": "INFRASTRUCTURE_INDETERMINATE",
