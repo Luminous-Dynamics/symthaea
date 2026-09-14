@@ -8,10 +8,7 @@ on:
       - ".github/workflows/butlin-gwt1-final-consumer-contract.yml"
       - ".github/workflows/butlin-gwt1-trusted-final-consumer.yml"
       - "crates/domains/symthaea-psych-bench/Cargo.toml"
-      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_final_consumer_candidate.rs"
-      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs"
-      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs"
-      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/**/*.rs"
       - "crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_verified_report_candidate.rs"
   workflow_dispatch:
 
@@ -40,12 +37,16 @@ jobs:
 
           root = pathlib.Path.cwd()
           crate = root / "crates/domains/symthaea-psych-bench"
+          butlin_dir = crate / "src/benchmarks/butlin"
           manifest = (crate / "Cargo.toml").read_text()
-          authority = (crate / "src/benchmarks/butlin/gwt1_verified_final_artifact.rs").read_text()
-          projection = (crate / "src/benchmarks/butlin/gwt1_verified_report_projection.rs").read_text()
-          candidate = (crate / "src/benchmarks/butlin/gwt1_final_consumer_candidate.rs").read_text()
+          authority_path = butlin_dir / "gwt1_verified_final_artifact.rs"
+          projection_path = butlin_dir / "gwt1_verified_report_projection.rs"
+          candidate_path = butlin_dir / "gwt1_final_consumer_candidate.rs"
+          authority = authority_path.read_text()
+          projection = projection_path.read_text()
+          candidate = candidate_path.read_text()
           binary = (crate / "src/bin/gwt1_generate_verified_report_candidate.rs").read_text()
-          mod = (crate / "src/benchmarks/butlin/mod.rs").read_text()
+          mod = (butlin_dir / "mod.rs").read_text()
           workflow = (root / ".github/workflows/butlin-gwt1-trusted-final-consumer.yml").read_text()
           verifier_root = (root / ".github/workflows/butlin-gwt1-consumer-verifier-root.yml").read_text()
           engine_path = root / ".github/scripts/evidence_archive_admission.py"
@@ -78,8 +79,38 @@ jobs:
           struct_body = projection.split("pub struct Gwt1VerifiedReportProjectionV1 {", 1)[1].split("}", 1)[0]
           assert not re.search(r"^\s*pub\s+\w+\s*:", struct_body, re.MULTILINE)
 
-          # The sibling consumer adapter is the only non-test module that may
-          # invoke the reconstruction minting theorem.
+          # `pub(super)` is intentionally narrower than crate-public, but every
+          # sibling under `butlin` can still see the reconstruction theorem.
+          # Audit the *entire* non-test Butlin source tree so a future sibling
+          # cannot become a second minting/report-projection path. The workflow
+          # path filter above deliberately triggers on every Butlin Rust change.
+          def non_test_source(path):
+              text = path.read_text()
+              return text.split("\n#[cfg(test)]", 1)[0]
+
+          sources = {path.name: non_test_source(path) for path in butlin_dir.glob("*.rs")}
+          mint_symbol = "verify_gwt1_final_reconstruction_v1("
+          mint_sites = {
+              name: text.count(mint_symbol)
+              for name, text in sources.items()
+              if mint_symbol in text
+          }
+          assert mint_sites == {
+              "gwt1_verified_final_artifact.rs": 1,
+              "gwt1_final_consumer_candidate.rs": 1,
+          }, mint_sites
+
+          projection_symbol = "project_gwt1_verified_report_v1("
+          projection_sites = {
+              name: text.count(projection_symbol)
+              for name, text in sources.items()
+              if projection_symbol in text
+          }
+          assert projection_sites == {
+              "gwt1_verified_report_projection.rs": 1,
+              "gwt1_final_consumer_candidate.rs": 1,
+          }, projection_sites
+
           assert candidate.count("verify_gwt1_final_reconstruction_v1(") == 1
           assert "validate_frozen_gh_root" in candidate
           assert "read_canonical_json" in candidate
