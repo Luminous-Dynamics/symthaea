@@ -1,0 +1,329 @@
+name: MANIFOLD-006N-B Robust Reachability Arithmetic Migration
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/manifold-006n-b-migrate-reachability.yml'
+      - 'crates/core/symthaea-core/src/robust_reachability.rs'
+      - 'crates/core/symthaea-core/src/certified_interval.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006n_b_production_boundary.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006c_robust_reachability.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006c1_existential_reachability.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006c1_exact_oracle_vectors.rs'
+      - 'scripts/qualification/manifold_006n_kernel_harness.rs'
+      - 'scripts/qualification/manifold_006n_kernel_oracle.py'
+      - 'scripts/qualification/manifold_006c1_exact_oracle.py'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: 639a6da0ff98e7c9dc3a61aa7090457417ef3deb
+  A1_RUN: '34795142574'
+  A1_ARTIFACT_ID: '10330022316'
+  A1_ARTIFACT_SHA256: 6dd26f904ef48b0ac611df82e51579fcaa2004b14d32c57a1740ff6ea0152220
+  A1_KERNEL_SOURCE_SHA256: cffe5574d000a44a87a757a788d08cb7ba474810e9c6a3d860d57ac57352eb3c
+  A1_KERNEL_HARNESS_SHA256: fee5e5302b7c2c8ddbb7be774ddef0233fe61781856c6b4b6e306e5b260fdac4
+  A1_KERNEL_ORACLE_SHA256: f59735eb10e44d92918df988bd9933e764cba94f5026604e3aa2c81263f17c73
+  A1_KERNEL_SEMANTIC_IDENTITY: 65a15473bf128bd604e72c4f32b20f49fcba1e82797714b29b96479af5f38395
+  QUALIFIED_006C1_VECTOR_IDENTITY: 9a5c32e2aa9e61c95dea21e0445cf60fc4714a930d29066975f3e6c9ef092013
+
+jobs:
+  qualify:
+    name: Migrate robust proof arithmetic to qualified kernel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.SUBJECT_SHA }}
+          persist-credentials: false
+
+      - name: Bind exact N-B subject and qualified A1 parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          mkdir -p artifacts/manifold-006n-b
+          {
+            echo "schema=symthaea.manifold-006n-b.environment.v1"
+            echo "phase=N-B-production-authority-migration"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$(git rev-parse HEAD^)"
+            echo "a1_run=$A1_RUN"
+            echo "a1_artifact_id=$A1_ARTIFACT_ID"
+            echo "a1_artifact_sha256=$A1_ARTIFACT_SHA256"
+            echo "a1_kernel_semantic_identity=$A1_KERNEL_SEMANTIC_IDENTITY"
+            echo "qualified_006c1_vector_identity=$QUALIFIED_006C1_VECTOR_IDENTITY"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "runner_label=ubuntu-24.04"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > artifacts/manifold-006n-b/environment.txt
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Extend environment capsule and bind unchanged A1 kernel bytes
+        run: |
+          set -euo pipefail
+          test "$(sha256sum crates/core/symthaea-core/src/certified_interval.rs | awk '{print $1}')" = "$A1_KERNEL_SOURCE_SHA256"
+          test "$(sha256sum scripts/qualification/manifold_006n_kernel_harness.rs | awk '{print $1}')" = "$A1_KERNEL_HARNESS_SHA256"
+          test "$(sha256sum scripts/qualification/manifold_006n_kernel_oracle.py | awk '{print $1}')" = "$A1_KERNEL_ORACLE_SHA256"
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "rustfmt=$(rustfmt --version)"
+            echo "clippy=$(cargo clippy --version)"
+            echo "python=$(python3 --version 2>&1)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "kernel_source_sha256=$(sha256sum crates/core/symthaea-core/src/certified_interval.rs | awk '{print $1}')"
+            echo "kernel_harness_sha256=$(sha256sum scripts/qualification/manifold_006n_kernel_harness.rs | awk '{print $1}')"
+            echo "kernel_oracle_sha256=$(sha256sum scripts/qualification/manifold_006n_kernel_oracle.py | awk '{print $1}')"
+            echo "robust_source_sha256=$(sha256sum crates/core/symthaea-core/src/robust_reachability.rs | awk '{print $1}')"
+            echo "production_boundary_test_sha256=$(sha256sum crates/core/symthaea-core/tests/manifold_006n_b_production_boundary.rs | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+          } >> artifacts/manifold-006n-b/environment.txt
+
+      - name: Enforce one-commit migration surface and single arithmetic authority
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+
+          base = os.environ['BASE_SHA']
+          subject = os.environ['SUBJECT_SHA']
+          changed = subprocess.check_output(
+              ['git', 'diff', '--name-only', base, subject], text=True
+          ).splitlines()
+          expected = {
+              '.github/workflows/manifold-006n-b-migrate-reachability.yml',
+              'crates/core/symthaea-core/src/robust_reachability.rs',
+              'crates/core/symthaea-core/tests/manifold_006n_b_production_boundary.rs',
+          }
+          assert set(changed) == expected, (changed, expected)
+
+          robust = Path('crates/core/symthaea-core/src/robust_reachability.rs').read_text()
+          lib = Path('crates/core/symthaea-core/src/lib.rs').read_text()
+
+          assert 'crate::certified_interval' in robust
+          assert 'impl From<CertifiedIntervalError> for RobustReachabilityError' in robust
+          for forbidden in (
+              'struct OutwardInterval',
+              'fn outward_add(',
+              'fn outward_sub(',
+              'fn outward_mul(',
+              'fn outward_div(',
+              'fn next_up(',
+              'fn next_down(',
+              'fn is_normal_power_of_two(',
+              'fn canonical_zero(',
+          ):
+              assert forbidden not in robust, f'duplicate arithmetic authority remains: {forbidden}'
+
+          assert re.search(r'(?m)^mod certified_interval;$', lib)
+          assert not re.search(r'(?m)^pub(?:\([^)]*\))?\s+mod certified_interval;$', lib)
+
+          audit = {
+              'schema': 'symthaea.manifold-006n-b.source-audit.v1',
+              'changed_files': changed,
+              'shared_kernel_imported': True,
+              'legacy_outward_interval_deleted': True,
+              'legacy_outward_scalar_functions_deleted': True,
+              'legacy_neighbor_functions_deleted': True,
+              'legacy_power_of_two_predicate_deleted': True,
+              'legacy_zero_canonicalizer_deleted': True,
+              'certified_interval_module_crate_private': True,
+              'existing_public_error_surface_retained': True,
+              'verdict': 'PASS',
+          }
+          Path('artifacts/manifold-006n-b/source-audit.json').write_text(
+              json.dumps(audit, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Check formatting of changed Rust only
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/core/symthaea-core/src/robust_reachability.rs \
+            crates/core/symthaea-core/tests/manifold_006n_b_production_boundary.rs
+
+      - name: Check exact core crate
+        run: cargo check --locked -p symthaea-core --no-default-features
+
+      - name: Run existing 006C robust theorem suite unchanged
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c_robust_reachability
+
+      - name: Run existing 006C1 existential theorem suite unchanged
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c1_existential_reachability
+
+      - name: Run N-B production boundary regressions
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006n_b_production_boundary
+
+      - name: Re-run A1 exact-rational kernel qualification unchanged
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 scripts/qualification/manifold_006n_kernel_harness.rs \
+            -o artifacts/manifold-006n-b/kernel-harness
+          artifacts/manifold-006n-b/kernel-harness artifacts/manifold-006n-b/kernel-vectors.tsv
+          python3 scripts/qualification/manifold_006n_kernel_oracle.py \
+            artifacts/manifold-006n-b/kernel-vectors.tsv \
+            artifacts/manifold-006n-b/kernel-oracle.json
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          d = json.loads(Path('artifacts/manifold-006n-b/kernel-oracle.json').read_text())
+          assert d['verdict'] == 'PASS'
+          assert d['counterexample_count'] == 0
+          assert d['sweep_record_count'] == 4096
+          assert d['semantic_vector_sha3_256'] == os.environ['A1_KERNEL_SEMANTIC_IDENTITY']
+          assert d['power2_normal_subnormal_boundaries_widened'] is True
+          assert d['normal_interior_power2_fast_paths_exact'] is True
+          PY
+
+      - name: Emit child frozen 006C1 theorem vectors
+        env:
+          MANIFOLD_006C1_VECTOR_PATH: ${{ github.workspace }}/artifacts/manifold-006n-b/child-vectors.json
+        run: |
+          cargo test --locked -p symthaea-core --no-default-features \
+            --test manifold_006c1_exact_oracle_vectors
+          python3 scripts/qualification/manifold_006c1_exact_oracle.py \
+            artifacts/manifold-006n-b/child-vectors.json \
+            artifacts/manifold-006n-b/child-oracle.json
+
+      - name: Emit exact-parent frozen 006C1 theorem vectors under same toolchain
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/manifold-006n-b-parent"
+          git worktree add --detach "$parent" "$BASE_SHA"
+          MANIFOLD_006C1_VECTOR_PATH="$GITHUB_WORKSPACE/artifacts/manifold-006n-b/parent-vectors.json" \
+          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-b-parent-target" \
+            cargo test --manifest-path "$parent/Cargo.toml" --locked -p symthaea-core --no-default-features \
+              --test manifold_006c1_exact_oracle_vectors
+          python3 "$parent/scripts/qualification/manifold_006c1_exact_oracle.py" \
+            artifacts/manifold-006n-b/parent-vectors.json \
+            artifacts/manifold-006n-b/parent-oracle.json
+
+      - name: Require byte-identical frozen parent/child theorem corpus
+        run: |
+          set -euo pipefail
+          cmp -s artifacts/manifold-006n-b/parent-vectors.json artifacts/manifold-006n-b/child-vectors.json
+          cmp -s artifacts/manifold-006n-b/parent-oracle.json artifacts/manifold-006n-b/child-oracle.json
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006n-b')
+          parent = root.joinpath('parent-vectors.json').read_bytes()
+          child = root.joinpath('child-vectors.json').read_bytes()
+          po = json.loads(root.joinpath('parent-oracle.json').read_text())
+          co = json.loads(root.joinpath('child-oracle.json').read_text())
+          assert parent == child
+          assert po == co
+          assert po['verdict'] == 'PASS'
+          assert po['vector_set_identity'] == os.environ['QUALIFIED_006C1_VECTOR_IDENTITY']
+          assert co['vector_set_identity'] == os.environ['QUALIFIED_006C1_VECTOR_IDENTITY']
+          comparison = {
+              'schema': 'symthaea.manifold-006n-b.parent-child-comparison.v1',
+              'parent_vector_sha256': hashlib.sha256(parent).hexdigest(),
+              'child_vector_sha256': hashlib.sha256(child).hexdigest(),
+              'byte_identical_vectors': True,
+              'byte_identical_oracle_receipts': True,
+              'semantic_vector_identity': po['vector_set_identity'],
+              'verdict': 'PASS',
+          }
+          root.joinpath('comparison.json').write_text(
+              json.dumps(comparison, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Scoped strict Clippy
+        run: cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings
+
+      - name: Emit N-B qualification receipt
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006n-b')
+          source = json.loads(root.joinpath('source-audit.json').read_text())
+          kernel = json.loads(root.joinpath('kernel-oracle.json').read_text())
+          comparison = json.loads(root.joinpath('comparison.json').read_text())
+          receipt = {
+              'schema': 'symthaea.manifold-006n-b.qualification.v1',
+              'phase': 'production-certified-interval-authority-migration',
+              'source_subject': os.environ['SUBJECT_SHA'].lower(),
+              'exact_parent_a1_subject': os.environ['BASE_SHA'].lower(),
+              'a1_run': os.environ['A1_RUN'],
+              'a1_artifact_id': os.environ['A1_ARTIFACT_ID'],
+              'a1_artifact_sha256': os.environ['A1_ARTIFACT_SHA256'].lower(),
+              'a1_kernel_semantic_identity': os.environ['A1_KERNEL_SEMANTIC_IDENTITY'].lower(),
+              'core_check': 'PASS',
+              'existing_006c_robust_suite': 'PASS',
+              'existing_006c1_existential_suite': 'PASS',
+              'production_boundary_regressions': 'PASS',
+              'a1_exact_rational_kernel_rerun': 'PASS',
+              'a1_kernel_counterexample_count': kernel['counterexample_count'],
+              'single_arithmetic_authority_source_audit': source['verdict'],
+              'frozen_parent_child_vectors_byte_identical': comparison['byte_identical_vectors'],
+              'frozen_parent_child_oracles_byte_identical': comparison['byte_identical_oracle_receipts'],
+              'frozen_006c1_vector_identity': comparison['semantic_vector_identity'],
+              'scoped_strict_clippy': 'PASS',
+              'production_robust_reachability_consumes_hardened_kernel': True,
+              'new_reachability_claim': False,
+              'claim_scope': 'certified-numerics implementation-locus migration plus boundary soundness hardening only',
+              'verdict': 'PASS',
+          }
+          root.joinpath('report.json').write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Hash qualification capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd artifacts/manifold-006n-b
+          rm -f kernel-harness
+          : > SHA256SUMS
+          for file in environment.txt source-audit.json kernel-vectors.tsv kernel-oracle.json child-vectors.json child-oracle.json parent-vectors.json parent-oracle.json comparison.json report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Upload qualification capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006n-b-migration-${{ env.SUBJECT_SHA }}
+          path: artifacts/manifold-006n-b/
+          if-no-files-found: error
+          retention-days: 90

@@ -21,6 +21,7 @@
 use blake3::Hasher;
 use thiserror::Error;
 
+use crate::certified_interval::{CertifiedIntervalError, OutwardInterval, canonical_zero};
 use crate::kinodynamic_reachability::{
     BoundedSingleIntegrator1D, DynamicsTimeDomain, PlantTimeProfile,
 };
@@ -521,66 +522,11 @@ pub enum RobustReachabilityError {
     InvalidCertificate { reason: String },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct OutwardInterval {
-    lower: f64,
-    upper: f64,
-}
-
-impl OutwardInterval {
-    fn point(value: f64) -> Result<Self, RobustReachabilityError> {
-        let value = finite("outward point", value)?;
-        Ok(Self {
-            lower: value,
-            upper: value,
-        })
-    }
-
-    fn add(self, other: Self) -> Result<Self, RobustReachabilityError> {
-        let lower = outward_add(self.lower, other.lower)?.lower;
-        let upper = outward_add(self.upper, other.upper)?.upper;
-        Self::ordered(lower, upper, "outward interval addition")
-    }
-
-    fn sub(self, other: Self) -> Result<Self, RobustReachabilityError> {
-        let lower = outward_sub(self.lower, other.upper)?.lower;
-        let upper = outward_sub(self.upper, other.lower)?.upper;
-        Self::ordered(lower, upper, "outward interval subtraction")
-    }
-
-    fn mul_positive(self, scalar: f64) -> Result<Self, RobustReachabilityError> {
-        if !scalar.is_finite() || scalar <= 0.0 {
-            return Err(RobustReachabilityError::Numerical {
-                reason: format!("outward interval multiplication requires finite positive scalar, got {scalar}"),
-            });
+impl From<CertifiedIntervalError> for RobustReachabilityError {
+    fn from(error: CertifiedIntervalError) -> Self {
+        Self::Numerical {
+            reason: error.reason().to_string(),
         }
-        let lower = outward_mul(self.lower, scalar)?.lower;
-        let upper = outward_mul(self.upper, scalar)?.upper;
-        Self::ordered(lower, upper, "outward interval multiplication")
-    }
-
-    fn div_positive(self, scalar: f64) -> Result<Self, RobustReachabilityError> {
-        if !scalar.is_finite() || scalar <= 0.0 {
-            return Err(RobustReachabilityError::Numerical {
-                reason: format!("outward interval division requires finite positive scalar, got {scalar}"),
-            });
-        }
-        let lower = outward_div(self.lower, scalar)?.lower;
-        let upper = outward_div(self.upper, scalar)?.upper;
-        Self::ordered(lower, upper, "outward interval division")
-    }
-
-    fn ordered(
-        lower: f64,
-        upper: f64,
-        operation: &str,
-    ) -> Result<Self, RobustReachabilityError> {
-        if !lower.is_finite() || !upper.is_finite() || lower > upper {
-            return Err(RobustReachabilityError::Numerical {
-                reason: format!("{operation} produced invalid enclosure [{lower}, {upper}]"),
-            });
-        }
-        Ok(Self { lower, upper })
     }
 }
 
@@ -591,10 +537,7 @@ struct CertifiedRequirement1D {
 }
 
 impl CertifiedRequirement1D {
-    fn guaranteed_control_interval(
-        self,
-        model: &BoundedSingleIntegrator1D,
-    ) -> Option<(f64, f64)> {
+    fn guaranteed_control_interval(self, model: &BoundedSingleIntegrator1D) -> Option<(f64, f64)> {
         let lower = self.required_lower.upper.max(model.controls().minimum());
         let upper = self.required_upper.lower.min(model.controls().maximum());
         (lower <= upper).then_some((lower, upper))
@@ -719,12 +662,7 @@ pub fn solve_robust_single_integrator_analytic(
     }
 
     if proves_target_too_narrow(certified, tolerance)? {
-        return certified_not_robust(
-            model,
-            query,
-            diagnostic,
-            NotRobustReason1D::TargetTooNarrow,
-        );
+        return certified_not_robust(model, query, diagnostic, NotRobustReason1D::TargetTooNarrow);
     }
 
     if proves_above_actuator(certified, model.controls().maximum(), tolerance)? {
@@ -777,16 +715,18 @@ pub fn verify_robust_witness(
     };
     if witness.control() < lower || witness.control() > upper {
         return Err(RobustReachabilityError::InvalidWitness {
-            reason: "robust witness control is outside the independently certified control interval"
-                .to_string(),
+            reason:
+                "robust witness control is outside the independently certified control interval"
+                    .to_string(),
         });
     }
 
     let envelope = fixed_control_terminal_envelope(model, query, witness.control())?;
     if witness.terminal_envelope != envelope {
         return Err(RobustReachabilityError::InvalidWitness {
-            reason: "robust witness terminal envelope does not match independent outward recomputation"
-                .to_string(),
+            reason:
+                "robust witness terminal envelope does not match independent outward recomputation"
+                    .to_string(),
         });
     }
     if !query.target().contains_interval(envelope) {
@@ -796,7 +736,12 @@ pub fn verify_robust_witness(
         });
     }
 
-    let expected = hash_robust_witness(model.identity(), query.identity(), witness.control(), envelope);
+    let expected = hash_robust_witness(
+        model.identity(),
+        query.identity(),
+        witness.control(),
+        envelope,
+    );
     if witness.identity != expected {
         return Err(RobustReachabilityError::InvalidWitness {
             reason: "robust witness identity does not match independent theorem inputs".to_string(),
@@ -817,7 +762,9 @@ pub fn verify_not_robust_certificate(
     certificate: &NotRobustCertificate1D,
 ) -> Result<NotRobustVerificationReceipt1D, RobustReachabilityError> {
     require_model_query_identity(model, query)?;
-    if certificate.model_identity != model.identity() || certificate.query_identity != query.identity() {
+    if certificate.model_identity != model.identity()
+        || certificate.query_identity != query.identity()
+    {
         return Err(RobustReachabilityError::InvalidCertificate {
             reason: "not-robust certificate subject identities do not match".to_string(),
         });
@@ -882,8 +829,8 @@ fn proves_above_actuator(
     actuator_maximum: f64,
     tolerance: f64,
 ) -> Result<bool, RobustReachabilityError> {
-    let guarded_maximum = OutwardInterval::point(actuator_maximum)?
-        .add(OutwardInterval::point(tolerance)?)?;
+    let guarded_maximum =
+        OutwardInterval::point(actuator_maximum)?.add(OutwardInterval::point(tolerance)?)?;
     Ok(certified.required_lower.lower > guarded_maximum.upper)
 }
 
@@ -892,8 +839,8 @@ fn proves_below_actuator(
     actuator_minimum: f64,
     tolerance: f64,
 ) -> Result<bool, RobustReachabilityError> {
-    let guarded_minimum = OutwardInterval::point(actuator_minimum)?
-        .sub(OutwardInterval::point(tolerance)?)?;
+    let guarded_minimum =
+        OutwardInterval::point(actuator_minimum)?.sub(OutwardInterval::point(tolerance)?)?;
     Ok(certified.required_upper.upper < guarded_minimum.lower)
 }
 
@@ -1031,159 +978,12 @@ fn hash_not_robust_certificate(
 }
 
 fn robust_witness_verifier_identity() -> [u8; 32] {
-    *blake3::hash(
-        b"symthaea-robust-witness-verifier-1d-v2\0outward-certified-universal-envelope\0",
-    )
-    .as_bytes()
+    *blake3::hash(b"symthaea-robust-witness-verifier-1d-v2\0outward-certified-universal-envelope\0")
+        .as_bytes()
 }
 
 fn not_robust_verifier_identity() -> [u8; 32] {
-    *blake3::hash(
-        b"symthaea-not-robust-verifier-1d-v2\0outward-certified-separator\0",
-    )
-    .as_bytes()
-}
-
-fn outward_add(left: f64, right: f64) -> Result<OutwardInterval, RobustReachabilityError> {
-    let left = finite("outward addition left operand", left)?;
-    let right = finite("outward addition right operand", right)?;
-    if right == 0.0 {
-        return OutwardInterval::point(left);
-    }
-    if left == 0.0 {
-        return OutwardInterval::point(right);
-    }
-
-    let sum = finite("outward addition nearest result", left + right)?;
-    let virtual_right = sum - left;
-    let virtual_left = sum - virtual_right;
-    let right_roundoff = right - virtual_right;
-    let left_roundoff = left - virtual_left;
-    let residual = finite(
-        "outward addition residual",
-        left_roundoff + right_roundoff,
-    )?;
-
-    if residual == 0.0 {
-        return OutwardInterval::point(sum);
-    }
-    if residual > 0.0 {
-        OutwardInterval::ordered(sum, next_up(sum)?, "directed outward addition")
-    } else {
-        OutwardInterval::ordered(next_down(sum)?, sum, "directed outward addition")
-    }
-}
-
-fn outward_sub(left: f64, right: f64) -> Result<OutwardInterval, RobustReachabilityError> {
-    outward_add(left, finite("outward subtraction negation", -right)?)
-}
-
-fn outward_mul(left: f64, right: f64) -> Result<OutwardInterval, RobustReachabilityError> {
-    let left = finite("outward multiplication left operand", left)?;
-    let right = finite("outward multiplication right operand", right)?;
-    if left == 0.0 || right == 0.0 {
-        return OutwardInterval::point(0.0);
-    }
-    if left == 1.0 {
-        return OutwardInterval::point(right);
-    }
-    if right == 1.0 {
-        return OutwardInterval::point(left);
-    }
-    if left == -1.0 {
-        return OutwardInterval::point(finite("exact multiplication by -1", -right)?);
-    }
-    if right == -1.0 {
-        return OutwardInterval::point(finite("exact multiplication by -1", -left)?);
-    }
-
-    let product = finite("outward multiplication nearest result", left * right)?;
-    if (is_normal_power_of_two(left.abs()) || is_normal_power_of_two(right.abs()))
-        && product.is_normal()
-    {
-        return OutwardInterval::point(product);
-    }
-
-    OutwardInterval::ordered(
-        next_down(product)?,
-        next_up(product)?,
-        "outward multiplication enclosure",
-    )
-}
-
-fn outward_div(left: f64, right: f64) -> Result<OutwardInterval, RobustReachabilityError> {
-    let left = finite("outward division numerator", left)?;
-    let right = finite("outward division denominator", right)?;
-    if right == 0.0 {
-        return Err(RobustReachabilityError::Numerical {
-            reason: "division by zero in outward robust arithmetic".to_string(),
-        });
-    }
-    if left == 0.0 {
-        return OutwardInterval::point(0.0);
-    }
-    if right == 1.0 {
-        return OutwardInterval::point(left);
-    }
-    if right == -1.0 {
-        return OutwardInterval::point(finite("exact division by -1", -left)?);
-    }
-
-    let quotient = finite("outward division nearest result", left / right)?;
-    if is_normal_power_of_two(right.abs()) && quotient.is_normal() {
-        return OutwardInterval::point(quotient);
-    }
-
-    OutwardInterval::ordered(
-        next_down(quotient)?,
-        next_up(quotient)?,
-        "outward division enclosure",
-    )
-}
-
-fn next_up(value: f64) -> Result<f64, RobustReachabilityError> {
-    let value = finite("next-up input", value)?;
-    if value == f64::MAX {
-        return Err(RobustReachabilityError::Numerical {
-            reason: "next-up would leave finite binary64 domain".to_string(),
-        });
-    }
-    if value == 0.0 {
-        return Ok(f64::from_bits(1));
-    }
-    let bits = value.to_bits();
-    let stepped = if value > 0.0 {
-        f64::from_bits(bits + 1)
-    } else {
-        f64::from_bits(bits - 1)
-    };
-    finite("next-up result", stepped)
-}
-
-fn next_down(value: f64) -> Result<f64, RobustReachabilityError> {
-    let value = finite("next-down input", value)?;
-    if value == -f64::MAX {
-        return Err(RobustReachabilityError::Numerical {
-            reason: "next-down would leave finite binary64 domain".to_string(),
-        });
-    }
-    if value == 0.0 {
-        return Ok(-f64::from_bits(1));
-    }
-    let bits = value.to_bits();
-    let stepped = if value > 0.0 {
-        f64::from_bits(bits - 1)
-    } else {
-        f64::from_bits(bits + 1)
-    };
-    finite("next-down result", stepped)
-}
-
-fn is_normal_power_of_two(value: f64) -> bool {
-    if !value.is_normal() || value <= 0.0 {
-        return false;
-    }
-    value.to_bits() & ((1_u64 << 52) - 1) == 0
+    *blake3::hash(b"symthaea-not-robust-verifier-1d-v2\0outward-certified-separator\0").as_bytes()
 }
 
 fn checked_sub(left: f64, right: f64) -> Result<f64, RobustReachabilityError> {
@@ -1210,8 +1010,4 @@ fn finite(operation: &str, value: f64) -> Result<f64, RobustReachabilityError> {
         });
     }
     Ok(canonical_zero(value))
-}
-
-fn canonical_zero(value: f64) -> f64 {
-    if value == 0.0 { 0.0 } else { value }
 }
