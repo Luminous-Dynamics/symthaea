@@ -18,7 +18,6 @@ jobs:
     permissions:
       contents: read
     outputs:
-      has_evidence: ${{ steps.bundle.outputs.has_evidence }}
       artifact_name: ${{ steps.bundle.outputs.artifact_name }}
 
     steps:
@@ -79,11 +78,33 @@ jobs:
           SYMTHAEA_GWT1_CAUSAL_EVIDENCE_DIR: ${{ runner.temp }}/gwt1-causal-evidence
         run: |
           set -euo pipefail
+          set +e
           cargo run --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_causal_qualification
+          status=$?
+          set -e
+
+          case "$status" in
+            0) expected_outcome="Qualified" ;;
+            20) expected_outcome="NotDemonstrated" ;;
+            21) expected_outcome="Contradicted" ;;
+            22) expected_outcome="Inconclusive" ;;
+            *)
+              echo "Causal qualification infrastructure failure: unexpected exit status $status" >&2
+              exit "$status"
+              ;;
+          esac
+
+          outcome_file="$SYMTHAEA_GWT1_CAUSAL_EVIDENCE_DIR/outcome.txt"
+          test -f "$outcome_file"
+          observed_outcome="$(tr -d '\r\n' < "$outcome_file")"
+          if [[ "$observed_outcome" != "$expected_outcome" ]]; then
+            echo "Causal qualification exit/outcome mismatch: status=$status expected=$expected_outcome observed=$observed_outcome" >&2
+            exit 2
+          fi
+          echo "Causal scientific outcome: $expected_outcome (exit $status); continuing to independent verification."
 
       - name: Package isolated causal evidence
         id: bundle
-        if: always()
         shell: bash
         env:
           EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
@@ -101,10 +122,8 @@ jobs:
           expected=(causal_observations.json matched_sham_observations.json causal_evidence_envelope.json resolution.json outcome.txt)
           for file in "${expected[@]}"; do
             if [[ ! -f "${SOURCE_DIR}/${file}" ]]; then
-              echo "Missing causal evidence file: ${file}"
-              echo "has_evidence=false" >> "$GITHUB_OUTPUT"
-              echo "artifact_name=" >> "$GITHUB_OUTPUT"
-              exit 0
+              echo "Missing causal evidence file after completed qualification: ${file}" >&2
+              exit 1
             fi
           done
           rm -rf "$TRANSPORT_DIR"
@@ -122,11 +141,9 @@ jobs:
             | /usr/bin/gzip -n > "$TRANSPORT_DIR/gwt1-causal-evidence.tar.gz"
           (cd "$TRANSPORT_DIR" && /usr/bin/sha256sum gwt1-causal-evidence.tar.gz > gwt1-causal-evidence.tar.gz.sha256)
           artifact_name="gwt1-causal-intermediate-unattested-${EVIDENCE_SUBJECT_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          echo "has_evidence=true" >> "$GITHUB_OUTPUT"
           echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
 
       - name: Upload unattested causal intermediate bundle
-        if: always() && steps.bundle.outputs.has_evidence == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.bundle.outputs.artifact_name }}
@@ -139,7 +156,7 @@ jobs:
   attest:
     name: Independently verify and attest causal evidence
     needs: qualify
-    if: always() && needs.qualify.outputs.has_evidence == 'true'
+    if: needs.qualify.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
