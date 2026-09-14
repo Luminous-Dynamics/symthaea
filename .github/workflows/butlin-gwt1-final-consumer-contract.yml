@@ -30,9 +30,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # This contract is intentionally refreshed whenever its producer
-          # ancestry changes, so the hosted compile/test surface always observes
-          # the exact final-resolution parent consumed by this reconstruction theorem.
           /usr/bin/python3 - <<'PY'
           import importlib.util
           import pathlib
@@ -138,12 +135,19 @@ jobs:
           for pattern in forbidden:
               assert not pattern.search(authority), pattern.pattern
 
-          # Workflow trust roots and exact-run consumption.
+          # Workflow trust roots, exact-run consumption, and self-run provenance.
           assert "BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" in workflow
           assert "198aaf257de0b4f264f69eb64d813d772f0362d6" in workflow
           assert "final_resolution_run_id" in workflow
           assert "final_resolution_run_attempt" in workflow
           assert "run-id: ${{ inputs.final_resolution_run_id }}" in workflow
+          assert '[[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]' in workflow
+          assert '[[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]' in workflow
+          assert '--arg consumer_run_id "$GITHUB_RUN_ID"' in workflow
+          assert '--arg consumer_run_attempt "$GITHUB_RUN_ATTEMPT"' in workflow
+          assert 'consumer_run_id:$consumer_run_id' in workflow
+          assert 'consumer_run_attempt:$consumer_run_attempt' in workflow
+          assert "inputs.consumer_run" not in workflow
           assert "latest" not in workflow.lower()
           assert "--signer-digest \"$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA\"" in workflow
           assert "--signer-digest \"$CONSUMER_WORKFLOW_SHA\"" in workflow
