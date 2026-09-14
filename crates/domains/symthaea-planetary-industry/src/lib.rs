@@ -6,11 +6,13 @@
 //! interval-aware bulk-mass conservation. PIE-002 adds first-order electrical
 //! and thermal utility accounting while keeping gross/current-cycle supply
 //! separate from steady-cycle recovery. PIE-002B projects neutral utility
-//! declarations without inventing aggregation semantics, and PIE-002D binds a
-//! complete electrical projection to explicit recovery/storage/supply facts
-//! without evaluating feasibility. Chemistry, detailed thermodynamics,
-//! equipment reproduction, optimization, and control authority belong to later
-//! layers.
+//! declarations without inventing aggregation semantics, PIE-002D binds a
+//! complete electrical projection to explicit recovery/storage/supply facts,
+//! and PIE-002E validates and freshly projects the exact process value supplied
+//! to a composition invocation before binding it. None of these layers evaluates
+//! feasibility or establishes persistence currentness. Chemistry, detailed
+//! thermodynamics, equipment reproduction, optimization, and control authority
+//! belong to later layers.
 
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
@@ -21,6 +23,7 @@ mod process;
 mod types;
 mod utility_accounting;
 mod utility_binding;
+mod utility_composition;
 mod utility_projection;
 
 pub use graph::*;
@@ -29,6 +32,7 @@ pub use process::*;
 pub use types::*;
 pub use utility_accounting::*;
 pub use utility_binding::*;
+pub use utility_composition::*;
 pub use utility_projection::*;
 
 #[cfg(test)]
