@@ -27,6 +27,7 @@
 //! - Direct ActivePrimitive evidence preservation with HDC identity auditing
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 //! - Candidate-specific typed epistemic grounding bound to exact primitive identity
+//! - Verified reasoning-chain transition history isolated from legacy feedback aggregates
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -55,6 +56,9 @@ pub mod reasoning_objective_evidence;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
+pub mod reasoning_transition_history;
+#[cfg(test)]
+mod reasoning_transition_history_negative_controls;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
@@ -176,4 +180,11 @@ pub use reasoning_qualification::{
 pub use reasoning_shadow_meta::{
     ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner,
     V3ShadowObservation, V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
+};
+pub use reasoning_transition_history::{
+    inspect_active_primitive_transition_history, inspect_verified_transition_history,
+    ActiveTransitionHistoryProfile, ActiveTransitionHistoryReport, TransitionMeanEnvelope,
+    VerifiedChainAdmission, VerifiedTransitionHistory, VerifiedTransitionHistoryError,
+    VerifiedTransitionHistoryKey, VerifiedTransitionSummary, LOCAL_TRANSITION_CONTRIBUTION_SCALE,
+    VERIFIED_TRANSITION_HISTORY_VERSION,
 };
