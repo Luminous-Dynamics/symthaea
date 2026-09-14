@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-evidence-current-independence"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Current-head-qualified composition of verifier independence evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "currentness", "independence"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-evidence-active-independence = { path = "../symthaea-evidence-active-independence" }
+symthaea-evidence-lifecycle-head-currentness = { path = "../symthaea-evidence-lifecycle-head-currentness" }
