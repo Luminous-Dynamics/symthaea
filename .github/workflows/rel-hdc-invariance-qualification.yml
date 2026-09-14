@@ -1,0 +1,149 @@
+name: REL HDC Invariance Qualification
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md"
+      - "crates/core/symthaea-core/tests/relational_invariance.rs"
+      - ".github/rel/rel-hdc-invariance-qualification.sh"
+      - ".github/workflows/rel-hdc-invariance-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-hdc-invariance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  exact-subject:
+    name: Exact-subject REL-001/002/003
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 1
+
+      - name: Bind checkout to requested subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          test "${actual_head}" = "${EXPECTED_HEAD}"
+          printf 'expected_head=%s\nactual_head=%s\ntree=%s\n' \
+            "${EXPECTED_HEAD}" "${actual_head}" "$(git rev-parse HEAD^{tree})"
+
+      - name: Install frozen Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc -Vv
+          cargo -V
+          rustfmt -V
+          cargo clippy -V
+
+      - name: Record preflight source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md \
+            crates/core/symthaea-core/tests/relational_invariance.rs \
+            .github/rel/rel-hdc-invariance-qualification.sh \
+            .github/workflows/rel-hdc-invariance-qualification.yml
+
+      - name: Format contract
+        shell: bash
+        run: bash .github/rel/rel-hdc-invariance-qualification.sh fmt
+
+      - name: Execute REL theorem controls
+        shell: bash
+        run: bash .github/rel/rel-hdc-invariance-qualification.sh test
+
+      - name: Warnings-denied Clippy
+        shell: bash
+        run: bash .github/rel/rel-hdc-invariance-qualification.sh clippy
+
+      - name: Postflight subject and checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Build machine-readable qualification receipt
+        shell: bash
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/rel-hdc-invariance-receipt.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          paths = [
+              "docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md",
+              "crates/core/symthaea-core/tests/relational_invariance.rs",
+              ".github/rel/rel-hdc-invariance-qualification.sh",
+              ".github/workflows/rel-hdc-invariance-qualification.yml",
+          ]
+
+          def sha256(path: str) -> str:
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+          def cmd(*args: str) -> str:
+              return subprocess.check_output(args, text=True).strip()
+
+          receipt = {
+              "schema": "symthaea.rel.hdc-invariance-qualification.v1",
+              "authority": "MeasurementOnly",
+              "subject_head": cmd("git", "rev-parse", "HEAD"),
+              "subject_tree": cmd("git", "rev-parse", "HEAD^{tree}"),
+              "expected_head": os.environ["EXPECTED_HEAD"],
+              "expected_base": os.environ.get("EXPECTED_BASE", ""),
+              "rustc": cmd("rustc", "--version"),
+              "cargo": cmd("cargo", "--version"),
+              "files_sha256": {path: sha256(path) for path in paths},
+              "phases": {
+                  "rustfmt_check": "passed",
+                  "relational_invariance_test": "passed",
+                  "warnings_denied_clippy": "passed",
+                  "checkout_immutable_before_receipt": True,
+              },
+              "claims": {
+                  "production_cognition_changed": False,
+                  "field_theoretic_gauge_symmetry_established": False,
+                  "intelligence_improvement_established": False,
+                  "consciousness_claim_established": False,
+              },
+          }
+          pathlib.Path(os.environ["RECEIPT_PATH"]).write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-hdc-invariance-${{ env.EXPECTED_HEAD }}
+          path: ${{ runner.temp }}/rel-hdc-invariance-receipt.json
+          retention-days: 30
+          if-no-files-found: error
