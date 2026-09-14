@@ -16,8 +16,15 @@
 
 use sha2::{Digest, Sha256};
 use symthaea_assurance_core::{DigestSha256, StableId};
+use thiserror::Error;
 
 pub const SEMANTIC_COMMITMENT_SCHEMA: &str = "symthaea.assurance.semantic-commitment.v1";
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum SemanticCommitmentError {
+    #[error("duplicate semantic identifier: {0}")]
+    DuplicateSemanticId(String),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SelfDescribingSemanticCommitmentV1 {
@@ -70,6 +77,63 @@ impl SelfDescribingSemanticCommitmentV1 {
 
     pub fn digest(&self) -> DigestSha256 {
         digest_canonical(&self.canonical_bytes())
+    }
+}
+
+/// Canonicalizes a semantic set by semantic identifier and rejects duplicate
+/// identifiers even when callers supply different schemas or definition
+/// digests. A semantic identifier names one slot in one declared set.
+pub fn canonical_semantic_set(
+    mut values: Vec<SelfDescribingSemanticCommitmentV1>,
+) -> Result<Vec<SelfDescribingSemanticCommitmentV1>, SemanticCommitmentError> {
+    values.sort_by(|left, right| left.semantic_id.cmp(&right.semantic_id));
+    for pair in values.windows(2) {
+        if pair[0].semantic_id == pair[1].semantic_id {
+            return Err(SemanticCommitmentError::DuplicateSemanticId(
+                pair[0].semantic_id.as_str().to_owned(),
+            ));
+        }
+    }
+    Ok(values)
+}
+
+/// Identity required before two externally ordered events may be compared.
+/// Sequence numbers remain event data; source, validation semantics, and epoch
+/// define the lineage in which those sequence numbers have meaning.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct OrderingLineageIdentityV1 {
+    source: StableId,
+    validation_profile: SelfDescribingSemanticCommitmentV1,
+    epoch: u64,
+}
+
+impl OrderingLineageIdentityV1 {
+    pub fn new(
+        source: StableId,
+        validation_profile: SelfDescribingSemanticCommitmentV1,
+        epoch: u64,
+    ) -> Self {
+        Self {
+            source,
+            validation_profile,
+            epoch,
+        }
+    }
+
+    pub fn source(&self) -> &StableId {
+        &self.source
+    }
+
+    pub fn validation_profile(&self) -> &SelfDescribingSemanticCommitmentV1 {
+        &self.validation_profile
+    }
+
+    pub fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    pub fn is_comparable_with(&self, other: &Self) -> bool {
+        self == other
     }
 }
 
