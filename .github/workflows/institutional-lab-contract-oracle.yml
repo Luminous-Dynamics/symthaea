@@ -1,0 +1,92 @@
+name: Institutional Lab Contract Oracle
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig006a_contract_oracle.py"
+      - "docs/research/INSTITUTIONAL_LAB_RECEIPT_CONTRACT_V1.md"
+      - ".github/workflows/institutional-lab-contract-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-contract-oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subject and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          test -z "$(git status --porcelain)"
+
+      - name: Syntax compile independent oracle
+        run: python -m py_compile scripts/ig006a_contract_oracle.py
+
+      - name: Execute self-test twice deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ig006a_contract_oracle.py --self-test > /tmp/ig006a-self-1.json
+          python scripts/ig006a_contract_oracle.py --self-test > /tmp/ig006a-self-2.json
+          cmp /tmp/ig006a-self-1.json /tmp/ig006a-self-2.json
+
+      - name: Execute canonical fixture twice deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ig006a_contract_oracle.py --fixture > /tmp/ig006a-fixture-1.json
+          python scripts/ig006a_contract_oracle.py --fixture > /tmp/ig006a-fixture-2.json
+          cmp /tmp/ig006a-fixture-1.json /tmp/ig006a-fixture-2.json
+
+      - name: Assert frozen v1 commitments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          with open('/tmp/ig006a-self-1.json', encoding='utf-8') as f:
+              self_test = json.load(f)
+          with open('/tmp/ig006a-fixture-1.json', encoding='utf-8') as f:
+              fixture = json.load(f)
+
+          assert self_test['all_self_tests_passed'] is True
+          assert self_test['authority'] == 'MeasurementOnly'
+          assert self_test['fixture_receipt_sha256'] == '29c623c1716d3792d5365d82202cbd82e21b41dae1ce8941b946aa153406b3df'
+          assert self_test['fixture_experiment_identity_sha256'] == 'c1db43ac72798d2f178bede9c0b5cf1157c4a49e8f6cdf1d832e7c093bd7fcd5'
+          assert self_test['metric_schema_sha256'] == '113b17a9c17248eda9dd2d18e078308912efe65ba804db39d7c4405b41f1f89d'
+          assert self_test['constitutional_violation_not_compensated'] is True
+          assert self_test['descriptive_metric_direction_preserved'] is True
+          assert fixture['receipt_sha256'] == self_test['fixture_receipt_sha256']
+
+          receipt = json.loads(fixture['receipt_json'])
+          for forbidden in ('governance_score', 'alignment_score', 'flourishing_score', 'safe'):
+              assert forbidden not in receipt
+          PY
+
+      - name: Verify checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain)"
