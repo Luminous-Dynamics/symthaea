@@ -600,20 +600,25 @@ impl CognitiveLoopService {
         // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        // Clone the processor's exact current active records before borrowing the shadow reasoner
-        // mutably. This preserves activation strength/reason/duration and immutable primitive
-        // identity for V3 measurement without changing the historical candidate builder below.
-        let active_primitive_snapshot: Vec<crate::consciousness::ActivePrimitive> = self
-            .primitive_tier
-            .primitive_processor
-            .as_ref()
-            .and_then(|processor| processor.current())
-            .map(|current| current.all_active().into_iter().cloned().collect())
-            .unwrap_or_default();
+        let meta_reasoning_due = self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0;
+        // Clone the processor's exact current active records only when the meta-reasoner itself is
+        // due to run. This preserves activation strength/reason/duration and immutable primitive
+        // identity for V3 measurement without adding per-cycle clone overhead.
+        let active_primitive_snapshot: Vec<crate::consciousness::ActivePrimitive> =
+            if meta_reasoning_due {
+                self.primitive_tier
+                    .primitive_processor
+                    .as_ref()
+                    .and_then(|processor| processor.current())
+                    .map(|current| current.all_active().into_iter().cloned().collect())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
         let (meta_reasoning_confidence, meta_reasoning_insights) = if let Some(ref mut reasoner) =
             self.primitive_tier.meta_cognitive_reasoner
         {
-            if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+            if meta_reasoning_due {
                 // Build lightweight candidate primitives from active set
                 let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
                     active_primitive_names
