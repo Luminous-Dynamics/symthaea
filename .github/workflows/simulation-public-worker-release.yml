@@ -1,0 +1,250 @@
+name: Simulation Public Worker Release
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-release/**"
+      - "crates/bridges/symthaea-sim-public-worker-routing/**"
+      - "crates/bridges/symthaea-sim-public-worker-deployment/**"
+      - "crates/bridges/symthaea-sim-public-worker-execution/**"
+      - "crates/bridges/symthaea-sim-public-worker-input/**"
+      - "crates/bridges/symthaea-sim-deployment/**"
+      - "crates/bridges/symthaea-sim-worker-qualification/**"
+      - "crates/bridges/symthaea-sim-worker-containment/**"
+      - "crates/bridges/symthaea-sim-worker-filesystem/**"
+      - "examples/extensions/hello-simulation/**"
+      - ".github/workflows/simulation-public-worker-release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+  SYMTHAEA_CGROUP_V2_DELEGATED_ROOT: ${{ vars.SYMTHAEA_CGROUP_V2_DELEGATED_ROOT }}
+
+jobs:
+  public-worker-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          test -r /sys/fs/cgroup/cgroup.controllers
+          uname -a
+          cat /sys/fs/cgroup/cgroup.controllers
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-wasip2
+          components: rustfmt, clippy
+
+      - name: Cache Cargo and Component builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            examples/extensions/hello-simulation/target
+          key: ${{ runner.os }}-simulation-public-worker-release-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-release/**', 'crates/bridges/symthaea-sim-public-worker-routing/**', 'crates/bridges/symthaea-sim-public-worker-deployment/**', 'crates/bridges/symthaea-sim-public-worker-execution/**', 'crates/bridges/symthaea-sim-public-worker-input/**', 'crates/bridges/symthaea-sim-worker-qualification/**', 'examples/extensions/hello-simulation/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-public-worker-release-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-public-worker-release-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches public release graph."
+          else
+            cat simulation-public-worker-release-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-release-cargo-lock-patch
+          path: simulation-public-worker-release-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Reconcile candidate pinned formatting
+        run: |
+          cargo fmt -p symthaea-sim-release
+          git diff -- crates/bridges/symthaea-sim-release \
+            > simulation-public-worker-release-rustfmt.patch
+          if git diff --quiet -- crates/bridges/symthaea-sim-release; then
+            echo "Release source already matches Rust 1.96 rustfmt."
+          else
+            cat simulation-public-worker-release-rustfmt.patch
+          fi
+
+      - name: Upload candidate rustfmt patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-release-rustfmt-patch
+          path: simulation-public-worker-release-rustfmt.patch
+          if-no-files-found: error
+
+      - name: Require standalone guest WIT parity
+        run: |
+          cmp crates/core/symthaea-extension-core/wit/extension-control.wit \
+              examples/extensions/hello-simulation/wit/extension-control.wit
+          cmp crates/core/symthaea-extension-core/wit/simulation-provider.wit \
+              examples/extensions/hello-simulation/wit/simulation-provider.wit
+
+      - name: Build exact release Component
+        run: |
+          cargo build \
+            --manifest-path examples/extensions/hello-simulation/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          test -s "$component"
+          sha256sum "$component" examples/extensions/hello-simulation/manifest.json
+
+      - name: Check public release graph
+        run: |
+          cargo check --locked -p symthaea-sim-release --all-targets
+          cargo check --locked -p symthaea-sim-public-worker-routing --all-targets
+          cargo check --locked -p symthaea-sim-public-worker-deployment --all-targets
+
+      - name: Test source corpus
+        run: |
+          cargo test --locked -p symthaea-sim-release
+          cargo test --locked -p symthaea-sim-public-worker-routing
+
+      - name: Strict Clippy
+        run: |
+          cargo clippy --locked -p symthaea-sim-release --all-targets -- -D warnings
+          cargo clippy --locked -p symthaea-sim-public-worker-routing --all-targets -- -D warnings
+
+      - name: Build exact qualified worker and containment probes
+        run: |
+          cargo build --locked \
+            -p symthaea-sim-worker-filesystem \
+            --bin symthaea-sim-filesystem-worker \
+            --bin symthaea-sim-filesystem-probe
+          cargo build --locked \
+            -p symthaea-sim-worker-containment \
+            --bin symthaea-sim-containment-probe
+          sha256sum \
+            target/debug/symthaea-sim-filesystem-worker \
+            target/debug/symthaea-sim-filesystem-probe \
+            target/debug/symthaea-sim-containment-probe
+
+      - name: Execute exact containment probes
+        run: |
+          target/debug/symthaea-sim-containment-probe \
+            | tee public-worker-release-seccomp-probe.txt
+          target/debug/symthaea-sim-filesystem-probe \
+            | tee public-worker-release-landlock-probe.txt
+          grep -qx 'containment_probe=pass' public-worker-release-seccomp-probe.txt
+          grep -qx 'filesystem_probe=pass' public-worker-release-landlock-probe.txt
+
+      - name: Mint qualification evidence root for exact worker lineage
+        run: |
+          {
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "containment_probe_sha256=$(sha256sum target/debug/symthaea-sim-containment-probe | cut -d' ' -f1)"
+            echo "filesystem_probe_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-probe | cut -d' ' -f1)"
+            echo "worker_image_profile=symthaea.simulation.worker-image.memfd-sealed-v1"
+            echo "supervisor_profile=symthaea.simulation.worker-supervisor.linux-rlimit-v1"
+            echo "worker_protocol=symthaea.simulation.worker.v1"
+            echo "process_containment_profile=symthaea.simulation.worker-containment.seccomp-x86_64-v1"
+            echo "filesystem_containment_profile=symthaea.simulation.worker-filesystem.landlock-deny-content-v1"
+            echo "---seccomp-probe---"
+            cat public-worker-release-seccomp-probe.txt
+            echo "---landlock-probe---"
+            cat public-worker-release-landlock-probe.txt
+          } > public-worker-release-qualification-bundle.txt
+          qualification_sha="$(sha256sum public-worker-release-qualification-bundle.txt | cut -d' ' -f1)"
+          test "${#qualification_sha}" -eq 64
+          echo "qualification_evidence_sha256=${qualification_sha}" \
+            | tee public-worker-release-qualification-root.txt
+
+      - name: Execute canonical public release corpus when cgroup root is configured
+        shell: bash
+        env:
+          SYMTHAEA_PUBLIC_RELEASE_WORKER_BIN: ${{ github.workspace }}/target/debug/symthaea-sim-filesystem-worker
+        run: |
+          qualification_sha="$(cut -d= -f2 public-worker-release-qualification-root.txt)"
+          if [[ -n "${SYMTHAEA_CGROUP_V2_DELEGATED_ROOT:-}" ]]; then
+            SYMTHAEA_WORKER_QUALIFICATION_EVIDENCE_SHA256="$qualification_sha" \
+              cargo test --locked \
+                -p symthaea-sim-release \
+                --test public_worker_release \
+                -- --ignored --test-threads=1
+            echo 'kernel_public_release_probe=pass' \
+              | tee public-worker-release-kernel-status.txt
+          else
+            echo 'kernel_public_release_probe=not_established' \
+              | tee public-worker-release-kernel-status.txt
+          fi
+
+      - name: Record exact public release subject
+        run: |
+          component="examples/extensions/hello-simulation/target/wasm32-wasip2/release/symthaea_hello_simulation_extension.wasm"
+          qualification_sha="$(cut -d= -f2 public-worker-release-qualification-root.txt)"
+          kernel_probe="$(cut -d= -f2 public-worker-release-kernel-status.txt)"
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "manifest_sha256=$(sha256sum examples/extensions/hello-simulation/manifest.json | cut -d' ' -f1)"
+            echo "component_sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+            echo "worker_sha256=$(sha256sum target/debug/symthaea-sim-filesystem-worker | cut -d' ' -f1)"
+            echo "worker_qualification_evidence_sha256=${qualification_sha}"
+            echo "release_profile=symthaea.simulation.release.v1"
+            echo "new_release_receipt_format=false"
+            echo "private_release_finalizer_reused=true"
+            echo "package_runtime=wasm_preserved_exactly"
+            echo "manifest_runtime_rewrite=forbidden"
+            echo "public_input_profile=symthaea.simulation.public-worker-input-envelope.v1"
+            echo "public_execution_profile=symthaea.simulation.public-worker-execution.v1"
+            echo "public_deployment_profile=symthaea.simulation.deployment.public-worker-execution.v1"
+            echo "canonical_request_bound_by_routing=true"
+            echo "legacy_preexec_rlimits_applied=true"
+            echo "first_instruction_cgroup_birth=true"
+            echo "final_admission_currentness_before_mint=true"
+            echo "final_worker_qualification_currentness_before_mint=true"
+            echo "provider_warnings_preserved=true"
+            echo "worker_may_mint_simulation_evidence=false"
+            echo "extension_component_engineering_evidence=false"
+            echo "success_currentness_cadence=route+pre_execution+post_execution+release"
+            echo "final_admission_revocation_withholds_receipt=true_if_kernel_probe_passes"
+            echo "final_worker_revocation_withholds_receipt=true_if_kernel_probe_passes"
+            echo "kernel_public_release_probe=${kernel_probe}"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-public-worker-release-receipt.txt
+
+      - name: Upload public release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-release-evidence
+          path: |
+            public-worker-release-seccomp-probe.txt
+            public-worker-release-landlock-probe.txt
+            public-worker-release-qualification-bundle.txt
+            public-worker-release-qualification-root.txt
+            public-worker-release-kernel-status.txt
+            simulation-public-worker-release-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed pinned formatting
+        run: git diff --exit-code -- crates/bridges/symthaea-sim-release
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock

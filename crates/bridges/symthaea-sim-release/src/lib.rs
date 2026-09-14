@@ -886,3 +886,9 @@ mod tests {
         assert_ne!(first, policy_changed);
     }
 }
+
+mod public_worker_release;
+pub use public_worker_release::{
+    PUBLIC_WORKER_DEPLOYMENT_BACKEND_V1, PUBLIC_WORKER_RELEASE_ADAPTER_V1,
+    release_routed_public_worker,
+};
