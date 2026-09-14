@@ -26,6 +26,10 @@
 //! integrity, authorship, support and currentness as independent propositions.
 //! Evidence summaries do not emit a generic trust or authorization verdict.
 //!
+//! IG-005 separates objective-bearing principals from presented identities and
+//! executable agent instances, and provides explicit bounded false-name
+//! counterfactual witnesses without claiming universal Sybil resistance.
+//!
 //! This crate complements `symthaea-economics` and `symthaea-social-choice`
 //! without depending on `symthaea-core`.
 //!
@@ -45,6 +49,7 @@
 mod behavior;
 mod coalition;
 mod evidence;
+mod identity;
 mod n_player;
 
 pub use behavior::{
@@ -60,6 +65,11 @@ pub use evidence::{
     EvidenceChallengeOutcome, EvidenceCostLedger, EvidenceCurrentness, EvidenceDecisionBreakdown,
     EvidenceIntegrity, EvidenceItem, EvidenceObservation, EvidenceScenario, EvidenceSupport,
     EvidenceView,
+};
+pub use identity::{
+    evaluate_false_name_counterfactual, AgentInstanceId, BoundedFalseNameReport,
+    FalseNameDeviationWitness, FalseNameSearchCoverage, IdentityBinding, IdentityCostModel,
+    IdentityId, IdentityRegistry, IdentityStatus, PrincipalId,
 };
 pub use n_player::{NPlayerGame, UnilateralDeviation};
 
