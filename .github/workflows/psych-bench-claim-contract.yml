@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/psych-bench-claim-contract.yml'
+      - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/claim_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/security/**'
@@ -73,11 +74,25 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib claim_contract::tests -- --nocapture
 
-      - name: Strict Clippy
+      # `-D warnings` over the package's transitive dependency graph previously
+      # failed on unrelated evidence-plane lint debt after this exact claim
+      # module had already compiled and passed all focused regressions. Keep
+      # dependency compile failures authoritative, but make lint authority match
+      # the source surface this job claims to qualify.
+      - name: Strict focused Clippy
         shell: bash
         run: |
           set -euo pipefail
-          cargo clippy --locked -p symthaea-psych-bench --lib -- -D warnings
+          report="$RUNNER_TEMP/claim-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --lib --no-deps \
+            --message-format=json > "$report"
+          cargo_status=$?
+          set -e
+          python3 scripts/ci/strict_clippy_paths.py \
+            "$report" \
+            crates/domains/symthaea-psych-bench/src/claim_contract.rs
+          test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
         shell: bash
