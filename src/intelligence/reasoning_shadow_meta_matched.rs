@@ -9,6 +9,12 @@
 //! panel. The two source classes remain explicit: the baseline says what V3 knows from live
 //! identity and activation alone; the matched pass says what changes after bounded evidence from
 //! the same frozen input and preregistered operator panel is introduced.
+//!
+//! A same-name candidate is not automatically the same measured object. Before matched evidence is
+//! compared with the historical selection, the wrapper requires the historical `CandidatePrimitive`
+//! to match the live `ActivePrimitive` on every immutable field represented by both structures:
+//! name, tier, definition, and exact HDC encoding. A mismatch blocks only matched telemetry; the
+//! historical result is still returned unchanged.
 
 use super::reasoning_active_primitive_evidence::ActivePrimitiveEvidenceReport;
 use super::reasoning_context_competition::{ContextCompetitionPolicy, ContextHypothesis};
@@ -39,6 +45,7 @@ pub struct MatchedShadowStats {
     pub attempts: u64,
     pub successes: u64,
     pub errors: u64,
+    pub cross_plane_identity_mismatch_attempts: u64,
     pub outcome_changes: u64,
     pub top_request_changes: u64,
 }
@@ -57,6 +64,9 @@ pub struct MatchedV3ShadowObservation {
     pub matched_selected_candidate: Option<String>,
     pub active_profiles: usize,
     pub matched_probe_profiles: usize,
+    /// Historical candidates whose represented immutable identity does not exactly match the live
+    /// ActivePrimitive carrying the evidence. Nonzero means the matched pass is not admissible.
+    pub cross_plane_identity_mismatches: usize,
     pub matched_probe_input_digest: Option<String>,
     /// Global minimum lower bound across candidate operator envelopes.
     pub integration_min: Option<f64>,
@@ -164,6 +174,8 @@ impl MatchedShadowQualifiedMetaReasoner {
             .iter()
             .map(|primitive| primitive.name.clone())
             .collect::<Vec<_>>();
+        let cross_plane_identity_mismatches =
+            count_cross_plane_identity_mismatches(&primitives, active_primitives);
 
         // This call remains behavior-authoritative. Its own V3 observation is the all-unknown
         // baseline against which the bounded matched probe is compared.
@@ -177,8 +189,56 @@ impl MatchedShadowQualifiedMetaReasoner {
 
         let attempt = self.matched_stats.attempts;
         self.matched_stats.attempts = self.matched_stats.attempts.saturating_add(1);
-        let hypotheses = context_hypotheses(&legacy_result);
+        let baseline_summary = baseline.as_ref().and_then(summarize_baseline);
 
+        if cross_plane_identity_mismatches > 0 {
+            self.matched_stats.errors = self.matched_stats.errors.saturating_add(1);
+            self.matched_stats.cross_plane_identity_mismatch_attempts = self
+                .matched_stats
+                .cross_plane_identity_mismatch_attempts
+                .saturating_add(1);
+            let error = format!(
+                "matched evidence blocked: {cross_plane_identity_mismatches} historical candidate identities differ from their live ActivePrimitive records"
+            );
+            tracing::debug!(
+                target: "symthaea::reasoning_shadow_v3_matched",
+                attempt,
+                cross_plane_identity_mismatches,
+                error = %error,
+                "matched IntegrationProxy shadow rejected cross-plane identity mismatch"
+            );
+            self.last_matched_v3_observation = Some(MatchedV3ShadowObservation {
+                shadow_version: MATCHED_META_SHADOW_VERSION.into(),
+                attempt,
+                baseline_outcome: baseline_summary.as_ref().map(|summary| summary.kind),
+                matched_outcome: V3ShadowOutcomeKind::Error,
+                baseline_request_count: baseline_summary
+                    .as_ref()
+                    .map(|summary| summary.request_count),
+                matched_request_count: 0,
+                baseline_top_request_id: baseline_summary
+                    .as_ref()
+                    .and_then(|summary| summary.top_request_id.clone()),
+                matched_top_request_id: None,
+                baseline_selected_candidate: baseline_summary
+                    .as_ref()
+                    .and_then(|summary| summary.selected_candidate.clone()),
+                matched_selected_candidate: None,
+                active_profiles: 0,
+                matched_probe_profiles: 0,
+                cross_plane_identity_mismatches,
+                matched_probe_input_digest: None,
+                integration_min: None,
+                integration_max: None,
+                integration_spread: None,
+                evidence_changed_outcome: None,
+                evidence_changed_top_request: None,
+                error: Some(error),
+            });
+            return Ok(legacy_result);
+        }
+
+        let hypotheses = context_hypotheses(&legacy_result);
         match probe(
             &hypotheses,
             ContextCompetitionPolicy::development_v1(),
@@ -189,7 +249,6 @@ impl MatchedShadowQualifiedMetaReasoner {
             Ok((active_report, probe_report, plan)) => {
                 self.matched_stats.successes = self.matched_stats.successes.saturating_add(1);
                 let matched = summarize_outcome(&plan.outcome);
-                let baseline_summary = baseline.as_ref().and_then(summarize_baseline);
                 let changed_outcome = baseline_summary
                     .as_ref()
                     .map(|summary| summary.kind != matched.kind);
@@ -241,6 +300,7 @@ impl MatchedShadowQualifiedMetaReasoner {
                     matched_selected_candidate: matched.selected_candidate,
                     active_profiles: active_report.profiles.len(),
                     matched_probe_profiles: probe_report.profiles.len(),
+                    cross_plane_identity_mismatches: 0,
                     matched_probe_input_digest: Some(probe_report.input_digest),
                     integration_min: Some(probe_report.integration_min),
                     integration_max: Some(probe_report.integration_max),
@@ -252,7 +312,6 @@ impl MatchedShadowQualifiedMetaReasoner {
             }
             Err(err) => {
                 self.matched_stats.errors = self.matched_stats.errors.saturating_add(1);
-                let baseline_summary = baseline.as_ref().and_then(summarize_baseline);
                 tracing::debug!(
                     target: "symthaea::reasoning_shadow_v3_matched",
                     attempt,
@@ -278,6 +337,7 @@ impl MatchedShadowQualifiedMetaReasoner {
                     matched_selected_candidate: None,
                     active_profiles: 0,
                     matched_probe_profiles: 0,
+                    cross_plane_identity_mismatches: 0,
                     matched_probe_input_digest: None,
                     integration_min: None,
                     integration_max: None,
@@ -321,6 +381,26 @@ impl MatchedShadowQualifiedMetaReasoner {
     pub fn last_matched_v3_shadow_observation(&self) -> Option<&MatchedV3ShadowObservation> {
         self.last_matched_v3_observation.as_ref()
     }
+}
+
+fn count_cross_plane_identity_mismatches(
+    candidates: &[CandidatePrimitive],
+    active_primitives: &[ActivePrimitive],
+) -> usize {
+    candidates
+        .iter()
+        .filter(|candidate| {
+            let Some(active) = active_primitives
+                .iter()
+                .find(|active| active.primitive.name == candidate.name)
+            else {
+                return true;
+            };
+            candidate.tier != active.primitive.tier
+                || candidate.definition != active.primitive.definition
+                || candidate.encoding != active.primitive.encoding
+        })
+        .count()
 }
 
 fn summarize_baseline(observation: &V3ShadowObservation) -> Option<OutcomeSummary> {
@@ -392,12 +472,15 @@ mod tests {
     use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 
     fn candidate(name: &str) -> CandidatePrimitive {
+        let primitive = PrimitiveSystem::global()
+            .get(name)
+            .unwrap_or_else(|| panic!("fixture primitive `{name}` must exist"));
         CandidatePrimitive {
-            name: name.into(),
-            tier: PrimitiveTier::Physical,
-            definition: format!("fixture-{name}"),
+            name: primitive.name.clone(),
+            tier: primitive.tier,
+            definition: primitive.definition.clone(),
             fitness: 0.5,
-            encoding: BinaryHV::random(name.len() as u64 + 2100),
+            encoding: primitive.encoding,
             epistemic_coordinate: EpistemicCoordinate::axiom(),
             harmonic_alignment: 0.6,
         }
@@ -445,6 +528,7 @@ mod tests {
         assert_eq!(reasoner.matched_shadow_stats().successes, 1);
 
         let observation = reasoner.last_matched_v3_shadow_observation().unwrap();
+        assert_eq!(observation.cross_plane_identity_mismatches, 0);
         assert_eq!(
             observation.baseline_outcome,
             Some(V3ShadowOutcomeKind::NeedEvidence)
@@ -464,9 +548,43 @@ mod tests {
     }
 
     #[test]
-    fn injected_matched_probe_failure_cannot_reject_legacy_result() {
+    fn cross_plane_identity_mismatch_blocks_only_matched_evidence() {
         let mut reasoner = reasoner();
         let input = BinaryHV::random(2201);
+        let mut chain = ReasoningChain::new(input);
+        let actives = [active("NSM_KNOW", 0.8), active("NSM_DO", 0.6)];
+        let mut mismatched = candidate("NSM_KNOW");
+        mismatched.encoding = BinaryHV::random(99_001);
+        let result = reasoner.meta_reason_with_active_evidence(
+            "evidence experiment research theory scientific",
+            vec![mismatched, candidate("NSM_DO")],
+            &actives,
+            &mut chain,
+        );
+        assert!(result.is_ok());
+        assert_eq!(reasoner.matched_shadow_stats().attempts, 1);
+        assert_eq!(reasoner.matched_shadow_stats().successes, 0);
+        assert_eq!(reasoner.matched_shadow_stats().errors, 1);
+        assert_eq!(
+            reasoner
+                .matched_shadow_stats()
+                .cross_plane_identity_mismatch_attempts,
+            1
+        );
+        let observation = reasoner.last_matched_v3_shadow_observation().unwrap();
+        assert_eq!(observation.matched_outcome, V3ShadowOutcomeKind::Error);
+        assert_eq!(observation.cross_plane_identity_mismatches, 1);
+        assert!(observation
+            .error
+            .as_deref()
+            .unwrap_or_default()
+            .contains("historical candidate identities differ"));
+    }
+
+    #[test]
+    fn injected_matched_probe_failure_cannot_reject_legacy_result() {
+        let mut reasoner = reasoner();
+        let input = BinaryHV::random(2202);
         let mut chain = ReasoningChain::new(input);
         let actives = [active("NSM_KNOW", 0.8), active("NSM_DO", 0.6)];
         let result = reasoner.meta_reason_with_active_evidence_using_probe(
@@ -485,6 +603,7 @@ mod tests {
         assert_eq!(reasoner.matched_shadow_stats().errors, 1);
         let observation = reasoner.last_matched_v3_shadow_observation().unwrap();
         assert_eq!(observation.matched_outcome, V3ShadowOutcomeKind::Error);
+        assert_eq!(observation.cross_plane_identity_mismatches, 0);
         assert_eq!(
             observation.baseline_outcome,
             Some(V3ShadowOutcomeKind::NeedEvidence)
@@ -501,7 +620,7 @@ mod tests {
         let actives = [active("NSM_KNOW", 0.8), active("NSM_DO", 0.6)];
 
         let mut first = reasoner();
-        let mut first_chain = ReasoningChain::new(BinaryHV::random(2202));
+        let mut first_chain = ReasoningChain::new(BinaryHV::random(2203));
         first
             .meta_reason_with_active_evidence(
                 "evidence experiment research theory scientific",
@@ -516,7 +635,7 @@ mod tests {
             .unwrap();
 
         let mut second = reasoner();
-        let mut second_chain = ReasoningChain::new(BinaryHV::random(2203));
+        let mut second_chain = ReasoningChain::new(BinaryHV::random(2204));
         second
             .meta_reason_with_active_evidence(
                 "evidence experiment research theory scientific",
