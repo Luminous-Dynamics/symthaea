@@ -30,6 +30,9 @@
 //!   assumptions explicit and testable.
 //! - [`run_validity_capacity_controls`] separates semantic-change density from
 //!   archive write segmentation while holding the null-model coordinates fixed.
+//! - [`measure_validity_capacity_score_moments`] independently reconstructs the
+//!   frozen synthetic capacity cases and measures target/distractor score moments
+//!   plus signed true margins for direct comparison with the null model.
 //! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
 //!   temporal update commutes with `UnitaryRole` binding.
 //! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
@@ -81,6 +84,7 @@ pub mod state_tracking_validity_archive;
 pub mod temporal_phasor;
 pub mod validity_capacity;
 pub mod validity_capacity_controls;
+pub mod validity_capacity_score_moments;
 pub mod validity_capacity_theory;
 pub mod validity_interval_memory;
 
@@ -136,6 +140,10 @@ pub use validity_capacity_controls::{
     ValidityCapacityControlAxis, ValidityCapacityControlCase, ValidityCapacityControlError,
     ValidityCapacityControlObservation, ValidityCapacityControlPlan, ValidityCapacityControlResult,
     run_validity_capacity_controls,
+};
+pub use validity_capacity_score_moments::{
+    ScoreMomentSummary, ValidityCapacityScoreMomentError, ValidityCapacityScoreMomentObservation,
+    ValidityCapacityScoreMomentResult, measure_validity_capacity_score_moments,
 };
 pub use validity_capacity_theory::{
     ValidityCapacityNullModel, ValidityCapacityTheoryError,
