@@ -18166,6 +18166,7 @@ version = "0.1.0"
 dependencies = [
  "sha2 0.10.9",
  "symthaea-assurance-core",
+ "symthaea-assurance-semantics",
  "symthaea-assurance-subject",
  "thiserror 1.0.69",
 ]
@@ -18175,6 +18176,15 @@ name = "symthaea-assurance-core"
 version = "0.1.0"
 dependencies = [
  "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "symthaea-assurance-semantics"
+version = "0.1.0"
+dependencies = [
+ "sha2 0.10.9",
+ "symthaea-assurance-core",
  "thiserror 1.0.69",
 ]
 

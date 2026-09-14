@@ -1,81 +1,93 @@
-# ASSURE-002 qualification and claim boundary
+# ASSURE-002B convergence qualification and claim boundary
 
-This note records the executable state and the narrow theorem currently established by the draft ASSURE-002 campaign kernel. It is intentionally stricter than legacy identifier names in the source.
+This note is part of the ASSURE-002B candidate tree. It describes the theorem the source is designed to establish; it does **not** self-assert that any Git head has passed qualification. Qualification is external evidence produced by the permanent read-only workflows for an exact candidate head.
 
-## Current exact-subject history
+## Convergence lineage
 
-Historical head `0f4396592574e0e72d261bf956c88d197707f5f2` reached the permanent Rust 1.96 qualifier and failed first at `cargo fmt --check`. No compile/test claim was made from that run.
+ASSURE-002B is constructed from two independently qualified parents:
 
-The read-only qualifier exposed the required root `Cargo.lock` campaign-package stanza. A temporary narrowly constrained repair job committed only that reviewed lock transformation. A separate read-only formatter-capture job reproduced the exact Rust 1.96 formatter output for:
+- campaign parent: `8f619541528362a30e7caf432eaf256a64e302e8`;
+- shared-semantics parent: `a95bbb2d0eac395b1d734e1031f9209240f3b8d6`.
 
-- `src/lib.rs`;
-- `tests/assure002.rs`.
+The convergence writer imports `crates/core/symthaea-assurance-semantics` byte-for-byte from the qualified shared-semantics parent and refuses publication if Rust 1.96 formatting changes that subtree. The campaign-local semantic commitment implementation is removed; the shared schema-bearing semantic commitment becomes authoritative.
 
-Its write-authority repair job then verified the original Git blob identities, reproduced the exact reviewed output SHA-256 values, refused unrelated tracked changes, and committed only those two formatted files.
+The writer is process scaffolding only. It executes no candidate Symthaea code with write authority and refuses to publish a product tree containing `.github/workflows/` mutations. Exact-head product qualification remains read-only.
 
-Those repair jobs are process evidence, not qualification. A fresh ordinary repository commit starts a new exact-head read-only qualification. Historical failures remain failures.
+## Evidence-context boundary
+
+An evidence artifact is admissible only when its committed context matches the exact campaign context before evidence-kind, duplicate, timing, admission-order, or evidence-root mutation checks:
+
+```text
+evidence.subject_id == campaign.subject_core_id
+
+evidence.claim_digest == campaign.claim_digest
+```
+
+A registered evidence kind by itself is therefore insufficient to establish that evidence belongs to the campaign subject or claim.
 
 ## Temporal provenance boundary
 
-The current implementation contains names such as:
+The base theorem is commitment ordering:
 
 ```text
-evidence_production_statement_digest
-ProducedBeforeOrAtRegistration
-registration < production[i] < admission[i]
+terminal registration in supplied view
+    < exact evidence-artifact commitment
+    < evidence admission
 ```
 
-Until ASSURE-002C (#2877) performs the source/API rename and optional production-witness integration, these names must be interpreted under the **narrower commitment-ordering theorem**:
+This establishes that the exact evidence commitment was durably ordered after the terminal registration represented by the supplied view. It does **not** establish that the underlying evidence bytes were first produced after registration.
+
+Therefore:
 
 ```text
-exact evidence-artifact commitment
-was durably ordered after the current registration
+CommittedAfterTerminalRegistrationInView
+    != ProductionWitnessedAfterRegistration
 ```
 
-This does **not** establish:
+A stronger production theorem requires causal execution evidence binding the exact registration, execution request, real execution, and exact output/evidence commitment with authority outside the candidate worker.
+
+## Currentness boundary
+
+ASSURE-002B resolves a unique terminal unwithdrawn registration only inside the registration/withdrawal view supplied to the resolver.
+
+Therefore:
 
 ```text
-the underlying evidence bytes were first created after registration
+TerminalRegistrationInView
+    != CurrentThroughVerifiedCheckpoint
 ```
 
-A pre-existing artifact can be committed to an ordering service after registration. Therefore a normal ordering receipt over an evidence digest proves post-registration commitment ordering, not first production time.
+The base kernel does not claim global completeness, authoritative external currentness, or absence of a later registration outside the supplied view.
 
-The intended base relation is:
+## Ordering and authorization boundary
+
+A valid ordering receipt establishes the bounded ordering relation defined by its committed validation profile. It does not prove that the ordered event was authorized by an external policy authority.
+
+Therefore:
 
 ```text
-registration < commitment[i] < admission[i]
+OrderedEvent
+    != AuthorizedEvent
 ```
 
-with the authoritative ledger still requiring:
+## Canonicalization and arithmetic boundary
+
+ASSURE-002B uses the shared semantic-set canonicalizer, explicit support-tier ranking, minimal unsigned-decimal ASCII for public `u64` wire fields, and checked evidence-ordinal advancement. Ordinal overflow fails closed before statement or ledger transition identity can wrap.
+
+## Qualification requirement
+
+No source-tree statement substitutes for exact-head execution. A candidate is not qualified until the permanent read-only workflows establish, for that exact head, at minimum:
 
 ```text
-registration < admission[1] < admission[2] < ...
-```
-
-This preserves the useful preregistration/admission theorem without laundering a later digest commitment into a stronger production claim.
-
-## Stronger production theorem
-
-`ProductionWitnessedAfterRegistration` is a separate, optional stronger theorem tracked by ASSURE-002C. It requires causal execution evidence binding the exact current registration + execution request + real execution + exact output/evidence commitment, with authority outside the candidate worker. Ordinary digest ordering cannot satisfy that stronger class.
-
-Existing Symthaea secure-worker parent recomputation and privilege-separated trusted-verifier patterns should be reused rather than creating a parallel provenance universe.
-
-## Semantic-definition boundary
-
-The campaign-local semantic type remains provisional and binds semantic ID + definition digest only. ASSURE-002A is being requalified independently as the reusable `symthaea-assurance-semantics` shared-core primitive. ASSURE-002B (#2874) will make that shared schema-bearing commitment authoritative inside campaign semantics before final public campaign golden vectors are frozen.
-
-## Current status
-
-ASSURE-002 remains **draft and unqualified** until a fresh exact head passes, at minimum:
-
-```text
-exact checkout
-Rust 1.96 format
+exact checkout binding
+Rust 1.96 formatting
 cargo check
-focused campaign tests
+focused tests
 strict Clippy -D warnings
-committed root-lock parity
+committed Cargo.lock parity
 tracked-checkout immutability
 ```
 
-No historical repair or queued/action-required workflow is substituted for those gates.
+Because ASSURE-002B also adds ASSURE-002F evidence-context accessors to `symthaea-assurance-core`, the final convergence head must satisfy both the existing `ASSURE-000 Qualification` and `ASSURE-002 Qualification` lanes triggered by the product delta.
+
+A passing campaign does not establish universal AI safety, certification, regulatory conformity, global currentness, causal production provenance, or authorization beyond the precisely implemented and tested relations above.
