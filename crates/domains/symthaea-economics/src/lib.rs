@@ -6,16 +6,26 @@
 //! # symthaea-economics
 //!
 //! A pure-`std`, auditable economics kernel with explicit validation and
-//! numerical-failure semantics. The crate contains mathematical primitives;
-//! agent cognition and simulation adapters belong in higher layers.
+//! numerical-failure semantics. The crate contains mathematical primitives and
+//! theory-neutral scientific contracts; agent cognition, simulation, empirical
+//! data ingestion, governance, and execution authority belong in higher layers.
 
+pub mod accounting;
 pub mod error;
+pub mod etir;
 pub mod finance;
 pub mod game;
 pub mod inequality;
 pub mod market;
+pub mod ontology;
+pub mod science;
+pub mod theory;
 
+pub use accounting::{DoubleEntryLedger, JournalEntry, Posting};
 pub use error::{EconomicsError, Result};
+pub use etir::{
+    ETIR_SCHEMA_VERSION, MechanismSpec, ModelAdapterDeclaration, ModelParadigm, TheoryIr,
+};
 pub use finance::{
     AmortizationPeriod, IrrAnalysis, IrrOptions, IrrStatus, amortization_schedule, annuity_payment,
     compound_interest, effective_annual_rate, future_value, irr, irr_analysis, mirr,
@@ -29,6 +39,15 @@ pub use market::{
     Demand, Equilibrium, MarketSurplus, PriceOutcome, Supply, TaxedEquilibrium,
     arc_price_elasticity_of_demand, equilibrium, equilibrium_with_tax, market_at_price,
     market_surplus, price_elasticity_of_demand,
+};
+pub use ontology::{
+    AccountId, ClaimId, EconomicVariable, EntityId, MechanismId, ModelId, PredictionId, StateDomain,
+    StockId, TheoryId, UnitId, VariableId,
+};
+pub use science::{ECONOMIC_SCIENCE_CONSTITUTION_VERSION, EvidenceChannel, StatementKind};
+pub use theory::{
+    ConstraintClaim, EconomicClaim, EmpiricalClaim, EmpiricalClaimMode, FalsificationCriterion,
+    NormativeProposition, Prediction, ResponseDirection,
 };
 
 #[cfg(test)]
