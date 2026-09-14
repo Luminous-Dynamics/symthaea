@@ -60,6 +60,8 @@ pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
 pub mod reasoning_transition_geometry_shadow;
 pub mod reasoning_transition_history;
+#[cfg(test)]
+mod reasoning_transition_history_negative_controls;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
