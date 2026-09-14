@@ -1,0 +1,101 @@
+name: ARC Public Training Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'src/bin/arc_smoke_receipt.rs'
+      - '.github/reasoning/qualify-arc-smoke.sh'
+      - '.github/workflows/arc-public-training-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-public-training-smoke-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  exact-manifest-smoke:
+    name: Exact-manifest ARC public-training smoke
+    runs-on: ubuntu-latest
+    env:
+      SYMTHAEA_SUBJECT_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      SYMTHAEA_ARC_DATASET_REPOSITORY: arcprize/ARC-AGI-2
+      SYMTHAEA_ARC_DATASET_REVISION: f3283f727488ad98fe575ea6a5ac981e4a188e49
+      SYMTHAEA_ARC_DATASET_TREE: afab62b97f29dd2341f401d4af70491e14da35c2
+      SYMTHAEA_ARC_DATASET_ROOT: target/rq-006z/arc-agi-2
+      SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-training-manifest.json
+      SYMTHAEA_ARC_POLICY_RESULTS_PATH: target/rq-006z/arc-public-training-smoke-report.json
+      SYMTHAEA_ARC_SMOKE_RECEIPT_PATH: target/rq-006z/arc-public-training-smoke-receipt.json
+      SYMTHAEA_ARC_SMOKE_TASK_FILES: '5'
+      SYMTHAEA_ARC_CANDIDATE_BUDGET: '128'
+      SYMTHAEA_ARC_POLICY_SEED: '2797608998'
+      SYMTHAEA_ARC_DATASET_MANIFEST_BIN: ${{ github.workspace }}/target/debug/arc_dataset_manifest
+      SYMTHAEA_ARC_POLICY_BIN: ${{ github.workspace }}/target/debug/arc_budgeted_policy
+      SYMTHAEA_ARC_SMOKE_RECEIPT_BIN: ${{ github.workspace }}/target/debug/arc_smoke_receipt
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Qualify smoke source surface
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/bin/arc_smoke_receipt.rs
+          cargo check --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_budgeted_policy \
+            --bin arc_smoke_receipt
+          cargo test --locked --bin arc_budgeted_policy
+          cargo test --locked --bin arc_smoke_receipt
+          cargo clippy --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_budgeted_policy \
+            --bin arc_smoke_receipt \
+            -- -D warnings
+          cargo build --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_budgeted_policy \
+            --bin arc_smoke_receipt
+
+      - name: Acquire exact public ARC-AGI-2 subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$SYMTHAEA_ARC_DATASET_ROOT"
+          mkdir -p "$SYMTHAEA_ARC_DATASET_ROOT"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" init -q
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" remote add origin https://github.com/arcprize/ARC-AGI-2.git
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" fetch --depth=1 origin "$SYMTHAEA_ARC_DATASET_REVISION"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" checkout --detach -q FETCH_HEAD
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse HEAD)" = "$SYMTHAEA_ARC_DATASET_REVISION"
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse 'HEAD^{tree}')" = "$SYMTHAEA_ARC_DATASET_TREE"
+          test -z "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" status --porcelain=v1 --untracked-files=all)"
+
+      - name: Qualify exact full public-training manifest
+        env:
+          SYMTHAEA_ARC_SPLIT: training
+          SYMTHAEA_ARC_EXPECTED_TASKS: '1000'
+        run: bash .github/reasoning/qualify-arc-dataset.sh
+
+      - name: Execute exact-manifest smoke measurement
+        run: bash .github/reasoning/qualify-arc-smoke.sh
+
+      - name: Upload smoke evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: arc-public-training-smoke-${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          path: |
+            target/rq-006z/arc-agi-2-training-manifest.json
+            target/rq-006z/arc-public-training-smoke-report.json
+            target/rq-006z/arc-public-training-smoke-receipt.json
+          if-no-files-found: error
+          retention-days: 30
