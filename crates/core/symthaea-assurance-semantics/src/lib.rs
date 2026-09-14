@@ -8,10 +8,14 @@
 //! ```text
 //! semantic id + definition SHA-256
 //!     != self-describing semantic commitment
+//!
+//! schema label
+//!     != immutable schema specification
 //! ```
 //!
-//! The definition schema is identity-bearing. This crate does not establish
-//! that definition bytes are available, semantically adequate, or trusted.
+//! Both the definition schema and its exact specification commitment are
+//! identity-bearing. This crate does not establish that definition/schema bytes
+//! are available, semantically adequate, or trusted.
 
 use sha2::{Digest, Sha256};
 use symthaea_assurance_core::{DigestSha256, StableId};
@@ -26,16 +30,39 @@ pub enum SemanticCommitmentError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct DefinitionSchemaV1 {
+    schema_id: StableId,
+    specification_digest: DigestSha256,
+}
+
+impl DefinitionSchemaV1 {
+    pub fn new(schema_id: StableId, specification_digest: DigestSha256) -> Self {
+        Self {
+            schema_id,
+            specification_digest,
+        }
+    }
+
+    pub fn schema_id(&self) -> &StableId {
+        &self.schema_id
+    }
+
+    pub fn specification_digest(&self) -> &DigestSha256 {
+        &self.specification_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SemanticCommitmentV1 {
     semantic_id: StableId,
-    definition_schema: StableId,
+    definition_schema: DefinitionSchemaV1,
     definition_digest: DigestSha256,
 }
 
 impl SemanticCommitmentV1 {
     pub fn new(
         semantic_id: StableId,
-        definition_schema: StableId,
+        definition_schema: DefinitionSchemaV1,
         definition_digest: DigestSha256,
     ) -> Self {
         Self {
@@ -49,7 +76,7 @@ impl SemanticCommitmentV1 {
         &self.semantic_id
     }
 
-    pub fn definition_schema(&self) -> &StableId {
+    pub fn definition_schema(&self) -> &DefinitionSchemaV1 {
         &self.definition_schema
     }
 
@@ -63,8 +90,13 @@ impl SemanticCommitmentV1 {
         field(&mut out, "semantic-id", self.semantic_id.as_str());
         field(
             &mut out,
-            "definition-schema",
-            self.definition_schema.as_str(),
+            "definition-schema-id",
+            self.definition_schema.schema_id.as_str(),
+        );
+        field(
+            &mut out,
+            "definition-schema-specification-digest",
+            self.definition_schema.specification_digest.as_str(),
         );
         field(
             &mut out,
