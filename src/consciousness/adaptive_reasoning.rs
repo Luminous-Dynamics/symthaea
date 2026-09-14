@@ -239,7 +239,7 @@ pub struct QLearningAgent {
     /// Minimum epsilon
     epsilon_min: f64,
 
-    /// Maximum replay buffer size
+    /// Maximum replay buffer size (prevents unbounded growth)
     max_buffer_size: usize,
 
     /// Maximum Q-table entries (prevents unbounded growth)
@@ -619,3 +619,5 @@ mod tests {
         assert_eq!(agent.replay_buffer.len(), 1);
     }
 }
+
+pub mod qualification;
