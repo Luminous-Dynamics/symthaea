@@ -448,7 +448,74 @@ fn preregistered_admission_advances_append_only_evidence_root() {
 }
 
 #[test]
-fn later_ledger_entry_cannot_time_travel_before_previous_admission() {
+fn concurrent_production_can_be_admitted_after_prior_admission() {
+    let subject = subject('a');
+    let plan = plan(&subject, "campaign-a");
+    let root = root_registration(&plan, 5);
+    let current = resolve_current_registration(&[root], &[]).unwrap();
+    let mut ledger = CampaignEvidenceLedgerV1::new(&current);
+
+    let first = evidence(&subject, EvidenceKind::Observation, "evidence-a");
+    let first_production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &first),
+        'b',
+    );
+    let second = evidence(&subject, EvidenceKind::Observation, "evidence-b");
+    let second_production = ordering(
+        "transparency-log-a",
+        1,
+        7,
+        evidence_production_statement_digest(&current, &second),
+        'd',
+    );
+
+    let first_admission_statement = ledger
+        .admission_statement_digest(&current, &first, &first_production)
+        .unwrap();
+    let first_admission = ordering(
+        "transparency-log-a",
+        1,
+        8,
+        first_admission_statement,
+        'c',
+    );
+    ledger
+        .admit_preregistered(
+            &plan,
+            &current,
+            &first,
+            &first_production,
+            &first_admission,
+        )
+        .unwrap();
+
+    let second_admission_statement = ledger
+        .admission_statement_digest(&current, &second, &second_production)
+        .unwrap();
+    let second_admission = ordering(
+        "transparency-log-a",
+        1,
+        9,
+        second_admission_statement,
+        'e',
+    );
+    ledger
+        .admit_preregistered(
+            &plan,
+            &current,
+            &second,
+            &second_production,
+            &second_admission,
+        )
+        .unwrap();
+    assert_eq!(ledger.admitted_count(), 2);
+}
+
+#[test]
+fn admission_must_advance_previous_admission_ordering() {
     let subject = subject('a');
     let plan = plan(&subject, "campaign-a");
     let root = root_registration(&plan, 5);
@@ -469,7 +536,7 @@ fn later_ledger_entry_cannot_time_travel_before_previous_admission() {
     let first_admission = ordering(
         "transparency-log-a",
         1,
-        7,
+        8,
         first_admission_statement,
         'c',
     );
@@ -484,18 +551,34 @@ fn later_ledger_entry_cannot_time_travel_before_previous_admission() {
         .unwrap();
 
     let second = evidence(&subject, EvidenceKind::Observation, "evidence-b");
-    let stale_production = ordering(
+    let second_production = ordering(
         "transparency-log-a",
         1,
-        6,
+        7,
         evidence_production_statement_digest(&current, &second),
         'd',
     );
+    let second_admission_statement = ledger
+        .admission_statement_digest(&current, &second, &second_production)
+        .unwrap();
+    let stale_admission = ordering(
+        "transparency-log-a",
+        1,
+        8,
+        second_admission_statement,
+        'e',
+    );
     assert_eq!(
         ledger
-            .admission_statement_digest(&current, &second, &stale_production)
+            .admit_preregistered(
+                &plan,
+                &current,
+                &second,
+                &second_production,
+                &stale_admission,
+            )
             .unwrap_err(),
-        CampaignError::EvidenceProductionNotAfterLedgerHead
+        CampaignError::AdmissionNotAfterLedgerHead
     );
 }
 
