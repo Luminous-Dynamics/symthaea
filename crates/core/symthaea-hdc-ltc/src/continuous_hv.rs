@@ -18,11 +18,39 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 pub const HDC_DIMENSION: usize = 16_384;
 const RNG_SEED_XOR: u64 = 0x9E37_79B9_7F4A_7C15;
 const RNG_ZERO_ESCAPE: u64 = 0xD1B5_4A32_D192_ED03;
+const ROLE_SEED_DOMAIN: u64 = 0xA076_1D64_78BD_642F;
+const SPLITMIX_MUL_1: u64 = 0xBF58_476D_1CE4_E5B9;
+const SPLITMIX_MUL_2: u64 = 0x94D0_49BB_1331_11EB;
 
 #[inline]
 fn seeded_xorshift_state(seed: u64) -> u64 {
     let state = seed ^ RNG_SEED_XOR;
     if state == 0 { RNG_ZERO_ESCAPE } else { state }
+}
+
+/// Nonlinear deterministic seed finalizer for unitary-role codewords.
+///
+/// Xorshift expansion is linear over GF(2). Feeding structured integer seeds
+/// directly into it therefore leaks seed-XOR relations into bipolar role
+/// multiplication: pairs with the same seed XOR can produce identical composed
+/// roles. This SplitMix64-style finalizer breaks that algebraic relation before
+/// xorshift expands the state. Continuous-valued random vectors intentionally
+/// keep their historical generator unchanged.
+#[inline]
+fn mixed_role_seed(seed: u64) -> u64 {
+    let mut value = (seed ^ ROLE_SEED_DOMAIN).wrapping_add(RNG_SEED_XOR);
+    value = (value ^ (value >> 30)).wrapping_mul(SPLITMIX_MUL_1);
+    value = (value ^ (value >> 27)).wrapping_mul(SPLITMIX_MUL_2);
+    value ^ (value >> 31)
+}
+
+#[inline]
+fn seeded_role_xorshift_state(seed: u64) -> u64 {
+    // Unlike the legacy continuous-vector generator, the role path must accept
+    // the full u64 state domain without remapping zero to a second valid state.
+    // `mixed_role_seed` is bijective, so preserving its zero output avoids a
+    // deterministic two-seed alias before role expansion begins.
+    mixed_role_seed(seed)
 }
 
 /// A real Hadamard-unitary HDC role vector.
@@ -46,11 +74,22 @@ pub struct UnitaryRole {
 
 impl UnitaryRole {
     /// Deterministically generate a bipolar role from `seed`.
+    ///
+    /// The seed is nonlinearly pre-mixed before expansion so simple arithmetic
+    /// relations among caller seeds do not become exact algebraic relations among
+    /// composed bipolar roles. Each component first advances the full 64-bit
+    /// state by an odd Weyl increment and then applies the bijective xorshift
+    /// transition. This makes zero a valid initial role state instead of an
+    /// absorbing or remapped special case.
     pub fn new(dim: usize, seed: u64) -> Self {
         let mut values = Vec::with_capacity(dim);
-        let mut state = seeded_xorshift_state(seed);
+        let mut state = seeded_role_xorshift_state(seed);
 
         for _ in 0..dim {
+            // Addition by an odd Weyl increment and xorshift are both bijections
+            // on u64. Distinct internal role states therefore remain distinct at
+            // every transition, including when the mixed initial state is zero.
+            state = state.wrapping_add(RNG_SEED_XOR);
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
@@ -429,15 +468,20 @@ mod tests {
     }
 
     #[test]
-    fn xorshift_absorbing_seed_is_remapped_for_roles_and_vectors() {
-        let pathological_seed = RNG_SEED_XOR;
-        let role = UnitaryRole::new(256, pathological_seed);
+    fn role_stream_accepts_full_seed_domain_and_vector_escape_remains_deterministic() {
+        let mixed_zero_seed = 0xC1BE_9B22_F808_E7C4;
+        assert_eq!(mixed_role_seed(mixed_zero_seed), 0);
+        let role = UnitaryRole::new(256, mixed_zero_seed);
         assert!(role.as_slice().iter().any(|value| *value == -1.0));
         assert!(role.as_slice().iter().any(|value| *value == 1.0));
 
-        let vector = ContinuousHV::new_random(256, pathological_seed);
+        let pathological_vector_seed = RNG_SEED_XOR;
+        let vector = ContinuousHV::new_random(256, pathological_vector_seed);
         assert!(vector.values.iter().any(|value| *value != -1.0));
-        assert_eq!(vector, ContinuousHV::new_random(256, pathological_seed));
+        assert_eq!(
+            vector,
+            ContinuousHV::new_random(256, pathological_vector_seed)
+        );
     }
 
     #[test]
@@ -515,6 +559,76 @@ mod tests {
         let bound_b = role.bind(&b);
         assert_eq!(bound_a.dot(&bound_b), a.dot(&b));
         assert!((bound_a.similarity(&bound_b) - a.similarity(&b)).abs() < 1e-7);
+    }
+
+    #[test]
+    fn unitary_role_seed_mixing_breaks_equal_xor_composition_collision() {
+        let dim = 4096;
+        assert_eq!(30_u64 ^ 40_u64, 31_u64 ^ 41_u64);
+        let left = UnitaryRole::new(dim, 30).compose(&UnitaryRole::new(dim, 40));
+        let right = UnitaryRole::new(dim, 31).compose(&UnitaryRole::new(dim, 41));
+        assert_ne!(left, right);
+        let normalized_dot = left
+            .as_slice()
+            .iter()
+            .zip(right.as_slice())
+            .map(|(&a, &b)| (a * b) as f64)
+            .sum::<f64>()
+            / dim as f64;
+        assert!(
+            normalized_dot.abs() < 0.1,
+            "equal seed-XOR pairs remained strongly coupled: {normalized_dot}"
+        );
+    }
+
+    #[test]
+    fn unitary_role_stream_breaks_previous_zero_escape_alias() {
+        let dim = 4096;
+        let mixed_zero_seed = 0xC1BE_9B22_F808_E7C4;
+        let mixed_escape_seed = 0xD8C6_4A40_75AB_3494;
+        assert_eq!(mixed_role_seed(mixed_zero_seed), 0);
+        assert_eq!(mixed_role_seed(mixed_escape_seed), RNG_ZERO_ESCAPE);
+
+        let zero_role = UnitaryRole::new(dim, mixed_zero_seed);
+        let escape_role = UnitaryRole::new(dim, mixed_escape_seed);
+        assert_ne!(zero_role, escape_role);
+
+        let normalized_dot = zero_role
+            .as_slice()
+            .iter()
+            .zip(escape_role.as_slice())
+            .map(|(&a, &b)| (a * b) as f64)
+            .sum::<f64>()
+            / dim as f64;
+        assert!(
+            normalized_dot.abs() < 0.1,
+            "previous zero/escape alias remained strongly coupled: {normalized_dot}"
+        );
+    }
+
+    #[test]
+    fn structured_unitary_role_codebooks_have_no_exact_composition_collisions() {
+        let dim = 4096;
+        let keys = (0..8)
+            .map(|index| UnitaryRole::new(dim, 200 + index))
+            .collect::<Vec<_>>();
+        let values = (0..4)
+            .map(|index| UnitaryRole::new(dim, 400 + index))
+            .collect::<Vec<_>>();
+        let mut compositions = Vec::with_capacity(keys.len() * values.len());
+        for key in &keys {
+            for value in &values {
+                compositions.push(key.compose(value));
+            }
+        }
+        for left in 0..compositions.len() {
+            for right in (left + 1)..compositions.len() {
+                assert_ne!(
+                    compositions[left], compositions[right],
+                    "structured codebook produced exact composed-role collision at {left} and {right}"
+                );
+            }
+        }
     }
 
     #[test]
