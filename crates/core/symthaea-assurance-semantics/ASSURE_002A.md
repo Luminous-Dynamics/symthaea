@@ -5,19 +5,29 @@ ASSURE-002A is a narrow hardening tranche stacked on ASSURE-002. It extracts sem
 ## Governing theorem
 
 ```text
-same semantic id
-+ same SHA-256 digest
-!= same semantic commitment
-unless definition schema also matches
+semantic id + definition digest
+    != self-describing semantic commitment
+
+schema id
+    != immutable schema specification
+```
+
+A conforming commitment therefore requires all of:
+
+```text
+semantic id
++ definition schema id
++ exact schema-specification digest
++ exact definition digest
 ```
 
 Likewise:
 
 ```text
-definition digest known
-    != definition bytes available
-    != definition semantics adequate
-    != definition semantics trusted
+definition/schema digest known
+    != bytes available
+    != semantics adequate
+    != semantics trusted
 ```
 
 Availability/replayability remains outside this tranche.
@@ -27,6 +37,11 @@ Availability/replayability remains outside this tranche.
 `symthaea-assurance-semantics` defines:
 
 ```text
+DefinitionSchemaV1 {
+    schema_id,
+    specification_digest,
+}
+
 SemanticCommitmentV1 {
     semantic_id,
     definition_schema,
@@ -34,39 +49,72 @@ SemanticCommitmentV1 {
 }
 ```
 
-Its canonical wire commitment is domain separated and explicitly orders:
+The schema specification digest is SHA-256 over the exact specification artifact bytes under this v1 theorem. This stops a schema from retaining the same identifier while its own definition changes unnoticed.
 
-1. commitment schema;
+The semantic commitment's canonical wire form is domain separated and explicitly orders:
+
+1. commitment schema/version;
 2. semantic ID;
-3. definition schema;
-4. definition digest.
+3. definition-schema ID;
+4. definition-schema specification digest;
+5. definition digest.
 
-`definition_schema` is identity-bearing. Changing only the schema changes the commitment digest even when semantic ID and definition digest stay fixed.
+Therefore all of these are identity-bearing:
+
+```text
+semantic-id
+schema-id
+schema-specification-digest
+definition-digest
+```
+
+Changing any one changes the commitment identity.
+
+## Why schema specification is committed
+
+A bare schema label would merely move the ambiguity up one level:
+
+```text
+canonical-text-v1
+```
+
+would still rely on an external mutable explanation of what `canonical-text-v1` means.
+
+Binding an exact schema-specification artifact commitment creates a finite trust boundary:
+
+```text
+schema identifier
++ immutable specification bytes commitment
+```
+
+The specification may still be bad, ambiguous, unavailable, or untrusted; those are different theorems. But its bytes cannot change while retaining the same semantic commitment unnoticed.
 
 ## Canonical semantic-set semantics
 
-`canonical_semantic_set()` sorts only by semantic identifier and rejects duplicate semantic IDs even when callers attach different schemas or definition digests.
+`canonical_semantic_set()` sorts only by semantic identifier and rejects duplicate semantic IDs even when callers attach different schema IDs, schema-specification digests, or definition digests.
 
-This preserves the ASSURE-002 rule that one semantic ID names one slot in one declared semantic set. Schema/digest are identity-bearing contents of that slot, not a mechanism for creating multiple meanings under the same label.
+One semantic ID names one slot in one declared set. Schema and digest are identity-bearing contents of that slot, not a mechanism for creating multiple meanings under the same label.
 
 ## Conformance corpus
 
-The initial reusable-crate corpus proves:
+The reusable-crate corpus currently proves:
 
-- definition schema changes commitment identity;
+- definition-schema ID changes commitment identity;
+- definition-schema specification digest changes commitment identity;
 - definition digest changes commitment identity;
-- exact semantic ID/schema/digest components are preserved;
+- exact semantic/schema/specification/definition components are preserved;
 - duplicate semantic IDs fail even when schema differs;
 - semantic sets canonicalize by semantic ID only;
 - an independently calculated canonical commitment golden vector is stable.
 
-The frozen primitive-level golden fixture is:
+The primitive-level golden fixture is:
 
 ```text
 semantic-id: matched-sham
-definition-schema: symthaea.assurance.semantic-definition.canonical-text-v1
+definition-schema-id: symthaea.assurance.semantic-definition.canonical-text-v1
+definition-schema-specification-digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 definition-digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-commitment-digest: ccf57b5d5fbc762fc072eaa7b885a2eff8e8de78a56329e4999b403da2011ac4
+commitment-digest: 3a510b215853c77285e39c95b6ab45c0d816370e17e14ccda8337110a790f1ba
 ```
 
 This freezes only the generic semantic-commitment wire format. Full campaign/registration/ordering/admission golden vectors remain deferred until integration into ASSURE-002.
@@ -75,7 +123,7 @@ This freezes only the generic semantic-commitment wire format. Full campaign/reg
 
 The parent ASSURE-002 candidate remains frozen while independently qualified. ASSURE-002A is qualified as a separate core primitive first.
 
-Then integrate from those frozen inputs:
+Then integrate from frozen inputs:
 
 ```text
 qualified ASSURE-002 campaign kernel
@@ -83,13 +131,14 @@ qualified ASSURE-002 campaign kernel
 qualified semantic commitment primitive
         ↓
 replace campaign-local label+digest semantics
-with SemanticCommitmentV1
+with reusable SemanticCommitmentV1
         ↓
-make schema identity-bearing in support criteria,
+make full schema identity-bearing in support criteria,
 controls, custom evidence, conditions, and
 ordering-validation profiles
         ↓
-add validation-profile schema incomparability theorem
+prove validation-profile schema/spec drift
+makes ordering lineages incomparable
         ↓
 recompute full campaign golden vectors independently
         ↓
@@ -100,9 +149,9 @@ qualify integrated exact head
 
 ASSURE-002A does not establish:
 
-- authenticity of definition bytes;
-- availability of definition bytes;
-- adequacy or correctness of a criterion/control definition;
+- authenticity of schema or definition bytes;
+- availability of schema or definition bytes;
+- adequacy/correctness of a schema, criterion, or control;
 - criterion satisfaction;
 - ordering-provider authenticity;
 - experimental quality;
