@@ -1,0 +1,71 @@
+name: PIE-002E Rustfmt Maintenance
+
+on:
+  push:
+    branches:
+      - maint/pie-002e-rustfmt-64988923
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    name: Format and verify PIE-002E candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      EXPECTED_HEAD: 649889235cc9789568ff6502982d02d80aa94906
+      EXPECTED_PARENT: e9b4bff9d186bf1150e21d097d912d5b46747262
+      TARGET_BRANCH: feat/pie-002e-subject-bound-composition
+      PACKAGE: symthaea-planetary-industry
+      TARGET_FILE: crates/domains/symthaea-planetary-industry/src/utility_composition.rs
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact product candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify immutable starting point
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Apply package rustfmt
+        run: cargo fmt -p "$PACKAGE"
+
+      - name: Enforce formatting-only scope
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = "$TARGET_FILE"
+          git diff --check
+
+      - name: Verify formatted package
+        run: |
+          set -euo pipefail
+          cargo fmt -p "$PACKAGE" -- --check
+          cargo check -p "$PACKAGE" --all-targets --locked
+          cargo test -p "$PACKAGE" --all-targets --locked --no-fail-fast
+          cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Commit formatting-only successor
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$TARGET_FILE"
+          git diff --cached --quiet && { echo "rustfmt produced no change"; exit 1; }
+          git commit -m "style(pie): rustfmt PIE-002E composition"
+          git push origin "HEAD:$TARGET_BRANCH"
