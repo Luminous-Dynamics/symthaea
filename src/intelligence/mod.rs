@@ -28,7 +28,7 @@
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 //! - Candidate-specific typed epistemic grounding bound to exact primitive identity
 //! - Verified reasoning-chain IntegrationProxy history isolated from legacy feedback aggregates
-//! - Matched counterfactual IntegrationProxy probes over exact live contender sets
+//! - Matched counterfactual IntegrationProxy operator envelopes over exact live contender sets
 //! - Compatibility-preserving baseline-vs-matched V3 evidence-impact telemetry
 
 pub mod athena;
@@ -152,7 +152,7 @@ pub use reasoning_live_primitive_evidence::{
 pub use reasoning_matched_integration_probe::{
     plan_active_primitive_with_matched_integration, probe_active_primitive_integration,
     MatchedIntegrationProbeError, MatchedIntegrationProbeProfile, MatchedIntegrationProbeReport,
-    MATCHED_INTEGRATION_PROBE_VERSION,
+    MatchedOperatorObservation, MATCHED_INTEGRATION_PROBE_VERSION, MATCHED_TRANSFORMATION_PANEL,
 };
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
