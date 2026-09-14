@@ -88,12 +88,12 @@ pub enum CampaignError {
     EvidenceProductionStatementMismatch,
     #[error("evidence is not preregistered for the current plan: {0:?}")]
     EvidenceNotPreregistered(EvidenceTimingClass),
-    #[error("evidence production is not strictly later than the admitted ledger head")]
-    EvidenceProductionNotAfterLedgerHead,
     #[error("evidence admission statement does not bind the exact current ledger state")]
     EvidenceAdmissionStatementMismatch,
     #[error("evidence admission ordering is not strictly later than production")]
     AdmissionNotAfterProduction,
+    #[error("evidence admission ordering is not strictly later than the ledger's prior admission")]
+    AdmissionNotAfterLedgerHead,
     #[error("evidence ledger belongs to a different registration")]
     LedgerRegistrationMismatch,
     #[error("duplicate evidence id in the admitted campaign ledger: {0}")]
@@ -237,11 +237,7 @@ impl CampaignPlanV1 {
             self.subject_manifest_id.as_str(),
         );
         field(&mut out, "core-subject", self.subject_core_id.as_str());
-        field(
-            &mut out,
-            "core-plan",
-            self.core_plan().digest().as_str(),
-        );
+        field(&mut out, "core-plan", self.core_plan().digest().as_str());
         field(
             &mut out,
             "maximum-support",
@@ -824,7 +820,7 @@ pub struct CampaignEvidenceLedgerV1 {
     plan_digest: DigestSha256,
     evidence_root: DigestSha256,
     admitted_count: u64,
-    last_ordering: OrderingReceiptV1,
+    last_admission: OrderingReceiptV1,
     seen_evidence_ids: BTreeSet<StableId>,
     seen_evidence: BTreeSet<DigestSha256>,
 }
@@ -837,7 +833,7 @@ impl CampaignEvidenceLedgerV1 {
             plan_digest: current.receipt.plan_digest().clone(),
             evidence_root: current.receipt.empty_evidence_root().clone(),
             admitted_count: 0,
-            last_ordering: current.receipt.ordering().clone(),
+            last_admission: current.receipt.ordering().clone(),
             seen_evidence_ids: BTreeSet::new(),
             seen_evidence: BTreeSet::new(),
         }
@@ -858,14 +854,6 @@ impl CampaignEvidenceLedgerV1 {
         production: &OrderingReceiptV1,
     ) -> Result<DigestSha256, CampaignError> {
         self.require_current(current)?;
-        production
-            .require_later_than(&self.last_ordering)
-            .map_err(|error| match error {
-                CampaignError::NonIncreasingOrderingSequence => {
-                    CampaignError::EvidenceProductionNotAfterLedgerHead
-                }
-                other => other,
-            })?;
         let mut out = String::from("symthaea-assurance-evidence-admission-statement-v1\n");
         field(&mut out, "registration", self.registration_digest.as_str());
         field(&mut out, "campaign-nonce", self.campaign_nonce.as_str());
@@ -879,8 +867,8 @@ impl CampaignEvidenceLedgerV1 {
         field(&mut out, "prior-root", self.evidence_root.as_str());
         field(
             &mut out,
-            "previous-ordering",
-            self.last_ordering.digest().as_str(),
+            "previous-admission-ordering",
+            self.last_admission.digest().as_str(),
         );
         field(&mut out, "production-ordering", production.digest().as_str());
         Ok(digest_canonical(out.as_bytes()))
@@ -932,6 +920,14 @@ impl CampaignEvidenceLedgerV1 {
                 }
                 other => other,
             })?;
+        admission
+            .require_later_than(&self.last_admission)
+            .map_err(|error| match error {
+                CampaignError::NonIncreasingOrderingSequence => {
+                    CampaignError::AdmissionNotAfterLedgerHead
+                }
+                other => other,
+            })?;
 
         let ordinal = self.admitted_count + 1;
         let previous_evidence_root = self.evidence_root.clone();
@@ -958,7 +954,7 @@ impl CampaignEvidenceLedgerV1 {
         self.seen_evidence.insert(evidence_digest);
         self.admitted_count = ordinal;
         self.evidence_root = evidence_root;
-        self.last_ordering = admission.clone();
+        self.last_admission = admission.clone();
         Ok(result)
     }
 
