@@ -225,6 +225,22 @@ pub fn generate_gwt1_trusted_resolution_candidate_v1(
 }
 
 #[cfg(test)]
+pub(crate) fn trusted_resolution_candidate_for_test(
+    base_report: ButlinIndicatorReport,
+    resolved_view: ButlinResolvedEvidenceViewV2,
+    disposition: Gwt1EvidenceDispositionSummaryV1,
+    promotion_attestation_verification_bytes: Vec<u8>,
+) -> Gwt1TrustedResolutionCandidateV1 {
+    Gwt1TrustedResolutionCandidateV1 {
+        schema: GWT1_TRUSTED_RESOLUTION_CANDIDATE_SCHEMA_V1.to_string(),
+        base_report,
+        resolved_view,
+        disposition,
+        promotion_attestation_verification_bytes,
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

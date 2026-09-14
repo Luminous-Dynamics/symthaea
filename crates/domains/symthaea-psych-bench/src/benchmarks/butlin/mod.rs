@@ -4,7 +4,7 @@
 //! Butlin et al. (2023) consciousness indicators (arXiv:2308.08708, Table 1).
 //!
 //! Tests architectural properties against the paper's actual 14 indicators:
-//! RPT (Recurrent Processing), GWT (Global Workspace), HOT (Higher-Order),
+//! RPT (Recurrent Processing Theory), GWT (Global Workspace), HOT (Higher-Order),
 //! PP (Predictive Processing, one indicator), AST (Attention Schema), AE
 //! (Agency and Embodiment). The paper explicitly excludes IIT.
 //!
@@ -35,6 +35,12 @@ pub mod gwt1_qualification;
 #[cfg(feature = "trusted-resolution-authority")]
 #[doc(hidden)]
 pub mod gwt1_trusted_resolution;
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub mod gwt1_verified_final_artifact;
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub mod gwt1_verified_report_projection;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
@@ -102,6 +108,18 @@ pub use gwt1_qualification::{
 pub use gwt1_trusted_resolution::{
     GWT1_TRUSTED_RESOLUTION_CANDIDATE_SCHEMA_V1, Gwt1TrustedResolutionCandidateErrorV1,
     Gwt1TrustedResolutionCandidateV1, generate_gwt1_trusted_resolution_candidate_v1,
+};
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub use gwt1_verified_final_artifact::{
+    GWT1_VERIFIED_FINAL_ARTIFACT_SCHEMA_V1, Gwt1FinalArtifactReconstructionErrorV1,
+    VerifiedGwt1ResolvedArtifactV1,
+};
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub use gwt1_verified_report_projection::{
+    GWT1_VERIFIED_REPORT_PROJECTION_SCHEMA_V1, Gwt1VerifiedReportProjectionV1,
+    project_gwt1_verified_report_v1,
 };
 pub use indicators::ButlinIndicatorSuite;
 pub use qualification_design::{
