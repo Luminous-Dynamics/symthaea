@@ -24,8 +24,7 @@ use super::gwt1_trusted_resolution::{
 use super::report::{ButlinIndicatorReport, EvidenceOutcome, SupportTier};
 use super::resolution_view_v2::ButlinResolvedEvidenceViewV2;
 
-pub const GWT1_VERIFIED_FINAL_ARTIFACT_SCHEMA_V1: &str =
-    "butlin-gwt1-verified-final-artifact-v1";
+pub const GWT1_VERIFIED_FINAL_ARTIFACT_SCHEMA_V1: &str = "butlin-gwt1-verified-final-artifact-v1";
 
 /// Opaque read-only authority token for one reconstructed final GWT-1 artifact.
 ///
@@ -112,20 +111,32 @@ impl std::fmt::Display for Gwt1FinalArtifactReconstructionErrorV1 {
                 "independent reconstruction did not retain its inner promotion-verification transcript"
             ),
             Self::StoredCandidateBaseMismatch => {
-                write!(f, "stored resolution candidate disagrees with stored base report")
+                write!(
+                    f,
+                    "stored resolution candidate disagrees with stored base report"
+                )
             }
             Self::StoredCandidateViewMismatch => {
-                write!(f, "stored resolution candidate disagrees with stored V2 view")
+                write!(
+                    f,
+                    "stored resolution candidate disagrees with stored V2 view"
+                )
             }
             Self::StoredCandidateDispositionMismatch => write!(
                 f,
                 "stored resolution candidate disagrees with stored GWT-1 disposition"
             ),
             Self::RecomputedBaseMismatch => {
-                write!(f, "stored base report differs from independent reconstruction")
+                write!(
+                    f,
+                    "stored base report differs from independent reconstruction"
+                )
             }
             Self::RecomputedViewMismatch => {
-                write!(f, "stored V2 resolved view differs from independent reconstruction")
+                write!(
+                    f,
+                    "stored V2 resolved view differs from independent reconstruction"
+                )
             }
             Self::RecomputedDispositionMismatch => write!(
                 f,
@@ -136,7 +147,10 @@ impl std::fmt::Display for Gwt1FinalArtifactReconstructionErrorV1 {
                 "stored inner promotion-verification transcript differs from the reconstruction transcript"
             ),
             Self::StoredDispositionInvalid(error) => {
-                write!(f, "stored GWT-1 disposition is not derivable from its V2 view: {error}")
+                write!(
+                    f,
+                    "stored GWT-1 disposition is not derivable from its V2 view: {error}"
+                )
             }
             Self::FunctionallySupportedForbidden => write!(
                 f,
@@ -206,9 +220,7 @@ pub(super) fn verify_gwt1_final_reconstruction_v1(
         .promotion_attestation_verification_bytes()
         .is_empty()
     {
-        return Err(
-            Gwt1FinalArtifactReconstructionErrorV1::EmptyRecomputedPromotionVerification,
-        );
+        return Err(Gwt1FinalArtifactReconstructionErrorV1::EmptyRecomputedPromotionVerification);
     }
 
     if &stored_candidate.base_report != stored_base_report {
@@ -218,17 +230,13 @@ pub(super) fn verify_gwt1_final_reconstruction_v1(
         return Err(Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateViewMismatch);
     }
     if &stored_candidate.disposition != stored_disposition {
-        return Err(
-            Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateDispositionMismatch,
-        );
+        return Err(Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateDispositionMismatch);
     }
 
     let rederived_disposition = classify_gwt1_evidence_disposition_v1(stored_resolved_view)
         .map_err(Gwt1FinalArtifactReconstructionErrorV1::StoredDispositionInvalid)?;
     if &rederived_disposition != stored_disposition {
-        return Err(
-            Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateDispositionMismatch,
-        );
+        return Err(Gwt1FinalArtifactReconstructionErrorV1::StoredCandidateDispositionMismatch);
     }
 
     if &recomputed_candidate.base_report != stored_base_report {
@@ -243,9 +251,7 @@ pub(super) fn verify_gwt1_final_reconstruction_v1(
     if recomputed_candidate.promotion_attestation_verification_bytes()
         != stored_internal_promotion_verification
     {
-        return Err(
-            Gwt1FinalArtifactReconstructionErrorV1::InternalPromotionVerificationMismatch,
-        );
+        return Err(Gwt1FinalArtifactReconstructionErrorV1::InternalPromotionVerificationMismatch);
     }
 
     if gwt1_claims_functional_support(stored_resolved_view)
@@ -267,6 +273,7 @@ pub(super) fn verify_gwt1_final_reconstruction_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::benchmarks::butlin::ButlinIndicatorSuite;
     use crate::benchmarks::butlin::gwt1_trusted_resolution::trusted_resolution_candidate_for_test;
     use crate::benchmarks::butlin::resolution_view::{
         EvidenceArtifactIdentityV1, EvidenceLineageIdentityV1, EvidenceLineageKindV1,
@@ -275,7 +282,6 @@ mod tests {
     use crate::benchmarks::butlin::resolution_view_v2::{
         BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V2, IndicatorEvidenceLineageV2,
     };
-    use crate::benchmarks::butlin::ButlinIndicatorSuite;
     use crate::harness::BenchmarkConfig;
 
     fn fixture() -> (

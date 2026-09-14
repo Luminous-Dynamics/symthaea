@@ -113,6 +113,9 @@ mod tests {
             GWT1_VERIFIED_REPORT_PROJECTION_SCHEMA_V1,
             "butlin-gwt1-verified-report-projection-v1"
         );
-        assert_eq!(SupportTier::CausallySupported, SupportTier::CausallySupported);
+        assert_eq!(
+            SupportTier::CausallySupported,
+            SupportTier::CausallySupported
+        );
     }
 }
