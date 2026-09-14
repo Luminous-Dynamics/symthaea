@@ -322,6 +322,8 @@ pub enum FalseNameSearchCoverage {
 pub struct BoundedFalseNameReport {
     pub principal: PrincipalId,
     pub max_additional_identities: usize,
+    /// Human/machine-readable declaration of the mechanism/action candidate scope.
+    pub search_scope: String,
     pub candidates_evaluated: usize,
     pub coverage: FalseNameSearchCoverage,
     pub cost_model: IdentityCostModel,
@@ -329,9 +331,11 @@ pub struct BoundedFalseNameReport {
 }
 
 impl BoundedFalseNameReport {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         principal: PrincipalId,
         max_additional_identities: usize,
+        search_scope: impl Into<String>,
         candidates_evaluated: usize,
         coverage: FalseNameSearchCoverage,
         cost_model: IdentityCostModel,
@@ -339,6 +343,10 @@ impl BoundedFalseNameReport {
     ) -> Result<Self, String> {
         if max_additional_identities == 0 {
             return Err("false-name search bound must permit at least one added identity".to_string());
+        }
+        let search_scope = search_scope.into();
+        if search_scope.is_empty() {
+            return Err("false-name search scope must be non-empty".to_string());
         }
         if let Some(witness) = &best_profitable_witness {
             if candidates_evaluated == 0 {
@@ -360,6 +368,7 @@ impl BoundedFalseNameReport {
         Ok(Self {
             principal,
             max_additional_identities,
+            search_scope,
             candidates_evaluated,
             coverage,
             cost_model,
@@ -552,6 +561,7 @@ mod tests {
         let report = BoundedFalseNameReport::new(
             principal("p"),
             4,
+            "first ten binary-ballot candidates",
             10,
             FalseNameSearchCoverage::Truncated,
             cost_model,
@@ -559,6 +569,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.coverage, FalseNameSearchCoverage::Truncated);
+        assert_eq!(report.search_scope, "first ten binary-ballot candidates");
         assert_eq!(report.cost_model, cost_model);
         assert!(report.best_profitable_witness.is_none());
     }
@@ -600,6 +611,7 @@ mod tests {
         let report = BoundedFalseNameReport::new(
             p,
             2,
+            "all binary ballots for <=2 added identities",
             8,
             FalseNameSearchCoverage::ExhaustiveWithinDeclaredBound,
             cost_model,
@@ -610,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn report_rejects_non_profitable_or_mismatched_witnesses() {
+    fn report_rejects_non_profitable_mismatched_or_scope_less_witnesses() {
         let p = principal("p");
         let base = IdentityRegistry::new(vec![IdentityBinding::active(
             p.clone(),
@@ -641,6 +653,7 @@ mod tests {
             BoundedFalseNameReport::new(
                 p.clone(),
                 2,
+                "all binary ballots",
                 1,
                 FalseNameSearchCoverage::ExhaustiveWithinDeclaredBound,
                 witness_cost,
@@ -662,12 +675,25 @@ mod tests {
         .unwrap();
         assert!(
             BoundedFalseNameReport::new(
-                p,
+                p.clone(),
                 2,
+                "all binary ballots",
                 1,
                 FalseNameSearchCoverage::ExhaustiveWithinDeclaredBound,
                 IdentityCostModel::new(0.5).unwrap(),
                 Some(profitable),
+            )
+            .is_err()
+        );
+        assert!(
+            BoundedFalseNameReport::new(
+                p,
+                2,
+                "",
+                0,
+                FalseNameSearchCoverage::Truncated,
+                IdentityCostModel::new(0.0).unwrap(),
+                None,
             )
             .is_err()
         );
