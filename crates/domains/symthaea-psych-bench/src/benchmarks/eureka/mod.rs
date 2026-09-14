@@ -110,6 +110,10 @@ mod v2_authorized_anti_rollback_transition;
 mod v2_durably_authorized_transition;
 #[cfg(test)]
 mod v2_checkpoint_reconciliation;
+#[cfg(test)]
+mod v2_external_high_water_witness;
+#[cfg(test)]
+mod v2_external_high_water_witness_chain;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
