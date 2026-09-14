@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-kubernetes-bridge"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only Kubernetes object replay bridge for the Symthaea infrastructure integration fabric"
+
+[dependencies]
+symthaea-integration-core = { path = "../../core/symthaea-integration-core" }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
