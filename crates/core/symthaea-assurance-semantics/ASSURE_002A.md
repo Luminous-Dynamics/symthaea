@@ -57,7 +57,7 @@ Canonical string framing uses UTF-8 byte lengths. Unicode normalization is delib
 
 ## Conformance corpus
 
-The focused corpus proves:
+The focused Rust corpus proves:
 
 1. definition-schema ID drift changes identity;
 2. schema-specification drift changes identity;
@@ -81,13 +81,88 @@ commitment-digest: 3a510b215853c77285e39c95b6ab45c0d816370e17e14ccda8337110a790f
 
 This freezes only the generic semantic-commitment wire format. Full campaign/registration/ordering/admission vectors belong to ASSURE-002B integration.
 
-## Lineage and qualification
+## Independent cross-implementation vectors
 
-The source was previously exercised successfully through Rust 1.96 format/check, 9/9 tests, and strict Clippy while stacked on ASSURE-002, but that lineage also inherited unrelated campaign and lockfile state.
+The qualification lane also runs a standard-library Python implementation over language-neutral JSON fixtures. It reconstructs the canonical framing and SHA-256 independently of Rust for:
 
-This branch intentionally re-homes the identical semantic source on the exact qualified ASSURE-000 head `a39e9f1692570b7731c416cc98b4f875a199b3a1`. Its dedicated qualification lane is read-only and independently proves exact head, Rust 1.96 format/check/tests/strict Clippy, generated root-lock evidence, committed lock parity, and final tracked-checkout immutability.
+```text
+matched-sham-ascii
+unicode-nfc
+unicode-nfd
+```
 
-Historical stacked runs remain historical evidence; this cleaner shared-core lineage must earn its own exact-head PASS.
+The independent implementation deliberately exercises UTF-8 byte lengths and proves that canonically equivalent-looking NFC/NFD text remains byte-distinct when no higher-level normalization rule has been committed.
+
+The current theorem is intentionally narrow:
+
+```text
+independent canonical-encoding agreement
+for declared valid vectors
+```
+
+It is not yet:
+
+```text
+complete cross-language parser / constructor equivalence
+```
+
+Rust `StableId` and `DigestSha256` enforce their own accepted-value domains. A future general-purpose non-Rust parser claiming constructor equivalence must mirror those validity predicates rather than coercing arbitrary JSON values or accepting malformed identifiers/digests.
+
+## Independent lineage and qualification
+
+This active lineage is based directly on exact qualified ASSURE-000 head:
+
+`a39e9f1692570b7731c416cc98b4f875a199b3a1`
+
+It supersedes the earlier stacked semantic experiment only as the active qualification lineage. Historical stacked runs remain historical evidence and are not rewritten.
+
+Read-only ASSURE-002A qualification run `34828725215` executed exact semantic source head:
+
+`b1e3e5540ad3b4516d931dcc1453f5d6fb5fb3c0`
+
+and passed:
+
+```text
+exact candidate checkout
+Rust 1.96 formatting
+independent Python valid-vector oracle
+cargo check
+9/9 Rust conformance tests
+doc tests
+strict Clippy -D warnings
+```
+
+That run failed only committed root-lock parity. Cargo 1.96 produced exactly one missing workspace package stanza for `symthaea-assurance-semantics`; no dependency upgrades or unrelated lock changes were observed.
+
+The generated target root-lock SHA-256 was:
+
+`391b766f3f812f2d4c1a5b6a377ce1bcdeb5b7e2f88213078c88dab21846274a`
+
+A temporary one-purpose repair workflow then proved the exact starting candidate head and starting lock blob, applied only that reviewed stanza, required the exact target SHA-256 above, committed exactly `Cargo.lock`, and pushed repair commit:
+
+`f172621...`
+
+The temporary workflow executed no Symthaea build/test/candidate code with write authority, was removed immediately after use, and its PR was closed without merge. That repair process is not product qualification.
+
+The exact post-repair head containing this document must independently pass the permanent read-only qualification lane before ASSURE-002A is called qualified.
+
+## Permanent qualification contract
+
+Final PASS requires all of:
+
+```text
+exact PR-head checkout
+Rust 1.96 format
+independent Python valid-vector oracle
+cargo check
+9/9 Rust conformance tests
+strict Clippy -D warnings
+generated root-lock evidence
+committed root-lock parity
+tracked-checkout immutability
+```
+
+A failed, canceled, action-required, or superseded run remains evidence of that actual state; it is never rewritten as PASS by a later run.
 
 ## Integration sequence
 
@@ -100,13 +175,18 @@ qualified ASSURE-002 campaign mechanics
         ↓
 ASSURE-002B integration
         ↓
-ASSURE-002C temporal provenance correction
+base claim-strength convergence
+        ├─ ASSURE-002C: commitment ordering != witnessed production
+        ├─ ASSURE-002D: terminal in supplied view != checkpoint current
+        └─ ASSURE-002E: declared principal != authenticated authority
         ↓
 ASSURE-003 resolver
 ```
 
 ASSURE-002B must consume this crate as the single semantic-definition authority rather than independently re-encoding the schema/specification/definition tuple.
 
+The stronger optional production-witness, external-currentness, and authority-verification adapters are separate theorems. They do not change this primitive and should be implemented only where a campaign/customer actually requires those stronger claims.
+
 ## Deliberate nonclaims
 
-ASSURE-002A does not establish definition-byte availability or authenticity, semantic adequacy, criterion satisfaction, ordering-provider trust, claim support, replication, verifier independence, compliance/certification, deployment authority, or production-time provenance.
+ASSURE-002A does not establish definition-byte availability or authenticity, semantic adequacy, criterion satisfaction, complete cross-language parser equivalence, ordering-provider trust, registration authority, external registration-view completeness/currentness, claim support, replication, verifier independence, compliance/certification, deployment authority, or production-time provenance.
