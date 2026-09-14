@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-geometric-lesions"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Architecture-specific reversible lesion adapters for Symthaea geometric-emergence experiments"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["lesion", "workspace", "causality", "research"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-geometric-interventions = { path = "../symthaea-geometric-interventions" }
