@@ -1,0 +1,65 @@
+name: ARC Reasoning Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'examples/benchmark_arc_exact_output.rs'
+      - 'src/bin/arc_exact_reference.rs'
+      - 'src/bin/arc_budgeted_policy.rs'
+      - '.github/workflows/arc-reasoning-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-reasoning-qualification-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-policy-contract:
+    name: ARC semantic policy contract
+    runs-on: ubuntu-latest
+    env:
+      RQ003_REFERENCE_BLOB: ab2f861ebbb7c7b5e9d89ec5f58cb6a67ccbd5b4
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Prove frozen RQ-003 reference bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          example_blob="$(git hash-object examples/benchmark_arc_exact_output.rs)"
+          binary_blob="$(git hash-object src/bin/arc_exact_reference.rs)"
+          test "$example_blob" = "$RQ003_REFERENCE_BLOB"
+          test "$binary_blob" = "$RQ003_REFERENCE_BLOB"
+          cmp -s examples/benchmark_arc_exact_output.rs src/bin/arc_exact_reference.rs
+
+      - name: Check qualification-source formatting
+        run: >-
+          rustfmt --edition 2024 --check
+          examples/benchmark_arc_exact_output.rs
+          src/bin/arc_exact_reference.rs
+          src/bin/arc_budgeted_policy.rs
+
+      - name: Check ARC qualification targets
+        run: cargo check --locked --bin arc_exact_reference --bin arc_budgeted_policy
+
+      - name: Run ARC policy contract regressions
+        run: cargo test --locked --bin arc_budgeted_policy
+
+      - name: Deny warnings in ARC qualification targets
+        run: >-
+          cargo clippy --locked
+          --bin arc_exact_reference
+          --bin arc_budgeted_policy
+          -- -D warnings
