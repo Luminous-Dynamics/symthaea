@@ -182,7 +182,7 @@ impl ReasoningState {
 }
 
 /// Action: (Primitive, TransformationType) pair
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReasoningAction {
     pub primitive_name: String,
     pub transformation: TransformationType,
@@ -239,7 +239,7 @@ pub struct QLearningAgent {
     /// Minimum epsilon
     epsilon_min: f64,
 
-    /// Maximum replay buffer size (prevents unbounded growth)
+    /// Maximum replay buffer size
     max_buffer_size: usize,
 
     /// Maximum Q-table entries (prevents unbounded growth)
