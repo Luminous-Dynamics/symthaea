@@ -79,12 +79,6 @@ jobs:
           struct_body = projection.split("pub struct Gwt1VerifiedReportProjectionV1 {", 1)[1].split("}", 1)[0]
           assert not re.search(r"^\s*pub\s+\w+\s*:", struct_body, re.MULTILINE)
 
-          # `pub(super)` is intentionally narrower than crate-public, but every
-          # sibling/descendant under `butlin` can still see the reconstruction
-          # theorem. Audit the entire non-test Butlin Rust tree so a future
-          # module cannot become a second minting/report-projection path. The
-          # workflow path filter above deliberately covers the same recursive
-          # source tree.
           def non_test_source(path):
               text = path.read_text()
               return text.split("\n#[cfg(test)]", 1)[0]
@@ -135,9 +129,24 @@ jobs:
           for pattern in forbidden:
               assert not pattern.search(authority), pattern.pattern
 
-          # Workflow trust roots, exact-run consumption, and self-run provenance.
+          # Workflow trust roots, exact-run consumption, self-run provenance,
+          # and independent direct-root re-verification.
           assert "BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" in workflow
           assert "198aaf257de0b4f264f69eb64d813d772f0362d6" in workflow
+          assert "BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA" in workflow
+          assert "6eaf73a20047b99120e59eb96f48ae0e194e2c80" in workflow
+          assert "Freshly verify direct authority at consumer fault domain" in workflow
+          assert "authority/direct/archive_attestation.json" in workflow
+          assert "authority/direct/profile_attestation.json" in workflow
+          assert "sources/direct/direct_verifier_profile.json" in workflow
+          assert "authority/direct/direct_verifier_profile.json" in workflow
+          assert '--signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-builder.yml"' in workflow
+          assert '--signer-digest "$BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA"' in workflow
+          assert "butlin-gwt1-direct-attestation-verifier-profile-v2" in workflow
+          assert "butlin-gwt1-final-direct-authority-v1" in workflow
+          assert "fresh_direct_archive_verification_sha256" in workflow
+          assert "fresh_direct_profile_verification_sha256" in workflow
+          assert "direct_builder_workflow_sha" in workflow
           assert "final_resolution_run_id" in workflow
           assert "final_resolution_run_attempt" in workflow
           assert "run-id: ${{ inputs.final_resolution_run_id }}" in workflow
@@ -151,11 +160,13 @@ jobs:
           assert "latest" not in workflow.lower()
           assert "--signer-digest \"$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA\"" in workflow
           assert "--signer-digest \"$CONSUMER_WORKFLOW_SHA\"" in workflow
-          assert workflow.count("--deny-self-hosted-runners") >= 2
+          assert workflow.count("--deny-self-hosted-runners") >= 4
           assert ".member_count==60" in workflow
           assert ".member_count==7" in workflow
           assert ".member_count==26" in workflow
           assert "fresh_nested_direct_archive_admission.json" in workflow
+          assert "fresh_direct_archive_verification.json" in workflow
+          assert "fresh_direct_profile_verification.json" in workflow
           assert "cargo run --locked -p symthaea-psych-bench" in workflow
           assert "--features trusted-resolution-consumer" in workflow
           assert "actions/cache" not in workflow
@@ -185,11 +196,16 @@ jobs:
           assert profile["profile_id"] == "gwt1-verified-report-archive-v1"
           assert profile["root"] == "gwt1-verified-report"
           assert len(profile["members"]) == 26
-          assert len({item["path"] for item in profile["members"]}) == 26
-          assert any(item["path"].endswith("source/gwt1-final-resolution.tar.gz") for item in profile["members"])
-          assert any(item["path"].endswith("authority/fresh_final_archive_verification.json") for item in profile["members"])
-          assert any(item["path"].endswith("authority/fresh_nested_direct_archive_admission.json") for item in profile["members"])
-          assert any(item["path"].endswith("projection.json") for item in profile["members"])
+          member_paths = {item["path"] for item in profile["members"]}
+          assert len(member_paths) == 26
+          assert "gwt1-verified-report/source/gwt1-final-resolution.tar.gz" in member_paths
+          assert "gwt1-verified-report/authority/fresh_final_archive_verification.json" in member_paths
+          assert "gwt1-verified-report/authority/fresh_nested_direct_archive_admission.json" in member_paths
+          assert "gwt1-verified-report/authority/fresh_direct_archive_verification.json" in member_paths
+          assert "gwt1-verified-report/authority/fresh_direct_profile_verification.json" in member_paths
+          assert "gwt1-verified-report/source/resolution_provenance.json" not in member_paths
+          assert "gwt1-verified-report/source/final_verifier_profile.json" not in member_paths
+          assert "gwt1-verified-report/projection.json" in member_paths
           PY
 
       - name: Install pinned Rust 1.96.0
