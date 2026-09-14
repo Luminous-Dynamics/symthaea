@@ -5,11 +5,13 @@ on:
     branches:
       - main
       - psych-bench/typed-claim-class
+      - psych-bench/direction-aware-regression
     paths:
       - '.github/workflows/psych-bench-claim-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/claim_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/regression_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/security/**'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
@@ -60,7 +62,8 @@ jobs:
           set -euo pipefail
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/claim_contract.rs \
-            crates/domains/symthaea-psych-bench/src/regression_contract.rs
+            crates/domains/symthaea-psych-bench/src/regression_contract.rs \
+            crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs
 
       - name: Compile evidence contracts
         shell: bash
@@ -80,6 +83,12 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib regression_contract::tests -- --nocapture
 
+      - name: Execute regression-policy-manifest regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib regression_policy_manifest::tests -- --nocapture
+
       - name: Strict focused Clippy
         shell: bash
         run: |
@@ -93,7 +102,8 @@ jobs:
           python3 scripts/ci/strict_clippy_paths.py \
             "$report" \
             crates/domains/symthaea-psych-bench/src/claim_contract.rs \
-            crates/domains/symthaea-psych-bench/src/regression_contract.rs
+            crates/domains/symthaea-psych-bench/src/regression_contract.rs \
+            crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs
           test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability

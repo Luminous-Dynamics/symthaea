@@ -56,6 +56,7 @@ pub mod benchmarks;
 pub mod claim_contract;
 pub mod harness;
 pub mod regression_contract;
+pub mod regression_policy_manifest;
 pub mod substrate_transfer;
 pub mod wm;
 
