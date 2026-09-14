@@ -22,6 +22,10 @@
 //! is not labeled QRE: quantal-response equilibrium requires a strategic fixed
 //! point that this tranche does not solve.
 //!
+//! IG-004 adds formal strategic-evidence state and actions while preserving
+//! integrity, authorship, support and currentness as independent propositions.
+//! Evidence summaries do not emit a generic trust or authorization verdict.
+//!
 //! This crate complements `symthaea-economics` and `symthaea-social-choice`
 //! without depending on `symthaea-core`.
 //!
@@ -40,6 +44,7 @@
 
 mod behavior;
 mod coalition;
+mod evidence;
 mod n_player;
 
 pub use behavior::{
@@ -49,6 +54,12 @@ pub use behavior::{
 pub use coalition::{
     BoundedCoalitionDeviationReport, CoalitionDeviationWitness, CoalitionImprovementCriterion,
     CoalitionSearchTermination,
+};
+pub use evidence::{
+    DisclosureState, EvidenceAction, EvidenceAdmissibilityPolicy, EvidenceAuthorship,
+    EvidenceChallengeOutcome, EvidenceCostLedger, EvidenceCurrentness, EvidenceDecisionBreakdown,
+    EvidenceIntegrity, EvidenceItem, EvidenceObservation, EvidenceScenario, EvidenceSupport,
+    EvidenceView,
 };
 pub use n_player::{NPlayerGame, UnilateralDeviation};
 
