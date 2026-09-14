@@ -5,9 +5,8 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
-      - "crates/domains/symthaea-psych-bench/**"
-      - "crates/domains/symthaea-fep/**"
-      - "src/cognitive_loop/**"
+      - "src/**"
+      - "crates/**"
       - ".github/workflows/eureka-v2-backend-qualification.yml"
   workflow_dispatch:
 
