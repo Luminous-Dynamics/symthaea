@@ -7,7 +7,9 @@ fn no_rollback_authority_consumes_only_observed_head() {
     assert!(source.contains(
         "observed: &QuorumObservedUpgradeOperationalHeadV1"
     ));
-    assert!(!source.contains("FabricationUpgradeOperationalState"));
+    assert!(!source.contains(
+        "use symthaea_fabrication_kernel::upgrade_operational_state"
+    ));
     assert!(!source.contains("AutomaticRollbackTrigger"));
     assert!(!source.contains("Option<&"));
 }
