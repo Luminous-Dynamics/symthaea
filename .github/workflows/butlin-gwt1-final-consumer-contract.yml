@@ -28,6 +28,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # This contract is intentionally refreshed whenever its producer
+          # ancestry changes, so the hosted compile/test surface always observes
+          # the exact final-resolution parent consumed by this reconstruction theorem.
           /usr/bin/python3 - <<'PY'
           import pathlib
           import re
