@@ -1012,7 +1012,7 @@ fn validation_profile_schema_specification_drift_is_incomparable() {
 #[test]
 fn foreign_subject_evidence_fails_before_ledger_mutation() {
     let subject = subject('a');
-    let foreign_subject = subject('b');
+    let foreign_subject = crate::subject('b');
     let plan = plan(&subject, "campaign-a");
     let root = root_registration(&plan, 5);
     let terminal = resolve_terminal_registration_in_view(&[root], &[]).unwrap();
