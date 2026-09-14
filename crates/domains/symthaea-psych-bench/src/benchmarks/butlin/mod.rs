@@ -30,6 +30,9 @@ pub mod gwt1_evidence_disposition;
 pub mod gwt1_evidence_envelope;
 #[cfg(feature = "symthaea-backend")]
 pub mod gwt1_end_to_end;
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub mod gwt1_final_consumer_candidate;
 pub mod gwt1_promotion;
 pub mod gwt1_qualification;
 #[cfg(feature = "trusted-resolution-authority")]
@@ -92,6 +95,13 @@ pub use gwt1_evidence_envelope::{
 pub use gwt1_end_to_end::{
     Gwt1EndToEndErrorV1, Gwt1EndToEndEvidenceV1, Gwt1ExecutionIdentityV1,
     build_gwt1_evidence_v1, run_gwt1_end_to_end_v1,
+};
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub use gwt1_final_consumer_candidate::{
+    GWT1_CONSUMER_GH_ARCHIVE_SHA256_V1, GWT1_CONSUMER_GH_BINARY_SHA256_V1,
+    GWT1_CONSUMER_GH_VERSION_OUTPUT_SHA256_V1, GWT1_CONSUMER_GH_VERSION_V1,
+    Gwt1FinalConsumerCandidateErrorV1, reconstruct_gwt1_verified_report_projection_candidate_v1,
 };
 pub use gwt1_promotion::{
     GWT1_DIRECT_PROMOTION_POLICY_V1, Gwt1DirectPromotionDecisionV1,
