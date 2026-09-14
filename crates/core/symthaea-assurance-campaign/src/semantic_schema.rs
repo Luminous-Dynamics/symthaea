@@ -78,7 +78,7 @@ impl SelfDescribingSemanticCommitmentV1 {
 pub fn canonical_semantic_set(
     mut values: Vec<SelfDescribingSemanticCommitmentV1>,
 ) -> Result<Vec<SelfDescribingSemanticCommitmentV1>, SemanticCommitmentError> {
-    values.sort_by(|left, right| left.semantic_id.cmp(&right.semantic_id));
+    values.sort_by_cached_key(|value| value.semantic_id.clone());
     for pair in values.windows(2) {
         if pair[0].semantic_id == pair[1].semantic_id {
             return Err(SemanticCommitmentError::DuplicateSemanticId(
