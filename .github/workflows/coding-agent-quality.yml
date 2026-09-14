@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "Cargo.toml"
-      - "Cargo.lock"
       - "src/language/**"
       - "examples/benchmark_coding_backends.rs"
       - "examples/forecastbench_eval.rs"

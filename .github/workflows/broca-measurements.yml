@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - "Cargo.toml"
-      - "Cargo.lock"
       - "crates/domains/symthaea-broca/**"
       - "scripts/broca_measurement_artifacts.sh"
       - "scripts/broca_capture_baseline.sh"
