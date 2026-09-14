@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-fabrication-upgrade-finalization-context"
+version = "0.1.0"
+edition = "2024"
+description = "Single-view opaque pre-finalization context for hardened fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgrade-authority" }
+symthaea-fabrication-upgrade-runtime = { path = "../symthaea-fabrication-upgrade-runtime" }
+symthaea-fabrication-upgrade-probation-authority = { path = "../symthaea-fabrication-upgrade-probation-authority" }
+symthaea-fabrication-upgrade-probation-telemetry = { path = "../symthaea-fabrication-upgrade-probation-telemetry" }
+symthaea-fabrication-upgrade-hardware-authority = { path = "../symthaea-fabrication-upgrade-hardware-authority" }
+symthaea-fabrication-evidence-retention-head = { path = "../symthaea-fabrication-evidence-retention-head" }
+symthaea-fabrication-current-no-rollback = { path = "../symthaea-fabrication-current-no-rollback" }
+symthaea-fabrication-key-continuity-authority = { path = "../symthaea-fabrication-key-continuity-authority" }
+symthaea-fabrication-witness-registry-containment-bound = { path = "../symthaea-fabrication-witness-registry-containment-bound" }
+symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
