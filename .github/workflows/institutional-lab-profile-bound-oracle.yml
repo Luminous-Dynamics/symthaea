@@ -1,0 +1,108 @@
+name: Institutional Lab Profile-Bound Oracle
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig006a_contract_oracle.py"
+      - "scripts/ig006a_profile_bound_oracle_v2.py"
+      - "docs/research/INSTITUTIONAL_LAB_RECEIPT_CONTRACT_V2.md"
+      - ".github/workflows/institutional-lab-profile-bound-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-profile-bound-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subject and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          test -z "$(git status --porcelain)"
+
+      - name: Syntax compile v1 and v2 independent oracles
+        run: |
+          python -m py_compile scripts/ig006a_contract_oracle.py
+          python -m py_compile scripts/ig006a_profile_bound_oracle_v2.py
+
+      - name: Re-run v1 prerequisite self-test
+        run: python scripts/ig006a_contract_oracle.py --self-test > /tmp/ig006a-v1-self.json
+
+      - name: Execute v2 self-test twice deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ig006a_profile_bound_oracle_v2.py --self-test > /tmp/ig006a-v2-self-1.json
+          python scripts/ig006a_profile_bound_oracle_v2.py --self-test > /tmp/ig006a-v2-self-2.json
+          cmp /tmp/ig006a-v2-self-1.json /tmp/ig006a-v2-self-2.json
+
+      - name: Execute v2 fixture twice deterministically
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ig006a_profile_bound_oracle_v2.py --fixture > /tmp/ig006a-v2-fixture-1.json
+          python scripts/ig006a_profile_bound_oracle_v2.py --fixture > /tmp/ig006a-v2-fixture-2.json
+          cmp /tmp/ig006a-v2-fixture-1.json /tmp/ig006a-v2-fixture-2.json
+
+      - name: Assert frozen v2 commitments and hardening controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          with open('/tmp/ig006a-v1-self.json', encoding='utf-8') as f:
+              v1 = json.load(f)
+          with open('/tmp/ig006a-v2-self-1.json', encoding='utf-8') as f:
+              v2 = json.load(f)
+          with open('/tmp/ig006a-v2-fixture-1.json', encoding='utf-8') as f:
+              fixture = json.load(f)
+
+          assert v1['all_self_tests_passed'] is True
+          assert v2['all_self_tests_passed'] is True
+          assert v2['v1_prerequisite_self_test_passed'] is True
+          assert v2['authority'] == 'MeasurementOnly'
+          assert v2['fixture_receipt_sha256'] == '84a146109b9f75920ceeb42fab5eaf0ee45b5761679f46d99fead821ba2d0920'
+          assert v2['fixture_experiment_identity_sha256'] == '65c39a0d1d6f655f1e604d729ad1cdd0a95861b9627250b6e0ee82536ea676ba'
+          assert v2['metric_schema_sha256'] == '113b17a9c17248eda9dd2d18e078308912efe65ba804db39d7c4405b41f1f89d'
+          assert v2['mechanism_changed_identity_sha256'] == 'e0fc885158ccb9258e10974762210650d274e42606ad4f78e182d3a8ceef0bdf'
+          assert v2['scenario_changed_identity_sha256'] == '39eff712849c7d98ddde32b9daaf9f0823c98c70e4f13e10972800ababaa9e9b'
+          assert v2['same_revision_mechanism_content_changes_identity'] is True
+          assert v2['same_revision_scenario_content_changes_identity'] is True
+          assert v2['metric_schema_content_is_self_bound'] is True
+          assert v2['profile_commitment_format_fail_closed'] is True
+          assert fixture['receipt_sha256'] == v2['fixture_receipt_sha256']
+
+          receipt = json.loads(fixture['receipt_json'])
+          refs = receipt['experiment_identity']
+          for name in ('scenario', 'mechanism', 'population', 'adversary', 'metric_schema', 'constitutional_policy', 'rng_profile'):
+              assert set(refs[name]) == {'id', 'revision', 'content_sha256'}
+              assert len(refs[name]['content_sha256']) == 64
+          PY
+
+      - name: Verify checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain)"
