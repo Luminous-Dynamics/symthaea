@@ -100,6 +100,8 @@ mod v2_openssh_sshsig_metadata;
 mod v2_openssh_admission_verifier;
 #[cfg(test)]
 mod v2_qualifier_anti_rollback;
+#[cfg(test)]
+mod v2_qualifier_checkpoint_store;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
