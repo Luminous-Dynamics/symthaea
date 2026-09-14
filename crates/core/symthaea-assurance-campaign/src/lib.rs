@@ -15,8 +15,8 @@
 //! self-declared timestamp
 //!     != durable ordering evidence
 //!
-//! registration receipt exists
-//!     != registration is current
+//! unique terminal receipt in supplied view
+//!     != authoritative external currentness
 //! ```
 //!
 //! This crate binds exact campaign semantics before admitted evidence begins.
@@ -27,6 +27,9 @@ use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use symthaea_assurance_core::{
     Claim, DigestSha256, EvidenceArtifact, EvidenceKind, QualificationPlan, StableId, SupportTier,
+};
+use symthaea_assurance_semantics::{
+    SemanticCommitmentError, SemanticCommitmentV1, canonical_semantic_set,
 };
 use symthaea_assurance_subject::{AiSubjectManifest, SubjectError};
 use thiserror::Error;
@@ -79,20 +82,28 @@ pub enum CampaignError {
     ConflictingWithdrawal,
     #[error("a withdrawn registration has a successor")]
     SuccessorOfWithdrawnRegistration,
-    #[error("the registration lineage has no current registration")]
-    NoCurrentRegistration,
-    #[error("campaign plan does not match the current registration")]
-    CurrentPlanMismatch,
-    #[error("evidence kind is not registered by the current campaign plan")]
+    #[error("the supplied registration view has no terminal unwithdrawn registration")]
+    NoTerminalRegistrationInView,
+    #[error("campaign plan does not match the terminal registration in the supplied view")]
+    TerminalPlanMismatch,
+    #[error("evidence subject does not match the exact campaign subject")]
+    EvidenceSubjectMismatch,
+    #[error("evidence claim does not match the exact campaign claim")]
+    EvidenceClaimMismatch,
+    #[error("evidence kind is not registered by the terminal campaign plan in the supplied view")]
     UnregisteredEvidenceKind,
-    #[error("evidence timing statement does not bind the exact evidence/current registration")]
-    EvidenceProductionStatementMismatch,
-    #[error("evidence is not preregistered for the current plan: {0:?}")]
-    EvidenceNotPreregistered(EvidenceTimingClass),
+    #[error(
+        "evidence commitment statement does not bind the exact evidence/terminal registration in the supplied view"
+    )]
+    EvidenceCommitmentStatementMismatch,
+    #[error(
+        "evidence commitment is not after the terminal registration in the supplied view: {0:?}"
+    )]
+    EvidenceCommitmentNotAfterRegistration(EvidenceCommitmentTimingClass),
     #[error("evidence admission statement does not bind the exact current ledger state")]
     EvidenceAdmissionStatementMismatch,
-    #[error("evidence admission ordering is not strictly later than production")]
-    AdmissionNotAfterProduction,
+    #[error("evidence admission ordering is not strictly later than evidence commitment ordering")]
+    AdmissionNotAfterCommitment,
     #[error("evidence admission ordering is not strictly later than the ledger's prior admission")]
     AdmissionNotAfterLedgerHead,
     #[error("evidence ledger belongs to a different registration")]
@@ -101,31 +112,10 @@ pub enum CampaignError {
     DuplicateEvidenceId(String),
     #[error("duplicate evidence digest in the admitted campaign ledger")]
     DuplicateEvidenceDigest,
+    #[error("evidence ordinal overflow")]
+    EvidenceOrdinalOverflow,
     #[error(transparent)]
     Subject(#[from] SubjectError),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SemanticCommitmentV1 {
-    semantic_id: StableId,
-    definition_digest: DigestSha256,
-}
-
-impl SemanticCommitmentV1 {
-    pub fn new(semantic_id: StableId, definition_digest: DigestSha256) -> Self {
-        Self {
-            semantic_id,
-            definition_digest,
-        }
-    }
-
-    pub fn semantic_id(&self) -> &StableId {
-        &self.semantic_id
-    }
-
-    pub fn definition_digest(&self) -> &DigestSha256 {
-        &self.definition_digest
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,19 +139,12 @@ impl EvidenceRequirementV1 {
     pub fn core_kind(&self) -> EvidenceKind {
         match self {
             Self::Builtin(kind) => kind.clone(),
-            Self::Custom(semantic) => EvidenceKind::Custom(semantic.semantic_id.clone()),
+            Self::Custom(semantic) => EvidenceKind::Custom(semantic.semantic_id().clone()),
         }
     }
 
     fn canonical_name(&self) -> String {
         evidence_kind_name(&self.core_kind())
-    }
-
-    fn definition_digest(&self) -> Option<&DigestSha256> {
-        match self {
-            Self::Builtin(_) => None,
-            Self::Custom(semantic) => Some(&semantic.definition_digest),
-        }
     }
 }
 
@@ -256,20 +239,16 @@ impl CampaignPlanV1 {
             reproduction_requirement,
             evidence_requirements,
             support_criteria,
-            controls: canonical_semantics("controls", controls)?,
-            failure_conditions: canonical_semantics("failure-conditions", failure_conditions)?,
-            contradiction_conditions: canonical_semantics(
-                "contradiction-conditions",
-                contradiction_conditions,
-            )?,
-            inconclusive_conditions: canonical_semantics(
-                "inconclusive-conditions",
-                inconclusive_conditions,
-            )?,
-            invalidation_conditions: canonical_semantics(
-                "invalidation-conditions",
-                invalidation_conditions,
-            )?,
+            controls: canonical_semantic_set(controls)
+                .map_err(|error| semantic_set_error("controls", error))?,
+            failure_conditions: canonical_semantic_set(failure_conditions)
+                .map_err(|error| semantic_set_error("failure-conditions", error))?,
+            contradiction_conditions: canonical_semantic_set(contradiction_conditions)
+                .map_err(|error| semantic_set_error("contradiction-conditions", error))?,
+            inconclusive_conditions: canonical_semantic_set(inconclusive_conditions)
+                .map_err(|error| semantic_set_error("inconclusive-conditions", error))?,
+            invalidation_conditions: canonical_semantic_set(invalidation_conditions)
+                .map_err(|error| semantic_set_error("invalidation-conditions", error))?,
         })
     }
 
@@ -287,6 +266,10 @@ impl CampaignPlanV1 {
 
     pub fn subject_manifest_id(&self) -> &DigestSha256 {
         &self.subject_manifest_id
+    }
+
+    pub fn subject_core_id(&self) -> &DigestSha256 {
+        &self.subject_core_id
     }
 
     pub fn maximum_support(&self) -> SupportTier {
@@ -312,7 +295,7 @@ impl CampaignPlanV1 {
             self.maximum_support,
             self.invalidation_conditions
                 .iter()
-                .map(|condition| condition.semantic_id.clone())
+                .map(|condition| condition.semantic_id().clone())
                 .collect(),
         )
     }
@@ -433,16 +416,16 @@ impl OrderingReceiptV1 {
         field(&mut out, "source", self.source.as_str());
         field(
             &mut out,
-            "validation-profile",
-            self.validation_profile.semantic_id.as_str(),
+            "validation-profile-id",
+            self.validation_profile.semantic_id().as_str(),
         );
         field(
             &mut out,
-            "validation-profile-definition",
-            self.validation_profile.definition_digest.as_str(),
+            "validation-profile-commitment",
+            self.validation_profile.digest().as_str(),
         );
-        field(&mut out, "epoch", &self.epoch.to_string());
-        field(&mut out, "sequence", &self.sequence.to_string());
+        field(&mut out, "epoch", &canonical_u64(self.epoch));
+        field(&mut out, "sequence", &canonical_u64(self.sequence));
         field(&mut out, "statement", self.statement_digest.as_str());
         field(
             &mut out,
@@ -710,11 +693,11 @@ impl RegistrationWithdrawalV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CurrentRegistrationV1 {
+pub struct TerminalRegistrationInViewV1 {
     receipt: PreregistrationReceiptV1,
 }
 
-impl CurrentRegistrationV1 {
+impl TerminalRegistrationInViewV1 {
     pub fn receipt(&self) -> &PreregistrationReceiptV1 {
         &self.receipt
     }
@@ -724,10 +707,10 @@ impl CurrentRegistrationV1 {
     }
 }
 
-pub fn resolve_current_registration(
+pub fn resolve_terminal_registration_in_view(
     registrations: &[PreregistrationReceiptV1],
     withdrawals: &[RegistrationWithdrawalV1],
-) -> Result<CurrentRegistrationV1, CampaignError> {
+) -> Result<TerminalRegistrationInViewV1, CampaignError> {
     if registrations.is_empty() {
         return Err(CampaignError::EmptyRegistrationSet);
     }
@@ -812,26 +795,26 @@ pub fn resolve_current_registration(
         return Err(CampaignError::DisconnectedRegistrationLineage);
     }
     if withdrawal_by_target.contains_key(&current) {
-        return Err(CampaignError::NoCurrentRegistration);
+        return Err(CampaignError::NoTerminalRegistrationInView);
     }
 
-    Ok(CurrentRegistrationV1 {
+    Ok(TerminalRegistrationInViewV1 {
         receipt: by_digest[&current].clone(),
     })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EvidenceTimingClass {
-    AfterCurrentRegistration,
-    ProducedBeforeOrAtRegistration,
+pub enum EvidenceCommitmentTimingClass {
+    CommittedAfterTerminalRegistrationInView,
+    CommittedBeforeOrAtTerminalRegistrationInView,
     IncomparableOrderingLineage,
 }
 
-pub fn evidence_production_statement_digest(
-    current: &CurrentRegistrationV1,
+pub fn evidence_commitment_statement_digest(
+    current: &TerminalRegistrationInViewV1,
     evidence: &EvidenceArtifact,
 ) -> DigestSha256 {
-    let mut out = String::from("symthaea-assurance-evidence-production-statement-v1\n");
+    let mut out = String::from("symthaea-assurance-evidence-commitment-statement-v1\n");
     field(&mut out, "registration", current.receipt.digest().as_str());
     field(
         &mut out,
@@ -843,26 +826,28 @@ pub fn evidence_production_statement_digest(
     digest_canonical(out.as_bytes())
 }
 
-pub fn classify_evidence_timing(
-    current: &CurrentRegistrationV1,
+pub fn classify_evidence_commitment_timing(
+    current: &TerminalRegistrationInViewV1,
     evidence: &EvidenceArtifact,
-    production: &OrderingReceiptV1,
-) -> Result<EvidenceTimingClass, CampaignError> {
-    if production.statement_digest() != &evidence_production_statement_digest(current, evidence) {
-        return Err(CampaignError::EvidenceProductionStatementMismatch);
+    commitment_ordering: &OrderingReceiptV1,
+) -> Result<EvidenceCommitmentTimingClass, CampaignError> {
+    if commitment_ordering.statement_digest()
+        != &evidence_commitment_statement_digest(current, evidence)
+    {
+        return Err(CampaignError::EvidenceCommitmentStatementMismatch);
     }
 
     let registration = current.receipt.ordering();
-    if production.source() != registration.source()
-        || production.validation_profile() != registration.validation_profile()
-        || production.epoch() != registration.epoch()
+    if commitment_ordering.source() != registration.source()
+        || commitment_ordering.validation_profile() != registration.validation_profile()
+        || commitment_ordering.epoch() != registration.epoch()
     {
-        return Ok(EvidenceTimingClass::IncomparableOrderingLineage);
+        return Ok(EvidenceCommitmentTimingClass::IncomparableOrderingLineage);
     }
-    if production.sequence() <= registration.sequence() {
-        return Ok(EvidenceTimingClass::ProducedBeforeOrAtRegistration);
+    if commitment_ordering.sequence() <= registration.sequence() {
+        return Ok(EvidenceCommitmentTimingClass::CommittedBeforeOrAtTerminalRegistrationInView);
     }
-    Ok(EvidenceTimingClass::AfterCurrentRegistration)
+    Ok(EvidenceCommitmentTimingClass::CommittedAfterTerminalRegistrationInView)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -872,7 +857,7 @@ pub struct CampaignEvidenceAdmissionV1 {
     campaign_nonce: StableId,
     ordinal: u64,
     evidence_digest: DigestSha256,
-    production_ordering_digest: DigestSha256,
+    commitment_ordering_digest: DigestSha256,
     admission_ordering_digest: DigestSha256,
     previous_evidence_root: DigestSha256,
     evidence_root: DigestSha256,
@@ -888,12 +873,12 @@ impl CampaignEvidenceAdmissionV1 {
         field(&mut out, "registration", self.registration_digest.as_str());
         field(&mut out, "plan", self.plan_digest.as_str());
         field(&mut out, "campaign-nonce", self.campaign_nonce.as_str());
-        field(&mut out, "ordinal", &self.ordinal.to_string());
+        field(&mut out, "ordinal", &canonical_u64(self.ordinal));
         field(&mut out, "evidence", self.evidence_digest.as_str());
         field(
             &mut out,
-            "production-ordering",
-            self.production_ordering_digest.as_str(),
+            "commitment-ordering",
+            self.commitment_ordering_digest.as_str(),
         );
         field(
             &mut out,
@@ -923,7 +908,7 @@ pub struct CampaignEvidenceLedgerV1 {
 }
 
 impl CampaignEvidenceLedgerV1 {
-    pub fn new(current: &CurrentRegistrationV1) -> Self {
+    pub fn new(current: &TerminalRegistrationInViewV1) -> Self {
         Self {
             registration_digest: current.receipt.digest(),
             campaign_nonce: current.receipt.campaign_nonce().clone(),
@@ -946,16 +931,17 @@ impl CampaignEvidenceLedgerV1 {
 
     pub fn admission_statement_digest(
         &self,
-        current: &CurrentRegistrationV1,
+        current: &TerminalRegistrationInViewV1,
         evidence: &EvidenceArtifact,
-        production: &OrderingReceiptV1,
+        commitment_ordering: &OrderingReceiptV1,
     ) -> Result<DigestSha256, CampaignError> {
         self.require_current(current)?;
+        let ordinal = checked_next_evidence_ordinal(self.admitted_count)?;
         let mut out = String::from("symthaea-assurance-evidence-admission-statement-v1\n");
         field(&mut out, "registration", self.registration_digest.as_str());
         field(&mut out, "campaign-nonce", self.campaign_nonce.as_str());
         field(&mut out, "plan", self.plan_digest.as_str());
-        field(&mut out, "ordinal", &(self.admitted_count + 1).to_string());
+        field(&mut out, "ordinal", &canonical_u64(ordinal));
         field(&mut out, "evidence", evidence.digest().as_str());
         field(&mut out, "prior-root", self.evidence_root.as_str());
         field(
@@ -965,8 +951,8 @@ impl CampaignEvidenceLedgerV1 {
         );
         field(
             &mut out,
-            "production-ordering",
-            production.digest().as_str(),
+            "commitment-ordering",
+            commitment_ordering.digest().as_str(),
         );
         Ok(digest_canonical(out.as_bytes()))
     }
@@ -974,9 +960,9 @@ impl CampaignEvidenceLedgerV1 {
     pub fn admit_preregistered(
         &mut self,
         plan: &CampaignPlanV1,
-        current: &CurrentRegistrationV1,
+        current: &TerminalRegistrationInViewV1,
         evidence: &EvidenceArtifact,
-        production: &OrderingReceiptV1,
+        commitment_ordering: &OrderingReceiptV1,
         admission: &OrderingReceiptV1,
     ) -> Result<CampaignEvidenceAdmissionV1, CampaignError> {
         self.require_current(current)?;
@@ -984,7 +970,13 @@ impl CampaignEvidenceLedgerV1 {
             || plan.campaign_nonce() != &self.campaign_nonce
             || current.receipt.plan_digest() != &plan.digest()
         {
-            return Err(CampaignError::CurrentPlanMismatch);
+            return Err(CampaignError::TerminalPlanMismatch);
+        }
+        if evidence.subject_id() != plan.subject_core_id() {
+            return Err(CampaignError::EvidenceSubjectMismatch);
+        }
+        if evidence.claim_digest() != plan.claim_digest() {
+            return Err(CampaignError::EvidenceClaimMismatch);
         }
         if !plan.registers_kind(evidence.kind()) {
             return Err(CampaignError::UnregisteredEvidenceKind);
@@ -1000,20 +992,23 @@ impl CampaignEvidenceLedgerV1 {
             return Err(CampaignError::DuplicateEvidenceDigest);
         }
 
-        let timing = classify_evidence_timing(current, evidence, production)?;
-        if timing != EvidenceTimingClass::AfterCurrentRegistration {
-            return Err(CampaignError::EvidenceNotPreregistered(timing));
+        let timing = classify_evidence_commitment_timing(current, evidence, commitment_ordering)?;
+        if timing != EvidenceCommitmentTimingClass::CommittedAfterTerminalRegistrationInView {
+            return Err(CampaignError::EvidenceCommitmentNotAfterRegistration(
+                timing,
+            ));
         }
 
-        let expected_admission = self.admission_statement_digest(current, evidence, production)?;
+        let expected_admission =
+            self.admission_statement_digest(current, evidence, commitment_ordering)?;
         if admission.statement_digest() != &expected_admission {
             return Err(CampaignError::EvidenceAdmissionStatementMismatch);
         }
         admission
-            .require_later_than(production)
+            .require_later_than(commitment_ordering)
             .map_err(|error| match error {
                 CampaignError::NonIncreasingOrderingSequence => {
-                    CampaignError::AdmissionNotAfterProduction
+                    CampaignError::AdmissionNotAfterCommitment
                 }
                 other => other,
             })?;
@@ -1026,13 +1021,13 @@ impl CampaignEvidenceLedgerV1 {
                 other => other,
             })?;
 
-        let ordinal = self.admitted_count + 1;
+        let ordinal = checked_next_evidence_ordinal(self.admitted_count)?;
         let previous_evidence_root = self.evidence_root.clone();
         let evidence_root = next_evidence_root(
             &previous_evidence_root,
             ordinal,
             &evidence_digest,
-            &production.digest(),
+            &commitment_ordering.digest(),
             &admission.digest(),
         );
         let result = CampaignEvidenceAdmissionV1 {
@@ -1041,7 +1036,7 @@ impl CampaignEvidenceLedgerV1 {
             campaign_nonce: self.campaign_nonce.clone(),
             ordinal,
             evidence_digest: evidence_digest.clone(),
-            production_ordering_digest: production.digest(),
+            commitment_ordering_digest: commitment_ordering.digest(),
             admission_ordering_digest: admission.digest(),
             previous_evidence_root,
             evidence_root: evidence_root.clone(),
@@ -1056,7 +1051,7 @@ impl CampaignEvidenceLedgerV1 {
         Ok(result)
     }
 
-    fn require_current(&self, current: &CurrentRegistrationV1) -> Result<(), CampaignError> {
+    fn require_current(&self, current: &TerminalRegistrationInViewV1) -> Result<(), CampaignError> {
         if self.registration_digest != current.receipt.digest()
             || &self.campaign_nonce != current.receipt.campaign_nonce()
             || &self.plan_digest != current.receipt.plan_digest()
@@ -1086,41 +1081,47 @@ fn canonical_support_criteria(
     maximum_support: SupportTier,
 ) -> Result<Vec<SupportCriterionV1>, CampaignError> {
     for criterion in &criteria {
-        if criterion.tier > maximum_support {
+        if support_tier_rank(criterion.tier) > support_tier_rank(maximum_support) {
             return Err(CampaignError::SupportCriterionAboveCeiling);
         }
     }
     criteria.sort_by(|left, right| {
-        left.tier
-            .cmp(&right.tier)
-            .then_with(|| left.criterion.semantic_id.cmp(&right.criterion.semantic_id))
+        support_tier_rank(left.tier)
+            .cmp(&support_tier_rank(right.tier))
+            .then_with(|| {
+                left.criterion
+                    .semantic_id()
+                    .cmp(right.criterion.semantic_id())
+            })
     });
     let mut ids = BTreeSet::new();
     for criterion in &criteria {
-        if !ids.insert(criterion.criterion.semantic_id.clone()) {
+        if !ids.insert(criterion.criterion.semantic_id().clone()) {
             return Err(CampaignError::DuplicateSemanticId {
                 set: "support-criteria",
-                id: criterion.criterion.semantic_id.as_str().to_owned(),
+                id: criterion.criterion.semantic_id().as_str().to_owned(),
             });
         }
     }
     Ok(criteria)
 }
 
-fn canonical_semantics(
-    set: &'static str,
-    mut values: Vec<SemanticCommitmentV1>,
-) -> Result<Vec<SemanticCommitmentV1>, CampaignError> {
-    values.sort_by(|left, right| left.semantic_id.cmp(&right.semantic_id));
-    for pair in values.windows(2) {
-        if pair[0].semantic_id == pair[1].semantic_id {
-            return Err(CampaignError::DuplicateSemanticId {
-                set,
-                id: pair[0].semantic_id.as_str().to_owned(),
-            });
+fn semantic_set_error(set: &'static str, error: SemanticCommitmentError) -> CampaignError {
+    match error {
+        SemanticCommitmentError::DuplicateSemanticId(id) => {
+            CampaignError::DuplicateSemanticId { set, id }
         }
     }
-    Ok(values)
+}
+
+fn checked_next_evidence_ordinal(current: u64) -> Result<u64, CampaignError> {
+    current
+        .checked_add(1)
+        .ok_or(CampaignError::EvidenceOrdinalOverflow)
+}
+
+fn canonical_u64(value: u64) -> String {
+    value.to_string()
 }
 
 fn empty_evidence_root(
@@ -1139,17 +1140,17 @@ fn next_evidence_root(
     previous: &DigestSha256,
     ordinal: u64,
     evidence: &DigestSha256,
-    production_ordering: &DigestSha256,
+    commitment_ordering: &DigestSha256,
     admission_ordering: &DigestSha256,
 ) -> DigestSha256 {
     let mut out = String::from("symthaea-assurance-evidence-root-step-v1\n");
     field(&mut out, "previous", previous.as_str());
-    field(&mut out, "ordinal", &ordinal.to_string());
+    field(&mut out, "ordinal", &canonical_u64(ordinal));
     field(&mut out, "evidence", evidence.as_str());
     field(
         &mut out,
-        "production-ordering",
-        production_ordering.as_str(),
+        "commitment-ordering",
+        commitment_ordering.as_str(),
     );
     field(&mut out, "admission-ordering", admission_ordering.as_str());
     digest_canonical(out.as_bytes())
@@ -1159,14 +1160,16 @@ fn append_evidence_requirements(out: &mut String, requirements: &[EvidenceRequir
     field(out, "evidence-kind-count", &requirements.len().to_string());
     for requirement in requirements {
         field(out, "evidence-kind", &requirement.canonical_name());
-        field(
-            out,
-            "evidence-kind-definition",
-            requirement
-                .definition_digest()
-                .map(DigestSha256::as_str)
-                .unwrap_or(""),
-        );
+        match requirement {
+            EvidenceRequirementV1::Builtin(_) => {
+                field(out, "evidence-kind-semantic-commitment", "")
+            }
+            EvidenceRequirementV1::Custom(semantic) => field(
+                out,
+                "evidence-kind-semantic-commitment",
+                semantic.digest().as_str(),
+            ),
+        }
     }
 }
 
@@ -1181,12 +1184,12 @@ fn append_support_criteria(out: &mut String, criteria: &[SupportCriterionV1]) {
         field(
             out,
             "support-criterion-id",
-            criterion.criterion.semantic_id.as_str(),
+            criterion.criterion.semantic_id().as_str(),
         );
         field(
             out,
-            "support-criterion-definition",
-            criterion.criterion.definition_digest.as_str(),
+            "support-criterion-commitment",
+            criterion.criterion.digest().as_str(),
         );
     }
 }
@@ -1194,12 +1197,17 @@ fn append_support_criteria(out: &mut String, criteria: &[SupportCriterionV1]) {
 fn append_semantics(out: &mut String, label: &str, values: &[SemanticCommitmentV1]) {
     field(out, &format!("{label}-count"), &values.len().to_string());
     for value in values {
-        field(out, &format!("{label}-id"), value.semantic_id.as_str());
-        field(
-            out,
-            &format!("{label}-definition"),
-            value.definition_digest.as_str(),
-        );
+        field(out, &format!("{label}-id"), value.semantic_id().as_str());
+        field(out, &format!("{label}-commitment"), value.digest().as_str());
+    }
+}
+
+fn support_tier_rank(tier: SupportTier) -> u8 {
+    match tier {
+        SupportTier::Structural => 0,
+        SupportTier::Observed => 1,
+        SupportTier::CausallySupported => 2,
+        SupportTier::FunctionallySupported => 3,
     }
 }
 
@@ -1246,4 +1254,24 @@ fn digest_canonical(bytes: &[u8]) -> DigestSha256 {
         write!(&mut encoded, "{byte:02x}").expect("writing to String cannot fail");
     }
     DigestSha256::new(encoded).expect("SHA-256 encoding is always valid")
+}
+
+#[cfg(test)]
+mod convergence_tests {
+    use super::*;
+
+    #[test]
+    fn evidence_ordinal_overflow_fails_closed() {
+        assert_eq!(
+            checked_next_evidence_ordinal(u64::MAX),
+            Err(CampaignError::EvidenceOrdinalOverflow)
+        );
+    }
+
+    #[test]
+    fn canonical_u64_is_minimal_unsigned_decimal_ascii() {
+        assert_eq!(canonical_u64(0), "0");
+        assert_eq!(canonical_u64(7), "7");
+        assert_eq!(canonical_u64(u64::MAX), "18446744073709551615");
+    }
 }
