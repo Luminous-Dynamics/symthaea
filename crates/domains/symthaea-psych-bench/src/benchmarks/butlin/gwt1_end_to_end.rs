@@ -307,7 +307,7 @@ fn changed_specialists(
     Ok(GWT1_SPECIALISTS_V1
         .iter()
         .filter(|id| {
-            perturbation.baseline_outputs.get(*id) != perturbation.perturbed_outputs.get(*id)
+            perturbation.baseline_outputs.get(**id) != perturbation.perturbed_outputs.get(**id)
         })
         .map(|id| (*id).to_string())
         .collect())
