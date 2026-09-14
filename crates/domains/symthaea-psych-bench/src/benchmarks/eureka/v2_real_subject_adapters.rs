@@ -14,7 +14,7 @@
 use symthaea_fep::{FepHeldOutSubject, FepPredictionSessionError, FrozenPredictionCommitment};
 
 use super::consequence::{ConsequencePrediction, PredictionOutcome};
-use super::hidden_world::{PublicAction, PublicValue};
+use super::hidden_world::PublicValue;
 use super::v2_preheldout_custody::{
     V2PreHeldOutCampaignCapability, V2PreHeldOutManifest,
 };
@@ -59,8 +59,6 @@ impl From<V2TargetContractError> for V2RealSubjectAdapterError {
     }
 }
 
-/// Move-only evidence that the sealed production target produced one exact
-/// prediction from one exact prospective ticket under the frozen adapter code.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct V2RealTargetPredictionReceipt {
     prospective_ticket_commitment: [u8; 32],
@@ -97,14 +95,11 @@ impl V2RealTargetPredictionReceipt {
         self.commitment
     }
 
-    /// Ownership-consuming handoff for a separately qualified freeze bridge.
     pub(super) fn into_prediction(self) -> ConsequencePrediction {
         self.prediction
     }
 }
 
-/// Move-only evidence that the exact Calibration-selected comparator produced
-/// one exact prediction from one exact prospective ticket.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct V2RealComparatorPredictionReceipt {
     prospective_ticket_commitment: [u8; 32],
@@ -141,13 +136,11 @@ impl V2RealComparatorPredictionReceipt {
         self.commitment
     }
 
-    /// Ownership-consuming handoff for a separately qualified freeze bridge.
     pub(super) fn into_prediction(self) -> ConsequencePrediction {
         self.prediction
     }
 }
 
-/// Narrow prediction adapter over one sealed FEP subject.
 pub(super) struct V2RealTargetAdapter<'a> {
     subject: &'a FepHeldOutSubject,
     campaign_manifest_commitment: [u8; 32],
@@ -219,7 +212,6 @@ impl<'a> V2RealTargetAdapter<'a> {
     }
 }
 
-/// Narrow prediction adapter over the single comparator selected on Calibration.
 pub(super) struct V2RealComparatorAdapter<'a> {
     subject: &'a V2SelectedComparatorSubject,
     campaign_manifest_commitment: [u8; 32],
@@ -285,8 +277,6 @@ impl<'a> V2RealComparatorAdapter<'a> {
     }
 }
 
-/// One typed binding of both real prediction-only subjects to one exact
-/// non-Clone pre-HeldOut campaign capability and exact adapter semantics.
 pub(super) struct V2RealSubjectAdapterPair<'a> {
     target: V2RealTargetAdapter<'a>,
     comparator: V2RealComparatorAdapter<'a>,
@@ -386,19 +376,12 @@ fn prediction_receipt_commitment(
     let mut bytes = Vec::new();
     encode_bytes(&mut bytes, revision.as_bytes());
     bytes.extend_from_slice(&ticket.commitment());
-    bytes.push(ticket_domain_tag(ticket.domain()));
+    encode_bytes(&mut bytes, ticket.domain().fep_modality().as_bytes());
     bytes.extend_from_slice(&ticket.campaign_manifest_commitment());
     bytes.extend_from_slice(subject_commitment);
     bytes.extend_from_slice(&adapter_source_commitment);
     encode_prediction(&mut bytes, prediction);
     *blake3::hash(&bytes).as_bytes()
-}
-
-fn ticket_domain_tag(domain: V2ProspectiveTicketDomain) -> u8 {
-    match domain {
-        V2ProspectiveTicketDomain::HeldOutEvaluation => 1,
-        V2ProspectiveTicketDomain::DevelopmentPlumbingCanary => 2,
-    }
 }
 
 fn encode_prediction(bytes: &mut Vec<u8>, prediction: &ConsequencePrediction) {
@@ -598,6 +581,7 @@ mod tests {
         assert!(!source.contains("{:?}"));
         assert!(source.contains("action_index(prediction.action)"));
         assert!(source.contains("encode_public_value(bytes, *field)"));
+        assert!(source.contains("ticket.domain().fep_modality().as_bytes()"));
     }
 
     #[test]
