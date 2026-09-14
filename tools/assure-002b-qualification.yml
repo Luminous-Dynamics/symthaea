@@ -1,0 +1,175 @@
+name: ASSURE-002B Convergence Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-assurance-core/**'
+      - 'crates/core/symthaea-assurance-subject/**'
+      - 'crates/core/symthaea-assurance-semantics/**'
+      - 'crates/core/symthaea-assurance-campaign/**'
+      - 'Cargo.lock'
+      - '.github/workflows/assure-002a.yml'
+      - '.github/workflows/assure-002b.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-002b-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CAMPAIGN_PARENT: 8f619541528362a30e7caf432eaf256a64e302e8
+  SEMANTICS_PARENT: a95bbb2d0eac395b1d734e1031f9209240f3b8d6
+
+jobs:
+  qualify:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          python3 --version
+
+      - name: Prove exact two-parent convergence subject
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          PARENTS="$(git show -s --format=%P HEAD)"
+          test "$PARENTS" = "$CAMPAIGN_PARENT $SEMANTICS_PARENT"
+          git diff --exit-code
+
+      - name: Format
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path crates/core/symthaea-assurance-core/Cargo.toml -- --check
+          cargo fmt --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml -- --check
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml -- --check
+
+      - name: Independent shared semantic vectors
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 crates/core/symthaea-assurance-semantics/tools/verify_vectors.py
+
+      - name: Source-contract audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('crates/core/symthaea-assurance-campaign/src/lib.rs').read_text()
+          forbidden = [
+              'pub struct SemanticCommitmentV1',
+              'canonical_semantics(',
+              'evidence_production_statement_digest',
+              'ProducedBeforeOrAtRegistration',
+              'AfterCurrentRegistration',
+              'CurrentRegistrationV1',
+              'resolve_current_registration',
+              'production-ordering',
+              'definition_digest.as_str()',
+              'admitted_count + 1',
+          ]
+          for token in forbidden:
+              if token in text:
+                  raise SystemExit(f'forbidden legacy authority surface remains: {token}')
+          required = [
+              'canonical_semantic_set',
+              'semantic.digest()',
+              'TerminalRegistrationInViewV1',
+              'evidence_commitment_statement_digest',
+              'EvidenceCommitmentTimingClass',
+              'checked_next_evidence_ordinal',
+              'support_tier_rank',
+              'evidence.subject_id()',
+              'evidence.claim_digest()',
+          ]
+          for token in required:
+              if token not in text:
+                  raise SystemExit(f'missing convergence invariant: {token}')
+          print('ASSURE-002B source contract: PASS')
+          PY
+
+      - name: Check and expose lock reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+          git diff -- Cargo.lock || true
+
+      - name: Capture integrated lock evidence
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/assure-002b-lock
+          cp Cargo.lock target/assure-002b-lock/Cargo.lock
+          {
+            printf 'candidate_head=%s\n' "$EXPECTED_HEAD"
+            printf 'campaign_parent=%s\n' "$CAMPAIGN_PARENT"
+            printf 'semantics_parent=%s\n' "$SEMANTICS_PARENT"
+            printf 'lock_sha256=%s\n' "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            rustc --version
+            cargo --version
+            python3 --version
+          } > target/assure-002b-lock/MANIFEST.txt
+          cat target/assure-002b-lock/MANIFEST.txt
+
+      - name: Upload integrated lock evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-002b-lock-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/assure-002b-lock/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Test generic core
+        run: cargo test --manifest-path crates/core/symthaea-assurance-core/Cargo.toml
+
+      - name: Test shared semantics
+        run: cargo test --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml
+
+      - name: Test integrated campaign
+        run: cargo test --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+
+      - name: Strict Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --manifest-path crates/core/symthaea-assurance-core/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --all-targets -- -D warnings
+
+      - name: Require committed lock parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
+
+      - name: Prove tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
