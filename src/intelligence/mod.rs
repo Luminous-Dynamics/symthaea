@@ -22,6 +22,7 @@
 //! - Live measurement-only shadowing of the production meta-reasoner through canonical V2
 //! - Evidence-backed objective intervals that preserve unknown axes instead of fabricating neutrality
 //! - Evidence-seeking V3 planning with Select / NeedEvidence / Abstain outcomes
+//! - Live primitive identity recovery with explicit objective-evidence gaps
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -38,6 +39,7 @@ pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_evidence_seeking;
 pub mod reasoning_kernel;
 pub mod reasoning_kernel_v2;
+pub mod reasoning_live_primitive_evidence;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
@@ -103,6 +105,11 @@ pub use reasoning_kernel_v2::{
     CanonicalReasoningDecisionV2, CanonicalReasoningInputV2, CanonicalReasoningKernelV2,
     CanonicalSubjectCheckpointV2, ReasoningKernelV2Error,
     CANONICAL_REASONING_BASELINE_PLASTICITY, CANONICAL_REASONING_KERNEL_V2_VERSION,
+};
+pub use reasoning_live_primitive_evidence::{
+    plan_live_primitive_evidence, recover_live_primitive_evidence, LiveCandidateIdentityAudit,
+    LivePrimitiveEvidenceError, LivePrimitiveEvidenceProfile, LivePrimitiveEvidenceReport,
+    RegistryPrimitiveMetadata, LIVE_PRIMITIVE_EVIDENCE_BRIDGE_VERSION,
 };
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
