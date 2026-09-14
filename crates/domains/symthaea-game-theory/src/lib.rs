@@ -11,8 +11,11 @@
 //!
 //! IG-001 adds [`NPlayerGame`], a validated dependency-free N-player surface
 //! with canonical pure-profile indexing, exact unilateral-deviation witnesses,
-//! regret, epsilon-Nash checks and pure-Nash enumeration. It does not model
-//! coalitions, bounded rationality, identities, evidence or governance policy.
+//! regret, epsilon-Nash checks and pure-Nash enumeration.
+//!
+//! IG-002 adds bounded coalition-deviation search with explicit search bounds,
+//! termination reasons and exact witnesses. It deliberately does not claim
+//! coalition-proof Nash equilibrium or strong-Nash certification.
 //!
 //! This crate complements `symthaea-economics` and `symthaea-social-choice`
 //! without depending on `symthaea-core`.
@@ -30,8 +33,13 @@
 //! assert_eq!(g.pure_nash_equilibria(), vec![(1, 1)]);
 //! ```
 
+mod coalition;
 mod n_player;
 
+pub use coalition::{
+    BoundedCoalitionDeviationReport, CoalitionDeviationWitness, CoalitionImprovementCriterion,
+    CoalitionSearchTermination,
+};
 pub use n_player::{NPlayerGame, UnilateralDeviation};
 
 /// A two-player normal-form game.
