@@ -6,6 +6,7 @@ on:
       - ".github/workflows/butlin-gwt1-final-consumer-contract.yml"
       - "crates/domains/symthaea-psych-bench/Cargo.toml"
       - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs"
       - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
   workflow_dispatch:
 
@@ -34,6 +35,7 @@ jobs:
           root = pathlib.Path.cwd()
           manifest = (root / "crates/domains/symthaea-psych-bench/Cargo.toml").read_text()
           source = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs").read_text()
+          projection = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs").read_text()
           mod = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs").read_text()
 
           assert 'trusted-resolution-consumer = ["trusted-resolution-authority"]' in manifest
@@ -51,6 +53,17 @@ jobs:
           assert "InternalPromotionVerificationMismatch" in source
           assert "EmptyRecomputedPromotionVerification" in source
           assert "classify_gwt1_evidence_disposition_v1" in source
+
+          assert "pub struct Gwt1VerifiedReportProjectionV1" in projection
+          projection_prefix = projection.split("pub struct Gwt1VerifiedReportProjectionV1", 1)[0].split("#[derive", 1)[-1]
+          assert "Serialize" in projection_prefix
+          assert "Deserialize" not in projection_prefix
+          assert "pub fn project_gwt1_verified_report_v1" in projection
+          assert "verified: &VerifiedGwt1ResolvedArtifactV1" in projection
+          assert "tier_ceiling: SupportTier::CausallySupported" in projection
+          assert "FunctionallySupported" not in projection
+          struct_body = projection.split("pub struct Gwt1VerifiedReportProjectionV1 {", 1)[1].split("}", 1)[0]
+          assert not re.search(r"^\s*pub\s+\w+\s*:", struct_body, re.MULTILINE)
 
           forbidden = [
               re.compile(r"attestation_verified\s*:\s*bool"),
@@ -71,7 +84,8 @@ jobs:
         run: |
           set -euo pipefail
           rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs
+            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs
 
       - name: Compile trusted consumer feature surface
         shell: bash
@@ -82,7 +96,7 @@ jobs:
           set -euo pipefail
           cargo check --locked -p symthaea-psych-bench --features trusted-resolution-consumer
 
-      - name: Run consumer reconstruction unit tests
+      - name: Run consumer reconstruction and projection unit tests
         shell: bash
         env:
           CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-contract-cargo-home
@@ -92,3 +106,6 @@ jobs:
           cargo test --locked -p symthaea-psych-bench \
             --features trusted-resolution-consumer \
             gwt1_verified_final_artifact::tests
+          cargo test --locked -p symthaea-psych-bench \
+            --features trusted-resolution-consumer \
+            gwt1_verified_report_projection::tests
