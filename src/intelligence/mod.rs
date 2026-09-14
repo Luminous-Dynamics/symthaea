@@ -27,7 +27,7 @@
 //! - Direct ActivePrimitive evidence preservation with HDC identity auditing
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 //! - Candidate-specific typed epistemic grounding bound to exact primitive identity
-//! - Verified reasoning-chain local-transition history isolated from legacy feedback aggregates
+//! - Verified reasoning-chain transition history isolated from legacy feedback aggregates
 //! - Exact live candidate identity binding without changing legacy scoring inputs
 //! - Matched transition-geometry diagnostics that do not mutate canonical objective evidence
 
@@ -47,7 +47,6 @@ pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_evidence_seeking;
 pub mod reasoning_evidence_session;
-pub mod reasoning_integration_history;
 pub mod reasoning_kernel;
 pub mod reasoning_kernel_v2;
 pub mod reasoning_live_primitive_evidence;
@@ -60,6 +59,7 @@ pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
 pub mod reasoning_transition_geometry_shadow;
+pub mod reasoning_transition_history;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
@@ -126,13 +126,6 @@ pub use reasoning_evidence_session::{
     EvidenceAcquisitionSession, EvidenceAcquisitionSnapshot,
     EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION,
 };
-pub use reasoning_integration_history::{
-    apply_verified_integration_history, plan_active_primitive_with_verified_integration,
-    AppliedVerifiedIntegrationEvidence, VerifiedChainAdmission, VerifiedIntegrationApplicationReport,
-    VerifiedIntegrationSummary, VerifiedReasoningHistory, VerifiedReasoningHistoryError,
-    VerifiedReasoningHistoryKey, LOCAL_TRANSITION_CONTRIBUTION_SCALE,
-    VERIFIED_REASONING_HISTORY_VERSION,
-};
 pub use reasoning_kernel::{
     CanonicalReasoningDecision, CanonicalReasoningInput, CanonicalReasoningKernel,
     CanonicalSubjectCheckpoint, ReasoningKernelError, BASELINE_PLASTICITY_MULTIPLIER,
@@ -191,10 +184,16 @@ pub use reasoning_shadow_meta::{
 };
 pub use reasoning_transition_geometry_shadow::{
     measure_transition_geometry, CandidateIdentityBindingReport, CandidateTransitionGeometry,
-    TransitionGeometryError, TransitionGeometryReport,
-    TransitionGeometryShadowObservation, TransitionGeometryShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner,
-    TransitionGeometryShadowStats, TransitionOperatorObservation,
-    LIVE_META_IDENTITY_BINDING_VERSION, TRANSITION_GEOMETRY_PANEL,
-    TRANSITION_GEOMETRY_PANEL_VERSION, TRANSITION_GEOMETRY_SCALE,
+    TransitionGeometryError, TransitionGeometryReport, TransitionGeometryShadowObservation,
+    TransitionGeometryShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner,
+    TransitionGeometryShadowStats, TransitionOperatorObservation, LIVE_META_IDENTITY_BINDING_VERSION,
+    TRANSITION_GEOMETRY_PANEL, TRANSITION_GEOMETRY_PANEL_VERSION, TRANSITION_GEOMETRY_SCALE,
     TRANSITION_GEOMETRY_SHADOW_VERSION,
+};
+pub use reasoning_transition_history::{
+    inspect_active_primitive_transition_history, inspect_verified_transition_history,
+    ActiveTransitionHistoryProfile, ActiveTransitionHistoryReport, TransitionMeanEnvelope,
+    VerifiedChainAdmission, VerifiedTransitionHistory, VerifiedTransitionHistoryError,
+    VerifiedTransitionHistoryKey, VerifiedTransitionSummary, LOCAL_TRANSITION_CONTRIBUTION_SCALE,
+    VERIFIED_TRANSITION_HISTORY_VERSION,
 };
