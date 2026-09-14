@@ -42,6 +42,7 @@ pub mod graph;
 pub mod hdc_retrieval;
 pub mod llm_extraction;
 pub mod manager;
+pub mod matter_observatory;
 pub mod persistence;
 pub mod reasoning_context;
 #[cfg(feature = "self_schema")]
