@@ -1,0 +1,136 @@
+name: PIE-002I Evidence Applicability Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002i-applicability-4f61d7b1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-002I evidence applicability oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SUBJECT_SHA: 4f61d7b1d079c1d5815f01f92cf65036303b747d
+      PARENT_SHA: 391619e9822ad5367dc80a538a9cfa76620366e4
+      SUBJECT_TREE: 7c9c9bfb6a048a0df4b1b2463803f44aeb47bcb4
+      ORACLE: scripts/pie-evidence-applicability-oracle.py
+      EVIDENCE: docs/release/evidence/PIE_002I_EVIDENCE_APPLICABILITY_ORACLE.md
+
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        id: identity
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "$EVIDENCE"
+          test "${files[1]}" = "$ORACLE"
+
+      - name: Record subject file digests
+        id: digests
+        continue-on-error: true
+        run: sha256sum "$ORACLE" "$EVIDENCE" | tee pie-002i-subject-sha256.txt
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13.5
+
+      - name: Record Python identity
+        id: python_identity
+        continue-on-error: true
+        run: test "$(python --version)" = "Python 3.13.5"
+
+      - name: Syntax compile
+        id: syntax
+        continue-on-error: true
+        run: python -m py_compile "$ORACLE"
+
+      - name: Run applicability self-test
+        id: selftest
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          output="$(python "$ORACLE" --self-test)"
+          printf '%s\n' "$output"
+          test "$output" = "ok"
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          ORACLE_SHA="$(sha256sum "$ORACLE" | cut -d' ' -f1)"
+          EVIDENCE_SHA="$(sha256sum "$EVIDENCE" | cut -d' ' -f1)"
+          cat > pie-002i-applicability-qualification.json <<EOF
+          {
+            "program": "PIE-002I",
+            "theorem": "per-evidence evidence-to-study applicability resolution",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "subject_tree": "$SUBJECT_TREE",
+            "python": "3.13.5",
+            "oracle_sha256": "$ORACLE_SHA",
+            "evidence_doc_sha256": "$EVIDENCE_SHA",
+            "statuses": ["Applicable", "Inapplicable", "Indeterminate"],
+            "precedence": "any exact mismatch -> Inapplicable; else any unresolved material dimension -> Indeterminate; else Applicable",
+            "scope": "explicit study scope + explicit per-evidence scope + explicit material-dimension profile; per-evidence receipts preserve exact matches, declared generalizations, mismatches, unresolved dimensions, evidence class, fact key, and evidence identity",
+            "non_claims": [
+              "truth",
+              "source authenticity",
+              "source independence",
+              "calibration validity",
+              "numerical uncertainty adequacy",
+              "freshness or trusted current time",
+              "persistence or authority currentness",
+              "general lexical canonicality",
+              "utility feasibility",
+              "storage dispatch",
+              "thermodynamic closure",
+              "equipment qualification",
+              "economics",
+              "execution authority"
+            ],
+            "gates": {
+              "identity_scope": "${{ steps.identity.outcome }}",
+              "file_digests": "${{ steps.digests.outcome }}",
+              "python_identity": "${{ steps.python_identity.outcome }}",
+              "syntax_compile": "${{ steps.syntax.outcome }}",
+              "self_test": "${{ steps.selftest.outcome }}"
+            }
+          }
+          EOF
+          cat pie-002i-applicability-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002i-evidence-applicability-qualification
+          path: |
+            pie-002i-applicability-qualification.json
+            pie-002i-subject-sha256.txt
+          if-no-files-found: error
+
+      - name: Enforce all oracle gates
+        if: always()
+        run: |
+          test "${{ steps.identity.outcome }}" = success
+          test "${{ steps.digests.outcome }}" = success
+          test "${{ steps.python_identity.outcome }}" = success
+          test "${{ steps.syntax.outcome }}" = success
+          test "${{ steps.selftest.outcome }}" = success
