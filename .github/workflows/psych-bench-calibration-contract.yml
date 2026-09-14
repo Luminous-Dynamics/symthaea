@@ -37,7 +37,7 @@ jobs:
           test "$actual" = "$expected"
           test -z "$(git status --porcelain)"
           echo "sha=$actual" >> "$GITHUB_OUTPUT"
-          printf 'qualified_subject=%s\n' "$actual" | tee qualified-subject.txt
+          printf 'qualified_subject=%s\n' "$actual"
 
       - name: Install pinned Rust toolchain
         shell: bash
