@@ -11,6 +11,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: paradox-001-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   qualify:
     runs-on: ubuntu-24.04
@@ -18,6 +25,7 @@ jobs:
       - name: Checkout exact subject
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.SUBJECT_SHA }}
           fetch-depth: 2
 
       - name: Install pinned Rust
@@ -30,11 +38,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
-          git diff --exit-code
-          git diff --cached --exit-code
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
           test -f docs/research/PARADOX_000_STRUCTURED_INCONSISTENCY_PREREGISTRATION.md
           test -f crates/research/symthaea-structured-inconsistency/Cargo.toml
+          test -f crates/research/symthaea-structured-inconsistency/Cargo.lock
+          test -f crates/research/symthaea-structured-inconsistency/rust-toolchain.toml
           test -f crates/research/symthaea-structured-inconsistency/src/lib.rs
 
       - name: Format
@@ -63,6 +72,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git diff --exit-code
-          git diff --cached --exit-code
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
           test -z "$(git status --porcelain --untracked-files=all)"
