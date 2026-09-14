@@ -485,3 +485,35 @@ fn invalidation_returns_a_new_result_and_preserves_original() {
     ));
     assert!(result.invalidated_by(&id("unregistered-change")).is_none());
 }
+
+#[test]
+fn evidence_context_accessors_preserve_qualified_wire_identity() {
+    let subject = subject();
+    let claim = claim(&subject);
+    let observation = artifact(
+        "observation",
+        &subject,
+        &claim,
+        EvidenceKind::Observation,
+        None,
+        'c',
+    );
+    let expected_subject = subject.subject_id();
+    let expected_claim = claim.digest();
+    let evidence_digest = observation.digest();
+
+    assert_eq!(
+        expected_subject.as_str(),
+        "f1d6799d2aa3d718639a298f06fd7318efefd1b798d2e241f4dd154351f35786"
+    );
+    assert_eq!(
+        expected_claim.as_str(),
+        "3530e01aebb221303404012e1b490d556066fa0b029f0e723f2dea5e8b5ab8c8"
+    );
+    assert_eq!(observation.subject_id(), &expected_subject);
+    assert_eq!(observation.claim_digest(), &expected_claim);
+    assert_eq!(
+        evidence_digest.as_str(),
+        "802cebd6e4c713391f8aa73c262fc8f48cf0abe2f7fcf216f2c8d2d44c6bcc7f"
+    );
+}

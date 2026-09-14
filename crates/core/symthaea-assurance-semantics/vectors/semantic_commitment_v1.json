@@ -1,0 +1,35 @@
+{
+  "schema": "symthaea.assurance.semantic-commitment.v1",
+  "vectors": [
+    {
+      "name": "matched-sham-ascii",
+      "semantic_id": "matched-sham",
+      "definition_schema_id": "symthaea.assurance.semantic-definition.canonical-text-v1",
+      "definition_schema_specification_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_semantic_id_utf8_len": 12,
+      "expected_definition_schema_id_utf8_len": 56,
+      "expected_digest": "3a510b215853c77285e39c95b6ab45c0d816370e17e14ccda8337110a790f1ba"
+    },
+    {
+      "name": "unicode-nfc",
+      "semantic_id": "café",
+      "definition_schema_id": "schema-β",
+      "definition_schema_specification_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_semantic_id_utf8_len": 5,
+      "expected_definition_schema_id_utf8_len": 9,
+      "expected_digest": "34279ba0da18eed81c5819073ec7b62e906e9001a65920028ba7a7ed7668d11d"
+    },
+    {
+      "name": "unicode-nfd",
+      "semantic_id": "café",
+      "definition_schema_id": "schema-β",
+      "definition_schema_specification_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+      "definition_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_semantic_id_utf8_len": 6,
+      "expected_definition_schema_id_utf8_len": 9,
+      "expected_digest": "1f5877af326b1f5d33946cc144e8b3d97d36b1e0fdf858f70e711d76c1a391e7"
+    }
+  ]
+}
