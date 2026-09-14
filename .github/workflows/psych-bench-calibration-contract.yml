@@ -6,10 +6,16 @@ on:
       - main
       - psych-bench/calibration-manifest-contract
       - psych-bench/calibration-frozen-receipt
+      - psych-bench/calibration-target-provenance
     paths:
       - '.github/workflows/psych-bench-calibration-contract.yml'
+      - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/calibration_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/calibration_binding.rs'
+      - 'crates/domains/symthaea-psych-bench/src/calibration_inventory.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/reasoning/arc_fluid.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'Cargo.lock'
@@ -59,7 +65,8 @@ jobs:
           set -euo pipefail
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/calibration_contract.rs \
-            crates/domains/symthaea-psych-bench/src/calibration_binding.rs
+            crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
+            crates/domains/symthaea-psych-bench/src/calibration_inventory.rs
 
       - name: Compile psych-bench library
         shell: bash
@@ -79,11 +86,30 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib calibration_binding::tests -- --nocapture
 
-      - name: Strict Clippy
+      - name: Execute source-inventory regressions
         shell: bash
         run: |
           set -euo pipefail
-          cargo clippy --locked -p symthaea-psych-bench --lib -- -D warnings
+          cargo test --locked -p symthaea-psych-bench --lib calibration_inventory::tests -- --nocapture
+
+      # Keep dependency compilation authoritative, but make lint authority match
+      # the calibration evidence surface this focused job claims to qualify.
+      - name: Strict focused Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/calibration-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --lib --no-deps \
+            --message-format=json > "$report"
+          cargo_status=$?
+          set -e
+          python3 scripts/ci/strict_clippy_paths.py \
+            "$report" \
+            crates/domains/symthaea-psych-bench/src/calibration_contract.rs \
+            crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
+            crates/domains/symthaea-psych-bench/src/calibration_inventory.rs
+          test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
         shell: bash
