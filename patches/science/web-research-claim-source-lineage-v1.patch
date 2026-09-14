@@ -1,0 +1,209 @@
+diff --git a/src/web_research/researcher.rs b/src/web_research/researcher.rs
+--- a/src/web_research/researcher.rs
++++ b/src/web_research/researcher.rs
+@@ -52,7 +52,7 @@ impl WebResearcher {
+         // Fetch and extract from multiple sources
+         let mut all_sources: Vec<SourceEvidence> = Vec::new();
+-        let mut all_claims: Vec<String> = Vec::new();
++        let mut all_claims: Vec<(String, HashSet<String>)> = Vec::new();
+         let mut primary_content = String::new();
+         let mut primary_title = String::new();
+ 
+@@ -82,14 +82,26 @@ impl WebResearcher {
+                                     .classify_source(url, extraction.metadata.content_type),
+                                 relevant_text: extraction.summary.clone(),
+-                                supports: Some(true), // Will be refined by verifier
++                                // Source quality/relevance is not a claim stance. The
++                                // exact source(s) from which each claim was extracted
++                                // are bound below when that claim is verified.
++                                supports: None,
+                                 similarity: self.calculate_similarity(&extraction.body_text, query),
+                                 credibility: extraction.quality,
+                             };
+ 
+                             all_sources.push(source);
+-                            all_claims.extend(extraction.claims);
++                            for claim in &extraction.claims {
++                                if let Some((_, asserting_urls)) = all_claims
++                                    .iter_mut()
++                                    .find(|(existing, _)| existing == claim)
++                                {
++                                    asserting_urls.insert(url.clone());
++                                } else {
++                                    let mut asserting_urls = HashSet::new();
++                                    asserting_urls.insert(url.clone());
++                                    all_claims.push((claim.clone(), asserting_urls));
++                                }
++                            }
+ 
+                             if primary_content.is_empty() && extraction.quality > 0.5 {
+                                 primary_content = extraction.body_text;
+@@ -111,7 +123,7 @@ impl WebResearcher {
+ 
+         // Verify claims
+         let mut verified_claims: Vec<VerifiedClaim> = Vec::new();
+-        for claim in all_claims.iter().take(10) {
++        for (claim, asserting_urls) in all_claims.iter().take(10) {
+             // Hardened script/boilerplate filter matrix
+             let claim_lower = claim.to_lowercase();
+             if claim_lower.contains("@type")
+@@ -126,8 +138,16 @@ impl WebResearcher {
+             {
+                 continue;
+             }
++
++            let claim_sources = all_sources
++                .iter()
++                .cloned()
++                .map(|mut source| {
++                    source.supports = asserting_urls.contains(&source.url).then_some(true);
++                    source
++                })
++                .collect();
+             let context = VerificationContext {
+-                sources: all_sources.clone(),
++                sources: claim_sources,
+                 query: query.to_string(),
+                 domain: self.detect_domain(query),
+             };
+diff --git a/src/web_research/verifier.rs b/src/web_research/verifier.rs
+--- a/src/web_research/verifier.rs
++++ b/src/web_research/verifier.rs
+@@ -7,7 +7,7 @@
+ //! epistemically verified before being presented.
+ 
+ use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
+-use std::collections::HashMap;
++use std::collections::{HashMap, HashSet};
+ 
+ /// Configuration for the epistemic verifier
+ #[derive(Debug, Clone)]
+@@ -186,17 +186,43 @@ impl EpistemicVerifier {
+     /// Verify a claim from research results
+     pub fn verify_from_results(&self, claim: &str, results: &[WebResearchResult]) -> VerifiedClaim {
+-        // Build verification context from results
+-        let sources: Vec<SourceEvidence> = results
+-            .iter()
+-            .map(|r| SourceEvidence {
+-                url: r.url.clone(),
+-                domain: self.extract_domain(&r.url),
+-                source_type: r.source_type,
+-                relevant_text: r.summary.clone(),
+-                supports: Some(r.confidence > 0.5),
+-                similarity: r.relevance,
+-                credibility: r.confidence,
+-            })
+-            .collect();
++        // Reconstruct claim stance only from explicit verified-claim lineage.
++        // Result-level confidence/relevance describes the research result; it
++        // does not tell us whether that result supports this particular claim.
++        let mut sources: Vec<SourceEvidence> = Vec::new();
++        let mut seen: HashSet<(String, bool)> = HashSet::new();
++
++        for result in results {
++            for verified in &result.claims {
++                if !verified.text.trim().eq_ignore_ascii_case(claim.trim()) {
++                    continue;
++                }
++
++                for url in &verified.supporting_sources {
++                    if seen.insert((url.clone(), true)) {
++                        sources.push(SourceEvidence {
++                            url: url.clone(),
++                            domain: self.extract_domain(url),
++                            source_type: result.source_type,
++                            relevant_text: verified.text.clone(),
++                            supports: Some(true),
++                            similarity: 1.0,
++                            // No per-source credibility is retained by
++                            // WebResearchResult; stay neutral rather than
++                            // laundering claim/result confidence into source trust.
++                            credibility: 0.5,
++                        });
++                    }
++                }
++
++                for url in &verified.contradicting_sources {
++                    if seen.insert((url.clone(), false)) {
++                        sources.push(SourceEvidence {
++                            url: url.clone(),
++                            domain: self.extract_domain(url),
++                            source_type: result.source_type,
++                            relevant_text: verified.text.clone(),
++                            supports: Some(false),
++                            similarity: 1.0,
++                            credibility: 0.5,
++                        });
++                    }
++                }
++            }
++        }
+ 
+         let context = VerificationContext {
+             sources,
+@@ -386,4 +412,66 @@ mod tests {
+         // Should be low confidence or contradicted due to conflicting sources
+         assert!(result.confidence < 0.7);
+     }
++
++    #[test]
++    fn result_confidence_is_not_claim_support() {
++        let verifier = EpistemicVerifier::new();
++        let result = WebResearchResult {
++            url: "https://example.org/high-confidence-result".to_string(),
++            summary: "Highly relevant material".to_string(),
++            relevance: 1.0,
++            confidence: 0.99,
++            ..WebResearchResult::default()
++        };
++
++        let verified = verifier.verify_from_results("A specific claim", &[result]);
++        assert_eq!(verified.status, EpistemicStatus::InsufficientEvidence);
++        assert!(verified.supporting_sources.is_empty());
++        assert!(verified.contradicting_sources.is_empty());
++    }
++
++    #[test]
++    fn explicit_claim_lineage_reconstructs_support() {
++        let verifier = EpistemicVerifier::new();
++        let result = WebResearchResult {
++            source_type: ResearchSource::Academic,
++            claims: vec![VerifiedClaim {
++                text: "A specific claim".to_string(),
++                status: EpistemicStatus::LowConfidence,
++                confidence: 0.4,
++                supporting_sources: vec!["https://example.org/paper".to_string()],
++                contradicting_sources: vec![],
++                hedge: String::new(),
++            }],
++            ..WebResearchResult::default()
++        };
++
++        let verified = verifier.verify_from_results("A specific claim", &[result]);
++        assert_eq!(verified.supporting_sources, vec!["https://example.org/paper"]);
++        assert_eq!(verified.status, EpistemicStatus::LowConfidence);
++    }
++
++    #[test]
++    fn explicit_claim_lineage_reconstructs_contradiction() {
++        let verifier = EpistemicVerifier::new();
++        let result = WebResearchResult {
++            claims: vec![VerifiedClaim {
++                text: "A specific claim".to_string(),
++                status: EpistemicStatus::Contradicted,
++                confidence: 0.2,
++                supporting_sources: vec![],
++                contradicting_sources: vec!["https://example.org/counterevidence".to_string()],
++                hedge: String::new(),
++            }],
++            ..WebResearchResult::default()
++        };
++
++        let verified = verifier.verify_from_results("A specific claim", &[result]);
++        assert_eq!(
++            verified.contradicting_sources,
++            vec!["https://example.org/counterevidence"]
++        );
++        assert_eq!(verified.status, EpistemicStatus::Contradicted);
++    }
+ }
