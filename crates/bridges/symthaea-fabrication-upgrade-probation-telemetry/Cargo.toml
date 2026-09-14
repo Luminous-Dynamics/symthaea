@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-fabrication-upgrade-probation-telemetry"
+version = "0.1.0"
+edition = "2024"
+description = "Exact telemetry evidence binding for clock-governed upgrade probation"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-upgrade-probation-authority = { path = "../symthaea-fabrication-upgrade-probation-authority" }
+serde = { workspace = true }
+serde_json = { workspace = true }
