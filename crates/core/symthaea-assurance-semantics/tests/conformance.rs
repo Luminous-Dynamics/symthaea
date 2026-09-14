@@ -107,6 +107,14 @@ fn canonical_lengths_are_utf8_byte_lengths() {
 }
 
 #[test]
+fn unicode_normalization_is_not_implicit() {
+    let composed = commitment("café", "canonical-text-v1", '1', 'a');
+    let decomposed = commitment("cafe\u{301}", "canonical-text-v1", '1', 'a');
+    assert_ne!(composed.canonical_bytes(), decomposed.canonical_bytes());
+    assert_ne!(composed.digest(), decomposed.digest());
+}
+
+#[test]
 fn independent_canonical_golden_vector_is_stable() {
     let commitment = commitment(
         "matched-sham",
