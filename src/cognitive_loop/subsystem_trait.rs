@@ -1373,4 +1373,197 @@ mod tests {
         assert_eq!(sub.fire_count, 1);
         assert!(!health.is_faulted("mock"));
     }
+
+    /// SPINE-000B-P1: Rust ↔ independent Python oracle golden equivalence over 0/1/2/N contributors (Issue #3036).
+    ///
+    /// This test verifies exact-bit equivalences between the Rust `OutputCollector` and the independent Python oracle
+    /// across 0, 1, 2, and N contributor cases, including leave-one-out counterfactuals, channel changes, unique flags,
+    /// and explicit floating-point IEEE-754 bit preservation.
+    #[test]
+    fn test_spine_000b_p1_golden_equivalence() {
+        // 1. Run python oracle self-test if python3 is available.
+        if let Ok(status) = std::process::Command::new("python3")
+            .args(["scripts/spine_000b_influence_oracle.py", "--self-test"])
+            .status()
+        {
+            assert!(status.success(), "Python influence oracle self-test failed");
+        }
+
+        // 2. Load golden fixtures
+        let fixture_path = std::path::Path::new("tests/fixtures/spine_000b_golden_fixtures.json");
+        assert!(
+            fixture_path.exists(),
+            "Golden fixture file missing at tests/fixtures/spine_000b_golden_fixtures.json"
+        );
+        let fixture_str = std::fs::read_to_string(fixture_path).expect("failed reading golden fixtures");
+        let fixtures: serde_json::Value = serde_json::from_str(&fixture_str).expect("failed parsing golden fixture JSON");
+        let cases = fixtures.as_array().expect("fixtures must be a JSON array");
+
+        assert_eq!(cases.len(), 8, "Expected 8 golden fixture cases (0, 1, 2, N contributors)");
+
+        for case in cases {
+            let case_name = case["name"].as_str().unwrap();
+            let input_proposals = case["input_proposals"].as_array().unwrap();
+
+            // Build Rust collector
+            let mut collector = OutputCollector::new();
+            for p in input_proposals {
+                let name_raw = p["subsystem_name"].as_str().unwrap();
+                let name: &'static str = Box::leak(name_raw.to_string().into_boxed_str());
+                let conf = p.get("confidence_delta").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let lr = p.get("lr_modulation").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                let exp = p.get("exploration_delta").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                let ar = p.get("arousal_delta").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let val = p.get("valence_delta").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let flags = p.get("flags").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+
+                collector.record(
+                    name,
+                    SubsystemOutput {
+                        confidence_delta: conf,
+                        lr_modulation: lr,
+                        exploration_delta: exp,
+                        arousal_delta: ar,
+                        valence_delta: val,
+                        flags,
+                        _reserved: 0,
+                    },
+                );
+            }
+
+            let integrated = collector.integrate();
+
+            // Check against expected_integrated exact bits
+            let exp_integrated = &case["expected_integrated"];
+            let exp_bits = &exp_integrated["exact_bits"];
+
+            assert_eq!(
+                integrated.n_contributors,
+                exp_bits["n_contributors"].as_u64().unwrap() as usize,
+                "[{}] n_contributors mismatch", case_name
+            );
+            assert_eq!(
+                integrated.confidence_delta.to_bits(),
+                exp_bits["confidence_delta_bits"].as_u64().unwrap(),
+                "[{}] confidence_delta_bits mismatch", case_name
+            );
+            assert_eq!(
+                integrated.lr_modulation.to_bits(),
+                exp_bits["lr_modulation_bits"].as_u64().unwrap(),
+                "[{}] lr_modulation_bits mismatch", case_name
+            );
+            assert_eq!(
+                integrated.exploration_delta.to_bits(),
+                exp_bits["exploration_delta_bits"].as_u64().unwrap(),
+                "[{}] exploration_delta_bits mismatch", case_name
+            );
+            assert_eq!(
+                integrated.arousal_delta.to_bits() as u64,
+                exp_bits["arousal_delta_bits"].as_u64().unwrap(),
+                "[{}] arousal_delta_bits mismatch", case_name
+            );
+            assert_eq!(
+                integrated.valence_delta.to_bits() as u64,
+                exp_bits["valence_delta_bits"].as_u64().unwrap(),
+                "[{}] valence_delta_bits mismatch", case_name
+            );
+            assert_eq!(
+                integrated.flags,
+                exp_bits["flags"].as_u64().unwrap() as u32,
+                "[{}] flags mismatch", case_name
+            );
+
+            // Compute leave-one-out receipts in Rust
+            let exp_receipts = case["expected_report"]["receipts"].as_array().unwrap();
+            
+            // Collect proposals in predictable name-sorted order matching Python oracle report
+            let mut sorted_names: Vec<String> = input_proposals
+                .iter()
+                .map(|p| p["subsystem_name"].as_str().unwrap().to_string())
+                .collect();
+            sorted_names.sort();
+
+            for (idx, target_name) in sorted_names.iter().enumerate() {
+                let exp_receipt = &exp_receipts[idx];
+                assert_eq!(
+                    target_name,
+                    exp_receipt["subsystem_name"].as_str().unwrap(),
+                    "[{}] receipt subsystem order mismatch", case_name
+                );
+
+                // Build collector without target_name
+                let mut collector_without = OutputCollector::new();
+                for p in input_proposals {
+                    let name_raw = p["subsystem_name"].as_str().unwrap();
+                    if name_raw == target_name {
+                        continue;
+                    }
+                    let name: &'static str = Box::leak(name_raw.to_string().into_boxed_str());
+                    let conf = p.get("confidence_delta").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let lr = p.get("lr_modulation").and_then(|v| v.as_f64()).unwrap_or(1.0);
+                    let exp = p.get("exploration_delta").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let ar = p.get("arousal_delta").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                    let val = p.get("valence_delta").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                    let flags = p.get("flags").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+
+                    collector_without.record(
+                        name,
+                        SubsystemOutput {
+                            confidence_delta: conf,
+                            lr_modulation: lr,
+                            exploration_delta: exp,
+                            arousal_delta: ar,
+                            valence_delta: val,
+                            flags,
+                            _reserved: 0,
+                        },
+                    );
+                }
+
+                let integrated_without = collector_without.integrate();
+
+                let mut changed_channels = Vec::new();
+                if integrated.confidence_delta.to_bits() != integrated_without.confidence_delta.to_bits() {
+                    changed_channels.push("confidence_delta_bits");
+                }
+                if integrated.lr_modulation.to_bits() != integrated_without.lr_modulation.to_bits() {
+                    changed_channels.push("lr_modulation_bits");
+                }
+                if integrated.exploration_delta.to_bits() != integrated_without.exploration_delta.to_bits() {
+                    changed_channels.push("exploration_delta_bits");
+                }
+                if integrated.arousal_delta.to_bits() != integrated_without.arousal_delta.to_bits() {
+                    changed_channels.push("arousal_delta_bits");
+                }
+                if integrated.valence_delta.to_bits() != integrated_without.valence_delta.to_bits() {
+                    changed_channels.push("valence_delta_bits");
+                }
+
+                let unique_flags = integrated.flags & !integrated_without.flags;
+                let integration_changed = !changed_channels.is_empty() || unique_flags != 0;
+
+                let exp_changed_channels: Vec<&str> = exp_receipt["changed_channels"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap())
+                    .collect();
+
+                assert_eq!(
+                    changed_channels, exp_changed_channels,
+                    "[{}/{}] changed_channels mismatch", case_name, target_name
+                );
+                assert_eq!(
+                    unique_flags,
+                    exp_receipt["uniquely_contributed_flags"].as_u64().unwrap() as u32,
+                    "[{}/{}] uniquely_contributed_flags mismatch", case_name, target_name
+                );
+                assert_eq!(
+                    integration_changed,
+                    exp_receipt["integration_changed"].as_bool().unwrap(),
+                    "[{}/{}] integration_changed mismatch", case_name, target_name
+                );
+            }
+        }
+    }
 }
