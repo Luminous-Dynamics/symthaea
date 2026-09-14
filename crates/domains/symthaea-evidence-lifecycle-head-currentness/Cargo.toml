@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-evidence-lifecycle-head-currentness"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Signed current-head and anti-rollback assurance for verifier-profile lifecycle evidence"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["safety", "assurance", "currentness", "lifecycle"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+symthaea-evidence-independence-lifecycle = { path = "../symthaea-evidence-independence-lifecycle" }
+
+[dev-dependencies]
+symthaea-evidence-independence-provenance = { path = "../symthaea-evidence-independence-provenance" }
+symthaea-evidence-verifier-diversity = { path = "../symthaea-evidence-verifier-diversity" }
