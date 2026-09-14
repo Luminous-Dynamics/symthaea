@@ -99,6 +99,14 @@ fn canonical_semantic_set_orders_by_semantic_id_only() {
 }
 
 #[test]
+fn canonical_lengths_are_utf8_byte_lengths() {
+    let value = commitment("café", "schema-β", '1', 'a');
+    let canonical = String::from_utf8(value.canonical_bytes()).unwrap();
+    assert!(canonical.contains("semantic-id 5:café\n"));
+    assert!(canonical.contains("definition-schema-id 9:schema-β\n"));
+}
+
+#[test]
 fn independent_canonical_golden_vector_is_stable() {
     let commitment = commitment(
         "matched-sham",
