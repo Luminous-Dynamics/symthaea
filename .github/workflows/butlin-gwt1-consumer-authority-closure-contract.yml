@@ -1,0 +1,175 @@
+name: Butlin GWT-1 Consumer Authority Closure Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/evidence-profiles/gwt1-consumer-authority-closure-v1.json"
+      - ".github/workflows/butlin-gwt1-consumer-authority-closure.yml"
+      - ".github/workflows/butlin-gwt1-consumer-authority-closure-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Freeze trust-only consumer authority closure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualification head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact lineage and immutable closure objects
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          DIRECT_ROOT_PARENT: 2b4b54da4ee9028bb727267e4ae38fcc002e28dc
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git merge-base --is-ancestor "$DIRECT_ROOT_PARENT" HEAD
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-consumer-authority-closure.yml)" = "0e2630778811bb36457206f1fa400794d6d077da"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-consumer-authority-closure-v1.json)" = "d12b4ecc42dd828fda04e3ece68159df3a679862"
+          test "$(git rev-parse HEAD:.github/scripts/evidence_archive_admission.py)" = "4a7228ab25fcd512d3b038bab29d5f10e0f22eaa"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v1.json)" = "45863366cfc1218781608a9293415ce7c0dec678"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v2.json)" = "aacc7146467d1c14bedb96055b7b821ac29ea5f7"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-final-resolution-v1.json)" = "ad5bc423cc326ec61a0f1a2e1df6ad30bcc47f3d"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-causal-evidence-v1.json)" = "d251f39460d9cb187e98381a9c786f1073e5d8c1"
+          test ! -e .github/evidence-profiles/gwt1-verified-report-v3.json
+          test -z "$(git diff --name-only "$DIRECT_ROOT_PARENT" HEAD -- crates/domains/symthaea-psych-bench)"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Audit closure semantics and non-circular authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+
+          root = Path.cwd()
+          workflow = (root / ".github/workflows/butlin-gwt1-consumer-authority-closure.yml").read_text()
+          profile_path = root / ".github/evidence-profiles/gwt1-consumer-authority-closure-v1.json"
+          engine_path = root / ".github/scripts/evidence_archive_admission.py"
+
+          # The closure accepts only execution coordinates, never caller-selected trust roots.
+          assert "evidence_subject_sha:" in workflow
+          assert "consumer_run_id:" in workflow
+          assert "consumer_run_attempt:" in workflow
+          for forbidden_input in (
+              "consumer_workflow_sha:\n        description",
+              "promotion_workflow_sha:\n        description",
+              "causal_builder_sha:\n        description",
+              "final_resolution_workflow_sha:\n        description",
+              "verifier_path:\n        description",
+          ):
+              assert forbidden_input not in workflow
+
+          # Frozen candidate roots remain internal bootstrap constants until activation.
+          for frozen in (
+              "2b4b54da4ee9028bb727267e4ae38fcc002e28dc",
+              "198aaf257de0b4f264f69eb64d813d772f0362d6",
+              "6eaf73a20047b99120e59eb96f48ae0e194e2c80",
+              "b5b693f3162ac4c66d00e2391f77a6e86a84a788",
+              "21f83eece23c8ee9c2f8fa3c1fc1ab3f555c40e7",
+              "4a7228ab25fcd512d3b038bab29d5f10e0f22eaa",
+              "aacc7146467d1c14bedb96055b7b821ac29ea5f7",
+              "ad5bc423cc326ec61a0f1a2e1df6ad30bcc47f3d",
+              "d251f39460d9cb187e98381a9c786f1073e5d8c1",
+              "d12b4ecc42dd828fda04e3ece68159df3a679862",
+              "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",
+              "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee",
+              "2ec8b2f6e0e8e915f7e0c8d7b14b77fe93e33225872ea1d98041228950c620a9",
+          ):
+              assert frozen in workflow
+
+          # Trust and transport invariants.
+          for pinned in (
+              "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+              "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
+              "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          ):
+              assert pinned in workflow
+          assert "runs-on: ubuntu-24.04" in workflow
+          assert "ubuntu-latest" not in workflow
+          assert "actions/cache" not in workflow
+          assert "latest" not in workflow.lower()
+          assert "run-id: ${{ inputs.consumer_run_id }}" in workflow
+          assert workflow.count("--deny-self-hosted-runners") >= 4
+          assert "unset GH_HOST GH_ENTERPRISE_TOKEN" in workflow
+          assert "GH_CONFIG_DIR" in workflow
+          assert "GH_NO_UPDATE_NOTIFIER" in workflow
+          assert "GH_PROMPT_DISABLED" in workflow
+          assert "tarfile.getmembers" not in workflow
+
+          # The closure is trust-only: it executes no Rust/scientific path and does not inspect outcome tiers.
+          assert "cargo " not in workflow
+          assert "rustc " not in workflow
+          assert "symthaea-psych-bench" not in workflow
+          assert "FunctionallySupported" not in workflow
+          assert "CausallySupported" not in workflow
+          assert "NotDemonstrated" not in workflow
+          assert "Contradicted" not in workflow
+          assert "Inconclusive" not in workflow
+
+          # Both promotion authority objects are freshly verified at this fault domain.
+          assert 'authority/promotion/capsule_attestation.json' in workflow
+          assert 'authority/promotion/profile_attestation.json' in workflow
+          assert 'sources/promotion/promotion_capsule.json' in workflow
+          assert 'sources/promotion/promotion_verifier_profile.json' in workflow
+          assert "Freshly verify promotion capsule and verifier profile" in workflow
+          assert workflow.count('butlin-gwt1-causal-trusted-promotion.yml') >= 2
+          assert workflow.count('--signer-digest "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA"') == 2
+          assert "butlin-gwt1-attestation-verifier-profile-v2" in workflow
+          assert "butlin-gwt1-final-promotion-authority-v1" in workflow
+
+          # Report and nested final archive are independently re-admitted before promotion bytes are trusted.
+          assert "gwt1-verified-report-archive-v2" in workflow
+          assert "gwt1-final-resolution-archive-v1" in workflow
+          assert ".member_count==26" in workflow
+          assert ".member_count==60" in workflow
+          assert "fresh-report-admission.json" in workflow
+          assert "gwt1-closure-final-admission.json" in workflow
+
+          # Closure identity is one-way: the manifest cannot commit its own archive/attestation digest.
+          assert "butlin-gwt1-final-consumer-authority-closure-v1" in workflow
+          assert "butlin-gwt1-consumer-authority-closure-verifier-profile-v1" in workflow
+          assert "closure_archive_sha256" not in workflow
+          assert "closure_attestation_sha256" not in workflow
+          assert "find . -type f ! -name SHA256SUMS" in workflow
+          assert "gwt1-consumer-authority-closure-archive-v1" in workflow
+
+          spec = importlib.util.spec_from_file_location("archive_admission", engine_path)
+          module = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(module)
+          profile = module.load_profile(profile_path)
+          assert profile["profile_id"] == "gwt1-consumer-authority-closure-archive-v1"
+          assert profile["root"] == "gwt1-consumer-authority-closure"
+          assert len(profile["members"]) == 26
+          paths = {item["path"] for item in profile["members"]}
+          assert len(paths) == 26
+          for required in (
+              "gwt1-consumer-authority-closure/closure.json",
+              "gwt1-consumer-authority-closure/closure_verifier_profile.json",
+              "gwt1-consumer-authority-closure/source/consumer_provenance.json",
+              "gwt1-consumer-authority-closure/source/consumer_verifier_profile.json",
+              "gwt1-consumer-authority-closure/source/promotion_verifier_profile.json",
+              "gwt1-consumer-authority-closure/source/promotion_authority.json",
+              "gwt1-consumer-authority-closure/authority/fresh_report_archive_verification.json",
+              "gwt1-consumer-authority-closure/authority/fresh_report_archive_admission.json",
+              "gwt1-consumer-authority-closure/authority/fresh_final_archive_admission.json",
+              "gwt1-consumer-authority-closure/authority/fresh_promotion_capsule_verification.json",
+              "gwt1-consumer-authority-closure/authority/fresh_promotion_profile_verification.json",
+              "gwt1-consumer-authority-closure/environment/runner_environment.json",
+          ):
+              assert required in paths, required
+          PY
