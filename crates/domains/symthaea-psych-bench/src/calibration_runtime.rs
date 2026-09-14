@@ -8,10 +8,10 @@
 //! It deliberately exposes no promotion into `CalibrationManifest` or frozen
 //! authority.
 
-use crate::benchmarks::executive::StroopBenchmark;
+use crate::benchmarks::{executive::StroopBenchmark, worm::NBackBenchmark};
 use crate::calibration_inventory::{
     CalibrationInventory, CalibrationInventoryCoverage, CalibrationInventoryError,
-    stroop_source_inventory,
+    nback_source_inventory, stroop_source_inventory,
 };
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::difficulty::difficulty_model_for;
@@ -46,7 +46,7 @@ impl RuntimeCalibrationObservation {
     /// Validate only the source/provenance side of the observation.
     ///
     /// This does not establish that the stored effective values match a caller's
-    /// runtime configuration. Use [`validate_stroop_against_config`] for that.
+    /// runtime configuration. Use the benchmark-specific config validator for that.
     pub fn validate_against_inventory(
         &self,
         inventory: &CalibrationInventory,
@@ -102,29 +102,19 @@ impl RuntimeCalibrationObservation {
     }
 }
 
-/// Observe the exact migrated Stroop effective values used by scoring for this
-/// configuration. The benchmark and this observer call the same calculation
-/// helper; there is no duplicated calibration formula here.
-pub fn stroop_runtime_observation(
+fn validate_common_inputs(
     config: &BenchmarkConfig,
-) -> Result<RuntimeCalibrationObservation, RuntimeCalibrationObservationError> {
+) -> Result<(), RuntimeCalibrationObservationError> {
     if !config.difficulty.is_finite()
         || !config.encoding_noise.is_finite()
         || !config.time_pressure.is_finite()
     {
         return Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue);
     }
+    Ok(())
+}
 
-    let inventory = stroop_source_inventory()?;
-    let diff_model = difficulty_model_for("Executive::Stroop");
-    let values = StroopBenchmark::effective_calibration_values(config, &diff_model);
-    if !values.reading_automaticity.is_finite()
-        || !values.temperature.is_finite()
-        || !values.encoding_noise.is_finite()
-    {
-        return Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue);
-    }
-
+fn common_config_inputs(config: &BenchmarkConfig) -> BTreeMap<String, String> {
     let mut config_inputs = BTreeMap::new();
     config_inputs.insert("difficulty".to_string(), canonical_f64(config.difficulty));
     config_inputs.insert(
@@ -135,6 +125,26 @@ pub fn stroop_runtime_observation(
         "time_pressure".to_string(),
         canonical_f64(config.time_pressure),
     );
+    config_inputs
+}
+
+/// Observe the exact migrated Stroop effective values used by scoring for this
+/// configuration. The benchmark and this observer call the same calculation
+/// helper; there is no duplicated calibration formula here.
+pub fn stroop_runtime_observation(
+    config: &BenchmarkConfig,
+) -> Result<RuntimeCalibrationObservation, RuntimeCalibrationObservationError> {
+    validate_common_inputs(config)?;
+
+    let inventory = stroop_source_inventory()?;
+    let diff_model = difficulty_model_for("Executive::Stroop");
+    let values = StroopBenchmark::effective_calibration_values(config, &diff_model);
+    if !values.reading_automaticity.is_finite()
+        || !values.temperature.is_finite()
+        || !values.encoding_noise.is_finite()
+    {
+        return Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue);
+    }
 
     let mut effective_values = BTreeMap::new();
     effective_values.insert(
@@ -156,7 +166,7 @@ pub fn stroop_runtime_observation(
         source_inventory_digest: inventory.digest_hex()?,
         source_inventory_coverage: inventory.coverage,
         runtime_coverage: RuntimeCalibrationCoverage::Partial,
-        config_inputs,
+        config_inputs: common_config_inputs(config),
         effective_values,
     };
     observation.validate_against_inventory(&inventory)?;
@@ -170,6 +180,72 @@ pub fn validate_stroop_against_config(
     config: &BenchmarkConfig,
 ) -> Result<(), RuntimeCalibrationObservationError> {
     let expected = stroop_runtime_observation(config)?;
+    if observation != &expected {
+        return Err(RuntimeCalibrationObservationError::RuntimeObservationMismatch);
+    }
+    Ok(())
+}
+
+/// Observe the exact migrated N-back threshold values consumed by scoring.
+///
+/// Runtime coverage remains partial: this binds the executed threshold chain,
+/// not a claim that all upstream scientific/calibration choices are complete.
+pub fn nback_runtime_observation(
+    config: &BenchmarkConfig,
+) -> Result<RuntimeCalibrationObservation, RuntimeCalibrationObservationError> {
+    validate_common_inputs(config)?;
+
+    let inventory = nback_source_inventory()?;
+    let diff_model = difficulty_model_for("WorM::N-back");
+    let temp_mult = diff_model.temperature_multiplier(config.difficulty);
+    let values = NBackBenchmark::effective_calibration_values(config, temp_mult);
+
+    if !values.effective_noise.is_finite()
+        || !values.temperature_multiplier.is_finite()
+        || !values.base_threshold.is_finite()
+        || !values.match_threshold.is_finite()
+    {
+        return Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue);
+    }
+
+    let mut effective_values = BTreeMap::new();
+    effective_values.insert(
+        "effective_encoding_noise".to_string(),
+        canonical_f64(values.effective_noise),
+    );
+    effective_values.insert(
+        "temperature_multiplier".to_string(),
+        canonical_f64(values.temperature_multiplier),
+    );
+    effective_values.insert(
+        "base_threshold".to_string(),
+        canonical_f64(values.base_threshold),
+    );
+    effective_values.insert(
+        "match_threshold".to_string(),
+        canonical_f32(values.match_threshold),
+    );
+
+    let observation = RuntimeCalibrationObservation {
+        schema_version: RUNTIME_CALIBRATION_OBSERVATION_SCHEMA_VERSION.to_string(),
+        benchmark: inventory.benchmark.clone(),
+        source_inventory_digest: inventory.digest_hex()?,
+        source_inventory_coverage: inventory.coverage,
+        runtime_coverage: RuntimeCalibrationCoverage::Partial,
+        config_inputs: common_config_inputs(config),
+        effective_values,
+    };
+    observation.validate_against_inventory(&inventory)?;
+    Ok(observation)
+}
+
+/// Recompute the N-back observation through the same helper used by scoring and
+/// require exact equality with a stored/deserialized receipt.
+pub fn validate_nback_against_config(
+    observation: &RuntimeCalibrationObservation,
+    config: &BenchmarkConfig,
+) -> Result<(), RuntimeCalibrationObservationError> {
+    let expected = nback_runtime_observation(config)?;
     if observation != &expected {
         return Err(RuntimeCalibrationObservationError::RuntimeObservationMismatch);
     }
@@ -286,6 +362,76 @@ mod tests {
     }
 
     #[test]
+    fn default_nback_observation_binds_exact_threshold_chain() {
+        let config = BenchmarkConfig::default();
+        let observation = nback_runtime_observation(&config).unwrap();
+        let diff_model = difficulty_model_for("WorM::N-back");
+        let temp_mult = diff_model.temperature_multiplier(config.difficulty);
+        let values = NBackBenchmark::effective_calibration_values(&config, temp_mult);
+
+        assert_eq!(observation.benchmark, "WorM::N-back");
+        assert_eq!(observation.runtime_coverage, RuntimeCalibrationCoverage::Partial);
+        assert_eq!(
+            observation.effective_values["effective_encoding_noise"],
+            canonical_f64(values.effective_noise)
+        );
+        assert_eq!(
+            observation.effective_values["temperature_multiplier"],
+            canonical_f64(values.temperature_multiplier)
+        );
+        assert_eq!(
+            observation.effective_values["base_threshold"],
+            canonical_f64(values.base_threshold)
+        );
+        assert_eq!(
+            observation.effective_values["match_threshold"],
+            canonical_f32(values.match_threshold)
+        );
+        assert!(
+            observation
+                .validate_against_inventory(&nback_source_inventory().unwrap())
+                .is_ok()
+        );
+        assert!(validate_nback_against_config(&observation, &config).is_ok());
+    }
+
+    #[test]
+    fn shared_helper_is_bit_identical_to_pre_refactor_nback_formula() {
+        let mut cases = vec![BenchmarkConfig::default()];
+
+        let mut pressured = BenchmarkConfig::default();
+        pressured.time_pressure = 0.4;
+        cases.push(pressured);
+
+        let mut difficult = BenchmarkConfig::default();
+        difficult.difficulty = 0.7;
+        cases.push(difficult);
+
+        let mut noisy = BenchmarkConfig::default();
+        noisy.encoding_noise = 0.23;
+        noisy.time_pressure = 0.35;
+        noisy.difficulty = 0.55;
+        cases.push(noisy);
+
+        for config in cases {
+            let diff_model = difficulty_model_for("WorM::N-back");
+            let temp_mult = diff_model.temperature_multiplier(config.difficulty);
+            let actual = NBackBenchmark::effective_calibration_values(&config, temp_mult);
+
+            // Migration oracle: exact pre-refactor production expressions.
+            // Duplication is test-only; production has one calculation authority.
+            let expected_noise = config.effective_noise();
+            let expected_base = 0.50 - config.time_pressure * 0.25 - expected_noise * 0.15;
+            let expected_match = (expected_base / temp_mult).max(0.05) as f32;
+
+            assert_eq!(actual.effective_noise.to_bits(), expected_noise.to_bits());
+            assert_eq!(actual.temperature_multiplier.to_bits(), temp_mult.to_bits());
+            assert_eq!(actual.base_threshold.to_bits(), expected_base.to_bits());
+            assert_eq!(actual.match_threshold.to_bits(), expected_match.to_bits());
+        }
+    }
+
+    #[test]
     fn relevant_config_change_changes_runtime_observation_digest() {
         let base = BenchmarkConfig::default();
         let mut changed = base.clone();
@@ -304,11 +450,38 @@ mod tests {
     }
 
     #[test]
+    fn nback_relevant_config_change_changes_runtime_observation_digest() {
+        let base = BenchmarkConfig::default();
+        let mut changed = base.clone();
+        changed.encoding_noise = 0.3;
+        let first = nback_runtime_observation(&base).unwrap();
+        let second = nback_runtime_observation(&changed).unwrap();
+
+        assert_ne!(first.digest_hex().unwrap(), second.digest_hex().unwrap());
+        assert_ne!(
+            first.effective_values["effective_encoding_noise"],
+            second.effective_values["effective_encoding_noise"]
+        );
+        assert_ne!(
+            first.effective_values["match_threshold"],
+            second.effective_values["match_threshold"]
+        );
+        assert_eq!(
+            validate_nback_against_config(&first, &changed),
+            Err(RuntimeCalibrationObservationError::RuntimeObservationMismatch)
+        );
+    }
+
+    #[test]
     fn non_finite_inputs_do_not_produce_evidence_receipts() {
         let mut nan_difficulty = BenchmarkConfig::default();
         nan_difficulty.difficulty = f64::NAN;
         assert_eq!(
             stroop_runtime_observation(&nan_difficulty),
+            Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue)
+        );
+        assert_eq!(
+            nback_runtime_observation(&nan_difficulty),
             Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue)
         );
 
@@ -318,11 +491,19 @@ mod tests {
             stroop_runtime_observation(&infinite_noise),
             Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue)
         );
+        assert_eq!(
+            nback_runtime_observation(&infinite_noise),
+            Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue)
+        );
 
         let mut infinite_pressure = BenchmarkConfig::default();
         infinite_pressure.time_pressure = f64::NEG_INFINITY;
         assert_eq!(
             stroop_runtime_observation(&infinite_pressure),
+            Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue)
+        );
+        assert_eq!(
+            nback_runtime_observation(&infinite_pressure),
             Err(RuntimeCalibrationObservationError::NonFiniteInputOrValue)
         );
     }
@@ -360,13 +541,37 @@ mod tests {
     }
 
     #[test]
+    fn changing_nback_effective_value_fails_runtime_revalidation() {
+        let config = BenchmarkConfig::default();
+        let first = nback_runtime_observation(&config).unwrap();
+        let mut second = first.clone();
+        second.effective_values.insert(
+            "match_threshold".to_string(),
+            canonical_f32(0.50000006),
+        );
+        assert_ne!(first.digest_hex().unwrap(), second.digest_hex().unwrap());
+        assert_eq!(
+            validate_nback_against_config(&second, &config),
+            Err(RuntimeCalibrationObservationError::RuntimeObservationMismatch)
+        );
+    }
+
+    #[test]
     fn exact_float_bits_survive_serialization_round_trip() {
         let config = BenchmarkConfig::default();
-        let observation = stroop_runtime_observation(&config).unwrap();
-        let json = serde_json::to_string(&observation).unwrap();
-        let decoded: RuntimeCalibrationObservation = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded, observation);
-        assert_eq!(decoded.digest_hex().unwrap(), observation.digest_hex().unwrap());
-        assert!(validate_stroop_against_config(&decoded, &config).is_ok());
+        for observation in [
+            stroop_runtime_observation(&config).unwrap(),
+            nback_runtime_observation(&config).unwrap(),
+        ] {
+            let json = serde_json::to_string(&observation).unwrap();
+            let decoded: RuntimeCalibrationObservation = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, observation);
+            assert_eq!(decoded.digest_hex().unwrap(), observation.digest_hex().unwrap());
+        }
+
+        let stroop = stroop_runtime_observation(&config).unwrap();
+        assert!(validate_stroop_against_config(&stroop, &config).is_ok());
+        let nback = nback_runtime_observation(&config).unwrap();
+        assert!(validate_nback_against_config(&nback, &config).is_ok());
     }
 }

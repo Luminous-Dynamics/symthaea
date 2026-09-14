@@ -20,7 +20,41 @@ use symthaea_core::hdc::ContinuousHV;
 /// N-back benchmark testing the updating function of working memory.
 pub struct NBackBenchmark;
 
+/// Effective calibration-relevant values consumed by the N-back scorer.
+///
+/// This is deliberately a runtime execution surface, not a claim that the
+/// complete scientific calibration surface has been enumerated.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct NBackEffectiveCalibrationValues {
+    pub effective_noise: f64,
+    pub temperature_multiplier: f64,
+    pub base_threshold: f64,
+    pub match_threshold: f32,
+}
+
 impl NBackBenchmark {
+    /// Single production calculation authority for the migrated N-back
+    /// threshold path. Runtime evidence must observe this helper rather than
+    /// independently re-implementing its formulas.
+    pub(crate) fn effective_calibration_values(
+        config: &BenchmarkConfig,
+        temp_mult: f64,
+    ) -> NBackEffectiveCalibrationValues {
+        // Difficulty: scale match threshold via temperature multiplier.
+        // Time pressure widens the acceptance window (lower threshold → more false alarms).
+        // Encoding noise degrades similarity signal, further reducing discriminability.
+        let noise = config.effective_noise();
+        let base_threshold = 0.50 - config.time_pressure * 0.25 - noise * 0.15;
+        let match_threshold = (base_threshold / temp_mult).max(0.05) as f32;
+
+        NBackEffectiveCalibrationValues {
+            effective_noise: noise,
+            temperature_multiplier: temp_mult,
+            base_threshold,
+            match_threshold,
+        }
+    }
+
     /// Run a single N-back trial with difficulty scaling and optional trace collection.
     fn run_trial_traced(
         &self,
@@ -70,12 +104,9 @@ impl NBackBenchmark {
 
         let mut perceived_history: Vec<ContinuousHV> = Vec::with_capacity(sequence_len);
 
-        // Difficulty: scale match threshold via temperature multiplier.
-        // Time pressure widens the acceptance window (lower threshold → more false alarms).
-        // Encoding noise degrades similarity signal, further reducing discriminability.
-        let noise = config.effective_noise();
-        let base_threshold = 0.50 - config.time_pressure * 0.25 - noise * 0.15;
-        let match_threshold = (base_threshold / temp_mult).max(0.05) as f32;
+        let calibration = Self::effective_calibration_values(config, temp_mult);
+        let noise = calibration.effective_noise;
+        let match_threshold = calibration.match_threshold;
 
         for (i, &item) in sequence.iter().enumerate() {
             let hv = adapter.encode(&item, dim);
@@ -268,5 +299,18 @@ mod tests {
             assert!(val.mean.is_finite(), "metric {} is not finite", key);
             assert!(val.std_dev.is_finite(), "metric {} std_dev not finite", key);
         }
+    }
+
+    #[test]
+    fn effective_calibration_values_match_default_scoring_inputs() {
+        let config = BenchmarkConfig::default();
+        let diff_model = difficulty_model_for("WorM::N-back");
+        let temp_mult = diff_model.temperature_multiplier(config.difficulty);
+        let values = NBackBenchmark::effective_calibration_values(&config, temp_mult);
+
+        assert_eq!(values.effective_noise.to_bits(), config.effective_noise().to_bits());
+        assert_eq!(values.temperature_multiplier.to_bits(), temp_mult.to_bits());
+        assert_eq!(values.base_threshold.to_bits(), 0.50f64.to_bits());
+        assert_eq!(values.match_threshold.to_bits(), 0.50f32.to_bits());
     }
 }
