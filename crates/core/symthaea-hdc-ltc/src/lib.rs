@@ -170,5 +170,6 @@ pub use validity_capacity_theory::{
     ValidityCapacityNullModel, ValidityCapacityTheoryError,
 };
 pub use validity_interval_memory::{
-    ValidityCleanupResult, ValidityIntervalMemory, ValidityMemoryError,
+    EXACT_CAUSAL_CHECKPOINT_LIMIT, ValidityCleanupResult, ValidityIntervalMemory,
+    ValidityMemoryError,
 };
