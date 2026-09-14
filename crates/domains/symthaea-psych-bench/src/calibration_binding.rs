@@ -3,10 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Frozen-holdout receipt binding for psych-bench calibration evidence.
 //!
-//! The base calibration contract establishes parameter origin and manifest
-//! identity. This layer preserves the full pre-scoring commitment in the final
-//! receipt so downstream consumers cannot lose the code/task/holdout/lineage
-//! identities while retaining only a parameter digest.
+//! The base calibration contract establishes parameter origin, comparison-target
+//! provenance, and manifest identity. This layer preserves the full pre-scoring
+//! commitment so downstream consumers cannot detach those semantics from the
+//! code/task/holdout/lineage identities that were actually frozen.
 
 use crate::calibration_contract::{
     CalibrationContractError, CalibrationEvaluationReceipt, CalibrationFreezeStatus,
@@ -131,13 +131,14 @@ mod tests {
     use super::*;
     use crate::calibration_contract::{
         CALIBRATION_FREEZE_SCHEMA_VERSION, CalibrationClass, CalibrationParameter,
-        CalibrationParameterSource,
+        CalibrationParameterSource, ComparisonTargetAuthority, ComparisonTargetClass,
     };
 
     fn manifest() -> CalibrationManifest {
         CalibrationManifest::new(
             "NBack",
             1,
+            ComparisonTargetClass::HumanEmpirical,
             vec![CalibrationParameter::new(
                 "base_threshold",
                 "0.5",
@@ -161,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn frozen_receipt_preserves_full_experiment_identity() {
+    fn frozen_receipt_preserves_full_experiment_identity_and_target_provenance() {
         let manifest = manifest();
         let commitment = commitment(&manifest);
         let receipt = FrozenCalibrationEvidenceReceipt::new(&manifest, &commitment).unwrap();
@@ -170,6 +171,10 @@ mod tests {
         assert_eq!(
             receipt.evaluation.evidence_profile.freeze_status,
             CalibrationFreezeStatus::VerifiedFrozen
+        );
+        assert_eq!(
+            receipt.evaluation.evidence_profile.target_authority,
+            ComparisonTargetAuthority::HumanEmpiricalTarget
         );
         assert!(receipt.validate(&manifest).is_ok());
     }
