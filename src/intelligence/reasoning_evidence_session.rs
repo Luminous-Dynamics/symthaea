@@ -8,15 +8,16 @@
 //! plus a hash-chained event ledger. The current evidence view is always reconstructed by replay.
 //!
 //! Important transition rules:
-//! - an observed objective cannot be silently overwritten;
-//! - an observation must be explicitly invalidated before replacement;
+//! - an observed point or interval cannot be silently overwritten;
+//! - an observation must be explicitly invalidated before replacement/refinement;
 //! - context support revisions are append-only events rather than in-place history edits;
 //! - context retraction is explicit and evidence-referenced;
 //! - every replan uses the replayed current view through the canonical V3 planner.
+//!
+//! Schema v2 adds bounded objective observations. Existing schema-v1 point/unknown ledgers remain
+//! readable and appendable with v1-compatible events; interval evidence requires a v2 session.
 
-use super::reasoning_context_competition::{
-    ContextCompetitionPolicy, ContextHypothesis,
-};
+use super::reasoning_context_competition::{ContextCompetitionPolicy, ContextHypothesis};
 use super::reasoning_evidence_seeking::{
     plan_with_evidence, EvidenceSeekingPlanReport, EvidenceSeekingPlannerError,
 };
@@ -30,7 +31,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt;
 
-pub const EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION: u32 = 1;
+pub const EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION: u32 = 2;
+const LEGACY_EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION: u32 = 1;
 const GENESIS_DOMAIN: &[u8] = b"symthaea/reasoning/evidence-session/genesis/v1";
 const EVENT_DOMAIN: &[u8] = b"symthaea/reasoning/evidence-session/event/v1";
 
@@ -121,7 +123,7 @@ impl EvidenceAcquisitionSession {
     }
 
     pub fn validate_chain(&self) -> Result<(), EvidenceAcquisitionError> {
-        if self.schema_version != EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION {
+        if !schema_supported(self.schema_version) {
             return Err(EvidenceAcquisitionError::UnsupportedSchemaVersion(
                 self.schema_version,
             ));
@@ -129,6 +131,7 @@ impl EvidenceAcquisitionSession {
         if self.session_id.trim().is_empty() {
             return Err(EvidenceAcquisitionError::EmptyField("session_id"));
         }
+        validate_candidate_schema(self.schema_version, &self.initial_candidates)?;
         plan_with_evidence(
             &self.initial_hypotheses,
             self.context_policy,
@@ -159,6 +162,7 @@ impl EvidenceAcquisitionSession {
                     sequence: record.sequence,
                 });
             }
+            validate_event_schema(self.schema_version, &record.event)?;
             let expected_digest = compute_event_digest(
                 &self.session_id,
                 record.sequence,
@@ -183,7 +187,8 @@ impl EvidenceAcquisitionSession {
         let state = self.replay()?;
         Ok(EvidenceAcquisitionSnapshot {
             session_id: self.session_id.clone(),
-            next_sequence: self.events.len() as u64,
+            next_sequence: u64::try_from(self.events.len())
+                .map_err(|_| EvidenceAcquisitionError::SequenceOverflow)?,
             head_digest: self.head_digest().to_owned(),
             hypotheses: state.hypotheses,
             candidates: state.candidates,
@@ -207,7 +212,7 @@ impl EvidenceAcquisitionSession {
     }
 
     pub fn next_sequence(&self) -> u64 {
-        self.events.len() as u64
+        u64::try_from(self.events.len()).unwrap_or(u64::MAX)
     }
 
     pub fn append(
@@ -217,6 +222,7 @@ impl EvidenceAcquisitionSession {
         // Validate the existing ledger before extending it. A caller cannot append onto a
         // corrupted persisted session and thereby create a new apparently-valid suffix.
         self.validate_chain()?;
+        validate_event_schema(self.schema_version, &event)?;
         let mut state = self.replay_unchecked()?;
         apply_event(&mut state, &event, self.context_policy)?;
 
@@ -316,6 +322,59 @@ struct ReplayState {
     candidates: Vec<CandidateObjectiveEvidence>,
 }
 
+fn schema_supported(schema_version: u32) -> bool {
+    matches!(
+        schema_version,
+        LEGACY_EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION
+            | EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION
+    )
+}
+
+fn validate_candidate_schema(
+    schema_version: u32,
+    candidates: &[CandidateObjectiveEvidence],
+) -> Result<(), EvidenceAcquisitionError> {
+    if schema_version != LEGACY_EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION {
+        return Ok(());
+    }
+    for candidate in candidates {
+        for evidence in [
+            &candidate.integration_proxy,
+            &candidate.harmonic_alignment,
+            &candidate.epistemic_grounding,
+        ] {
+            if matches!(
+                evidence.status,
+                ObjectiveEvidenceStatus::ObservedInterval { .. }
+            ) {
+                return Err(EvidenceAcquisitionError::IntervalEvidenceRequiresSchemaV2);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_event_schema(
+    schema_version: u32,
+    event: &EvidenceAcquisitionEvent,
+) -> Result<(), EvidenceAcquisitionError> {
+    if schema_version == LEGACY_EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION
+        && matches!(
+            event,
+            EvidenceAcquisitionEvent::ObjectiveObserved {
+                evidence: ObjectiveEvidence {
+                    status: ObjectiveEvidenceStatus::ObservedInterval { .. },
+                    ..
+                },
+                ..
+            }
+        )
+    {
+        return Err(EvidenceAcquisitionError::IntervalEvidenceRequiresSchemaV2);
+    }
+    Ok(())
+}
+
 fn apply_event(
     state: &mut ReplayState,
     event: &EvidenceAcquisitionEvent,
@@ -329,12 +388,12 @@ fn apply_event(
         } => {
             require_nonempty("candidate_id", candidate_id)?;
             evidence.validate()?;
-            if !matches!(evidence.status, ObjectiveEvidenceStatus::Observed { .. }) {
+            if !evidence.is_observed() {
                 return Err(EvidenceAcquisitionError::ObservationMustBeObserved);
             }
             let candidate = candidate_mut(&mut state.candidates, candidate_id)?;
             let current = objective_mut(candidate, *objective);
-            if matches!(current.status, ObjectiveEvidenceStatus::Observed { .. }) {
+            if current.is_observed() {
                 return Err(EvidenceAcquisitionError::ObjectiveAlreadyObserved {
                     candidate_id: candidate_id.clone(),
                     objective: *objective,
@@ -355,7 +414,7 @@ fn apply_event(
             validate_references("invalidation", evidence_refs)?;
             let candidate = candidate_mut(&mut state.candidates, candidate_id)?;
             let current = objective_mut(candidate, *objective);
-            if !matches!(current.status, ObjectiveEvidenceStatus::Observed { .. }) {
+            if !current.is_observed() {
                 return Err(EvidenceAcquisitionError::ObjectiveNotObserved {
                     candidate_id: candidate_id.clone(),
                     objective: *objective,
@@ -391,7 +450,9 @@ fn apply_event(
             require_nonempty("retraction.rationale", rationale)?;
             validate_references("retraction", evidence_refs)?;
             let before = state.hypotheses.len();
-            state.hypotheses.retain(|hypothesis| hypothesis.context != *context);
+            state
+                .hypotheses
+                .retain(|hypothesis| hypothesis.context != *context);
             if state.hypotheses.len() == before {
                 return Err(EvidenceAcquisitionError::UnknownContext(*context));
             }
@@ -538,6 +599,7 @@ fn hash_objective_evidence(hasher: &mut blake3::Hasher, evidence: &ObjectiveEvid
     hash_str(hasher, &evidence.source);
     hash_strings(hasher, &evidence.evidence_refs);
     match evidence.status {
+        // Preserve the original v1 discriminants for backward-compatible point/unknown ledgers.
         ObjectiveEvidenceStatus::Observed { value } => {
             hash_u64(hasher, 0);
             hash_u64(hasher, value.to_bits());
@@ -552,6 +614,11 @@ fn hash_objective_evidence(hasher: &mut blake3::Hasher, evidence: &ObjectiveEvid
                     ObjectiveUnknownReason::Invalidated => 2,
                 },
             );
+        }
+        ObjectiveEvidenceStatus::ObservedInterval { lower, upper } => {
+            hash_u64(hasher, 2);
+            hash_u64(hasher, lower.to_bits());
+            hash_u64(hasher, upper.to_bits());
         }
     }
 }
@@ -614,6 +681,7 @@ fn hash_u64(hasher: &mut blake3::Hasher, value: u64) {
 pub enum EvidenceAcquisitionError {
     EmptyField(&'static str),
     UnsupportedSchemaVersion(u32),
+    IntervalEvidenceRequiresSchemaV2,
     GenesisDigestMismatch,
     SequenceMismatch { expected: u64, found: u64 },
     SequenceOverflow,
@@ -643,6 +711,9 @@ impl fmt::Display for EvidenceAcquisitionError {
             Self::EmptyField(field) => write!(f, "required field `{field}` is empty"),
             Self::UnsupportedSchemaVersion(version) => {
                 write!(f, "unsupported evidence-acquisition session schema version {version}")
+            }
+            Self::IntervalEvidenceRequiresSchemaV2 => {
+                write!(f, "bounded objective evidence requires evidence-session schema v2")
             }
             Self::GenesisDigestMismatch => write!(f, "evidence-acquisition genesis digest mismatch"),
             Self::SequenceMismatch { expected, found } => {
@@ -741,6 +812,16 @@ mod tests {
         ObjectiveEvidence::observed("fixture-measurement", vec![id.into()], value).unwrap()
     }
 
+    fn observed_interval(lower: f64, upper: f64, id: &str) -> ObjectiveEvidence {
+        ObjectiveEvidence::observed_interval(
+            "fixture-measurement",
+            vec![id.into()],
+            lower,
+            upper,
+        )
+        .unwrap()
+    }
+
     fn session() -> EvidenceAcquisitionSession {
         EvidenceAcquisitionSession::new(
             "fixture-session",
@@ -787,6 +868,72 @@ mod tests {
     }
 
     #[test]
+    fn interval_observation_replays_and_is_content_bound() {
+        let mut session = session();
+        assert_eq!(session.schema_version, EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION);
+        session
+            .observe_objective(
+                "a",
+                ObjectiveKind::IntegrationProxy,
+                observed_interval(0.4, 0.7, "a-i-bounded"),
+            )
+            .unwrap();
+        let snapshot = session.snapshot().unwrap();
+        assert!(matches!(
+            snapshot.candidates[0].integration_proxy.status,
+            ObjectiveEvidenceStatus::ObservedInterval {
+                lower: 0.4,
+                upper: 0.7
+            }
+        ));
+        session.validate_chain().unwrap();
+
+        if let EvidenceAcquisitionEvent::ObjectiveObserved { evidence, .. } =
+            &mut session.events[0].event
+        {
+            evidence.status = ObjectiveEvidenceStatus::ObservedInterval {
+                lower: 0.4,
+                upper: 0.8,
+            };
+        }
+        assert!(matches!(
+            session.validate_chain(),
+            Err(EvidenceAcquisitionError::EventDigestMismatch { sequence: 0 })
+        ));
+    }
+
+    #[test]
+    fn schema_v1_point_ledger_remains_valid() {
+        let mut legacy = session();
+        legacy.schema_version = LEGACY_EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION;
+        legacy.genesis_digest = compute_genesis_digest(&legacy);
+        legacy
+            .observe_objective(
+                "a",
+                ObjectiveKind::IntegrationProxy,
+                observed(0.6, "legacy-point"),
+            )
+            .unwrap();
+        legacy.validate_chain().unwrap();
+    }
+
+    #[test]
+    fn schema_v1_rejects_new_interval_events() {
+        let mut legacy = session();
+        legacy.schema_version = LEGACY_EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION;
+        legacy.genesis_digest = compute_genesis_digest(&legacy);
+        assert!(matches!(
+            legacy.observe_objective(
+                "a",
+                ObjectiveKind::IntegrationProxy,
+                observed_interval(0.4, 0.7, "legacy-interval"),
+            ),
+            Err(EvidenceAcquisitionError::IntervalEvidenceRequiresSchemaV2)
+        ));
+        assert_eq!(legacy.next_sequence(), 0);
+    }
+
+    #[test]
     fn observed_value_cannot_be_silently_overwritten() {
         let mut session = session();
         session
@@ -800,7 +947,7 @@ mod tests {
             .observe_objective(
                 "a",
                 ObjectiveKind::IntegrationProxy,
-                observed(0.8, "a-i-2"),
+                observed_interval(0.6, 0.8, "a-i-2"),
             )
             .unwrap_err();
         assert!(matches!(
@@ -817,7 +964,7 @@ mod tests {
             .observe_objective(
                 "a",
                 ObjectiveKind::IntegrationProxy,
-                observed(0.7, "a-i-1"),
+                observed_interval(0.6, 0.8, "a-i-1"),
             )
             .unwrap();
         session
@@ -866,7 +1013,7 @@ mod tests {
         assert!(matches!(
             first.outcome,
             EvidenceSeekingOutcome::NeedEvidence { ref requests, .. }
-                if matches!(requests[0].kind, EvidenceRequestKind::ContextSupport { .. })
+                if matches!(&requests[0].kind, EvidenceRequestKind::ContextSupport { .. })
         ));
 
         session.revise_context(context(0.9)).unwrap();
@@ -909,7 +1056,7 @@ mod tests {
                 .observe_objective(
                     "a",
                     ObjectiveKind::IntegrationProxy,
-                    observed(0.7, "a-i"),
+                    observed_interval(0.6, 0.8, "a-i"),
                 )
                 .unwrap();
             target
