@@ -7,7 +7,6 @@ license = "AGPL-3.0-or-later"
 
 [dependencies]
 symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
-symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
 symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgrade-authority" }
 symthaea-fabrication-upgrade-probation-authority = { path = "../symthaea-fabrication-upgrade-probation-authority" }
 symthaea-fabrication-upgrade-probation-telemetry = { path = "../symthaea-fabrication-upgrade-probation-telemetry" }
