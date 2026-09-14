@@ -1,0 +1,61 @@
+{
+  "schema": "butlin-evidence-archive-admission-profile-v1",
+  "profile_id": "gwt1-direct-evidence-archive-v1",
+  "root": "gwt1-evidence",
+  "canonical_uid": 0,
+  "canonical_gid": 0,
+  "canonical_mtime": 0,
+  "max_archive_bytes": 67108864,
+  "max_tar_stream_bytes": 167772160,
+  "max_member_bytes": 67108864,
+  "max_total_unpacked_bytes": 134217728,
+  "members": [
+    {
+      "path": "gwt1-evidence",
+      "kind": "directory",
+      "mode": 493
+    },
+    {
+      "path": "gwt1-evidence/SHA256SUMS",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 16384
+    },
+    {
+      "path": "gwt1-evidence/evidence_envelope.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 16777216
+    },
+    {
+      "path": "gwt1-evidence/outcome.txt",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 1024
+    },
+    {
+      "path": "gwt1-evidence/raw_observations.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 67108864
+    },
+    {
+      "path": "gwt1-evidence/resolution.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 4194304
+    },
+    {
+      "path": "gwt1-evidence/workflow_provenance.json",
+      "kind": "file",
+      "mode": 420,
+      "allow_empty": false,
+      "max_bytes": 65536
+    }
+  ]
+}
