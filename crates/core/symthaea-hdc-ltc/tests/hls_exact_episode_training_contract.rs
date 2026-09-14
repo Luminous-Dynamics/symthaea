@@ -75,7 +75,12 @@ fn public_current_only_training_loop_keeps_evaluation_held_out_and_outcome_agnos
 #[test]
 fn historical_benchmark_fails_before_state_or_parameter_mutation() {
     let benchmark = world(3, 1.0);
-    assert!(benchmark.queries.iter().all(|query| query.is_historical()));
+    let historical_count = benchmark
+        .queries
+        .iter()
+        .filter(|query| query.is_historical())
+        .count();
+    assert!(historical_count > 0);
 
     let dim = 96;
     let codec = StateTrackingCodec::from_benchmark_config(dim, &benchmark.config, 77).unwrap();
@@ -85,7 +90,19 @@ fn historical_benchmark_fails_before_state_or_parameter_mutation() {
 
     let state_before = cell.state().clone();
     let parameters_before = cell.parameters();
-    let error = train_current_only_episode(
+
+    let evaluation_error =
+        evaluate_current_only_episode(&cell, &benchmark, &codec, 1e-4).unwrap_err();
+    match evaluation_error {
+        CurrentOnlyTrainingError::HistoricalQueriesUnsupported { count } => {
+            assert_eq!(count, historical_count);
+        }
+        other => panic!("unexpected evaluation error: {other}"),
+    }
+    assert_eq!(cell.state(), &state_before);
+    assert_eq!(cell.parameters(), parameters_before);
+
+    let training_error = train_current_only_episode(
         &mut cell,
         &benchmark,
         &codec,
@@ -93,11 +110,11 @@ fn historical_benchmark_fails_before_state_or_parameter_mutation() {
     )
     .unwrap_err();
 
-    match error {
+    match training_error {
         CurrentOnlyTrainingError::HistoricalQueriesUnsupported { count } => {
-            assert_eq!(count, benchmark.queries.len());
+            assert_eq!(count, historical_count);
         }
-        other => panic!("unexpected error: {other}"),
+        other => panic!("unexpected training error: {other}"),
     }
 
     assert_eq!(cell.state(), &state_before);
