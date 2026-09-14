@@ -12,6 +12,7 @@
 //! - static capability evaluation != sequential learning evaluation;
 //! - trial rows inside one mutable episode are not independent replicates;
 //! - outcome feedback and production learning are separate policy axes;
+//! - a claim that production learning is forbidden requires an enforced freeze;
 //! - unsupported reset/freeze semantics fail closed;
 //! - receipts serialize the declared replication unit and observed learning.
 
@@ -104,16 +105,22 @@ impl LiveExecutionContract {
     ) -> Result<(), LiveExecutionContractError> {
         match self.mode {
             LiveExecutionMode::ResetPerTrial if !capabilities.reset_identity_established => {
-                Err(LiveExecutionContractError::ResetIdentityNotEstablished)
-            }
-            LiveExecutionMode::FrozenEpisode if !capabilities.learning_freeze_enforced => {
-                Err(LiveExecutionContractError::LearningFreezeNotEnforced)
+                return Err(LiveExecutionContractError::ResetIdentityNotEstablished);
             }
             LiveExecutionMode::FrozenEpisode if self.production_learning_permitted => {
-                Err(LiveExecutionContractError::FrozenEpisodePermitsLearning)
+                return Err(LiveExecutionContractError::FrozenEpisodePermitsLearning);
             }
-            _ => Ok(()),
+            LiveExecutionMode::FrozenEpisode if !capabilities.learning_freeze_enforced => {
+                return Err(LiveExecutionContractError::LearningFreezeNotEnforced);
+            }
+            _ => {}
         }
+
+        if !self.production_learning_permitted && !capabilities.learning_freeze_enforced {
+            return Err(LiveExecutionContractError::LearningForbiddenWithoutEnforcedFreeze);
+        }
+
+        Ok(())
     }
 }
 
@@ -145,6 +152,7 @@ impl LiveExecutionCapabilities {
 pub enum LiveExecutionContractError {
     ResetIdentityNotEstablished,
     LearningFreezeNotEnforced,
+    LearningForbiddenWithoutEnforcedFreeze,
     FrozenEpisodePermitsLearning,
     ObservedLearningWasForbidden,
     UnsupportedReceiptSchema,
@@ -253,6 +261,24 @@ mod tests {
     }
 
     #[test]
+    fn reset_identity_alone_does_not_prove_learning_was_frozen() {
+        let contract = LiveExecutionContract {
+            mode: LiveExecutionMode::ResetPerTrial,
+            outcome_feedback: OutcomeFeedbackPolicy::NoOutcomeFeedback,
+            warmup: WarmupPolicy::None,
+            production_learning_permitted: false,
+        };
+        let capabilities = LiveExecutionCapabilities {
+            reset_identity_established: true,
+            learning_freeze_enforced: false,
+        };
+        assert_eq!(
+            contract.validate_support(capabilities),
+            Err(LiveExecutionContractError::LearningForbiddenWithoutEnforcedFreeze)
+        );
+    }
+
+    #[test]
     fn frozen_episode_fails_closed_without_learning_freeze() {
         let contract = LiveExecutionContract {
             mode: LiveExecutionMode::FrozenEpisode,
@@ -294,7 +320,7 @@ mod tests {
         };
         let capabilities = LiveExecutionCapabilities {
             reset_identity_established: true,
-            learning_freeze_enforced: false,
+            learning_freeze_enforced: true,
         };
         let receipt = LiveExecutionReceipt::new(
             "StaticCapability",
@@ -337,7 +363,7 @@ mod tests {
         };
         let capabilities = LiveExecutionCapabilities {
             reset_identity_established: true,
-            learning_freeze_enforced: false,
+            learning_freeze_enforced: true,
         };
         assert!(matches!(
             LiveExecutionReceipt::new(
@@ -354,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn feedback_policy_does_not_silently_define_learning_permission() {
+    fn apply_reward_does_not_substitute_for_learning_freeze_authority() {
         let contract = LiveExecutionContract {
             mode: LiveExecutionMode::SequentialLearning,
             outcome_feedback: OutcomeFeedbackPolicy::ApplyReward,
@@ -363,11 +389,39 @@ mod tests {
         };
         assert_eq!(contract.outcome_feedback, OutcomeFeedbackPolicy::ApplyReward);
         assert!(!contract.production_learning_permitted);
-        assert!(
-            contract
-                .validate_support(LiveExecutionCapabilities::legacy_current_runner())
-                .is_ok()
+        assert_eq!(
+            contract.validate_support(LiveExecutionCapabilities::legacy_current_runner()),
+            Err(LiveExecutionContractError::LearningForbiddenWithoutEnforcedFreeze)
         );
+    }
+
+    #[test]
+    fn no_feedback_does_not_substitute_for_learning_freeze_authority() {
+        let contract = LiveExecutionContract {
+            mode: LiveExecutionMode::SequentialLearning,
+            outcome_feedback: OutcomeFeedbackPolicy::NoOutcomeFeedback,
+            warmup: WarmupPolicy::None,
+            production_learning_permitted: false,
+        };
+        assert_eq!(
+            contract.validate_support(LiveExecutionCapabilities::legacy_current_runner()),
+            Err(LiveExecutionContractError::LearningForbiddenWithoutEnforcedFreeze)
+        );
+    }
+
+    #[test]
+    fn learning_forbidden_is_valid_only_with_enforced_freeze() {
+        let contract = LiveExecutionContract {
+            mode: LiveExecutionMode::SequentialLearning,
+            outcome_feedback: OutcomeFeedbackPolicy::ObserveOutcomeOnly,
+            warmup: WarmupPolicy::None,
+            production_learning_permitted: false,
+        };
+        let capabilities = LiveExecutionCapabilities {
+            reset_identity_established: false,
+            learning_freeze_enforced: true,
+        };
+        assert!(contract.validate_support(capabilities).is_ok());
     }
 
     #[test]
@@ -397,6 +451,35 @@ mod tests {
         }"#;
         let decoded = serde_json::from_str::<LiveExecutionContract>(json);
         assert!(decoded.is_err());
+    }
+
+    #[test]
+    fn tampered_learning_freeze_fails_deserialized_receipt_validation() {
+        let contract = LiveExecutionContract {
+            mode: LiveExecutionMode::ResetPerTrial,
+            outcome_feedback: OutcomeFeedbackPolicy::NoOutcomeFeedback,
+            warmup: WarmupPolicy::None,
+            production_learning_permitted: false,
+        };
+        let capabilities = LiveExecutionCapabilities {
+            reset_identity_established: true,
+            learning_freeze_enforced: true,
+        };
+        let mut receipt = LiveExecutionReceipt::new(
+            "StaticCapability",
+            None,
+            5,
+            8,
+            contract,
+            capabilities,
+            false,
+        )
+        .unwrap();
+        receipt.learning_freeze_enforced = false;
+        assert_eq!(
+            receipt.validate(),
+            Err(LiveExecutionContractError::LearningForbiddenWithoutEnforcedFreeze)
+        );
     }
 
     #[test]

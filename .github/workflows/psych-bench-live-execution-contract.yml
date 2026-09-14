@@ -2,7 +2,9 @@ name: Psych-Bench Live Execution Contract
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - psych-bench/live-execution-contract
     paths:
       - '.github/workflows/psych-bench-live-execution-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
