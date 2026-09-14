@@ -26,15 +26,16 @@ jobs:
       SYMTHAEA_ARC_DATASET_REPOSITORY: arcprize/ARC-AGI-2
       SYMTHAEA_ARC_DATASET_REVISION: f3283f727488ad98fe575ea6a5ac981e4a188e49
       SYMTHAEA_ARC_DATASET_TREE: afab62b97f29dd2341f401d4af70491e14da35c2
-      SYMTHAEA_ARC_DATASET_ROOT: target/rq-006z/arc-agi-2
-      SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-training-manifest.json
+      SYMTHAEA_ARC_EVALUATOR_ROOT: target/rq-006z/evaluator-only
+      SYMTHAEA_ARC_DATASET_ROOT: target/rq-006z/evaluator-only/arc-agi-2
+      SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/evaluator-only/arc-agi-2-training-manifest.json
       SYMTHAEA_ARC_DATASET_MANIFEST_BIN: ${{ github.workspace }}/target/debug/arc_dataset_manifest
       SYMTHAEA_ARC_SOLVER_VIEW_ROOT: target/rq-006z/solver-view
       SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH: target/rq-006z/solver-view-manifest.json
-      SYMTHAEA_ARC_TARGET_BUNDLE_PATH: target/rq-006z/evaluator-target-bundle.json
+      SYMTHAEA_ARC_TARGET_BUNDLE_PATH: target/rq-006z/evaluator-only/evaluator-target-bundle.json
       SYMTHAEA_ARC_POLICY_RESULTS_PATH: target/rq-006z/process-isolated-policy-report.json
-      SYMTHAEA_ARC_ISOLATED_EVALUATION_PATH: target/rq-006z/process-isolated-evaluation.json
-      SYMTHAEA_ARC_EXHAUSTIVE_VERIFY_PATH: target/rq-006z/process-isolated-exhaustive.json
+      SYMTHAEA_ARC_ISOLATED_EVALUATION_PATH: target/rq-006z/evaluator-only/process-isolated-evaluation.json
+      SYMTHAEA_ARC_EXHAUSTIVE_VERIFY_PATH: target/rq-006z/evaluator-only/process-isolated-exhaustive.json
       SYMTHAEA_ARC_PROJECTOR_BIN: ${{ github.workspace }}/target/debug/arc_solver_view_projector
       SYMTHAEA_ARC_POLICY_BIN: ${{ github.workspace }}/target/debug/arc_budgeted_policy
       SYMTHAEA_ARC_ISOLATED_EVALUATOR_BIN: ${{ github.workspace }}/target/debug/arc_process_isolated_evaluator
@@ -95,7 +96,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf "$SYMTHAEA_ARC_DATASET_ROOT"
+          rm -rf target/rq-006z
+          mkdir -p "$SYMTHAEA_ARC_EVALUATOR_ROOT"
+          chmod 0700 "$SYMTHAEA_ARC_EVALUATOR_ROOT"
           mkdir -p "$SYMTHAEA_ARC_DATASET_ROOT"
           git -C "$SYMTHAEA_ARC_DATASET_ROOT" init -q
           git -C "$SYMTHAEA_ARC_DATASET_ROOT" remote add origin https://github.com/arcprize/ARC-AGI-2.git
@@ -118,12 +121,12 @@ jobs:
         with:
           name: arc-process-isolated-${{ env.SYMTHAEA_SUBJECT_REVISION }}
           path: |
-            target/rq-006z/arc-agi-2-training-manifest.json
+            target/rq-006z/evaluator-only/arc-agi-2-training-manifest.json
             target/rq-006z/solver-view-manifest.json
-            target/rq-006z/evaluator-target-bundle.json
+            target/rq-006z/evaluator-only/evaluator-target-bundle.json
             target/rq-006z/process-isolated-policy-report.json
-            target/rq-006z/process-isolated-evaluation.json
-            target/rq-006z/process-isolated-exhaustive.json
+            target/rq-006z/evaluator-only/process-isolated-evaluation.json
+            target/rq-006z/evaluator-only/process-isolated-exhaustive.json
             target/rq-006z/solver-view/training/*.json
           if-no-files-found: error
           retention-days: 30
