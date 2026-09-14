@@ -108,6 +108,8 @@ mod v2_signed_governance_authorization;
 mod v2_authorized_anti_rollback_transition;
 #[cfg(test)]
 mod v2_durably_authorized_transition;
+#[cfg(test)]
+mod v2_checkpoint_reconciliation;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
