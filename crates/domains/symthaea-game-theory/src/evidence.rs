@@ -153,12 +153,8 @@ pub struct EvidenceCostLedger {
 
 impl EvidenceCostLedger {
     pub fn total_cost(self) -> Result<f64, String> {
-        let subtotal = self.disclosure_cost + self.verification_cost;
-        let total = subtotal + self.challenge_cost;
-        if !subtotal.is_finite() || !total.is_finite() {
-            return Err("evidence cost total overflowed finite f64 range".to_string());
-        }
-        Ok(total)
+        let subtotal = checked_cost_add(self.disclosure_cost, self.verification_cost)?;
+        checked_cost_add(subtotal, self.challenge_cost)
     }
 }
 
@@ -222,6 +218,7 @@ pub struct EvidenceDecisionBreakdown {
     pub excluded_integrity: usize,
     pub excluded_authorship: usize,
     pub verification_failures: usize,
+    pub authorship_rejections: usize,
     pub challenges_sustained: usize,
     pub challenges_rejected: usize,
     pub challenges_inconclusive: usize,
@@ -259,6 +256,9 @@ impl EvidenceScenario {
     }
 
     /// Apply one strategic evidence action to an existing view.
+    ///
+    /// Cost accumulation is checked before state mutation so a failed action is
+    /// transactional: it leaves both observations and cost ledger unchanged.
     pub fn apply_action(
         &self,
         view: &mut EvidenceView,
@@ -275,6 +275,23 @@ impl EvidenceScenario {
             .items
             .get(evidence_id)
             .ok_or_else(|| format!("unknown evidence identifier: {evidence_id}"))?;
+
+        let pending_cost = match &action {
+            EvidenceAction::Disclose(_) => Some((
+                CostAxis::Disclosure,
+                checked_cost_add(view.costs.disclosure_cost, item.disclosure_cost)?,
+            )),
+            EvidenceAction::Verify(_) => Some((
+                CostAxis::Verification,
+                checked_cost_add(view.costs.verification_cost, item.verification_cost)?,
+            )),
+            EvidenceAction::Challenge(_) => Some((
+                CostAxis::Challenge,
+                checked_cost_add(view.costs.challenge_cost, item.challenge_cost)?,
+            )),
+            EvidenceAction::Withhold(_) => None,
+        };
+
         let observation = view
             .observations
             .get_mut(evidence_id)
@@ -286,7 +303,6 @@ impl EvidenceScenario {
                     return Err("evidence is already disclosed".to_string());
                 }
                 observation.disclosure = DisclosureState::Disclosed;
-                add_cost(&mut view.costs.disclosure_cost, item.disclosure_cost)?;
             }
             EvidenceAction::Withhold(_) => {
                 if observation.disclosure == DisclosureState::Disclosed {
@@ -302,7 +318,6 @@ impl EvidenceScenario {
                     return Err("evidence integrity has already been observed".to_string());
                 }
                 observation.observed_integrity = Some(item.integrity);
-                add_cost(&mut view.costs.verification_cost, item.verification_cost)?;
             }
             EvidenceAction::Challenge(_) => {
                 if observation.disclosure != DisclosureState::Disclosed {
@@ -312,7 +327,14 @@ impl EvidenceScenario {
                     return Err("evidence has already been challenged".to_string());
                 }
                 observation.observed_challenge = Some(item.challenge_outcome);
-                add_cost(&mut view.costs.challenge_cost, item.challenge_cost)?;
+            }
+        }
+
+        if let Some((axis, updated_cost)) = pending_cost {
+            match axis {
+                CostAxis::Disclosure => view.costs.disclosure_cost = updated_cost,
+                CostAxis::Verification => view.costs.verification_cost = updated_cost,
+                CostAxis::Challenge => view.costs.challenge_cost = updated_cost,
             }
         }
         Ok(())
@@ -345,9 +367,11 @@ impl EvidenceScenario {
                 DisclosureState::Disclosed => {}
             }
 
-            match observation.observed_integrity {
-                Some(EvidenceIntegrity::Invalid) => result.verification_failures += 1,
-                Some(EvidenceIntegrity::Unknown) | Some(EvidenceIntegrity::Valid) | None => {}
+            if observation.observed_integrity == Some(EvidenceIntegrity::Invalid) {
+                result.verification_failures += 1;
+            }
+            if item.authorship == EvidenceAuthorship::Rejected {
+                result.authorship_rejections += 1;
             }
 
             match observation.observed_challenge {
@@ -409,6 +433,13 @@ impl EvidenceScenario {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CostAxis {
+    Disclosure,
+    Verification,
+    Challenge,
+}
+
 fn validate_cost(cost: f64, name: &str) -> Result<(), String> {
     if !cost.is_finite() || cost < 0.0 {
         return Err(format!("{name} must be finite and non-negative"));
@@ -416,13 +447,12 @@ fn validate_cost(cost: f64, name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn add_cost(total: &mut f64, increment: f64) -> Result<(), String> {
-    let updated = *total + increment;
+fn checked_cost_add(total: f64, increment: f64) -> Result<f64, String> {
+    let updated = total + increment;
     if !updated.is_finite() {
         return Err("evidence cost accumulation overflowed finite f64 range".to_string());
     }
-    *total = updated;
-    Ok(())
+    Ok(updated)
 }
 
 #[cfg(test)]
@@ -645,6 +675,50 @@ mod tests {
     }
 
     #[test]
+    fn failed_cost_accumulation_is_transactional() {
+        let first = EvidenceItem::new(
+            "first",
+            "claim",
+            "source-first",
+            EvidenceIntegrity::Unknown,
+            EvidenceAuthorship::Unknown,
+            EvidenceSupport::Unknown,
+            EvidenceCurrentness::Unknown,
+            EvidenceChallengeOutcome::Inconclusive,
+            f64::MAX,
+            0.0,
+            0.0,
+        )
+        .unwrap();
+        let second = EvidenceItem::new(
+            "second",
+            "claim",
+            "source-second",
+            EvidenceIntegrity::Unknown,
+            EvidenceAuthorship::Unknown,
+            EvidenceSupport::Unknown,
+            EvidenceCurrentness::Unknown,
+            EvidenceChallengeOutcome::Inconclusive,
+            f64::MAX,
+            0.0,
+            0.0,
+        )
+        .unwrap();
+        let scenario = EvidenceScenario::new(vec![first, second]).unwrap();
+        let mut view = scenario.initial_view();
+        scenario
+            .apply_action(&mut view, EvidenceAction::Disclose("first".into()))
+            .unwrap();
+        let before = view.clone();
+        assert!(
+            scenario
+                .apply_action(&mut view, EvidenceAction::Disclose("second".into()))
+                .is_err()
+        );
+        assert_eq!(view, before);
+    }
+
+    #[test]
     fn invalid_costs_duplicate_ids_and_unknown_actions_fail_closed() {
         assert!(
             EvidenceItem::new(
@@ -725,5 +799,30 @@ mod tests {
             .unwrap();
         assert_eq!(result.explicitly_withheld, 1);
         assert_eq!(result.undisclosed, 1);
+    }
+
+    #[test]
+    fn authorship_rejection_is_observable_separately() {
+        let scenario = EvidenceScenario::new(vec![item(
+            "e",
+            EvidenceSupport::Supports,
+            EvidenceIntegrity::Valid,
+            EvidenceAuthorship::Rejected,
+            EvidenceCurrentness::Current,
+        )])
+        .unwrap();
+        let mut view = scenario.initial_view();
+        scenario
+            .apply_action(&mut view, EvidenceAction::Disclose("e".into()))
+            .unwrap();
+        scenario
+            .apply_action(&mut view, EvidenceAction::Verify("e".into()))
+            .unwrap();
+        let result = scenario
+            .decision_breakdown(&view, EvidenceAdmissibilityPolicy::strict_current_authenticated())
+            .unwrap();
+        assert_eq!(result.authorship_rejections, 1);
+        assert_eq!(result.excluded_authorship, 1);
+        assert_eq!(result.supports, 0);
     }
 }
