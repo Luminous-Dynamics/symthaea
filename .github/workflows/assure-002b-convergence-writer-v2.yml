@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/assure-002b-convergence-writer-v2.yml'
       - 'tools/assure_002b_converge.py'
+      - 'tools/assure-002b-qualification-status.md'
 
 permissions:
   contents: write
@@ -36,14 +37,15 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Capture and validate writer input
+      - name: Capture and validate writer inputs
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           python3 -m py_compile tools/assure_002b_converge.py
           cp tools/assure_002b_converge.py /tmp/assure_002b_converge.py
-          sha256sum /tmp/assure_002b_converge.py
+          cp tools/assure-002b-qualification-status.md /tmp/assure-002b-qualification-status.md
+          sha256sum /tmp/assure_002b_converge.py /tmp/assure-002b-qualification-status.md
 
       - name: Reset to exact qualified campaign parent and fetch semantic parent
         shell: bash
@@ -63,6 +65,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 /tmp/assure_002b_converge.py
+          cp /tmp/assure-002b-qualification-status.md \
+            crates/core/symthaea-assurance-campaign/QUALIFICATION_STATUS.md
 
       - name: Rust 1.96 syntax and formatting guard only
         shell: bash
@@ -111,6 +115,20 @@ jobs:
           for token in required:
               if token not in text:
                   raise SystemExit(f'missing convergence token: {token}')
+
+          status = Path('crates/core/symthaea-assurance-campaign/QUALIFICATION_STATUS.md').read_text()
+          for token in [
+              'TerminalRegistrationInView',
+              'CurrentThroughVerifiedCheckpoint',
+              'CommittedAfterTerminalRegistrationInView',
+              'ProductionWitnessedAfterRegistration',
+              'OrderedEvent',
+              'AuthorizedEvent',
+              'ASSURE-000 Qualification',
+              'ASSURE-002 Qualification',
+          ]:
+              if token not in status:
+                  raise SystemExit(f'missing claim-boundary status token: {token}')
 
           lock = Path('Cargo.lock').read_text()
           if lock.count('name = "symthaea-assurance-semantics"') != 1:
