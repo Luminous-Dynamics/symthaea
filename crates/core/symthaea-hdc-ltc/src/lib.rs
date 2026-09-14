@@ -28,6 +28,9 @@
 //!   prediction that the score-noise variance approaches `rho / 2` for
 //!   `rho = key_count * horizon / dimension`, while making its independence
 //!   assumptions explicit and testable.
+//! - [`ValidityCapacityAccuracyNullModel`] adds a stricter pre-result prediction:
+//!   winner-take-all cleanup accuracy under an explicitly idealized independent
+//!   Gaussian score model, with deterministic quadrature convergence diagnostics.
 //! - [`run_validity_capacity_controls`] separates semantic-change density from
 //!   archive write segmentation while holding the null-model coordinates fixed.
 //! - [`measure_validity_capacity_score_moments`] independently reconstructs the
@@ -83,6 +86,7 @@ pub mod state_tracking_readout;
 pub mod state_tracking_validity_archive;
 pub mod temporal_phasor;
 pub mod validity_capacity;
+pub mod validity_capacity_accuracy_theory;
 pub mod validity_capacity_controls;
 pub mod validity_capacity_score_moments;
 pub mod validity_capacity_theory;
@@ -136,6 +140,7 @@ pub use validity_capacity::{
     ValidityCapacityAxis, ValidityCapacityCase, ValidityCapacityError, ValidityCapacityObservation,
     ValidityCapacityPlan, ValidityCapacitySweepResult, run_validity_capacity_sweep,
 };
+pub use validity_capacity_accuracy_theory::ValidityCapacityAccuracyNullModel;
 pub use validity_capacity_controls::{
     ValidityCapacityControlAxis, ValidityCapacityControlCase, ValidityCapacityControlError,
     ValidityCapacityControlObservation, ValidityCapacityControlPlan, ValidityCapacityControlResult,
