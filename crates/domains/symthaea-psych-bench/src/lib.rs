@@ -53,6 +53,7 @@
 
 pub mod adapter;
 pub mod benchmarks;
+pub mod calculation_authority;
 pub mod calibration_binding;
 pub mod calibration_contract;
 pub mod calibration_inventory;
