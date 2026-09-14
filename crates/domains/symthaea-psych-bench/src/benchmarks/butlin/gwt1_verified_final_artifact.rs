@@ -168,9 +168,10 @@ fn gwt1_claims_functional_support(view: &ButlinResolvedEvidenceViewV2) -> bool {
 /// Complete the pure reconstruction theorem after cryptographic verification,
 /// bounded final-archive admission, and source replay have succeeded.
 ///
-/// Kept module-private so there is exactly one future authority-minting call
-/// site: the cryptographic consumer verifier implemented alongside this theorem.
-fn verify_gwt1_final_reconstruction_v1(
+/// Visible only to sibling modules inside the Butlin authority implementation.
+/// The trusted final-consumer adapter is the sole non-test caller and can invoke
+/// it only after the workflow has established the external authority roots.
+pub(super) fn verify_gwt1_final_reconstruction_v1(
     final_archive_sha256: &str,
     stored_base_report: &ButlinIndicatorReport,
     stored_resolved_view: &ButlinResolvedEvidenceViewV2,
