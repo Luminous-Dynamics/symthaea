@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-resolver"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Deterministic non-scalar resolution for preregistered Symthaea Assurance campaigns"
+
+[dependencies]
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-assurance-core = { path = "../symthaea-assurance-core" }
+symthaea-assurance-campaign = { path = "../symthaea-assurance-campaign" }
+symthaea-assurance-semantics = { path = "../symthaea-assurance-semantics" }
+
+[dev-dependencies]
+symthaea-assurance-subject = { path = "../symthaea-assurance-subject" }
