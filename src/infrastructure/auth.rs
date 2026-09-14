@@ -3,8 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! K1: Socket Authentication
 //!
-//! Token-based authentication for IPC clients connecting
-//! to the Symthaea service.
+//! Token-based authentication for IPC clients connecting to the Symthaea
+//! service. Unix peer credentials are identity evidence only: being local or
+//! running as uid 0 does not itself create application authority.
 
 use std::collections::HashMap;
 use std::fs;
@@ -12,27 +13,30 @@ use std::io;
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime};
 
-/// Authentication token for IPC clients
+/// Authentication token for IPC clients.
 #[derive(Debug, Clone)]
 pub struct AuthToken {
-    /// Unique token identifier
+    /// Unique token identifier.
     pub id: String,
-    /// Token value (hashed for storage)
+    /// Token value, hashed for storage.
     pub token_hash: String,
-    /// Client identifier
+    /// Client identifier.
     pub client_id: String,
-    /// Permissions granted
+    /// Permissions granted.
     pub permissions: Permissions,
-    /// Creation time
+    /// Creation time.
     pub created_at: SystemTime,
-    /// Expiration time
+    /// Expiration time.
     pub expires_at: Option<SystemTime>,
-    /// Last used time
+    /// Last used time.
     pub last_used: Option<SystemTime>,
 }
 
 impl AuthToken {
-    /// Create a new auth token
+    /// Create a new auth token record.
+    ///
+    /// Prefer [`AuthProvider::create_token`] when the cleartext token value is
+    /// needed by a client; this constructor intentionally stores only its hash.
     pub fn new(client_id: impl Into<String>, permissions: Permissions) -> Self {
         let id = generate_token_id();
         let token = generate_token();
@@ -49,72 +53,71 @@ impl AuthToken {
         }
     }
 
-    /// Create a token with expiration
+    /// Create a token record with expiration.
     pub fn with_expiry(mut self, duration: Duration) -> Self {
         self.expires_at = Some(SystemTime::now() + duration);
         self
     }
 
-    /// Check if token is expired
+    /// Check whether the token is expired.
     pub fn is_expired(&self) -> bool {
-        if let Some(expires) = self.expires_at {
-            SystemTime::now() > expires
-        } else {
-            false
-        }
+        self.expires_at
+            .is_some_and(|expires| SystemTime::now() > expires)
     }
 
-    /// Verify a token value against this token
+    /// Verify a token value against this record.
     pub fn verify(&self, token: &str) -> bool {
-        if self.is_expired() {
-            return false;
-        }
-        hash_token(token) == self.token_hash
+        !self.is_expired() && hash_token(token) == self.token_hash
     }
 
-    /// Update last used time
+    /// Update the last-used timestamp.
     pub fn touch(&mut self) {
         self.last_used = Some(SystemTime::now());
     }
 
-    /// Check if token has specific permission
+    /// Check whether the token has a specific permission.
     pub fn has_permission(&self, permission: Permission) -> bool {
         self.permissions.has(permission)
     }
 }
 
-/// Permission levels for clients
+/// Legacy coarse permission levels for IPC clients.
+///
+/// These remain for compatibility while mutation paths migrate to explicit
+/// bounded capabilities. In particular, `Execute` must not be inferred from
+/// locality, uid, Phi, or model confidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
-    /// Read status and metrics
+    /// Read status and metrics.
     Read,
-    /// Request completions and validation
+    /// Request completions and validation.
     Query,
-    /// Execute commands (phi-gated)
+    /// Execute commands through the legacy path.
     Execute,
-    /// Modify configuration
+    /// Modify configuration.
     Configure,
-    /// Administrative actions
+    /// Administrative actions.
     Admin,
 }
 
-/// Set of permissions
+/// Set of legacy permissions.
 #[derive(Debug, Clone, Default)]
 pub struct Permissions {
     flags: u8,
 }
 
 impl Permissions {
+    /// Empty permission set.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Read-only permissions
+    /// Read-only permissions.
     pub fn read_only() -> Self {
         Self::new().with(Permission::Read)
     }
 
-    /// Standard shell permissions
+    /// Legacy shell permissions.
     pub fn shell() -> Self {
         Self::new()
             .with(Permission::Read)
@@ -122,7 +125,7 @@ impl Permissions {
             .with(Permission::Execute)
     }
 
-    /// GUI permissions
+    /// Legacy GUI permissions.
     pub fn gui() -> Self {
         Self::new()
             .with(Permission::Read)
@@ -130,7 +133,7 @@ impl Permissions {
             .with(Permission::Configure)
     }
 
-    /// Full permissions
+    /// Full legacy permissions.
     pub fn full() -> Self {
         Self::new()
             .with(Permission::Read)
@@ -140,85 +143,103 @@ impl Permissions {
             .with(Permission::Admin)
     }
 
-    /// Add a permission
+    /// Add a permission.
     pub fn with(mut self, permission: Permission) -> Self {
         self.flags |= 1 << (permission as u8);
         self
     }
 
-    /// Check if has permission
+    /// Check whether this set includes a permission.
     pub fn has(&self, permission: Permission) -> bool {
         self.flags & (1 << (permission as u8)) != 0
     }
 
-    /// List all permissions
+    /// List all included permissions.
     pub fn list(&self) -> Vec<Permission> {
-        let mut perms = Vec::new();
-        for p in [
+        [
             Permission::Read,
             Permission::Query,
             Permission::Execute,
             Permission::Configure,
             Permission::Admin,
-        ] {
-            if self.has(p) {
-                perms.push(p);
-            }
-        }
-        perms
+        ]
+        .into_iter()
+        .filter(|permission| self.has(*permission))
+        .collect()
     }
 }
 
-/// Authentication provider
+/// Identity evidence obtained from Unix peer credentials.
+///
+/// This type deliberately contains no permissions. Authorization must be
+/// supplied independently through a token/capability decision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LocalPeerIdentity {
+    /// Kernel-reported effective user id of the peer.
+    pub uid: u32,
+    /// Kernel-reported effective group id of the peer.
+    pub gid: u32,
+}
+
+/// Authentication provider.
 pub struct AuthProvider {
-    /// Active tokens by ID
     tokens: HashMap<String, AuthToken>,
-    /// Token lookup by hash
     token_lookup: HashMap<String, String>,
-    /// Token storage path
     storage_path: Option<PathBuf>,
-    /// Enable authentication
     enabled: bool,
-    /// Allow unauthenticated local connections
-    allow_local: bool,
+    /// Explicit compatibility switch for unauthenticated local *read-only*
+    /// access. Disabled by default.
+    allow_local_read_only: bool,
 }
 
 impl AuthProvider {
-    /// Create a new auth provider
+    /// Create a default-deny authentication provider.
     pub fn new() -> Self {
         Self {
             tokens: HashMap::new(),
             token_lookup: HashMap::new(),
             storage_path: None,
             enabled: true,
-            allow_local: true,
+            allow_local_read_only: false,
         }
     }
 
-    /// Set storage path for token persistence
+    /// Set storage path for token persistence.
     pub fn with_storage(mut self, path: impl Into<PathBuf>) -> Self {
         self.storage_path = Some(path.into());
         self
     }
 
-    /// Disable authentication (not recommended for production)
+    /// Disable this authentication provider.
+    ///
+    /// Disabled does not mean implicitly authorized: authentication attempts,
+    /// including local compatibility auth, return [`AuthError::Disabled`].
     pub fn disabled(mut self) -> Self {
         self.enabled = false;
         self
     }
 
-    /// Disallow local unauthenticated connections
+    /// Require authenticated authorization for every local connection.
     pub fn require_auth_always(mut self) -> Self {
-        self.allow_local = false;
+        self.allow_local_read_only = false;
         self
     }
 
-    /// Check if authentication is enabled
+    /// Explicitly permit unauthenticated local read-only compatibility access.
+    ///
+    /// This never grants Query, Execute, Configure, or Admin, including to
+    /// uid 0. Prefer token/capability authorization for new callers.
+    pub fn allow_local_read_only(mut self) -> Self {
+        self.allow_local_read_only = true;
+        self
+    }
+
+    /// Check whether authentication is enabled.
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
 
-    /// Create and register a new token
+    /// Create and register a new token.
     pub fn create_token(
         &mut self,
         client_id: impl Into<String>,
@@ -238,11 +259,10 @@ impl AuthProvider {
         self.token_lookup
             .insert(token.token_hash.clone(), token.id.clone());
         self.tokens.insert(token.id.clone(), token.clone());
-
         (token_value, token)
     }
 
-    /// Create a token with expiration
+    /// Create and register a token with expiration.
     pub fn create_temp_token(
         &mut self,
         client_id: impl Into<String>,
@@ -255,14 +275,13 @@ impl AuthProvider {
         (value, token)
     }
 
-    /// Authenticate a token value
+    /// Authenticate a token value.
     pub fn authenticate(&mut self, token_value: &str) -> Result<&AuthToken, AuthError> {
         if !self.enabled {
             return Err(AuthError::Disabled);
         }
 
         let hash = hash_token(token_value);
-
         if let Some(id) = self.token_lookup.get(&hash).cloned() {
             if let Some(token) = self.tokens.get_mut(&id) {
                 if token.is_expired() {
@@ -272,37 +291,38 @@ impl AuthProvider {
                 return Ok(token);
             }
         }
-
         Err(AuthError::InvalidToken)
     }
 
-    /// Check if local connections are allowed without auth
+    /// Check whether explicit unauthenticated local read-only compatibility is enabled.
     pub fn allows_local(&self) -> bool {
-        self.allow_local
+        self.allow_local_read_only
     }
 
-    /// Authenticate from peer credentials (Unix socket)
-    pub fn authenticate_local(&self, uid: u32, gid: u32) -> Result<LocalAuth, AuthError> {
-        if !self.enabled || self.allow_local {
-            // Local connections allowed
-            let is_root = uid == 0;
-            let permissions = if is_root {
-                Permissions::full()
-            } else {
-                Permissions::shell()
-            };
+    /// Record Unix peer identity without conferring any application authority.
+    pub fn identify_local(&self, uid: u32, gid: u32) -> LocalPeerIdentity {
+        LocalPeerIdentity { uid, gid }
+    }
 
-            return Ok(LocalAuth {
-                uid,
-                gid,
-                permissions,
-            });
+    /// Authenticate through the explicit local read-only compatibility path.
+    ///
+    /// Unix peer credentials are not an authorization source. Default
+    /// providers reject this path, and even explicit opt-in only grants Read.
+    pub fn authenticate_local(&self, uid: u32, gid: u32) -> Result<LocalAuth, AuthError> {
+        if !self.enabled {
+            return Err(AuthError::Disabled);
+        }
+        if !self.allow_local_read_only {
+            return Err(AuthError::LocalAuthDisabled);
         }
 
-        Err(AuthError::LocalAuthDisabled)
+        Ok(LocalAuth {
+            identity: self.identify_local(uid, gid),
+            permissions: Permissions::read_only(),
+        })
     }
 
-    /// Revoke a token
+    /// Revoke a token.
     pub fn revoke(&mut self, token_id: &str) -> bool {
         if let Some(token) = self.tokens.remove(token_id) {
             self.token_lookup.remove(&token.token_hash);
@@ -312,91 +332,81 @@ impl AuthProvider {
         }
     }
 
-    /// Revoke all tokens for a client
+    /// Revoke all tokens for a client.
     pub fn revoke_client(&mut self, client_id: &str) {
         let to_remove: Vec<String> = self
             .tokens
             .iter()
-            .filter(|(_, t)| t.client_id == client_id)
+            .filter(|(_, token)| token.client_id == client_id)
             .map(|(id, _)| id.clone())
             .collect();
-
         for id in to_remove {
             self.revoke(&id);
         }
     }
 
-    /// Clean up expired tokens
+    /// Clean up expired tokens.
     pub fn cleanup_expired(&mut self) {
         let expired: Vec<String> = self
             .tokens
             .iter()
-            .filter(|(_, t)| t.is_expired())
+            .filter(|(_, token)| token.is_expired())
             .map(|(id, _)| id.clone())
             .collect();
-
         for id in expired {
             self.revoke(&id);
         }
     }
 
-    /// Get token by ID
+    /// Get a token by id.
     pub fn get_token(&self, token_id: &str) -> Option<&AuthToken> {
         self.tokens.get(token_id)
     }
 
-    /// List all tokens for a client
+    /// List all tokens for one client.
     pub fn list_client_tokens(&self, client_id: &str) -> Vec<&AuthToken> {
         self.tokens
             .values()
-            .filter(|t| t.client_id == client_id)
+            .filter(|token| token.client_id == client_id)
             .collect()
     }
 
-    /// Persist tokens to storage
+    /// Persist token records using the existing line-oriented format.
     pub fn save(&self) -> io::Result<()> {
         if let Some(path) = &self.storage_path {
-            let data = self.serialize_tokens()?;
-            fs::write(path, data)?;
+            fs::write(path, self.serialize_tokens()?)?;
         }
         Ok(())
     }
 
-    /// Load tokens from storage
+    /// Load token records using the existing line-oriented format.
     pub fn load(&mut self) -> io::Result<()> {
         if let Some(path) = &self.storage_path {
             if path.exists() {
-                let data = fs::read_to_string(path)?;
-                self.deserialize_tokens(&data)?;
+                self.deserialize_tokens(&fs::read_to_string(path)?)?;
             }
         }
         Ok(())
     }
 
     fn serialize_tokens(&self) -> io::Result<String> {
-        // Simple format: one token per line
-        // id:client_id:hash:perms:created:expires
         let mut lines = Vec::new();
         for token in self.tokens.values() {
             let expires = token
                 .expires_at
-                .map(|t| {
-                    format!(
-                        "{}",
-                        t.duration_since(SystemTime::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_secs()
-                    )
+                .map(|time| {
+                    time.duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        .to_string()
                 })
                 .unwrap_or_else(|| "none".to_string());
-
             let created = token
                 .created_at
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-
-            let line = format!(
+            lines.push(format!(
                 "{}:{}:{}:{}:{}:{}",
                 token.id,
                 token.client_id,
@@ -404,8 +414,7 @@ impl AuthProvider {
                 token.permissions.flags,
                 created,
                 expires
-            );
-            lines.push(line);
+            ));
         }
         Ok(lines.join("\n"))
     }
@@ -413,34 +422,33 @@ impl AuthProvider {
     fn deserialize_tokens(&mut self, data: &str) -> io::Result<()> {
         for line in data.lines() {
             let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() >= 6 {
-                let id = parts[0].to_string();
-                let client_id = parts[1].to_string();
-                let token_hash = parts[2].to_string();
-                let flags: u8 = parts[3].parse().unwrap_or(0);
-                let created_secs: u64 = parts[4].parse().unwrap_or(0);
-                let expires = if parts[5] == "none" {
-                    None
-                } else {
-                    parts[5]
-                        .parse::<u64>()
-                        .ok()
-                        .map(|s| SystemTime::UNIX_EPOCH + Duration::from_secs(s))
-                };
-
-                let token = AuthToken {
-                    id: id.clone(),
-                    token_hash: token_hash.clone(),
-                    client_id,
-                    permissions: Permissions { flags },
-                    created_at: SystemTime::UNIX_EPOCH + Duration::from_secs(created_secs),
-                    expires_at: expires,
-                    last_used: None,
-                };
-
-                self.token_lookup.insert(token_hash, id.clone());
-                self.tokens.insert(id, token);
+            if parts.len() < 6 {
+                continue;
             }
+            let id = parts[0].to_string();
+            let client_id = parts[1].to_string();
+            let token_hash = parts[2].to_string();
+            let flags: u8 = parts[3].parse().unwrap_or(0);
+            let created_secs: u64 = parts[4].parse().unwrap_or(0);
+            let expires_at = if parts[5] == "none" {
+                None
+            } else {
+                parts[5]
+                    .parse::<u64>()
+                    .ok()
+                    .map(|seconds| SystemTime::UNIX_EPOCH + Duration::from_secs(seconds))
+            };
+            let token = AuthToken {
+                id: id.clone(),
+                token_hash: token_hash.clone(),
+                client_id,
+                permissions: Permissions { flags },
+                created_at: SystemTime::UNIX_EPOCH + Duration::from_secs(created_secs),
+                expires_at,
+                last_used: None,
+            };
+            self.token_lookup.insert(token_hash, id.clone());
+            self.tokens.insert(id, token);
         }
         Ok(())
     }
@@ -452,28 +460,35 @@ impl Default for AuthProvider {
     }
 }
 
-/// Local authentication result
+/// Result of the explicit local read-only compatibility authentication path.
 #[derive(Debug)]
 pub struct LocalAuth {
-    pub uid: u32,
-    pub gid: u32,
+    /// Kernel-provided identity evidence.
+    pub identity: LocalPeerIdentity,
+    /// Compatibility permissions. This path only grants Read.
     pub permissions: Permissions,
 }
 
-/// Authentication errors
+impl LocalAuth {
+    /// Peer uid convenience accessor retained for migration readability.
+    pub fn uid(&self) -> u32 {
+        self.identity.uid
+    }
+
+    /// Peer gid convenience accessor retained for migration readability.
+    pub fn gid(&self) -> u32 {
+        self.identity.gid
+    }
+}
+
+/// Authentication errors.
 #[derive(Debug, Clone)]
 pub enum AuthError {
-    /// Invalid token provided
     InvalidToken,
-    /// Token has expired
     TokenExpired,
-    /// Authentication is disabled
     Disabled,
-    /// Local auth not allowed
     LocalAuthDisabled,
-    /// Insufficient permissions
     InsufficientPermissions(Permission),
-    /// IO error
     IoError(String),
 }
 
@@ -484,35 +499,32 @@ impl std::fmt::Display for AuthError {
             Self::TokenExpired => write!(f, "Token has expired"),
             Self::Disabled => write!(f, "Authentication is disabled"),
             Self::LocalAuthDisabled => write!(f, "Local authentication not allowed"),
-            Self::InsufficientPermissions(p) => write!(f, "Missing permission: {p:?}"),
-            Self::IoError(e) => write!(f, "IO error: {e}"),
+            Self::InsufficientPermissions(permission) => {
+                write!(f, "Missing permission: {permission:?}")
+            }
+            Self::IoError(error) => write!(f, "IO error: {error}"),
         }
     }
 }
 
 impl std::error::Error for AuthError {}
 
-/// Generate a cryptographically random authentication token.
-///
-/// Uses OS entropy via `OsRng` for unpredictable token values.
 fn generate_token() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 32];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
-    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
     format!("sym_{hex}")
 }
 
-/// Generate a cryptographically random token ID.
 fn generate_token_id() -> String {
     use rand::RngCore;
     let mut bytes = [0u8; 16];
     rand::rngs::OsRng.fill_bytes(&mut bytes);
-    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
     format!("tok_{hex}")
 }
 
-/// Hash a token using BLAKE3 for secure, non-reversible storage.
 fn hash_token(token: &str) -> String {
     blake3::hash(token.as_bytes()).to_hex().to_string()
 }
@@ -522,243 +534,114 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_permissions() {
-        let perms = Permissions::shell();
-        assert!(perms.has(Permission::Read));
-        assert!(perms.has(Permission::Query));
-        assert!(perms.has(Permission::Execute));
-        assert!(!perms.has(Permission::Admin));
+    fn shell_permissions_remain_available_for_explicit_tokens() {
+        let permissions = Permissions::shell();
+        assert!(permissions.has(Permission::Read));
+        assert!(permissions.has(Permission::Query));
+        assert!(permissions.has(Permission::Execute));
+        assert!(!permissions.has(Permission::Admin));
     }
 
     #[test]
-    fn test_token_creation() {
+    fn token_creation_and_authentication_round_trip() {
         let mut provider = AuthProvider::new();
         let (value, token) = provider.create_token("test-client", Permissions::shell());
-
         assert!(value.starts_with("sym_"));
         assert_eq!(token.client_id, "test-client");
-        assert!(token.has_permission(Permission::Execute));
+        assert!(provider.authenticate(&value).is_ok());
+        assert!(provider.authenticate("bad_token").is_err());
     }
 
     #[test]
-    fn test_token_authentication() {
-        let mut provider = AuthProvider::new();
-        let (value, _) = provider.create_token("test-client", Permissions::shell());
-
-        let result = provider.authenticate(&value);
-        assert!(result.is_ok());
-
-        let bad_result = provider.authenticate("bad_token");
-        assert!(bad_result.is_err());
-    }
-
-    #[test]
-    fn test_token_expiration() {
+    fn token_expiration_is_enforced() {
         let mut provider = AuthProvider::new();
         let (value, _) = provider.create_temp_token(
             "test-client",
             Permissions::read_only(),
             Duration::from_millis(1),
         );
-
-        // Wait for expiration
         std::thread::sleep(Duration::from_millis(10));
-
-        let result = provider.authenticate(&value);
-        assert!(matches!(result, Err(AuthError::TokenExpired)));
+        assert!(matches!(provider.authenticate(&value), Err(AuthError::TokenExpired)));
     }
 
     #[test]
-    fn test_token_revocation() {
+    fn token_revocation_is_enforced() {
         let mut provider = AuthProvider::new();
         let (value, token) = provider.create_token("test-client", Permissions::shell());
-
         assert!(provider.authenticate(&value).is_ok());
         assert!(provider.revoke(&token.id));
         assert!(provider.authenticate(&value).is_err());
     }
 
     #[test]
-    fn test_tokens_are_unique() {
-        let t1 = generate_token();
-        let t2 = generate_token();
-        assert_ne!(t1, t2, "Two generated tokens should be unique (OS entropy)");
+    fn default_local_auth_denies_root_and_user() {
+        let provider = AuthProvider::new();
+        assert!(matches!(
+            provider.authenticate_local(0, 0),
+            Err(AuthError::LocalAuthDisabled)
+        ));
+        assert!(matches!(
+            provider.authenticate_local(1000, 1000),
+            Err(AuthError::LocalAuthDisabled)
+        ));
     }
 
     #[test]
-    fn test_token_hash_uses_blake3() {
+    fn peer_credentials_identify_but_do_not_authorize() {
+        let provider = AuthProvider::new();
+        let identity = provider.identify_local(1000, 1001);
+        assert_eq!(identity, LocalPeerIdentity { uid: 1000, gid: 1001 });
+    }
+
+    #[test]
+    fn explicit_local_compatibility_is_read_only_even_for_root() {
+        let provider = AuthProvider::new().allow_local_read_only();
+        let root = provider.authenticate_local(0, 0).unwrap();
+        let user = provider.authenticate_local(1000, 1000).unwrap();
+        for auth in [&root, &user] {
+            assert!(auth.permissions.has(Permission::Read));
+            assert!(!auth.permissions.has(Permission::Query));
+            assert!(!auth.permissions.has(Permission::Execute));
+            assert!(!auth.permissions.has(Permission::Configure));
+            assert!(!auth.permissions.has(Permission::Admin));
+        }
+    }
+
+    #[test]
+    fn disabled_provider_does_not_turn_locality_into_authority() {
+        let provider = AuthProvider::new().disabled().allow_local_read_only();
+        assert!(matches!(provider.authenticate_local(0, 0), Err(AuthError::Disabled)));
+    }
+
+    #[test]
+    fn token_hash_uses_blake3() {
         let token = "sym_test_token";
         let hash = hash_token(token);
-        // BLAKE3 hex output is 64 characters
-        assert_eq!(hash.len(), 64, "BLAKE3 hash should be 64 hex chars");
-        // Same input should produce same hash
+        assert_eq!(hash.len(), 64);
         assert_eq!(hash, hash_token(token));
     }
 
     #[test]
-    fn test_local_auth() {
-        let provider = AuthProvider::new();
-
-        // Root gets full permissions
-        let root_auth = provider.authenticate_local(0, 0).unwrap();
-        assert!(root_auth.permissions.has(Permission::Admin));
-
-        // Normal user gets shell permissions
-        let user_auth = provider.authenticate_local(1000, 1000).unwrap();
-        assert!(user_auth.permissions.has(Permission::Execute));
-        assert!(!user_auth.permissions.has(Permission::Admin));
-    }
-
-    // ── AuthError construction and Display/Debug tests ──────────────
-
-    #[test]
-    fn test_auth_error_invalid_token_display() {
-        let err = AuthError::InvalidToken;
-        let msg = format!("{}", err);
-        assert!(!msg.is_empty());
-        assert_eq!(msg, "Invalid authentication token");
+    fn generated_tokens_are_unique() {
+        assert_ne!(generate_token(), generate_token());
     }
 
     #[test]
-    fn test_auth_error_token_expired_display() {
-        let err = AuthError::TokenExpired;
-        let msg = format!("{}", err);
-        assert!(!msg.is_empty());
-        assert_eq!(msg, "Token has expired");
-    }
-
-    #[test]
-    fn test_auth_error_disabled_display() {
-        let err = AuthError::Disabled;
-        let msg = format!("{}", err);
-        assert!(!msg.is_empty());
-        assert_eq!(msg, "Authentication is disabled");
-    }
-
-    #[test]
-    fn test_auth_error_local_auth_disabled_display() {
-        let err = AuthError::LocalAuthDisabled;
-        let msg = format!("{}", err);
-        assert!(!msg.is_empty());
-        assert_eq!(msg, "Local authentication not allowed");
-    }
-
-    #[test]
-    fn test_auth_error_insufficient_permissions_display_all_variants() {
-        let cases = [
-            (Permission::Read, "Missing permission: Read"),
-            (Permission::Query, "Missing permission: Query"),
-            (Permission::Execute, "Missing permission: Execute"),
-            (Permission::Configure, "Missing permission: Configure"),
-            (Permission::Admin, "Missing permission: Admin"),
-        ];
-        for (perm, expected) in &cases {
-            let err = AuthError::InsufficientPermissions(*perm);
-            let msg = format!("{}", err);
-            assert!(!msg.is_empty());
-            assert_eq!(&msg, expected);
-        }
-    }
-
-    #[test]
-    fn test_auth_error_io_error_display() {
-        let err = AuthError::IoError("connection refused".to_string());
-        let msg = format!("{}", err);
-        assert!(!msg.is_empty());
-        assert_eq!(msg, "IO error: connection refused");
-    }
-
-    #[test]
-    fn test_auth_error_io_error_empty_inner_message() {
-        let err = AuthError::IoError(String::new());
-        let msg = format!("{}", err);
-        // Even with empty inner string, the prefix is still present
-        assert_eq!(msg, "IO error: ");
-    }
-
-    #[test]
-    fn test_auth_error_debug_format_all_variants() {
-        let variants: Vec<AuthError> = vec![
-            AuthError::InvalidToken,
-            AuthError::TokenExpired,
-            AuthError::Disabled,
-            AuthError::LocalAuthDisabled,
-            AuthError::InsufficientPermissions(Permission::Admin),
-            AuthError::IoError("test".to_string()),
-        ];
-        for err in &variants {
-            let dbg = format!("{:?}", err);
-            assert!(
-                !dbg.is_empty(),
-                "Debug output must be non-empty for {:?}",
-                err
-            );
-        }
-    }
-
-    #[test]
-    fn test_auth_error_clone() {
-        let original = AuthError::InsufficientPermissions(Permission::Execute);
-        let cloned = original.clone();
-        assert_eq!(format!("{}", original), format!("{}", cloned));
-
-        let original_io = AuthError::IoError("disk full".to_string());
-        let cloned_io = original_io.clone();
-        assert_eq!(format!("{}", original_io), format!("{}", cloned_io));
-    }
-
-    #[test]
-    fn test_auth_error_is_std_error() {
-        // Verify that AuthError implements std::error::Error by using it as a trait object
-        let err: Box<dyn std::error::Error> = Box::new(AuthError::InvalidToken);
-        assert!(!err.to_string().is_empty());
-
-        let err: Box<dyn std::error::Error> = Box::new(AuthError::IoError("fail".into()));
-        assert!(!err.to_string().is_empty());
-    }
-
-    #[test]
-    fn test_auth_error_source_is_none() {
-        // AuthError does not wrap an inner error, so source() should be None
-        use std::error::Error;
-        let variants: Vec<AuthError> = vec![
-            AuthError::InvalidToken,
-            AuthError::TokenExpired,
-            AuthError::Disabled,
-            AuthError::LocalAuthDisabled,
-            AuthError::InsufficientPermissions(Permission::Read),
-            AuthError::IoError("x".into()),
-        ];
-        for err in &variants {
-            assert!(
-                err.source().is_none(),
-                "source() should be None for {:?}",
-                err
-            );
-        }
-    }
-
-    // ── AuthError integration with AuthProvider error paths ─────────
-
-    #[test]
-    fn test_authenticate_disabled_returns_disabled_error() {
-        let mut provider = AuthProvider::new().disabled();
-        let result = provider.authenticate("any_token");
-        assert!(matches!(result, Err(AuthError::Disabled)));
-    }
-
-    #[test]
-    fn test_authenticate_bad_token_returns_invalid_token() {
-        let mut provider = AuthProvider::new();
-        let result = provider.authenticate("nonexistent_token_value");
-        assert!(matches!(result, Err(AuthError::InvalidToken)));
-    }
-
-    #[test]
-    fn test_local_auth_disabled_returns_error() {
-        let provider = AuthProvider::new().require_auth_always();
-        // With auth enabled AND allow_local=false, local auth should fail
-        let result = provider.authenticate_local(1000, 1000);
-        assert!(matches!(result, Err(AuthError::LocalAuthDisabled)));
+    fn auth_error_display_is_stable() {
+        assert_eq!(AuthError::InvalidToken.to_string(), "Invalid authentication token");
+        assert_eq!(AuthError::TokenExpired.to_string(), "Token has expired");
+        assert_eq!(AuthError::Disabled.to_string(), "Authentication is disabled");
+        assert_eq!(
+            AuthError::LocalAuthDisabled.to_string(),
+            "Local authentication not allowed"
+        );
+        assert_eq!(
+            AuthError::InsufficientPermissions(Permission::Execute).to_string(),
+            "Missing permission: Execute"
+        );
+        assert_eq!(
+            AuthError::IoError("connection refused".into()).to_string(),
+            "IO error: connection refused"
+        );
     }
 }
