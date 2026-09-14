@@ -1,0 +1,58 @@
+name: Institutional Game Theory Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-game-theory/**"
+      - ".github/workflows/institutional-game-theory-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-game-theory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPECTED_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact subject and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          test -z "$(git status --porcelain)"
+
+      - name: Rustfmt
+        run: cargo fmt --package symthaea-game-theory -- --check
+
+      - name: Check
+        run: cargo check --locked --package symthaea-game-theory
+
+      - name: Test
+        run: cargo test --locked --package symthaea-game-theory
+
+      - name: Clippy warnings denied
+        run: cargo clippy --locked --package symthaea-game-theory --all-targets -- -D warnings
+
+      - name: Verify checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain)"
