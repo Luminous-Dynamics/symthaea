@@ -1,0 +1,436 @@
+name: Butlin GWT-1 Consumer Authority Closure
+
+on:
+  workflow_call:
+    inputs:
+      evidence_subject_sha:
+        description: Exact GWT-1 evidence subject bound by the verified report
+        required: true
+        type: string
+      consumer_run_id:
+        description: Exact trusted-final-consumer run that produced the verified report
+        required: true
+        type: string
+      consumer_run_attempt:
+        description: Exact trusted-final-consumer run attempt that produced the verified report
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  close-authority:
+    name: Independently close consumer promotion authority
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Checkout exact closure authority revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate closure inputs and immutable policy objects
+        shell: bash
+        env:
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          CONSUMER_RUN_ID: ${{ inputs.consumer_run_id }}
+          CONSUMER_RUN_ATTEMPT: ${{ inputs.consumer_run_attempt }}
+          CLOSURE_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          CLOSURE_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          CLOSURE_WORKFLOW_PATH: ${{ job.workflow_file_path }}
+        run: |
+          set -euo pipefail
+          test "$CLOSURE_WORKFLOW_REPOSITORY" = "$GITHUB_REPOSITORY"
+          test "$CLOSURE_WORKFLOW_PATH" = ".github/workflows/butlin-gwt1-consumer-authority-closure.yml"
+          [[ "$CLOSURE_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$EVIDENCE_SUBJECT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CONSUMER_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$CONSUMER_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          test "$(git rev-parse HEAD)" = "$CLOSURE_WORKFLOW_SHA"
+          test "$(git rev-parse HEAD:.github/scripts/evidence_archive_admission.py)" = "4a7228ab25fcd512d3b038bab29d5f10e0f22eaa"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v2.json)" = "aacc7146467d1c14bedb96055b7b821ac29ea5f7"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-final-resolution-v1.json)" = "ad5bc423cc326ec61a0f1a2e1df6ad30bcc47f3d"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-causal-evidence-v1.json)" = "d251f39460d9cb187e98381a9c786f1073e5d8c1"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-consumer-authority-closure-v1.json)" = "d12b4ecc42dd828fda04e3ece68159df3a679862"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Install and require frozen GitHub CLI verifier root
+        id: trusted_gh
+        shell: bash
+        env:
+          TRUSTED_GH_VERSION: "2.100.0"
+          TRUSTED_GH_ARCHIVE_URL: "https://github.com/cli/cli/releases/download/v2.100.0/gh_2.100.0_linux_amd64.tar.gz"
+          TRUSTED_GH_ARCHIVE_SHA256: "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be"
+          TRUSTED_GH_BINARY_SHA256: "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee"
+          TRUSTED_GH_VERSION_OUTPUT_SHA256: "2ec8b2f6e0e8e915f7e0c8d7b14b77fe93e33225872ea1d98041228950c620a9"
+          TRUSTED_GH_ROOT: ${{ runner.temp }}/gwt1-closure-trusted-gh
+          TRUSTED_GH_CONFIG_DIR: ${{ runner.temp }}/gwt1-closure-trusted-gh-config
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          rm -rf "$TRUSTED_GH_ROOT" "$TRUSTED_GH_CONFIG_DIR"
+          mkdir -p "$TRUSTED_GH_ROOT" "$TRUSTED_GH_CONFIG_DIR"
+          chmod 0700 "$TRUSTED_GH_CONFIG_DIR"
+          archive="$TRUSTED_GH_ROOT/gh_${TRUSTED_GH_VERSION}_linux_amd64.tar.gz"
+          /usr/bin/curl --fail --location --proto '=https' --tlsv1.2 --output "$archive" "$TRUSTED_GH_ARCHIVE_URL"
+          printf '%s  %s\n' "$TRUSTED_GH_ARCHIVE_SHA256" "$archive" | /usr/bin/sha256sum -c -
+          /usr/bin/tar --no-same-owner -xzf "$archive" -C "$TRUSTED_GH_ROOT"
+          gh_path="$TRUSTED_GH_ROOT/gh_${TRUSTED_GH_VERSION}_linux_amd64/bin/gh"
+          test -f "$gh_path"
+          test ! -L "$gh_path"
+          test -x "$gh_path"
+          version_output="$($gh_path --version)"
+          test "$(printf '%s\n' "$version_output" | /usr/bin/awk 'NR==1{print $3}')" = "$TRUSTED_GH_VERSION"
+          binary_sha="$(/usr/bin/sha256sum "$gh_path" | /usr/bin/awk '{print $1}')"
+          version_sha="$(printf '%s' "$version_output" | /usr/bin/sha256sum | /usr/bin/awk '{print $1}')"
+          test "$binary_sha" = "$TRUSTED_GH_BINARY_SHA256"
+          test "$version_sha" = "$TRUSTED_GH_VERSION_OUTPUT_SHA256"
+          echo "gh_path=$gh_path" >> "$GITHUB_OUTPUT"
+          echo "binary_sha256=$binary_sha" >> "$GITHUB_OUTPUT"
+          echo "version_output_sha256=$version_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact verified-report artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: gwt1-verified-report-${{ inputs.evidence_subject_sha }}-${{ inputs.consumer_run_id }}-${{ inputs.consumer_run_attempt }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.consumer_run_id }}
+          path: ${{ runner.temp }}/gwt1-closure-report-source
+
+      - name: Verify report transport and fresh report attestation
+        id: report_verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/gwt1-closure-trusted-gh-config
+          GH_NO_UPDATE_NOTIFIER: "1"
+          GH_PROMPT_DISABLED: "1"
+          TRUSTED_GH_PATH: ${{ steps.trusted_gh.outputs.gh_path }}
+          SOURCE_DIR: ${{ runner.temp }}/gwt1-closure-report-source
+          BOOTSTRAP_CONSUMER_WORKFLOW_SHA: "2b4b54da4ee9028bb727267e4ae38fcc002e28dc"
+        run: |
+          set -euo pipefail
+          unset GH_HOST GH_ENTERPRISE_TOKEN
+          required=(
+            gwt1-verified-report.tar.gz
+            gwt1-verified-report.tar.gz.sha256
+            gwt1-verified-report-admission.json
+            gwt1-verified-report-admission.json.sha256
+            gwt1-verified-report-attestation/attestation.json
+            gwt1-verified-report-attestation/attestation.json.sha256
+            gwt1-verified-report-attestation/verification.json
+            gwt1-verified-report-attestation/verification.json.sha256
+          )
+          for path in "${required[@]}"; do test -f "$SOURCE_DIR/$path"; done
+          (cd "$SOURCE_DIR" && /usr/bin/sha256sum -c gwt1-verified-report.tar.gz.sha256 && /usr/bin/sha256sum -c gwt1-verified-report-admission.json.sha256)
+          (cd "$SOURCE_DIR/gwt1-verified-report-attestation" && /usr/bin/sha256sum -c attestation.json.sha256 && /usr/bin/sha256sum -c verification.json.sha256)
+          report_sha="$(/usr/bin/sha256sum "$SOURCE_DIR/gwt1-verified-report.tar.gz" | /usr/bin/awk '{print $1}')"
+          fresh="$SOURCE_DIR/fresh-report-verification.json"
+          "$TRUSTED_GH_PATH" attestation verify "$SOURCE_DIR/gwt1-verified-report.tar.gz" --repo "$GITHUB_REPOSITORY" \
+            --bundle "$SOURCE_DIR/gwt1-verified-report-attestation/attestation.json" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-final-consumer.yml" \
+            --signer-digest "$BOOTSTRAP_CONSUMER_WORKFLOW_SHA" --deny-self-hosted-runners --format json > "$fresh"
+          test -s "$fresh"
+          echo "archive_sha256=$report_sha" >> "$GITHUB_OUTPUT"
+          echo "verification_sha256=$(/usr/bin/sha256sum "$fresh" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Re-admit report and validate consumer authority bindings
+        id: report_admission
+        shell: bash
+        env:
+          SOURCE_DIR: ${{ runner.temp }}/gwt1-closure-report-source
+          TRUSTED_ENGINE: ${{ github.workspace }}/.github/scripts/evidence_archive_admission.py
+          TRUSTED_REPORT_PROFILE: ${{ github.workspace }}/.github/evidence-profiles/gwt1-verified-report-v2.json
+          REPORT_ARCHIVE_SHA256: ${{ steps.report_verify.outputs.archive_sha256 }}
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          CONSUMER_RUN_ID: ${{ inputs.consumer_run_id }}
+          CONSUMER_RUN_ATTEMPT: ${{ inputs.consumer_run_attempt }}
+          BOOTSTRAP_CONSUMER_WORKFLOW_SHA: "2b4b54da4ee9028bb727267e4ae38fcc002e28dc"
+          BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA: "198aaf257de0b4f264f69eb64d813d772f0362d6"
+          BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA: "6eaf73a20047b99120e59eb96f48ae0e194e2c80"
+          TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.binary_sha256 }}
+          TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/gwt1-closure-report-admitted"
+          rm -rf "$out"
+          mkdir -p "$out"
+          /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_REPORT_PROFILE" --archive "$SOURCE_DIR/gwt1-verified-report.tar.gz" --output-dir "$out" > "$SOURCE_DIR/fresh-report-admission.json"
+          /usr/bin/jq -e --arg archive_sha "$REPORT_ARCHIVE_SHA256" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-verified-report-archive-v2" and .archive_sha256==$archive_sha and .member_count==26 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' "$SOURCE_DIR/fresh-report-admission.json" >/dev/null
+          root="$out/gwt1-verified-report"
+          test -d "$root"
+          /usr/bin/cmp -s "$TRUSTED_ENGINE" "$root/archive_admission_engine.py"
+          /usr/bin/cmp -s "$TRUSTED_REPORT_PROFILE" "$root/archive_admission_profile.json"
+          (cd "$root" && /usr/bin/sha256sum -c SHA256SUMS)
+
+          final_archive_sha="$(/usr/bin/sha256sum "$root/source/gwt1-final-resolution.tar.gz" | /usr/bin/awk '{print $1}')"
+          final_verify_sha="$(/usr/bin/sha256sum "$root/authority/fresh_final_archive_verification.json" | /usr/bin/awk '{print $1}')"
+          final_admission_sha="$(/usr/bin/sha256sum "$root/authority/fresh_final_archive_admission.json" | /usr/bin/awk '{print $1}')"
+          direct_admission_sha="$(/usr/bin/sha256sum "$root/authority/fresh_nested_direct_archive_admission.json" | /usr/bin/awk '{print $1}')"
+          direct_archive_verify_sha="$(/usr/bin/sha256sum "$root/authority/fresh_direct_archive_verification.json" | /usr/bin/awk '{print $1}')"
+          direct_profile_verify_sha="$(/usr/bin/sha256sum "$root/authority/fresh_direct_profile_verification.json" | /usr/bin/awk '{print $1}')"
+          projection_sha="$(/usr/bin/sha256sum "$root/projection.json" | /usr/bin/awk '{print $1}')"
+          engine_sha="$(/usr/bin/sha256sum "$root/archive_admission_engine.py" | /usr/bin/awk '{print $1}')"
+          profile_sha="$(/usr/bin/sha256sum "$root/archive_admission_profile.json" | /usr/bin/awk '{print $1}')"
+          runner_sha="$(/usr/bin/sha256sum "$root/environment/runner_environment.json" | /usr/bin/awk '{print $1}')"
+
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg consumer_sha "$BOOTSTRAP_CONSUMER_WORKFLOW_SHA" --arg subject "$EVIDENCE_SUBJECT_SHA" --arg run_id "$CONSUMER_RUN_ID" --arg run_attempt "$CONSUMER_RUN_ATTEMPT" --arg final_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" \
+            '.schema=="butlin-gwt1-trusted-final-consumer-provenance-v2" and .repository==$repository and .consumer_workflow_sha==$consumer_sha and .evidence_subject_sha==$subject and .consumer_run_id==$run_id and .consumer_run_attempt==$run_attempt and .source_final_resolution_workflow_sha==$final_sha' \
+            "$root/consumer_provenance.json" >/dev/null
+
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg consumer_sha "$BOOTSTRAP_CONSUMER_WORKFLOW_SHA" --arg final_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg direct_sha "$BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA" \
+            --arg binary_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" --arg final_archive_sha "$final_archive_sha" --arg final_verify_sha "$final_verify_sha" --arg final_admission_sha "$final_admission_sha" \
+            --arg direct_admission_sha "$direct_admission_sha" --arg direct_archive_verify_sha "$direct_archive_verify_sha" --arg direct_profile_verify_sha "$direct_profile_verify_sha" --arg projection_sha "$projection_sha" \
+            --arg engine_sha "$engine_sha" --arg profile_sha "$profile_sha" --arg runner_sha "$runner_sha" \
+            '.schema=="butlin-gwt1-final-consumer-verifier-profile-v2" and .repository==$repository and .consumer_workflow_sha==$consumer_sha and .source_final_resolution_workflow_sha==$final_sha and .direct_builder_workflow_sha==$direct_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256=="e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be" and .executable_sha256==$binary_sha and .version_output_sha256==$version_sha and .configuration_policy=="isolated-gh-config-v1" and .deny_self_hosted_runners==true and .source_final_archive_sha256==$final_archive_sha and .fresh_final_archive_verification_sha256==$final_verify_sha and .fresh_final_archive_admission_sha256==$final_admission_sha and .nested_direct_archive_admission_sha256==$direct_admission_sha and .fresh_direct_archive_verification_sha256==$direct_archive_verify_sha and .fresh_direct_profile_verification_sha256==$direct_profile_verify_sha and .projection_sha256==$projection_sha and .archive_admission_engine_sha256==$engine_sha and .archive_admission_profile_sha256==$profile_sha and .runner_environment_sha256==$runner_sha' \
+            "$root/consumer_verifier_profile.json" >/dev/null
+
+          echo "root=$root" >> "$GITHUB_OUTPUT"
+          echo "admission_sha256=$(/usr/bin/sha256sum "$SOURCE_DIR/fresh-report-admission.json" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "final_archive_sha256=$final_archive_sha" >> "$GITHUB_OUTPUT"
+          echo "projection_sha256=$projection_sha" >> "$GITHUB_OUTPUT"
+          echo "consumer_provenance_sha256=$(/usr/bin/sha256sum "$root/consumer_provenance.json" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "consumer_profile_sha256=$(/usr/bin/sha256sum "$root/consumer_verifier_profile.json" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Re-admit embedded final-resolution archive
+        id: final_admission
+        shell: bash
+        env:
+          REPORT_ROOT: ${{ steps.report_admission.outputs.root }}
+          TRUSTED_ENGINE: ${{ github.workspace }}/.github/scripts/evidence_archive_admission.py
+          TRUSTED_FINAL_PROFILE: ${{ github.workspace }}/.github/evidence-profiles/gwt1-final-resolution-v1.json
+          FINAL_ARCHIVE_SHA256: ${{ steps.report_admission.outputs.final_archive_sha256 }}
+          BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA: "198aaf257de0b4f264f69eb64d813d772f0362d6"
+        run: |
+          set -euo pipefail
+          archive="$REPORT_ROOT/source/gwt1-final-resolution.tar.gz"
+          (cd "$REPORT_ROOT/source" && /usr/bin/sha256sum -c gwt1-final-resolution.tar.gz.sha256)
+          out="$RUNNER_TEMP/gwt1-closure-final-admitted"
+          rm -rf "$out"
+          mkdir -p "$out"
+          /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_FINAL_PROFILE" --archive "$archive" --output-dir "$out" > "$RUNNER_TEMP/gwt1-closure-final-admission.json"
+          /usr/bin/jq -e --arg archive_sha "$FINAL_ARCHIVE_SHA256" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-final-resolution-archive-v1" and .archive_sha256==$archive_sha and .member_count==60 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' "$RUNNER_TEMP/gwt1-closure-final-admission.json" >/dev/null
+          root="$out/gwt1-final-resolution"
+          /usr/bin/cmp -s "$TRUSTED_ENGINE" "$root/archive_admission_engine.py"
+          /usr/bin/cmp -s "$TRUSTED_FINAL_PROFILE" "$root/archive_admission_profile.json"
+          (cd "$root" && /usr/bin/sha256sum -c SHA256SUMS)
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" '.schema=="butlin-gwt1-trusted-final-resolution-provenance-v1" and .repository==$repository and .resolution_workflow_sha==$workflow_sha' "$root/resolution_provenance.json" >/dev/null
+          /usr/bin/cmp -s "$root/sources/promotion/promotion_verifier_profile.json" "$root/authority/promotion/promotion_verifier_profile.json"
+          /usr/bin/cmp -s "$root/sources/promotion/promotion_provenance.json" "$root/authority/promotion/promotion_provenance.json"
+          echo "root=$root" >> "$GITHUB_OUTPUT"
+          echo "admission_sha256=$(/usr/bin/sha256sum "$RUNNER_TEMP/gwt1-closure-final-admission.json" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Freshly verify promotion capsule and verifier profile
+        id: promotion_verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/gwt1-closure-trusted-gh-config
+          GH_NO_UPDATE_NOTIFIER: "1"
+          GH_PROMPT_DISABLED: "1"
+          TRUSTED_GH_PATH: ${{ steps.trusted_gh.outputs.gh_path }}
+          TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.binary_sha256 }}
+          TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
+          FINAL_ROOT: ${{ steps.final_admission.outputs.root }}
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          BOOTSTRAP_PROMOTION_WORKFLOW_SHA: "b5b693f3162ac4c66d00e2391f77a6e86a84a788"
+          BOOTSTRAP_CAUSAL_BUILDER_SHA: "21f83eece23c8ee9c2f8fa3c1fc1ab3f555c40e7"
+          TRUSTED_ENGINE: ${{ github.workspace }}/.github/scripts/evidence_archive_admission.py
+          TRUSTED_CAUSAL_PROFILE: ${{ github.workspace }}/.github/evidence-profiles/gwt1-causal-evidence-v1.json
+        run: |
+          set -euo pipefail
+          unset GH_HOST GH_ENTERPRISE_TOKEN
+          capsule="$FINAL_ROOT/sources/promotion/promotion_capsule.json"
+          profile="$FINAL_ROOT/sources/promotion/promotion_verifier_profile.json"
+          authority="$FINAL_ROOT/authority/promotion/authority.json"
+          out="$RUNNER_TEMP/gwt1-closure-promotion-authority"
+          rm -rf "$out"
+          mkdir -p "$out"
+
+          "$TRUSTED_GH_PATH" attestation verify "$capsule" --repo "$GITHUB_REPOSITORY" \
+            --bundle "$FINAL_ROOT/authority/promotion/capsule_attestation.json" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-causal-trusted-promotion.yml" \
+            --signer-digest "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --deny-self-hosted-runners --format json > "$out/capsule-verification.json"
+          "$TRUSTED_GH_PATH" attestation verify "$profile" --repo "$GITHUB_REPOSITORY" \
+            --bundle "$FINAL_ROOT/authority/promotion/profile_attestation.json" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-causal-trusted-promotion.yml" \
+            --signer-digest "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --deny-self-hosted-runners --format json > "$out/profile-verification.json"
+          test -s "$out/capsule-verification.json"
+          test -s "$out/profile-verification.json"
+
+          /usr/bin/cmp -s "$TRUSTED_ENGINE" "$FINAL_ROOT/sources/promotion/archive_admission_engine.py"
+          /usr/bin/cmp -s "$TRUSTED_CAUSAL_PROFILE" "$FINAL_ROOT/sources/promotion/archive_admission_profile.json"
+          capsule_sha="$(/usr/bin/sha256sum "$capsule" | /usr/bin/awk '{print $1}')"
+          verifier_profile_sha="$(/usr/bin/sha256sum "$profile" | /usr/bin/awk '{print $1}')"
+          admission_engine_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/sources/promotion/archive_admission_engine.py" | /usr/bin/awk '{print $1}')"
+          admission_profile_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/sources/promotion/archive_admission_profile.json" | /usr/bin/awk '{print $1}')"
+          admission_result_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/sources/promotion/archive_admission.json" | /usr/bin/awk '{print $1}')"
+          causal_archive_sha="$(/usr/bin/jq -r '.archive_sha256' "$FINAL_ROOT/sources/promotion/archive_admission.json")"
+          causal_archive_verify_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/sources/promotion/upstream/causal_archive_verification.json" | /usr/bin/awk '{print $1}')"
+          upstream_profile_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/sources/promotion/upstream/causal_builder_verifier_profile.json" | /usr/bin/awk '{print $1}')"
+          upstream_profile_verify_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/sources/promotion/upstream/causal_builder_verifier_profile_verification.json" | /usr/bin/awk '{print $1}')"
+
+          /usr/bin/jq -e --arg archive_sha "$causal_archive_sha" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-causal-evidence-archive-v1" and .archive_sha256==$archive_sha and .archive_bytes>0 and .tar_stream_bytes>0 and .member_count==8 and .total_unpacked_bytes>0' "$FINAL_ROOT/sources/promotion/archive_admission.json" >/dev/null
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg promotion_sha "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --arg dist_sha "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be" \
+            --arg binary_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" --arg engine_sha "$admission_engine_sha" --arg admission_profile_sha "$admission_profile_sha" --arg admission_result_sha "$admission_result_sha" \
+            --arg causal_archive_sha "$causal_archive_sha" --arg causal_archive_verify_sha "$causal_archive_verify_sha" --arg upstream_profile_sha "$upstream_profile_sha" --arg upstream_profile_verify_sha "$upstream_profile_verify_sha" --arg capsule_sha "$capsule_sha" \
+            '.schema=="butlin-gwt1-attestation-verifier-profile-v2" and .repository==$repository and .promotion_workflow_sha==$promotion_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256==$dist_sha and .executable_sha256==$binary_sha and .version_output_sha256==$version_sha and .configuration_policy=="isolated-gh-config-v1" and .archive_admission_profile_id=="gwt1-causal-evidence-archive-v1" and .archive_admission_engine_sha256==$engine_sha and .archive_admission_profile_sha256==$admission_profile_sha and .archive_admission_result_sha256==$admission_result_sha and .causal_archive_sha256==$causal_archive_sha and .causal_archive_verification_sha256==$causal_archive_verify_sha and .upstream_builder_profile_sha256==$upstream_profile_sha and .upstream_builder_profile_verification_sha256==$upstream_profile_verify_sha and .deny_self_hosted_runners==true and .capsule_sha256==$capsule_sha' \
+            "$profile" >/dev/null
+
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg promotion_sha "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --arg builder_sha "$BOOTSTRAP_CAUSAL_BUILDER_SHA" --arg subject "$EVIDENCE_SUBJECT_SHA" --arg capsule_sha "$capsule_sha" --arg profile_sha "$verifier_profile_sha" \
+            '.schema=="butlin-gwt1-causal-promotion-provenance-v2" and .repository==$repository and .promotion_workflow_sha==$promotion_sha and .approved_causal_builder_sha==$builder_sha and .evidence_subject_sha==$subject and .capsule_sha256==$capsule_sha and .verifier_profile_sha256==$profile_sha' \
+            "$FINAL_ROOT/sources/promotion/promotion_provenance.json" >/dev/null
+
+          stored_capsule_verify_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/authority/promotion/fresh_capsule_verification.json" | /usr/bin/awk '{print $1}')"
+          stored_profile_verify_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/authority/promotion/fresh_profile_verification.json" | /usr/bin/awk '{print $1}')"
+          internal_verify_sha="$(/usr/bin/sha256sum "$FINAL_ROOT/authority/promotion/internal_verification.json" | /usr/bin/awk '{print $1}')"
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg builder_sha "$BOOTSTRAP_CAUSAL_BUILDER_SHA" --arg promotion_sha "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --arg subject "$EVIDENCE_SUBJECT_SHA" --arg capsule_sha "$capsule_sha" --arg profile_sha "$verifier_profile_sha" --arg capsule_verify_sha "$stored_capsule_verify_sha" --arg profile_verify_sha "$stored_profile_verify_sha" --arg internal_sha "$internal_verify_sha" \
+            '.schema=="butlin-gwt1-final-promotion-authority-v1" and .repository==$repository and .approved_causal_builder_sha==$builder_sha and .approved_promotion_workflow_sha==$promotion_sha and .evidence_subject_sha==$subject and .promotion_capsule_sha256==$capsule_sha and .promotion_verifier_profile_sha256==$profile_sha and .fresh_capsule_verification_sha256==$capsule_verify_sha and .fresh_profile_verification_sha256==$profile_verify_sha and .internal_token_verification_sha256==$internal_sha' \
+            "$authority" >/dev/null
+
+          echo "capsule_sha256=$capsule_sha" >> "$GITHUB_OUTPUT"
+          echo "profile_sha256=$verifier_profile_sha" >> "$GITHUB_OUTPUT"
+          echo "capsule_verification_sha256=$(/usr/bin/sha256sum "$out/capsule-verification.json" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "profile_verification_sha256=$(/usr/bin/sha256sum "$out/profile-verification.json" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+          echo "authority_sha256=$(/usr/bin/sha256sum "$authority" | /usr/bin/awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Package deterministic authority closure
+        id: package
+        shell: bash
+        env:
+          REPORT_SOURCE_DIR: ${{ runner.temp }}/gwt1-closure-report-source
+          REPORT_ROOT: ${{ steps.report_admission.outputs.root }}
+          FINAL_ROOT: ${{ steps.final_admission.outputs.root }}
+          REPORT_ARCHIVE_SHA256: ${{ steps.report_verify.outputs.archive_sha256 }}
+          REPORT_VERIFICATION_SHA256: ${{ steps.report_verify.outputs.verification_sha256 }}
+          REPORT_ADMISSION_SHA256: ${{ steps.report_admission.outputs.admission_sha256 }}
+          FINAL_ARCHIVE_SHA256: ${{ steps.report_admission.outputs.final_archive_sha256 }}
+          FINAL_ADMISSION_SHA256: ${{ steps.final_admission.outputs.admission_sha256 }}
+          PROJECTION_SHA256: ${{ steps.report_admission.outputs.projection_sha256 }}
+          CONSUMER_PROVENANCE_SHA256: ${{ steps.report_admission.outputs.consumer_provenance_sha256 }}
+          CONSUMER_PROFILE_SHA256: ${{ steps.report_admission.outputs.consumer_profile_sha256 }}
+          PROMOTION_CAPSULE_SHA256: ${{ steps.promotion_verify.outputs.capsule_sha256 }}
+          PROMOTION_PROFILE_SHA256: ${{ steps.promotion_verify.outputs.profile_sha256 }}
+          PROMOTION_CAPSULE_VERIFICATION_SHA256: ${{ steps.promotion_verify.outputs.capsule_verification_sha256 }}
+          PROMOTION_PROFILE_VERIFICATION_SHA256: ${{ steps.promotion_verify.outputs.profile_verification_sha256 }}
+          PROMOTION_AUTHORITY_SHA256: ${{ steps.promotion_verify.outputs.authority_sha256 }}
+          TRUSTED_GH_PATH: ${{ steps.trusted_gh.outputs.gh_path }}
+          TRUSTED_GH_BINARY_SHA256: ${{ steps.trusted_gh.outputs.binary_sha256 }}
+          TRUSTED_GH_VERSION_OUTPUT_SHA256: ${{ steps.trusted_gh.outputs.version_output_sha256 }}
+          EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
+          CONSUMER_RUN_ID: ${{ inputs.consumer_run_id }}
+          CONSUMER_RUN_ATTEMPT: ${{ inputs.consumer_run_attempt }}
+          CLOSURE_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          BOOTSTRAP_CONSUMER_WORKFLOW_SHA: "2b4b54da4ee9028bb727267e4ae38fcc002e28dc"
+          BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA: "198aaf257de0b4f264f69eb64d813d772f0362d6"
+          BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA: "6eaf73a20047b99120e59eb96f48ae0e194e2c80"
+          BOOTSTRAP_PROMOTION_WORKFLOW_SHA: "b5b693f3162ac4c66d00e2391f77a6e86a84a788"
+          BOOTSTRAP_CAUSAL_BUILDER_SHA: "21f83eece23c8ee9c2f8fa3c1fc1ab3f555c40e7"
+        run: |
+          set -euo pipefail
+          package_root="$RUNNER_TEMP/gwt1-consumer-authority-closure-package"
+          stage="$package_root/gwt1-consumer-authority-closure"
+          rm -rf "$package_root"
+          mkdir -p "$stage/authority" "$stage/environment" "$stage/source"
+
+          /usr/bin/install -m 0644 "$GITHUB_WORKSPACE/.github/scripts/evidence_archive_admission.py" "$stage/archive_admission_engine.py"
+          /usr/bin/install -m 0644 "$GITHUB_WORKSPACE/.github/evidence-profiles/gwt1-consumer-authority-closure-v1.json" "$stage/archive_admission_profile.json"
+          /usr/bin/install -m 0644 "$REPORT_ROOT/consumer_provenance.json" "$stage/source/consumer_provenance.json"
+          /usr/bin/install -m 0644 "$REPORT_ROOT/consumer_verifier_profile.json" "$stage/source/consumer_verifier_profile.json"
+          /usr/bin/install -m 0644 "$FINAL_ROOT/sources/promotion/promotion_verifier_profile.json" "$stage/source/promotion_verifier_profile.json"
+          /usr/bin/install -m 0644 "$FINAL_ROOT/authority/promotion/authority.json" "$stage/source/promotion_authority.json"
+          /usr/bin/install -m 0644 "$REPORT_SOURCE_DIR/fresh-report-verification.json" "$stage/authority/fresh_report_archive_verification.json"
+          /usr/bin/install -m 0644 "$REPORT_SOURCE_DIR/fresh-report-admission.json" "$stage/authority/fresh_report_archive_admission.json"
+          /usr/bin/install -m 0644 "$RUNNER_TEMP/gwt1-closure-final-admission.json" "$stage/authority/fresh_final_archive_admission.json"
+          /usr/bin/install -m 0644 "$RUNNER_TEMP/gwt1-closure-promotion-authority/capsule-verification.json" "$stage/authority/fresh_promotion_capsule_verification.json"
+          /usr/bin/install -m 0644 "$RUNNER_TEMP/gwt1-closure-promotion-authority/profile-verification.json" "$stage/authority/fresh_promotion_profile_verification.json"
+
+          "$TRUSTED_GH_PATH" --version > "$stage/environment/gh-version.txt"
+          /usr/bin/python3 --version > "$stage/environment/python-version.txt" 2>&1
+          /usr/bin/tar --version > "$stage/environment/tar-version.txt"
+          /usr/bin/gzip --version > "$stage/environment/gzip-version.txt"
+          /usr/bin/sha256sum --version > "$stage/environment/sha256sum-version.txt"
+          /usr/bin/jq --version > "$stage/environment/jq-version.txt"
+          /usr/bin/curl --version > "$stage/environment/curl-version.txt"
+          /usr/bin/jq -n --arg schema butlin-gwt1-consumer-authority-closure-runner-environment-v1 --arg image_os "${ImageOS:-unknown}" --arg image_version "${ImageVersion:-unknown}" --arg runner_arch "${RUNNER_ARCH:-unknown}" --arg python_sha "$(/usr/bin/sha256sum /usr/bin/python3 | /usr/bin/awk '{print $1}')" --arg tar_sha "$(/usr/bin/sha256sum /usr/bin/tar | /usr/bin/awk '{print $1}')" --arg gzip_sha "$(/usr/bin/sha256sum /usr/bin/gzip | /usr/bin/awk '{print $1}')" --arg sha256sum_sha "$(/usr/bin/sha256sum /usr/bin/sha256sum | /usr/bin/awk '{print $1}')" --arg jq_sha "$(/usr/bin/sha256sum /usr/bin/jq | /usr/bin/awk '{print $1}')" --arg curl_sha "$(/usr/bin/sha256sum /usr/bin/curl | /usr/bin/awk '{print $1}')" '{schema:$schema,image_os:$image_os,image_version:$image_version,runner_arch:$runner_arch,python3_sha256:$python_sha,tar_sha256:$tar_sha,gzip_sha256:$gzip_sha,sha256sum_sha256:$sha256sum_sha,jq_sha256:$jq_sha,curl_sha256:$curl_sha}' > "$stage/environment/runner_environment.json"
+
+          runner_sha="$(/usr/bin/sha256sum "$stage/environment/runner_environment.json" | /usr/bin/awk '{print $1}')"
+          closure_engine_blob="$(git rev-parse HEAD:.github/scripts/evidence_archive_admission.py)"
+          report_profile_blob="$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v2.json)"
+          final_profile_blob="$(git rev-parse HEAD:.github/evidence-profiles/gwt1-final-resolution-v1.json)"
+          causal_profile_blob="$(git rev-parse HEAD:.github/evidence-profiles/gwt1-causal-evidence-v1.json)"
+          closure_profile_blob="$(git rev-parse HEAD:.github/evidence-profiles/gwt1-consumer-authority-closure-v1.json)"
+
+          /usr/bin/jq -n --arg schema butlin-gwt1-final-consumer-authority-closure-v1 --arg repository "$GITHUB_REPOSITORY" --arg closure_workflow_sha "$CLOSURE_WORKFLOW_SHA" --arg subject "$EVIDENCE_SUBJECT_SHA" --arg consumer_run_id "$CONSUMER_RUN_ID" --arg consumer_run_attempt "$CONSUMER_RUN_ATTEMPT" --arg consumer_workflow_sha "$BOOTSTRAP_CONSUMER_WORKFLOW_SHA" --arg final_workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg promotion_workflow_sha "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --arg causal_builder_sha "$BOOTSTRAP_CAUSAL_BUILDER_SHA" --arg report_sha "$REPORT_ARCHIVE_SHA256" --arg report_verify_sha "$REPORT_VERIFICATION_SHA256" --arg report_admission_sha "$REPORT_ADMISSION_SHA256" --arg final_archive_sha "$FINAL_ARCHIVE_SHA256" --arg final_admission_sha "$FINAL_ADMISSION_SHA256" --arg projection_sha "$PROJECTION_SHA256" --arg consumer_provenance_sha "$CONSUMER_PROVENANCE_SHA256" --arg consumer_profile_sha "$CONSUMER_PROFILE_SHA256" --arg promotion_capsule_sha "$PROMOTION_CAPSULE_SHA256" --arg promotion_profile_sha "$PROMOTION_PROFILE_SHA256" --arg promotion_capsule_verify_sha "$PROMOTION_CAPSULE_VERIFICATION_SHA256" --arg promotion_profile_verify_sha "$PROMOTION_PROFILE_VERIFICATION_SHA256" --arg promotion_authority_sha "$PROMOTION_AUTHORITY_SHA256" '{schema:$schema,repository:$repository,closure_workflow_sha:$closure_workflow_sha,evidence_subject_sha:$subject,consumer_run_id:$consumer_run_id,consumer_run_attempt:$consumer_run_attempt,consumer_workflow_sha:$consumer_workflow_sha,final_resolution_workflow_sha:$final_workflow_sha,promotion_workflow_sha:$promotion_workflow_sha,causal_builder_sha:$causal_builder_sha,report_archive_sha256:$report_sha,fresh_report_archive_verification_sha256:$report_verify_sha,fresh_report_archive_admission_sha256:$report_admission_sha,embedded_final_archive_sha256:$final_archive_sha,fresh_embedded_final_archive_admission_sha256:$final_admission_sha,projection_sha256:$projection_sha,consumer_provenance_sha256:$consumer_provenance_sha,consumer_verifier_profile_sha256:$consumer_profile_sha,promotion_capsule_sha256:$promotion_capsule_sha,promotion_verifier_profile_sha256:$promotion_profile_sha,fresh_promotion_capsule_verification_sha256:$promotion_capsule_verify_sha,fresh_promotion_profile_verification_sha256:$promotion_profile_verify_sha,promotion_authority_sha256:$promotion_authority_sha}' > "$stage/closure.json"
+
+          /usr/bin/jq -n --arg schema butlin-gwt1-consumer-authority-closure-verifier-profile-v1 --arg repository "$GITHUB_REPOSITORY" --arg closure_workflow_sha "$CLOSURE_WORKFLOW_SHA" --arg consumer_workflow_sha "$BOOTSTRAP_CONSUMER_WORKFLOW_SHA" --arg final_workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg direct_builder_sha "$BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA" --arg promotion_workflow_sha "$BOOTSTRAP_PROMOTION_WORKFLOW_SHA" --arg causal_builder_sha "$BOOTSTRAP_CAUSAL_BUILDER_SHA" --arg binary_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" --arg engine_blob "$closure_engine_blob" --arg report_profile_blob "$report_profile_blob" --arg final_profile_blob "$final_profile_blob" --arg causal_profile_blob "$causal_profile_blob" --arg closure_profile_blob "$closure_profile_blob" --arg runner_sha "$runner_sha" '{schema:$schema,repository:$repository,closure_workflow_sha:$closure_workflow_sha,consumer_workflow_sha:$consumer_workflow_sha,final_resolution_workflow_sha:$final_workflow_sha,direct_builder_workflow_sha:$direct_builder_sha,promotion_workflow_sha:$promotion_workflow_sha,causal_builder_sha:$causal_builder_sha,verifier:"github-cli",verifier_version:"2.100.0",distribution_sha256:"e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",executable_sha256:$binary_sha,version_output_sha256:$version_sha,configuration_policy:"isolated-gh-config-v1",deny_self_hosted_runners:true,archive_admission_engine_git_blob:$engine_blob,report_archive_profile_id:"gwt1-verified-report-archive-v2",report_archive_profile_git_blob:$report_profile_blob,final_resolution_archive_profile_id:"gwt1-final-resolution-archive-v1",final_resolution_archive_profile_git_blob:$final_profile_blob,causal_archive_profile_id:"gwt1-causal-evidence-archive-v1",causal_archive_profile_git_blob:$causal_profile_blob,closure_archive_profile_id:"gwt1-consumer-authority-closure-archive-v1",closure_archive_profile_git_blob:$closure_profile_blob,runner_environment_sha256:$runner_sha}' > "$stage/closure_verifier_profile.json"
+
+          (
+            cd "$stage"
+            find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 /usr/bin/sha256sum > SHA256SUMS
+          )
+          /usr/bin/tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C "$package_root" -cf - gwt1-consumer-authority-closure | /usr/bin/gzip -n > "$RUNNER_TEMP/gwt1-consumer-authority-closure.tar.gz"
+          (cd "$RUNNER_TEMP" && /usr/bin/sha256sum gwt1-consumer-authority-closure.tar.gz > gwt1-consumer-authority-closure.tar.gz.sha256)
+
+          archive_sha="$(/usr/bin/sha256sum "$RUNNER_TEMP/gwt1-consumer-authority-closure.tar.gz" | /usr/bin/awk '{print $1}')"
+          admission="$RUNNER_TEMP/gwt1-consumer-authority-closure-admission.json"
+          extract="$RUNNER_TEMP/gwt1-consumer-authority-closure-admitted"
+          rm -rf "$extract"
+          mkdir -p "$extract"
+          /usr/bin/python3 "$GITHUB_WORKSPACE/.github/scripts/evidence_archive_admission.py" --profile "$GITHUB_WORKSPACE/.github/evidence-profiles/gwt1-consumer-authority-closure-v1.json" --archive "$RUNNER_TEMP/gwt1-consumer-authority-closure.tar.gz" --output-dir "$extract" > "$admission"
+          /usr/bin/jq -e --arg archive_sha "$archive_sha" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-consumer-authority-closure-archive-v1" and .archive_sha256==$archive_sha and .member_count==26 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' "$admission" >/dev/null
+          (cd "$extract/gwt1-consumer-authority-closure" && /usr/bin/sha256sum -c SHA256SUMS)
+          rm -rf "$extract"
+          (cd "$RUNNER_TEMP" && /usr/bin/sha256sum gwt1-consumer-authority-closure-admission.json > gwt1-consumer-authority-closure-admission.json.sha256)
+          echo "archive_sha256=$archive_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Attest complete consumer authority closure archive
+        id: closure_attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: ${{ runner.temp }}/gwt1-consumer-authority-closure.tar.gz
+
+      - name: Verify and preserve closure attestation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_CONFIG_DIR: ${{ runner.temp }}/gwt1-closure-trusted-gh-config
+          GH_NO_UPDATE_NOTIFIER: "1"
+          GH_PROMPT_DISABLED: "1"
+          TRUSTED_GH_PATH: ${{ steps.trusted_gh.outputs.gh_path }}
+          CLOSURE_ATTESTATION_BUNDLE: ${{ steps.closure_attest.outputs.bundle-path }}
+          CLOSURE_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          unset GH_HOST GH_ENTERPRISE_TOKEN
+          out="$RUNNER_TEMP/gwt1-consumer-authority-closure-attestation"
+          rm -rf "$out"
+          mkdir -p "$out"
+          cp "$CLOSURE_ATTESTATION_BUNDLE" "$out/attestation.json"
+          "$TRUSTED_GH_PATH" attestation verify "$RUNNER_TEMP/gwt1-consumer-authority-closure.tar.gz" --repo "$GITHUB_REPOSITORY" --bundle "$out/attestation.json" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-consumer-authority-closure.yml" --signer-digest "$CLOSURE_WORKFLOW_SHA" --deny-self-hosted-runners --format json > "$out/verification.json"
+          test -s "$out/verification.json"
+          (cd "$out" && /usr/bin/sha256sum attestation.json > attestation.json.sha256 && /usr/bin/sha256sum verification.json > verification.json.sha256)
+
+      - name: Upload independently closed GWT-1 authority artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gwt1-consumer-authority-closure-${{ inputs.evidence_subject_sha }}-${{ inputs.consumer_run_id }}-${{ inputs.consumer_run_attempt }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/gwt1-consumer-authority-closure.tar.gz
+            ${{ runner.temp }}/gwt1-consumer-authority-closure.tar.gz.sha256
+            ${{ runner.temp }}/gwt1-consumer-authority-closure-admission.json
+            ${{ runner.temp }}/gwt1-consumer-authority-closure-admission.json.sha256
+            ${{ runner.temp }}/gwt1-consumer-authority-closure-attestation/
+          if-no-files-found: error
+          retention-days: 90
