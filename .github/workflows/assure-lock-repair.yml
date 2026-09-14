@@ -1,0 +1,136 @@
+name: ASSURE lock parity repair
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/assure-lock-repair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  repair-parent-lock:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feat/assure-002-preregistration
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Verify exact parent input
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "0f4396592574e0e72d261bf956c88d197707f5f2"
+          test "$(git hash-object Cargo.lock)" = "e770b290d667da88dae44c5ab6fff9fb615a4098"
+          test -z "$(git status --porcelain)"
+      - name: Apply reviewed campaign lock entry only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('Cargo.lock')
+          text = path.read_text()
+          assert 'name = "symthaea-assurance-campaign"' not in text
+          marker = '[[package]]\nname = "symthaea-assurance-core"\n'
+          assert text.count(marker) == 1
+          block = '''[[package]]
+          name = "symthaea-assurance-campaign"
+          version = "0.1.0"
+          dependencies = [
+           "sha2 0.10.9",
+           "symthaea-assurance-core",
+           "symthaea-assurance-subject",
+           "thiserror 1.0.69",
+          ]
+
+          '''
+          path.write_text(text.replace(marker, block + marker))
+          PY
+          test "$(sha256sum Cargo.lock | cut -d' ' -f1)" = "bbb6e6b7e8e3393ccc22238ec1056ca5dd31574cd61e3185595acd3fc761500a"
+          test "$(git diff --name-only)" = "Cargo.lock"
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock
+      - name: Commit exact parent lock repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore(assurance): reconcile ASSURE-002 root lock"
+          git push origin HEAD:feat/assure-002-preregistration
+
+  repair-semantics-lock:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feat/assure-002a-semantic-schema
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Verify exact stacked input
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "41b77d97c9617b7ba726e71b79d13737777f4146"
+          test "$(git hash-object Cargo.lock)" = "e770b290d667da88dae44c5ab6fff9fb615a4098"
+          test -z "$(git status --porcelain)"
+      - name: Apply reviewed campaign and semantics lock entries only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('Cargo.lock')
+          text = path.read_text()
+          assert 'name = "symthaea-assurance-campaign"' not in text
+          assert 'name = "symthaea-assurance-semantics"' not in text
+          core_marker = '[[package]]\nname = "symthaea-assurance-core"\n'
+          subject_marker = '[[package]]\nname = "symthaea-assurance-subject"\n'
+          assert text.count(core_marker) == 1
+          assert text.count(subject_marker) == 1
+          campaign = '''[[package]]
+          name = "symthaea-assurance-campaign"
+          version = "0.1.0"
+          dependencies = [
+           "sha2 0.10.9",
+           "symthaea-assurance-core",
+           "symthaea-assurance-subject",
+           "thiserror 1.0.69",
+          ]
+
+          '''
+          semantics = '''[[package]]
+          name = "symthaea-assurance-semantics"
+          version = "0.1.0"
+          dependencies = [
+           "sha2 0.10.9",
+           "symthaea-assurance-core",
+           "thiserror 1.0.69",
+          ]
+
+          '''
+          text = text.replace(core_marker, campaign + core_marker)
+          text = text.replace(subject_marker, semantics + subject_marker)
+          path.write_text(text)
+          PY
+          test "$(sha256sum Cargo.lock | cut -d' ' -f1)" = "c8393c2ac181cb86151aa82bfd4ac406cf7f7eb8f9da4242b02c3712997f0cd8"
+          test "$(git diff --name-only)" = "Cargo.lock"
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock
+      - name: Commit exact stacked lock repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "chore(assurance): reconcile ASSURE-002A root lock"
+          git push origin HEAD:feat/assure-002a-semantic-schema
