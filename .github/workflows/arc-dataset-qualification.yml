@@ -1,0 +1,124 @@
+name: ARC Dataset Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'src/bin/arc_dataset_manifest.rs'
+      - '.github/reasoning/qualify-arc-dataset.sh'
+      - '.github/workflows/arc-dataset-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-dataset-qualification-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  exact-dataset-subject:
+    name: Exact ARC-AGI-2 public dataset subject
+    runs-on: ubuntu-latest
+    env:
+      SYMTHAEA_SUBJECT_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      SYMTHAEA_ARC_DATASET_REPOSITORY: arcprize/ARC-AGI-2
+      SYMTHAEA_ARC_DATASET_REVISION: f3283f727488ad98fe575ea6a5ac981e4a188e49
+      SYMTHAEA_ARC_DATASET_TREE: afab62b97f29dd2341f401d4af70491e14da35c2
+      SYMTHAEA_ARC_DATASET_ROOT: target/rq-006z/arc-agi-2
+      SYMTHAEA_ARC_DATASET_MANIFEST_BIN: ${{ github.workspace }}/target/debug/arc_dataset_manifest
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Qualify manifest oracle source
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/bin/arc_dataset_manifest.rs
+          cargo check --locked --bin arc_dataset_manifest
+          cargo test --locked --bin arc_dataset_manifest
+          cargo clippy --locked --bin arc_dataset_manifest -- -D warnings
+          cargo build --locked --bin arc_dataset_manifest
+
+      - name: Acquire exact public ARC-AGI-2 subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$SYMTHAEA_ARC_DATASET_ROOT"
+          mkdir -p "$SYMTHAEA_ARC_DATASET_ROOT"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" init -q
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" remote add origin https://github.com/arcprize/ARC-AGI-2.git
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" fetch --depth=1 origin "$SYMTHAEA_ARC_DATASET_REVISION"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" checkout --detach -q FETCH_HEAD
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse HEAD)" = "$SYMTHAEA_ARC_DATASET_REVISION"
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse 'HEAD^{tree}')" = "$SYMTHAEA_ARC_DATASET_TREE"
+          test -z "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" status --porcelain=v1 --untracked-files=all)"
+
+      - name: Qualify public training split manifest
+        env:
+          SYMTHAEA_ARC_SPLIT: training
+          SYMTHAEA_ARC_EXPECTED_TASKS: '1000'
+          SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-training-manifest.json
+        run: bash .github/reasoning/qualify-arc-dataset.sh
+
+      - name: Prove training manifest determinism
+        env:
+          SYMTHAEA_ARC_SPLIT: training
+          SYMTHAEA_ARC_EXPECTED_TASKS: '1000'
+          SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-training-manifest.repeat.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/reasoning/qualify-arc-dataset.sh
+          cmp -s \
+            target/rq-006z/arc-agi-2-training-manifest.json \
+            target/rq-006z/arc-agi-2-training-manifest.repeat.json
+          rm target/rq-006z/arc-agi-2-training-manifest.repeat.json
+
+      - name: Qualify public evaluation split manifest
+        env:
+          SYMTHAEA_ARC_SPLIT: evaluation
+          SYMTHAEA_ARC_EXPECTED_TASKS: '120'
+          SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-evaluation-manifest.json
+        run: bash .github/reasoning/qualify-arc-dataset.sh
+
+      - name: Prove evaluation manifest determinism
+        env:
+          SYMTHAEA_ARC_SPLIT: evaluation
+          SYMTHAEA_ARC_EXPECTED_TASKS: '120'
+          SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/arc-agi-2-evaluation-manifest.repeat.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/reasoning/qualify-arc-dataset.sh
+          cmp -s \
+            target/rq-006z/arc-agi-2-evaluation-manifest.json \
+            target/rq-006z/arc-agi-2-evaluation-manifest.repeat.json
+          rm target/rq-006z/arc-agi-2-evaluation-manifest.repeat.json
+
+      - name: Final checkout immutability proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SYMTHAEA_SUBJECT_REVISION"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse HEAD)" = "$SYMTHAEA_ARC_DATASET_REVISION"
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse 'HEAD^{tree}')" = "$SYMTHAEA_ARC_DATASET_TREE"
+          test -z "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" status --porcelain=v1 --untracked-files=all)"
+
+      - name: Upload dataset manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: arc-agi-2-public-manifests-${{ env.SYMTHAEA_ARC_DATASET_REVISION }}
+          path: |
+            target/rq-006z/arc-agi-2-training-manifest.json
+            target/rq-006z/arc-agi-2-evaluation-manifest.json
+          if-no-files-found: error
+          retention-days: 30
