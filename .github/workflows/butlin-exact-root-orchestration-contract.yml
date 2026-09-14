@@ -1,0 +1,85 @@
+name: Butlin Exact-Root Reusable Workflow Orchestration Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-exact-root-orchestration-contract.yml"
+      - ".github/workflows/butlin-reusable-run-context-producer-probe.yml"
+      - ".github/workflows/butlin-reusable-run-context-consumer-probe.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  producer:
+    name: Invoke producer probe at exact historical SHA P
+    permissions:
+      contents: read
+    uses: Luminous-Dynamics/symthaea/.github/workflows/butlin-reusable-run-context-producer-probe.yml@bde90278e5b61391a58311a2945a9a5c557586b5
+    with:
+      expected_run_id: ${{ github.run_id }}
+      expected_run_attempt: ${{ github.run_attempt }}
+
+  consumer:
+    name: Invoke consumer probe at exact historical SHA P
+    needs: producer
+    permissions:
+      contents: read
+      actions: read
+    uses: Luminous-Dynamics/symthaea/.github/workflows/butlin-reusable-run-context-consumer-probe.yml@bde90278e5b61391a58311a2945a9a5c557586b5
+    with:
+      expected_run_id: ${{ github.run_id }}
+      expected_run_attempt: ${{ github.run_attempt }}
+      artifact_name: ${{ needs.producer.outputs.artifact_name }}
+
+  theorem:
+    name: Prove exact reusable-workflow and caller-run identities
+    needs: [producer, consumer]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact caller qualification head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact historical P and shared caller run
+        shell: bash
+        env:
+          EXPECTED_CALLER_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_PROBE_SHA: bde90278e5b61391a58311a2945a9a5c557586b5
+          PRODUCER_RUN_ID: ${{ needs.producer.outputs.observed_run_id }}
+          PRODUCER_RUN_ATTEMPT: ${{ needs.producer.outputs.observed_run_attempt }}
+          PRODUCER_WORKFLOW_SHA: ${{ needs.producer.outputs.observed_workflow_sha }}
+          PRODUCER_WORKFLOW_PATH: ${{ needs.producer.outputs.observed_workflow_path }}
+          CONSUMER_RUN_ID: ${{ needs.consumer.outputs.observed_run_id }}
+          CONSUMER_RUN_ATTEMPT: ${{ needs.consumer.outputs.observed_run_attempt }}
+          CONSUMER_WORKFLOW_SHA: ${{ needs.consumer.outputs.observed_workflow_sha }}
+          PAYLOAD_PRODUCER_WORKFLOW_SHA: ${{ needs.consumer.outputs.producer_workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_CALLER_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_CALLER_SHA"
+          test "$EXPECTED_CALLER_SHA" != "$EXPECTED_PROBE_SHA"
+
+          test "$PRODUCER_RUN_ID" = "$GITHUB_RUN_ID"
+          test "$CONSUMER_RUN_ID" = "$GITHUB_RUN_ID"
+          test "$PRODUCER_RUN_ATTEMPT" = "$GITHUB_RUN_ATTEMPT"
+          test "$CONSUMER_RUN_ATTEMPT" = "$GITHUB_RUN_ATTEMPT"
+
+          test "$PRODUCER_WORKFLOW_SHA" = "$EXPECTED_PROBE_SHA"
+          test "$CONSUMER_WORKFLOW_SHA" = "$EXPECTED_PROBE_SHA"
+          test "$PAYLOAD_PRODUCER_WORKFLOW_SHA" = "$EXPECTED_PROBE_SHA"
+          test "$PRODUCER_WORKFLOW_PATH" = ".github/workflows/butlin-reusable-run-context-producer-probe.yml"
+
+          workflow=.github/workflows/butlin-exact-root-orchestration-contract.yml
+          test "$(grep -F -c '@bde90278e5b61391a58311a2945a9a5c557586b5' "$workflow")" -eq 2
+          ! grep -F 'uses: ./.github/workflows/butlin-reusable-run-context-' "$workflow"
+          ! grep -F 'uses: $/.github/workflows/butlin-reusable-run-context-' "$workflow"
+          ! grep -E 'uses: .*@(main|master|HEAD|v[0-9])' "$workflow"
+          ! grep -i 'latest' "$workflow"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
