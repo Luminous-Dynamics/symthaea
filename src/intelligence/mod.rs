@@ -23,6 +23,7 @@
 //! - Evidence-backed objective intervals that preserve unknown axes instead of fabricating neutrality
 //! - Evidence-seeking V3 planning with Select / NeedEvidence / Abstain outcomes
 //! - Live primitive identity recovery with explicit objective-evidence gaps
+//! - Append-only evidence acquisition sessions with hash-chained deterministic replanning
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -37,6 +38,7 @@ pub mod reasoning_evaluator;
 pub mod reasoning_evaluator_policy;
 pub mod reasoning_evidence_revision_probe;
 pub mod reasoning_evidence_seeking;
+pub mod reasoning_evidence_session;
 pub mod reasoning_kernel;
 pub mod reasoning_kernel_v2;
 pub mod reasoning_live_primitive_evidence;
@@ -95,6 +97,11 @@ pub use reasoning_evidence_seeking::{
     plan_with_evidence, EvidenceRequest, EvidenceRequestKind, EvidenceSeekingAbstention,
     EvidenceSeekingOutcome, EvidenceSeekingPlanReport, EvidenceSeekingPlannerError,
     EVIDENCE_SEEKING_PLANNER_VERSION,
+};
+pub use reasoning_evidence_session::{
+    EvidenceAcquisitionError, EvidenceAcquisitionEvent, EvidenceAcquisitionEventRecord,
+    EvidenceAcquisitionSession, EvidenceAcquisitionSnapshot,
+    EVIDENCE_ACQUISITION_SESSION_SCHEMA_VERSION,
 };
 pub use reasoning_kernel::{
     CanonicalReasoningDecision, CanonicalReasoningInput, CanonicalReasoningKernel,
