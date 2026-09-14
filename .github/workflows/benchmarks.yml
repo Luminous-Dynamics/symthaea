@@ -13,8 +13,10 @@ on:
       - 'benches/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
-  pull_request:
-    branches: [main]
+  # PR validation is intentionally absent. The only automatic benchmark job is
+  # quick-check, which is push-only; all expensive suites are explicit manual
+  # dispatches. A pull_request trigger therefore created an empty workflow run
+  # for every PR without executing a single benchmark job.
   workflow_dispatch:
     inputs:
       benchmark_suite:
@@ -47,7 +49,7 @@ env:
   BENCHMARK_SEED: 42  # Reproducibility
 
 jobs:
-  # Quick smoke test on all pushes
+  # Quick smoke test on matching pushes.
   quick-check:
     name: Quick Benchmark Check
     runs-on: ubuntu-latest
@@ -121,19 +123,8 @@ jobs:
         id: suite
         run: |
           SUITE="${{ inputs.benchmark_suite || 'standard' }}"
-          if [ "${{ github.event_name }}" == "schedule" ]; then
-            SUITE="full"
-          fi
           echo "suite=$SUITE" >> $GITHUB_OUTPUT
           echo "Running benchmark suite: $SUITE"
-
-      - name: Fetch baseline from main
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch origin main
-          if [ -d ".benchmark-baselines" ]; then
-            cp -r .benchmark-baselines target/criterion/
-          fi
 
       - name: Run benchmark suite
         run: |
@@ -150,15 +141,6 @@ jobs:
             --example phi_capability_correlation \
             --release \
             -- --output results/phi_correlation_${{ github.sha }}.json
-
-      - name: Compare with baseline
-        if: github.event_name == 'pull_request'
-        run: |
-          nix develop --command cargo bench \
-            --bench ${{ steps.suite.outputs.suite }} \
-            -- \
-            --baseline main \
-            --compare
 
       - name: Generate benchmark report
         run: |
@@ -179,7 +161,6 @@ jobs:
           retention-days: 30
 
       - name: Post to dashboard
-        if: github.event_name != 'pull_request'
         env:
           DASHBOARD_TOKEN: ${{ secrets.DASHBOARD_TOKEN }}
         run: |
@@ -197,21 +178,6 @@ jobs:
             --critical-threshold 10 \
             --results target/criterion/ \
             --output regression_report.json
-
-      - name: Comment on PR with results
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const report = fs.readFileSync('results/report_${{ github.sha }}.md', 'utf8');
-
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `## Benchmark Results\n\n${report}`
-            });
 
       - name: Fail on critical regression
         if: steps.regression.outputs.critical == 'true'
