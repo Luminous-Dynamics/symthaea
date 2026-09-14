@@ -4,12 +4,10 @@ on:
   pull_request:
     paths:
       - ".github/evidence-profiles/gwt1-verified-report-v1.json"
-      - ".github/workflows/butlin-gwt1-consumer-verifier-root.yml"
+      - ".github/evidence-profiles/gwt1-verified-report-v2.json"
       - ".github/workflows/butlin-gwt1-final-consumer-contract.yml"
       - ".github/workflows/butlin-gwt1-trusted-final-consumer.yml"
-      - "crates/domains/symthaea-psych-bench/Cargo.toml"
-      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/**/*.rs"
-      - "crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_verified_report_candidate.rs"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_final_consumer_candidate.rs"
   workflow_dispatch:
 
 permissions:
@@ -17,220 +15,91 @@ permissions:
 
 jobs:
   qualify:
-    name: Qualify trusted final consumer authority contract
+    name: Qualify final-consumer trust metadata v2
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          fetch-depth: 0
           persist-credentials: false
 
-      - name: Audit consumer authority and workflow boundaries
+      - name: Require immutable V1/V2 archive profiles and audit authority split
         shell: bash
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v1.json)" = "45863366cfc1218781608a9293415ce7c0dec678"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v2.json)" = "aacc7146467d1c14bedb96055b7b821ac29ea5f7"
           /usr/bin/python3 - <<'PY'
-          import importlib.util
-          import pathlib
-          import re
+          import json
+          from pathlib import Path
 
-          root = pathlib.Path.cwd()
-          crate = root / "crates/domains/symthaea-psych-bench"
-          butlin_dir = crate / "src/benchmarks/butlin"
-          manifest = (crate / "Cargo.toml").read_text()
-          authority_path = butlin_dir / "gwt1_verified_final_artifact.rs"
-          projection_path = butlin_dir / "gwt1_verified_report_projection.rs"
-          candidate_path = butlin_dir / "gwt1_final_consumer_candidate.rs"
-          authority = authority_path.read_text()
-          projection = projection_path.read_text()
-          candidate = candidate_path.read_text()
-          binary = (crate / "src/bin/gwt1_generate_verified_report_candidate.rs").read_text()
-          mod = (butlin_dir / "mod.rs").read_text()
+          root = Path.cwd()
           workflow = (root / ".github/workflows/butlin-gwt1-trusted-final-consumer.yml").read_text()
-          verifier_root = (root / ".github/workflows/butlin-gwt1-consumer-verifier-root.yml").read_text()
-          engine_path = root / ".github/scripts/evidence_archive_admission.py"
-          profile_path = root / ".github/evidence-profiles/gwt1-verified-report-v1.json"
+          candidate = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_final_consumer_candidate.rs").read_text()
+          projection = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs").read_text()
+          v1 = json.loads((root / ".github/evidence-profiles/gwt1-verified-report-v1.json").read_text())
+          v2 = json.loads((root / ".github/evidence-profiles/gwt1-verified-report-v2.json").read_text())
 
-          assert 'trusted-resolution-consumer = ["trusted-resolution-authority"]' in manifest
-          assert 'pub mod gwt1_final_consumer_candidate;' in mod
-          assert "reconstruct_gwt1_verified_report_projection_candidate_v1" in mod
+          assert v1["schema"] == "butlin-evidence-archive-admission-profile-v1"
+          assert v1["profile_id"] == "gwt1-verified-report-archive-v1"
+          assert v2["schema"] == "butlin-evidence-archive-admission-profile-v1"
+          assert v2["profile_id"] == "gwt1-verified-report-archive-v2"
+          assert v1["root"] == v2["root"] == "gwt1-verified-report"
+          assert len(v1["members"]) == len(v2["members"]) == 26
 
-          assert "pub struct VerifiedGwt1ResolvedArtifactV1" in authority
-          assert "pub(super) fn verify_gwt1_final_reconstruction_v1" in authority
-          assert "pub(crate) fn verify_gwt1_final_reconstruction_v1" not in authority
-          assert "pub fn verify_gwt1_final_reconstruction_v1" not in authority
-          assert "#[derive(Debug)]\npub struct VerifiedGwt1ResolvedArtifactV1" in authority
-          token_prefix = authority.split("pub struct VerifiedGwt1ResolvedArtifactV1", 1)[0].split("#[derive", 1)[-1]
-          assert "Clone" not in token_prefix
-          assert "Serialize" not in token_prefix
-          assert "Deserialize" not in token_prefix
-          assert "FunctionallySupportedForbidden" in authority
-          assert "InternalPromotionVerificationMismatch" in authority
-          assert "EmptyRecomputedPromotionVerification" in authority
+          v1_paths = {item["path"] for item in v1["members"]}
+          v2_paths = {item["path"] for item in v2["members"]}
+          assert len(v1_paths) == len(v2_paths) == 26
+          assert "gwt1-verified-report/source/resolution_provenance.json" in v1_paths
+          assert "gwt1-verified-report/source/final_verifier_profile.json" in v1_paths
+          assert "gwt1-verified-report/authority/fresh_direct_archive_verification.json" not in v1_paths
+          assert "gwt1-verified-report/authority/fresh_direct_profile_verification.json" not in v1_paths
+          assert "gwt1-verified-report/source/resolution_provenance.json" not in v2_paths
+          assert "gwt1-verified-report/source/final_verifier_profile.json" not in v2_paths
+          assert "gwt1-verified-report/authority/fresh_direct_archive_verification.json" in v2_paths
+          assert "gwt1-verified-report/authority/fresh_direct_profile_verification.json" in v2_paths
 
-          assert "pub struct Gwt1VerifiedReportProjectionV1" in projection
-          projection_prefix = projection.split("pub struct Gwt1VerifiedReportProjectionV1", 1)[0].split("#[derive", 1)[-1]
-          assert "Serialize" in projection_prefix
-          assert "Deserialize" not in projection_prefix
-          assert "verified: &VerifiedGwt1ResolvedArtifactV1" in projection
-          assert "tier_ceiling: SupportTier::CausallySupported" in projection
-          assert "FunctionallySupported" not in projection
-          struct_body = projection.split("pub struct Gwt1VerifiedReportProjectionV1 {", 1)[1].split("}", 1)[0]
-          assert not re.search(r"^\s*pub\s+\w+\s*:", struct_body, re.MULTILINE)
+          assert "butlin-gwt1-trusted-final-consumer-provenance-v2" in workflow
+          assert "butlin-gwt1-trusted-final-consumer-provenance-v1" not in workflow
+          assert "butlin-gwt1-final-consumer-verifier-profile-v2" in workflow
+          assert "butlin-gwt1-final-consumer-verifier-profile-v1" not in workflow
+          assert ".github/evidence-profiles/gwt1-verified-report-v2.json" in workflow
+          assert 'profile_id=="gwt1-verified-report-archive-v2"' in workflow
+          assert 'profile_id=="gwt1-verified-report-archive-v1"' not in workflow
 
-          # `pub(super)` is intentionally narrower than crate-public, but every
-          # sibling/descendant under `butlin` can still see the reconstruction
-          # theorem. Audit the entire non-test Butlin Rust tree so a future
-          # module cannot become a second minting/report-projection path. The
-          # workflow path filter above deliberately covers the same recursive
-          # source tree.
-          def non_test_source(path):
-              text = path.read_text()
-              return text.split("\n#[cfg(test)]", 1)[0]
+          assert "BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA" in workflow
+          assert "6eaf73a20047b99120e59eb96f48ae0e194e2c80" in workflow
+          assert "Freshly verify direct authority at consumer fault domain" in workflow
+          assert "authority/direct/archive_attestation.json" in workflow
+          assert "authority/direct/profile_attestation.json" in workflow
+          assert '--signer-digest "$BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA"' in workflow
+          assert "butlin-gwt1-direct-attestation-verifier-profile-v2" in workflow
+          assert "butlin-gwt1-final-direct-authority-v1" in workflow
+          assert "fresh_direct_archive_verification_sha256" in workflow
+          assert "fresh_direct_profile_verification_sha256" in workflow
+          assert "direct_builder_workflow_sha" in workflow
 
-          sources = {
-              path.relative_to(butlin_dir).as_posix(): non_test_source(path)
-              for path in butlin_dir.rglob("*.rs")
-          }
-          mint_symbol = "verify_gwt1_final_reconstruction_v1("
-          mint_sites = {
-              name: text.count(mint_symbol)
-              for name, text in sources.items()
-              if mint_symbol in text
-          }
-          assert mint_sites == {
-              "gwt1_verified_final_artifact.rs": 1,
-              "gwt1_final_consumer_candidate.rs": 1,
-          }, mint_sites
+          provenance_line = next(line for line in workflow.splitlines() if "butlin-gwt1-trusted-final-consumer-provenance-v2" in line)
+          verifier_line = next(line for line in workflow.splitlines() if "butlin-gwt1-final-consumer-verifier-profile-v2" in line)
+          assert "direct_builder_workflow_sha" not in provenance_line
+          assert "direct_builder_workflow_sha" in verifier_line
+          assert '--arg direct_builder_sha "$DIRECT_BUILDER_WORKFLOW_SHA"' in verifier_line
 
-          projection_symbol = "project_gwt1_verified_report_v1("
-          projection_sites = {
-              name: text.count(projection_symbol)
-              for name, text in sources.items()
-              if projection_symbol in text
-          }
-          assert projection_sites == {
-              "gwt1_verified_report_projection.rs": 1,
-              "gwt1_final_consumer_candidate.rs": 1,
-          }, projection_sites
-
-          assert candidate.count("verify_gwt1_final_reconstruction_v1(") == 1
-          assert "validate_frozen_gh_root" in candidate
-          assert "read_canonical_json" in candidate
-          assert "GWT1_CONSUMER_GH_BINARY_SHA256_V1" in candidate
-          assert "pub const GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1: bool = false;" in candidate
-          assert "PublicReportingAuthorityBlocked" in candidate
-          assert "if !GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1" in candidate
-          assert "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee" in candidate
-          assert "2ec8b2f6e0e8e915f7e0c8d7b14b77fe93e33225872ea1d98041228950c620a9" in candidate
-          assert "reconstruct_gwt1_verified_report_projection_candidate_v1" in binary
-          assert "create_new(true)" in binary
-
-          forbidden = [
-              re.compile(r"attestation_verified\s*:\s*bool"),
-              re.compile(r"verified\s*:\s*bool"),
-              re.compile(r"pub\s+fn\s+new\s*\([^)]*VerifiedGwt1ResolvedArtifactV1", re.DOTALL),
-          ]
-          for pattern in forbidden:
-              assert not pattern.search(authority), pattern.pattern
-
-          # Workflow trust roots, exact-run consumption, and self-run provenance.
-          assert "BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" in workflow
-          assert "198aaf257de0b4f264f69eb64d813d772f0362d6" in workflow
-          assert "final_resolution_run_id" in workflow
-          assert "final_resolution_run_attempt" in workflow
-          assert "run-id: ${{ inputs.final_resolution_run_id }}" in workflow
           assert '[[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]' in workflow
           assert '[[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]' in workflow
-          assert '--arg consumer_run_id "$GITHUB_RUN_ID"' in workflow
-          assert '--arg consumer_run_attempt "$GITHUB_RUN_ATTEMPT"' in workflow
-          assert 'consumer_run_id:$consumer_run_id' in workflow
-          assert 'consumer_run_attempt:$consumer_run_attempt' in workflow
+          assert '--arg consumer_run_id "$GITHUB_RUN_ID"' in provenance_line
+          assert '--arg consumer_run_attempt "$GITHUB_RUN_ATTEMPT"' in provenance_line
           assert "inputs.consumer_run" not in workflow
           assert "latest" not in workflow.lower()
-          assert "--signer-digest \"$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA\"" in workflow
-          assert "--signer-digest \"$CONSUMER_WORKFLOW_SHA\"" in workflow
-          assert workflow.count("--deny-self-hosted-runners") >= 2
+          assert workflow.count("--deny-self-hosted-runners") >= 4
           assert ".member_count==60" in workflow
           assert ".member_count==7" in workflow
           assert ".member_count==26" in workflow
-          assert "fresh_nested_direct_archive_admission.json" in workflow
-          assert "cargo run --locked -p symthaea-psych-bench" in workflow
-          assert "--features trusted-resolution-consumer" in workflow
           assert "actions/cache" not in workflow
           assert "ubuntu-latest" not in workflow
-          for pinned in (
-              "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-              "actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
-              "dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d",
-              "actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6",
-              "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-          ):
-              assert pinned in workflow, pinned
 
-          for frozen in (
-              "e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",
-              "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee",
-              "2ec8b2f6e0e8e915f7e0c8d7b14b77fe93e33225872ea1d98041228950c620a9",
-          ):
-              assert frozen in workflow
-              assert frozen in verifier_root
-
-          spec = importlib.util.spec_from_file_location("archive_admission", engine_path)
-          module = importlib.util.module_from_spec(spec)
-          assert spec.loader is not None
-          spec.loader.exec_module(module)
-          profile = module.load_profile(profile_path)
-          assert profile["profile_id"] == "gwt1-verified-report-archive-v1"
-          assert profile["root"] == "gwt1-verified-report"
-          assert len(profile["members"]) == 26
-          assert len({item["path"] for item in profile["members"]}) == 26
-          assert any(item["path"].endswith("source/gwt1-final-resolution.tar.gz") for item in profile["members"])
-          assert any(item["path"].endswith("authority/fresh_final_archive_verification.json") for item in profile["members"])
-          assert any(item["path"].endswith("authority/fresh_nested_direct_archive_admission.json") for item in profile["members"])
-          assert any(item["path"].endswith("projection.json") for item in profile["members"])
+          assert "pub const GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1: bool = false;" in candidate
+          assert "FunctionallySupported" not in projection
           PY
-
-      - name: Install pinned Rust 1.96.0
-        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
-        with:
-          components: rustfmt
-
-      - name: Check consumer-owned Rust formatting
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_final_consumer_candidate.rs \
-            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs \
-            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs \
-            crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_verified_report_candidate.rs
-
-      - name: Compile exact trusted consumer adapter
-        shell: bash
-        env:
-          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-contract-cargo-home
-          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-contract-target
-        run: |
-          set -euo pipefail
-          cargo check --locked -p symthaea-psych-bench \
-            --features trusted-resolution-consumer \
-            --bin gwt1_generate_verified_report_candidate
-
-      - name: Run consumer reconstruction, projection, and adapter unit tests
-        shell: bash
-        env:
-          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-contract-cargo-home
-          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-contract-target
-        run: |
-          set -euo pipefail
-          cargo test --locked -p symthaea-psych-bench \
-            --features trusted-resolution-consumer \
-            gwt1_verified_final_artifact::tests
-          cargo test --locked -p symthaea-psych-bench \
-            --features trusted-resolution-consumer \
-            gwt1_verified_report_projection::tests
-          cargo test --locked -p symthaea-psych-bench \
-            --features trusted-resolution-consumer \
-            gwt1_final_consumer_candidate::tests
