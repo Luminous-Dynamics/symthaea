@@ -13,11 +13,12 @@ permissions:
 
 env:
   SUBJECT_SHA: ee79f86a6d431c462ae8701094a3e29be88c4a5e
+  BASE_SHA: 639a6da0ff98e7c9dc3a61aa7090457417ef3deb
   ARTIFACT_DIR: artifacts/manifold-006n-bd
 
 jobs:
   diagnose:
-    name: Reproduce and capture frozen N-B Clippy failure
+    name: Reproduce and attribute frozen N-B Clippy failure
     runs-on: ubuntu-24.04
     timeout-minutes: 35
 
@@ -38,22 +39,35 @@ jobs:
           path: subject
           persist-credentials: false
 
-      - name: Bind control plane and tested subject
+      - name: Check out exact qualified A1 parent control
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          ref: ${{ env.BASE_SHA }}
+          path: parent
+          persist-credentials: false
+
+      - name: Bind control plane and matched tested pair
         run: |
           set -euo pipefail
           mkdir -p "$ARTIFACT_DIR"
           test "$(git -C control rev-parse HEAD)" = "$GITHUB_SHA"
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git -C parent rev-parse HEAD)" = "$BASE_SHA"
           test -z "$(git -C subject status --porcelain)"
+          test -z "$(git -C parent status --porcelain)"
 
           control_tree="$(git -C control rev-parse HEAD^{tree})"
           subject_tree="$(git -C subject rev-parse HEAD^{tree})"
+          parent_tree="$(git -C parent rev-parse HEAD^{tree})"
           workflow_sha256="$(sha256sum control/.github/workflows/manifold-006n-bd-clippy-diagnostic.yml | awk '{print $1}')"
-          robust_source_sha256="$(sha256sum subject/crates/core/symthaea-core/src/robust_reachability.rs | awk '{print $1}')"
-          cargo_lock_sha256="$(sha256sum subject/Cargo.lock | awk '{print $1}')"
+          subject_source_sha256="$(sha256sum subject/crates/core/symthaea-core/src/robust_reachability.rs | awk '{print $1}')"
+          parent_source_sha256="$(sha256sum parent/crates/core/symthaea-core/src/robust_reachability.rs | awk '{print $1}')"
+          subject_lock_sha256="$(sha256sum subject/Cargo.lock | awk '{print $1}')"
+          parent_lock_sha256="$(sha256sum parent/Cargo.lock | awk '{print $1}')"
 
           {
-            echo "schema=symthaea.manifold-006n-bd.environment.v1"
+            echo "schema=symthaea.manifold-006n-bd.environment.v2"
             echo "authority=diagnostic-only"
             echo "qualification_granted=false"
             echo "control_sha=$GITHUB_SHA"
@@ -61,8 +75,12 @@ jobs:
             echo "workflow_sha256=$workflow_sha256"
             echo "subject_sha=$SUBJECT_SHA"
             echo "subject_tree_sha=$subject_tree"
-            echo "robust_source_sha256=$robust_source_sha256"
-            echo "cargo_lock_sha256=$cargo_lock_sha256"
+            echo "subject_robust_source_sha256=$subject_source_sha256"
+            echo "subject_cargo_lock_sha256=$subject_lock_sha256"
+            echo "parent_sha=$BASE_SHA"
+            echo "parent_tree_sha=$parent_tree"
+            echo "parent_robust_source_sha256=$parent_source_sha256"
+            echo "parent_cargo_lock_sha256=$parent_lock_sha256"
             echo "runner_label=ubuntu-24.04"
             echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
             echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
@@ -84,35 +102,64 @@ jobs:
             echo "image_version=${ImageVersion:-unknown}"
           } >> "$ARTIFACT_DIR/environment.txt"
 
-      - name: Replay exact failing Clippy command verbatim
+      - name: Replay exact N-B failing command verbatim
         run: |
           set -uo pipefail
           out="$GITHUB_WORKSPACE/$ARTIFACT_DIR"
           cd subject
           set +e
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-exact-target" \
+          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-subject-exact-target" \
             cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings \
-            > "$out/clippy-exact.stdout.txt" \
-            2> "$out/clippy-exact.stderr.txt"
+            > "$out/subject-exact.stdout.txt" \
+            2> "$out/subject-exact.stderr.txt"
           status=$?
           set -e
-          printf '%s\n' "$status" > "$out/clippy-exact.exit-code.txt"
+          printf '%s\n' "$status" > "$out/subject-exact.exit-code.txt"
 
-      - name: Replay with machine-readable diagnostics
+      - name: Replay N-B with machine-readable diagnostics
         run: |
           set -uo pipefail
           out="$GITHUB_WORKSPACE/$ARTIFACT_DIR"
           cd subject
           set +e
-          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-json-target" \
+          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-subject-json-target" \
             cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings \
-            > "$out/clippy-json.stdout.jsonl" \
-            2> "$out/clippy-json.stderr.txt"
+            > "$out/subject-json.stdout.jsonl" \
+            2> "$out/subject-json.stderr.txt"
           status=$?
           set -e
-          printf '%s\n' "$status" > "$out/clippy-json.exit-code.txt"
+          printf '%s\n' "$status" > "$out/subject-json.exit-code.txt"
 
-      - name: Normalize compiler diagnostics
+      - name: Replay identical strict Clippy on exact A1 parent
+        run: |
+          set -uo pipefail
+          out="$GITHUB_WORKSPACE/$ARTIFACT_DIR"
+          cd parent
+          set +e
+          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-parent-exact-target" \
+            cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings \
+            > "$out/parent-exact.stdout.txt" \
+            2> "$out/parent-exact.stderr.txt"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$out/parent-exact.exit-code.txt"
+
+          if [ "$status" -ne 0 ]; then
+            set +e
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-parent-json-target" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings \
+              > "$out/parent-json.stdout.jsonl" \
+              2> "$out/parent-json.stderr.txt"
+            json_status=$?
+            set -e
+          else
+            : > "$out/parent-json.stdout.jsonl"
+            : > "$out/parent-json.stderr.txt"
+            json_status=0
+          fi
+          printf '%s\n' "$json_status" > "$out/parent-json.exit-code.txt"
+
+      - name: Normalize and compare compiler diagnostics
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -120,102 +167,143 @@ jobs:
           from pathlib import Path
 
           root = Path('artifacts/manifold-006n-bd')
-          records = []
-          unparsable = 0
 
-          for raw in root.joinpath('clippy-json.stdout.jsonl').read_text(errors='replace').splitlines():
-              try:
-                  event = json.loads(raw)
-              except json.JSONDecodeError:
-                  unparsable += 1
-                  continue
-              if event.get('reason') != 'compiler-message':
-                  continue
-              msg = event.get('message') or {}
-              code_obj = msg.get('code') or {}
-              spans = []
-              for span in msg.get('spans') or []:
-                  if not span.get('is_primary'):
+          def parse(path):
+              records = []
+              unparsable = 0
+              for raw in path.read_text(errors='replace').splitlines():
+                  try:
+                      event = json.loads(raw)
+                  except json.JSONDecodeError:
+                      unparsable += 1
                       continue
-                  spans.append({
-                      'file': span.get('file_name'),
-                      'line_start': span.get('line_start'),
-                      'line_end': span.get('line_end'),
-                      'column_start': span.get('column_start'),
-                      'column_end': span.get('column_end'),
-                      'suggested_replacement': span.get('suggested_replacement'),
-                      'suggestion_applicability': span.get('suggestion_applicability'),
+                  if event.get('reason') != 'compiler-message':
+                      continue
+                  msg = event.get('message') or {}
+                  code_obj = msg.get('code') or {}
+                  spans = []
+                  for span in msg.get('spans') or []:
+                      if not span.get('is_primary'):
+                          continue
+                      spans.append({
+                          'file': span.get('file_name'),
+                          'line_start': span.get('line_start'),
+                          'line_end': span.get('line_end'),
+                          'column_start': span.get('column_start'),
+                          'column_end': span.get('column_end'),
+                          'suggested_replacement': span.get('suggested_replacement'),
+                          'suggestion_applicability': span.get('suggestion_applicability'),
+                      })
+                  records.append({
+                      'level': msg.get('level'),
+                      'code': code_obj.get('code'),
+                      'message': msg.get('message'),
+                      'spans': spans,
+                      'rendered': msg.get('rendered'),
                   })
-              records.append({
-                  'level': msg.get('level'),
-                  'code': code_obj.get('code'),
-                  'message': msg.get('message'),
-                  'spans': spans,
-                  'rendered': msg.get('rendered'),
-              })
+              relevant = [r for r in records if r['level'] in {'error', 'warning'}]
+              clippy = [r for r in relevant if (r.get('code') or '').startswith('clippy::')]
+              return records, relevant, clippy, unparsable
 
-          relevant = [r for r in records if r['level'] in {'error', 'warning'}]
-          clippy = [r for r in relevant if (r.get('code') or '').startswith('clippy::')]
-          payload = {
-              'schema': 'symthaea.manifold-006n-bd.clippy-diagnostics.v1',
+          def signature(record):
+              primary_file = record['spans'][0]['file'] if record['spans'] else None
+              return (record.get('code'), record.get('message'), primary_file)
+
+          subject_records, subject_relevant, subject_clippy, subject_unparsable = parse(
+              root / 'subject-json.stdout.jsonl'
+          )
+          parent_records, parent_relevant, parent_clippy, parent_unparsable = parse(
+              root / 'parent-json.stdout.jsonl'
+          )
+
+          parent_signatures = {signature(r) for r in parent_relevant}
+          added = [r for r in subject_relevant if signature(r) not in parent_signatures]
+
+          subject_payload = {
+              'schema': 'symthaea.manifold-006n-bd.subject-diagnostics.v2',
               'authority': 'diagnostic-only',
               'subject_sha': 'ee79f86a6d431c462ae8701094a3e29be88c4a5e',
-              'compiler_message_count': len(records),
-              'relevant_diagnostic_count': len(relevant),
-              'clippy_diagnostic_count': len(clippy),
-              'clippy_codes': sorted({r['code'] for r in clippy}),
-              'unparsable_stdout_line_count': unparsable,
-              'diagnostics': relevant,
+              'compiler_message_count': len(subject_records),
+              'relevant_diagnostic_count': len(subject_relevant),
+              'clippy_diagnostic_count': len(subject_clippy),
+              'clippy_codes': sorted({r['code'] for r in subject_clippy}),
+              'unparsable_stdout_line_count': subject_unparsable,
+              'diagnostics': subject_relevant,
           }
-          root.joinpath('clippy-diagnostics.json').write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + '\n'
-          )
+          parent_payload = {
+              'schema': 'symthaea.manifold-006n-bd.parent-diagnostics.v2',
+              'authority': 'diagnostic-only',
+              'subject_sha': '639a6da0ff98e7c9dc3a61aa7090457417ef3deb',
+              'compiler_message_count': len(parent_records),
+              'relevant_diagnostic_count': len(parent_relevant),
+              'clippy_diagnostic_count': len(parent_clippy),
+              'clippy_codes': sorted({r['code'] for r in parent_clippy}),
+              'unparsable_stdout_line_count': parent_unparsable,
+              'diagnostics': parent_relevant,
+          }
+          delta_payload = {
+              'schema': 'symthaea.manifold-006n-bd.diagnostic-delta.v2',
+              'authority': 'diagnostic-only',
+              'comparison_key': ['code', 'message', 'primary_file'],
+              'subject_relevant_diagnostic_count': len(subject_relevant),
+              'parent_relevant_diagnostic_count': len(parent_relevant),
+              'added_subject_diagnostic_count': len(added),
+              'added_subject_diagnostics': added,
+          }
+          root.joinpath('subject-diagnostics.json').write_text(json.dumps(subject_payload, indent=2, sort_keys=True) + '\n')
+          root.joinpath('parent-diagnostics.json').write_text(json.dumps(parent_payload, indent=2, sort_keys=True) + '\n')
+          root.joinpath('diagnostic-delta.json').write_text(json.dumps(delta_payload, indent=2, sort_keys=True) + '\n')
           PY
 
-      - name: Prove tested tracked checkout remained immutable
+      - name: Prove both tested tracked checkouts remained immutable
         run: |
           set -euo pipefail
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git -C parent rev-parse HEAD)" = "$BASE_SHA"
           test -z "$(git -C subject status --porcelain --untracked-files=no)"
+          test -z "$(git -C parent status --porcelain --untracked-files=no)"
           git -C subject diff --exit-code --
           git -C subject diff --cached --exit-code --
+          git -C parent diff --exit-code --
+          git -C parent diff --cached --exit-code --
 
           python3 - <<'PY'
           import json, os, subprocess
           from pathlib import Path
 
           root = Path('artifacts/manifold-006n-bd')
-          env = dict(
-              line.split('=', 1)
-              for line in root.joinpath('environment.txt').read_text().splitlines()
-              if '=' in line
-          )
-          current_head = subprocess.check_output(
-              ['git', '-C', 'subject', 'rev-parse', 'HEAD'], text=True
-          ).strip()
-          current_tree = subprocess.check_output(
-              ['git', '-C', 'subject', 'rev-parse', 'HEAD^{tree}'], text=True
-          ).strip()
+          env = dict(line.split('=', 1) for line in root.joinpath('environment.txt').read_text().splitlines() if '=' in line)
+
+          def git(which, expr):
+              return subprocess.check_output(['git', '-C', which, 'rev-parse', expr], text=True).strip()
+
+          subject_head = git('subject', 'HEAD')
+          subject_tree = git('subject', 'HEAD^{tree}')
+          parent_head = git('parent', 'HEAD')
+          parent_tree = git('parent', 'HEAD^{tree}')
           payload = {
-              'schema': 'symthaea.manifold-006n-bd.execution-integrity.v1',
-              'subject_sha': current_head,
-              'preflight_tree_sha': env['subject_tree_sha'],
-              'postflight_tree_sha': current_tree,
-              'head_unchanged': current_head == os.environ['SUBJECT_SHA'],
-              'tree_identity_unchanged': current_tree == env['subject_tree_sha'],
-              'tracked_worktree_clean': True,
-              'index_clean': True,
+              'schema': 'symthaea.manifold-006n-bd.execution-integrity.v2',
+              'subject_head_unchanged': subject_head == os.environ['SUBJECT_SHA'],
+              'subject_tree_identity_unchanged': subject_tree == env['subject_tree_sha'],
+              'parent_head_unchanged': parent_head == os.environ['BASE_SHA'],
+              'parent_tree_identity_unchanged': parent_tree == env['parent_tree_sha'],
+              'subject_tracked_worktree_clean': True,
+              'subject_index_clean': True,
+              'parent_tracked_worktree_clean': True,
+              'parent_index_clean': True,
               'untracked_build_and_evidence_outputs_excluded_from_immutability_claim': True,
-              'verdict': 'PASS',
           }
-          assert payload['head_unchanged']
-          assert payload['tree_identity_unchanged']
-          root.joinpath('execution-integrity.json').write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + '\n'
-          )
+          payload['verdict'] = 'PASS' if all([
+              payload['subject_head_unchanged'],
+              payload['subject_tree_identity_unchanged'],
+              payload['parent_head_unchanged'],
+              payload['parent_tree_identity_unchanged'],
+          ]) else 'FAIL'
+          assert payload['verdict'] == 'PASS'
+          root.joinpath('execution-integrity.json').write_text(json.dumps(payload, indent=2, sort_keys=True) + '\n')
           PY
 
-      - name: Emit diagnostic replay receipt
+      - name: Emit matched diagnostic replay receipt
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -223,41 +311,45 @@ jobs:
           from pathlib import Path
 
           root = Path('artifacts/manifold-006n-bd')
-          exact_status = int(root.joinpath('clippy-exact.exit-code.txt').read_text().strip())
-          json_status = int(root.joinpath('clippy-json.exit-code.txt').read_text().strip())
-          diagnostics = json.loads(root.joinpath('clippy-diagnostics.json').read_text())
+          subject_exact = int(root.joinpath('subject-exact.exit-code.txt').read_text().strip())
+          subject_json = int(root.joinpath('subject-json.exit-code.txt').read_text().strip())
+          parent_exact = int(root.joinpath('parent-exact.exit-code.txt').read_text().strip())
+          parent_json = int(root.joinpath('parent-json.exit-code.txt').read_text().strip())
+          subject_diag = json.loads(root.joinpath('subject-diagnostics.json').read_text())
+          delta = json.loads(root.joinpath('diagnostic-delta.json').read_text())
           integrity = json.loads(root.joinpath('execution-integrity.json').read_text())
 
-          raw_exact = root.joinpath('clippy-exact.stdout.txt').read_bytes() + root.joinpath('clippy-exact.stderr.txt').read_bytes()
-          raw_json = root.joinpath('clippy-json.stdout.jsonl').read_bytes() + root.joinpath('clippy-json.stderr.txt').read_bytes()
+          child_reproduced = subject_exact != 0 and subject_json != 0 and subject_diag['relevant_diagnostic_count'] > 0
+          parent_clean = parent_exact == 0
+          differential_established = parent_clean or delta['added_subject_diagnostic_count'] > 0
+          reproduced_and_attributed = child_reproduced and differential_established and integrity['verdict'] == 'PASS'
 
-          reproduced = (
-              exact_status != 0
-              and json_status != 0
-              and diagnostics['relevant_diagnostic_count'] > 0
-              and integrity['verdict'] == 'PASS'
-          )
+          raw_subject = root.joinpath('subject-exact.stdout.txt').read_bytes() + root.joinpath('subject-exact.stderr.txt').read_bytes()
+          raw_parent = root.joinpath('parent-exact.stdout.txt').read_bytes() + root.joinpath('parent-exact.stderr.txt').read_bytes()
+
           receipt = {
-              'schema': 'symthaea.manifold-006n-bd.diagnostic-replay.v1',
+              'schema': 'symthaea.manifold-006n-bd.diagnostic-replay.v2',
               'authority': 'diagnostic-only',
               'qualification_granted': False,
               'control_sha': os.environ['GITHUB_SHA'].lower(),
               'tested_subject_sha': os.environ['SUBJECT_SHA'].lower(),
+              'matched_parent_sha': os.environ['BASE_SHA'].lower(),
               'exact_command': 'cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings',
-              'exact_command_exit_code': exact_status,
-              'json_replay_exit_code': json_status,
-              'relevant_diagnostic_count': diagnostics['relevant_diagnostic_count'],
-              'clippy_diagnostic_count': diagnostics['clippy_diagnostic_count'],
-              'clippy_codes': diagnostics['clippy_codes'],
-              'exact_raw_sha256': hashlib.sha256(raw_exact).hexdigest(),
-              'json_raw_sha256': hashlib.sha256(raw_json).hexdigest(),
+              'subject_exact_exit_code': subject_exact,
+              'subject_json_exit_code': subject_json,
+              'parent_exact_exit_code': parent_exact,
+              'parent_json_exit_code': parent_json,
+              'subject_clippy_codes': subject_diag['clippy_codes'],
+              'added_subject_diagnostic_count': delta['added_subject_diagnostic_count'],
+              'matched_parent_clean_under_exact_command': parent_clean,
+              'migration_specific_diagnostic_delta_established': differential_established,
+              'subject_exact_raw_sha256': hashlib.sha256(raw_subject).hexdigest(),
+              'parent_exact_raw_sha256': hashlib.sha256(raw_parent).hexdigest(),
               'tracked_checkout_immutability': integrity['verdict'],
-              'source_repair_authorized': reproduced,
-              'verdict': 'PASS_DIAGNOSTIC_REPRODUCTION' if reproduced else 'FAIL_DIAGNOSTIC_REPRODUCTION',
+              'source_repair_authorized': reproduced_and_attributed,
+              'verdict': 'PASS_DIAGNOSTIC_ATTRIBUTION' if reproduced_and_attributed else 'FAIL_DIAGNOSTIC_ATTRIBUTION',
           }
-          root.joinpath('report.json').write_text(
-              json.dumps(receipt, indent=2, sort_keys=True) + '\n'
-          )
+          root.joinpath('report.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
           PY
 
       - name: Hash diagnostic capsule
@@ -268,15 +360,12 @@ jobs:
           : > SHA256SUMS
           for file in \
             environment.txt \
-            clippy-exact.stdout.txt \
-            clippy-exact.stderr.txt \
-            clippy-exact.exit-code.txt \
-            clippy-json.stdout.jsonl \
-            clippy-json.stderr.txt \
-            clippy-json.exit-code.txt \
-            clippy-diagnostics.json \
-            execution-integrity.json \
-            report.json; do
+            subject-exact.stdout.txt subject-exact.stderr.txt subject-exact.exit-code.txt \
+            subject-json.stdout.jsonl subject-json.stderr.txt subject-json.exit-code.txt \
+            parent-exact.stdout.txt parent-exact.stderr.txt parent-exact.exit-code.txt \
+            parent-json.stdout.jsonl parent-json.stderr.txt parent-json.exit-code.txt \
+            subject-diagnostics.json parent-diagnostics.json diagnostic-delta.json \
+            execution-integrity.json report.json; do
             if [ -f "$file" ]; then
               sha256sum "$file" >> SHA256SUMS
             fi
@@ -291,7 +380,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: Require faithful diagnostic reproduction
+      - name: Require faithful diagnostic attribution
         if: always()
         run: |
           set -euo pipefail
@@ -303,6 +392,6 @@ jobs:
           if not report.exists():
               raise SystemExit('diagnostic report missing')
           data = json.loads(report.read_text())
-          if data.get('verdict') != 'PASS_DIAGNOSTIC_REPRODUCTION':
-              raise SystemExit(f"diagnostic replay failed closed: {data.get('verdict')}")
+          if data.get('verdict') != 'PASS_DIAGNOSTIC_ATTRIBUTION':
+              raise SystemExit(f"diagnostic attribution failed closed: {data.get('verdict')}")
           PY
