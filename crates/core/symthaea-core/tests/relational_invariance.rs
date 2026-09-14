@@ -27,7 +27,8 @@ fn deterministic_permutation(dim: usize, seed: u64) -> Vec<usize> {
         state = state
             .wrapping_mul(6_364_136_223_846_793_005)
             .wrapping_add(1_442_695_040_888_963_407);
-        permutation.swap(i, (state as usize) % (i + 1));
+        let target = (state % (i as u64 + 1)) as usize;
+        permutation.swap(i, target);
     }
 
     permutation
