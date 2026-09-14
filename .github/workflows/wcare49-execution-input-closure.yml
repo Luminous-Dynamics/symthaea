@@ -1,0 +1,142 @@
+name: WCARE-49 Preregistered Execution Input Closure Gate
+
+on:
+  push:
+    branches:
+      - wcare-49-execution-input-closure
+    paths:
+      - .github/workflows/wcare49-execution-input-closure.yml
+      - scripts/wcare49_verify_admission_precondition.py
+      - scripts/wcare49_close_inputs.py
+      - scripts/wcare49_selftest.py
+      - docs/release/evidence/WCARE49_EXECUTION_INPUT_CLOSURE_PROTOCOL_V1.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  gate:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact WCARE-49 harness
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify one-commit sibling harness and self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "wcare-49-execution-input-closure"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test "$(git rev-list --count 0321a22986e5c6bf1a6b099d30dc75ccc33d9deb..HEAD)" = "1"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 -m py_compile \
+            scripts/wcare49_verify_admission_precondition.py \
+            scripts/wcare49_close_inputs.py \
+            scripts/wcare49_selftest.py
+          python3 scripts/wcare49_selftest.py
+          printf '%s\n' 'PASS_WCARE49_PREREGISTERED_HARNESS'
+
+      - name: Retrieve and verify exact WCARE-47Q admission event
+        id: admission
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RUN_ID="34871019291"
+          API="https://api.github.com/repos/Luminous-Dynamics/symthaea"
+          HEADER=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+
+          curl -fsSL "${HEADER[@]}" "$API/actions/runs/$RUN_ID" > "$RUNNER_TEMP/wcare47q-run.json"
+          STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8"))["status"])' "$RUNNER_TEMP/wcare47q-run.json")"
+          printf 'EXACT_WCARE47Q_STATUS=%s\n' "$STATUS"
+
+          if [[ "$STATUS" != "completed" ]]; then
+            set +e
+            python3 scripts/wcare49_verify_admission_precondition.py \
+              --run-json "$RUNNER_TEMP/wcare47q-run.json" \
+              > "$RUNNER_TEMP/wcare49-admission.json"
+            RC=$?
+            set -e
+            test "$RC" -eq 3
+            grep -Fq '"classification":"ADMISSION_PRECONDITION_PENDING"' "$RUNNER_TEMP/wcare49-admission.json"
+            grep -Fq '"lock_admitted":false' "$RUNNER_TEMP/wcare49-admission.json"
+            grep -Fq '"execution_inputs_closed":false' "$RUNNER_TEMP/wcare49-admission.json"
+            cat "$RUNNER_TEMP/wcare49-admission.json"
+            printf '%s\n' 'PASS_WCARE49_PREREGISTERED_PRECONDITION_PENDING'
+            printf '%s\n' 'NO_WCARE49_EXECUTION_INPUT_CLOSURE_CLAIM'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          curl -fsSL "${HEADER[@]}" "$API/actions/runs/$RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/wcare47q-jobs.json"
+          JOB_ID="$(python3 -c 'import json,sys; jobs=json.load(open(sys.argv[1],encoding="utf-8")).get("jobs",[]); found=[j for j in jobs if j.get("name")=="qualify"]; assert len(found)==1, len(found); print(found[0]["id"])' "$RUNNER_TEMP/wcare47q-jobs.json")"
+          curl -fsSL -L "${HEADER[@]}" "$API/actions/jobs/$JOB_ID/logs" > "$RUNNER_TEMP/wcare47q-job.log"
+
+          python3 scripts/wcare49_verify_admission_precondition.py \
+            --run-json "$RUNNER_TEMP/wcare47q-run.json" \
+            --jobs-json "$RUNNER_TEMP/wcare47q-jobs.json" \
+            --log "$RUNNER_TEMP/wcare47q-job.log" \
+            > "$RUNNER_TEMP/wcare49-admission.json"
+
+          grep -Fq '"classification":"ADMISSION_PRECONDITION_SATISFIED"' "$RUNNER_TEMP/wcare49-admission.json"
+          grep -Fq '"lock_admitted":true' "$RUNNER_TEMP/wcare49-admission.json"
+          grep -Fq '"execution_inputs_closed":false' "$RUNNER_TEMP/wcare49-admission.json"
+          cat "$RUNNER_TEMP/wcare49-admission.json"
+          printf 'WCARE49_ADMISSION_PRECONDITION_SHA256=%s\n' "$(sha256sum "$RUNNER_TEMP/wcare49-admission.json" | awk '{print $1}')"
+          printf '%s\n' 'PASS_WCARE49_EXACT_ADMISSION_PRECONDITION'
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact admitted WCARE-48 FINAL
+        if: steps.admission.outputs.ready == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 5bc23735f545b1b82044820f0e02ece59be04b4a
+          fetch-depth: 0
+          persist-credentials: false
+          path: candidate
+
+      - name: Install exact Rust toolchain for closure execution
+        if: steps.admission.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          cd candidate/tools/wcare42_builder_attestation_verifier
+          rustc --version | grep -Eq '^rustc 1\.96\.0 '
+          cargo --version | grep -Eq '^cargo 1\.96\.0 '
+
+      - name: Execute bounded WCARE-49 input closure
+        if: steps.admission.outputs.ready == 'true'
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/wcare49-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/wcare49-target
+        run: |
+          set -euo pipefail
+          rm -rf "$CARGO_HOME" "$CARGO_TARGET_DIR"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          cp "$RUNNER_TEMP/wcare49-admission.json" "$RUNNER_TEMP/wcare49-admission-frozen.json"
+          cd candidate
+          python3 ../scripts/wcare49_close_inputs.py \
+            --admission-json "$RUNNER_TEMP/wcare49-admission-frozen.json" \
+            | tee "$RUNNER_TEMP/wcare49-result.json"
+
+          grep -Fq '"classification":"EXECUTION_INPUTS_CLOSED"' "$RUNNER_TEMP/wcare49-result.json"
+          grep -Fq '"execution_inputs_closed":true' "$RUNNER_TEMP/wcare49-result.json"
+          grep -Fq '"lock_admitted":true' "$RUNNER_TEMP/wcare49-result.json"
+          grep -Fq '"wcare42_executable_qualification_established":false' "$RUNNER_TEMP/wcare49-result.json"
+          grep -Fq '"full_machine_hermeticity_established":false' "$RUNNER_TEMP/wcare49-result.json"
+          grep -Fq '"runtime_authority_granted":false' "$RUNNER_TEMP/wcare49-result.json"
+          printf 'WCARE49_RESULT_SHA256=%s\n' "$(sha256sum "$RUNNER_TEMP/wcare49-result.json" | awk '{print $1}')"
+          printf '%s\n' 'PASS_WCARE49_EXECUTION_INPUTS_CLOSED'
