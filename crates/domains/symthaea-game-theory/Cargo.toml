@@ -3,7 +3,7 @@ name = "symthaea-game-theory"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Formal game-theory layer for Symthaea: validated N-player normal-form games, unilateral regret/Nash analysis, and explicitly bounded coalition-deviation witnesses. Pure-std, zero dependencies."
+description = "Formal game-theory layer for Symthaea: two-player and validated N-player normal-form games, unilateral deviation witnesses, regret, pure Nash, and 2x2 mixed Nash. Pure-std, zero dependencies."
 
 # Pure-std, zero dependencies, no symthaea-core link.
 [dependencies]
