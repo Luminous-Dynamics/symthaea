@@ -28,6 +28,8 @@
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 //! - Candidate-specific typed epistemic grounding bound to exact primitive identity
 //! - Verified reasoning-chain IntegrationProxy history isolated from legacy feedback aggregates
+//! - Matched counterfactual IntegrationProxy probes over exact live contender sets
+//! - Compatibility-preserving baseline-vs-matched V3 evidence-impact telemetry
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -49,6 +51,7 @@ pub mod reasoning_integration_history;
 pub mod reasoning_kernel;
 pub mod reasoning_kernel_v2;
 pub mod reasoning_live_primitive_evidence;
+pub mod reasoning_matched_integration_probe;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
@@ -57,6 +60,7 @@ pub mod reasoning_objective_evidence;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
+pub mod reasoning_shadow_meta_matched;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
@@ -145,6 +149,11 @@ pub use reasoning_live_primitive_evidence::{
     LivePrimitiveEvidenceError, LivePrimitiveEvidenceProfile, LivePrimitiveEvidenceReport,
     RegistryPrimitiveMetadata, LIVE_PRIMITIVE_EVIDENCE_BRIDGE_VERSION,
 };
+pub use reasoning_matched_integration_probe::{
+    plan_active_primitive_with_matched_integration, probe_active_primitive_integration,
+    MatchedIntegrationProbeError, MatchedIntegrationProbeProfile, MatchedIntegrationProbeReport,
+    MATCHED_INTEGRATION_PROBE_VERSION,
+};
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
     META_CONTROL_PROBE_VERSION,
@@ -183,6 +192,10 @@ pub use reasoning_qualification::{
     ResourceUsage, REASONING_EPISODE_SCHEMA_VERSION,
 };
 pub use reasoning_shadow_meta::{
-    ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner,
-    V3ShadowObservation, V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
+    ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, V3ShadowObservation,
+    V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
+};
+pub use reasoning_shadow_meta_matched::{
+    MatchedShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner, MatchedShadowStats,
+    MatchedV3ShadowObservation, MATCHED_META_SHADOW_VERSION,
 };
