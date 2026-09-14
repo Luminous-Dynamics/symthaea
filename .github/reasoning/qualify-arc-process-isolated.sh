@@ -57,6 +57,12 @@ for binary in "$projector_bin" "$policy_bin" "$evaluator_bin" "$exhaustive_bin";
     exit 2
   fi
 done
+for command in sudo useradd runuser unshare realpath install; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    echo "required isolation command is unavailable: $command" >&2
+    exit 2
+  fi
+done
 
 # Stage A: evaluator-side projection. True targets exist only here and in the target artifact.
 "$projector_bin"
@@ -66,36 +72,97 @@ if [[ ! -s "$SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH" || ! -s "$SYMTHAEA_ARC_TARG
   exit 2
 fi
 
-# Stage B: policy-only process. Copy the frozen executable into an isolated working directory and
-# run with an empty environment except for solver-visible configuration. Real dataset root,
-# manifest path, target bundle path/tree and evaluator outputs are absent from the process env.
+# Harden evaluator-only inputs before the policy starts. The dedicated policy UID must be unable to
+# traverse the real dataset checkout or read either evaluator artifact even if it guesses a path.
+policy_user="rq006zpolicy"
+if ! id -u "$policy_user" >/dev/null 2>&1; then
+  sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$policy_user"
+fi
+policy_uid="$(id -u "$policy_user")"
+policy_gid="$(id -g "$policy_user")"
+
+chmod -R go-rwx "$SYMTHAEA_ARC_DATASET_ROOT"
+chmod go-rwx "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"
+chmod -R a+rX "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT"
+chmod a+r "$SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH"
+
+for sensitive in \
+  "$SYMTHAEA_ARC_DATASET_ROOT" \
+  "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" \
+  "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"; do
+  if sudo -u "$policy_user" -- test -r "$sensitive"; then
+    echo "policy UID can read evaluator-only input: $sensitive" >&2
+    exit 2
+  fi
+done
+if ! sudo -u "$policy_user" -- test -r "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT/training"; then
+  echo "policy UID cannot read target-stripped solver view" >&2
+  exit 2
+fi
+
+# Stage B: policy-only process. Copy the frozen executable into a dedicated sandbox and run it as a
+# separate unprivileged UID in a fresh network namespace. The real dataset, manifest and target
+# bundle are locally unreadable to this UID, and the new network namespace has no route to fetch
+# public ARC target bytes remotely.
 sandbox="$repo_root/target/rq-006z/arc-policy-sandbox"
 rm -rf "$sandbox"
 mkdir -p "$sandbox/bin" "$sandbox/out"
 cp "$policy_bin" "$sandbox/bin/arc_budgeted_policy"
 chmod 0555 "$sandbox/bin/arc_budgeted_policy"
-solver_root_abs="$(realpath "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT")"
-report_abs="$(realpath -m "$SYMTHAEA_ARC_POLICY_RESULTS_PATH")"
+chmod 0755 "$sandbox" "$sandbox/bin"
+sudo chown "$policy_uid:$policy_gid" "$sandbox/out"
+sudo chmod 0700 "$sandbox/out"
 
-(
-  cd "$sandbox"
+solver_root_abs="$(realpath "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT")"
+sandbox_report="$sandbox/out/policy-report.json"
+report_abs="$(realpath -m "$SYMTHAEA_ARC_POLICY_RESULTS_PATH")"
+mkdir -p "$(dirname "$report_abs")"
+
+# Preflight the exact UID that will execute the policy. Known evaluator paths must remain unreadable.
+for sensitive in \
+  "$SYMTHAEA_ARC_DATASET_ROOT" \
+  "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" \
+  "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"; do
+  if sudo -u "$policy_user" -- test -r "$sensitive"; then
+    echo "policy UID unexpectedly gained access to evaluator-only input: $sensitive" >&2
+    exit 2
+  fi
+done
+
+sudo unshare --net --fork -- \
+  runuser -u "$policy_user" -- \
   env -i \
-    PATH="$PATH" \
+    PATH="/usr/bin:/bin" \
     SYMTHAEA_SUBJECT_REVISION="$SYMTHAEA_SUBJECT_REVISION" \
     SYMTHAEA_ARC_DATASET_VERSION="$SYMTHAEA_ARC_DATASET_REVISION" \
     SYMTHAEA_ARC_SPLIT="training" \
     SYMTHAEA_ARC_DATA_DIR="$solver_root_abs" \
-    SYMTHAEA_ARC_POLICY_RESULTS_PATH="$report_abs" \
+    SYMTHAEA_ARC_POLICY_RESULTS_PATH="$sandbox_report" \
     SYMTHAEA_ARC_MAX_TASKS="$SYMTHAEA_ARC_SMOKE_TASK_FILES" \
     SYMTHAEA_ARC_CANDIDATE_BUDGET="$SYMTHAEA_ARC_CANDIDATE_BUDGET" \
     SYMTHAEA_ARC_POLICY_SEED="$SYMTHAEA_ARC_POLICY_SEED" \
-    ./bin/arc_budgeted_policy
-)
+    "$sandbox/bin/arc_budgeted_policy"
 
-if [[ ! -s "$SYMTHAEA_ARC_POLICY_RESULTS_PATH" ]]; then
+if ! sudo -u "$policy_user" -- test -s "$sandbox_report"; then
   echo "isolated policy process did not emit a report" >&2
   exit 2
 fi
+sudo install -o "$(id -u)" -g "$(id -g)" -m 0644 "$sandbox_report" "$report_abs"
+if [[ ! -s "$SYMTHAEA_ARC_POLICY_RESULTS_PATH" ]]; then
+  echo "policy report was not exported from the isolated sandbox" >&2
+  exit 2
+fi
+
+# Prove evaluator-only paths are still unreadable to the policy UID after execution.
+for sensitive in \
+  "$SYMTHAEA_ARC_DATASET_ROOT" \
+  "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" \
+  "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"; do
+  if sudo -u "$policy_user" -- test -r "$sensitive"; then
+    echo "policy UID can read evaluator-only input after execution: $sensitive" >&2
+    exit 2
+  fi
+done
 
 # Stage C: evaluator-only processes. The primary evaluator gets real targets and independently
 # replays each policy action/seal. A separate verifier recomputes the full exhaustive reference.
@@ -111,9 +178,9 @@ for artifact in \
   fi
 done
 
-# Independent outer sanity: the true target bundle must never have been copied into the policy
-# sandbox. The solver-view files must contain the fixed public sentinel in every test output.
-if find "$sandbox" -type f -name '*target*' -o -name '*manifest*' | grep -q .; then
+# Independent outer sanity: evaluator provenance was never copied into the policy sandbox, and the
+# solver-view files contain only the fixed public sentinel in every test-output slot.
+if find "$sandbox" -type f \( -name '*target*' -o -name '*manifest*' \) | grep -q .; then
   echo "policy sandbox unexpectedly contains evaluator provenance" >&2
   exit 2
 fi
