@@ -95,6 +95,8 @@ The specification may still be bad, ambiguous, unavailable, or untrusted; those 
 
 One semantic ID names one slot in one declared set. Schema and digest are identity-bearing contents of that slot, not a mechanism for creating multiple meanings under the same label.
 
+Canonical string framing uses UTF-8 byte lengths. Unicode normalization is deliberately not implicit: byte-distinct NFC/NFD inputs remain distinct commitments unless a committed higher-level definition schema explicitly specifies normalization before the bytes reach this primitive.
+
 ## Conformance corpus
 
 The reusable-crate corpus currently proves:
@@ -105,6 +107,8 @@ The reusable-crate corpus currently proves:
 - exact semantic/schema/specification/definition components are preserved;
 - duplicate semantic IDs fail even when schema differs;
 - semantic sets canonicalize by semantic ID only;
+- length framing counts UTF-8 bytes rather than Unicode scalar values;
+- Unicode normalization is not implicit;
 - an independently calculated canonical commitment golden vector is stable.
 
 The primitive-level golden fixture is:
@@ -119,9 +123,35 @@ commitment-digest: 3a510b215853c77285e39c95b6ab45c0d816370e17e14ccda8337110a790f
 
 This freezes only the generic semantic-commitment wire format. Full campaign/registration/ordering/admission golden vectors remain deferred until integration into ASSURE-002.
 
+## Executable evidence
+
+Exact semantic source head `41b77d97c9617b7ba726e71b79d13737777f4146` executed under Rust 1.96.0 in ASSURE-002 qualification run `34795741819`, dedicated job `qualify-semantic-schema`.
+
+That exact source established:
+
+```text
+exact checkout                 PASS
+cargo fmt --check              PASS
+cargo check                    PASS
+9/9 conformance tests          PASS
+strict Clippy -D warnings      PASS
+root-lock evidence capture     PASS
+committed root-lock parity     FAIL
+```
+
+The failure was limited to missing workspace package entries in committed `Cargo.lock`; no semantic-source failure was observed. The read-only job produced exact reconciled root-lock SHA-256:
+
+```text
+c8393c2ac181cb86151aa82bfd4ac406cf7f7eb8f9da4242b02c3712997f0cd8
+```
+
+A narrowly constrained repair subsequently committed only that previously observed lock transformation. Because the repair push was authored through GitHub Actions, GitHub did not create executable qualification jobs for the resulting commit; a fresh ordinary repository commit therefore starts a new exact-head qualification rather than treating the repair run as product evidence.
+
+Historical failed/action-required runs remain their actual evidence states.
+
 ## Integration sequence
 
-The parent ASSURE-002 candidate remains frozen while independently qualified. ASSURE-002A is qualified as a separate core primitive first.
+ASSURE-002A is qualified as a separate core primitive before integration. The parent campaign kernel is qualified independently.
 
 Then integrate from frozen inputs:
 
@@ -144,6 +174,8 @@ recompute full campaign golden vectors independently
         ↓
 qualify integrated exact head
 ```
+
+The integration contract is tracked separately in ASSURE-002B (#2874). Final campaign-level golden vectors are not frozen before that integration.
 
 ## Deliberate nonclaims
 
