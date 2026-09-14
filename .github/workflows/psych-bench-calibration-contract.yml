@@ -9,6 +9,7 @@ on:
       - psych-bench/calibration-target-provenance
       - psych-bench/calibration-source-inventory
       - psych-bench/calibration-runtime-stroop
+      - psych-bench/calibration-runtime-nback
     paths:
       - '.github/workflows/psych-bench-calibration-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
@@ -16,6 +17,9 @@ on:
       - 'crates/domains/symthaea-psych-bench/src/calibration_binding.rs'
       - 'crates/domains/symthaea-psych-bench/src/calibration_inventory.rs'
       - 'crates/domains/symthaea-psych-bench/src/calibration_runtime.rs'
+      - 'crates/domains/symthaea-psych-bench/src/calculation_authority.rs'
+      - 'crates/domains/symthaea-psych-bench/src/harness/config.rs'
+      - 'crates/domains/symthaea-psych-bench/src/harness/difficulty.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/reasoning/arc_fluid.rs'
@@ -71,6 +75,7 @@ jobs:
             crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
             crates/domains/symthaea-psych-bench/src/calibration_inventory.rs \
             crates/domains/symthaea-psych-bench/src/calibration_runtime.rs \
+            crates/domains/symthaea-psych-bench/src/calculation_authority.rs \
             crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs \
             crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs
 
@@ -106,6 +111,12 @@ jobs:
           cargo test --locked -p symthaea-psych-bench --lib benchmarks::executive::stroop::tests::effective_calibration_values_match_default_scoring_inputs -- --nocapture
           cargo test --locked -p symthaea-psych-bench --lib benchmarks::worm::nback::tests::effective_calibration_values_match_default_scoring_inputs -- --nocapture
 
+      - name: Execute calculation-authority regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib calculation_authority::tests -- --nocapture
+
       # Keep dependency compilation authoritative, but make lint authority match
       # the calibration evidence/scoring surface this focused job qualifies.
       - name: Strict focused Clippy
@@ -124,6 +135,7 @@ jobs:
             crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
             crates/domains/symthaea-psych-bench/src/calibration_inventory.rs \
             crates/domains/symthaea-psych-bench/src/calibration_runtime.rs \
+            crates/domains/symthaea-psych-bench/src/calculation_authority.rs \
             crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs \
             crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs
           test "$cargo_status" -eq 0
