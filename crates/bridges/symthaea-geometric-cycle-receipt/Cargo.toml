@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-geometric-cycle-receipt"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Canonical deterministic per-cycle state receipts for Symthaea geometric-emergence reproducibility experiments"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["reproducibility", "receipt", "cognition", "research"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+serde = { workspace = true }
+bincode = { workspace = true }
+blake3 = { workspace = true }
+symthaea = { path = "../../..", default-features = false }
+symthaea-core = { path = "../../core/symthaea-core" }
