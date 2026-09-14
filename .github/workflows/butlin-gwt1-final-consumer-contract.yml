@@ -84,6 +84,9 @@ jobs:
           assert "validate_frozen_gh_root" in candidate
           assert "read_canonical_json" in candidate
           assert "GWT1_CONSUMER_GH_BINARY_SHA256_V1" in candidate
+          assert "pub const GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1: bool = false;" in candidate
+          assert "PublicReportingAuthorityBlocked" in candidate
+          assert "if !GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1" in candidate
           assert "553949e2efa12842771efe6012aa4de21f1d591530ec17fc435f610f10e017ee" in candidate
           assert "2ec8b2f6e0e8e915f7e0c8d7b14b77fe93e33225872ea1d98041228950c620a9" in candidate
           assert "reconstruct_gwt1_verified_report_projection_candidate_v1" in binary
@@ -109,7 +112,8 @@ jobs:
           assert workflow.count("--deny-self-hosted-runners") >= 2
           assert ".member_count==60" in workflow
           assert ".member_count==7" in workflow
-          assert ".member_count==25" in workflow
+          assert ".member_count==26" in workflow
+          assert "fresh_nested_direct_archive_admission.json" in workflow
           assert "cargo run --locked -p symthaea-psych-bench" in workflow
           assert "--features trusted-resolution-consumer" in workflow
           assert "actions/cache" not in workflow
@@ -138,10 +142,11 @@ jobs:
           profile = module.load_profile(profile_path)
           assert profile["profile_id"] == "gwt1-verified-report-archive-v1"
           assert profile["root"] == "gwt1-verified-report"
-          assert len(profile["members"]) == 25
-          assert len({item["path"] for item in profile["members"]}) == 25
+          assert len(profile["members"]) == 26
+          assert len({item["path"] for item in profile["members"]}) == 26
           assert any(item["path"].endswith("source/gwt1-final-resolution.tar.gz") for item in profile["members"])
           assert any(item["path"].endswith("authority/fresh_final_archive_verification.json") for item in profile["members"])
+          assert any(item["path"].endswith("authority/fresh_nested_direct_archive_admission.json") for item in profile["members"])
           assert any(item["path"].endswith("projection.json") for item in profile["members"])
           PY
 
