@@ -1,0 +1,170 @@
+# Focused exact-head qualification for lattice-QCD work in symthaea-particle-physics.
+# Full CI remains whole-workspace integration authority.
+#
+# Verifier authority and scientific subject are checked out separately so a
+# base-owned/manual verifier can qualify an older immutable subject SHA without
+# requiring that old subject to contain this workflow or verifier script.
+
+name: LQCD Fast Lane
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-particle-physics/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/**'
+      - 'scripts/check-class-a-changes.sh'
+      - 'scripts/qualify-lqcd-fast.py'
+      - '.github/workflows/lqcd-fast.yml'
+  workflow_dispatch:
+    inputs:
+      qualified_sha:
+        description: 'Exact immutable commit SHA to qualify'
+        required: true
+        type: string
+      qualification_base_sha:
+        description: 'Optional exact base SHA for governance/ancestry binding'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lqcd-fast-${{ github.event_name == 'workflow_dispatch' && inputs.qualified_sha || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+
+jobs:
+  qualify:
+    name: LQCD particle-physics exact-head candidate qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout verifier authority
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.workflow_sha }}
+          path: verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact scientific subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.qualified_sha }}
+          path: subject
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions and verifier authority
+        id: verifier
+        shell: bash
+        env:
+          EXPECTED_VERIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          workflow="$GITHUB_WORKSPACE/verifier/.github/workflows/lqcd-fast.yml"
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" "$workflow")" -eq 2
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" "$workflow")" -eq 2
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' "$workflow"; then
+            echo 'mutable major-version GitHub Action tag found in LQCD fast lane' >&2
+            exit 1
+          fi
+          actual="$(git -C "$GITHUB_WORKSPACE/verifier" rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_VERIFIER_SHA"
+          tree="$(git -C "$GITHUB_WORKSPACE/verifier" rev-parse 'HEAD^{tree}')"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare exact PR base in subject repository
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C "$GITHUB_WORKSPACE/subject" fetch --no-tags origin "${GITHUB_BASE_REF}:refs/remotes/origin/${GITHUB_BASE_REF}"
+          test "$(git -C "$GITHUB_WORKSPACE/subject" rev-parse "origin/${GITHUB_BASE_REF}")" = "${{ github.event.pull_request.base.sha }}"
+
+      - name: Prepare optional manual base in subject repository
+        if: github.event_name == 'workflow_dispatch' && inputs.qualification_base_sha != ''
+        shell: bash
+        env:
+          BASE_SHA: ${{ inputs.qualification_base_sha }}
+        run: |
+          set -euo pipefail
+          git -C "$GITHUB_WORKSPACE/subject" fetch --no-tags origin "$BASE_SHA"
+          git -C "$GITHUB_WORKSPACE/subject" cat-file -e "$BASE_SHA^{commit}"
+
+      - name: Install subject-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/subject"
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc -Vv
+          cargo -V
+          rustfmt -V
+          cargo clippy -V
+
+      - name: Qualify LQCD particle-physics subject
+        id: qualify
+        env:
+          QUALIFIED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.qualified_sha }}
+          QUALIFICATION_BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || inputs.qualification_base_sha }}
+          VERIFIER_AUTHORITY_SHA: ${{ steps.verifier.outputs.sha }}
+          VERIFIER_AUTHORITY_TREE: ${{ steps.verifier.outputs.tree }}
+          LQCD_SUBJECT_DIR: ${{ github.workspace }}/subject
+          LQCD_VERIFIER_DIR: ${{ github.workspace }}/verifier
+          LQCD_QUALIFICATION_DIR: ${{ runner.temp }}/lqcd-qualification-v2
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lqcd-target
+        run: python3 "$GITHUB_WORKSPACE/verifier/scripts/qualify-lqcd-fast.py"
+
+      - name: Publish attempt digest
+        if: always()
+        shell: bash
+        env:
+          ATTEMPT: ${{ runner.temp }}/lqcd-qualification-v2/attempt.json
+        run: |
+          set -euo pipefail
+          if [[ -f "$ATTEMPT" ]]; then
+            digest="$(sha256sum "$ATTEMPT" | awk '{print $1}')"
+            echo "LQCD qualification attempt_sha256=$digest"
+          else
+            echo 'No attempt record was produced.' >&2
+            exit 1
+          fi
+
+      - name: Upload qualification attempt evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lqcd-attempt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lqcd-qualification-v2/attempt.json
+            ${{ runner.temp }}/lqcd-qualification-v2/attempt.json.sha256
+            ${{ runner.temp }}/lqcd-qualification-v2/subject-inputs.tsv
+            ${{ runner.temp }}/lqcd-qualification-v2/verifier-inputs.tsv
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload positive candidate receipt
+        if: always() && steps.qualify.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lqcd-positive-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lqcd-qualification-v2/positive-receipt.json
+            ${{ runner.temp }}/lqcd-qualification-v2/positive-receipt.json.sha256
+          if-no-files-found: error
+          retention-days: 90
