@@ -1,0 +1,178 @@
+name: WCARE-50 Frozen WCARE-42 Executable Qualification
+
+on:
+  push:
+    branches:
+      - wcare-50-wcare42-executable-qualification
+    paths:
+      - .github/workflows/wcare50-wcare42-executable-qualification.yml
+      - scripts/wcare50_materialize_fixtures.py
+      - scripts/wcare50_verify_w49_precondition.py
+      - scripts/wcare50_execute_qualification.py
+      - scripts/wcare50_selftest.py
+      - docs/release/evidence/WCARE50_FIXTURE_PACKAGE_V1.zlib.b64
+      - docs/release/evidence/WCARE50_WCARE42_EXECUTABLE_QUALIFICATION_PROTOCOL_V1.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qualify:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact WCARE-50 harness
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify one-commit sibling harness and frozen fixtures
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          BASE="0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test "$GITHUB_REF_NAME" = "wcare-50-wcare42-executable-qualification"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE"
+          test "$(git rev-list --count "$BASE"..HEAD)" = "1"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 -m py_compile \
+            scripts/wcare50_materialize_fixtures.py \
+            scripts/wcare50_verify_w49_precondition.py \
+            scripts/wcare50_execute_qualification.py \
+            scripts/wcare50_selftest.py
+          python3 scripts/wcare50_selftest.py
+          rm -rf scripts/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          printf '%s\n' 'PASS_WCARE50_PREREGISTERED_HARNESS'
+
+      - name: Materialize exact frozen fixture package
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/wcare50-fixtures" "$RUNNER_TEMP/wcare50-package.json"
+          python3 scripts/wcare50_materialize_fixtures.py \
+            --archive docs/release/evidence/WCARE50_FIXTURE_PACKAGE_V1.zlib.b64 \
+            --out "$RUNNER_TEMP/wcare50-fixtures" \
+            --package-json "$RUNNER_TEMP/wcare50-package.json"
+          test "$(sha256sum "$RUNNER_TEMP/wcare50-package.json" | awk '{print $1}')" = \
+            "c6b66a25b5a04649306d81a4275019885edddd84d90bd4510a522441c3a8a9d9"
+          printf '%s\n' 'PASS_WCARE50_EXACT_FIXTURE_MATERIALIZATION'
+
+      - name: Retrieve and verify exact WCARE-49 closure event
+        id: closure
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          RUN_ID="34877774593"
+          API="https://api.github.com/repos/Luminous-Dynamics/symthaea"
+          HEADER=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+
+          curl -fsSL "${HEADER[@]}" "$API/actions/runs/$RUN_ID" > "$RUNNER_TEMP/wcare49-run.json"
+          STATUS="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1],encoding="utf-8"))["status"])' "$RUNNER_TEMP/wcare49-run.json")"
+          printf 'EXACT_WCARE49_STATUS=%s\n' "$STATUS"
+
+          if [[ "$STATUS" != "completed" ]]; then
+            set +e
+            python3 scripts/wcare50_verify_w49_precondition.py \
+              --run-json "$RUNNER_TEMP/wcare49-run.json" \
+              > "$RUNNER_TEMP/wcare50-w49-precondition.json"
+            RC=$?
+            set -e
+            test "$RC" -eq 3
+            grep -Fq '"classification":"WCARE49_PRECONDITION_PENDING"' "$RUNNER_TEMP/wcare50-w49-precondition.json"
+            grep -Fq '"execution_inputs_closed":false' "$RUNNER_TEMP/wcare50-w49-precondition.json"
+            cat "$RUNNER_TEMP/wcare50-w49-precondition.json"
+            printf '%s\n' 'PASS_WCARE50_PREREGISTERED_WCARE49_PENDING'
+            printf '%s\n' 'NO_WCARE42_EXECUTABLE_QUALIFICATION_CLAIM'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          curl -fsSL "${HEADER[@]}" "$API/actions/runs/$RUN_ID/jobs?per_page=100" > "$RUNNER_TEMP/wcare49-jobs.json"
+          JOB_ID="$(python3 -c 'import json,sys; jobs=json.load(open(sys.argv[1],encoding="utf-8")).get("jobs",[]); found=[j for j in jobs if j.get("name")=="gate"]; assert len(found)==1, len(found); print(found[0]["id"])' "$RUNNER_TEMP/wcare49-jobs.json")"
+          curl -fsSL -L "${HEADER[@]}" "$API/actions/jobs/$JOB_ID/logs" > "$RUNNER_TEMP/wcare49-job.log"
+
+          python3 scripts/wcare50_verify_w49_precondition.py \
+            --run-json "$RUNNER_TEMP/wcare49-run.json" \
+            --jobs-json "$RUNNER_TEMP/wcare49-jobs.json" \
+            --log "$RUNNER_TEMP/wcare49-job.log" \
+            > "$RUNNER_TEMP/wcare50-w49-precondition.json"
+
+          grep -Fq '"classification":"WCARE49_PRECONDITION_SATISFIED"' "$RUNNER_TEMP/wcare50-w49-precondition.json"
+          grep -Fq '"execution_inputs_closed":true' "$RUNNER_TEMP/wcare50-w49-precondition.json"
+          grep -Fq '"wcare42_executable_qualification_established":false' "$RUNNER_TEMP/wcare50-w49-precondition.json"
+          cat "$RUNNER_TEMP/wcare50-w49-precondition.json"
+          printf 'WCARE50_W49_PRECONDITION_SHA256=%s\n' "$(sha256sum "$RUNNER_TEMP/wcare50-w49-precondition.json" | awk '{print $1}')"
+          printf '%s\n' 'PASS_WCARE50_EXACT_WCARE49_PRECONDITION'
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact WCARE-49 input guard
+        if: steps.closure.outputs.ready == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 720c7ebf6c03b5698c48a4d2315ea9c4d25107e7
+          fetch-depth: 0
+          persist-credentials: false
+          path: w49
+
+      - name: Checkout exact lock-bearing WCARE-48 FINAL
+        if: steps.closure.outputs.ready == 'true'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: 5bc23735f545b1b82044820f0e02ece59be04b4a
+          fetch-depth: 0
+          persist-credentials: false
+          path: candidate
+
+      - name: Install exact Rust toolchain
+        if: steps.closure.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          cd candidate/tools/wcare42_builder_attestation_verifier
+          rustc --version | grep -Eq '^rustc 1\.96\.0 '
+          cargo --version | grep -Eq '^cargo 1\.96\.0 '
+
+      - name: Execute frozen WCARE-42 qualification matrix
+        if: steps.closure.outputs.ready == 'true'
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/wcare50-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/wcare50-target
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          rm -rf "$CARGO_HOME" "$CARGO_TARGET_DIR"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          python3 scripts/wcare50_execute_qualification.py \
+            --candidate candidate \
+            --w49-guard w49/scripts/wcare49_close_inputs.py \
+            --w49-precondition-json "$RUNNER_TEMP/wcare50-w49-precondition.json" \
+            --fixture-package-json "$RUNNER_TEMP/wcare50-package.json" \
+            --fixture-root "$RUNNER_TEMP/wcare50-fixtures" \
+            | tee "$RUNNER_TEMP/wcare50-result.json"
+
+          grep -Fq '"classification":"WCARE42_EXECUTABLE_QUALIFIED"' "$RUNNER_TEMP/wcare50-result.json"
+          grep -Fq '"cryptographic_execution_qualified":true' "$RUNNER_TEMP/wcare50-result.json"
+          grep -Fq '"wcare42_executable_qualification_established":true' "$RUNNER_TEMP/wcare50-result.json"
+          grep -Fq '"builder_authentication_established":false' "$RUNNER_TEMP/wcare50-result.json"
+          grep -Fq '"preregistration_temporal_precedence_established":false' "$RUNNER_TEMP/wcare50-result.json"
+          grep -Fq '"subject_correctness_established":false' "$RUNNER_TEMP/wcare50-result.json"
+          grep -Fq '"runtime_authority_granted":false' "$RUNNER_TEMP/wcare50-result.json"
+          printf 'WCARE50_RESULT_SHA256=%s\n' "$(sha256sum "$RUNNER_TEMP/wcare50-result.json" | awk '{print $1}')"
+          printf '%s\n' 'PASS_WCARE50_WCARE42_EXECUTABLE_QUALIFICATION'
