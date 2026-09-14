@@ -49,7 +49,9 @@ pub enum Gwt1FinalConsumerCandidateErrorV1 {
     NonCanonicalJson {
         component: &'static str,
     },
-    InvalidFinalRoot {
+    InvalidAdmittedRoot {
+        role: &'static str,
+        expected_name: &'static str,
         observed: String,
     },
     EmptyInternalPromotionVerification,
@@ -88,9 +90,13 @@ impl std::fmt::Display for Gwt1FinalConsumerCandidateErrorV1 {
                 f,
                 "stored {component} bytes are not the producer's canonical serde_json encoding"
             ),
-            Self::InvalidFinalRoot { observed } => write!(
+            Self::InvalidAdmittedRoot {
+                role,
+                expected_name,
+                observed,
+            } => write!(
                 f,
-                "admitted final root must be an absolute non-symlink directory named gwt1-final-resolution, observed {observed:?}"
+                "admitted {role} root must be an absolute non-symlink directory named {expected_name}, observed {observed:?}"
             ),
             Self::EmptyInternalPromotionVerification => write!(
                 f,
@@ -154,6 +160,32 @@ fn validate_regular_executable(
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(Gwt1FinalConsumerCandidateErrorV1::VerifierPathInvalid {
             role,
+            observed: path.display().to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_admitted_root(
+    path: &Path,
+    role: &'static str,
+    expected_name: &'static str,
+) -> Result<(), Gwt1FinalConsumerCandidateErrorV1> {
+    if !path.is_absolute()
+        || path.file_name().and_then(|name| name.to_str()) != Some(expected_name)
+    {
+        return Err(Gwt1FinalConsumerCandidateErrorV1::InvalidAdmittedRoot {
+            role,
+            expected_name,
+            observed: path.display().to_string(),
+        });
+    }
+    let metadata = fs::symlink_metadata(path)
+        .map_err(|error| Gwt1FinalConsumerCandidateErrorV1::Io(error.to_string()))?;
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Err(Gwt1FinalConsumerCandidateErrorV1::InvalidAdmittedRoot {
+            role,
+            expected_name,
             observed: path.display().to_string(),
         });
     }
@@ -257,24 +289,6 @@ fn validate_frozen_gh_root(
     Ok(())
 }
 
-fn validate_admitted_final_root(
-    path: &Path,
-) -> Result<(), Gwt1FinalConsumerCandidateErrorV1> {
-    if !path.is_absolute() || path.file_name().and_then(|name| name.to_str()) != Some("gwt1-final-resolution") {
-        return Err(Gwt1FinalConsumerCandidateErrorV1::InvalidFinalRoot {
-            observed: path.display().to_string(),
-        });
-    }
-    let metadata = fs::symlink_metadata(path)
-        .map_err(|error| Gwt1FinalConsumerCandidateErrorV1::Io(error.to_string()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        return Err(Gwt1FinalConsumerCandidateErrorV1::InvalidFinalRoot {
-            observed: path.display().to_string(),
-        });
-    }
-    Ok(())
-}
-
 fn read_canonical_json<T>(
     path: &Path,
     component: &'static str,
@@ -302,7 +316,8 @@ where
     Ok(value)
 }
 
-/// Reconstruct a report projection candidate from a bounded-admitted final root.
+/// Reconstruct a report projection candidate from bounded-admitted final and
+/// nested-direct roots.
 ///
 /// **Not an authority boundary.** The trusted consumer workflow must first
 /// verify the final archive attestation and perform bounded archive admission,
@@ -316,7 +331,8 @@ pub fn reconstruct_gwt1_verified_report_projection_candidate_v1(
     sha256sum_executable: &Path,
     gh_config_dir: &Path,
 ) -> Result<Gwt1VerifiedReportProjectionV1, Gwt1FinalConsumerCandidateErrorV1> {
-    validate_admitted_final_root(admitted_final_root)?;
+    validate_admitted_root(admitted_final_root, "final", "gwt1-final-resolution")?;
+    validate_admitted_root(admitted_direct_evidence_dir, "direct evidence", "gwt1-evidence")?;
     validate_frozen_gh_root(gh_executable, sha256sum_executable)?;
 
     let stored_base: ButlinIndicatorReport = read_canonical_json(
@@ -367,6 +383,7 @@ pub fn reconstruct_gwt1_verified_report_projection_candidate_v1(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn consumer_verifier_root_constants_are_frozen() {
@@ -381,5 +398,34 @@ mod tests {
         assert!(is_lower_hex_64(GWT1_CONSUMER_GH_ARCHIVE_SHA256_V1));
         assert!(is_lower_hex_64(GWT1_CONSUMER_GH_BINARY_SHA256_V1));
         assert!(is_lower_hex_64(GWT1_CONSUMER_GH_VERSION_OUTPUT_SHA256_V1));
+    }
+
+    #[test]
+    fn admitted_roots_reject_relative_paths_before_io() {
+        let error = validate_admitted_root(
+            &PathBuf::from("gwt1-final-resolution"),
+            "final",
+            "gwt1-final-resolution",
+        )
+        .expect_err("relative roots must fail");
+        assert!(matches!(
+            error,
+            Gwt1FinalConsumerCandidateErrorV1::InvalidAdmittedRoot { .. }
+        ));
+    }
+
+    #[test]
+    fn admitted_roots_reject_wrong_names_before_io() {
+        let path = if cfg!(windows) {
+            PathBuf::from(r"C:\wrong-root")
+        } else {
+            PathBuf::from("/wrong-root")
+        };
+        let error = validate_admitted_root(&path, "final", "gwt1-final-resolution")
+            .expect_err("wrong root name must fail");
+        assert!(matches!(
+            error,
+            Gwt1FinalConsumerCandidateErrorV1::InvalidAdmittedRoot { .. }
+        ));
     }
 }
