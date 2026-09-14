@@ -78,6 +78,8 @@ mod v2_shadow_campaign;
 mod v2_selected_comparator;
 #[cfg(test)]
 mod v2_prospective_ticket;
+#[cfg(test)]
+mod v2_qualification_receipt;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
