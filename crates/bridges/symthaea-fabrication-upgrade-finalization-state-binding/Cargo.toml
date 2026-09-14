@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-fabrication-upgrade-finalization-state-binding"
+version = "0.1.0"
+edition = "2024"
+description = "Bind fresh finalization execution authority to the exact activated upgrade state"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-current-no-rollback = { path = "../symthaea-fabrication-current-no-rollback" }
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-upgrade-finalization-execution = { path = "../symthaea-fabrication-upgrade-finalization-execution" }
+serde = { workspace = true }
+serde_json = { workspace = true }
