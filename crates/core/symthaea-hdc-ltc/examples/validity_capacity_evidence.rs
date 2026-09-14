@@ -475,7 +475,7 @@ fn emit_record<W: Write>(
         .as_str()
         .ok_or_else(|| other("record digest was not a string"))?
         .to_owned();
-    *sequence = sequence
+    *sequence = (*sequence)
         .checked_add(1)
         .ok_or_else(|| other("evidence sequence overflow"))?;
     Ok(())
@@ -493,7 +493,10 @@ fn canonicalize(value: &Value) -> Value {
             keys.sort();
             let mut sorted = Map::new();
             for key in keys {
-                sorted.insert((*key).clone(), canonicalize(&map[*key]));
+                let nested = map
+                    .get(key.as_str())
+                    .expect("canonicalization key came from the same map");
+                sorted.insert(key.to_string(), canonicalize(nested));
             }
             Value::Object(sorted)
         }
