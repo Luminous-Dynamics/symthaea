@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -29,9 +30,14 @@ def q(
     )
 
 
+def digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
 class LockfileRepairLineageTests(unittest.TestCase):
     def test_generation_mode_qualifies_cargo_candidate(self) -> None:
         report = q(BASE, BASE, BASE + RSK)
+        self.assertEqual(report["schema"], lineage.LINEAGE_SCHEMA)
         self.assertEqual(report["mode"], "generated-candidate")
         self.assertEqual(report["status"], "accepted")
         self.assertTrue(report["head_equals_base"])
@@ -39,13 +45,44 @@ class LockfileRepairLineageTests(unittest.TestCase):
         self.assertEqual(
             report["candidate_delta"]["status"], "rsk-path-records-added"
         )
+        self.assertEqual(
+            report["cargo_metadata_evidence"],
+            {"present": False, "sha256": None, "bytes": 0},
+        )
 
-    def test_generation_mode_accepts_proved_feature_unification_edge(self) -> None:
-        report = q(FEATURE_BASE, FEATURE_BASE, FEATURE_AFTER, metadata())
+    def test_generation_mode_accepts_and_binds_proved_feature_metadata(self) -> None:
+        evidence = metadata()
+        report = q(FEATURE_BASE, FEATURE_BASE, FEATURE_AFTER, evidence)
         self.assertEqual(report["mode"], "generated-candidate")
         self.assertEqual(
             report["candidate_delta"]["status"],
             "rsk-path-records-and-proved-feature-edges-added",
+        )
+        self.assertEqual(
+            report["cargo_metadata_evidence"],
+            {
+                "present": True,
+                "sha256": digest(evidence),
+                "bytes": len(evidence),
+            },
+        )
+
+    def test_metadata_binding_is_exact_byte_sensitive(self) -> None:
+        compact = metadata()
+        pretty = (json.dumps(json.loads(compact), indent=2, sort_keys=True) + "\n").encode()
+        compact_report = q(FEATURE_BASE, FEATURE_BASE, FEATURE_AFTER, compact)
+        pretty_report = q(FEATURE_BASE, FEATURE_BASE, FEATURE_AFTER, pretty)
+        self.assertEqual(compact_report["status"], "accepted")
+        self.assertEqual(pretty_report["status"], "accepted")
+        self.assertNotEqual(
+            compact_report["cargo_metadata_evidence"]["sha256"],
+            pretty_report["cargo_metadata_evidence"]["sha256"],
+        )
+        self.assertEqual(
+            compact_report["cargo_metadata_evidence"]["sha256"], digest(compact)
+        )
+        self.assertEqual(
+            pretty_report["cargo_metadata_evidence"]["sha256"], digest(pretty)
         )
 
     def test_already_repaired_generation_head_is_idempotent(self) -> None:
@@ -64,11 +101,15 @@ class LockfileRepairLineageTests(unittest.TestCase):
         )
 
     def test_committed_feature_candidate_requires_exact_post_cargo_bytes(self) -> None:
-        report = q(FEATURE_BASE, FEATURE_AFTER, FEATURE_AFTER, metadata())
+        evidence = metadata()
+        report = q(FEATURE_BASE, FEATURE_AFTER, FEATURE_AFTER, evidence)
         self.assertEqual(report["mode"], "committed-candidate-verified")
         self.assertEqual(
             report["committed_delta"]["status"],
             "rsk-path-records-and-proved-feature-edges-added",
+        )
+        self.assertEqual(
+            report["cargo_metadata_evidence"]["sha256"], digest(evidence)
         )
 
     def test_committed_candidate_rejects_post_cargo_reordering(self) -> None:
@@ -89,7 +130,7 @@ class LockfileRepairLineageTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "non-RSK package graph drift"):
             q(BASE, BASE, bad_post)
 
-    def test_main_discovers_sibling_cargo_metadata_for_feature_edge(self) -> None:
+    def test_main_does_not_discover_sibling_cargo_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             base = root / "Cargo.lock.base"
@@ -111,6 +152,40 @@ class LockfileRepairLineageTests(unittest.TestCase):
                     str(report_path),
                 ]
             )
+            self.assertEqual(rc, 1)
+            report = json.loads(report_path.read_text())
+            self.assertEqual(report["status"], "rejected")
+            self.assertEqual(report["reason_code"], "cargo_metadata_required")
+            self.assertEqual(
+                report["cargo_metadata_evidence"],
+                {"present": False, "sha256": None, "bytes": 0},
+            )
+
+    def test_main_binds_explicit_cargo_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = root / "Cargo.lock.base"
+            head = root / "Cargo.lock.head"
+            post = root / "Cargo.lock.post-cargo"
+            metadata_path = root / "cargo-metadata.json"
+            report_path = root / "lineage-report.json"
+            evidence = metadata()
+            base.write_text(FEATURE_BASE)
+            head.write_text(FEATURE_BASE)
+            post.write_text(FEATURE_AFTER)
+            metadata_path.write_bytes(evidence)
+
+            rc = lineage.main(
+                [
+                    str(base),
+                    str(head),
+                    str(post),
+                    "--cargo-metadata",
+                    str(metadata_path),
+                    "--json-out",
+                    str(report_path),
+                ]
+            )
             self.assertEqual(rc, 0)
             report = json.loads(report_path.read_text())
             self.assertEqual(report["status"], "accepted")
@@ -118,6 +193,14 @@ class LockfileRepairLineageTests(unittest.TestCase):
             self.assertEqual(
                 report["candidate_delta"]["status"],
                 "rsk-path-records-and-proved-feature-edges-added",
+            )
+            self.assertEqual(
+                report["cargo_metadata_evidence"],
+                {
+                    "present": True,
+                    "sha256": digest(evidence),
+                    "bytes": len(evidence),
+                },
             )
 
     def test_main_writes_structured_rejection_report(self) -> None:
@@ -127,16 +210,21 @@ class LockfileRepairLineageTests(unittest.TestCase):
             base = root / "base.lock"
             head = root / "head.lock"
             post = root / "post.lock"
+            metadata_path = root / "cargo-metadata.json"
             report_path = root / "lineage-report.json"
+            evidence = metadata()
             base.write_text(BASE)
             head.write_text(BASE)
             post.write_text(bad_post)
+            metadata_path.write_bytes(evidence)
 
             rc = lineage.main(
                 [
                     str(base),
                     str(head),
                     str(post),
+                    "--cargo-metadata",
+                    str(metadata_path),
                     "--json-out",
                     str(report_path),
                 ]
@@ -150,6 +238,14 @@ class LockfileRepairLineageTests(unittest.TestCase):
             self.assertIn("base_sha256", report)
             self.assertIn("head_sha256", report)
             self.assertIn("post_cargo_sha256", report)
+            self.assertEqual(
+                report["cargo_metadata_evidence"],
+                {
+                    "present": True,
+                    "sha256": digest(evidence),
+                    "bytes": len(evidence),
+                },
+            )
 
 
 if __name__ == "__main__":
