@@ -1,0 +1,227 @@
+diff --git a/crates/domains/symthaea-broca/src/formal_logic_scorer.rs b/crates/domains/symthaea-broca/src/formal_logic_scorer.rs
+--- a/crates/domains/symthaea-broca/src/formal_logic_scorer.rs
++++ b/crates/domains/symthaea-broca/src/formal_logic_scorer.rs
+@@ -2,14 +2,11 @@
+ // SPDX-License-Identifier: AGPL-3.0-or-later
+ //! FormalLogicScorer — E-axis (Epistemic) formal verification scorer.
+ //!
+-//! Uses the symthaea-lean-bridge (z3_to_lean, bridge, fol_ext_bridge, runner)
+-//! to translate generated algorithms into Lean 4 proof obligations and
+-//! verifies them via Z3/Lean.
+-//! Returns a formal_correctness score (0.0–1.0) that is injected into
+-//! ThoughtChannels and used by CodeGate + reward shaping.
+-//!
+-//! This completes "Absolute Correctness": the system doesn't just
+-//! "look correct" — it can *prove* it.
++//! Uses the symthaea-lean-bridge to check explicitly supplied formal
++//! statements. The current implementation does **not** derive semantics from
++//! generated source code, so specification verification and implementation
++//! conformance are kept as different scopes. Implementation credit fails closed
++//! until a code↔spec proof obligation is actually constructed and checked.
+ 
+ use std::path::PathBuf;
+ use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
+@@ -20,13 +17,30 @@
+ };
+ use tempfile::NamedTempFile;
+ 
++/// What a successful formal check is actually allowed to establish.
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum FormalVerificationScope {
++    /// The supplied formal statement itself was checked.
++    SpecificationOnly,
++    /// The implementation was shown to conform to the supplied specification.
++    ///
++    /// This scope currently fails closed because no code→semantics→spec
++    /// extraction/binding pipeline exists yet.
++    ImplementationConformance,
++}
++
+ /// Result of formal verification.
++///
++/// `verified` and `score` apply only to `scope`. A supporting specification
++/// can be verified while implementation conformance remains unestablished.
+ #[derive(Debug, Clone)]
+ pub struct FormalVerificationResult {
+-    pub score: f32,           // 0.0 = no proof, 1.0 = fully verified
++    pub score: f32,           // 0.0 = no qualified proof, 1.0 = verified in scope
+     pub proof_script: String, // emitted Lean source
+     pub verified: bool,
+-    pub logic: String, // detected SMT fragment or "propositional"
++    pub scope: FormalVerificationScope,
++    pub supporting_statement_verified: bool,
++    pub logic: String,
+ }
+ 
+ /// FormalLogicScorer — the E-axis component.
+@@ -41,36 +55,16 @@
+         Self { temp_dir }
+     }
+ 
+-    /// Score a generated algorithm against a formal specification.
+-    ///
+-    /// `spec` is a FolFormulaExt (from conjecture_engine or manual spec).
+-    /// `generated_code` is the Rust/Nix/etc. source (for future extraction of
+-    /// invariants; currently we just verify the spec itself).
+-    pub fn score_algorithm(
++    fn verify_specification_named(
+         &self,
+         theorem_name: &str,
+         spec: &FolFormulaExt,
+-        _generated_code: &str, // placeholder for future invariant extraction
+     ) -> FormalVerificationResult {
+-        // 1. Emit Lean proof obligation using the full bridge
+         let lean_source = render_fol_ext_file(theorem_name, spec);
+-
+-        // 2. Write to temp file and run lean check
+         let tmp = NamedTempFile::new_in(&self.temp_dir).unwrap();
+         std::fs::write(tmp.path(), &lean_source).unwrap();
+ 
+         let outcome = check_with_lean4(tmp.path());
+-
+-        // `score` is documented as "0.0 = no proof, 1.0 = fully verified" on
+-        // FormalVerificationResult, and feeds directly into reward shaping
+-        // (compute_epistemic_reward: 25% of the epistemic term, 40% of the
+-        // final shaped_reward) and CodeGate. LeanNotInstalled/ProcessError
+-        // mean zero verification happened -- no proof was established either
+-        // way -- so they must score 0.0 like Rejected, not a fabricated
+-        // partial-credit value. An environment missing the `lean` binary
+-        // would otherwise silently inject a constant, meaningless ~0.15
+-        // (0.6 * the 25% weight) into every training reward regardless of
+-        // whether the generated code is actually correct.
+         let (score, verified) = match outcome {
+             CheckOutcome::Accepted => (1.0, true),
+             CheckOutcome::Rejected(_) => (0.0, false),
+@@ -82,11 +76,42 @@
+             score,
+             proof_script: lean_source,
+             verified,
++            scope: FormalVerificationScope::SpecificationOnly,
++            supporting_statement_verified: verified,
+             logic: "fol_ext + mathlib".to_string(),
+         }
+     }
+ 
+-    /// Alternative path: Z3 witness → Lean script (for conjecture_engine output).
++    /// Score a generated algorithm against a formal specification.
++    ///
++    /// The current implementation can check `spec`, but it does not extract
++    /// semantics from `generated_code` or construct a proof that the code
++    /// implements `spec`. Therefore implementation-conformance authority
++    /// fails closed even when the supporting specification is itself provable.
++    pub fn score_algorithm(
++        &self,
++        theorem_name: &str,
++        spec: &FolFormulaExt,
++        generated_code: &str,
++    ) -> FormalVerificationResult {
++        let supporting = self.verify_specification_named(theorem_name, spec);
++        let _ = generated_code;
++
++        FormalVerificationResult {
++            score: 0.0,
++            proof_script: supporting.proof_script,
++            verified: false,
++            scope: FormalVerificationScope::ImplementationConformance,
++            supporting_statement_verified: supporting.verified,
++            logic: format!("{}; implementation_binding=absent", supporting.logic),
++        }
++    }
++
++    /// Alternative path: use an SMT logic declaration as a tactic hint when
++    /// checking an independently supplied Lean statement.
++    ///
++    /// This path does not currently establish semantic identity between the
++    /// SMT problem body and `lean_statement`; it is specification-only.
+     pub fn score_from_z3(
+         &self,
+         theorem_name: &str,
+@@ -109,13 +134,19 @@
+             score,
+             proof_script: lean_source,
+             verified,
+-            logic: "z3".to_string(),
++            scope: FormalVerificationScope::SpecificationOnly,
++            supporting_statement_verified: verified,
++            logic: "smt_logic_hint -> lean; smt_statement_binding=not_checked".to_string(),
+         }
+     }
+ 
+     /// Direct verification of a formal logic formula (E-axis).
++    ///
++    /// This establishes only that the supplied formal statement is accepted
++    /// by the configured Lean checker. It does not establish implementation
++    /// conformance or correspondence to an informal natural-language claim.
+     pub fn verify_formula(&self, formula: &FolFormulaExt) -> FormalVerificationResult {
+-        self.score_algorithm("evolution_check", formula, "")
++        self.verify_specification_named("evolution_check", formula)
+     }
+ }
+ 
+diff --git a/crates/domains/symthaea-broca/src/epistemic_scorers.rs b/crates/domains/symthaea-broca/src/epistemic_scorers.rs
+--- a/crates/domains/symthaea-broca/src/epistemic_scorers.rs
++++ b/crates/domains/symthaea-broca/src/epistemic_scorers.rs
+@@ -76,7 +76,7 @@
+         let result = formal_scorer.score_algorithm("generated_algorithm", s, code);
+         result.score
+     } else {
+-        0.5 // Default neutral if no spec provided
++        0.0 // No specification means no formal-proof evidence.
+     };
+ 
+     let epistemic = 0.30 * correctness
+diff --git a/crates/domains/symthaea-broca/src/invariant_discovery.rs b/crates/domains/symthaea-broca/src/invariant_discovery.rs
+--- a/crates/domains/symthaea-broca/src/invariant_discovery.rs
++++ b/crates/domains/symthaea-broca/src/invariant_discovery.rs
+@@ -8,8 +8,6 @@
+ use crate::formal_logic_scorer::FormalLogicScorer;
+ use crate::substrate_binding::SubstrateBindingEngine;
+ use symthaea_core::hdc::ContinuousHV;
+-use symthaea_core::hdc::fol_formula_ext::FolFormulaExt;
+-use symthaea_core::hdc::logic_engine::Proposition;
+ 
+ pub struct InvariantDiscovery {
+     discovered_theorems: Vec<String>,
+@@ -62,17 +60,18 @@
+         }
+     }
+ 
+-    /// Attempt to prove the discovered invariants.
+-    pub fn prove_discovered(&self, scorer: &FormalLogicScorer) {
++    /// Report discovered invariant proposals that still need a typed theorem
++    /// translation and evidence binding before formal proof can be attempted.
++    ///
++    /// The historical implementation proved `Proposition::True` as a
++    /// placeholder and then attributed that success to the unrelated theorem
++    /// string. A placeholder tautology is not evidence for a discovered claim.
++    pub fn prove_discovered(&self, _scorer: &FormalLogicScorer) {
+         for theorem in &self.discovered_theorems {
+-            let spec = FolFormulaExt::from_prop(Proposition::True); // placeholder
+-            let result = scorer.score_algorithm("discovered_invariant", &spec, "...");
+-            if result.verified {
+-                println!(
+-                    "🔒 Proven invariant: {} (Scientific consensus established)",
+-                    theorem
+-                );
+-            }
++            println!(
++                "🧪 Proposed invariant: {} (formal proof NOT ESTABLISHED: theorem translation/binding absent)",
++                theorem
++            );
+         }
+     }
+ }
+diff --git a/crates/domains/symthaea-broca/src/lib.rs b/crates/domains/symthaea-broca/src/lib.rs
+--- a/crates/domains/symthaea-broca/src/lib.rs
++++ b/crates/domains/symthaea-broca/src/lib.rs
+@@ -106,7 +106,9 @@
+     EvalConfig, EvalResult, IntentScore, QualityDelta, QualityGateFailure, QualitySuiteResult,
+ };
+ pub use evolutionary_scaffolder::{EvolutionResult, EvolutionaryScaffolder};
+-pub use formal_logic_scorer::{FormalLogicScorer, FormalVerificationResult};
++pub use formal_logic_scorer::{
++    FormalLogicScorer, FormalVerificationResult, FormalVerificationScope,
++};
+ pub use gating::{
+     CodeGate, CoherenceFeedback, EmotionalModulator, EpistemicCubeGate, EpistemicGate, GatingConfig,
+ };
