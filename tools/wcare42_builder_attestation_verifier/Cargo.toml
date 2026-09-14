@@ -1,0 +1,17 @@
+[package]
+name = "wcare42-builder-attestation-verifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Standalone qualification tool: intentionally outside the Symthaea workspace.
+# Executable qualification is fail-closed until this tool has its own committed
+# Cargo.lock; scripts/wcare42-qualify.sh refuses PASS_VERIFIER without it.
+[workspace]
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+ed25519-dalek = "=2.1.0"
+hex = "0.4"
+serde_json = "1.0"
+sha2 = "0.10"
