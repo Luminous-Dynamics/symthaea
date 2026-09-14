@@ -16,12 +16,8 @@
 use crate::continuous_hv::ContinuousHV;
 use crate::hls_online_trace::{HlsEligibilityTrace, HlsTraceError, step_with_eligibility};
 use crate::holographic_liquid::{HlsError, HlsParameters, HolographicLiquidCell};
-use crate::state_tracking_associative::{
-    AssociativeReadoutError, associative_query,
-};
-use crate::state_tracking_benchmark::{
-    StateTrackingBenchmark, TrackingAnswer, TrackingScore,
-};
+use crate::state_tracking_associative::{AssociativeReadoutError, associative_query};
+use crate::state_tracking_benchmark::{StateTrackingBenchmark, TrackingAnswer, TrackingScore};
 use crate::state_tracking_codec::{StateTrackingCodec, TrackingCodecError};
 use std::fmt;
 
@@ -74,6 +70,7 @@ pub enum ExactEpisodeTrainingError {
     InvalidParameterBound,
     InvalidLossEpsilon,
     NoQueries,
+    HistoricalQueriesUnsupported { count: usize },
     DimensionMismatch { expected: usize, actual: usize },
     Codec(TrackingCodecError),
     Readout(AssociativeReadoutError),
@@ -91,6 +88,10 @@ impl fmt::Display for ExactEpisodeTrainingError {
             Self::InvalidParameterBound => write!(f, "exact episode parameter bound must be finite and positive"),
             Self::InvalidLossEpsilon => write!(f, "exact episode loss epsilon must be finite and positive"),
             Self::NoQueries => write!(f, "exact episode requires at least one scored query"),
+            Self::HistoricalQueriesUnsupported { count } => write!(
+                f,
+                "exact episode associative training is current-query only; benchmark contains {count} historical queries"
+            ),
             Self::DimensionMismatch { expected, actual } => write!(f, "exact episode dimension mismatch: expected {expected}, got {actual}"),
             Self::Codec(error) => write!(f, "exact episode codec error: {error}"),
             Self::Readout(error) => write!(f, "exact episode readout error: {error}"),
@@ -105,20 +106,28 @@ impl fmt::Display for ExactEpisodeTrainingError {
 impl std::error::Error for ExactEpisodeTrainingError {}
 
 impl From<TrackingCodecError> for ExactEpisodeTrainingError {
-    fn from(value: TrackingCodecError) -> Self { Self::Codec(value) }
+    fn from(value: TrackingCodecError) -> Self {
+        Self::Codec(value)
+    }
 }
 impl From<AssociativeReadoutError> for ExactEpisodeTrainingError {
-    fn from(value: AssociativeReadoutError) -> Self { Self::Readout(value) }
+    fn from(value: AssociativeReadoutError) -> Self {
+        Self::Readout(value)
+    }
 }
 impl From<HlsTraceError> for ExactEpisodeTrainingError {
-    fn from(value: HlsTraceError) -> Self { Self::Trace(value) }
+    fn from(value: HlsTraceError) -> Self {
+        Self::Trace(value)
+    }
 }
 impl From<HlsError> for ExactEpisodeTrainingError {
-    fn from(value: HlsError) -> Self { Self::Cell(value) }
+    fn from(value: HlsError) -> Self {
+        Self::Cell(value)
+    }
 }
 
-/// Evaluate the fixed associative decoder on one complete world without mutating
-/// the supplied cell or its parameters.
+/// Evaluate the fixed associative decoder on one complete current-query world
+/// without mutating the supplied cell or its parameters.
 pub fn evaluate_associative_episode(
     cell: &HolographicLiquidCell,
     benchmark: &StateTrackingBenchmark,
@@ -127,6 +136,7 @@ pub fn evaluate_associative_episode(
 ) -> Result<AssociativeEpisodeMetrics, ExactEpisodeTrainingError> {
     validate_loss_epsilon(loss_epsilon)?;
     check_dimensions(cell, codec)?;
+    validate_current_query_scope(benchmark)?;
     let mut eval_cell = cell.clone();
     eval_cell.reset();
     let mut predictions = Vec::with_capacity(benchmark.queries.len());
@@ -164,6 +174,7 @@ pub fn train_exact_episode(
 ) -> Result<ExactEpisodeTrainingReport, ExactEpisodeTrainingError> {
     validate_training_config(config)?;
     check_dimensions(cell, codec)?;
+    validate_current_query_scope(benchmark)?;
 
     // State and eligibility are episode-local; parameters intentionally persist.
     cell.reset();
@@ -227,6 +238,21 @@ pub fn train_exact_episode(
         clipped_gradient_norm,
         parameter_norm_after,
     })
+}
+
+fn validate_current_query_scope(
+    benchmark: &StateTrackingBenchmark,
+) -> Result<(), ExactEpisodeTrainingError> {
+    let count = benchmark
+        .queries
+        .iter()
+        .filter(|query| query.is_historical())
+        .count();
+    if count == 0 {
+        Ok(())
+    } else {
+        Err(ExactEpisodeTrainingError::HistoricalQueriesUnsupported { count })
+    }
 }
 
 fn episode_metrics(
@@ -321,7 +347,23 @@ mod tests {
             locations: 3,
             events: 48,
             query_every: 4,
-            historical_query_rate: 0.5,
+            historical_query_rate: 0.0,
+            seed,
+            ..StateTrackingBenchmarkConfig::default()
+        })
+        .unwrap();
+        let codec = StateTrackingCodec::from_benchmark_config(64, &benchmark.config, 500).unwrap();
+        (benchmark, codec)
+    }
+
+    fn historical_fixture(seed: u64) -> (StateTrackingBenchmark, StateTrackingCodec) {
+        let benchmark = StateTrackingBenchmark::generate(StateTrackingBenchmarkConfig {
+            entities: 4,
+            objects: 6,
+            locations: 3,
+            events: 48,
+            query_every: 4,
+            historical_query_rate: 1.0,
             seed,
             ..StateTrackingBenchmarkConfig::default()
         })
@@ -389,6 +431,38 @@ mod tests {
         let role = UnitaryRole::new(64, 902);
         let error = cell.binding_equivariance_error(&role, &input, 0.17).unwrap();
         assert!(error <= 1e-6, "post-training equivariance error={error}");
+    }
+
+    #[test]
+    fn historical_queries_are_rejected_before_training_mutation() {
+        let (benchmark, codec) = historical_fixture(4);
+        let mut cell = cell();
+        cell.set_state(ContinuousHV::new_random(64, 905).scale(0.2)).unwrap();
+        let before_state = cell.state().clone();
+        let before_parameters = cell.parameters();
+
+        let evaluation_error =
+            evaluate_associative_episode(&cell, &benchmark, &codec, 1e-4).unwrap_err();
+        assert!(matches!(
+            evaluation_error,
+            ExactEpisodeTrainingError::HistoricalQueriesUnsupported { count } if count > 0
+        ));
+        assert_eq!(cell.state(), &before_state);
+        assert_eq!(cell.parameters(), before_parameters);
+
+        let training_error = train_exact_episode(
+            &mut cell,
+            &benchmark,
+            &codec,
+            &ExactEpisodeTrainingConfig::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            training_error,
+            ExactEpisodeTrainingError::HistoricalQueriesUnsupported { count } if count > 0
+        ));
+        assert_eq!(cell.state(), &before_state);
+        assert_eq!(cell.parameters(), before_parameters);
     }
 
     #[test]
