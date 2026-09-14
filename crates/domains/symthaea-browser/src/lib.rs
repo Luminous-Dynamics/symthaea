@@ -5,46 +5,16 @@
 //!
 //! Consciousness-driven browser agent for Symthaea.
 //!
-//! Bridges the cognitive loop to a headless Chrome/Chromium instance via the
-//! Chrome DevTools Protocol (CDP). The browser becomes a sensory organ: the
-//! accessibility tree is encoded as a 16,384D `ContinuousHV`, and actions
-//! (navigate, click, type) are Phi-gated to ensure conscious intent.
+//! Bridges the cognitive loop to Chrome/Chromium through CDP while keeping
+//! browser authority separate from cognitive confidence. Normal browser
+//! mutation is mediated by [`BrowserExecutor`], which combines ordinary browser
+//! policy with a bounded runtime: exact approvals for consequential actions,
+//! action budgets, a failure circuit breaker, and privacy-minimized receipts.
 //!
-//! ## Architecture
-//!
-//! ```text
-//! ┌─────────────────────────────────────────────────────┐
-//! │  Chrome / Chromium (headless)                       │
-//! │  CDP WebSocket ← chromiumoxide                      │
-//! └────────────────────┬────────────────────────────────┘
-//!                      │ accessibility tree + DOM events
-//! ┌────────────────────▼────────────────────────────────┐
-//! │  CdpSession                                         │
-//! │  navigate / click / type / screenshot               │
-//! └────────────────────┬────────────────────────────────┘
-//!                      │ PageObservation
-//! ┌────────────────────▼────────────────────────────────┐
-//! │  BrowserHdcEncoder                                  │
-//! │  role codebook + text hashing → ContinuousHV(16384) │
-//! └────────────────────┬────────────────────────────────┘
-//!                      │
-//! ┌────────────────────▼────────────────────────────────┐
-//! │  BrowserBridge                                     │
-//! │  bounded observation → perception + change telemetry│
-//! └────────────────────┬────────────────────────────────┘
-//!                      │ BrowserAction proposal
-//! ┌────────────────────▼────────────────────────────────┐
-//! │  BrowserExecutor                                   │
-//! │  capability + Phi + URL policy → ActionReceipt     │
-//! └─────────────────────────────────────────────────────┘
-//! ```
-//!
-//! ## Safety
-//!
-//! Every `BrowserAction` requires both an explicit capability and a finite
-//! `required_phi()` threshold. Phi can increase caution but cannot create
-//! authority. `BrowserSafetyPolicy` also applies canonical origin checks and
-//! denies local-network targets by default.
+//! Raw page outputs are returned separately from durable receipt evidence.
+//! `BrowserApproval` is currently a process-local exact approval object, not a
+//! cryptographic credential; future Xenia/`symthaea-authority` integration can
+//! authenticate the same request/decision semantics.
 
 #![deny(unsafe_code)]
 
@@ -54,6 +24,7 @@ pub mod config;
 pub mod embodiment;
 pub mod encoder;
 pub mod executor;
+pub mod hardening;
 pub mod observation;
 pub mod safety;
 pub mod web_agent;
@@ -63,7 +34,13 @@ pub use cdp::CdpSession;
 pub use config::BrowserAgentConfig;
 pub use embodiment::BrowserBridge;
 pub use encoder::BrowserHdcEncoder;
-pub use executor::{ActionOutcome, ActionOutput, ActionReceipt, BrowserExecutor};
+pub use executor::{
+    ActionExecution, ActionOutcome, ActionOutput, ActionReceipt, BrowserExecutor,
+};
+pub use hardening::{
+    BrowserApproval, BrowserApprovalRequest, BrowserConsequence, BrowserRuntimeDenial,
+    BrowserRuntimeLimits, BrowserRuntimeSnapshot, action_digest, action_kind, consequence_of,
+};
 pub use observation::{
     AccessibleElement, MAX_OBSERVATION_TEXT_CHARS, PageObservation, UNTRUSTED_WEB_CONTENT_LABEL,
 };
