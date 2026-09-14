@@ -109,7 +109,10 @@ impl EmpiricalGroundingBasis {
                         found: observation_refs.len(),
                     });
                 }
-                validate_ref_set("empirical.repeated_internal", observation_refs.iter().map(String::as_str))?;
+                validate_ref_set(
+                    "empirical.repeated_internal",
+                    observation_refs.iter().map(String::as_str),
+                )?;
             }
             Self::CryptographicVerification {
                 proof_ref,
@@ -496,7 +499,7 @@ pub fn apply_epistemic_grounding_measurements(
                 });
             }
             if matches!(
-                candidate.epistemic_grounding.status,
+                &candidate.epistemic_grounding.status,
                 ObjectiveEvidenceStatus::Observed { .. }
             ) {
                 return Err(EpistemicGroundingMeasurementError::AxisAlreadyObserved(
@@ -794,7 +797,10 @@ mod tests {
             adapt_active_primitive_evidence(&actives, &["NSM_KNOW".into()]).unwrap();
         let report = apply_epistemic_grounding_measurements(&active_report, &[]).unwrap();
         assert_eq!(report.candidates[0].observed_axes(), 0);
-        assert_eq!(report.unmeasured_candidate_ids, vec!["NSM_KNOW"]);
+        assert_eq!(
+            report.unmeasured_candidate_ids,
+            vec!["NSM_KNOW".to_string()]
+        );
     }
 
     #[test]
@@ -832,11 +838,11 @@ mod tests {
             apply_epistemic_grounding_measurements(&active_report, &[measurement]).unwrap();
         assert_eq!(report.candidates[0].observed_axes(), 1);
         let ObjectiveEvidenceStatus::Observed { value } =
-            report.candidates[0].epistemic_grounding.status
+            &report.candidates[0].epistemic_grounding.status
         else {
             panic!("expected observed epistemic grounding");
         };
-        assert!((value - expected).abs() < 1.0e-12);
+        assert!((*value - expected).abs() < 1.0e-12);
         assert!(!report.candidates[0].integration_proxy.is_observed());
         assert!(!report.candidates[0].harmonic_alignment.is_observed());
     }
@@ -864,6 +870,18 @@ mod tests {
                 basis: "empirical.repeated_internal",
                 ..
             })
+        ));
+    }
+
+    #[test]
+    fn missing_producer_qualification_fails_closed() {
+        let mut measurement = weak_measurement("candidate", "digest");
+        measurement.producer_qualification_ref.clear();
+        assert!(matches!(
+            measurement.validate(),
+            Err(EpistemicGroundingMeasurementError::EmptyField(
+                "measurement.producer_qualification_ref"
+            ))
         ));
     }
 
@@ -902,6 +920,21 @@ mod tests {
         assert!(matches!(
             apply_epistemic_grounding_measurements(&active_report, &[measurement]),
             Err(EpistemicGroundingMeasurementError::EncodingDigestMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_measurements_for_candidate_fail_closed() {
+        let actives = [active("NSM_KNOW", 0.8)];
+        let active_report =
+            adapt_active_primitive_evidence(&actives, &["NSM_KNOW".into()]).unwrap();
+        let digest = &active_report.profiles[0].observed_primitive.encoding_digest;
+        let first = weak_measurement("NSM_KNOW", digest);
+        let second = weak_measurement("NSM_KNOW", digest);
+        assert!(matches!(
+            apply_epistemic_grounding_measurements(&active_report, &[first, second]),
+            Err(EpistemicGroundingMeasurementError::DuplicateMeasurement(id))
+                if id == "NSM_KNOW"
         ));
     }
 
@@ -952,7 +985,10 @@ mod tests {
             &[strong],
         )
         .unwrap();
-        assert!(matches!(plan.outcome, EvidenceSeekingOutcome::NeedEvidence { .. }));
+        assert!(matches!(
+            plan.outcome,
+            EvidenceSeekingOutcome::NeedEvidence { .. }
+        ));
     }
 
     #[test]
