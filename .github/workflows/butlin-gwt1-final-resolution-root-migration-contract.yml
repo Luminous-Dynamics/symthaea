@@ -1,0 +1,148 @@
+name: Butlin GWT-1 Final Resolution Root Migration Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-final-resolution-root-migration-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify exact post-R/P final-resolution root F
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact final-resolution successor F
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 95a4cb91644e6c2f6f7847cb503207ce070c6887
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact topology and two-file migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          F=95a4cb91644e6c2f6f7847cb503207ce070c6887
+          OLD=b1c9b30d596c7e4f4b955bcacb47b2902618efd7
+          P=16c85d54a65f284b18202ee5b510a41500466b6c
+          R=726d2be515e52eeff6c3f32a137e42a2648e35c7
+
+          test "$(git rev-parse HEAD)" = "$F"
+          test "$(git rev-parse HEAD^{tree})" = "5ee504f07f437b1393316ed3c1ab2af4343968ac"
+          read -r commit parent1 parent2 extra <<<"$(git rev-list --parents -n 1 HEAD)"
+          test "$commit" = "$F"
+          test "$parent1" = "$OLD"
+          test "$parent2" = "$P"
+          test -z "${extra:-}"
+          git merge-base --is-ancestor "$R" "$P"
+          git merge-base --is-ancestor "$R" "$F"
+          git merge-base --is-ancestor "$P" "$F"
+
+          mapfile -t changed < <(git diff --name-only "$OLD" "$F")
+          test "${#changed[@]}" -eq 2
+          printf '%s\n' "${changed[@]}" | /usr/bin/grep -Fx '.github/workflows/butlin-gwt1-trusted-final-resolution.yml'
+          printf '%s\n' "${changed[@]}" | /usr/bin/grep -Fx 'crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_verified_promotion.rs'
+
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-trusted-final-resolution.yml)" = "164058fbd0fbb6843299f0e7ccdf1812819ab9c3"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_verified_promotion.rs)" = "0003dd0138648145b4b1702dea01cd06fb124877"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove final workflow changed only authority roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          old_commit = "b1c9b30d596c7e4f4b955bcacb47b2902618efd7"
+          path = ".github/workflows/butlin-gwt1-trusted-final-resolution.yml"
+          old = subprocess.check_output(["git", "show", f"{old_commit}:{path}"], text=True)
+          new = Path(path).read_text()
+
+          old_direct = "6eaf73a20047b99120e59eb96f48ae0e194e2c80"
+          old_causal = "21f83eece23c8ee9c2f8fa3c1fc1ab3f555c40e7"
+          old_promotion = "b5b693f3162ac4c66d00e2391f77a6e86a84a788"
+          r = "726d2be515e52eeff6c3f32a137e42a2648e35c7"
+          p = "16c85d54a65f284b18202ee5b510a41500466b6c"
+
+          assert old.count(old_direct) == 3
+          assert old.count(old_causal) == 2
+          assert old.count(old_promotion) == 4
+          expected = old.replace(old_direct, r).replace(old_causal, r).replace(old_promotion, p)
+          assert new == expected, "final-resolution workflow changed beyond frozen authority-root substitutions"
+          assert old_direct not in new
+          assert old_causal not in new
+          assert old_promotion not in new
+          assert new.count(r) == 5
+          assert new.count(p) == 4
+
+          for required in (
+              "--features trusted-resolution-authority",
+              "gwt1-final-resolution-archive-v1",
+              "promotion_internal_verification.json",
+              "internal_token_verification_sha256",
+              ".member_count==60",
+              "--deny-self-hosted-runners",
+              "persist-credentials: false",
+          ):
+              assert required in new, required
+          assert "ubuntu-latest" not in new
+          assert "actions/cache" not in new
+          PY
+
+      - name: Prove opaque verifier changed only the two approved roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          old_commit = "b1c9b30d596c7e4f4b955bcacb47b2902618efd7"
+          path = "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_verified_promotion.rs"
+          old = subprocess.check_output(["git", "show", f"{old_commit}:{path}"], text=True)
+          new = Path(path).read_text()
+
+          replacements = [
+              ("8e8100bee2c1f850d7abc2ffee1d903600e2a0ab", "16c85d54a65f284b18202ee5b510a41500466b6c"),
+              ("afabae61fa9b93d033410fb58af56f41ec47f60f", "726d2be515e52eeff6c3f32a137e42a2648e35c7"),
+              ("/// Bootstrap candidate only. Before activation this must be updated to the\n/// reviewed/landed #2510 promotion-workflow revision.", "/// Activation candidate only. Authoritative execution requires this exact\n/// promotion root to be independently reviewed and landed first."),
+              ("/// Bootstrap candidate only. Before activation this must be updated to the\n/// reviewed/landed #2507 causal-builder revision.", "/// Activation candidate only. Authoritative execution requires this exact\n/// unified causal-builder root to be independently reviewed and landed first."),
+          ]
+          expected = old
+          for source, target in replacements:
+              assert expected.count(source) == 1, source
+              expected = expected.replace(source, target)
+          assert new == expected, "opaque promotion verifier changed beyond two frozen authority roots"
+          assert "pub(crate) fn verify_gwt1_causal_promotion_package_v1" in new
+          assert "pub fn verify_gwt1_causal_promotion_package_v1" not in new
+          assert "promotion_attestation_verification_bytes: Vec<u8>" in new
+          assert ".arg(GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1)" in new
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Compile trusted final-resolution adapter at exact F
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-f-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-f-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --features trusted-resolution-authority --bin gwt1_generate_trusted_resolution_candidate
+
+      - name: Run frozen final-resolution and opaque-authority tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-f-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-f-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --features trusted-resolution-authority gwt1_trusted_resolution::tests
+          cargo test --locked -p symthaea-psych-bench --features trusted-resolution-authority gwt1_causal_verified_promotion::tests
