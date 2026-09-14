@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Independent exact-rational oracle for the MANIFOLD-006N N-A kernel.
+"""Independent exact-rational oracle for MANIFOLD-006N-A1 certified numerics.
 
-The Rust harness emits only raw IEEE-754 binary64 bit patterns. This checker uses
-Python's exact Fraction representation and does not import or reproduce the Rust
-rounding implementation; it verifies that every emitted enclosure contains the
-exact-real operation result and that every emitted scalar rejection is justified by
-the declared finite-binary64 domain or division-by-zero boundary.
+Rust emits raw IEEE-754 binary64 bit patterns. This checker reconstructs the exact
+real values with Fraction and verifies every successful enclosure and every
+fail-closed scalar rejection. Semantic mismatches are collected across the full
+campaign, written into the receipt, and only then cause qualification failure.
 """
 
 from __future__ import annotations
@@ -17,8 +16,9 @@ import struct
 from fractions import Fraction
 from pathlib import Path
 
-DOMAIN = b"symthaea.manifold-006n.kernel-vectors.v2\0"
+DOMAIN = b"symthaea.manifold-006n-a1.kernel-vectors.v1\0"
 MAX_FINITE_BITS = "7fefffffffffffff"
+EXPECTED_SWEEP_VALUES = 32
 
 
 def binary64(hex_bits: str) -> float:
@@ -79,8 +79,7 @@ def expected_interval(
         return a_lower * b_lower, a_upper * b_lower
     if op.startswith("div"):
         assert b_lower == b_upper and b_lower != 0
-        quotient = b_lower
-        values = (a_lower / quotient, a_upper / quotient)
+        values = (a_lower / b_lower, a_upper / b_lower)
         return min(values), max(values)
     if op == "interval-div-positive":
         assert b_lower == b_upper and b_lower > 0
@@ -94,6 +93,10 @@ def push_text(hasher: object, value: str) -> None:
     hasher.update(encoded)
 
 
+def fraction_text(value: Fraction) -> str:
+    return f"{value.numerator}/{value.denominator}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("vectors", type=Path)
@@ -103,7 +106,7 @@ def main() -> int:
     payload = args.vectors.read_bytes()
     lines = args.vectors.read_text().splitlines()
     if lines[:2] != [
-        "schema\tsymthaea.manifold-006n.kernel-vectors.v3",
+        "schema\tsymthaea.manifold-006n-a1.kernel-vectors.v1",
         "encoding\tieee754-binary64-u64-hex",
     ]:
         raise AssertionError("unexpected kernel vector header")
@@ -117,6 +120,7 @@ def main() -> int:
     sweep_record_count = 0
     sweep_kinds: set[str] = set()
     max_finite = exact(MAX_FINITE_BITS)
+    counterexamples: list[dict[str, object]] = []
 
     for line in lines[2:]:
         parts = line.split("\t")
@@ -133,8 +137,22 @@ def main() -> int:
             if a_lo > a_hi or b_lo > b_hi or out_lo > out_hi:
                 raise AssertionError(f"{op}: reversed interval")
             exact_lo, exact_hi = expected_interval(op, a_lo, a_hi, b_lo, b_hi)
-            if not (out_lo <= exact_lo <= exact_hi <= out_hi):
-                raise AssertionError(f"{op}: Rust output does not contain exact result")
+            contained = out_lo <= exact_lo <= exact_hi <= out_hi
+            if not contained:
+                counterexamples.append(
+                    {
+                        "kind": "containment",
+                        "operation": op,
+                        "a_lower_bits": a_lo_b,
+                        "a_upper_bits": a_hi_b,
+                        "b_lower_bits": b_lo_b,
+                        "b_upper_bits": b_hi_b,
+                        "out_lower_bits": out_lo_b,
+                        "out_upper_bits": out_hi_b,
+                        "exact_lower": fraction_text(exact_lo),
+                        "exact_upper": fraction_text(exact_hi),
+                    }
+                )
 
             semantic.update(b"V")
             push_text(semantic, op)
@@ -143,13 +161,14 @@ def main() -> int:
             vectors.append(
                 {
                     "operation": op,
-                    "exact_result_contained": True,
+                    "exact_result_contained": contained,
                     "output_is_point": out_lo == out_hi,
                 }
             )
             if "-sweep-" in op:
                 sweep_record_count += 1
                 sweep_kinds.add(operation_kind(op))
+
         elif parts[0] == "reject":
             if len(parts) != 5:
                 raise AssertionError(f"malformed rejection line: {line}")
@@ -157,19 +176,39 @@ def main() -> int:
             if len(left_b) != 16 or len(right_b) != 16:
                 raise AssertionError(f"non-canonical rejection operand width: {line}")
             left, right = exact(left_b), exact(right_b)
+            justified = True
+            detail = ""
             if reason == "division-by-zero":
                 if operation_kind(op) != "div" or right != 0:
-                    raise AssertionError(f"{op}: unjustified division-by-zero rejection")
+                    justified = False
+                    detail = "division-by-zero rejection without exact zero divisor"
             elif reason == "finite-domain":
                 if operation_kind(op) == "div" and right == 0:
-                    raise AssertionError(f"{op}: zero divisor mislabeled as finite-domain rejection")
-                exact_result = scalar_exact_result(op, left, right)
-                if abs(exact_result) <= max_finite:
-                    raise AssertionError(
-                        f"{op}: finite-domain rejection although exact result is representable in declared magnitude domain"
-                    )
+                    justified = False
+                    detail = "zero divisor mislabeled as finite-domain"
+                else:
+                    exact_result = scalar_exact_result(op, left, right)
+                    if abs(exact_result) <= max_finite:
+                        justified = False
+                        detail = (
+                            "finite-domain rejection although exact result lies inside "
+                            "declared finite-binary64 magnitude domain"
+                        )
             else:
-                raise AssertionError(f"{op}: unknown rejection reason {reason}")
+                justified = False
+                detail = f"unknown rejection reason {reason}"
+
+            if not justified:
+                counterexamples.append(
+                    {
+                        "kind": "rejection",
+                        "operation": op,
+                        "left_bits": left_b,
+                        "right_bits": right_b,
+                        "reason": reason,
+                        "detail": detail,
+                    }
+                )
 
             semantic.update(b"R")
             push_text(semantic, op)
@@ -180,12 +219,13 @@ def main() -> int:
                 {
                     "operation": op,
                     "reason": reason,
-                    "exact_rejection_justified": True,
+                    "exact_rejection_justified": justified,
                 }
             )
             if "-sweep-" in op:
                 sweep_record_count += 1
                 sweep_kinds.add(operation_kind(op))
+
         elif parts[0] == "meta":
             if len(parts) != 3:
                 raise AssertionError(f"malformed metadata line: {line}")
@@ -199,6 +239,7 @@ def main() -> int:
             semantic.update(b"M")
             push_text(semantic, name)
             semantic.update(parsed.to_bytes(8, "big"))
+
         elif parts[0] == "gate":
             if len(parts) != 3:
                 raise AssertionError(f"malformed gate line: {line}")
@@ -223,13 +264,19 @@ def main() -> int:
         "precondition-rejection",
         "qualified-error-text-preserved",
         "nonzero-underflow-enclosure",
+        "power2-mul-normal-boundary-widened",
+        "power2-div-normal-boundary-widened",
+        "power2-normal-interior-exact",
     }
     if set(gates) != required_gates:
         raise AssertionError(f"kernel gate set mismatch: {set(gates)!r}")
 
     adversarial_value_count = metadata.get("adversarial-value-count")
-    if adversarial_value_count is None or adversarial_value_count < 24:
-        raise AssertionError("adversarial scalar corpus is unexpectedly small")
+    if adversarial_value_count != EXPECTED_SWEEP_VALUES:
+        raise AssertionError(
+            f"adversarial scalar corpus size drift: {adversarial_value_count!r} "
+            f"!= {EXPECTED_SWEEP_VALUES}"
+        )
     expected_sweep_records = adversarial_value_count * adversarial_value_count * 4
     if sweep_record_count != expected_sweep_records:
         raise AssertionError(
@@ -241,17 +288,41 @@ def main() -> int:
         raise AssertionError("adversarial sweep produced no fail-closed rejection cases")
 
     by_op = {entry["operation"]: entry for entry in vectors}
-    if not by_op["mul-underflow"]["exact_result_contained"]:
-        raise AssertionError("underflow vector not contained")
-    if not by_op["mul-power2"]["output_is_point"]:
-        raise AssertionError("normal power-of-two multiply lost exact fast path")
-    if not by_op["div-power2"]["output_is_point"]:
-        raise AssertionError("normal power-of-two divide lost exact fast path")
-    if not by_op["add-cancel"]["output_is_point"]:
-        raise AssertionError("exact cancellation widened unexpectedly")
+    required_named = {
+        "mul-underflow",
+        "mul-power2",
+        "mul-power2-normal-boundary",
+        "div-power2",
+        "div-power2-normal-boundary",
+        "add-cancel",
+    }
+    if not required_named <= set(by_op):
+        raise AssertionError(f"missing named arithmetic vectors: {required_named - set(by_op)}")
 
+    if by_op["mul-power2-normal-boundary"]["output_is_point"]:
+        counterexamples.append(
+            {"kind": "gate", "operation": "mul-power2-normal-boundary", "detail": "boundary remained point"}
+        )
+    if by_op["div-power2-normal-boundary"]["output_is_point"]:
+        counterexamples.append(
+            {"kind": "gate", "operation": "div-power2-normal-boundary", "detail": "boundary remained point"}
+        )
+    if not by_op["mul-power2"]["output_is_point"]:
+        counterexamples.append(
+            {"kind": "gate", "operation": "mul-power2", "detail": "interior exact fast path lost"}
+        )
+    if not by_op["div-power2"]["output_is_point"]:
+        counterexamples.append(
+            {"kind": "gate", "operation": "div-power2", "detail": "interior exact fast path lost"}
+        )
+    if not by_op["add-cancel"]["output_is_point"]:
+        counterexamples.append(
+            {"kind": "gate", "operation": "add-cancel", "detail": "exact cancellation widened"}
+        )
+
+    verdict = "PASS" if not counterexamples else "FAIL"
     receipt = {
-        "schema": "symthaea.manifold-006n.kernel-exact-oracle.v3",
+        "schema": "symthaea.manifold-006n-a1.kernel-exact-oracle.v1",
         "authority": "qualification-only-independent-python-exact-rational",
         "transport_sha256": hashlib.sha256(payload).hexdigest(),
         "semantic_vector_sha3_256": semantic.hexdigest(),
@@ -260,19 +331,29 @@ def main() -> int:
         "gate_count": len(gates),
         "adversarial_value_count": adversarial_value_count,
         "sweep_record_count": sweep_record_count,
-        "all_exact_results_contained": True,
-        "all_scalar_rejections_exactly_justified": True,
+        "counterexample_count": len(counterexamples),
+        "counterexamples": counterexamples,
+        "all_exact_results_contained": not any(c["kind"] == "containment" for c in counterexamples),
+        "all_scalar_rejections_exactly_justified": not any(c["kind"] == "rejection" for c in counterexamples),
         "deterministic_adversarial_sweep_complete": True,
-        "normal_power_of_two_fast_paths_exact": True,
-        "nonzero_underflow_outward_enclosed": True,
-        "signed_zero_constructor_semantics_preserved": True,
-        "nonfinite_results_fail_closed": True,
-        "qualified_error_text_preserved": True,
+        "power2_normal_subnormal_boundaries_widened": (
+            not by_op["mul-power2-normal-boundary"]["output_is_point"]
+            and not by_op["div-power2-normal-boundary"]["output_is_point"]
+        ),
+        "normal_interior_power2_fast_paths_exact": (
+            by_op["mul-power2"]["output_is_point"] and by_op["div-power2"]["output_is_point"]
+        ),
         "production_runtime_authority": False,
-        "verdict": "PASS",
+        "verdict": verdict,
     }
     args.receipt.parent.mkdir(parents=True, exist_ok=True)
     args.receipt.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+
+    if counterexamples:
+        raise AssertionError(
+            f"{len(counterexamples)} exact-rational qualification counterexample(s); "
+            f"first={counterexamples[0]}"
+        )
     return 0
 
 
