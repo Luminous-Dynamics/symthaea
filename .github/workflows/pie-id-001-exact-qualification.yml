@@ -1,0 +1,105 @@
+name: PIE-ID-001 Canonical Identity Oracle Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-id-001-998810a1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-ID-001 canonical lexical identity oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SUBJECT_SHA: 998810a1966d4cfb50845599d36f23e07f19bf24
+      PARENT_SHA: 89a86bdb3d80cfbc83ce5399317686079484c903
+      SUBJECT_TREE: 042b02752622c9d9792e7c54fa12b557034d41c1
+      ORACLE: scripts/pie-canonical-identity-oracle.py
+      EVIDENCE: docs/release/evidence/PIE_ID_001_CANONICAL_IDENTITY_ORACLE.md
+      PROFILE: symthaea.pie.canonical-id.v1
+
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "$EVIDENCE"
+          test "${files[1]}" = "$ORACLE"
+
+      - name: Record subject file digests
+        run: sha256sum "$ORACLE" "$EVIDENCE" | tee pie-id-001-files.sha256
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13.5
+
+      - name: Record Python identity
+        run: python --version
+
+      - name: Syntax compile
+        id: syntax
+        continue-on-error: true
+        run: python -m py_compile "$ORACLE"
+
+      - name: Run canonical identity self-test
+        id: selftest
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          output="$(python "$ORACLE" --self-test)"
+          printf '%s\n' "$output"
+          test "$(printf '%s\n' "$output" | sed -n '1p')" = "$PROFILE"
+          test "$(printf '%s\n' "$output" | sed -n '2p')" = "ok"
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > pie-id-001-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "python": "3.13.5",
+            "profile": "$PROFILE",
+            "max_id_utf8_bytes": 4096,
+            "gates": {
+              "syntax_compile": "${{ steps.syntax.outcome }}",
+              "self_test": "${{ steps.selftest.outcome }}"
+            },
+            "scope": "Canonical durable lexical identity/reference spelling only; not namespace uniqueness, content identity, provenance, authenticity, currentness, applicability, feasibility, or authority."
+          }
+          EOF
+          cat pie-id-001-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-id-001-canonical-identity-qualification
+          path: |
+            pie-id-001-qualification.json
+            pie-id-001-files.sha256
+          if-no-files-found: error
+
+      - name: Enforce all oracle gates
+        if: always()
+        run: |
+          test "${{ steps.syntax.outcome }}" = success
+          test "${{ steps.selftest.outcome }}" = success
