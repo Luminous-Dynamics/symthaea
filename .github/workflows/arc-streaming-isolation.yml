@@ -1,0 +1,123 @@
+name: ARC Streaming Isolation Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/reasoning/qualify-arc-streaming-isolated.sh'
+      - '.github/workflows/arc-streaming-isolation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc-streaming-isolation-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-streaming-baselines:
+    name: Process-isolated streaming baselines
+    runs-on: ubuntu-latest
+    env:
+      SYMTHAEA_SUBJECT_REVISION: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      SYMTHAEA_ARC_DATASET_REPOSITORY: arcprize/ARC-AGI-2
+      SYMTHAEA_ARC_DATASET_REVISION: f3283f727488ad98fe575ea6a5ac981e4a188e49
+      SYMTHAEA_ARC_DATASET_TREE: afab62b97f29dd2341f401d4af70491e14da35c2
+      SYMTHAEA_ARC_EVALUATOR_ROOT: target/rq-006z/evaluator-only
+      SYMTHAEA_ARC_DATASET_ROOT: target/rq-006z/evaluator-only/arc-agi-2
+      SYMTHAEA_ARC_DATASET_MANIFEST_PATH: target/rq-006z/evaluator-only/arc-agi-2-training-manifest.json
+      SYMTHAEA_ARC_DATASET_MANIFEST_BIN: ${{ github.workspace }}/target/debug/arc_dataset_manifest
+      SYMTHAEA_ARC_SOLVER_VIEW_ROOT: target/rq-006z/solver-view
+      SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH: target/rq-006z/solver-view-manifest.json
+      SYMTHAEA_ARC_TARGET_BUNDLE_PATH: target/rq-006z/evaluator-only/evaluator-target-bundle.json
+      SYMTHAEA_ARC_PROJECTOR_BIN: ${{ github.workspace }}/target/debug/arc_solver_view_projector
+      SYMTHAEA_ARC_STREAM_BIN: ${{ github.workspace }}/target/debug/arc_streaming_policy
+      SYMTHAEA_ARC_STREAM_VERIFY_BIN: ${{ github.workspace }}/target/debug/arc_streaming_verifier
+      SYMTHAEA_ARC_STREAM_RESULTS_PATH: target/rq-006z/streaming-report.json
+      SYMTHAEA_ARC_STREAM_VERIFY_PATH: target/rq-006z/streaming-verification.json
+      SYMTHAEA_ARC_SMOKE_TASK_FILES: '5'
+      SYMTHAEA_ARC_POLICY_SEED: '2797608998'
+      RQ006Z_STREAM_PRODUCER_BLOB: 2399c9a48a02a7ca02eb7c54a55b052b73650acc
+      RQ006Z_STREAM_VERIFIER_BLOB: 4e9cad094a63170c926caa10199bf1b2f4385c67
+    steps:
+      - name: Checkout exact proposed subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          fetch-depth: 1
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Prove frozen streaming source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object src/bin/arc_streaming_policy.rs)" = "$RQ006Z_STREAM_PRODUCER_BLOB"
+          test "$(git hash-object src/bin/arc_streaming_verifier.rs)" = "$RQ006Z_STREAM_VERIFIER_BLOB"
+
+      - name: Qualify streaming source surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            src/bin/arc_streaming_policy.rs \
+            src/bin/arc_streaming_verifier.rs
+          cargo check --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_solver_view_projector \
+            --bin arc_streaming_policy \
+            --bin arc_streaming_verifier
+          cargo test --locked --bin arc_streaming_policy
+          cargo test --locked --bin arc_streaming_verifier
+          cargo clippy --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_solver_view_projector \
+            --bin arc_streaming_policy \
+            --bin arc_streaming_verifier \
+            -- -D warnings
+          cargo build --locked \
+            --bin arc_dataset_manifest \
+            --bin arc_solver_view_projector \
+            --bin arc_streaming_policy \
+            --bin arc_streaming_verifier
+
+      - name: Acquire exact public ARC-AGI-2 subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf target/rq-006z
+          mkdir -p "$SYMTHAEA_ARC_EVALUATOR_ROOT"
+          chmod 0700 "$SYMTHAEA_ARC_EVALUATOR_ROOT"
+          mkdir -p "$SYMTHAEA_ARC_DATASET_ROOT"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" init -q
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" remote add origin https://github.com/arcprize/ARC-AGI-2.git
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" fetch --depth=1 origin "$SYMTHAEA_ARC_DATASET_REVISION"
+          git -C "$SYMTHAEA_ARC_DATASET_ROOT" checkout --detach -q FETCH_HEAD
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse HEAD)" = "$SYMTHAEA_ARC_DATASET_REVISION"
+          test "$(git -C "$SYMTHAEA_ARC_DATASET_ROOT" rev-parse 'HEAD^{tree}')" = "$SYMTHAEA_ARC_DATASET_TREE"
+
+      - name: Qualify exact full public-training manifest
+        env:
+          SYMTHAEA_ARC_SPLIT: training
+          SYMTHAEA_ARC_EXPECTED_TASKS: '1000'
+        run: bash .github/reasoning/qualify-arc-dataset.sh
+
+      - name: Execute process-isolated streaming qualification
+        run: bash .github/reasoning/qualify-arc-streaming-isolated.sh
+
+      - name: Upload streaming evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: arc-streaming-isolated-${{ env.SYMTHAEA_SUBJECT_REVISION }}
+          path: |
+            target/rq-006z/evaluator-only/arc-agi-2-training-manifest.json
+            target/rq-006z/solver-view-manifest.json
+            target/rq-006z/evaluator-only/evaluator-target-bundle.json
+            target/rq-006z/streaming-report.json
+            target/rq-006z/streaming-verification.json
+            target/rq-006z/solver-view/training/*.json
+          if-no-files-found: error
+          retention-days: 30
