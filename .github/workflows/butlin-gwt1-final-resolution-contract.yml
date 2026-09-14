@@ -88,7 +88,6 @@ jobs:
           manifest = manifest_path.read_text()
           assert 'trusted-resolution-authority = ["symthaea-backend"]' in manifest
 
-          # Fail if someone later reintroduces a generic public bool-style gate.
           forbidden = re.compile(r"promote\s*\([^)]*attestation_verified\s*:\s*bool", re.DOTALL)
           for path in (verified_path, facade_path):
               assert not forbidden.search(path.read_text()), path
@@ -103,9 +102,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # These two files are introduced wholly by this tranche. Narrow edits
-          # to inherited prerequisite modules remain covered by source-boundary
-          # audits and compilation without rewriting unrelated ancestry.
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_trusted_resolution.rs \
             crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_trusted_resolution_candidate.rs
@@ -117,9 +113,21 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-final-contract-target
         run: |
           set -euo pipefail
+          log="$RUNNER_TEMP/gwt1-final-resolution-cargo-check.log"
+          set +e
           cargo check --locked -p symthaea-psych-bench \
             --features trusted-resolution-authority \
-            --bin gwt1_generate_trusted_resolution_candidate
+            --bin gwt1_generate_trusted_resolution_candidate \
+            >"$log" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "--- Rust compiler diagnostics ---" >&2
+            /usr/bin/grep -E -A12 -B4 '^(error(\[[^]]+\])?:|error:)' "$log" | /usr/bin/head -n 240 >&2 || true
+            echo "--- Cargo tail ---" >&2
+            /usr/bin/tail -n 120 "$log" >&2
+            exit "$status"
+          fi
 
       - name: Run final-resolution candidate unit tests
         shell: bash
