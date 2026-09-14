@@ -81,7 +81,6 @@ jobs:
           assert new.count(r) == 5
           assert new.count(p) == 4
 
-          # Frozen authority/archive semantics inherited from the already-qualified predecessor.
           for required in (
               "--features trusted-resolution-authority",
               "gwt1-final-resolution-archive-v1",
@@ -109,26 +108,16 @@ jobs:
           old = subprocess.check_output(["git", "show", f"{old_commit}:{path}"], text=True)
           new = Path(path).read_text()
 
-          old_promotion = '''/// Bootstrap candidate only. Before activation this must be updated to the
-/// reviewed/landed #2510 promotion-workflow revision.
-pub const GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1: &str =
-    "8e8100bee2c1f850d7abc2ffee1d903600e2a0ab";'''
-          new_promotion = '''/// Activation candidate only. Authoritative execution requires this exact
-/// promotion root to be independently reviewed and landed first.
-pub const GWT1_CAUSAL_APPROVED_PROMOTION_WORKFLOW_SHA_V1: &str =
-    "16c85d54a65f284b18202ee5b510a41500466b6c";'''
-          old_builder = '''/// Bootstrap candidate only. Before activation this must be updated to the
-/// reviewed/landed #2507 causal-builder revision.
-pub const GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1: &str =
-    "afabae61fa9b93d033410fb58af56f41ec47f60f";'''
-          new_builder = '''/// Activation candidate only. Authoritative execution requires this exact
-/// unified causal-builder root to be independently reviewed and landed first.
-pub const GWT1_CAUSAL_APPROVED_BUILDER_SHA_V1: &str =
-    "726d2be515e52eeff6c3f32a137e42a2648e35c7";'''
-
-          assert old.count(old_promotion) == 1
-          assert old.count(old_builder) == 1
-          expected = old.replace(old_promotion, new_promotion).replace(old_builder, new_builder)
+          replacements = [
+              ("8e8100bee2c1f850d7abc2ffee1d903600e2a0ab", "16c85d54a65f284b18202ee5b510a41500466b6c"),
+              ("afabae61fa9b93d033410fb58af56f41ec47f60f", "726d2be515e52eeff6c3f32a137e42a2648e35c7"),
+              ("/// Bootstrap candidate only. Before activation this must be updated to the\n/// reviewed/landed #2510 promotion-workflow revision.", "/// Activation candidate only. Authoritative execution requires this exact\n/// promotion root to be independently reviewed and landed first."),
+              ("/// Bootstrap candidate only. Before activation this must be updated to the\n/// reviewed/landed #2507 causal-builder revision.", "/// Activation candidate only. Authoritative execution requires this exact\n/// unified causal-builder root to be independently reviewed and landed first."),
+          ]
+          expected = old
+          for source, target in replacements:
+              assert expected.count(source) == 1, source
+              expected = expected.replace(source, target)
           assert new == expected, "opaque promotion verifier changed beyond two frozen authority roots"
           assert "pub(crate) fn verify_gwt1_causal_promotion_package_v1" in new
           assert "pub fn verify_gwt1_causal_promotion_package_v1" not in new
