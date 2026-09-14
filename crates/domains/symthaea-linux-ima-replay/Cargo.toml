@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-linux-ima-replay"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fail-closed canonical Linux IMA SHA-256 measurement replay for runtime assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "ima", "tpm", "integrity"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+sha2 = "0.10"
