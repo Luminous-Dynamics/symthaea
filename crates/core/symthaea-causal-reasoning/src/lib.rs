@@ -7,6 +7,7 @@
 //!
 //! - [`causal_calculus`]: Structural Causal Models, do-calculus rules, interventional queries
 //! - [`causal_emergence`]: Hoel's Effective Information and causal emergence measurement
+//! - [`multiscale_causal`]: Explicit fine-to-coarse causal sweeps with auditable coarse-graining
 //! - [`counterfactual`]: Backdoor/frontdoor identification, HDC graph surgery, semantic roles
 
 #![deny(unsafe_code)]
@@ -14,6 +15,7 @@
 
 pub mod causal_calculus;
 pub mod causal_emergence;
+pub mod multiscale_causal;
 
 #[cfg(feature = "counterfactual")]
 pub mod counterfactual;
