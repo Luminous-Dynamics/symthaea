@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-geometric-causal-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Theory-neutral bridge for joint reporting of Fisher-Rao trajectory geometry and multiscale causal profiles"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["information-geometry", "causality", "multiscale", "research"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+symthaea-frontier-physics = { path = "../../domains/symthaea-frontier-physics" }
+symthaea-causal-reasoning = { path = "../../core/symthaea-causal-reasoning" }
