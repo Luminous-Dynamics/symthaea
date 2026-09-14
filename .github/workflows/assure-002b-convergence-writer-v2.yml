@@ -1,0 +1,141 @@
+name: ASSURE-002B exact convergence writer v2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/assure-002b-convergence-writer-v2.yml'
+      - 'tools/assure_002b_converge.py'
+      - 'tools/assure-002b-qualification.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assure-002b-convergence-writer
+  cancel-in-progress: true
+
+env:
+  CAMPAIGN_PARENT: 8f619541528362a30e7caf432eaf256a64e302e8
+  SEMANTICS_PARENT: a95bbb2d0eac395b1d734e1031f9209240f3b8d6
+  FINAL_BRANCH: feat/assure-002b-convergence
+
+jobs:
+  build-convergence-commit:
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.event.pull_request.head.repo.full_name == 'Luminous-Dynamics/symthaea' &&
+      github.event.pull_request.head.ref == 'staging/assure-002b-convergence-writer-v2' &&
+      github.event.pull_request.base.ref == 'feat/assure-002-preregistration' &&
+      github.actor == 'Tristan-Stoltz-ERC'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Capture and validate writer inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          python3 -m py_compile tools/assure_002b_converge.py
+          cp tools/assure_002b_converge.py /tmp/assure_002b_converge.py
+          cp tools/assure-002b-qualification.yml /tmp/assure-002b-qualification.yml
+          sha256sum /tmp/assure_002b_converge.py /tmp/assure-002b-qualification.yml
+
+      - name: Reset to exact qualified campaign parent and fetch semantic parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard "$CAMPAIGN_PARENT"
+          test "$(git rev-parse HEAD)" = "$CAMPAIGN_PARENT"
+          test -z "$(git status --porcelain)"
+          git fetch --no-tags origin "$SEMANTICS_PARENT"
+          git cat-file -e "$SEMANTICS_PARENT^{commit}"
+          test "$(git show -s --format=%H "$SEMANTICS_PARENT")" = "$SEMANTICS_PARENT"
+          git checkout "$SEMANTICS_PARENT" -- \
+            .github/workflows/assure-002a.yml \
+            crates/core/symthaea-assurance-semantics
+          git show "$SEMANTICS_PARENT:Cargo.lock" > /tmp/semantics-parent.Cargo.lock
+
+      - name: Apply deterministic convergence transform
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 /tmp/assure_002b_converge.py
+          cp /tmp/assure-002b-qualification.yml .github/workflows/assure-002b.yml
+
+      - name: Rust 1.96 syntax and formatting guard only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
+          rustup override set 1.96.0
+          cargo fmt --manifest-path crates/core/symthaea-assurance-core/Cargo.toml
+          cargo fmt --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+          git diff --check
+
+      - name: Static preflight — execute no candidate code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('crates/core/symthaea-assurance-campaign/src/lib.rs').read_text()
+          forbidden = [
+              'pub struct SemanticCommitmentV1',
+              'canonical_semantics(',
+              'evidence_production_statement_digest',
+              'ProducedBeforeOrAtRegistration',
+              'AfterCurrentRegistration',
+              'CurrentRegistrationV1',
+              'resolve_current_registration',
+              'production-ordering',
+              'definition_digest.as_str()',
+              'admitted_count + 1',
+          ]
+          for token in forbidden:
+              if token in text:
+                  raise SystemExit(f'legacy surface remains: {token}')
+          required = [
+              'canonical_semantic_set',
+              'TerminalRegistrationInViewV1',
+              'evidence_commitment_statement_digest',
+              'checked_next_evidence_ordinal',
+              'EvidenceSubjectMismatch',
+              'EvidenceClaimMismatch',
+              'support_tier_rank',
+          ]
+          for token in required:
+              if token not in text:
+                  raise SystemExit(f'missing convergence token: {token}')
+
+          lock = Path('Cargo.lock').read_text()
+          if lock.count('name = "symthaea-assurance-semantics"') != 1:
+              raise SystemExit('expected exactly one semantics lock stanza')
+          print('static convergence preflight: PASS')
+          PY
+
+      - name: Create exact two-parent convergence commit and push final branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CAMPAIGN_PARENT"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          TREE="$(git write-tree)"
+          COMMIT="$(printf '%s\n\n%s\n%s\n' \
+            'feat(assurance): converge campaign semantic authority' \
+            "ASSURE-002B convergence of qualified campaign $CAMPAIGN_PARENT" \
+            "and qualified shared semantics $SEMANTICS_PARENT; includes ASSURE-002F context binding." \
+            | git commit-tree "$TREE" -p "$CAMPAIGN_PARENT" -p "$SEMANTICS_PARENT")"
+          test "$(git show -s --format=%P "$COMMIT")" = "$CAMPAIGN_PARENT $SEMANTICS_PARENT"
+          git push origin "$COMMIT:refs/heads/$FINAL_BRANCH" --force
+          printf 'convergence_commit=%s\n' "$COMMIT"
