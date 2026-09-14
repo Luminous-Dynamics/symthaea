@@ -156,6 +156,9 @@ impl NPlayerGame {
             deviated_profile[player] = to_strategy;
             let deviated_payoff = self.payoff(player, &deviated_profile)?;
             let gain = deviated_payoff - baseline_payoff;
+            if !gain.is_finite() {
+                return Err("unilateral payoff gain overflowed finite f64 range".to_string());
+            }
             if gain > 0.0 {
                 witnesses.push(UnilateralDeviation {
                     player,
@@ -226,21 +229,18 @@ impl NPlayerGame {
     }
 
     /// Enumerate every exact pure-strategy Nash equilibrium.
-    pub fn pure_nash_equilibria(&self) -> Vec<Vec<usize>> {
+    ///
+    /// Returns an error if finite input payoffs imply a non-finite payoff
+    /// difference during deviation analysis.
+    pub fn pure_nash_equilibria(&self) -> Result<Vec<Vec<usize>>, String> {
         let mut equilibria = Vec::new();
         for index in 0..self.profile_count {
-            // Every index in this loop is valid by construction.
-            let profile = self
-                .decode_profile(index)
-                .expect("validated profile index must decode");
-            if self
-                .is_pure_nash(&profile)
-                .expect("decoded profile must be valid")
-            {
+            let profile = self.decode_profile(index)?;
+            if self.is_pure_nash(&profile)? {
                 equilibria.push(profile);
             }
         }
-        equilibria
+        Ok(equilibria)
     }
 
     fn validate_profile(&self, profile: &[usize]) -> Result<(), String> {
@@ -345,13 +345,24 @@ mod tests {
     }
 
     #[test]
+    fn payoff_difference_overflow_fails_closed() {
+        let game = NPlayerGame::new(
+            vec![2],
+            vec![vec![-f64::MAX, f64::MAX]],
+        )
+        .unwrap();
+        assert!(game.unilateral_deviations(&[0], 0).is_err());
+        assert!(game.pure_nash_equilibria().is_err());
+    }
+
+    #[test]
     fn three_player_coordination_has_two_pure_equilibria() {
         // Every player receives 1 iff all three choose the same action, else 0.
         let common = vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
         let game = NPlayerGame::new(vec![2, 2, 2], vec![common.clone(), common.clone(), common])
             .unwrap();
         assert_eq!(
-            game.pure_nash_equilibria(),
+            game.pure_nash_equilibria().unwrap(),
             vec![vec![0, 0, 0], vec![1, 1, 1]]
         );
     }
@@ -369,6 +380,6 @@ mod tests {
             .into_iter()
             .map(|(row, column)| vec![row, column])
             .collect();
-        assert_eq!(game.pure_nash_equilibria(), legacy_equilibria);
+        assert_eq!(game.pure_nash_equilibria().unwrap(), legacy_equilibria);
     }
 }
