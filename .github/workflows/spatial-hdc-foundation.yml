@@ -1,0 +1,150 @@
+name: Spatial HDC Foundation
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/hdc/spatial_encoder.rs"
+      - "crates/core/symthaea-core/src/lib.rs"
+      - ".github/workflows/spatial-hdc-foundation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/core/symthaea-core/src/hdc/spatial_encoder.rs"
+      - "crates/core/symthaea-core/src/lib.rs"
+      - ".github/workflows/spatial-hdc-foundation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install qualification toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Freeze foundation-only boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC=crates/core/symthaea-core/src/hdc/spatial_encoder.rs
+          LIB=crates/core/symthaea-core/src/lib.rs
+
+          grep -Fq 'pub struct SpatialEncoder' "$SRC"
+          grep -Fq 'pub struct SpatialEncoderConfig' "$SRC"
+          grep -Fq 'pub struct SpatialHV' "$SRC"
+          grep -Fq 'pub enum SpatialEncodingDomain' "$SRC"
+          grep -Fq '#[path = "hdc/spatial_encoder.rs"]' "$LIB"
+          grep -Fq 'pub mod spatial_encoder;' "$LIB"
+
+          # PR0 is a foundation only. No runtime, vision, object-memory, scene,
+          # rendering, or other consumer may start depending on this surface in
+          # this qualification tranche.
+          if git grep -n -E '\b(SpatialEncoder|SpatialEncoderConfig|SpatialHV|SpatialEncodingDomain)\b' -- \
+            ':!crates/core/symthaea-core/src/hdc/spatial_encoder.rs' \
+            ':!crates/core/symthaea-core/src/lib.rs' \
+            ':!.github/workflows/spatial-hdc-foundation.yml'; then
+            echo 'Spatial HDC foundation unexpectedly has a downstream consumer' >&2
+            exit 1
+          fi
+
+          # Keep the mathematical limitation explicit: Fourier features provide
+          # locality/relational semantics, not authoritative globally injective geometry.
+          grep -Fq 'not a globally injective' "$SRC"
+          grep -Fq 'authoritative metric geometry must remain' "$SRC"
+
+          # 2D and 3D must use dimension-correct, domain-separated direction banks.
+          grep -Fq 'const SEED_DOMAIN_2D' "$SRC"
+          grep -Fq 'const SEED_DOMAIN_3D' "$SRC"
+          grep -Fq 'frequencies_2d: Vec<[f64; 2]>' "$SRC"
+          grep -Fq 'frequencies_3d: Vec<[f64; 3]>' "$SRC"
+          grep -Fq 'dimension_specific_banks_preserve_frequency_magnitude_schedule' "$SRC"
+          grep -Fq 'two_dimensional_kernel_is_approximately_isotropic' "$SRC"
+          grep -Fq 'pairwise_similarity_is_translation_consistent_2d' "$SRC"
+          grep -Fq 'pairwise_similarity_is_translation_consistent_3d' "$SRC"
+
+          # Metric precision stays f64 through coordinate/frequency/phase generation.
+          grep -Fq 'pub max_frequency: f64' "$SRC"
+          grep -Fq 'pub fn encode_2d(&self, x: f64, y: f64)' "$SRC"
+          grep -Fq 'pub fn encode_3d(&self, x: f64, y: f64, z: f64)' "$SRC"
+          grep -Fq 'pub fn similarity_2d(&self, a: [f64; 2], b: [f64; 2])' "$SRC"
+          grep -Fq 'pub fn similarity_3d(&self, a: [f64; 3], b: [f64; 3])' "$SRC"
+          grep -Fq 'fn phase_component(omega: f64, coordinate: f64)' "$SRC"
+          grep -Fq 'coordinate.rem_euclid(period)' "$SRC"
+          grep -Fq 'f64_metric_precision_survives_beyond_f32_resolution' "$SRC"
+
+          # The frequency schedule must remain exactly max/256 -> max, never a
+          # fixed clamp that can invert the configured range at small frequencies.
+          grep -Fq 'const FREQUENCY_SPAN: f64 = 256.0;' "$SRC"
+          grep -Fq 'let min_frequency = max_frequency / FREQUENCY_SPAN;' "$SRC"
+          grep -Fq 'frequency_schedule_never_inverts_below_old_clamp' "$SRC"
+          ! grep -Fq '.max(1e-4)' "$SRC"
+
+          # Protected SpatialHV comparisons must retain domain+basis identity and
+          # must not fall back to globally-strided generic ContinuousHV similarity.
+          grep -Fq 'domain: SpatialEncodingDomain' "$SRC"
+          grep -Fq 'basis: SpatialEncoderConfig' "$SRC"
+          grep -Fq 'fn full_cosine_similarity' "$SRC"
+          grep -Fq 'pub fn into_continuous(self) -> ContinuousHV' "$SRC"
+          grep -Fq 'protected_spatial_hv_rejects_cross_domain_and_cross_basis_similarity' "$SRC"
+          grep -Fq 'protected_spatial_hv_similarity_matches_direct_kernel' "$SRC"
+          grep -Fq 'explicit_generic_hdc_downgrade_preserves_dimension' "$SRC"
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          src = Path('crates/core/symthaea-core/src/hdc/spatial_encoder.rs').read_text()
+
+          def between(start: str, end: str) -> str:
+              if start not in src or end not in src:
+                  raise SystemExit(f'missing source markers: {start!r} / {end!r}')
+              return src.split(start, 1)[1].split(end, 1)[0]
+
+          spatial_hv_similarity = between(
+              'pub fn similarity(&self, other: &Self) -> Result<f32, String> {',
+              '/// Borrow the underlying generic HDC value',
+          )
+          if 'full_cosine_similarity' not in spatial_hv_similarity:
+              raise SystemExit('SpatialHV similarity must use full-resolution spatial cosine')
+          if 'self.hv.similarity' in spatial_hv_similarity or 'STRIDE' in spatial_hv_similarity:
+              raise SystemExit('SpatialHV similarity must not use cognitive-stride similarity')
+
+          sim2 = between(
+              'pub fn similarity_2d(&self, a: [f64; 2], b: [f64; 2]) -> Result<f32, String> {',
+              '/// Translation-invariant Fourier-kernel similarity between finite 3D positions.',
+          )
+          if 'encode_2d' in sim2 or '.similarity(' in sim2:
+              raise SystemExit('2D spatial kernel must remain direct and stride-independent')
+          if '.cos()' not in sim2:
+              raise SystemExit('2D spatial kernel must remain paired Fourier cosine')
+
+          sim3 = between(
+              'pub fn similarity_3d(&self, a: [f64; 3], b: [f64; 3]) -> Result<f32, String> {',
+              'fn validate_point',
+          )
+          if 'encode_3d' in sim3 or '.similarity(' in sim3:
+              raise SystemExit('3D spatial kernel must remain direct and stride-independent')
+          if '.cos()' not in sim3:
+              raise SystemExit('3D spatial kernel must remain paired Fourier cosine')
+          PY
+
+          # Input validation and finite-phase hardening remain load-bearing.
+          grep -Fq 'spatial coordinate component' "$SRC"
+          grep -Fq 'extreme_finite_coordinates_remain_finite' "$SRC"
+
+      - name: Locked metadata
+        run: cargo metadata --locked --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-core
+
+      - name: Focused tests
+        run: cargo test --locked -p symthaea-core --lib spatial_encoder
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-core --lib -- -D warnings
