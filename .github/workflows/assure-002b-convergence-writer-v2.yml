@@ -126,8 +126,14 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$CAMPAIGN_PARENT"
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          COMMIT_DATE="$(git show -s --format=%aI "$CAMPAIGN_PARENT")"
+          test -n "$COMMIT_DATE"
+          export GIT_AUTHOR_NAME='github-actions[bot]'
+          export GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          export GIT_AUTHOR_DATE="$COMMIT_DATE"
+          export GIT_COMMITTER_DATE="$COMMIT_DATE"
           git add -A
           git diff --cached --check
           TREE="$(git write-tree)"
