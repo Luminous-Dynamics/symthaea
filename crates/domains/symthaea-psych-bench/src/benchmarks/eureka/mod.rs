@@ -104,6 +104,8 @@ mod v2_qualifier_anti_rollback;
 mod v2_qualifier_checkpoint_store;
 #[cfg(test)]
 mod v2_signed_governance_authorization;
+#[cfg(test)]
+mod v2_authorized_anti_rollback_transition;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
