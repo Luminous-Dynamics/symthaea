@@ -1,0 +1,137 @@
+name: PIE-002J Strict Fact Applicability Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002j-6dcd90e9
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify PIE-002J strict fact applicability oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SUBJECT_SHA: 6dcd90e9ccc72b18650f46f7e2b7f77f9e9f245d
+      PARENT_SHA: 4f61d7b1d079c1d5815f01f92cf65036303b747d
+      SUBJECT_TREE: b819499e81d0bcaf4bcac8e6603a5423f6ed9efb
+      PIE_002I_ORACLE_SHA256: 33d2ab046542ca82d8cec1d0ab3409fcba8f808dc0c61c1deaf4dc361bbf086f
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        id: identity
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "docs/release/evidence/PIE_002J_STRICT_FACT_APPLICABILITY_ORACLE.md"
+          test "${files[1]}" = "scripts/pie-strict-fact-applicability-oracle.py"
+
+      - name: Record subject and dependency digests
+        id: digests
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          sha256sum \
+            scripts/pie-strict-fact-applicability-oracle.py \
+            docs/release/evidence/PIE_002J_STRICT_FACT_APPLICABILITY_ORACLE.md \
+            scripts/pie-evidence-applicability-oracle.py \
+            | tee pie-002j-subject-sha256.txt
+          printf '%s  %s\n' \
+            "$PIE_002I_ORACLE_SHA256" \
+            scripts/pie-evidence-applicability-oracle.py \
+            | sha256sum --check --strict
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13.5
+
+      - name: Verify Python identity
+        id: python
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(python --version)" = "Python 3.13.5"
+
+      - name: Syntax compile composed oracle pair
+        id: syntax
+        continue-on-error: true
+        run: |
+          python -m py_compile \
+            scripts/pie-evidence-applicability-oracle.py \
+            scripts/pie-strict-fact-applicability-oracle.py
+
+      - name: Enforce composition source boundary
+        id: boundary
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          grep -Fq 'pie-evidence-applicability-oracle.py' scripts/pie-strict-fact-applicability-oracle.py
+          test "$(grep -Ec '^def resolve_evidence_applicability\(' scripts/pie-strict-fact-applicability-oracle.py || true)" -eq 0
+          grep -Fq 'resolve_evidence_applicability = PIE_I.resolve_evidence_applicability' scripts/pie-strict-fact-applicability-oracle.py
+          grep -Fq 'params == ("fact", "evidence_scopes", "study", "profile")' scripts/pie-strict-fact-applicability-oracle.py
+
+      - name: Run strict fact applicability self-test
+        id: selftest
+        continue-on-error: true
+        run: python scripts/pie-strict-fact-applicability-oracle.py --self-test
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > pie-002j-qualification.json <<EOF
+          {
+            "schema": "symthaea.pie.exact-subject-qualification.v1",
+            "program": "PIE-002J",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "python": "3.13.5",
+            "pie_002i_oracle_sha256": "$PIE_002I_ORACLE_SHA256",
+            "policy": "all attached evidence must be Applicable; Inapplicable dominates Indeterminate; no any-applicable success path",
+            "gates": {
+              "identity_scope": "${{ steps.identity.outcome }}",
+              "subject_and_dependency_digests": "${{ steps.digests.outcome }}",
+              "python_identity": "${{ steps.python.outcome }}",
+              "syntax_compile": "${{ steps.syntax.outcome }}",
+              "composition_source_boundary": "${{ steps.boundary.outcome }}",
+              "self_test": "${{ steps.selftest.outcome }}"
+            },
+            "scope": "strict closed-set aggregation of all provenance attached to one exact numerical fact after fresh in-call PIE-002I resolution; not truth, authenticity, independence, derivation correctness, uncertainty adequacy, freshness/currentness, feasibility, dispatch, thermodynamic closure, economics, or execution authority"
+          }
+          EOF
+          cat pie-002j-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pie-002j-strict-fact-applicability-qualification
+          path: |
+            pie-002j-qualification.json
+            pie-002j-subject-sha256.txt
+          if-no-files-found: error
+
+      - name: Enforce all oracle gates
+        if: always()
+        run: |
+          test "${{ steps.identity.outcome }}" = success
+          test "${{ steps.digests.outcome }}" = success
+          test "${{ steps.python.outcome }}" = success
+          test "${{ steps.syntax.outcome }}" = success
+          test "${{ steps.boundary.outcome }}" = success
+          test "${{ steps.selftest.outcome }}" = success
