@@ -644,11 +644,11 @@ mod tests {
             .split("#[cfg(test)]")
             .next()
             .unwrap();
-        assert_eq!(source.matches("row.post()").count(), 1);
+        assert_eq!(source.matches("let post = row.post();").count(), 1);
         let reveal_start = source.find("pub(super) fn reveal(").unwrap();
-        let post_lookup = source.find("let post = row.post();").unwrap();
-        let pair_check = source.find("FrozenPairCommitmentMismatch").unwrap();
-        assert!(reveal_start < pair_check);
+        let reveal_tail = &source[reveal_start..];
+        let pair_check = reveal_tail.find("FrozenPairCommitmentMismatch").unwrap();
+        let post_lookup = reveal_tail.find("let post = row.post();").unwrap();
         assert!(pair_check < post_lookup);
     }
 
