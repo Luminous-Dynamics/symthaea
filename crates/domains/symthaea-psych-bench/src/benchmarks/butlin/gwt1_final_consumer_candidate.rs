@@ -11,7 +11,7 @@
 //! separately attested consumer/report artifact is durable external authority.
 
 use std::fs;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -39,8 +39,18 @@ pub const GWT1_CONSUMER_GH_BINARY_SHA256_V1: &str =
 pub const GWT1_CONSUMER_GH_VERSION_OUTPUT_SHA256_V1: &str =
     "2ec8b2f6e0e8e915f7e0c8d7b14b77fe93e33225872ea1d98041228950c620a9";
 
+/// Explicit activation fuse for durable public/reporting authority.
+///
+/// This remains `false` while the source final-resolution signer digest and
+/// upstream authority constants are draft bootstrap candidates. A later,
+/// separately reviewed activation tranche must both advance those immutable
+/// roots and flip this fuse. Until then the trusted consumer can be compiled and
+/// structurally qualified but cannot emit a report projection candidate.
+pub const GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1: bool = false;
+
 #[derive(Debug)]
 pub enum Gwt1FinalConsumerCandidateErrorV1 {
+    PublicReportingAuthorityBlocked,
     Io(String),
     Json {
         component: &'static str,
@@ -82,6 +92,10 @@ pub enum Gwt1FinalConsumerCandidateErrorV1 {
 impl std::fmt::Display for Gwt1FinalConsumerCandidateErrorV1 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::PublicReportingAuthorityBlocked => write!(
+                f,
+                "GWT-1 public/reporting authority is explicitly blocked pending reviewed activation"
+            ),
             Self::Io(error) => write!(f, "I/O failure: {error}"),
             Self::Json { component, error } => {
                 write!(f, "invalid JSON for {component}: {error}")
@@ -331,6 +345,9 @@ pub fn reconstruct_gwt1_verified_report_projection_candidate_v1(
     sha256sum_executable: &Path,
     gh_config_dir: &Path,
 ) -> Result<Gwt1VerifiedReportProjectionV1, Gwt1FinalConsumerCandidateErrorV1> {
+    if !GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1 {
+        return Err(Gwt1FinalConsumerCandidateErrorV1::PublicReportingAuthorityBlocked);
+    }
     validate_admitted_root(admitted_final_root, "final", "gwt1-final-resolution")?;
     validate_admitted_root(admitted_direct_evidence_dir, "direct evidence", "gwt1-evidence")?;
     validate_frozen_gh_root(gh_executable, sha256sum_executable)?;
@@ -384,6 +401,11 @@ pub fn reconstruct_gwt1_verified_report_projection_candidate_v1(
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn public_reporting_authority_is_fail_closed_before_activation() {
+        assert!(!GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1);
+    }
 
     #[test]
     fn consumer_verifier_root_constants_are_frozen() {
