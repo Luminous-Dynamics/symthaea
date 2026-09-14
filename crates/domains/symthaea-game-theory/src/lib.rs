@@ -17,6 +17,11 @@
 //! termination reasons and exact witnesses. It deliberately does not claim
 //! coalition-proof Nash equilibrium or strong-Nash certification.
 //!
+//! IG-003 adds validated independent mixed-strategy beliefs plus exact
+//! best-response and one-step [`LogitChoice`] policies. A local logit response
+//! is not labeled QRE: quantal-response equilibrium requires a strategic fixed
+//! point that this tranche does not solve.
+//!
 //! This crate complements `symthaea-economics` and `symthaea-social-choice`
 //! without depending on `symthaea-core`.
 //!
@@ -33,9 +38,14 @@
 //! assert_eq!(g.pure_nash_equilibria(), vec![(1, 1)]);
 //! ```
 
+mod behavior;
 mod coalition;
 mod n_player;
 
+pub use behavior::{
+    ActionDistribution, BehaviorPolicy, BestResponse, LogitChoice, MixedStrategyProfile,
+    PROBABILITY_SUM_TOLERANCE,
+};
 pub use coalition::{
     BoundedCoalitionDeviationReport, CoalitionDeviationWitness, CoalitionImprovementCriterion,
     CoalitionSearchTermination,
