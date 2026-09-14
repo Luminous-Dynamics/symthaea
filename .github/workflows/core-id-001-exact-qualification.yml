@@ -1,0 +1,199 @@
+name: CORE-ID-001 Exact Cross-Language Qualification
+
+on:
+  push:
+    branches:
+      - qualify/core-id-001-da3b0e04
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify CORE-ID-001 explicit cross-language profile
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SUBJECT_SHA: da3b0e04018f57d9edec6898324964839c36ff09
+      PARENT_SHA: 998810a1966d4cfb50845599d36f23e07f19bf24
+      SUBJECT_TREE: 701133db4a9fcff46377b5dc1a3005e4d313047d
+      LEGACY_PIE_ORACLE_SHA256: 0ca9f3e850b1d93b32700b2f2a52e63b3eeb35304de59f732f978cbd145686e5
+      VECTORS: docs/release/evidence/CORE_ID_001_GOLDEN_VECTORS.tsv
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject, lineage, tree, and file scope
+        id: identity
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          mapfile -t files < <(git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 4
+          test "${files[0]}" = "docs/release/evidence/CORE_ID_001_CANONICAL_IDENTITY_PROFILE.md"
+          test "${files[1]}" = "docs/release/evidence/CORE_ID_001_GOLDEN_VECTORS.tsv"
+          test "${files[2]}" = "scripts/core-canonical-identity-oracle.py"
+          test "${files[3]}" = "scripts/core-canonical-identity-oracle.rs"
+
+      - name: Record subject and legacy dependency digests
+        id: digests
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          sha256sum \
+            scripts/core-canonical-identity-oracle.py \
+            scripts/core-canonical-identity-oracle.rs \
+            docs/release/evidence/CORE_ID_001_GOLDEN_VECTORS.tsv \
+            docs/release/evidence/CORE_ID_001_CANONICAL_IDENTITY_PROFILE.md \
+            scripts/pie-canonical-identity-oracle.py \
+            | tee core-id-001-files.sha256
+          printf '%s  %s\n' \
+            "$LEGACY_PIE_ORACLE_SHA256" \
+            scripts/pie-canonical-identity-oracle.py \
+            | sha256sum --check --strict
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13.5
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify toolchain identities
+        id: toolchains
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(python --version)" = "Python 3.13.5"
+          rustc --version --verbose
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+
+      - name: Enforce explicit-profile source authority
+        id: source_boundary
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test "$(grep -Fo '.strip()' scripts/core-canonical-identity-oracle.py | wc -l)" -eq 1
+          ! grep -Fq '.trim(' scripts/core-canonical-identity-oracle.rs
+          ! grep -Fq 'is_whitespace' scripts/core-canonical-identity-oracle.rs
+          grep -Fq 'EDGE_WHITESPACE_CODEPOINTS' scripts/core-canonical-identity-oracle.py
+          grep -Fq 'is_explicit_edge_whitespace' scripts/core-canonical-identity-oracle.rs
+          grep -Fq 'prove_legacy_pie_edge_equivalence' scripts/core-canonical-identity-oracle.py
+
+      - name: Syntax compile Python oracle
+        id: python_syntax
+        continue-on-error: true
+        run: python -m py_compile scripts/core-canonical-identity-oracle.py
+
+      - name: Compile Rust oracle with warnings denied
+        id: rust_compile
+        continue-on-error: true
+        run: |
+          rustc --edition=2024 -D warnings \
+            scripts/core-canonical-identity-oracle.rs \
+            -o /tmp/core-canonical-identity-oracle
+
+      - name: Re-run qualified legacy PIE-ID oracle
+        id: legacy
+        continue-on-error: true
+        run: python scripts/pie-canonical-identity-oracle.py --self-test
+
+      - name: Run exhaustive Python explicit-profile self-test
+        id: python_selftest
+        continue-on-error: true
+        run: python scripts/core-canonical-identity-oracle.py --self-test
+
+      - name: Run Rust explicit-profile self-test
+        id: rust_selftest
+        continue-on-error: true
+        run: /tmp/core-canonical-identity-oracle --self-test
+
+      - name: Run Python golden vectors
+        id: python_vectors
+        continue-on-error: true
+        run: python scripts/core-canonical-identity-oracle.py --vectors "$VECTORS" > core-id-python.out
+
+      - name: Run Rust golden vectors
+        id: rust_vectors
+        continue-on-error: true
+        run: /tmp/core-canonical-identity-oracle --vectors "$VECTORS" > core-id-rust.out
+
+      - name: Enforce cross-language vector equivalence
+        id: vector_equivalence
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          diff -u core-id-python.out core-id-rust.out
+          test "$(wc -l < core-id-python.out)" -eq 71
+
+      - name: Emit machine-readable qualification receipt
+        if: always()
+        run: |
+          cat > core-id-001-qualification.json <<EOF
+          {
+            "schema": "symthaea.core.exact-subject-qualification.v1",
+            "program": "CORE-ID-001",
+            "profile": "symthaea.core.canonical-lexical-id.v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$SUBJECT_TREE",
+            "python": "3.13.5",
+            "rust": "1.96.0",
+            "legacy_pie_oracle_sha256": "$LEGACY_PIE_ORACLE_SHA256",
+            "edge_whitespace_codepoints": 25,
+            "golden_vectors": 71,
+            "gates": {
+              "identity_scope": "${{ steps.identity.outcome }}",
+              "subject_and_legacy_digests": "${{ steps.digests.outcome }}",
+              "toolchain_identities": "${{ steps.toolchains.outcome }}",
+              "explicit_profile_source_boundary": "${{ steps.source_boundary.outcome }}",
+              "python_syntax": "${{ steps.python_syntax.outcome }}",
+              "rust_compile_deny_warnings": "${{ steps.rust_compile.outcome }}",
+              "legacy_pie_self_test": "${{ steps.legacy.outcome }}",
+              "python_exhaustive_equivalence_self_test": "${{ steps.python_selftest.outcome }}",
+              "rust_self_test": "${{ steps.rust_selftest.outcome }}",
+              "python_vectors": "${{ steps.python_vectors.outcome }}",
+              "rust_vectors": "${{ steps.rust_vectors.outcome }}",
+              "cross_language_vector_equivalence": "${{ steps.vector_equivalence.outcome }}"
+            },
+            "scope": "explicit versioned lexical admission only; no Unicode normalization/case folding, namespace uniqueness, content identity, spoof defense, provenance/authenticity, currentness, applicability, or authority"
+          }
+          EOF
+          cat core-id-001-qualification.json
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-id-001-cross-language-qualification
+          path: |
+            core-id-001-qualification.json
+            core-id-001-files.sha256
+            core-id-python.out
+            core-id-rust.out
+          if-no-files-found: error
+
+      - name: Enforce all qualification gates
+        if: always()
+        run: |
+          test "${{ steps.identity.outcome }}" = success
+          test "${{ steps.digests.outcome }}" = success
+          test "${{ steps.toolchains.outcome }}" = success
+          test "${{ steps.source_boundary.outcome }}" = success
+          test "${{ steps.python_syntax.outcome }}" = success
+          test "${{ steps.rust_compile.outcome }}" = success
+          test "${{ steps.legacy.outcome }}" = success
+          test "${{ steps.python_selftest.outcome }}" = success
+          test "${{ steps.rust_selftest.outcome }}" = success
+          test "${{ steps.python_vectors.outcome }}" = success
+          test "${{ steps.rust_vectors.outcome }}" = success
+          test "${{ steps.vector_equivalence.outcome }}" = success
