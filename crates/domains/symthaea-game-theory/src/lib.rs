@@ -3,16 +3,21 @@
 
 //! # symthaea-game-theory
 //!
-//! Two-player normal-form (matrix) games — best responses, **pure-strategy Nash
-//! equilibria**, strict dominance, and **mixed-strategy Nash** for 2×2 games.
-//! Complements `symthaea-economics` (which has only 2×2 payoff helpers) and
-//! `symthaea-social-choice`.
+//! Formal normal-form game theory for Symthaea.
 //!
-//! Pure `std`, zero dependencies, no `symthaea-core` link. A [`Game`] holds two
-//! payoff matrices — `row_payoff[i][j]` and `col_payoff[i][j]` — for the row
-//! player choosing strategy `i` and the column player choosing `j`.
+//! The original [`Game`] API covers two-player normal-form (matrix) games —
+//! best responses, **pure-strategy Nash equilibria**, strict dominance, and
+//! **mixed-strategy Nash** for 2×2 games.
 //!
-//! ## Example
+//! IG-001 adds [`NPlayerGame`], a validated dependency-free N-player surface
+//! with canonical pure-profile indexing, exact unilateral-deviation witnesses,
+//! regret, epsilon-Nash checks and pure-Nash enumeration. It does not model
+//! coalitions, bounded rationality, identities, evidence or governance policy.
+//!
+//! This crate complements `symthaea-economics` and `symthaea-social-choice`
+//! without depending on `symthaea-core`.
+//!
+//! ## Two-player example
 //!
 //! ```
 //! use symthaea_game_theory::Game;
@@ -24,6 +29,10 @@
 //! ).unwrap();
 //! assert_eq!(g.pure_nash_equilibria(), vec![(1, 1)]);
 //! ```
+
+mod n_player;
+
+pub use n_player::{NPlayerGame, UnilateralDeviation};
 
 /// A two-player normal-form game.
 #[derive(Debug, Clone)]
