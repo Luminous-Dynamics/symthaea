@@ -1,0 +1,127 @@
+name: Psych-Bench Retired Backend Comparison
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/psych-bench-retired-backend-comparison.yml'
+      - 'crates/domains/symthaea-psych-bench/examples/backend_comparison.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retired-backend-comparison:
+    name: Exact-subject retired backend comparison surface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Retirement source gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/domains/symthaea-psych-bench/examples/backend_comparison.rs')
+          source = path.read_text()
+
+          required = [
+              'RETIRED_EVIDENCE_SURFACE',
+              'reason=no_reachable_live_backend_boundary',
+              'reason=legacy_direction_blind_regression_comparator',
+              'std::process::exit(2)',
+          ]
+          for marker in required:
+              if marker not in source:
+                  raise SystemExit(f'missing retirement marker: {marker}')
+
+          forbidden = [
+              'PsychBenchmark',
+              'BenchmarkConfig',
+              'BenchmarkReport',
+              'RegressionReport',
+              'RegressionSnapshot',
+              'ContinuousMind',
+              'CognitiveLoopBenchmarkRunner',
+              'CognitiveLoopService',
+              'cycle_with_hv',
+              'domain_of',
+              '.run(',
+              'Per-Domain Delta Summary',
+              'full-backend',
+              'symthaea_psych_bench',
+          ]
+          for marker in forbidden:
+              if marker in source:
+                  raise SystemExit(f'retired surface contains forbidden execution/comparison marker: {marker}')
+          PY
+
+      - name: Source format diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/examples/backend_comparison.rs
+
+      - name: Compile retired example target
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --example backend_comparison
+
+      - name: Historical invocation fails closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/backend-comparison-retirement.txt"
+          set +e
+          cargo run --quiet --locked -p symthaea-psych-bench --example backend_comparison \
+            >"$output" 2>&1
+          status=$?
+          set -e
+          test "$status" -eq 2
+          grep -Fx 'RETIRED_EVIDENCE_SURFACE' "$output"
+          grep -Fx 'reason=no_reachable_live_backend_boundary' "$output"
+          grep -Fx 'reason=legacy_direction_blind_regression_comparator' "$output"
+          grep -Fx 'replacement=qualified_live_execution_receipt_plus_explicit_metric_policy_manifest' "$output"
+
+      - name: Postflight exact-subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
