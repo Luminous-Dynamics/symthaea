@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-fabrication-upgrade-runtime"
+version = "0.1.0"
+edition = "2024"
+description = "Runtime activation permits for clock-governed fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgrade-authority" }
+symthaea-fabrication-policy-lineage = { path = "../symthaea-fabrication-policy-lineage" }
+symthaea-fabrication-policy-temporal-validity = { path = "../symthaea-fabrication-policy-temporal-validity" }
+symthaea-fabrication-policy-head-observation = { path = "../symthaea-fabrication-policy-head-observation" }
+symthaea-fabrication-witness-authority = { path = "../symthaea-fabrication-witness-authority" }
+symthaea-fabrication-policy-exact-evidence = { path = "../symthaea-fabrication-policy-exact-evidence" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
