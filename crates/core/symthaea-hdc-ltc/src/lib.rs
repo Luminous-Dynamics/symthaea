@@ -28,6 +28,8 @@
 //!   prediction that the score-noise variance approaches `rho / 2` for
 //!   `rho = key_count * horizon / dimension`, while making its independence
 //!   assumptions explicit and testable.
+//! - [`run_validity_capacity_controls`] separates semantic-change density from
+//!   archive write segmentation while holding the null-model coordinates fixed.
 //! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
 //!   temporal update commutes with `UnitaryRole` binding.
 //! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
@@ -78,6 +80,7 @@ pub mod state_tracking_readout;
 pub mod state_tracking_validity_archive;
 pub mod temporal_phasor;
 pub mod validity_capacity;
+pub mod validity_capacity_controls;
 pub mod validity_capacity_theory;
 pub mod validity_interval_memory;
 
@@ -128,6 +131,11 @@ pub use temporal_phasor::{
 pub use validity_capacity::{
     ValidityCapacityAxis, ValidityCapacityCase, ValidityCapacityError, ValidityCapacityObservation,
     ValidityCapacityPlan, ValidityCapacitySweepResult, run_validity_capacity_sweep,
+};
+pub use validity_capacity_controls::{
+    ValidityCapacityControlAxis, ValidityCapacityControlCase, ValidityCapacityControlError,
+    ValidityCapacityControlObservation, ValidityCapacityControlPlan, ValidityCapacityControlResult,
+    run_validity_capacity_controls,
 };
 pub use validity_capacity_theory::{
     ValidityCapacityNullModel, ValidityCapacityTheoryError,
