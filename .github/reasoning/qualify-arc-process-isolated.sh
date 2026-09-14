@@ -11,6 +11,7 @@ require_env() {
 
 for name in \
   SYMTHAEA_SUBJECT_REVISION \
+  SYMTHAEA_ARC_EVALUATOR_ROOT \
   SYMTHAEA_ARC_DATASET_ROOT \
   SYMTHAEA_ARC_DATASET_REVISION \
   SYMTHAEA_ARC_DATASET_MANIFEST_PATH \
@@ -57,12 +58,16 @@ for binary in "$projector_bin" "$policy_bin" "$evaluator_bin" "$exhaustive_bin";
     exit 2
   fi
 done
-for command in sudo useradd runuser unshare realpath install; do
+for command in sudo useradd runuser unshare realpath install setpriv ip bash; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "required isolation command is unavailable: $command" >&2
     exit 2
   fi
 done
+setpriv_bin="$(command -v setpriv)"
+ip_bin="$(command -v ip)"
+bash_bin="$(command -v bash)"
+env_bin="$(command -v env)"
 
 # Stage A: evaluator-side projection. True targets exist only here and in the target artifact.
 "$projector_bin"
@@ -72,8 +77,27 @@ if [[ ! -s "$SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH" || ! -s "$SYMTHAEA_ARC_TARG
   exit 2
 fi
 
-# Harden evaluator-only inputs before the policy starts. The dedicated policy UID must be unable to
-# traverse the real dataset checkout or read either evaluator artifact even if it guesses a path.
+evaluator_root_abs="$(realpath "$SYMTHAEA_ARC_EVALUATOR_ROOT")"
+dataset_root_abs="$(realpath "$SYMTHAEA_ARC_DATASET_ROOT")"
+manifest_abs="$(realpath "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH")"
+target_bundle_abs="$(realpath "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH")"
+for sensitive in "$dataset_root_abs" "$manifest_abs" "$target_bundle_abs"; do
+  case "$sensitive" in
+    "$evaluator_root_abs"/*) ;;
+    *)
+      echo "evaluator-only input escaped evaluator root: $sensitive" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# Harden the whole evaluator authority root. This prevents stale or future evaluator artifacts under
+# the same directory from becoming readable simply because one known filename was omitted here.
+chmod -R go-rwx "$evaluator_root_abs"
+chmod 0700 "$evaluator_root_abs"
+chmod -R a+rX "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT"
+chmod a+r "$SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH"
+
 policy_user="rq006zpolicy"
 if ! id -u "$policy_user" >/dev/null 2>&1; then
   sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$policy_user"
@@ -81,29 +105,28 @@ fi
 policy_uid="$(id -u "$policy_user")"
 policy_gid="$(id -g "$policy_user")"
 
-chmod -R go-rwx "$SYMTHAEA_ARC_DATASET_ROOT"
-chmod go-rwx "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"
-chmod -R a+rX "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT"
-chmod a+r "$SYMTHAEA_ARC_SOLVER_VIEW_MANIFEST_PATH"
-
-for sensitive in \
-  "$SYMTHAEA_ARC_DATASET_ROOT" \
-  "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" \
-  "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"; do
-  if sudo -u "$policy_user" -- test -r "$sensitive"; then
-    echo "policy UID can read evaluator-only input: $sensitive" >&2
-    exit 2
-  fi
-done
+# The exact UID that will run the policy must not be able to read or traverse the evaluator root.
+if sudo -u "$policy_user" -- test -r "$evaluator_root_abs" \
+  || sudo -u "$policy_user" -- test -x "$evaluator_root_abs"; then
+  echo "policy UID can access evaluator-only root" >&2
+  exit 2
+fi
 if ! sudo -u "$policy_user" -- test -r "$SYMTHAEA_ARC_SOLVER_VIEW_ROOT/training"; then
   echo "policy UID cannot read target-stripped solver view" >&2
   exit 2
 fi
 
+# Fail closed if the runner cannot actually create a route-empty network namespace.
+routes="$(sudo unshare --net --fork -- "$ip_bin" route show)"
+if [[ -n "$routes" ]]; then
+  echo "fresh policy network namespace unexpectedly has routes" >&2
+  printf '%s\n' "$routes" >&2
+  exit 2
+fi
+
 # Stage B: policy-only process. Copy the frozen executable into a dedicated sandbox and run it as a
-# separate unprivileged UID in a fresh network namespace. The real dataset, manifest and target
-# bundle are locally unreadable to this UID, and the new network namespace has no route to fetch
-# public ARC target bytes remotely.
+# separate unprivileged UID in a fresh route-empty network namespace. The real dataset, full
+# manifest, evaluator targets, and any evaluator-only output are behind an owner-only directory.
 sandbox="$repo_root/target/rq-006z/arc-policy-sandbox"
 rm -rf "$sandbox"
 mkdir -p "$sandbox/bin" "$sandbox/out"
@@ -118,30 +141,28 @@ sandbox_report="$sandbox/out/policy-report.json"
 report_abs="$(realpath -m "$SYMTHAEA_ARC_POLICY_RESULTS_PATH")"
 mkdir -p "$(dirname "$report_abs")"
 
-# Preflight the exact UID that will execute the policy. Known evaluator paths must remain unreadable.
-for sensitive in \
-  "$SYMTHAEA_ARC_DATASET_ROOT" \
-  "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" \
-  "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"; do
-  if sudo -u "$policy_user" -- test -r "$sensitive"; then
-    echo "policy UID unexpectedly gained access to evaluator-only input: $sensitive" >&2
-    exit 2
-  fi
-done
+# Re-prove the final filesystem boundary immediately before execution.
+if sudo -u "$policy_user" -- test -r "$evaluator_root_abs" \
+  || sudo -u "$policy_user" -- test -x "$evaluator_root_abs"; then
+  echo "policy UID unexpectedly gained evaluator-root access" >&2
+  exit 2
+fi
 
 sudo unshare --net --fork -- \
   runuser -u "$policy_user" -- \
-  env -i \
-    PATH="/usr/bin:/bin" \
+  "$setpriv_bin" --no-new-privs \
+  "$bash_bin" -c 'set -euo pipefail; sandbox="$1"; shift; cd "$sandbox"; umask 077; exec "$@"' \
+  bash "$sandbox" \
+  "$env_bin" -i \
     SYMTHAEA_SUBJECT_REVISION="$SYMTHAEA_SUBJECT_REVISION" \
     SYMTHAEA_ARC_DATASET_VERSION="$SYMTHAEA_ARC_DATASET_REVISION" \
     SYMTHAEA_ARC_SPLIT="training" \
     SYMTHAEA_ARC_DATA_DIR="$solver_root_abs" \
-    SYMTHAEA_ARC_POLICY_RESULTS_PATH="$sandbox_report" \
+    SYMTHAEA_ARC_POLICY_RESULTS_PATH="out/policy-report.json" \
     SYMTHAEA_ARC_MAX_TASKS="$SYMTHAEA_ARC_SMOKE_TASK_FILES" \
     SYMTHAEA_ARC_CANDIDATE_BUDGET="$SYMTHAEA_ARC_CANDIDATE_BUDGET" \
     SYMTHAEA_ARC_POLICY_SEED="$SYMTHAEA_ARC_POLICY_SEED" \
-    "$sandbox/bin/arc_budgeted_policy"
+    ./bin/arc_budgeted_policy
 
 if ! sudo -u "$policy_user" -- test -s "$sandbox_report"; then
   echo "isolated policy process did not emit a report" >&2
@@ -153,16 +174,12 @@ if [[ ! -s "$SYMTHAEA_ARC_POLICY_RESULTS_PATH" ]]; then
   exit 2
 fi
 
-# Prove evaluator-only paths are still unreadable to the policy UID after execution.
-for sensitive in \
-  "$SYMTHAEA_ARC_DATASET_ROOT" \
-  "$SYMTHAEA_ARC_DATASET_MANIFEST_PATH" \
-  "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH"; do
-  if sudo -u "$policy_user" -- test -r "$sensitive"; then
-    echo "policy UID can read evaluator-only input after execution: $sensitive" >&2
-    exit 2
-  fi
-done
+# Prove the same UID still cannot access evaluator-only state after policy execution.
+if sudo -u "$policy_user" -- test -r "$evaluator_root_abs" \
+  || sudo -u "$policy_user" -- test -x "$evaluator_root_abs"; then
+  echo "policy UID can access evaluator-only root after execution" >&2
+  exit 2
+fi
 
 # Independent coverage theorem: target problem IDs and policy problem IDs must be exactly equal,
 # with one canonical and one random row per target. Equal aggregate counts are not sufficient.
@@ -182,21 +199,22 @@ if not target_ids or any(not isinstance(value, str) or not value for value in ta
     raise SystemExit("target bundle contains invalid problem IDs")
 if len(target_ids) != len(set(target_ids)):
     raise SystemExit("target bundle contains duplicate problem IDs")
+target_set = set(target_ids)
 
 allowed = {"canonical-order-v1", "uniform-random-without-replacement-v1"}
 pairs = collections.defaultdict(list)
 for row in report.get("tasks", []):
     problem_id = row.get("problem_id")
     policy_id = row.get("policy_id")
-    if problem_id not in set(target_ids):
+    if problem_id not in target_set:
         raise SystemExit(f"policy report references non-target problem {problem_id!r}")
     if policy_id not in allowed:
         raise SystemExit(f"policy report contains unsupported policy {policy_id!r}")
     pairs[problem_id].append(policy_id)
 
-if set(pairs) != set(target_ids):
-    missing = sorted(set(target_ids).difference(pairs))
-    extra = sorted(set(pairs).difference(target_ids))
+if set(pairs) != target_set:
+    missing = sorted(target_set.difference(pairs))
+    extra = sorted(set(pairs).difference(target_set))
     raise SystemExit(f"target/policy problem set mismatch: missing={missing}, extra={extra}")
 for problem_id in sorted(target_ids):
     policies = pairs[problem_id]
@@ -224,7 +242,7 @@ done
 
 # Independent outer sanity: evaluator provenance was never copied into the policy sandbox, and the
 # solver-view files contain only the fixed public sentinel in every test-output slot.
-if find "$sandbox" -type f \( -name '*target*' -o -name '*manifest*' \) | grep -q .; then
+if sudo find "$sandbox" -type f \( -name '*target*' -o -name '*manifest*' \) | grep -q .; then
   echo "policy sandbox unexpectedly contains evaluator provenance" >&2
   exit 2
 fi
