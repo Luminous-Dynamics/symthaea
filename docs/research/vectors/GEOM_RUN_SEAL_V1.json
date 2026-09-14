@@ -1,0 +1,78 @@
+{
+  "schema": "symthaea.geom.run-seal.oracle-v1",
+  "process_environment": {
+    "entries": [
+      ["B", "2"],
+      ["A", "1"]
+    ],
+    "expected_commitment": "5b3117d45ec98f55103b1cb1a7cd6c629b0d73212521218ee03a62c58f26e767"
+  },
+  "canonical_json": {
+    "domain": "symthaea:geom:oracle-json:v1",
+    "value": {
+      "z": [3, true, null],
+      "a": {
+        "x": "hello",
+        "n": 7
+      }
+    },
+    "expected_canonical_utf8": "{\"a\":{\"n\":7,\"x\":\"hello\"},\"z\":[3,true,null]}",
+    "expected_commitment": "6bae876adb98a10119d7787637ac0666a9d160d919e381bf4debd9da0f819190"
+  },
+  "run_environment": {
+    "snapshot": {
+      "schema": "symthaea.geom.run-environment.v1",
+      "source": {
+        "subject_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tree_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "clean_tree": true,
+        "cargo_lock_blake3": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "flake_lock_blake3": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rust_toolchain_blake3": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      "runtime": {
+        "rustc_version": "rustc 1.96.0 (oracle)",
+        "cargo_version": "cargo 1.96.0 (oracle)",
+        "host_triple": "x86_64-unknown-linux-gnu",
+        "target_triple": "x86_64-unknown-linux-gnu",
+        "os": "linux",
+        "arch": "x86_64",
+        "hardware_identity": "oracle-cpu",
+        "thread_policy": "single-thread",
+        "cargo_features": [
+          "scientific_method",
+          "mathematics",
+          "scientific_method"
+        ]
+      },
+      "campaign": {
+        "campaign_id": "GEOM-ORACLE",
+        "arm_id": "A-intact",
+        "analysis_authority_revision": "GEOM-003D0B-v1",
+        "input_schedule_commitment": "2222222222222222222222222222222222222222222222222222222222222222",
+        "arm_order_commitment": "3333333333333333333333333333333333333333333333333333333333333333",
+        "fixed_utc_hour": 12.5
+      },
+      "config_commitment": "4444444444444444444444444444444444444444444444444444444444444444",
+      "preflight_commitment": "5555555555555555555555555555555555555555555555555555555555555555",
+      "process_environment_commitment": "5b3117d45ec98f55103b1cb1a7cd6c629b0d73212521218ee03a62c58f26e767",
+      "canonical_persistence_root": "/tmp/geom-oracle/persist"
+    },
+    "expected_commitment": "b4bae3ffee9cfdacde6d6a9ae3b18e2f7ac918643b58e239950dee06d57a4f94"
+  },
+  "evidence": {
+    "files": [
+      {
+        "path": "a.txt",
+        "content_hex": "616c7068610a",
+        "expected_blake3": "ac678d92b3d739773d18cd952cfcea443fa4a5a98ffc9554b66795bb22d5532d"
+      },
+      {
+        "path": "nested/b.bin",
+        "content_hex": "000102ff",
+        "expected_blake3": "10f847936eb4f56573613478660da66b5871069884957535f8ed979cecb88ea4"
+      }
+    ],
+    "expected_inventory_commitment": "2b6f7f110b7b877e448659c40ba555325b416758925a8498d8b457c9746859ef"
+  }
+}
