@@ -1,0 +1,197 @@
+diff --git a/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs b/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
+index 6d882bc..0000000 100644
+--- a/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
++++ b/crates/bridges/symthaea-physics-bridge/examples/verify_invariants_formal.rs
+@@ -31,7 +31,9 @@
+ use std::env;
+ use std::fs;
+ use std::io::Write;
+-use std::path::PathBuf;
++use std::path::{Path, PathBuf};
+ use std::process::{Command, ExitCode, Stdio};
+
+-use symthaea_core::hdc::conjecture_engine::SymExpr;
++use symthaea_core::hdc::conjecture_engine::{
++    RegressorConfig, SymExpr, discover_invariants_autonomous, expr_to_sym,
++};
+@@ -326,24 +329,28 @@ fn problems() -> Vec<Problem> {
+ // Build the SMT-LIB2 obligation for dE/dt ≠ 0.
+ // If Z3 returns `unsat`, the invariant is formally conserved.
+ // ───────────────────────────────────────────────────────────────────────────
+
+-fn build_obligation(problem: &Problem) -> Option<String> {
++fn build_obligation_for_energy(
++    problem: &Problem,
++    energy: &SymExpr,
++    proof_target_origin: &str,
++) -> Option<String> {
+     // dE/dt = Σ (∂E/∂x_i) * (dx_i/dt)
+     let mut total_deriv = SymExpr::Const(0.0);
+     for (var_name, dvar_dt) in &problem.dynamics {
+-        let partial = problem.energy.diff(var_name).simplify();
++        let partial = energy.diff(var_name).simplify();
+         total_deriv = add(total_deriv, mul(partial, dvar_dt.clone()));
+     }
+     let total_deriv = total_deriv.simplify();
+
+     let mut vars: Vec<String> = Vec::new();
+     variables_in(&total_deriv, &mut vars);
+-    variables_in(&problem.energy, &mut vars);
++    variables_in(energy, &mut vars);
+     vars.sort();
+     vars.dedup();
+
+     let deriv_smt = sym_to_smt(&total_deriv)?;
+-    let energy_smt = sym_to_smt(&problem.energy)?;
++    let energy_smt = sym_to_smt(energy)?;
+
+     let mut out = String::new();
+     out.push_str("(set-logic QF_NRA)\n");
+@@ -341,4 +349,5 @@ fn build_obligation(problem: &Problem) -> Option<String> {
+     ));
+     out.push_str(&format!("; Problem: {}\n", problem.description));
++    out.push_str(&format!("; Proof target origin: {}\n", proof_target_origin));
+     out.push_str(&format!("; Invariant (Lean-ready): {}\n", energy_smt));
+     out.push_str(&format!("; Claim: dE/dt = 0 identically.\n"));
+@@ -355,4 +364,11 @@ fn build_obligation(problem: &Problem) -> Option<String> {
+     Some(out)
+ }
+
++/// Historical/reference path: prove the verifier's explicitly declared target.
++/// This is a valid formal proof of that target, but it is not by itself a
++/// machine binding to an independently discovered `Expr`.
++fn build_reference_obligation(problem: &Problem) -> Option<String> {
++    build_obligation_for_energy(problem, &problem.energy, "verifier_reference_problem")
++}
++
+ fn run_z3(smt: &str) -> Result<String, String> {
+@@ -381,4 +399,97 @@ fn dump_dir() -> PathBuf {
+         .unwrap_or_else(|_| PathBuf::from("papers/ramanujan/proofs"))
+ }
+
++fn harmonic_rhs(state: &[f64], _t: f64) -> Vec<f64> {
++    vec![state[1], -state[0]]
++}
++
++/// Execute one end-to-end pilot where the Z3 obligation is derived from the
++/// exact formula returned by autonomous discovery rather than from the
++/// verifier's parallel reference expression.
++///
++/// The receipt is intentionally textual/non-cryptographic. It establishes a
++/// direct in-process translation chain, not a content-addressed evidence root.
++fn run_discovery_bound_harmonic_pilot(dir: &Path) -> Result<(), String> {
++    let problem = problems()
++        .into_iter()
++        .find(|problem| problem.name == "harmonic_oscillator")
++        .ok_or_else(|| "harmonic reference problem missing".to_string())?;
++
++    let config = RegressorConfig {
++        population_size: 250,
++        generations: 80,
++        max_depth: 4,
++        max_complexity: 12,
++        lambda: 0.001,
++        mutation_rate: 0.4,
++        seed: 42,
++        ..RegressorConfig::default()
++    };
++    let variable_names = ["x", "v"];
++    let discovered = discover_invariants_autonomous(
++        harmonic_rhs,
++        &[1.0, 0.0],
++        &variable_names,
++        Some(&problem.dynamics),
++        &config,
++        20.0,
++        0.01,
++    )
++    .into_iter()
++    .next()
++    .ok_or_else(|| "autonomous harmonic discovery returned no invariant".to_string())?;
++
++    let translated = expr_to_sym(&discovered.formula).ok_or_else(|| {
++        format!(
++            "discovered formula is outside Expr->SymExpr proof subset: {}",
++            discovered.formula
++        )
++    })?;
++    let obligation = build_obligation_for_energy(
++        &problem,
++        &translated,
++        "autonomous_discovery_expr_via_expr_to_sym",
++    )
++    .ok_or_else(|| {
++        format!(
++            "translated discovered formula is outside QF_NRA proof subset: {}",
++            translated
++        )
++    })?;
++
++    let witness_path = dir.join("harmonic_oscillator.discovery-bound.smt2");
++    fs::write(&witness_path, &obligation)
++        .map_err(|e| format!("write {} failed: {}", witness_path.display(), e))?;
++
++    let z3_result = run_z3(&obligation)?;
++    let final_line = z3_result.trim().lines().last().unwrap_or("");
++    if final_line != "unsat" {
++        return Err(format!(
++            "discovery-bound harmonic obligation was not UNSAT: {}",
++            final_line
++        ));
++    }
++
++    let receipt_path = dir.join("harmonic_oscillator.discovery-bound.binding.txt");
++    let receipt = format!(
++        "binding_version=1\nproblem={}\norigin=autonomous_discovery_expr_via_expr_to_sym\ndiscovered_formula={}\ntranslated_formula={}\nsymbolically_checked={}\nvariance={:.17e}\nsmt_file={}\nz3_result=unsat\nidentity_strength=in_process_direct_translation_non_cryptographic\n",
++        problem.name,
++        discovered.formula,
++        translated,
++        discovered.symbolically_proven,
++        discovered.variance,
++        witness_path.display(),
++    );
++    fs::write(&receipt_path, receipt)
++        .map_err(|e| format!("write {} failed: {}", receipt_path.display(), e))?;
++
++    eprintln!(
++        "# discovery-bound pilot: {} -> {} -> UNSAT [{}]",
++        discovered.formula,
++        translated,
++        receipt_path.display()
++    );
++    Ok(())
++}
++
+ fn main() -> ExitCode {
+@@ -410,6 +516,6 @@ fn main() -> ExitCode {
+             continue;
+         }
+
+-        let obligation = match build_obligation(&p) {
++        let obligation = match build_reference_obligation(&p) {
+             Some(s) => s,
+             None => {
+@@ -465,12 +571,20 @@ fn main() -> ExitCode {
+         }
+     }
+
++    let discovery_binding_ok = match run_discovery_bound_harmonic_pilot(&dir) {
++        Ok(()) => true,
++        Err(error) => {
++            eprintln!("# discovery-bound harmonic pilot failed: {}", error);
++            false
++        }
++    };
++
+     eprintln!(
+-        "# summary: {} formally proven | {} skipped (transcendental) | {} sat/unknown | {} z3 errors",
+-        proven, skipped_transcendental, sat_or_unknown, z3_unavailable
++        "# summary: {} reference targets formally proven | {} skipped (transcendental) | {} sat/unknown | {} z3 errors | discovery-bound harmonic={}",
++        proven, skipped_transcendental, sat_or_unknown, z3_unavailable, discovery_binding_ok
+     );
+
+-    if z3_unavailable > 0 {
++    if z3_unavailable > 0 || !discovery_binding_ok {
+         ExitCode::from(1)
+     } else {
+         ExitCode::SUCCESS
