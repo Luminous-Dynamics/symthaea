@@ -39,6 +39,9 @@
 //! - [`measure_validity_capacity_shadow_distractors`] reconstructs the same frozen
 //!   archive with a matched never-written shadow vocabulary selected on the same
 //!   per-query index schedule as the real distractor probe.
+//! - [`measure_validity_capacity_falsification_surface`] freezes the threshold-free
+//!   paired residuals that compare empirical cleanup, vocabulary distractors,
+//!   matched never-written shadows, and the pre-result accuracy/variance nulls.
 //! - [`HolographicLiquidCell`] is a theorem-bearing diagonal research cell whose
 //!   temporal update commutes with `UnitaryRole` binding.
 //! - [`HlsParameters`] exposes the complete theorem-compatible trainable surface
@@ -91,6 +94,7 @@ pub mod temporal_phasor;
 pub mod validity_capacity;
 pub mod validity_capacity_accuracy_theory;
 pub mod validity_capacity_controls;
+pub mod validity_capacity_falsification;
 pub mod validity_capacity_score_moments;
 pub mod validity_capacity_shadow_probe;
 pub mod validity_capacity_theory;
@@ -149,6 +153,10 @@ pub use validity_capacity_controls::{
     ValidityCapacityControlAxis, ValidityCapacityControlCase, ValidityCapacityControlError,
     ValidityCapacityControlObservation, ValidityCapacityControlPlan, ValidityCapacityControlResult,
     run_validity_capacity_controls,
+};
+pub use validity_capacity_falsification::{
+    ValidityCapacityFalsificationError, ValidityCapacityFalsificationObservation,
+    ValidityCapacityFalsificationResult, measure_validity_capacity_falsification_surface,
 };
 pub use validity_capacity_score_moments::{
     ScoreMomentSummary, ValidityCapacityScoreMomentError, ValidityCapacityScoreMomentObservation,
