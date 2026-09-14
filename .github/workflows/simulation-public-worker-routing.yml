@@ -1,0 +1,138 @@
+name: Simulation Public Worker Routing
+
+on:
+  pull_request:
+    paths:
+      - "crates/bridges/symthaea-sim-public-worker-routing/**"
+      - "crates/bridges/symthaea-sim-public-worker-deployment/**"
+      - "crates/bridges/symthaea-sim-public-worker-execution/**"
+      - "crates/bridges/symthaea-sim-public-worker-input/**"
+      - "crates/bridges/symthaea-sim-deployment/**"
+      - "crates/bridges/symthaea-sim-worker-qualification/**"
+      - "crates/core/symthaea-extension-router/**"
+      - "examples/extensions/hello-simulation/manifest.json"
+      - ".github/workflows/simulation-public-worker-routing.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  public-worker-routing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require Linux x86_64 subject
+        run: |
+          test "$(uname -s)" = Linux
+          test "$(uname -m)" = x86_64
+          uname -a
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-simulation-public-worker-routing-${{ hashFiles('Cargo.lock', 'crates/bridges/symthaea-sim-public-worker-routing/**', 'crates/bridges/symthaea-sim-public-worker-deployment/**', 'crates/bridges/symthaea-sim-public-worker-execution/**', 'crates/bridges/symthaea-sim-public-worker-input/**') }}
+          restore-keys: |
+            ${{ runner.os }}-simulation-public-worker-routing-
+
+      - name: Reconcile candidate root lockfile
+        run: |
+          cargo metadata --format-version 1 > /dev/null
+          git diff -- Cargo.lock > simulation-public-worker-routing-cargo-lock.patch
+          if git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock already matches public routing graph."
+          else
+            cat simulation-public-worker-routing-cargo-lock.patch
+          fi
+
+      - name: Upload candidate Cargo.lock patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-routing-cargo-lock-patch
+          path: simulation-public-worker-routing-cargo-lock.patch
+          if-no-files-found: error
+
+      - name: Reconcile candidate pinned formatting
+        run: |
+          cargo fmt -p symthaea-sim-public-worker-routing
+          git diff -- crates/bridges/symthaea-sim-public-worker-routing \
+            > simulation-public-worker-routing-rustfmt.patch
+          if git diff --quiet -- crates/bridges/symthaea-sim-public-worker-routing; then
+            echo "Source already matches Rust 1.96 rustfmt."
+          else
+            cat simulation-public-worker-routing-rustfmt.patch
+          fi
+
+      - name: Upload candidate rustfmt patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-routing-rustfmt-patch
+          path: simulation-public-worker-routing-rustfmt.patch
+          if-no-files-found: error
+
+      - name: Check routing graph
+        run: |
+          cargo check --locked -p symthaea-sim-public-worker-routing --all-targets
+          cargo check --locked -p symthaea-sim-public-worker-deployment --all-targets
+
+      - name: Test routing corpus
+        run: cargo test --locked -p symthaea-sim-public-worker-routing
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sim-public-worker-routing --all-targets -- -D warnings
+
+      - name: Record exact public routing subject
+        run: |
+          {
+            echo "head_sha=${GITHUB_SHA}"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+            echo "package_runtime=wasm_preserved_exactly"
+            echo "remote_runtime_rewrite=forbidden"
+            echo "canonical_request_bound_at_selection=true"
+            echo "request_substitution_rejected_before_execution=true"
+            echo "routing_decision_bound_to_exact_admission=true"
+            echo "exact_public_deployment_required=true"
+            echo "public_execution_profile=symthaea.simulation.public-worker-execution.v1"
+            echo "public_deployment_profile=symthaea.simulation.deployment.public-worker-execution.v1"
+            echo "legacy_preexec_rlimits_required=true"
+            echo "live_worker_qualification_required=true"
+            echo "duplicate_public_authority_rejected=true"
+            echo "remote_only_constraints_reject_contained_wasm=true"
+            echo "release_receipt=not_minted_by_routing"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } | tee simulation-public-worker-routing-receipt.txt
+
+      - name: Upload public routing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulation-public-worker-routing-evidence
+          path: simulation-public-worker-routing-receipt.txt
+          if-no-files-found: error
+
+      - name: Require committed pinned formatting
+        run: git diff --exit-code -- crates/bridges/symthaea-sim-public-worker-routing
+
+      - name: Require committed root lockfile
+        run: git diff --exit-code -- Cargo.lock
