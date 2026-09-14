@@ -9,6 +9,7 @@ license = "AGPL-3.0-or-later"
 symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
 symthaea-fabrication-evidence-retention-authority = { path = "../symthaea-fabrication-evidence-retention-authority" }
 symthaea-fabrication-witness-registry-containment-bound = { path = "../symthaea-fabrication-witness-registry-containment-bound" }
+symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
 symthaea-fabrication-containment-state-authority = { path = "../symthaea-fabrication-containment-state-authority" }
 symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
 symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
