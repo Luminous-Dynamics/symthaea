@@ -34,6 +34,7 @@ pub struct ReleaseResilienceState {
 pub enum ReleaseResilienceStateError {
     UnsupportedSchema,
     GenerationZero,
+    GenerationOverflow,
     InvalidGenesis,
     GenerationNotSuccessor { previous: u64, proposed: u64 },
     PreviousDigestMismatch,
@@ -87,9 +88,13 @@ impl ReleaseResilienceState {
 
     pub fn successor(&self) -> Result<Self, ReleaseResilienceStateError> {
         self.validate()?;
+        let next_generation = self
+            .generation
+            .checked_add(1)
+            .ok_or(ReleaseResilienceStateError::GenerationOverflow)?;
         Ok(Self {
             schema_version: RELEASE_RESILIENCE_STATE_SCHEMA.into(),
-            generation: self.generation.saturating_add(1),
+            generation: next_generation,
             previous_state_digest: Some(digest_release_resilience_state(self)?),
             release_lineage: self.release_lineage.clone(),
             regional_quorum_tracker: self.regional_quorum_tracker.clone(),
@@ -118,7 +123,11 @@ pub fn verify_release_resilience_successor(
 ) -> Result<(), ReleaseResilienceStateError> {
     previous.validate()?;
     proposed.validate()?;
-    if proposed.generation != previous.generation.saturating_add(1) {
+    let expected_generation = previous
+        .generation
+        .checked_add(1)
+        .ok_or(ReleaseResilienceStateError::GenerationOverflow)?;
+    if proposed.generation != expected_generation {
         return Err(ReleaseResilienceStateError::GenerationNotSuccessor {
             previous: previous.generation,
             proposed: proposed.generation,
@@ -166,5 +175,20 @@ mod tests {
         let genesis = ReleaseResilienceState::genesis();
         let next = genesis.successor().unwrap();
         assert_eq!(verify_release_resilience_successor(&genesis, &next), Ok(()));
+    }
+
+    #[test]
+    fn generation_overflow_fails_closed() {
+        let mut terminal = ReleaseResilienceState::genesis();
+        terminal.generation = u64::MAX;
+        terminal.previous_state_digest = Some(Sha256Digest([7; 32]));
+        assert_eq!(
+            terminal.successor(),
+            Err(ReleaseResilienceStateError::GenerationOverflow)
+        );
+        assert_eq!(
+            verify_release_resilience_successor(&terminal, &terminal),
+            Err(ReleaseResilienceStateError::GenerationOverflow)
+        );
     }
 }
