@@ -1,0 +1,84 @@
+name: Psych-Bench Claim Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/psych-bench-claim-contract.yml'
+      - 'crates/domains/symthaea-psych-bench/src/claim_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/src/lib.rs'
+      - 'crates/domains/symthaea-psych-bench/src/benchmarks/security/**'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  claim-contract:
+    name: Exact-subject claim contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual" | tee qualified-subject.txt
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Format check changed Rust surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/src/claim_contract.rs \
+            crates/domains/symthaea-psych-bench/src/lib.rs
+
+      - name: Compile claim contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --lib
+
+      - name: Execute claim-contract regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib claim_contract::tests -- --nocapture
+
+      - name: Strict Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea-psych-bench --lib -- -D warnings
+
+      - name: Postflight exact-subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
