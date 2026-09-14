@@ -4,9 +4,9 @@
 use symthaea_assurance_campaign::{
     CampaignError, CampaignEvidenceLedgerV1, CampaignPlanV1, EvidenceRequirementV1,
     EvidenceTimingClass, OrderingReceiptV1, PreregistrationReceiptV1, RegistrationStatementV1,
-    RegistrationWithdrawalV1, ReproductionRequirementV1, SemanticCommitmentV1,
-    SupportCriterionV1, WithdrawalStatementV1, classify_evidence_timing,
-    evidence_production_statement_digest, resolve_current_registration,
+    RegistrationWithdrawalV1, ReproductionRequirementV1, SemanticCommitmentV1, SupportCriterionV1,
+    WithdrawalStatementV1, classify_evidence_timing, evidence_production_statement_digest,
+    resolve_current_registration,
 };
 use symthaea_assurance_core::{
     Claim, DigestSha256, EvidenceArtifact, EvidenceKind, EvidenceProvenance, StableId, SupportTier,
@@ -33,16 +33,19 @@ fn req(kind: EvidenceKind) -> EvidenceRequirementV1 {
 }
 
 fn subject(model_byte: char) -> AiSubjectManifest {
-    let profile = SurfaceProfile::new(id("campaign-test-profile"), vec![AiSurfaceKind::Model]).unwrap();
+    let profile =
+        SurfaceProfile::new(id("campaign-test-profile"), vec![AiSurfaceKind::Model]).unwrap();
     AiSubjectManifest::new(
         id("campaign-test-agent"),
         profile,
-        vec![SurfaceBinding::applicable(
-            AiSurfaceKind::Model,
-            SurfaceLocator::new(Some(id("provider-a")), id("model-a"), Some(id("v1"))),
-            SurfaceState::Known(MaterialCommitment::artifact_bytes(digest(model_byte))),
-        )
-        .unwrap()],
+        vec![
+            SurfaceBinding::applicable(
+                AiSurfaceKind::Model,
+                SurfaceLocator::new(Some(id("provider-a")), id("model-a"), Some(id("v1"))),
+                SurfaceState::Known(MaterialCommitment::artifact_bytes(digest(model_byte))),
+            )
+            .unwrap(),
+        ],
     )
     .unwrap()
 }
@@ -70,7 +73,10 @@ fn plan_with_control_definition(
         subject,
         SupportTier::CausallySupported,
         ReproductionRequirementV1::NotRequired,
-        vec![req(EvidenceKind::Observation), req(EvidenceKind::ControlledIntervention)],
+        vec![
+            req(EvidenceKind::Observation),
+            req(EvidenceKind::ControlledIntervention),
+        ],
         vec![
             SupportCriterionV1::new(
                 SupportTier::Observed,
@@ -89,7 +95,10 @@ fn plan_with_control_definition(
         vec![semantic("allowed-path-broken", '6')],
         vec![semantic("unauthorized-execution-observed", '7')],
         vec![semantic("instrumentation-incomplete", '8')],
-        vec![semantic("subject-drift", '9'), semantic("policy-drift", 'a')],
+        vec![
+            semantic("subject-drift", '9'),
+            semantic("policy-drift", 'a'),
+        ],
     )
     .unwrap()
 }
@@ -107,7 +116,10 @@ fn revised_plan(subject: &AiSubjectManifest, campaign_nonce: &str) -> CampaignPl
         subject,
         SupportTier::CausallySupported,
         ReproductionRequirementV1::NotRequired,
-        vec![req(EvidenceKind::ControlledIntervention), req(EvidenceKind::Observation)],
+        vec![
+            req(EvidenceKind::ControlledIntervention),
+            req(EvidenceKind::Observation),
+        ],
         vec![
             SupportCriterionV1::new(
                 SupportTier::CausallySupported,
@@ -126,7 +138,10 @@ fn revised_plan(subject: &AiSubjectManifest, campaign_nonce: &str) -> CampaignPl
         vec![semantic("allowed-path-broken", '6')],
         vec![semantic("unauthorized-execution-observed", '7')],
         vec![semantic("instrumentation-incomplete", '8')],
-        vec![semantic("policy-drift", 'a'), semantic("subject-drift", '9')],
+        vec![
+            semantic("policy-drift", 'a'),
+            semantic("subject-drift", '9'),
+        ],
     )
     .unwrap()
 }
@@ -208,31 +223,49 @@ fn plan_identity_is_order_independent() {
     let subject = subject('a');
     let claim = claim(&subject);
     let left = CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim, &subject, SupportTier::Observed,
+        id("plan"),
+        id("campaign"),
+        &claim,
+        &subject,
+        SupportTier::Observed,
         ReproductionRequirementV1::NotRequired,
-        vec![req(EvidenceKind::ControlledIntervention), req(EvidenceKind::Observation)],
+        vec![
+            req(EvidenceKind::ControlledIntervention),
+            req(EvidenceKind::Observation),
+        ],
         vec![
             SupportCriterionV1::new(SupportTier::Observed, semantic("criterion-b", '2')),
             SupportCriterionV1::new(SupportTier::Structural, semantic("criterion-a", '1')),
         ],
         vec![semantic("control-b", '4'), semantic("control-a", '3')],
         vec![semantic("failure-b", '6'), semantic("failure-a", '5')],
-        vec![semantic("contradiction", '7')], vec![semantic("inconclusive", '8')],
+        vec![semantic("contradiction", '7')],
+        vec![semantic("inconclusive", '8')],
         vec![semantic("invalidate-b", 'a'), semantic("invalidate-a", '9')],
-    ).unwrap();
+    )
+    .unwrap();
     let right = CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim, &subject, SupportTier::Observed,
+        id("plan"),
+        id("campaign"),
+        &claim,
+        &subject,
+        SupportTier::Observed,
         ReproductionRequirementV1::NotRequired,
-        vec![req(EvidenceKind::Observation), req(EvidenceKind::ControlledIntervention)],
+        vec![
+            req(EvidenceKind::Observation),
+            req(EvidenceKind::ControlledIntervention),
+        ],
         vec![
             SupportCriterionV1::new(SupportTier::Structural, semantic("criterion-a", '1')),
             SupportCriterionV1::new(SupportTier::Observed, semantic("criterion-b", '2')),
         ],
         vec![semantic("control-a", '3'), semantic("control-b", '4')],
         vec![semantic("failure-a", '5'), semantic("failure-b", '6')],
-        vec![semantic("contradiction", '7')], vec![semantic("inconclusive", '8')],
+        vec![semantic("contradiction", '7')],
+        vec![semantic("inconclusive", '8')],
         vec![semantic("invalidate-a", '9'), semantic("invalidate-b", 'a')],
-    ).unwrap();
+    )
+    .unwrap();
     assert_eq!(left.digest(), right.digest());
     assert_eq!(left.core_plan().digest(), right.core_plan().digest());
 }
@@ -243,7 +276,10 @@ fn semantic_definition_drift_changes_richer_plan_not_generic_core_plan() {
     let original = plan_with_control_definition(&subject, "campaign-a", '4');
     let redefined = plan_with_control_definition(&subject, "campaign-a", 'b');
     assert_ne!(original.digest(), redefined.digest());
-    assert_eq!(original.core_plan().digest(), redefined.core_plan().digest());
+    assert_eq!(
+        original.core_plan().digest(),
+        redefined.core_plan().digest()
+    );
 }
 
 #[test]
@@ -251,12 +287,28 @@ fn duplicate_semantic_ids_fail_closed_even_with_different_definitions() {
     let subject = subject('a');
     let claim = claim(&subject);
     let error = CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim, &subject, SupportTier::Observed,
-        ReproductionRequirementV1::NotRequired, vec![req(EvidenceKind::Observation)], vec![],
+        id("plan"),
+        id("campaign"),
+        &claim,
+        &subject,
+        SupportTier::Observed,
+        ReproductionRequirementV1::NotRequired,
+        vec![req(EvidenceKind::Observation)],
+        vec![],
         vec![semantic("same-control", '1'), semantic("same-control", '2')],
-        vec![], vec![], vec![], vec![],
-    ).unwrap_err();
-    assert!(matches!(error, CampaignError::DuplicateSemanticId { set: "controls", .. }));
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        CampaignError::DuplicateSemanticId {
+            set: "controls",
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -264,11 +316,24 @@ fn duplicate_builtin_evidence_kinds_fail_closed() {
     let subject = subject('a');
     let claim = claim(&subject);
     let error = CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim, &subject, SupportTier::Observed,
+        id("plan"),
+        id("campaign"),
+        &claim,
+        &subject,
+        SupportTier::Observed,
         ReproductionRequirementV1::NotRequired,
-        vec![req(EvidenceKind::Observation), req(EvidenceKind::Observation)],
-        vec![], vec![], vec![], vec![], vec![], vec![],
-    ).unwrap_err();
+        vec![
+            req(EvidenceKind::Observation),
+            req(EvidenceKind::Observation),
+        ],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    )
+    .unwrap_err();
     assert!(matches!(error, CampaignError::DuplicateEvidenceKind(_)));
 }
 
@@ -284,12 +349,27 @@ fn custom_evidence_requires_definition_commitment() {
 fn custom_evidence_definition_changes_plan_identity() {
     let subject = subject('a');
     let claim = claim(&subject);
-    let make = |definition| CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim, &subject, SupportTier::Observed,
-        ReproductionRequirementV1::NotRequired,
-        vec![EvidenceRequirementV1::custom(semantic("custom-evidence", definition))],
-        vec![], vec![], vec![], vec![], vec![], vec![],
-    ).unwrap();
+    let make = |definition| {
+        CampaignPlanV1::new(
+            id("plan"),
+            id("campaign"),
+            &claim,
+            &subject,
+            SupportTier::Observed,
+            ReproductionRequirementV1::NotRequired,
+            vec![EvidenceRequirementV1::custom(semantic(
+                "custom-evidence",
+                definition,
+            ))],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )
+        .unwrap()
+    };
     assert_ne!(make('1').digest(), make('2').digest());
 }
 
@@ -298,11 +378,24 @@ fn support_criterion_above_ceiling_fails_closed() {
     let subject = subject('a');
     let claim = claim(&subject);
     let error = CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim, &subject, SupportTier::Observed,
-        ReproductionRequirementV1::NotRequired, vec![req(EvidenceKind::Observation)],
-        vec![SupportCriterionV1::new(SupportTier::CausallySupported, semantic("too-strong", '1'))],
-        vec![], vec![], vec![], vec![], vec![],
-    ).unwrap_err();
+        id("plan"),
+        id("campaign"),
+        &claim,
+        &subject,
+        SupportTier::Observed,
+        ReproductionRequirementV1::NotRequired,
+        vec![req(EvidenceKind::Observation)],
+        vec![SupportCriterionV1::new(
+            SupportTier::CausallySupported,
+            semantic("too-strong", '1'),
+        )],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    )
+    .unwrap_err();
     assert_eq!(error, CampaignError::SupportCriterionAboveCeiling);
 }
 
@@ -312,10 +405,21 @@ fn claim_must_bind_exact_assure001_subject() {
     let subject_b = subject('b');
     let claim_a = claim(&subject_a);
     let error = CampaignPlanV1::new(
-        id("plan"), id("campaign"), &claim_a, &subject_b, SupportTier::Observed,
-        ReproductionRequirementV1::NotRequired, vec![req(EvidenceKind::Observation)],
-        vec![], vec![], vec![], vec![], vec![], vec![],
-    ).unwrap_err();
+        id("plan"),
+        id("campaign"),
+        &claim_a,
+        &subject_b,
+        SupportTier::Observed,
+        ReproductionRequirementV1::NotRequired,
+        vec![req(EvidenceKind::Observation)],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+    )
+    .unwrap_err();
     assert_eq!(error, CampaignError::ClaimSubjectMismatch);
 }
 
@@ -323,8 +427,14 @@ fn claim_must_bind_exact_assure001_subject() {
 fn subject_or_campaign_change_changes_plan_identity() {
     let subject_a = subject('a');
     let subject_b = subject('b');
-    assert_ne!(plan(&subject_a, "campaign-a").digest(), plan(&subject_b, "campaign-a").digest());
-    assert_ne!(plan(&subject_a, "campaign-a").digest(), plan(&subject_a, "campaign-b").digest());
+    assert_ne!(
+        plan(&subject_a, "campaign-a").digest(),
+        plan(&subject_b, "campaign-a").digest()
+    );
+    assert_ne!(
+        plan(&subject_a, "campaign-a").digest(),
+        plan(&subject_a, "campaign-b").digest()
+    );
 }
 
 #[test]
@@ -345,7 +455,8 @@ fn successor_registration_requires_strict_same_lineage_ordering() {
     let first_plan = plan(&subject, "campaign-a");
     let second_plan = revised_plan(&subject, "campaign-a");
     let root = root_registration(&first_plan, 5);
-    let statement = RegistrationStatementV1::new(&second_plan, id("registrar-a"), Some(&root)).unwrap();
+    let statement =
+        RegistrationStatementV1::new(&second_plan, id("registrar-a"), Some(&root)).unwrap();
     let stale = ordering("transparency-log-a", 1, 5, statement.digest(), 'd');
     assert_eq!(
         PreregistrationReceiptV1::new(statement.clone(), stale, Some(&root)).unwrap_err(),
@@ -366,8 +477,13 @@ fn validation_profile_definition_is_part_of_ordering_lineage() {
     let current = resolve_current_registration(&[root], &[]).unwrap();
     let evidence = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
     let changed_definition = ordering_with_profile(
-        "transparency-log-a", "monotonic-ordering-profile-v1", '0', 1, 6,
-        evidence_production_statement_digest(&current, &evidence), 'b',
+        "transparency-log-a",
+        "monotonic-ordering-profile-v1",
+        '0',
+        1,
+        6,
+        evidence_production_statement_digest(&current, &evidence),
+        'b',
     );
     assert_eq!(
         classify_evidence_timing(&current, &evidence, &changed_definition).unwrap(),
@@ -436,9 +552,15 @@ fn evidence_before_or_at_registration_is_posthoc_not_preregistered() {
     let evidence = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
     let statement = evidence_production_statement_digest(&current, &evidence);
     let before = ordering("transparency-log-a", 1, 4, statement.clone(), 'b');
-    assert_eq!(classify_evidence_timing(&current, &evidence, &before).unwrap(), EvidenceTimingClass::ProducedBeforeOrAtRegistration);
+    assert_eq!(
+        classify_evidence_timing(&current, &evidence, &before).unwrap(),
+        EvidenceTimingClass::ProducedBeforeOrAtRegistration
+    );
     let equal = ordering("transparency-log-a", 1, 5, statement, 'c');
-    assert_eq!(classify_evidence_timing(&current, &evidence, &equal).unwrap(), EvidenceTimingClass::ProducedBeforeOrAtRegistration);
+    assert_eq!(
+        classify_evidence_timing(&current, &evidence, &equal).unwrap(),
+        EvidenceTimingClass::ProducedBeforeOrAtRegistration
+    );
 }
 
 #[test]
@@ -448,8 +570,17 @@ fn evidence_from_another_ordering_lineage_is_incomparable() {
     let root = root_registration(&plan, 5);
     let current = resolve_current_registration(&[root], &[]).unwrap();
     let evidence = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
-    let foreign = ordering("transparency-log-b", 1, 6, evidence_production_statement_digest(&current, &evidence), 'b');
-    assert_eq!(classify_evidence_timing(&current, &evidence, &foreign).unwrap(), EvidenceTimingClass::IncomparableOrderingLineage);
+    let foreign = ordering(
+        "transparency-log-b",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &evidence),
+        'b',
+    );
+    assert_eq!(
+        classify_evidence_timing(&current, &evidence, &foreign).unwrap(),
+        EvidenceTimingClass::IncomparableOrderingLineage
+    );
 }
 
 #[test]
@@ -461,10 +592,20 @@ fn preregistered_admission_advances_append_only_evidence_root() {
     let mut ledger = CampaignEvidenceLedgerV1::new(&current);
     let initial_root = ledger.evidence_root().clone();
     let evidence = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
-    let production = ordering("transparency-log-a", 1, 6, evidence_production_statement_digest(&current, &evidence), 'b');
-    let admission_statement = ledger.admission_statement_digest(&current, &evidence, &production).unwrap();
+    let production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &evidence),
+        'b',
+    );
+    let admission_statement = ledger
+        .admission_statement_digest(&current, &evidence, &production)
+        .unwrap();
     let admission = ordering("transparency-log-a", 1, 7, admission_statement, 'c');
-    let admitted = ledger.admit_preregistered(&plan, &current, &evidence, &production, &admission).unwrap();
+    let admitted = ledger
+        .admit_preregistered(&plan, &current, &evidence, &production, &admission)
+        .unwrap();
     assert_eq!(ledger.admitted_count(), 1);
     assert_ne!(ledger.evidence_root(), &initial_root);
     assert_eq!(admitted.evidence_root(), ledger.evidence_root());
@@ -479,14 +620,40 @@ fn concurrent_production_can_be_admitted_serially() {
     let mut ledger = CampaignEvidenceLedgerV1::new(&current);
     let first = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
     let second = evidence(&subject, EvidenceKind::Observation, "evidence-b", 'd');
-    let first_production = ordering("transparency-log-a", 1, 6, evidence_production_statement_digest(&current, &first), '1');
-    let second_production = ordering("transparency-log-a", 1, 7, evidence_production_statement_digest(&current, &second), '2');
-    let first_admission_statement = ledger.admission_statement_digest(&current, &first, &first_production).unwrap();
+    let first_production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &first),
+        '1',
+    );
+    let second_production = ordering(
+        "transparency-log-a",
+        1,
+        7,
+        evidence_production_statement_digest(&current, &second),
+        '2',
+    );
+    let first_admission_statement = ledger
+        .admission_statement_digest(&current, &first, &first_production)
+        .unwrap();
     let first_admission = ordering("transparency-log-a", 1, 8, first_admission_statement, '3');
-    ledger.admit_preregistered(&plan, &current, &first, &first_production, &first_admission).unwrap();
-    let second_admission_statement = ledger.admission_statement_digest(&current, &second, &second_production).unwrap();
+    ledger
+        .admit_preregistered(&plan, &current, &first, &first_production, &first_admission)
+        .unwrap();
+    let second_admission_statement = ledger
+        .admission_statement_digest(&current, &second, &second_production)
+        .unwrap();
     let second_admission = ordering("transparency-log-a", 1, 9, second_admission_statement, '4');
-    ledger.admit_preregistered(&plan, &current, &second, &second_production, &second_admission).unwrap();
+    ledger
+        .admit_preregistered(
+            &plan,
+            &current,
+            &second,
+            &second_production,
+            &second_admission,
+        )
+        .unwrap();
     assert_eq!(ledger.admitted_count(), 2);
 }
 
@@ -498,16 +665,42 @@ fn admission_must_advance_previous_admission_ordering() {
     let current = resolve_current_registration(&[root], &[]).unwrap();
     let mut ledger = CampaignEvidenceLedgerV1::new(&current);
     let first = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
-    let first_production = ordering("transparency-log-a", 1, 6, evidence_production_statement_digest(&current, &first), '1');
-    let first_admission_statement = ledger.admission_statement_digest(&current, &first, &first_production).unwrap();
+    let first_production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &first),
+        '1',
+    );
+    let first_admission_statement = ledger
+        .admission_statement_digest(&current, &first, &first_production)
+        .unwrap();
     let first_admission = ordering("transparency-log-a", 1, 8, first_admission_statement, '2');
-    ledger.admit_preregistered(&plan, &current, &first, &first_production, &first_admission).unwrap();
+    ledger
+        .admit_preregistered(&plan, &current, &first, &first_production, &first_admission)
+        .unwrap();
     let second = evidence(&subject, EvidenceKind::Observation, "evidence-b", 'd');
-    let second_production = ordering("transparency-log-a", 1, 7, evidence_production_statement_digest(&current, &second), '3');
-    let second_admission_statement = ledger.admission_statement_digest(&current, &second, &second_production).unwrap();
+    let second_production = ordering(
+        "transparency-log-a",
+        1,
+        7,
+        evidence_production_statement_digest(&current, &second),
+        '3',
+    );
+    let second_admission_statement = ledger
+        .admission_statement_digest(&current, &second, &second_production)
+        .unwrap();
     let stale_admission = ordering("transparency-log-a", 1, 8, second_admission_statement, '4');
     assert_eq!(
-        ledger.admit_preregistered(&plan, &current, &second, &second_production, &stale_admission).unwrap_err(),
+        ledger
+            .admit_preregistered(
+                &plan,
+                &current,
+                &second,
+                &second_production,
+                &stale_admission
+            )
+            .unwrap_err(),
         CampaignError::AdmissionNotAfterLedgerHead
     );
 }
@@ -520,11 +713,21 @@ fn admission_must_be_ordered_after_its_production() {
     let current = resolve_current_registration(&[root], &[]).unwrap();
     let mut ledger = CampaignEvidenceLedgerV1::new(&current);
     let evidence = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
-    let production = ordering("transparency-log-a", 1, 7, evidence_production_statement_digest(&current, &evidence), '1');
-    let admission_statement = ledger.admission_statement_digest(&current, &evidence, &production).unwrap();
+    let production = ordering(
+        "transparency-log-a",
+        1,
+        7,
+        evidence_production_statement_digest(&current, &evidence),
+        '1',
+    );
+    let admission_statement = ledger
+        .admission_statement_digest(&current, &evidence, &production)
+        .unwrap();
     let admission = ordering("transparency-log-a", 1, 7, admission_statement, '2');
     assert_eq!(
-        ledger.admit_preregistered(&plan, &current, &evidence, &production, &admission).unwrap_err(),
+        ledger
+            .admit_preregistered(&plan, &current, &evidence, &production, &admission)
+            .unwrap_err(),
         CampaignError::AdmissionNotAfterProduction
     );
 }
@@ -537,16 +740,36 @@ fn duplicate_evidence_id_cannot_be_admitted_twice() {
     let current = resolve_current_registration(&[root], &[]).unwrap();
     let mut ledger = CampaignEvidenceLedgerV1::new(&current);
     let first = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'c');
-    let production = ordering("transparency-log-a", 1, 6, evidence_production_statement_digest(&current, &first), '1');
-    let admission_statement = ledger.admission_statement_digest(&current, &first, &production).unwrap();
+    let production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &first),
+        '1',
+    );
+    let admission_statement = ledger
+        .admission_statement_digest(&current, &first, &production)
+        .unwrap();
     let admission = ordering("transparency-log-a", 1, 7, admission_statement, '2');
-    ledger.admit_preregistered(&plan, &current, &first, &production, &admission).unwrap();
+    ledger
+        .admit_preregistered(&plan, &current, &first, &production, &admission)
+        .unwrap();
     let changed_content = evidence(&subject, EvidenceKind::Observation, "evidence-a", 'd');
-    let production2 = ordering("transparency-log-a", 1, 8, evidence_production_statement_digest(&current, &changed_content), '3');
-    let admission_statement2 = ledger.admission_statement_digest(&current, &changed_content, &production2).unwrap();
+    let production2 = ordering(
+        "transparency-log-a",
+        1,
+        8,
+        evidence_production_statement_digest(&current, &changed_content),
+        '3',
+    );
+    let admission_statement2 = ledger
+        .admission_statement_digest(&current, &changed_content, &production2)
+        .unwrap();
     let admission2 = ordering("transparency-log-a", 1, 9, admission_statement2, '4');
     assert_eq!(
-        ledger.admit_preregistered(&plan, &current, &changed_content, &production2, &admission2).unwrap_err(),
+        ledger
+            .admit_preregistered(&plan, &current, &changed_content, &production2, &admission2)
+            .unwrap_err(),
         CampaignError::DuplicateEvidenceId("evidence-a".into())
     );
 }
@@ -558,12 +781,27 @@ fn unregistered_evidence_kind_cannot_enter_preregistered_ledger() {
     let root = root_registration(&plan, 5);
     let current = resolve_current_registration(&[root], &[]).unwrap();
     let mut ledger = CampaignEvidenceLedgerV1::new(&current);
-    let evidence = evidence(&subject, EvidenceKind::RuntimeReceipt, "runtime-evidence", 'c');
-    let production = ordering("transparency-log-a", 1, 6, evidence_production_statement_digest(&current, &evidence), '1');
-    let admission_statement = ledger.admission_statement_digest(&current, &evidence, &production).unwrap();
+    let evidence = evidence(
+        &subject,
+        EvidenceKind::RuntimeReceipt,
+        "runtime-evidence",
+        'c',
+    );
+    let production = ordering(
+        "transparency-log-a",
+        1,
+        6,
+        evidence_production_statement_digest(&current, &evidence),
+        '1',
+    );
+    let admission_statement = ledger
+        .admission_statement_digest(&current, &evidence, &production)
+        .unwrap();
     let admission = ordering("transparency-log-a", 1, 7, admission_statement, '2');
     assert_eq!(
-        ledger.admit_preregistered(&plan, &current, &evidence, &production, &admission).unwrap_err(),
+        ledger
+            .admit_preregistered(&plan, &current, &evidence, &production, &admission)
+            .unwrap_err(),
         CampaignError::UnregisteredEvidenceKind
     );
 }
@@ -595,10 +833,24 @@ fn old_registration_ledger_cannot_admit_under_new_current_registration() {
     let successor = successor_registration(&second_plan, &root, 2);
     let second_current = resolve_current_registration(&[root, successor], &[]).unwrap();
     let evidence = evidence(&subject, EvidenceKind::Observation, "new-evidence", 'c');
-    let production = ordering("transparency-log-a", 1, 3, evidence_production_statement_digest(&second_current, &evidence), '1');
+    let production = ordering(
+        "transparency-log-a",
+        1,
+        3,
+        evidence_production_statement_digest(&second_current, &evidence),
+        '1',
+    );
     let fake_admission = ordering("transparency-log-a", 1, 4, digest('0'), '2');
     assert_eq!(
-        old_ledger.admit_preregistered(&second_plan, &second_current, &evidence, &production, &fake_admission).unwrap_err(),
+        old_ledger
+            .admit_preregistered(
+                &second_plan,
+                &second_current,
+                &evidence,
+                &production,
+                &fake_admission
+            )
+            .unwrap_err(),
         CampaignError::LedgerRegistrationMismatch
     );
 }

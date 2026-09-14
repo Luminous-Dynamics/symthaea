@@ -343,11 +343,7 @@ impl CampaignPlanV1 {
         append_evidence_requirements(&mut out, &self.evidence_requirements);
         append_support_criteria(&mut out, &self.support_criteria);
         append_semantics(&mut out, "control", &self.controls);
-        append_semantics(
-            &mut out,
-            "failure-condition",
-            &self.failure_conditions,
-        );
+        append_semantics(&mut out, "failure-condition", &self.failure_conditions);
         append_semantics(
             &mut out,
             "contradiction-condition",
@@ -767,7 +763,9 @@ pub fn resolve_current_registration(
             let previous = by_digest
                 .get(predecessor)
                 .ok_or(CampaignError::MissingRegistrationPredecessor)?;
-            registration.ordering().require_later_than(previous.ordering())?;
+            registration
+                .ordering()
+                .require_later_than(previous.ordering())?;
             let list = children.entry(predecessor.clone()).or_default();
             list.push(digest.clone());
             if list.len() > 1 {
@@ -781,13 +779,16 @@ pub fn resolve_current_registration(
         let target = by_digest
             .get(withdrawal.target_registration())
             .ok_or(CampaignError::UnknownWithdrawalTarget)?;
-        withdrawal.ordering().require_later_than(target.ordering())?;
+        withdrawal
+            .ordering()
+            .require_later_than(target.ordering())?;
         if let Some(existing) = withdrawal_by_target.get(withdrawal.target_registration()) {
             if existing.digest() != withdrawal.digest() {
                 return Err(CampaignError::ConflictingWithdrawal);
             }
         } else {
-            withdrawal_by_target.insert(withdrawal.target_registration().clone(), withdrawal.clone());
+            withdrawal_by_target
+                .insert(withdrawal.target_registration().clone(), withdrawal.clone());
         }
     }
 
@@ -831,11 +832,7 @@ pub fn evidence_production_statement_digest(
     evidence: &EvidenceArtifact,
 ) -> DigestSha256 {
     let mut out = String::from("symthaea-assurance-evidence-production-statement-v1\n");
-    field(
-        &mut out,
-        "registration",
-        current.receipt.digest().as_str(),
-    );
+    field(&mut out, "registration", current.receipt.digest().as_str());
     field(
         &mut out,
         "campaign-nonce",
@@ -888,11 +885,7 @@ impl CampaignEvidenceAdmissionV1 {
 
     pub fn digest(&self) -> DigestSha256 {
         let mut out = String::from("symthaea-assurance-campaign-evidence-admission-v1\n");
-        field(
-            &mut out,
-            "registration",
-            self.registration_digest.as_str(),
-        );
+        field(&mut out, "registration", self.registration_digest.as_str());
         field(&mut out, "plan", self.plan_digest.as_str());
         field(&mut out, "campaign-nonce", self.campaign_nonce.as_str());
         field(&mut out, "ordinal", &self.ordinal.to_string());
@@ -962,11 +955,7 @@ impl CampaignEvidenceLedgerV1 {
         field(&mut out, "registration", self.registration_digest.as_str());
         field(&mut out, "campaign-nonce", self.campaign_nonce.as_str());
         field(&mut out, "plan", self.plan_digest.as_str());
-        field(
-            &mut out,
-            "ordinal",
-            &(self.admitted_count + 1).to_string(),
-        );
+        field(&mut out, "ordinal", &(self.admitted_count + 1).to_string());
         field(&mut out, "evidence", evidence.digest().as_str());
         field(&mut out, "prior-root", self.evidence_root.as_str());
         field(
@@ -974,7 +963,11 @@ impl CampaignEvidenceLedgerV1 {
             "previous-admission-ordering",
             self.last_admission.digest().as_str(),
         );
-        field(&mut out, "production-ordering", production.digest().as_str());
+        field(
+            &mut out,
+            "production-ordering",
+            production.digest().as_str(),
+        );
         Ok(digest_canonical(out.as_bytes()))
     }
 
@@ -1054,7 +1047,8 @@ impl CampaignEvidenceLedgerV1 {
             evidence_root: evidence_root.clone(),
         };
 
-        self.seen_evidence_ids.insert(evidence.evidence_id().clone());
+        self.seen_evidence_ids
+            .insert(evidence.evidence_id().clone());
         self.seen_evidence.insert(evidence_digest);
         self.admitted_count = ordinal;
         self.evidence_root = evidence_root;
@@ -1079,7 +1073,9 @@ fn canonical_evidence_requirements(
     requirements.sort_by_cached_key(EvidenceRequirementV1::canonical_name);
     for pair in requirements.windows(2) {
         if pair[0].core_kind() == pair[1].core_kind() {
-            return Err(CampaignError::DuplicateEvidenceKind(pair[0].canonical_name()));
+            return Err(CampaignError::DuplicateEvidenceKind(
+                pair[0].canonical_name(),
+            ));
         }
     }
     Ok(requirements)
@@ -1155,20 +1151,12 @@ fn next_evidence_root(
         "production-ordering",
         production_ordering.as_str(),
     );
-    field(
-        &mut out,
-        "admission-ordering",
-        admission_ordering.as_str(),
-    );
+    field(&mut out, "admission-ordering", admission_ordering.as_str());
     digest_canonical(out.as_bytes())
 }
 
 fn append_evidence_requirements(out: &mut String, requirements: &[EvidenceRequirementV1]) {
-    field(
-        out,
-        "evidence-kind-count",
-        &requirements.len().to_string(),
-    );
+    field(out, "evidence-kind-count", &requirements.len().to_string());
     for requirement in requirements {
         field(out, "evidence-kind", &requirement.canonical_name());
         field(
