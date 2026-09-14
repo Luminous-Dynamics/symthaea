@@ -24,6 +24,7 @@ env:
   RUSTC_WRAPPER: ""
   SCCACHE_DISABLE: "1"
   EUREKA_V2_QUALIFICATION_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION.v1"
+  EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   qualify-eureka-v2-backend:
@@ -34,6 +35,9 @@ jobs:
     steps:
       - name: Checkout exact subject
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -69,6 +73,13 @@ jobs:
           fi
 
           subject_head="$(git rev-parse HEAD)"
+          if [[ "$subject_head" != "$EXPECTED_SUBJECT_SHA" ]]; then
+            echo "Checked-out HEAD is not the intended qualification subject" >&2
+            echo "expected=$EXPECTED_SUBJECT_SHA" >&2
+            echo "actual=$subject_head" >&2
+            exit 1
+          fi
+
           subject_tree="$(git rev-parse 'HEAD^{tree}')"
           cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
           receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.txt"
@@ -82,6 +93,7 @@ jobs:
             echo "qualification_revision=${EUREKA_V2_QUALIFICATION_REVISION}"
             echo "repository=${GITHUB_REPOSITORY}"
             echo "event=${GITHUB_EVENT_NAME}"
+            echo "expected_subject_head=${EXPECTED_SUBJECT_SHA}"
             echo "subject_head=$subject_head"
             echo "subject_tree=$subject_tree"
             echo "cargo_lock_sha256=$cargo_lock_sha256"
@@ -123,6 +135,10 @@ jobs:
           current_tree="$(git rev-parse 'HEAD^{tree}')"
           current_lock="$(sha256sum Cargo.lock | awk '{print $1}')"
 
+          [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
+            echo "HEAD no longer equals intended qualification subject" >&2
+            exit 1
+          }
           [[ "$current_head" == "$EUREKA_SUBJECT_HEAD" ]] || {
             echo "HEAD changed during qualification" >&2
             exit 1
@@ -158,7 +174,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eureka-v2-backend-qualification-${{ github.sha }}
+          name: eureka-v2-backend-qualification-${{ github.run_id }}
           path: ${{ runner.temp }}/eureka-v2-backend-qualification.txt
           if-no-files-found: error
           retention-days: 90
