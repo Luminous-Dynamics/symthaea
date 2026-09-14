@@ -30,6 +30,7 @@
 //! - Verified reasoning-chain IntegrationProxy history isolated from legacy feedback aggregates
 //! - Matched counterfactual IntegrationProxy operator envelopes over exact live contender sets
 //! - Compatibility-preserving baseline-vs-matched V3 evidence-impact telemetry
+//! - Live candidate identity binding from exact ActivePrimitive records without changing score inputs
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -60,6 +61,7 @@ pub mod reasoning_objective_evidence;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
+pub mod reasoning_shadow_meta_identity;
 pub mod reasoning_shadow_meta_matched;
 
 pub use causal_consciousness::{
@@ -195,7 +197,12 @@ pub use reasoning_shadow_meta::{
     ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, V3ShadowObservation,
     V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
 };
+pub use reasoning_shadow_meta_identity::{
+    CandidateIdentityBindingReport,
+    IdentityBoundShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner,
+    LIVE_META_IDENTITY_BINDING_VERSION,
+};
 pub use reasoning_shadow_meta_matched::{
-    MatchedShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner, MatchedShadowStats,
-    MatchedV3ShadowObservation, MATCHED_META_SHADOW_VERSION,
+    MatchedShadowQualifiedMetaReasoner, MatchedShadowStats, MatchedV3ShadowObservation,
+    MATCHED_META_SHADOW_VERSION,
 };
