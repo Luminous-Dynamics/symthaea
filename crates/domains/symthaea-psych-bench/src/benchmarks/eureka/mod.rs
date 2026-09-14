@@ -92,6 +92,8 @@ mod v2_qualifier_admission_manifest;
 mod v2_qualifier_admission_manifest_fixture_tests;
 #[cfg(test)]
 mod v2_qualifier_admission_manifest_parser;
+#[cfg(test)]
+mod v2_qualifier_signer_policy;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
