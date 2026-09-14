@@ -1,0 +1,95 @@
+name: Butlin Reusable Run Context Consumer Probe
+
+on:
+  workflow_call:
+    inputs:
+      expected_run_id:
+        required: true
+        type: string
+      expected_run_attempt:
+        required: true
+        type: string
+      artifact_name:
+        required: true
+        type: string
+    outputs:
+      observed_run_id:
+        value: ${{ jobs.consume.outputs.observed_run_id }}
+      observed_run_attempt:
+        value: ${{ jobs.consume.outputs.observed_run_attempt }}
+      observed_workflow_sha:
+        value: ${{ jobs.consume.outputs.observed_workflow_sha }}
+      producer_workflow_sha:
+        value: ${{ jobs.consume.outputs.producer_workflow_sha }}
+
+permissions: {}
+
+jobs:
+  consume:
+    name: Consume exact-run context probe artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      observed_run_id: ${{ steps.verify.outputs.observed_run_id }}
+      observed_run_attempt: ${{ steps.verify.outputs.observed_run_attempt }}
+      observed_workflow_sha: ${{ steps.verify.outputs.observed_workflow_sha }}
+      producer_workflow_sha: ${{ steps.verify.outputs.producer_workflow_sha }}
+    steps:
+      - name: Validate reusable consumer identity
+        id: observe
+        shell: bash
+        env:
+          EXPECTED_RUN_ID: ${{ inputs.expected_run_id }}
+          EXPECTED_RUN_ATTEMPT: ${{ inputs.expected_run_attempt }}
+          OBSERVED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          OBSERVED_WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          OBSERVED_WORKFLOW_PATH: ${{ job.workflow_file_path }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$EXPECTED_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ ]]
+          [[ "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          [[ "$OBSERVED_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$GITHUB_RUN_ID" = "$EXPECTED_RUN_ID"
+          test "$GITHUB_RUN_ATTEMPT" = "$EXPECTED_RUN_ATTEMPT"
+          test "$OBSERVED_WORKFLOW_REPOSITORY" = "$GITHUB_REPOSITORY"
+          test "$OBSERVED_WORKFLOW_PATH" = ".github/workflows/butlin-reusable-run-context-consumer-probe.yml"
+
+      - name: Download producer artifact from exact caller run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.expected_run_id }}
+          path: ${{ runner.temp }}/butlin-reusable-run-context-consumer
+
+      - name: Verify shared run context and producer identity payload
+        id: verify
+        shell: bash
+        env:
+          EXPECTED_RUN_ID: ${{ inputs.expected_run_id }}
+          EXPECTED_RUN_ATTEMPT: ${{ inputs.expected_run_attempt }}
+          EXPECTED_ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          OBSERVED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          payload="$RUNNER_TEMP/butlin-reusable-run-context-consumer/payload.json"
+          test -s "$payload"
+          expected_name="butlin-reusable-run-context-${EXPECTED_RUN_ID}-${EXPECTED_RUN_ATTEMPT}"
+          test "$EXPECTED_ARTIFACT_NAME" = "$expected_name"
+          /usr/bin/jq -e \
+            --arg run_id "$EXPECTED_RUN_ID" \
+            --arg run_attempt "$EXPECTED_RUN_ATTEMPT" \
+            '.schema=="butlin-reusable-run-context-producer-v1" and .run_id==$run_id and .run_attempt==$run_attempt and .workflow_repository=="Luminous-Dynamics/symthaea" and .workflow_path==".github/workflows/butlin-reusable-run-context-producer-probe.yml" and .payload=="fixed-platform-probe-v1" and (.workflow_sha|test("^[0-9a-f]{40}$"))' \
+            "$payload" >/dev/null
+          producer_sha="$(/usr/bin/jq -r '.workflow_sha' "$payload")"
+          [[ "$producer_sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "observed_run_id=$GITHUB_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "observed_run_attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+          echo "observed_workflow_sha=$OBSERVED_WORKFLOW_SHA" >> "$GITHUB_OUTPUT"
+          echo "producer_workflow_sha=$producer_sha" >> "$GITHUB_OUTPUT"
