@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-fabrication-upgrade-finalization-authorization"
+version = "0.1.0"
+edition = "2024"
+description = "Threshold-authorized, non-executable fabrication upgrade finalization authority"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
+symthaea-fabrication-upgrade-finalization-context = { path = "../symthaea-fabrication-upgrade-finalization-context" }
+serde = { workspace = true }
+serde_json = { workspace = true }
