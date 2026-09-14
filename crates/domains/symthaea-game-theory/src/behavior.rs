@@ -106,7 +106,7 @@ impl MixedStrategyProfile {
     }
 
     fn validate_for_game(&self, game: &NPlayerGame) -> Result<(), String> {
-        if self.strategy_counts != game.strategy_counts() {
+        if self.strategy_counts.as_slice() != game.strategy_counts() {
             return Err("mixed-strategy profile shape does not match game".to_string());
         }
         Ok(())
