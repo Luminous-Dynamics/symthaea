@@ -113,6 +113,7 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-final-contract-target
         run: |
           set -euo pipefail
+          # Keep diagnostics bounded while preserving the exact cargo criterion.
           log="$RUNNER_TEMP/gwt1-final-resolution-cargo-check.log"
           set +e
           cargo check --locked -p symthaea-psych-bench \
