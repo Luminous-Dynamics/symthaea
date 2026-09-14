@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-fabrication-witness-registry-containment-bound"
+version = "0.1.0"
+edition = "2024"
+description = "Same-checkpoint containment-current rebinding for witnessed registry heads"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
+symthaea-fabrication-witness-registry-activation = { path = "../symthaea-fabrication-witness-registry-activation" }
+symthaea-fabrication-containment-head = { path = "../symthaea-fabrication-containment-head" }
+symthaea-fabrication-containment-state-authority = { path = "../symthaea-fabrication-containment-state-authority" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
