@@ -1,0 +1,135 @@
+name: SPINE-000B Influence Oracle
+
+on:
+  pull_request:
+    branches:
+      - research/spine-000-causal-census
+    paths:
+      - '.github/workflows/spine-000b-influence-oracle.yml'
+      - 'scripts/spine_000b_influence_oracle.py'
+      - 'docs/research/SPINE_000B_PROPOSAL_INFLUENCE_CONTRACT.md'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  oracle:
+    name: Independent leave-one-out oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > /tmp/spine_000b_expected_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_000b_pre_status
+          test ! -s /tmp/spine_000b_pre_status
+
+      - name: Syntax compile oracle
+        run: python3 -m py_compile scripts/spine_000b_influence_oracle.py
+
+      - name: Run independent oracle negative controls
+        run: python3 scripts/spine_000b_influence_oracle.py --self-test
+
+      - name: Exercise canonical fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000b-oracle
+          cat > artifacts/spine-000b-oracle/input.json <<'JSON'
+          {
+            "cycle_number": 42,
+            "proposals": [
+              {
+                "subsystem_name": "alpha",
+                "confidence_delta": 0.25,
+                "lr_modulation": 1.2,
+                "exploration_delta": 0.1,
+                "arousal_delta": 0.05,
+                "valence_delta": 0.0,
+                "flags": 5
+              },
+              {
+                "subsystem_name": "beta",
+                "confidence_delta": -0.10,
+                "lr_modulation": 0.8,
+                "exploration_delta": 0.0,
+                "arousal_delta": 0.0,
+                "valence_delta": -0.1,
+                "flags": 4
+              }
+            ]
+          }
+          JSON
+          python3 scripts/spine_000b_influence_oracle.py \
+            --input artifacts/spine-000b-oracle/input.json \
+            --output artifacts/spine-000b-oracle/report.json
+
+      - name: Validate scientific boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('artifacts/spine-000b-oracle/report.json').read_text())
+          assert report['schema'] == 'symthaea.spine.000b.influence-oracle.v1'
+          assert report['authority'] == 'measurement-only'
+          assert report['causal_load_claimed'] is False
+          assert report['runtime_evidence_claimed'] is False
+          assert report['admitted_proposal_count'] == 2
+          assert [r['subsystem_name'] for r in report['receipts']] == ['alpha', 'beta']
+
+          alpha, beta = report['receipts']
+          assert alpha['uniquely_contributed_flags'] == 1
+          assert beta['uniquely_contributed_flags'] == 0
+          assert alpha['integration_changed'] is True
+          assert beta['integration_changed'] is True
+          PY
+
+      - name: Seal oracle evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_tree=$(git write-tree)"
+            echo "authority=measurement-only"
+            echo "runtime_evidence_claimed=false"
+            echo "causal_load_claimed=false"
+          } > artifacts/spine-000b-oracle/subject.txt
+          sha256sum \
+            scripts/spine_000b_influence_oracle.py \
+            docs/research/SPINE_000B_PROPOSAL_INFLUENCE_CONTRACT.md \
+            artifacts/spine-000b-oracle/input.json \
+            artifacts/spine-000b-oracle/report.json \
+            artifacts/spine-000b-oracle/subject.txt \
+            > artifacts/spine-000b-oracle/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_000b_expected_head)"
+          git status --porcelain=v1 > /tmp/spine_000b_post_status
+          test ! -s /tmp/spine_000b_post_status
+
+      - name: Upload oracle evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-influence-oracle-${{ github.sha }}
+          path: artifacts/spine-000b-oracle/
+          retention-days: 90
