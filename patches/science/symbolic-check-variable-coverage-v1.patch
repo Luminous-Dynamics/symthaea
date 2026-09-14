@@ -1,0 +1,135 @@
+diff --git a/crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs b/crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs
+--- a/crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs
++++ b/crates/core/symthaea-core/src/hdc/conjecture_engine/symbolic.rs
+@@ -215,8 +215,51 @@ impl fmt::Display for ConservationProof {
+         Ok(())
+     }
++}
++
++fn collect_conservation_variables(expr: &SymExpr, out: &mut Vec<String>) {
++    match expr {
++        SymExpr::Var(name) => out.push(name.clone()),
++        SymExpr::Const(_) => {}
++        SymExpr::Add(a, b) | SymExpr::Mul(a, b) | SymExpr::Div(a, b) => {
++            collect_conservation_variables(a, out);
++            collect_conservation_variables(b, out);
++        }
++        SymExpr::Neg(a) | SymExpr::Log(a) | SymExpr::Sin(a) | SymExpr::Cos(a) => {
++            collect_conservation_variables(a, out);
++        }
++        SymExpr::Pow(base, _) => collect_conservation_variables(base, out),
++    }
++}
++
++/// Build deterministic finite probes that bind every variable still present
++/// in the simplified chain-rule residual.
++///
++/// These probes are only a finite falsification check, not a proof that the
++/// residual is identically zero. Their purpose is to prevent the evaluator's
++/// legacy missing-variable default (`0.0`) from collapsing multivariate checks
++/// onto an unintended lower-dimensional slice.
++fn conservation_probe_points(total_derivative: &SymExpr) -> Vec<Vec<(String, f64)>> {
++    let mut variables = Vec::new();
++    collect_conservation_variables(total_derivative, &mut variables);
++    variables.sort();
++    variables.dedup();
++
++    const BASES: [f64; 6] = [0.37, 0.71, 1.13, 1.59, 2.03, 2.47];
++    (0..BASES.len())
++        .map(|probe_index| {
++            variables
++                .iter()
++                .enumerate()
++                .map(|(variable_index, name)| {
++                    let base = BASES[(probe_index + variable_index) % BASES.len()];
++                    (name.clone(), base + 0.113 * variable_index as f64)
++                })
++                .collect()
++        })
++        .collect()
+ }
+ 
+ pub fn verify_conservation_symbolic(
+     energy: &SymExpr,
+     dynamics: &[(&str, SymExpr)],
+ ) -> ConservationProof {
+@@ -224,26 +267,27 @@ pub fn verify_conservation_symbolic(
+     for (var, dvar_dt) in dynamics {
+         let partial = energy.diff(var).simplify();
+         let term = SymExpr::Mul(Box::new(partial), Box::new(dvar_dt.clone()));
+         total_deriv = SymExpr::Add(Box::new(total_deriv), Box::new(term));
+     }
+     let total_deriv = total_deriv.simplify();
+-    let test_points: Vec<Vec<(&str, f64)>> = vec![
+-        vec![("x", 1.0), ("v", 0.0)],
+-        vec![("x", 0.0), ("v", 1.0)],
+-        vec![
+-            ("x", std::f64::consts::FRAC_1_SQRT_2),
+-            ("v", std::f64::consts::FRAC_1_SQRT_2),
+-        ],
+-        vec![("x", -1.0), ("v", 0.5)],
+-        vec![("x", 0.3), ("v", -0.9)],
+-        vec![("x", 2.0), ("v", -1.5)],
+-    ];
++    let test_points = conservation_probe_points(&total_deriv);
+     let max_residual = test_points
+         .iter()
+-        .map(|pt| total_deriv.eval(pt).abs())
++        .map(|point| {
++            let bindings: Vec<(&str, f64)> = point
++                .iter()
++                .map(|(name, value)| (name.as_str(), *value))
++                .collect();
++            let residual = total_deriv.eval(&bindings).abs();
++            if residual.is_finite() {
++                residual
++            } else {
++                f64::INFINITY
++            }
++        })
+         .fold(0.0f64, f64::max);
+ 
+     ConservationProof {
+         quantity: format!("{}", energy),
+         total_derivative: format!("{}", total_deriv),
+         is_conserved: max_residual < 1e-10,
+@@ -336,3 +380,39 @@ pub struct DerivativeVerification {
+     pub max_relative_error: f64,
+     pub is_consistent: bool,
+ }
++
++#[cfg(test)]
++mod conservation_verification_tests {
++    use super::*;
++
++    #[test]
++    fn multivariate_residual_cannot_pass_via_missing_variable_zero_fill() {
++        let energy = SymExpr::Var("x".into());
++        let dynamics = [
++            ("x", SymExpr::Var("y".into())),
++            ("y", SymExpr::Const(1.0)),
++        ];
++
++        let proof = verify_conservation_symbolic(&energy, &dynamics);
++
++        assert_eq!(proof.total_derivative, "y");
++        assert!(!proof.is_conserved);
++        assert!(proof.max_numerical_residual > 1e-10);
++    }
++
++    #[test]
++    fn harmonic_conservation_still_passes_with_complete_probe_bindings() {
++        let energy = SymExpr::Add(
++            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("x".into())), 2.0)),
++            Box::new(SymExpr::Pow(Box::new(SymExpr::Var("v".into())), 2.0)),
++        );
++        let dynamics = [
++            ("x", SymExpr::Var("v".into())),
++            ("v", SymExpr::Neg(Box::new(SymExpr::Var("x".into())))),
++        ];
++
++        let proof = verify_conservation_symbolic(&energy, &dynamics);
++
++        assert!(proof.is_conserved, "{proof}");
++    }
++}
