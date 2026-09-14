@@ -9,9 +9,9 @@ ASSURE-002B is constructed from two independently qualified parents:
 - campaign parent: `8f619541528362a30e7caf432eaf256a64e302e8`;
 - shared-semantics parent: `a95bbb2d0eac395b1d734e1031f9209240f3b8d6`.
 
-The convergence writer imports `crates/core/symthaea-assurance-semantics` byte-for-byte from the qualified shared-semantics parent and refuses publication if Rust 1.96 formatting changes that subtree. The campaign-local semantic commitment implementation is removed; the shared schema-bearing semantic commitment becomes authoritative.
+The candidate product tree contains the `crates/core/symthaea-assurance-semantics` subtree byte-for-byte from the qualified shared-semantics parent. The campaign-local semantic commitment implementation is removed; the shared schema-bearing semantic commitment becomes authoritative.
 
-The writer is process scaffolding only. It executes no candidate Symthaea code with write authority and refuses to publish a product tree containing `.github/workflows/` mutations. Exact-head product qualification remains read-only.
+The product delta contains no `.github/workflows/` mutation. Temporary writer/staging branches used while deriving earlier candidate trees are historical process evidence only and are not product ancestry or qualification authority. The final candidate is an exact two-parent Git commit over the qualified inputs, and exact-head product qualification remains read-only.
 
 ## Evidence-context boundary
 
