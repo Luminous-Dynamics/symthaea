@@ -80,15 +80,19 @@ jobs:
           assert not re.search(r"^\s*pub\s+\w+\s*:", struct_body, re.MULTILINE)
 
           # `pub(super)` is intentionally narrower than crate-public, but every
-          # sibling under `butlin` can still see the reconstruction theorem.
-          # Audit the *entire* non-test Butlin source tree so a future sibling
-          # cannot become a second minting/report-projection path. The workflow
-          # path filter above deliberately triggers on every Butlin Rust change.
+          # sibling/descendant under `butlin` can still see the reconstruction
+          # theorem. Audit the entire non-test Butlin Rust tree so a future
+          # module cannot become a second minting/report-projection path. The
+          # workflow path filter above deliberately covers the same recursive
+          # source tree.
           def non_test_source(path):
               text = path.read_text()
               return text.split("\n#[cfg(test)]", 1)[0]
 
-          sources = {path.name: non_test_source(path) for path in butlin_dir.glob("*.rs")}
+          sources = {
+              path.relative_to(butlin_dir).as_posix(): non_test_source(path)
+              for path in butlin_dir.rglob("*.rs")
+          }
           mint_symbol = "verify_gwt1_final_reconstruction_v1("
           mint_sites = {
               name: text.count(mint_symbol)
