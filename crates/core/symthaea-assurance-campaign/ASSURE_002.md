@@ -112,18 +112,21 @@ A registration with a valid successor is superseded automatically. Only the uniq
 
 ## Evidence production is distinct from evidence admission
 
-ASSURE-002 separates one monotonic campaign event chain:
+Each admitted evidence item must satisfy:
 
 ```text
-registration
-    < production[1]
-    < admission[1]
-    < production[2]
-    < admission[2]
-    < ...
+registration < production[i] < admission[i]
 ```
 
-All ordered events in one ledger use the same source + validation profile + epoch lineage.
+while the authoritative ledger itself requires:
+
+```text
+registration < admission[1] < admission[2] < admission[3] < ...
+```
+
+All comparable events use one exact ordering source + validation profile + epoch lineage.
+
+Evidence production does **not** have to occur after the previous evidence admission. Multiple workers may legitimately produce evidence concurrently or in batches after preregistration, and those already-produced artifacts may later be admitted one by one. What must never regress is the authoritative admission history.
 
 The production ordering statement binds:
 
@@ -134,13 +137,11 @@ The production ordering statement binds:
 
 Evidence produced before or at the registration sequence is classified `ProducedBeforeOrAtRegistration`. Evidence from another source/profile/epoch is `IncomparableOrderingLineage`. Neither can enter the preregistered ledger.
 
-After the first admission, later production must also be strictly later than the ledger's previous admission ordering. It is therefore impossible for append-only ledger position to move forward while the external ordering lineage moves backward.
-
 These records may still be retained elsewhere as post-hoc evidence; ASSURE-002 merely refuses to label them preregistered.
 
 ## Append-only evidence admission
 
-`CampaignEvidenceLedgerV1` begins from the exact empty root bound into the current registration and from the registration's exact ordering receipt as its initial ordering head.
+`CampaignEvidenceLedgerV1` begins from the exact empty root bound into the current registration. The registration ordering receipt is also the initial admission-ordering head.
 
 Each admitted item requires:
 
@@ -148,11 +149,14 @@ Each admitted item requires:
 2. the exact current campaign plan;
 3. an evidence kind registered by the plan;
 4. no duplicate evidence ID or exact evidence digest;
-5. a production statement ordered after registration and after the ledger's previous ordering head;
-6. an admission statement binding the current evidence root, next ordinal, exact evidence digest, previous ordering head, and production-ordering receipt;
-7. admission ordering strictly later than production ordering.
+5. a production statement ordered after the current registration;
+6. an admission statement binding the current evidence root, next ordinal, exact evidence digest, previous admission-ordering head, and production-ordering receipt;
+7. admission ordering strictly later than the evidence's production ordering;
+8. admission ordering strictly later than the ledger's previous admission ordering.
 
-Successful admission produces a new content-addressed root that commits the previous root, ordinal, evidence digest, production-ordering digest, and admission-ordering digest. The admission ordering then becomes the ledger's new ordering head.
+Successful admission produces a new content-addressed root that commits the previous root, ordinal, evidence digest, production-ordering digest, and admission-ordering digest. The admission ordering becomes the ledger's new ordering head.
+
+This permits concurrent production but prevents two successful admissions from occupying the same or regressing ordering position.
 
 An evidence ledger created under a superseded registration cannot be reused with a successor registration.
 
