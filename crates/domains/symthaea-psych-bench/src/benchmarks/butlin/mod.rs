@@ -32,6 +32,9 @@ pub mod gwt1_evidence_envelope;
 pub mod gwt1_end_to_end;
 pub mod gwt1_promotion;
 pub mod gwt1_qualification;
+#[cfg(feature = "trusted-resolution-authority")]
+#[doc(hidden)]
+pub mod gwt1_trusted_resolution;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
@@ -93,6 +96,12 @@ pub use gwt1_qualification::{
     GWT1_REQUIRED_WORKERS_V1, GWT1_SPECIALISTS_V1, Gwt1PerturbationObservationV1,
     Gwt1QualificationFailureV1, Gwt1QualificationOutcomeV1, Gwt1QualificationResolutionV1,
     Gwt1SpecialistIdentityV1, Gwt1SpecialistQualificationReceiptV1, resolve_gwt1_v1,
+};
+#[cfg(feature = "trusted-resolution-authority")]
+#[doc(hidden)]
+pub use gwt1_trusted_resolution::{
+    GWT1_TRUSTED_RESOLUTION_CANDIDATE_SCHEMA_V1, Gwt1TrustedResolutionCandidateErrorV1,
+    Gwt1TrustedResolutionCandidateV1, generate_gwt1_trusted_resolution_candidate_v1,
 };
 pub use indicators::ButlinIndicatorSuite;
 pub use qualification_design::{
