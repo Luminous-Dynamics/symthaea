@@ -10,4 +10,5 @@ description = "Preregistered qualification campaign and evidence-admission seman
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 symthaea-assurance-core = { path = "../symthaea-assurance-core" }
+symthaea-assurance-semantics = { path = "../symthaea-assurance-semantics" }
 symthaea-assurance-subject = { path = "../symthaea-assurance-subject" }

@@ -401,6 +401,14 @@ impl EvidenceArtifact {
         &self.evidence_id
     }
 
+    pub fn subject_id(&self) -> &DigestSha256 {
+        &self.subject_id
+    }
+
+    pub fn claim_digest(&self) -> &DigestSha256 {
+        &self.claim_digest
+    }
+
     pub fn kind(&self) -> &EvidenceKind {
         &self.kind
     }
