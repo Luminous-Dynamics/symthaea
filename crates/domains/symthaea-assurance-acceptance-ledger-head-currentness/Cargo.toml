@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-acceptance-ledger-head-currentness"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Authenticated current-head assurance for append-only attestation acceptance ledgers"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "attestation", "assurance", "currentness"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-tpm2-attestation-possession = { path = "../symthaea-assurance-tpm2-attestation-possession" }
