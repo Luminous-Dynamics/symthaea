@@ -7,6 +7,7 @@ on:
       - "Cargo.lock"
       - "src/**"
       - "crates/**"
+      - ".github/eureka/**"
       - ".github/workflows/eureka-v2-backend-qualification.yml"
   workflow_dispatch:
 
@@ -24,8 +25,9 @@ env:
   SCCACHE_DISABLE: "1"
   EUREKA_V2_QUALIFICATION_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"
   EUREKA_V2_RECEIPT_SCHEMA_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"
-  EUREKA_V2_COMMAND_CONTRACT_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v1"
+  EUREKA_V2_COMMAND_CONTRACT_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"
   EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
 
 jobs:
   qualify-eureka-v2-backend:
@@ -35,18 +37,19 @@ jobs:
 
     steps:
       - name: Checkout exact subject
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 1
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # pinned master commit
         with:
+          toolchain: 1.96.0
           components: clippy
 
       - name: Cache cargo registry and target
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -82,21 +85,32 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "$EUREKA_GITHUB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "github.workflow_sha is not a canonical commit identity" >&2
+            exit 1
+          fi
+          if ! git cat-file -e "${EUREKA_GITHUB_WORKFLOW_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$EUREKA_GITHUB_WORKFLOW_SHA"
+          fi
+
           subject_tree="$(git rev-parse 'HEAD^{tree}')"
           cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
           workflow_path=".github/workflows/eureka-v2-backend-qualification.yml"
+          contract_path=".github/eureka/eureka-v2-backend-qualification-contract.sh"
           workflow_sha256="$(sha256sum "$workflow_path" | awk '{print $1}')"
+          interpreted_workflow_sha256="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
+          command_contract_sha256="$(sha256sum "$contract_path" | awk '{print $1}')"
           receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.env"
-          contract="${RUNNER_TEMP}/eureka-v2-backend-qualification-contract.txt"
-
-          cat > "$contract" <<'EOF'
-          cargo check -p symthaea-psych-bench --features symthaea-backend --lib --tests
-          cargo test -p symthaea-psych-bench --features symthaea-backend --lib benchmarks::eureka -- --nocapture
-          cargo clippy -p symthaea-psych-bench --features symthaea-backend --lib --tests -- -D warnings
-          EOF
-          command_contract_sha256="$(sha256sum "$contract" | awk '{print $1}')"
           rustc_version="$(rustc --version)"
           cargo_version="$(cargo --version)"
+
+          if [[ "$workflow_sha256" != "$interpreted_workflow_sha256" ]]; then
+            echo "Checked-out qualifier workflow bytes differ from the workflow GitHub interpreted" >&2
+            echo "subject_workflow_sha256=$workflow_sha256" >&2
+            echo "interpreted_workflow_sha256=$interpreted_workflow_sha256" >&2
+            echo "github_workflow_sha=$EUREKA_GITHUB_WORKFLOW_SHA" >&2
+            exit 1
+          fi
 
           echo "EUREKA_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
           echo "EUREKA_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
@@ -104,7 +118,7 @@ jobs:
           echo "EUREKA_WORKFLOW_SHA256=$workflow_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_COMMAND_CONTRACT_SHA256=$command_contract_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_QUALIFICATION_RECEIPT=$receipt" >> "$GITHUB_ENV"
-          echo "EUREKA_QUALIFICATION_CONTRACT=$contract" >> "$GITHUB_ENV"
+          echo "EUREKA_QUALIFICATION_CONTRACT=$contract_path" >> "$GITHUB_ENV"
 
           {
             printf 'receipt_schema_revision=%s\n' "$EUREKA_V2_RECEIPT_SCHEMA_REVISION"
@@ -134,17 +148,17 @@ jobs:
       - name: Check backend-feature compilation
         run: |
           set -euo pipefail
-          cargo check -p symthaea-psych-bench --features symthaea-backend --lib --tests
+          bash "$EUREKA_QUALIFICATION_CONTRACT" check
 
       - name: Run EUREKA backend unit tests
         run: |
           set -euo pipefail
-          cargo test -p symthaea-psych-bench --features symthaea-backend --lib benchmarks::eureka -- --nocapture
+          bash "$EUREKA_QUALIFICATION_CONTRACT" test
 
       - name: Strict Clippy for backend test surface
         run: |
           set -euo pipefail
-          cargo clippy -p symthaea-psych-bench --features symthaea-backend --lib --tests -- -D warnings
+          bash "$EUREKA_QUALIFICATION_CONTRACT" clippy
 
       - name: Verify exact-subject postflight and seal PASS receipt
         shell: bash
@@ -156,6 +170,7 @@ jobs:
           current_tree="$(git rev-parse 'HEAD^{tree}')"
           current_lock="$(sha256sum Cargo.lock | awk '{print $1}')"
           current_workflow="$(sha256sum "$workflow_path" | awk '{print $1}')"
+          current_interpreted_workflow="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
           current_contract="$(sha256sum "$EUREKA_QUALIFICATION_CONTRACT" | awk '{print $1}')"
 
           [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
@@ -176,6 +191,10 @@ jobs:
           }
           [[ "$current_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || {
             echo "Qualifier workflow changed during qualification" >&2
+            exit 1
+          }
+          [[ "$current_interpreted_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || {
+            echo "GitHub-interpreted qualifier workflow no longer matches the trusted subject workflow bytes" >&2
             exit 1
           }
           [[ "$current_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]] || {
@@ -246,11 +265,11 @@ jobs:
 
       - name: Upload exact qualification receipt and contract
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: eureka-v2-backend-qualification-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/eureka-v2-backend-qualification.env
-            ${{ runner.temp }}/eureka-v2-backend-qualification-contract.txt
+            .github/eureka/eureka-v2-backend-qualification-contract.sh
           if-no-files-found: error
           retention-days: 90
