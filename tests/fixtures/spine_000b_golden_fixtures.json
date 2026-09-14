@@ -1,0 +1,876 @@
+[
+  {
+    "cycle_number": 1,
+    "description": "0 contributors (empty collector)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 0,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 0,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 0,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 1,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 0,
+        "valence_delta_bits": 0
+      },
+      "receipts": [],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [],
+    "name": "case_00_empty"
+  },
+  {
+    "cycle_number": 2,
+    "description": "1 contributor (confidence delta only)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.25,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4598175219545276416,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 1,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 2,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4598175219545276416,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "confidence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "confidence_delta": 0.25,
+        "subsystem_name": "sub_a"
+      }
+    ],
+    "name": "case_01_single_confidence"
+  },
+  {
+    "cycle_number": 3,
+    "description": "1 contributor (LR modulation only)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4609434218613702656,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.5,
+      "n_contributors": 1,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 3,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4609434218613702656,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "lr_modulation_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4609434218613702656,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4609434218613702656,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "lr_modulation": 1.5,
+        "subsystem_name": "sub_a"
+      }
+    ],
+    "name": "case_02_single_lr"
+  },
+  {
+    "cycle_number": 4,
+    "description": "1 contributor (flag only)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 4,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 4,
+      "lr_modulation": 1.0,
+      "n_contributors": 1,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 4,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 4,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 4
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "flags": 4,
+        "subsystem_name": "sub_a"
+      }
+    ],
+    "name": "case_03_single_flag"
+  },
+  {
+    "cycle_number": 5,
+    "description": "2 contributors (equal confidence delta)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.25,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4598175219545276416,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 2,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 5,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4598175219545276416,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": false,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": false,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "confidence_delta": 0.25,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "confidence_delta": 0.25,
+        "subsystem_name": "sub_b"
+      }
+    ],
+    "name": "case_04_two_equal_confidence"
+  },
+  {
+    "cycle_number": 6,
+    "description": "2 contributors (unequal confidence delta)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 2,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 6,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "confidence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 13821547256400052224,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4598175219545276416,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 13821547256400052224,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "confidence_delta": 0.25,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "confidence_delta": -0.25,
+        "subsystem_name": "sub_b"
+      }
+    ],
+    "name": "case_05_two_unequal_confidence"
+  },
+  {
+    "cycle_number": 7,
+    "description": "2 contributors (overlapping and unique flags)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 5,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 5,
+      "lr_modulation": 1.0,
+      "n_contributors": 2,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 7,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 5,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 5,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 5,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 1
+        },
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 5,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 5,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": false,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "flags": 5,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "flags": 4,
+        "subsystem_name": "sub_b"
+      }
+    ],
+    "name": "case_06_two_mixed_flags"
+  },
+  {
+    "cycle_number": 8,
+    "description": "4 contributors (multi-subsystem mixed signals)",
+    "expected_integrated": {
+      "arousal_delta": 0.012500000186264515,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 1011666125,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 4585565140588639027,
+        "flags": 7,
+        "lr_modulation_bits": 4607344584530892508,
+        "n_contributors": 4,
+        "valence_delta_bits": 3167538381
+      },
+      "exploration_delta": 0.0375,
+      "flags": 7,
+      "lr_modulation": 1.0360080256445405,
+      "n_contributors": 4,
+      "valence_delta": -0.02500000037252903
+    },
+    "expected_report": {
+      "admitted_proposal_count": 4,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 8,
+      "integrated_all": {
+        "arousal_delta_bits": 1011666125,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 4585565140588639027,
+        "flags": 7,
+        "lr_modulation_bits": 4607344584530892508,
+        "n_contributors": 4,
+        "valence_delta_bits": 3167538381
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1011666125,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4585565140588639027,
+            "flags": 7,
+            "lr_modulation_bits": 4607344584530892508,
+            "n_contributors": 4,
+            "valence_delta_bits": 3167538381
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 13808336697493098769,
+            "exploration_delta_bits": 4587366580439587225,
+            "flags": 6,
+            "lr_modulation_bits": 4607060684968453475,
+            "n_contributors": 3,
+            "valence_delta_bits": 3171453065
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 1028443341,
+            "confidence_delta_bits": 4591870180066957722,
+            "exploration_delta_bits": 0,
+            "flags": 1,
+            "is_neutral": false,
+            "lr_modulation_bits": 4608083138725491507,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "manager_alpha",
+          "uniquely_contributed_flags": 1
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1011666125,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4585565140588639027,
+            "flags": 7,
+            "lr_modulation_bits": 4607344584530892508,
+            "n_contributors": 4,
+            "valence_delta_bits": 3167538381
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 1015580809,
+            "confidence_delta_bits": 13812840297120469265,
+            "exploration_delta_bits": 4587366580439587225,
+            "flags": 5,
+            "lr_modulation_bits": 4607764478583459885,
+            "n_contributors": 3,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4596373779694328218,
+            "exploration_delta_bits": 0,
+            "flags": 2,
+            "is_neutral": false,
+            "lr_modulation_bits": 4605380978949069210,
+            "valence_delta_bits": 3184315597
+          },
+          "subsystem_name": "manager_beta",
+          "uniquely_contributed_flags": 2
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1011666125,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4585565140588639027,
+            "flags": 7,
+            "lr_modulation_bits": 4607344584530892508,
+            "n_contributors": 4,
+            "valence_delta_bits": 3167538381
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 1015580809,
+            "confidence_delta_bits": 4593971859893063953,
+            "exploration_delta_bits": 4587366580439587225,
+            "flags": 7,
+            "lr_modulation_bits": 4607399927159204360,
+            "n_contributors": 3,
+            "valence_delta_bits": 3171453065
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 13824249416176474522,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "manager_delta",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1011666125,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4585565140588639027,
+            "flags": 7,
+            "lr_modulation_bits": 4607344584530892508,
+            "n_contributors": 4,
+            "valence_delta_bits": 3167538381
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 1015580809,
+            "confidence_delta_bits": 13808336697493098769,
+            "exploration_delta_bits": 0,
+            "flags": 3,
+            "lr_modulation_bits": 4607060684968453475,
+            "n_contributors": 3,
+            "valence_delta_bits": 3171453065
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4591870180066957722,
+            "exploration_delta_bits": 4594572339843380019,
+            "flags": 4,
+            "is_neutral": false,
+            "lr_modulation_bits": 4608083138725491507,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "manager_gamma",
+          "uniquely_contributed_flags": 4
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "arousal_delta": 0.05,
+        "confidence_delta": 0.1,
+        "flags": 1,
+        "lr_modulation": 1.2,
+        "subsystem_name": "manager_alpha"
+      },
+      {
+        "confidence_delta": 0.2,
+        "flags": 2,
+        "lr_modulation": 0.8,
+        "subsystem_name": "manager_beta",
+        "valence_delta": -0.1
+      },
+      {
+        "confidence_delta": 0.1,
+        "exploration_delta": 0.15,
+        "flags": 4,
+        "lr_modulation": 1.2,
+        "subsystem_name": "manager_gamma"
+      },
+      {
+        "confidence_delta": -0.4,
+        "flags": 0,
+        "lr_modulation": 1.0,
+        "subsystem_name": "manager_delta"
+      }
+    ],
+    "name": "case_07_n_contributors_multi"
+  }
+]
