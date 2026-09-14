@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use super::report::{ButlinIndicatorReport, EvidenceOutcome, SupportTier};
 use super::resolution_view::{
     EvidenceLineageIdentityV1, EvidenceLineageKindV1, EvidenceOutcomeCountsV1,
-    EvidenceResolutionViewErrorV1, base_report_blake3_v1,
+    EvidenceResolutionViewErrorV1, IndicatorOutcomeOverlayV1, base_report_blake3_v1,
 };
 
 pub const BUTLIN_RESOLVED_EVIDENCE_VIEW_SCHEMA_V2: &str =
@@ -119,7 +119,7 @@ impl std::fmt::Display for EvidenceResolutionViewErrorV2 {
                 resolved_outcome,
             } => write!(
                 f,
-                "direct lineage must resolve exactly to its own capped outcome: lineage={lineage_outcome:?}, resolved={resolved_outcome:?}"
+                "direct lineage resolution is invalid: lineage={lineage_outcome:?}, resolved={resolved_outcome:?}"
             ),
             Self::InvalidCausalResolution {
                 base_outcome,
@@ -149,20 +149,32 @@ fn validate_transition(
     item: &IndicatorEvidenceLineageV2,
 ) -> Result<(), EvidenceResolutionViewErrorV2> {
     match item.lineage.kind {
-        EvidenceLineageKindV1::DirectQualification => {
-            if item.lineage_outcome != item.resolved_outcome
-                || matches!(
-                    item.lineage_outcome,
-                    EvidenceOutcome::Supported(SupportTier::CausallySupported)
-                        | EvidenceOutcome::Supported(SupportTier::FunctionallySupported)
-                )
-            {
+        EvidenceLineageKindV1::DirectQualification => match item.lineage_outcome {
+            EvidenceOutcome::Supported(SupportTier::Observed) => {
+                if item.resolved_outcome != EvidenceOutcome::Supported(SupportTier::Observed) {
+                    return Err(EvidenceResolutionViewErrorV2::InvalidDirectResolution {
+                        lineage_outcome: item.lineage_outcome,
+                        resolved_outcome: item.resolved_outcome,
+                    });
+                }
+            }
+            EvidenceOutcome::NotDemonstrated
+            | EvidenceOutcome::Contradicted
+            | EvidenceOutcome::Inconclusive => {
+                if item.resolved_outcome != item.base_outcome {
+                    return Err(EvidenceResolutionViewErrorV2::InvalidDirectResolution {
+                        lineage_outcome: item.lineage_outcome,
+                        resolved_outcome: item.resolved_outcome,
+                    });
+                }
+            }
+            EvidenceOutcome::Supported(_) => {
                 return Err(EvidenceResolutionViewErrorV2::InvalidDirectResolution {
                     lineage_outcome: item.lineage_outcome,
                     resolved_outcome: item.resolved_outcome,
                 });
             }
-        }
+        },
         EvidenceLineageKindV1::CausalQualification => match item.lineage_outcome {
             EvidenceOutcome::Supported(SupportTier::CausallySupported) => {
                 if item.base_outcome != EvidenceOutcome::Supported(SupportTier::Observed)
@@ -284,6 +296,53 @@ fn resolve_validated_lineages_v2(
     })
 }
 
+fn direct_lineage_from_v1(direct: IndicatorOutcomeOverlayV1) -> IndicatorEvidenceLineageV2 {
+    IndicatorEvidenceLineageV2 {
+        indicator_id: direct.indicator_id,
+        base_outcome: direct.base_outcome,
+        lineage_outcome: direct.lineage_outcome,
+        resolved_outcome: direct.resolved_outcome,
+        lineage: direct.lineage,
+    }
+}
+
+fn causal_lineage_from_v1(
+    direct: &IndicatorEvidenceLineageV2,
+    causal: IndicatorOutcomeOverlayV1,
+) -> Result<IndicatorEvidenceLineageV2, EvidenceResolutionViewErrorV2> {
+    let lineage_outcome = causal.lineage_outcome;
+    let resolved_outcome = match lineage_outcome {
+        EvidenceOutcome::Supported(SupportTier::CausallySupported) => {
+            if direct.resolved_outcome != EvidenceOutcome::Supported(SupportTier::Observed) {
+                return Err(EvidenceResolutionViewErrorV2::InvalidCausalResolution {
+                    base_outcome: direct.resolved_outcome,
+                    lineage_outcome,
+                    resolved_outcome: causal.resolved_outcome,
+                });
+            }
+            causal.resolved_outcome
+        }
+        EvidenceOutcome::NotDemonstrated
+        | EvidenceOutcome::Contradicted
+        | EvidenceOutcome::Inconclusive => direct.resolved_outcome,
+        EvidenceOutcome::Supported(_) => {
+            return Err(EvidenceResolutionViewErrorV2::InvalidCausalResolution {
+                base_outcome: direct.resolved_outcome,
+                lineage_outcome,
+                resolved_outcome: causal.resolved_outcome,
+            });
+        }
+    };
+
+    Ok(IndicatorEvidenceLineageV2 {
+        indicator_id: causal.indicator_id,
+        base_outcome: direct.resolved_outcome,
+        lineage_outcome,
+        resolved_outcome,
+        lineage: causal.lineage,
+    })
+}
+
 #[cfg(feature = "symthaea-backend")]
 pub fn resolve_gwt1_evidence_view_v2(
     report: &ButlinIndicatorReport,
@@ -298,16 +357,7 @@ pub fn resolve_gwt1_evidence_view_v2(
             kind: EvidenceLineageKindV1::DirectQualification,
         })?;
 
-    resolve_validated_lineages_v2(
-        report,
-        vec![IndicatorEvidenceLineageV2 {
-            indicator_id: direct.indicator_id,
-            base_outcome: direct.base_outcome,
-            lineage_outcome: direct.resolved_outcome,
-            resolved_outcome: direct.resolved_outcome,
-            lineage: direct.lineage,
-        }],
-    )
+    resolve_validated_lineages_v2(report, vec![direct_lineage_from_v1(direct)])
 }
 
 #[cfg(feature = "symthaea-backend")]
@@ -340,36 +390,8 @@ pub fn resolve_gwt1_causal_evidence_view_v2(
         kind: EvidenceLineageKindV1::CausalQualification,
     })?;
 
-    let direct_v2 = IndicatorEvidenceLineageV2 {
-        indicator_id: direct.indicator_id.clone(),
-        base_outcome: direct.base_outcome,
-        lineage_outcome: direct.resolved_outcome,
-        resolved_outcome: direct.resolved_outcome,
-        lineage: direct.lineage,
-    };
-
-    let causal_lineage_outcome = causal.resolved_outcome;
-    let causal_resolved_outcome = match causal_lineage_outcome {
-        EvidenceOutcome::Supported(SupportTier::CausallySupported) => causal_lineage_outcome,
-        EvidenceOutcome::NotDemonstrated
-        | EvidenceOutcome::Contradicted
-        | EvidenceOutcome::Inconclusive => direct_v2.resolved_outcome,
-        EvidenceOutcome::Supported(_) => {
-            return Err(EvidenceResolutionViewErrorV2::InvalidCausalResolution {
-                base_outcome: direct_v2.resolved_outcome,
-                lineage_outcome: causal_lineage_outcome,
-                resolved_outcome: causal_lineage_outcome,
-            });
-        }
-    };
-
-    let causal_v2 = IndicatorEvidenceLineageV2 {
-        indicator_id: causal.indicator_id,
-        base_outcome: direct_v2.resolved_outcome,
-        lineage_outcome: causal_lineage_outcome,
-        resolved_outcome: causal_resolved_outcome,
-        lineage: causal.lineage,
-    };
+    let direct_v2 = direct_lineage_from_v1(direct);
+    let causal_v2 = causal_lineage_from_v1(&direct_v2, causal)?;
 
     resolve_validated_lineages_v2(report, vec![direct_v2, causal_v2])
 }
@@ -408,6 +430,39 @@ mod tests {
         ])
     }
 
+    fn identity(kind: EvidenceLineageKindV1) -> EvidenceLineageIdentityV1 {
+        EvidenceLineageIdentityV1 {
+            kind,
+            method_id: "method-v1".to_string(),
+            policy_id: Some("policy-v1".to_string()),
+            source_commit_sha: "a".repeat(40),
+            source_tree_sha: "b".repeat(40),
+            execution_run_id: "run-1".to_string(),
+            toolchain: "rustc test".to_string(),
+            artifact: EvidenceArtifactIdentityV1 {
+                schema: "artifact-v1".to_string(),
+                digest_algorithm: if kind == EvidenceLineageKindV1::DirectQualification {
+                    "blake3".to_string()
+                } else {
+                    "sha256".to_string()
+                },
+                digest: "c".repeat(64),
+                byte_len: 64,
+            },
+            authority: if kind == EvidenceLineageKindV1::CausalQualification {
+                Some(EvidenceAuthorityIdentityV1 {
+                    repository: "Luminous-Dynamics/symthaea".to_string(),
+                    workflow: ".github/workflows/trusted.yml".to_string(),
+                    workflow_sha: "d".repeat(40),
+                    attestation_bundle_sha256: "e".repeat(64),
+                    attestation_verification_sha256: "f".repeat(64),
+                })
+            } else {
+                None
+            },
+        }
+    }
+
     fn lineage(
         kind: EvidenceLineageKindV1,
         base_outcome: EvidenceOutcome,
@@ -419,36 +474,22 @@ mod tests {
             base_outcome,
             lineage_outcome,
             resolved_outcome,
-            lineage: EvidenceLineageIdentityV1 {
-                kind,
-                method_id: "method-v1".to_string(),
-                policy_id: Some("policy-v1".to_string()),
-                source_commit_sha: "a".repeat(40),
-                source_tree_sha: "b".repeat(40),
-                execution_run_id: "run-1".to_string(),
-                toolchain: "rustc test".to_string(),
-                artifact: EvidenceArtifactIdentityV1 {
-                    schema: "artifact-v1".to_string(),
-                    digest_algorithm: if kind == EvidenceLineageKindV1::DirectQualification {
-                        "blake3".to_string()
-                    } else {
-                        "sha256".to_string()
-                    },
-                    digest: "c".repeat(64),
-                    byte_len: 64,
-                },
-                authority: if kind == EvidenceLineageKindV1::CausalQualification {
-                    Some(EvidenceAuthorityIdentityV1 {
-                        repository: "Luminous-Dynamics/symthaea".to_string(),
-                        workflow: ".github/workflows/trusted.yml".to_string(),
-                        workflow_sha: "d".repeat(40),
-                        attestation_bundle_sha256: "e".repeat(64),
-                        attestation_verification_sha256: "f".repeat(64),
-                    })
-                } else {
-                    None
-                },
-            },
+            lineage: identity(kind),
+        }
+    }
+
+    fn overlay_v1(
+        kind: EvidenceLineageKindV1,
+        base_outcome: EvidenceOutcome,
+        lineage_outcome: EvidenceOutcome,
+        resolved_outcome: EvidenceOutcome,
+    ) -> IndicatorOutcomeOverlayV1 {
+        IndicatorOutcomeOverlayV1 {
+            indicator_id: "GWT-1".to_string(),
+            base_outcome,
+            lineage_outcome,
+            resolved_outcome,
+            lineage: identity(kind),
         }
     }
 
@@ -462,6 +503,94 @@ mod tests {
     }
 
     #[test]
+    fn v1_direct_negative_conversion_preserves_method_outcome_and_support_floor() {
+        for outcome in [
+            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Contradicted,
+            EvidenceOutcome::Inconclusive,
+        ] {
+            let converted = direct_lineage_from_v1(overlay_v1(
+                EvidenceLineageKindV1::DirectQualification,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+                outcome,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            ));
+            assert_eq!(converted.lineage_outcome, outcome);
+            assert_eq!(
+                converted.resolved_outcome,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly)
+            );
+            validate_transition(&converted).expect("valid converted direct negative");
+        }
+    }
+
+    #[test]
+    fn v1_causal_negative_conversion_preserves_method_outcome_and_observed_floor() {
+        let direct = observed_direct();
+        for outcome in [
+            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Contradicted,
+            EvidenceOutcome::Inconclusive,
+        ] {
+            let converted = causal_lineage_from_v1(
+                &direct,
+                overlay_v1(
+                    EvidenceLineageKindV1::CausalQualification,
+                    EvidenceOutcome::Supported(SupportTier::Observed),
+                    outcome,
+                    EvidenceOutcome::Supported(SupportTier::Observed),
+                ),
+            )
+            .expect("valid converted causal negative");
+            assert_eq!(converted.lineage_outcome, outcome);
+            assert_eq!(
+                converted.resolved_outcome,
+                EvidenceOutcome::Supported(SupportTier::Observed)
+            );
+            validate_transition(&converted).expect("valid causal transition");
+        }
+    }
+
+    #[test]
+    fn paired_negative_methods_preserve_both_results_and_architectural_floor() {
+        let direct = direct_lineage_from_v1(overlay_v1(
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        ));
+        let causal = causal_lineage_from_v1(
+            &direct,
+            overlay_v1(
+                EvidenceLineageKindV1::CausalQualification,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+                EvidenceOutcome::Contradicted,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            ),
+        )
+        .expect("negative causal result does not require direct Observed");
+        let view = resolve_validated_lineages_v2(&report(), vec![direct, causal])
+            .expect("paired negative methods remain representable");
+        assert_eq!(view.lineages[0].lineage_outcome, EvidenceOutcome::NotDemonstrated);
+        assert_eq!(view.lineages[1].lineage_outcome, EvidenceOutcome::Contradicted);
+        assert_eq!(view.resolved_counts.architectural_only, 1);
+    }
+
+    #[test]
+    fn direct_architectural_only_cannot_masquerade_as_method_result() {
+        let invalid = lineage(
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        );
+        assert!(matches!(
+            resolve_validated_lineages_v2(&report(), vec![invalid]),
+            Err(EvidenceResolutionViewErrorV2::InvalidDirectResolution { .. })
+        ));
+    }
+
+    #[test]
     fn positive_causal_lineage_raises_observed_to_causal() {
         let causal = lineage(
             EvidenceLineageKindV1::CausalQualification,
@@ -472,8 +601,10 @@ mod tests {
         let view = resolve_validated_lineages_v2(&report(), vec![causal, observed_direct()])
             .expect("resolved causal chain");
         assert_eq!(view.resolved_counts.causally_supported, 1);
-        assert_eq!(view.lineages[1].lineage_outcome,
-            EvidenceOutcome::Supported(SupportTier::CausallySupported));
+        assert_eq!(
+            view.lineages[1].lineage_outcome,
+            EvidenceOutcome::Supported(SupportTier::CausallySupported)
+        );
     }
 
     #[test]
@@ -542,11 +673,11 @@ mod tests {
             EvidenceLineageKindV1::DirectQualification,
             EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
             EvidenceOutcome::NotDemonstrated,
-            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
         );
         let causal = lineage(
             EvidenceLineageKindV1::CausalQualification,
-            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
             EvidenceOutcome::Supported(SupportTier::CausallySupported),
             EvidenceOutcome::Supported(SupportTier::CausallySupported),
         );
