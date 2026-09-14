@@ -6,12 +6,14 @@ on:
       - main
       - psych-bench/typed-claim-class
       - psych-bench/direction-aware-regression
+      - psych-bench/regression-policy-manifest
     paths:
       - '.github/workflows/psych-bench-claim-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/claim_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/regression_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs'
+      - 'crates/domains/symthaea-psych-bench/tests/regression_guard.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/security/**'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
@@ -63,13 +65,15 @@ jobs:
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/claim_contract.rs \
             crates/domains/symthaea-psych-bench/src/regression_contract.rs \
-            crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs
+            crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs \
+            crates/domains/symthaea-psych-bench/tests/regression_guard.rs
 
       - name: Compile evidence contracts
         shell: bash
         run: |
           set -euo pipefail
           cargo check --locked -p symthaea-psych-bench --lib
+          cargo test --locked -p symthaea-psych-bench --test regression_guard --no-run
 
       - name: Execute claim-contract regressions
         shell: bash
@@ -89,7 +93,13 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib regression_policy_manifest::tests -- --nocapture
 
-      - name: Strict focused Clippy
+      - name: Execute migrated regression guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --test regression_guard -- --nocapture
+
+      - name: Strict focused library Clippy
         shell: bash
         run: |
           set -euo pipefail
@@ -104,6 +114,21 @@ jobs:
             crates/domains/symthaea-psych-bench/src/claim_contract.rs \
             crates/domains/symthaea-psych-bench/src/regression_contract.rs \
             crates/domains/symthaea-psych-bench/src/regression_policy_manifest.rs
+          test "$cargo_status" -eq 0
+
+      - name: Strict regression-guard Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/regression-guard-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --test regression_guard --no-deps \
+            --message-format=json > "$report"
+          cargo_status=$?
+          set -e
+          python3 scripts/ci/strict_clippy_paths.py \
+            "$report" \
+            crates/domains/symthaea-psych-bench/tests/regression_guard.rs
           test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
