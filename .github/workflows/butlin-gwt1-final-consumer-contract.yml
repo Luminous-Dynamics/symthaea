@@ -25,11 +25,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Require immutable V1 and audit V2 authority split
+      - name: Require immutable V1/V2 archive profiles and audit authority split
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v1.json)" = "45863366cfc1218781608a9293415ce7c0dec678"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-verified-report-v2.json)" = "aacc7146467d1c14bedb96055b7b821ac29ea5f7"
           /usr/bin/python3 - <<'PY'
           import json
           from pathlib import Path
@@ -37,6 +38,7 @@ jobs:
           root = Path.cwd()
           workflow = (root / ".github/workflows/butlin-gwt1-trusted-final-consumer.yml").read_text()
           candidate = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_final_consumer_candidate.rs").read_text()
+          projection = (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs").read_text()
           v1 = json.loads((root / ".github/evidence-profiles/gwt1-verified-report-v1.json").read_text())
           v2 = json.loads((root / ".github/evidence-profiles/gwt1-verified-report-v2.json").read_text())
 
@@ -70,8 +72,8 @@ jobs:
           assert "BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA" in workflow
           assert "6eaf73a20047b99120e59eb96f48ae0e194e2c80" in workflow
           assert "Freshly verify direct authority at consumer fault domain" in workflow
-          assert 'authority/direct/archive_attestation.json' in workflow
-          assert 'authority/direct/profile_attestation.json' in workflow
+          assert "authority/direct/archive_attestation.json" in workflow
+          assert "authority/direct/profile_attestation.json" in workflow
           assert '--signer-digest "$BOOTSTRAP_DIRECT_BUILDER_WORKFLOW_SHA"' in workflow
           assert "butlin-gwt1-direct-attestation-verifier-profile-v2" in workflow
           assert "butlin-gwt1-final-direct-authority-v1" in workflow
@@ -99,5 +101,5 @@ jobs:
           assert "ubuntu-latest" not in workflow
 
           assert "pub const GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1: bool = false;" in candidate
-          assert "FunctionallySupported" not in (root / "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_report_projection.rs").read_text()
+          assert "FunctionallySupported" not in projection
           PY
