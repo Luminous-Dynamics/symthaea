@@ -1,0 +1,39 @@
+name: README Paper Paths
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - papers/**
+      - scripts/check-readme-paper-paths.py
+      - .github/workflows/readme-paper-paths.yml
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - papers/**
+      - scripts/check-readme-paper-paths.py
+      - .github/workflows/readme-paper-paths.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readme-paper-paths-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Canonical README paper paths
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Validate canonical paper/evidence paths
+        run: python3 scripts/check-readme-paper-paths.py
+
+      - name: Prove validation is observational
+        run: git diff --exit-code
