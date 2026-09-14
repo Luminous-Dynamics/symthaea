@@ -5,7 +5,6 @@ on:
     paths:
       - '.github/workflows/assure-002b-convergence-writer-v2.yml'
       - 'tools/assure_002b_converge.py'
-      - 'tools/assure-002b-qualification.yml'
 
 permissions:
   contents: write
@@ -37,15 +36,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Capture and validate writer inputs
+      - name: Capture and validate writer input
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
           python3 -m py_compile tools/assure_002b_converge.py
           cp tools/assure_002b_converge.py /tmp/assure_002b_converge.py
-          cp tools/assure-002b-qualification.yml /tmp/assure-002b-qualification.yml
-          sha256sum /tmp/assure_002b_converge.py /tmp/assure-002b-qualification.yml
+          sha256sum /tmp/assure_002b_converge.py
 
       - name: Reset to exact qualified campaign parent and fetch semantic parent
         shell: bash
@@ -57,9 +55,7 @@ jobs:
           git fetch --no-tags origin "$SEMANTICS_PARENT"
           git cat-file -e "$SEMANTICS_PARENT^{commit}"
           test "$(git show -s --format=%H "$SEMANTICS_PARENT")" = "$SEMANTICS_PARENT"
-          git checkout "$SEMANTICS_PARENT" -- \
-            .github/workflows/assure-002a.yml \
-            crates/core/symthaea-assurance-semantics
+          git checkout "$SEMANTICS_PARENT" -- crates/core/symthaea-assurance-semantics
           git show "$SEMANTICS_PARENT:Cargo.lock" > /tmp/semantics-parent.Cargo.lock
 
       - name: Apply deterministic convergence transform
@@ -67,7 +63,6 @@ jobs:
         run: |
           set -euo pipefail
           python3 /tmp/assure_002b_converge.py
-          cp /tmp/assure-002b-qualification.yml .github/workflows/assure-002b.yml
 
       - name: Rust 1.96 syntax and formatting guard only
         shell: bash
@@ -136,7 +131,15 @@ jobs:
           export GIT_COMMITTER_DATE="$COMMIT_DATE"
           git add -A
           git diff --cached --check
+          if git diff --cached --name-only | grep -q '^\.github/workflows/'; then
+            echo 'refusing product commit containing workflow mutations' >&2
+            git diff --cached --name-only >&2
+            exit 1
+          fi
+          printf '%s\n' 'staged product paths:'
+          git diff --cached --name-only
           TREE="$(git write-tree)"
+          printf 'convergence_tree=%s\n' "$TREE"
           COMMIT="$(printf '%s\n\n%s\n%s\n' \
             'feat(assurance): converge campaign semantic authority' \
             "ASSURE-002B convergence of qualified campaign $CAMPAIGN_PARENT" \
