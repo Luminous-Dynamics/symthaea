@@ -1,0 +1,95 @@
+name: Butlin GWT-1 Promotion Unified-Root Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-promotion-unified-root-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify exact GWT-1 promotion successor P
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact promotion successor P
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 16c85d54a65f284b18202ee5b510a41500466b6c
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact convergence topology and immutable scientific objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "16c85d54a65f284b18202ee5b510a41500466b6c"
+          test "$(git rev-parse HEAD^{tree})" = "c13f402553483698d8bcf676c0775c0cff062a27"
+          read -r commit parent1 parent2 extra <<<"$(git rev-list --parents -n 1 HEAD)"
+          test "$commit" = "16c85d54a65f284b18202ee5b510a41500466b6c"
+          test "$parent1" = "b5b693f3162ac4c66d00e2391f77a6e86a84a788"
+          test "$parent2" = "726d2be515e52eeff6c3f32a137e42a2648e35c7"
+          test -z "${extra:-}"
+
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-causal-trusted-promotion.yml)" = "323218cb5e596a649a1e0912714b25464643e283"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs)" = "1e1a68a05235b043255a9e3ae690f7193708b9d7"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_promotion_capsule.rs)" = "bb62828391dcb5fc817f9435f9d40c195b69ac1e"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_causal_promotion_capsule.rs)" = "d9ff8e55fddcf425b025ea0105caf8ae2c776b04"
+          test "$(git rev-parse HEAD:.github/scripts/evidence_archive_admission.py)" = "4a7228ab25fcd512d3b038bab29d5f10e0f22eaa"
+          test "$(git rev-parse HEAD:.github/evidence-profiles/gwt1-causal-evidence-v1.json)" = "d251f39460d9cb187e98381a9c786f1073e5d8c1"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove promotion policy changed only the approved causal-builder root
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          old_commit = "b5b693f3162ac4c66d00e2391f77a6e86a84a788"
+          old_root = b"21f83eece23c8ee9c2f8fa3c1fc1ab3f555c40e7"
+          new_root = b"726d2be515e52eeff6c3f32a137e42a2648e35c7"
+          path = ".github/workflows/butlin-gwt1-causal-trusted-promotion.yml"
+
+          old = subprocess.check_output(["git", "show", f"{old_commit}:{path}"])
+          current = Path(path).read_bytes()
+          assert old.count(old_root) == 4, old.count(old_root)
+          expected = old.replace(old_root, new_root)
+          assert current == expected, "promotion workflow differs beyond approved-builder-root substitution"
+          assert current.count(new_root) == 4, current.count(new_root)
+          assert old_root not in current
+
+          # Frozen scientific eligibility code is unchanged. Negative outcomes remain
+          # negative; functional support remains impossible in this V1 policy.
+          capsule = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_causal_promotion_capsule.rs").read_text()
+          assert "NotDemonstrated => EvidenceOutcome::NotDemonstrated" in capsule
+          assert "Contradicted => EvidenceOutcome::Contradicted" in capsule
+          assert "Inconclusive => EvidenceOutcome::Inconclusive" in capsule
+          assert "SupportTier::CausallySupported" in capsule
+          assert "forged_functional_support_fails_shape_validation" in capsule
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Compile trusted promotion generator on repaired tree
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-promotion-successor-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-promotion-successor-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_generate_causal_promotion_capsule
+
+      - name: Run frozen promotion mapping tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-promotion-successor-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-promotion-successor-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --features symthaea-backend gwt1_causal_promotion_capsule::tests
