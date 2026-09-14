@@ -1,0 +1,97 @@
+diff --git a/src/web_research/conjecture_feed.rs b/src/web_research/conjecture_feed.rs
+index 2a38f0d..0000000 100644
+--- a/src/web_research/conjecture_feed.rs
++++ b/src/web_research/conjecture_feed.rs
+@@ -163,11 +163,17 @@ impl ResearchProvenance {
+         }
+     }
+ 
+-    /// Whether the underlying evidence is trustworthy enough that
+-    /// conjectures derived from it may be considered for macro promotion
+-    /// (contributing reusable sub-expressions to the engine's grammar).
++    /// Whether this web-research provenance alone grants authority to teach
++    /// the Conjecture Engine's persistent dynamic grammar.
++    ///
++    /// It deliberately does not. `EpistemicStatus::{High,Moderate}Confidence`
++    /// are heuristic research statuses, not qualified scientific-evidence or
++    /// replication receipts. Web-derived conjectures may still be explored,
++    /// tested, reported, and independently qualified, but this provenance
++    /// object alone cannot make their subexpressions reusable scientific
++    /// priors for later discoveries.
+     pub fn allows_macro_promotion(&self) -> bool {
+-        self.epistemic_status.is_trustworthy()
++        false
+     }
+ 
+     /// Short, filesystem/log-safe tag summarizing epistemic status —
+@@ -291,13 +297,13 @@ impl ConjectureFeeder {
+     /// Pedigree rule applied on the way out (never destructively — the
+     /// original engine-computed fields are still visible on
+     /// `conjecture.fitness` / `conjecture.training_mse`):
+-    /// - A conjecture can never be macro-promotion-eligible beyond what
+-    ///   its data source earned: if the provenance is not
+-    ///   [`EpistemicStatus::is_trustworthy`], the tier is forced down to
+-    ///   [`MacroPromotionTier::Quarantined`] regardless of numeric fit
+-    ///   quality.
++    /// - Web-research provenance alone never grants persistent grammar
++    ///   authority. Every conjecture paired through this feeder is forced to
++    ///   [`MacroPromotionTier::Quarantined`] regardless of heuristic web
++    ///   status or numeric fit quality. A future evidence-plane-backed
++    ///   admission contract must establish any stronger authority explicitly.
+     /// - `confidence` is capped by the source's verified confidence — a
+     ///   conjecture can never be more trustworthy than the data it was
+     ///   fit to.
+@@ -309,9 +315,7 @@ impl ConjectureFeeder {
+             .filter_map(|c| {
+                 self.provenance_by_sequence_name.get(&c.source).map(|prov| {
+                     let mut conjecture = c.clone();
+-                    if !prov.allows_macro_promotion() {
+-                        conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
+-                    }
++                    conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
+                     conjecture.confidence = conjecture.confidence.min(prov.confidence as f64);
+                     ProvenancedConjecture {
+                         conjecture,
+@@ -449,6 +453,38 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn test_web_status_alone_never_grants_macro_authority() {
++        assert!(EpistemicStatus::HighConfidence.is_trustworthy());
++        assert!(EpistemicStatus::ModerateConfidence.is_trustworthy());
++        assert!(!trustworthy_provenance().allows_macro_promotion());
++
++        let moderate = ResearchProvenance::new(
++            "https://example.com/moderate",
++            "moderately supported claim",
++            ResearchSource::Academic,
++            EpistemicStatus::ModerateConfidence,
++            0.7,
++        );
++        assert!(!moderate.allows_macro_promotion());
++    }
++
++    #[test]
++    fn test_trustworthy_web_provenance_is_still_macro_quarantined() {
++        let mut engine = fast_engine();
++        let mut feeder = ConjectureFeeder::new();
++        feeder
++            .feed(
++                &mut engine,
++                triangular_dataset("trusted_but_unqualified_for_grammar"),
++                trustworthy_provenance(),
++            )
++            .unwrap();
++
++        engine.generate_conjectures(3);
++        let provenanced = feeder.provenanced_conjectures(&engine);
++        assert!(!provenanced.is_empty());
++        assert!(provenanced.iter().all(|pc| {
++            pc.conjecture.macro_promotion_tier == MacroPromotionTier::Quarantined
++        }));
++    }
++
+     /// Data from an unverified/low-trust source must never be eligible
+     /// for macro promotion, no matter how good the numeric fit is — this
+     /// is the guard against silently laundering unverified web content
