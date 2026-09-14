@@ -1,0 +1,159 @@
+name: Causal DAG Cycle Rejection
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/causal-dag-cycle-rejection.yml'
+      - 'patches/science/causal-dag-cycle-rejection-v1.patch'
+      - 'crates/core/symthaea-causal-reasoning/src/causal_calculus.rs'
+      - 'crates/core/symthaea-causal-reasoning/src/counterfactual/identification/dag.rs'
+      - 'crates/core/symthaea-causal-reasoning/tests/integration.rs'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PATCH: patches/science/causal-dag-cycle-rejection-v1.patch
+
+jobs:
+  qualify:
+    name: Prove defect then qualify exact repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Freeze qualification-only branch scope
+        run: |
+          test -f "$PATCH"
+          git diff --exit-code "${{ github.event.pull_request.base.sha || 'HEAD^' }}" -- \
+            Cargo.toml Cargo.lock \
+            crates/core/symthaea-causal-reasoning/src \
+            crates/core/symthaea-causal-reasoning/tests || {
+            echo 'qualification branch must not materialize the candidate Rust diff'
+            exit 1
+          }
+
+      - name: Setup Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Execute current-main negative controls
+        run: |
+          cat > crates/core/symthaea-causal-reasoning/tests/dag_cycle_negative_control.rs <<'RS'
+          use symthaea_causal_reasoning::causal_calculus::CausalDAG as CalculusDag;
+          use symthaea_causal_reasoning::counterfactual::identification::CausalDAG as IdentificationDag;
+
+          fn binary() -> Vec<String> {
+              vec!["0".into(), "1".into()]
+          }
+
+          #[test]
+          fn current_calculus_add_edge_accepts_three_node_cycle() {
+              let mut dag = CalculusDag::new();
+              let a = dag.add_node("A", binary(), true);
+              let b = dag.add_node("B", binary(), true);
+              let c = dag.add_node("C", binary(), true);
+              dag.add_edge(a, b);
+              dag.add_edge(b, c);
+              dag.add_edge(c, a);
+
+              assert!(
+                  dag.descendants(a).contains(&a),
+                  "negative control expects current DAG invariant violation to be observable"
+              );
+          }
+
+          #[test]
+          fn current_identification_constructor_accepts_three_node_cycle() {
+              let dag = IdentificationDag::new(
+                  vec!["A".into(), "B".into(), "C".into()],
+                  vec![(0, 1), (1, 2), (2, 0)],
+              );
+
+              assert!(
+                  dag.has_path(0, 0),
+                  "negative control expects current constructor to admit a directed cycle"
+              );
+          }
+          RS
+
+          cargo test --locked -p symthaea-causal-reasoning \
+            --test dag_cycle_negative_control -- --nocapture
+          rm crates/core/symthaea-causal-reasoning/tests/dag_cycle_negative_control.rs
+
+      - name: Validate and apply exact repair candidate
+        run: |
+          git apply --check "$PATCH"
+          git apply "$PATCH"
+          git diff --check
+
+      - name: Ratchet cycle-rejection semantics
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          calculus = Path('crates/core/symthaea-causal-reasoning/src/causal_calculus.rs').read_text()
+          ident = Path('crates/core/symthaea-causal-reasoning/src/counterfactual/identification/dag.rs').read_text()
+          tests = Path('crates/core/symthaea-causal-reasoning/tests/integration.rs').read_text()
+
+          add_start = calculus.index('pub fn add_edge')
+          add_end = calculus.index('\n    /// Return the parents', add_start)
+          add_body = calculus[add_start:add_end]
+          assert 'self.descendants(child).contains(&parent)' in add_body
+          assert 'directed cycle' in add_body
+          assert 'if self.adjacency[parent][child]' in add_body
+
+          new_start = ident.index('pub fn new(nodes: Vec<String>, edges: Vec<(usize, usize)>)')
+          parents_start = ident.index('\n    /// Get parents', new_start)
+          ctor_body = ident[new_start:parents_start]
+          for required in [
+              'assert_valid_structure',
+              'Parent index out of bounds',
+              'Child index out of bounds',
+              'Self-loops are not allowed in a DAG',
+              'Directed cycles are not allowed in a DAG',
+          ]:
+              assert required in ctor_body, f'missing constructor invariant: {required}'
+
+          for required_test in [
+              'dag_rejects_three_node_directed_cycle',
+              'dag_constructor_rejects_directed_cycle',
+              'dag_constructor_rejects_out_of_bounds_edge',
+              'dag_constructor_rejects_self_loop',
+          ]:
+              assert required_test in tests, f'missing regression test: {required_test}'
+          PY
+
+      - name: Format exact candidate
+        run: cargo fmt --check -p symthaea-causal-reasoning
+
+      - name: Run focused causal DAG tests
+        run: |
+          cargo test --locked -p symthaea-causal-reasoning \
+            --test integration causal_calculus_tests::dag_rejects_three_node_directed_cycle -- --nocapture
+          cargo test --locked -p symthaea-causal-reasoning \
+            --test integration counterfactual_tests::dag_constructor_rejects -- --nocapture
+
+      - name: Run full causal-reasoning integration suite
+        run: cargo test --locked -p symthaea-causal-reasoning --test integration -- --nocapture
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-causal-reasoning --all-targets -- -D warnings
+
+      - name: Evidence boundary
+        run: |
+          echo 'PASS establishes only that current canonical constructor/add-edge paths reject directed cycles and malformed edge indices under the exact candidate.'
+          echo 'PASS does not establish deserialization/direct-field invariant closure, causal identification validity, causal truth, or scientific authority.'
