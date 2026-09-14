@@ -1,0 +1,189 @@
+name: Draft CI Governor
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [requested]
+  pull_request_target:
+    types: [ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: draft-ci-governor-${{ github.event.workflow_run.id || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  cancel-draft-full-ci:
+    name: Cancel full CI for same-repo draft PRs
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Cancel draft full-matrix run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const { owner, repo } = context.repo;
+
+            let prNumber = run.pull_requests?.[0]?.number;
+            if (!prNumber) {
+              const candidates = await github.paginate(github.rest.pulls.list, {
+                owner,
+                repo,
+                state: 'open',
+                head: `${owner}:${run.head_branch}`,
+                per_page: 100,
+              });
+              const match = candidates.find(pr => pr.head.sha === run.head_sha);
+              prNumber = match?.number;
+            }
+            if (!prNumber) {
+              core.notice(`CI run ${run.id} is not associated with an open PR; leaving it alone.`);
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber,
+            });
+
+            if (pr.head.repo.full_name !== `${owner}/${repo}`) {
+              core.notice(`PR #${pr.number} is from a fork; draft governor leaves its CI unchanged.`);
+              return;
+            }
+            if (!pr.draft) {
+              core.notice(`PR #${pr.number} is ready for review; full CI run ${run.id} is retained.`);
+              return;
+            }
+
+            core.notice(`Cancelling full CI run ${run.id} for draft PR #${pr.number} at ${run.head_sha}.`);
+            try {
+              await github.rest.actions.cancelWorkflowRun({
+                owner,
+                repo,
+                run_id: run.id,
+              });
+            } catch (error) {
+              if (error.status === 409) {
+                core.notice(`CI run ${run.id} was no longer cancellable; no action needed.`);
+                return;
+              }
+              throw error;
+            }
+
+  dispatch-ready-full-ci:
+    name: Dispatch definitive CI when draft becomes ready
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch full CI at exact ready head
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+
+            if (pr.head.repo.full_name !== `${owner}/${repo}`) {
+              core.notice(`PR #${pr.number} is from a fork; normal pull-request CI remains authoritative.`);
+              return;
+            }
+            if (pr.draft) {
+              core.setFailed(`ready_for_review event for PR #${pr.number} still reports draft=true`);
+              return;
+            }
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              branch: pr.head.ref,
+              per_page: 100,
+            });
+            const liveExactHead = runs.find(run =>
+              run.head_sha === pr.head.sha &&
+              ['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(run.status)
+            );
+            if (liveExactHead) {
+              core.notice(`Exact-head full CI run ${liveExactHead.id} already exists for ${pr.head.sha}; not duplicating it.`);
+              return;
+            }
+
+            core.notice(`Dispatching definitive full CI for ready PR #${pr.number} at ${pr.head.sha}.`);
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              ref: pr.head.ref,
+            });
+
+  reconcile-existing-draft-queue:
+    name: Reconcile existing draft CI queue
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Cancel only draft PR full-CI runs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const fullName = `${owner}/${repo}`;
+
+            const openPrs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const prByNumber = new Map(openPrs.map(pr => [pr.number, pr]));
+            const prByHeadSha = new Map(openPrs.map(pr => [pr.head.sha, pr]));
+
+            const runs = [];
+            for (const status of ['queued', 'in_progress']) {
+              const found = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner,
+                repo,
+                workflow_id: 'ci.yml',
+                event: 'pull_request',
+                status,
+                per_page: 100,
+              });
+              runs.push(...found);
+            }
+
+            let eligible = 0;
+            let cancelled = 0;
+            let alreadyGone = 0;
+            for (const run of runs) {
+              const referencedNumber = run.pull_requests?.[0]?.number;
+              const pr = (referencedNumber && prByNumber.get(referencedNumber)) || prByHeadSha.get(run.head_sha);
+              if (!pr || !pr.draft || pr.head.repo.full_name !== fullName) {
+                continue;
+              }
+              eligible += 1;
+              try {
+                await github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                cancelled += 1;
+              } catch (error) {
+                if (error.status === 409) {
+                  alreadyGone += 1;
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            core.notice(`Draft CI reconciliation examined ${runs.length} queued/in-progress pull-request CI runs.`);
+            core.notice(`Eligible same-repo draft CI runs: ${eligible}; cancellation accepted: ${cancelled}; already non-cancellable: ${alreadyGone}.`);
