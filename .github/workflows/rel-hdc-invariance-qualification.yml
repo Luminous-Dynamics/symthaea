@@ -67,7 +67,29 @@ jobs:
 
       - name: Format contract
         shell: bash
-        run: bash .github/rel/rel-hdc-invariance-qualification.sh fmt
+        run: |
+          set -euo pipefail
+          test_file="crates/core/symthaea-core/tests/relational_invariance.rs"
+          if ! bash .github/rel/rel-hdc-invariance-qualification.sh fmt; then
+            cp "${test_file}" "${RUNNER_TEMP}/relational_invariance.before-rustfmt.rs"
+            rustfmt --edition 2024 "${test_file}"
+            git diff -- "${test_file}" > "${RUNNER_TEMP}/relational_invariance.rustfmt.diff"
+            cp "${test_file}" "${RUNNER_TEMP}/relational_invariance.after-rustfmt.rs"
+            git checkout -- "${test_file}"
+            exit 1
+          fi
+
+      - name: Upload rustfmt failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-hdc-invariance-rustfmt-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/relational_invariance.before-rustfmt.rs
+            ${{ runner.temp }}/relational_invariance.after-rustfmt.rs
+            ${{ runner.temp }}/relational_invariance.rustfmt.diff
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Execute REL theorem controls
         shell: bash
