@@ -160,24 +160,15 @@ jobs:
           out="$SOURCE_DIR/admitted-final"
           rm -rf "$out"
           mkdir -p "$out"
-          /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_PROFILE" \
-            --archive "$SOURCE_DIR/gwt1-final-resolution.tar.gz" --output-dir "$out" \
-            > "$SOURCE_DIR/fresh-final-admission.json"
-          /usr/bin/jq -e --arg archive_sha "$FINAL_ARCHIVE_SHA256" \
-            '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-final-resolution-archive-v1" and .archive_sha256==$archive_sha and .member_count==60 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' \
-            "$SOURCE_DIR/fresh-final-admission.json" >/dev/null
+          /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_PROFILE" --archive "$SOURCE_DIR/gwt1-final-resolution.tar.gz" --output-dir "$out" > "$SOURCE_DIR/fresh-final-admission.json"
+          /usr/bin/jq -e --arg archive_sha "$FINAL_ARCHIVE_SHA256" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-final-resolution-archive-v1" and .archive_sha256==$archive_sha and .member_count==60 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' "$SOURCE_DIR/fresh-final-admission.json" >/dev/null
           root="$out/gwt1-final-resolution"
           test -d "$root"
           /usr/bin/cmp -s "$TRUSTED_ENGINE" "$root/archive_admission_engine.py"
           /usr/bin/cmp -s "$TRUSTED_PROFILE" "$root/archive_admission_profile.json"
           (cd "$root" && /usr/bin/sha256sum -c SHA256SUMS)
-          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" \
-            '.schema=="butlin-gwt1-trusted-final-resolution-provenance-v1" and .repository==$repository and .resolution_workflow_sha==$workflow_sha' \
-            "$root/resolution_provenance.json" >/dev/null
-          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" \
-            --arg executable_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
-            '.schema=="butlin-gwt1-final-attestation-verifier-profile-v1" and .repository==$repository and .resolution_workflow_sha==$workflow_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256=="e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be" and .executable_sha256==$executable_sha and .version_output_sha256==$version_sha and .deny_self_hosted_runners==true' \
-            "$root/final_verifier_profile.json" >/dev/null
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" '.schema=="butlin-gwt1-trusted-final-resolution-provenance-v1" and .repository==$repository and .resolution_workflow_sha==$workflow_sha' "$root/resolution_provenance.json" >/dev/null
+          /usr/bin/jq -e --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg executable_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" '.schema=="butlin-gwt1-final-attestation-verifier-profile-v1" and .repository==$repository and .resolution_workflow_sha==$workflow_sha and .verifier=="github-cli" and .verifier_version=="2.100.0" and .distribution_sha256=="e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be" and .executable_sha256==$executable_sha and .version_output_sha256==$version_sha and .deny_self_hosted_runners==true' "$root/final_verifier_profile.json" >/dev/null
           /usr/bin/jq -e --arg subject "$EVIDENCE_SUBJECT_SHA" '.schema=="butlin-gwt1-final-direct-authority-v1" and .evidence_subject_sha==$subject' "$root/authority/direct/authority.json" >/dev/null
           /usr/bin/jq -e --arg subject "$EVIDENCE_SUBJECT_SHA" '.schema=="butlin-gwt1-final-promotion-authority-v1" and .evidence_subject_sha==$subject' "$root/authority/promotion/authority.json" >/dev/null
           direct_archive_sha="$(/usr/bin/sha256sum "$root/sources/direct/gwt1-evidence.tar.gz" | /usr/bin/awk '{print $1}')"
@@ -204,13 +195,9 @@ jobs:
           out="$RUNNER_TEMP/gwt1-consumer-direct-admitted"
           rm -rf "$out"
           mkdir -p "$out"
-          /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_DIRECT_PROFILE" \
-            --archive "$direct_archive" --output-dir "$out" \
-            > "$RUNNER_TEMP/gwt1-consumer-direct-admission.json"
+          /usr/bin/python3 "$TRUSTED_ENGINE" --profile "$TRUSTED_DIRECT_PROFILE" --archive "$direct_archive" --output-dir "$out" > "$RUNNER_TEMP/gwt1-consumer-direct-admission.json"
           direct_archive_sha="$(/usr/bin/sha256sum "$direct_archive" | /usr/bin/awk '{print $1}')"
-          /usr/bin/jq -e --arg archive_sha "$direct_archive_sha" \
-            '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-direct-evidence-archive-v1" and .archive_sha256==$archive_sha and .member_count==7 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' \
-            "$RUNNER_TEMP/gwt1-consumer-direct-admission.json" >/dev/null
+          /usr/bin/jq -e --arg archive_sha "$direct_archive_sha" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-direct-evidence-archive-v1" and .archive_sha256==$archive_sha and .member_count==7 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' "$RUNNER_TEMP/gwt1-consumer-direct-admission.json" >/dev/null
           root="$out/gwt1-evidence"
           (cd "$root" && /usr/bin/sha256sum -c SHA256SUMS)
           echo "root=$root" >> "$GITHUB_OUTPUT"
@@ -241,13 +228,9 @@ jobs:
           unset GH_HOST GH_ENTERPRISE_TOKEN
           rm -rf "$RUNNER_TEMP/gwt1-consumer-candidate"
           mkdir -p "$RUNNER_TEMP/gwt1-consumer-candidate"
-          cargo run --locked -p symthaea-psych-bench \
-            --features trusted-resolution-consumer \
-            --bin gwt1_generate_verified_report_candidate
+          cargo run --locked -p symthaea-psych-bench --features trusted-resolution-consumer --bin gwt1_generate_verified_report_candidate
           test -s "$GWT1_VERIFIED_REPORT_OUTPUT"
-          /usr/bin/jq -e --arg archive_sha "$GWT1_FINAL_ARCHIVE_SHA256" \
-            '.schema=="butlin-gwt1-verified-report-projection-v1" and .indicator_id=="GWT-1" and .final_archive_sha256==$archive_sha and .tier_ceiling=="CausallySupported"' \
-            "$GWT1_VERIFIED_REPORT_OUTPUT" >/dev/null
+          /usr/bin/jq -e --arg archive_sha "$GWT1_FINAL_ARCHIVE_SHA256" '.schema=="butlin-gwt1-verified-report-projection-v1" and .indicator_id=="GWT-1" and .final_archive_sha256==$archive_sha and .tier_ceiling=="CausallySupported"' "$GWT1_VERIFIED_REPORT_OUTPUT" >/dev/null
           if /usr/bin/jq -e '.. | strings | select(.=="FunctionallySupported")' "$GWT1_VERIFIED_REPORT_OUTPUT" >/dev/null; then
             echo "FunctionallySupported is forbidden in the GWT-1 V1 report projection" >&2
             exit 1
@@ -290,6 +273,7 @@ jobs:
           /usr/bin/install -m 0644 "$SOURCE_DIR/gwt1-final-attestation/attestation.json" "$stage/authority/final_archive_attestation.json"
           /usr/bin/install -m 0644 "$SOURCE_DIR/fresh-final-verification.json" "$stage/authority/fresh_final_archive_verification.json"
           /usr/bin/install -m 0644 "$SOURCE_DIR/fresh-final-admission.json" "$stage/authority/fresh_final_archive_admission.json"
+          /usr/bin/install -m 0644 "$RUNNER_TEMP/gwt1-consumer-direct-admission.json" "$stage/authority/fresh_nested_direct_archive_admission.json"
 
           rustc --version --verbose > "$stage/rust-toolchain.txt"
           "$TRUSTED_GH_PATH" --version > "$stage/environment/gh-version.txt"
@@ -298,46 +282,22 @@ jobs:
           /usr/bin/gzip --version > "$stage/environment/gzip-version.txt"
           /usr/bin/sha256sum --version > "$stage/environment/sha256sum-version.txt"
           /usr/bin/jq --version > "$stage/environment/jq-version.txt"
-          /usr/bin/jq -n \
-            --arg schema butlin-gwt1-final-consumer-runner-environment-v1 \
-            --arg image_os "${ImageOS:-unknown}" --arg image_version "${ImageVersion:-unknown}" --arg runner_arch "${RUNNER_ARCH:-unknown}" \
-            --arg python_sha "$(/usr/bin/sha256sum /usr/bin/python3 | /usr/bin/awk '{print $1}')" \
-            --arg tar_sha "$(/usr/bin/sha256sum /usr/bin/tar | /usr/bin/awk '{print $1}')" \
-            --arg gzip_sha "$(/usr/bin/sha256sum /usr/bin/gzip | /usr/bin/awk '{print $1}')" \
-            --arg sha256sum_sha "$(/usr/bin/sha256sum /usr/bin/sha256sum | /usr/bin/awk '{print $1}')" \
-            --arg jq_sha "$(/usr/bin/sha256sum /usr/bin/jq | /usr/bin/awk '{print $1}')" \
-            '{schema:$schema,image_os:$image_os,image_version:$image_version,runner_arch:$runner_arch,python3_sha256:$python_sha,tar_sha256:$tar_sha,gzip_sha256:$gzip_sha,sha256sum_sha256:$sha256sum_sha,jq_sha256:$jq_sha}' \
-            > "$stage/environment/runner_environment.json"
+          /usr/bin/jq -n --arg schema butlin-gwt1-final-consumer-runner-environment-v1 --arg image_os "${ImageOS:-unknown}" --arg image_version "${ImageVersion:-unknown}" --arg runner_arch "${RUNNER_ARCH:-unknown}" --arg python_sha "$(/usr/bin/sha256sum /usr/bin/python3 | /usr/bin/awk '{print $1}')" --arg tar_sha "$(/usr/bin/sha256sum /usr/bin/tar | /usr/bin/awk '{print $1}')" --arg gzip_sha "$(/usr/bin/sha256sum /usr/bin/gzip | /usr/bin/awk '{print $1}')" --arg sha256sum_sha "$(/usr/bin/sha256sum /usr/bin/sha256sum | /usr/bin/awk '{print $1}')" --arg jq_sha "$(/usr/bin/sha256sum /usr/bin/jq | /usr/bin/awk '{print $1}')" '{schema:$schema,image_os:$image_os,image_version:$image_version,runner_arch:$runner_arch,python3_sha256:$python_sha,tar_sha256:$tar_sha,gzip_sha256:$gzip_sha,sha256sum_sha256:$sha256sum_sha,jq_sha256:$jq_sha}' > "$stage/environment/runner_environment.json"
 
           runner_environment_sha="$(/usr/bin/sha256sum "$stage/environment/runner_environment.json" | /usr/bin/awk '{print $1}')"
           engine_sha="$(/usr/bin/sha256sum "$stage/archive_admission_engine.py" | /usr/bin/awk '{print $1}')"
           profile_sha="$(/usr/bin/sha256sum "$stage/archive_admission_profile.json" | /usr/bin/awk '{print $1}')"
           base_report_blake3="$(/usr/bin/jq -r '.base_report_blake3' "$stage/projection.json")"
 
-          /usr/bin/jq -n --arg schema butlin-gwt1-trusted-final-consumer-provenance-v1 \
-            --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$CONSUMER_WORKFLOW_SHA" --arg workflow_ref "$CONSUMER_WORKFLOW_REF" \
-            --arg source_workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" \
-            --arg source_run_id "$FINAL_RUN_ID" --arg source_run_attempt "$FINAL_RUN_ATTEMPT" --arg source_archive_sha "$FINAL_ARCHIVE_SHA256" \
-            --arg projection_sha "$PROJECTION_SHA256" --arg base_report_blake3 "$base_report_blake3" \
-            '{schema:$schema,repository:$repository,consumer_workflow_sha:$workflow_sha,consumer_workflow_ref:$workflow_ref,source_final_resolution_workflow_sha:$source_workflow_sha,evidence_subject_sha:$evidence_subject_sha,source_final_resolution_run_id:$source_run_id,source_final_resolution_run_attempt:$source_run_attempt,source_final_archive_sha256:$source_archive_sha,projection_sha256:$projection_sha,base_report_blake3:$base_report_blake3}' \
-            > "$stage/consumer_provenance.json"
+          /usr/bin/jq -n --arg schema butlin-gwt1-trusted-final-consumer-provenance-v1 --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$CONSUMER_WORKFLOW_SHA" --arg workflow_ref "$CONSUMER_WORKFLOW_REF" --arg source_workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg evidence_subject_sha "$EVIDENCE_SUBJECT_SHA" --arg source_run_id "$FINAL_RUN_ID" --arg source_run_attempt "$FINAL_RUN_ATTEMPT" --arg source_archive_sha "$FINAL_ARCHIVE_SHA256" --arg projection_sha "$PROJECTION_SHA256" --arg base_report_blake3 "$base_report_blake3" '{schema:$schema,repository:$repository,consumer_workflow_sha:$workflow_sha,consumer_workflow_ref:$workflow_ref,source_final_resolution_workflow_sha:$source_workflow_sha,evidence_subject_sha:$evidence_subject_sha,source_final_resolution_run_id:$source_run_id,source_final_resolution_run_attempt:$source_run_attempt,source_final_archive_sha256:$source_archive_sha,projection_sha256:$projection_sha,base_report_blake3:$base_report_blake3}' > "$stage/consumer_provenance.json"
 
-          /usr/bin/jq -n --arg schema butlin-gwt1-final-consumer-verifier-profile-v1 \
-            --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$CONSUMER_WORKFLOW_SHA" --arg source_workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" \
-            --arg executable_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" \
-            --arg source_archive_sha "$FINAL_ARCHIVE_SHA256" --arg source_verify_sha "$FINAL_VERIFICATION_SHA256" --arg source_admission_sha "$FINAL_ADMISSION_SHA256" \
-            --arg direct_admission_sha "$DIRECT_ADMISSION_SHA256" --arg projection_sha "$PROJECTION_SHA256" --arg engine_sha "$engine_sha" --arg profile_sha "$profile_sha" \
-            --arg runner_environment_sha "$runner_environment_sha" \
-            '{schema:$schema,repository:$repository,consumer_workflow_sha:$workflow_sha,source_final_resolution_workflow_sha:$source_workflow_sha,verifier:"github-cli",verifier_version:"2.100.0",distribution_sha256:"e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",executable_sha256:$executable_sha,version_output_sha256:$version_sha,configuration_policy:"isolated-gh-config-v1",deny_self_hosted_runners:true,source_final_archive_sha256:$source_archive_sha,fresh_final_archive_verification_sha256:$source_verify_sha,fresh_final_archive_admission_sha256:$source_admission_sha,nested_direct_archive_admission_sha256:$direct_admission_sha,projection_sha256:$projection_sha,archive_admission_engine_sha256:$engine_sha,archive_admission_profile_sha256:$profile_sha,runner_environment_sha256:$runner_environment_sha}' \
-            > "$stage/consumer_verifier_profile.json"
+          /usr/bin/jq -n --arg schema butlin-gwt1-final-consumer-verifier-profile-v1 --arg repository "$GITHUB_REPOSITORY" --arg workflow_sha "$CONSUMER_WORKFLOW_SHA" --arg source_workflow_sha "$BOOTSTRAP_FINAL_RESOLUTION_WORKFLOW_SHA" --arg executable_sha "$TRUSTED_GH_BINARY_SHA256" --arg version_sha "$TRUSTED_GH_VERSION_OUTPUT_SHA256" --arg source_archive_sha "$FINAL_ARCHIVE_SHA256" --arg source_verify_sha "$FINAL_VERIFICATION_SHA256" --arg source_admission_sha "$FINAL_ADMISSION_SHA256" --arg direct_admission_sha "$DIRECT_ADMISSION_SHA256" --arg projection_sha "$PROJECTION_SHA256" --arg engine_sha "$engine_sha" --arg profile_sha "$profile_sha" --arg runner_environment_sha "$runner_environment_sha" '{schema:$schema,repository:$repository,consumer_workflow_sha:$workflow_sha,source_final_resolution_workflow_sha:$source_workflow_sha,verifier:"github-cli",verifier_version:"2.100.0",distribution_sha256:"e4d4bb4498e8d007abe545b6568926793ace1b6447da598294a610018cb164be",executable_sha256:$executable_sha,version_output_sha256:$version_sha,configuration_policy:"isolated-gh-config-v1",deny_self_hosted_runners:true,source_final_archive_sha256:$source_archive_sha,fresh_final_archive_verification_sha256:$source_verify_sha,fresh_final_archive_admission_sha256:$source_admission_sha,nested_direct_archive_admission_sha256:$direct_admission_sha,projection_sha256:$projection_sha,archive_admission_engine_sha256:$engine_sha,archive_admission_profile_sha256:$profile_sha,runner_environment_sha256:$runner_environment_sha}' > "$stage/consumer_verifier_profile.json"
 
           (
             cd "$stage"
             find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 /usr/bin/sha256sum > SHA256SUMS
           )
-          /usr/bin/tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
-            -C "$package_root" -cf - gwt1-verified-report | /usr/bin/gzip -n \
-            > "$RUNNER_TEMP/gwt1-verified-report.tar.gz"
+          /usr/bin/tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner -C "$package_root" -cf - gwt1-verified-report | /usr/bin/gzip -n > "$RUNNER_TEMP/gwt1-verified-report.tar.gz"
           (cd "$RUNNER_TEMP" && /usr/bin/sha256sum gwt1-verified-report.tar.gz > gwt1-verified-report.tar.gz.sha256)
 
           report_archive_sha="$(/usr/bin/sha256sum "$RUNNER_TEMP/gwt1-verified-report.tar.gz" | /usr/bin/awk '{print $1}')"
@@ -345,13 +305,8 @@ jobs:
           report_extract="$RUNNER_TEMP/gwt1-verified-report-admitted"
           rm -rf "$report_extract"
           mkdir -p "$report_extract"
-          /usr/bin/python3 "$GITHUB_WORKSPACE/.github/scripts/evidence_archive_admission.py" \
-            --profile "$GITHUB_WORKSPACE/.github/evidence-profiles/gwt1-verified-report-v1.json" \
-            --archive "$RUNNER_TEMP/gwt1-verified-report.tar.gz" --output-dir "$report_extract" \
-            > "$report_admission"
-          /usr/bin/jq -e --arg archive_sha "$report_archive_sha" \
-            '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-verified-report-archive-v1" and .archive_sha256==$archive_sha and .member_count==25 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' \
-            "$report_admission" >/dev/null
+          /usr/bin/python3 "$GITHUB_WORKSPACE/.github/scripts/evidence_archive_admission.py" --profile "$GITHUB_WORKSPACE/.github/evidence-profiles/gwt1-verified-report-v1.json" --archive "$RUNNER_TEMP/gwt1-verified-report.tar.gz" --output-dir "$report_extract" > "$report_admission"
+          /usr/bin/jq -e --arg archive_sha "$report_archive_sha" '.schema=="butlin-evidence-archive-admission-result-v1" and .profile_id=="gwt1-verified-report-archive-v1" and .archive_sha256==$archive_sha and .member_count==26 and .archive_bytes>0 and .tar_stream_bytes>0 and .total_unpacked_bytes>0' "$report_admission" >/dev/null
           (cd "$report_extract/gwt1-verified-report" && /usr/bin/sha256sum -c SHA256SUMS)
           rm -rf "$report_extract"
           (cd "$RUNNER_TEMP" && /usr/bin/sha256sum gwt1-verified-report-admission.json > gwt1-verified-report-admission.json.sha256)
@@ -379,11 +334,7 @@ jobs:
           out="$RUNNER_TEMP/gwt1-verified-report-attestation"
           mkdir -p "$out"
           cp "$REPORT_ATTESTATION_BUNDLE" "$out/attestation.json"
-          "$TRUSTED_GH_PATH" attestation verify "$RUNNER_TEMP/gwt1-verified-report.tar.gz" --repo "$GITHUB_REPOSITORY" \
-            --bundle "$out/attestation.json" \
-            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-final-consumer.yml" \
-            --signer-digest "$CONSUMER_WORKFLOW_SHA" --deny-self-hosted-runners --format json \
-            > "$out/verification.json"
+          "$TRUSTED_GH_PATH" attestation verify "$RUNNER_TEMP/gwt1-verified-report.tar.gz" --repo "$GITHUB_REPOSITORY" --bundle "$out/attestation.json" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/butlin-gwt1-trusted-final-consumer.yml" --signer-digest "$CONSUMER_WORKFLOW_SHA" --deny-self-hosted-runners --format json > "$out/verification.json"
           test -s "$out/verification.json"
           (cd "$out" && /usr/bin/sha256sum attestation.json > attestation.json.sha256 && /usr/bin/sha256sum verification.json > verification.json.sha256)
 
