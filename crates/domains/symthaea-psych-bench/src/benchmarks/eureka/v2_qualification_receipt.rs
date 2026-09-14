@@ -138,7 +138,7 @@ impl V2QualificationReceipt {
         }
 
         for key in ["checkout_clean_before", "checkout_clean_after"] {
-            if parse_canonical_bool(required(&fields, key)?)? != true {
+            if !parse_canonical_bool(required(&fields, key)?)? {
                 return Err(V2QualificationReceiptError::CheckoutNotClean);
             }
         }
@@ -334,7 +334,10 @@ fn parse_canonical_bool(value: &str) -> Result<bool, V2QualificationReceiptError
     }
 }
 
-fn validate_lower_hex(value: &str, expected_digits: usize) -> Result<(), V2QualificationReceiptError> {
+fn validate_lower_hex(
+    value: &str,
+    expected_digits: usize,
+) -> Result<(), V2QualificationReceiptError> {
     if value.len() != expected_digits
         || !value
             .bytes()
@@ -539,7 +542,10 @@ qualification_result=PASS\n"
 
     #[test]
     fn malformed_lines_and_empty_values_fail_closed() {
-        let malformed = valid_receipt().replace("repository=Luminous-Dynamics/symthaea", "repository");
+        let malformed = valid_receipt().replace(
+            "repository=Luminous-Dynamics/symthaea",
+            "repository",
+        );
         assert_eq!(
             V2QualificationReceipt::parse_and_verify(&malformed),
             Err(V2QualificationReceiptError::MalformedLine)
