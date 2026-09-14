@@ -19,7 +19,8 @@ fn activation_proves_both_clock_and_containment_ancestry() {
     assert!(source.contains("predecessor_operational_basis_id"));
     assert!(source.contains("current.previous_authority_id() != Some(previous.id())"));
     assert!(source.contains("current.previous_state_digest() != Some(previous.state_digest())"));
-    assert!(source.contains("previous.generation().checked_add(1)"));
+    assert!(source.contains("checked_add(1)"));
+    assert!(source.contains("ContainmentGenerationNotAdjacent"));
     assert!(source.contains("clock_lineage_digest"));
     assert!(source.contains("containment_lineage_digest"));
 }
