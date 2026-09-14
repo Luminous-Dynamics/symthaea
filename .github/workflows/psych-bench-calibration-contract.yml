@@ -8,6 +8,7 @@ on:
       - psych-bench/calibration-frozen-receipt
       - psych-bench/calibration-target-provenance
       - psych-bench/calibration-source-inventory
+      - psych-bench/calibration-runtime-stroop
     paths:
       - '.github/workflows/psych-bench-calibration-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
@@ -70,7 +71,8 @@ jobs:
             crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
             crates/domains/symthaea-psych-bench/src/calibration_inventory.rs \
             crates/domains/symthaea-psych-bench/src/calibration_runtime.rs \
-            crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs
+            crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs
 
       - name: Compile psych-bench library
         shell: bash
@@ -102,6 +104,7 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib calibration_runtime::tests -- --nocapture
           cargo test --locked -p symthaea-psych-bench --lib benchmarks::executive::stroop::tests::effective_calibration_values_match_default_scoring_inputs -- --nocapture
+          cargo test --locked -p symthaea-psych-bench --lib benchmarks::worm::nback::tests::effective_calibration_values_match_default_scoring_inputs -- --nocapture
 
       # Keep dependency compilation authoritative, but make lint authority match
       # the calibration evidence/scoring surface this focused job qualifies.
@@ -121,7 +124,8 @@ jobs:
             crates/domains/symthaea-psych-bench/src/calibration_binding.rs \
             crates/domains/symthaea-psych-bench/src/calibration_inventory.rs \
             crates/domains/symthaea-psych-bench/src/calibration_runtime.rs \
-            crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs
+            crates/domains/symthaea-psych-bench/src/benchmarks/executive/stroop.rs \
+            crates/domains/symthaea-psych-bench/src/benchmarks/worm/nback.rs
           test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
