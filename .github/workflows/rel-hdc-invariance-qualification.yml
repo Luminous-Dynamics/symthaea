@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md"
+      - "docs/research/REL_AUTOMORPHISM_CENSUS_2026-09-14.md"
       - "crates/core/symthaea-core/tests/relational_invariance.rs"
       - ".github/rel/rel-hdc-invariance-qualification.sh"
       - ".github/workflows/rel-hdc-invariance-qualification.yml"
@@ -61,9 +62,16 @@ jobs:
           set -euo pipefail
           sha256sum \
             docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md \
+            docs/research/REL_AUTOMORPHISM_CENSUS_2026-09-14.md \
             crates/core/symthaea-core/tests/relational_invariance.rs \
             .github/rel/rel-hdc-invariance-qualification.sh \
             .github/workflows/rel-hdc-invariance-qualification.yml
+          git rev-parse \
+            HEAD:docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md \
+            HEAD:docs/research/REL_AUTOMORPHISM_CENSUS_2026-09-14.md \
+            HEAD:crates/core/symthaea-core/tests/relational_invariance.rs \
+            HEAD:.github/rel/rel-hdc-invariance-qualification.sh \
+            HEAD:.github/workflows/rel-hdc-invariance-qualification.yml
 
       - name: Format contract
         shell: bash
@@ -121,6 +129,7 @@ jobs:
 
           paths = [
               "docs/research/RELATIONAL_INVARIANCE_PROGRAM_2026-09-14.md",
+              "docs/research/REL_AUTOMORPHISM_CENSUS_2026-09-14.md",
               "crates/core/symthaea-core/tests/relational_invariance.rs",
               ".github/rel/rel-hdc-invariance-qualification.sh",
               ".github/workflows/rel-hdc-invariance-qualification.yml",
@@ -133,7 +142,8 @@ jobs:
               return subprocess.check_output(args, text=True).strip()
 
           receipt = {
-              "schema": "symthaea.rel.hdc-invariance-qualification.v1",
+              "schema": "symthaea.rel.hdc-invariance-qualification.v2",
+              "contract_revision": "REL.001-003.v2",
               "authority": "MeasurementOnly",
               "subject_head": cmd("git", "rev-parse", "HEAD"),
               "subject_tree": cmd("git", "rev-parse", "HEAD^{tree}"),
@@ -142,14 +152,26 @@ jobs:
               "rustc": cmd("rustc", "--version"),
               "cargo": cmd("cargo", "--version"),
               "files_sha256": {path: sha256(path) for path in paths},
+              "files_git_blob": {
+                  path: cmd("git", "rev-parse", f"HEAD:{path}") for path in paths
+              },
               "phases": {
                   "rustfmt_check": "passed",
                   "relational_invariance_test": "passed",
                   "warnings_denied_clippy": "passed",
                   "checkout_immutable_before_receipt": True,
               },
+              "scope": {
+                  "general_coordinate_permutation_family": True,
+                  "permutation_inverse_and_composition": True,
+                  "binding_metric_and_bundle_controls": True,
+                  "fixed_sequence_commutation_control": True,
+                  "sequence_covariance_control": True,
+                  "partial_structure_negative_controls": True,
+              },
               "claims": {
                   "production_cognition_changed": False,
+                  "exhaustive_finite_dimension_group_enumeration": False,
                   "field_theoretic_gauge_symmetry_established": False,
                   "intelligence_improvement_established": False,
                   "consciousness_claim_established": False,
