@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-assurance-campaign"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Preregistered qualification campaign and evidence-admission semantics for Symthaea Assurance"
+
+[dependencies]
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-assurance-core = { path = "../symthaea-assurance-core" }
+symthaea-assurance-subject = { path = "../symthaea-assurance-subject" }
