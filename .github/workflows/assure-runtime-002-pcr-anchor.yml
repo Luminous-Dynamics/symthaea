@@ -1,0 +1,175 @@
+name: ASSURE-RUNTIME-002 PCR Anchor Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/assure-runtime-002-pcr-anchor.yml'
+      - '.github/qualification/assure-runtime-002-pcr-anchor-qualify.sh'
+      - 'crates/bridges/symthaea-assurance-linux-tpm-ima-pcr-anchor/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-runtime-002-pcr-anchor-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: d7acd8483c7bc4274543ebadb35b57de6fa893bf
+  PRODUCT_PARENT: 29eb017a2e5b3fda7731ec946439c3096b51cceb
+
+jobs:
+  qualify:
+    name: Exact-head TPM+IMA PCR anchor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Prove exact qualification subject and ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          git cat-file -e "$PRODUCT_HEAD^{commit}"
+          git cat-file -e "$PRODUCT_PARENT^{commit}"
+          git merge-base --is-ancestor "$PRODUCT_PARENT" "$PRODUCT_HEAD"
+          git merge-base --is-ancestor "$PRODUCT_HEAD" HEAD
+          test "$(git rev-list --count "$PRODUCT_HEAD"..HEAD)" = "1"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_HEAD"
+
+          {
+            echo 'qualification_revision=assure-runtime-002-pcr-anchor-v1'
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "pull_request=${{ github.event.pull_request.number }}"
+            echo "subject_sha=$actual"
+            echo "subject_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "product_head=$PRODUCT_HEAD"
+            echo "product_tree=$(git rev-parse "$PRODUCT_HEAD^{tree}")"
+            echo "product_parent=$PRODUCT_PARENT"
+            echo "product_crate_tree=$(git rev-parse "$PRODUCT_HEAD:crates/bridges/symthaea-assurance-linux-tpm-ima-pcr-anchor")"
+            echo "source_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "workflow_sha256=$(sha256sum .github/workflows/assure-runtime-002-pcr-anchor.yml | awk '{print $1}')"
+            echo "contract_sha256=$(sha256sum .github/qualification/assure-runtime-002-pcr-anchor-qualify.sh | awk '{print $1}')"
+            echo 'checkout_action=11d5960a326750d5838078e36cf38b85af677262'
+            echo 'upload_artifact_action=ea165f8d65b6e75b540449e92b4886f43607fa02'
+            echo 'runner_image=ubuntu-24.04'
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } > "$RUNNER_TEMP/assure-runtime-002-pcr-anchor-receipt.txt"
+
+          git rev-parse HEAD > "$RUNNER_TEMP/pre-head"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/pre-tree"
+          sha256sum Cargo.lock | awk '{print $1}' > "$RUNNER_TEMP/pre-lock"
+
+      - name: Prove exact product delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status "$PRODUCT_PARENT" "$PRODUCT_HEAD" \
+            > "$RUNNER_TEMP/product-delta.txt"
+          cat "$RUNNER_TEMP/product-delta.txt"
+          python3 - "$RUNNER_TEMP/product-delta.txt" <<'PY'
+          import pathlib
+          import sys
+
+          expected = {
+              ('A', 'crates/bridges/symthaea-assurance-linux-tpm-ima-pcr-anchor/Cargo.toml'),
+              ('A', 'crates/bridges/symthaea-assurance-linux-tpm-ima-pcr-anchor/README.md'),
+              ('A', 'crates/bridges/symthaea-assurance-linux-tpm-ima-pcr-anchor/src/lib.rs'),
+              ('A', 'crates/bridges/symthaea-assurance-linux-tpm-ima-pcr-anchor/tests/end_to_end.rs'),
+          }
+          actual = set()
+          for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+              fields = line.split('\t')
+              if len(fields) != 2:
+                  raise SystemExit(f'unexpected product-delta row: {line!r}')
+              actual.add((fields[0], fields[1]))
+          if actual != expected:
+              raise SystemExit(
+                  f'product delta mismatch: missing={sorted(expected-actual)!r} '
+                  f'extra={sorted(actual-expected)!r}'
+              )
+          print('product_delta=PASS files=4')
+          PY
+
+      - name: Prove qualification commit is plumbing-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status "$PRODUCT_HEAD" HEAD \
+            > "$RUNNER_TEMP/qualification-delta.txt"
+          cat "$RUNNER_TEMP/qualification-delta.txt"
+          python3 - "$RUNNER_TEMP/qualification-delta.txt" <<'PY'
+          import pathlib
+          import sys
+
+          expected = {
+              ('A', '.github/qualification/assure-runtime-002-pcr-anchor-qualify.sh'),
+              ('A', '.github/workflows/assure-runtime-002-pcr-anchor.yml'),
+          }
+          actual = set()
+          for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+              fields = line.split('\t')
+              if len(fields) != 2:
+                  raise SystemExit(f'unexpected qualification-delta row: {line!r}')
+              actual.add((fields[0], fields[1]))
+          if actual != expected:
+              raise SystemExit(
+                  f'qualification delta mismatch: missing={sorted(expected-actual)!r} '
+                  f'extra={sorted(actual-expected)!r}'
+              )
+          print('qualification_delta=PASS files=2')
+          PY
+
+      - name: Execute pinned qualification contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/qualification/assure-runtime-002-pcr-anchor-qualify.sh \
+            | tee "$RUNNER_TEMP/assure-runtime-002-pcr-anchor-contract.log"
+
+      - name: Prove checkout and source lock restored
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/pre-head")"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat "$RUNNER_TEMP/pre-tree")"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-lock")"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo 'qualification_result=PASS' >> "$RUNNER_TEMP/assure-runtime-002-pcr-anchor-receipt.txt"
+
+      - name: Upload exact-head qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-runtime-002-pcr-anchor-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/assure-runtime-002-pcr-anchor-receipt.txt
+            ${{ runner.temp }}/product-delta.txt
+            ${{ runner.temp }}/qualification-delta.txt
+            ${{ runner.temp }}/assure-runtime-002-pcr-anchor-contract.log
+            ${{ runner.temp }}/assure-runtime-002-pcr-anchor/Cargo.lock.pre
+            ${{ runner.temp }}/assure-runtime-002-pcr-anchor/Cargo.lock.reconciled
+            ${{ runner.temp }}/assure-runtime-002-pcr-anchor/Cargo.lock.diff
+            ${{ runner.temp }}/assure-runtime-002-pcr-anchor/Cargo.lock.audit.txt
+            .github/workflows/assure-runtime-002-pcr-anchor.yml
+            .github/qualification/assure-runtime-002-pcr-anchor-qualify.sh
+          if-no-files-found: ignore
+          retention-days: 90
