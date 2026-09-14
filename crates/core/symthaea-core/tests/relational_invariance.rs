@@ -18,21 +18,60 @@
 
 use symthaea_core::hdc::{binary_hv::BinaryHV, unified_hv::ContinuousHV};
 
-/// Reverse the 2,048 storage bytes. This is a deterministic permutation of
-/// BinaryHV coordinates in 8-bit blocks; no production permutation helper is
-/// used by the oracle transformation itself.
-fn reverse_binary_coordinates(hv: &BinaryHV) -> BinaryHV {
-    let mut bytes = hv.0;
-    bytes.reverse();
-    BinaryHV(bytes)
+fn deterministic_permutation(dim: usize, seed: u64) -> Vec<usize> {
+    assert!(dim > 0);
+    let mut permutation: Vec<usize> = (0..dim).collect();
+    let mut state = seed ^ 0x9E37_79B9_7F4A_7C15;
+
+    for i in (1..dim).rev() {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        permutation.swap(i, (state as usize) % (i + 1));
+    }
+
+    permutation
 }
 
-/// Reverse continuous coordinates without using the production `permute`
-/// operation. This is an involution, so it is its own inverse.
-fn reverse_continuous_coordinates(hv: &ContinuousHV) -> ContinuousHV {
-    let mut values = hv.values.clone();
-    values.reverse();
+fn inverse_permutation(permutation: &[usize]) -> Vec<usize> {
+    let mut inverse = vec![usize::MAX; permutation.len()];
+    for (source, &target) in permutation.iter().enumerate() {
+        assert!(target < permutation.len());
+        assert_eq!(inverse[target], usize::MAX, "permutation is not injective");
+        inverse[target] = source;
+    }
+    assert!(inverse.iter().all(|&index| index != usize::MAX));
+    inverse
+}
+
+fn compose_permutations(first: &[usize], second: &[usize]) -> Vec<usize> {
+    assert_eq!(first.len(), second.len());
+    first.iter().map(|&target| second[target]).collect()
+}
+
+fn permute_continuous(hv: &ContinuousHV, permutation: &[usize]) -> ContinuousHV {
+    assert_eq!(hv.values.len(), permutation.len());
+    let mut values = vec![0.0; permutation.len()];
+    for (source, &target) in permutation.iter().enumerate() {
+        values[target] = hv.values[source];
+    }
     ContinuousHV::from_vec(values)
+}
+
+fn binary_bit(hv: &BinaryHV, index: usize) -> u8 {
+    (hv.0[index / 8] >> (index % 8)) & 1
+}
+
+fn permute_binary(hv: &BinaryHV, permutation: &[usize]) -> BinaryHV {
+    assert_eq!(permutation.len(), BinaryHV::DIM);
+    let mut result = BinaryHV::zero();
+    for (source, &target) in permutation.iter().enumerate() {
+        assert!(target < BinaryHV::DIM);
+        if binary_bit(hv, source) == 1 {
+            result.0[target / 8] |= 1 << (target % 8);
+        }
+    }
+    result
 }
 
 /// Invertible XOR-linear shear over the first two binary coordinates:
@@ -81,64 +120,118 @@ fn max_abs_component_error(a: &ContinuousHV, b: &ContinuousHV) -> f32 {
 }
 
 #[test]
-fn rel_001_binary_coordinate_permutation_preserves_binding_and_hamming_geometry() {
+fn rel_001_binary_permutation_family_preserves_core_structure() {
     let a = BinaryHV::random(0x5245_4c01);
     let b = BinaryHV::random(0x5245_4c02);
+    let c = BinaryHV::random(0x5245_4c03);
+    let original_bundle = BinaryHV::bundle(&[a, b, c]);
 
-    // Algebra automorphism: g(a XOR b) = g(a) XOR g(b).
-    let transformed_bound = reverse_binary_coordinates(&a.bind(&b));
-    let bound_transformed = reverse_binary_coordinates(&a).bind(&reverse_binary_coordinates(&b));
-    assert!(transformed_bound == bound_transformed);
+    for seed in [0x5245_4c10, 0x5245_4c11, 0x5245_4c12] {
+        let permutation = deterministic_permutation(BinaryHV::DIM, seed);
+        let inverse = inverse_permutation(&permutation);
+        let pa = permute_binary(&a, &permutation);
+        let pb = permute_binary(&b, &permutation);
+        let pc = permute_binary(&c, &permutation);
 
-    // Metric isometry: a common coordinate permutation preserves every
-    // Hamming match/mismatch exactly.
-    assert_eq!(
-        a.hamming_distance(&b),
-        reverse_binary_coordinates(&a).hamming_distance(&reverse_binary_coordinates(&b))
-    );
-    assert_eq!(
-        a.similarity(&b),
-        reverse_binary_coordinates(&a).similarity(&reverse_binary_coordinates(&b))
-    );
+        let transformed_bound = permute_binary(&a.bind(&b), &permutation);
+        let bound_transformed = pa.bind(&pb);
+        assert!(transformed_bound == bound_transformed);
+
+        assert_eq!(a.hamming_distance(&b), pa.hamming_distance(&pb));
+        assert_eq!(a.similarity(&b), pa.similarity(&pb));
+
+        let transformed_bundle = permute_binary(&original_bundle, &permutation);
+        let bundle_transformed = BinaryHV::bundle(&[pa, pb, pc]);
+        assert!(transformed_bundle == bundle_transformed);
+
+        assert!(permute_binary(&pa, &inverse) == a);
+    }
 }
 
 #[test]
-fn rel_001_continuous_coordinate_permutation_preserves_binding_and_cosine_geometry() {
-    let a = ContinuousHV::random(256, 0x5245_4c11);
-    let b = ContinuousHV::random(256, 0x5245_4c12);
+fn rel_001_continuous_permutation_family_preserves_core_structure() {
+    let a = ContinuousHV::random(256, 0x5245_4c21);
+    let b = ContinuousHV::random(256, 0x5245_4c22);
+    let c = ContinuousHV::random(256, 0x5245_4c23);
+    let original_bundle = ContinuousHV::bundle(&[&a, &b, &c]);
 
-    // Hadamard multiplication is coordinatewise, so common coordinate
-    // permutations are exact algebra automorphisms.
-    let transformed_bound = reverse_continuous_coordinates(&a.bind(&b));
-    let bound_transformed =
-        reverse_continuous_coordinates(&a).bind(&reverse_continuous_coordinates(&b));
-    assert_eq!(transformed_bound.values, bound_transformed.values);
+    for seed in [0x5245_4c30, 0x5245_4c31, 0x5245_4c32] {
+        let permutation = deterministic_permutation(a.dim(), seed);
+        let inverse = inverse_permutation(&permutation);
+        let pa = permute_continuous(&a, &permutation);
+        let pb = permute_continuous(&b, &permutation);
+        let pc = permute_continuous(&c, &permutation);
 
-    // The implementation accumulates floating-point dot products/norms in
-    // coordinate order, so reversing that order can change only roundoff.
-    let before = a.similarity(&b);
-    let after = reverse_continuous_coordinates(&a).similarity(&reverse_continuous_coordinates(&b));
+        let transformed_bound = permute_continuous(&a.bind(&b), &permutation);
+        let bound_transformed = pa.bind(&pb);
+        assert_eq!(transformed_bound.values, bound_transformed.values);
+
+        let before = a.similarity(&b);
+        let after = pa.similarity(&pb);
+        assert!(
+            (before - after).abs() <= 1.0e-5,
+            "coordinate permutation changed cosine beyond narrow roundoff: before={before}, after={after}"
+        );
+
+        let transformed_bundle = permute_continuous(&original_bundle, &permutation);
+        let bundle_transformed = ContinuousHV::bundle(&[&pa, &pb, &pc]);
+        assert_eq!(transformed_bundle.values, bundle_transformed.values);
+
+        assert_eq!(permute_continuous(&pa, &inverse).values, a.values);
+    }
+}
+
+#[test]
+fn rel_001_permutation_composition_is_a_consistent_group_action() {
+    let continuous = ContinuousHV::random(256, 0x5245_4c41);
+    let binary = BinaryHV::random(0x5245_4c42);
+
+    let continuous_p = deterministic_permutation(continuous.dim(), 0x5245_4c43);
+    let continuous_q = deterministic_permutation(continuous.dim(), 0x5245_4c44);
+    let continuous_composed = compose_permutations(&continuous_p, &continuous_q);
+    assert_eq!(
+        permute_continuous(
+            &permute_continuous(&continuous, &continuous_p),
+            &continuous_q,
+        )
+        .values,
+        permute_continuous(&continuous, &continuous_composed).values
+    );
+
+    let binary_p = deterministic_permutation(BinaryHV::DIM, 0x5245_4c45);
+    let binary_q = deterministic_permutation(BinaryHV::DIM, 0x5245_4c46);
+    let binary_composed = compose_permutations(&binary_p, &binary_q);
     assert!(
-        (before - after).abs() <= 2.0e-6,
-        "coordinate permutation changed cosine beyond roundoff: before={before}, after={after}"
+        permute_binary(&permute_binary(&binary, &binary_p), &binary_q)
+            == permute_binary(&binary, &binary_composed)
     );
 }
 
 #[test]
-fn rel_001_sequence_fixed_operator_and_covariant_operator_are_distinct_claims() {
+fn rel_001_sequence_fixed_symmetry_and_covariance_are_distinct_claims() {
     let x = ContinuousHV::from_vec(vec![0.11, -0.23, 0.37, -0.41, 0.59, -0.61, 0.73, -0.89]);
 
-    // For the chosen frame change g (coordinate reversal), g and the fixed
-    // cyclic production shift rho do not commute on this non-degenerate fixture.
-    let g_rho_x = reverse_continuous_coordinates(&x.permute(1));
-    let rho_g_x = reverse_continuous_coordinates(&x).permute(1);
+    // Powers of the fixed cyclic shift commute exactly with the one-step shift.
+    for shift in [0, 1, 3, 7] {
+        assert_eq!(
+            x.permute(1).permute(shift).values,
+            x.permute(shift).permute(1).values
+        );
+    }
+
+    // A general coordinate permutation need not commute with the fixed rho.
+    let permutation = deterministic_permutation(x.dim(), 0x5245_4c51);
+    let inverse = inverse_permutation(&permutation);
+    let g_rho_x = permute_continuous(&x.permute(1), &permutation);
+    let gx = permute_continuous(&x, &permutation);
+    let rho_g_x = gx.permute(1);
     assert_ne!(g_rho_x.values, rho_g_x.values);
 
-    // Covariance is a different statement. Define rho' = g rho g^-1.
-    // Reversal is involutive, so g^-1 = g. Then rho'(g x) must equal g(rho x).
-    let gx = reverse_continuous_coordinates(&x);
-    let rho_prime_gx =
-        reverse_continuous_coordinates(&reverse_continuous_coordinates(&gx).permute(1));
+    // Covariance is a different statement: rho' = g rho g^-1.
+    let rho_prime_gx = permute_continuous(
+        &permute_continuous(&gx, &inverse).permute(1),
+        &permutation,
+    );
     assert_eq!(g_rho_x.values, rho_prime_gx.values);
 }
 
@@ -147,8 +240,6 @@ fn rel_003_continuous_metric_isometry_does_not_imply_hadamard_automorphism() {
     let a = ContinuousHV::from_vec(vec![0.21, -0.74, 0.43, 0.88, -0.52, 0.17, 0.69, -0.31]);
     let b = ContinuousHV::from_vec(vec![-0.63, 0.28, 0.91, -0.36, 0.44, -0.82, 0.13, 0.57]);
 
-    // Positive control for the partial claim: the pairwise transform is
-    // orthogonal, so cosine is preserved up to narrow f32 roundoff.
     let before = a.similarity(&b);
     let after = orthogonal_pair_mix(&a).similarity(&orthogonal_pair_mix(&b));
     assert!(
@@ -156,8 +247,6 @@ fn rel_003_continuous_metric_isometry_does_not_imply_hadamard_automorphism() {
         "orthogonal control failed cosine isometry: before={before}, after={after}"
     );
 
-    // Negative control for the stronger invalid claim: generic orthogonal
-    // mixing does not distribute over element-wise/Hadamard multiplication.
     let transformed_bound = orthogonal_pair_mix(&a.bind(&b));
     let bound_transformed = orthogonal_pair_mix(&a).bind(&orthogonal_pair_mix(&b));
     let error = max_abs_component_error(&transformed_bound, &bound_transformed);
@@ -169,17 +258,13 @@ fn rel_003_continuous_metric_isometry_does_not_imply_hadamard_automorphism() {
 
 #[test]
 fn rel_003_binary_xor_automorphism_does_not_imply_hamming_isometry() {
-    let a = BinaryHV::random(0x5245_4c31);
-    let b = BinaryHV::random(0x5245_4c32);
+    let a = BinaryHV::random(0x5245_4c61);
+    let b = BinaryHV::random(0x5245_4c62);
 
-    // Positive control for the partial claim: the shear is F2-linear, so it
-    // distributes over XOR binding exactly.
     let transformed_bound = binary_xor_linear_shear(&a.bind(&b));
     let bound_transformed = binary_xor_linear_shear(&a).bind(&binary_xor_linear_shear(&b));
     assert!(transformed_bound == bound_transformed);
 
-    // Negative control for the stronger claim. A one-bit difference at x1
-    // becomes a two-bit difference at (y0, y1).
     let zero = BinaryHV::zero();
     let mut one_bit = BinaryHV::zero();
     one_bit.0[0] = 0b0000_0010;
