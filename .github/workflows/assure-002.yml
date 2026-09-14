@@ -92,3 +92,39 @@ jobs:
           set -euo pipefail
           git diff --exit-code
           test -z "$(git status --porcelain --untracked-files=no)"
+
+  capture-rustfmt:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install exact formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
+          rustup override set 1.96.0
+          rustfmt --version
+      - name: Produce deterministic formatter output
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+          git diff --check
+          git diff --name-only
+          mkdir -p target/assure-002-rustfmt/crates/core/symthaea-assurance-campaign/src
+          mkdir -p target/assure-002-rustfmt/crates/core/symthaea-assurance-campaign/tests
+          cp crates/core/symthaea-assurance-campaign/src/lib.rs target/assure-002-rustfmt/crates/core/symthaea-assurance-campaign/src/lib.rs
+          cp crates/core/symthaea-assurance-campaign/tests/assure002.rs target/assure-002-rustfmt/crates/core/symthaea-assurance-campaign/tests/assure002.rs
+          git diff > target/assure-002-rustfmt/rustfmt.diff
+      - name: Upload formatter repair artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-002-rustfmt-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/assure-002-rustfmt/
+          if-no-files-found: error
+          retention-days: 1
