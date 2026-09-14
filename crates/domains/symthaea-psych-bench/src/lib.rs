@@ -53,6 +53,7 @@
 
 pub mod adapter;
 pub mod benchmarks;
+pub mod calibration_binding;
 pub mod calibration_contract;
 pub mod harness;
 pub mod substrate_transfer;

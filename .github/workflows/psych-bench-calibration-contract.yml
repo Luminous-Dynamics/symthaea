@@ -2,10 +2,13 @@ name: Psych-Bench Calibration Contract
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - psych-bench/calibration-manifest-contract
     paths:
       - '.github/workflows/psych-bench-calibration-contract.yml'
       - 'crates/domains/symthaea-psych-bench/src/calibration_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/src/calibration_binding.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
       - 'Cargo.lock'
@@ -54,7 +57,8 @@ jobs:
         run: |
           set -euo pipefail
           rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/calibration_contract.rs
+            crates/domains/symthaea-psych-bench/src/calibration_contract.rs \
+            crates/domains/symthaea-psych-bench/src/calibration_binding.rs
 
       - name: Compile psych-bench library
         shell: bash
@@ -67,6 +71,12 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib calibration_contract::tests -- --nocapture
+
+      - name: Execute frozen-binding regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib calibration_binding::tests -- --nocapture
 
       - name: Strict Clippy
         shell: bash
