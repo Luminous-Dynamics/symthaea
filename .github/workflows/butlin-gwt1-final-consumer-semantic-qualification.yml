@@ -1,0 +1,96 @@
+name: Butlin GWT-1 Final Consumer Semantic Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-final-consumer-semantic-qualification.yml"
+      - ".github/workflows/butlin-gwt1-trusted-final-consumer.yml"
+      - "crates/domains/symthaea-psych-bench/Cargo.toml"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/**/*.rs"
+      - "crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_verified_report_candidate.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify trusted final-consumer compile and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate with ancestry
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove repaired ancestry and inactive reporting fuse
+        shell: bash
+        env:
+          GWT1_ADAPTER_REPAIR_SHA: e9c5ba453391412564561b7de412d79ecf2dda29
+          TRUSTED_CONSUMER_PARENT_SHA: b431192225b18631b5dd9ab0e8fb1e5cec3ece23
+        run: |
+          set -euo pipefail
+          git cat-file -e "${GWT1_ADAPTER_REPAIR_SHA}^{commit}"
+          git cat-file -e "${TRUSTED_CONSUMER_PARENT_SHA}^{commit}"
+          git merge-base --is-ancestor "$GWT1_ADAPTER_REPAIR_SHA" HEAD
+          git merge-base --is-ancestor "$TRUSTED_CONSUMER_PARENT_SHA" HEAD
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+
+          candidate = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_final_consumer_candidate.rs").read_text()
+          workflow = Path(".github/workflows/butlin-gwt1-trusted-final-consumer.yml").read_text()
+          assert "pub const GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1: bool = false;" in candidate
+          assert "PublicReportingAuthorityBlocked" in candidate
+          assert "if !GWT1_PUBLIC_REPORTING_AUTHORITY_ENABLED_V1" in candidate
+          assert "actions/cache" not in workflow
+          assert "ubuntu-latest" not in workflow
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Compile exact trusted consumer adapter
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-semantic-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-semantic-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench \
+            --features trusted-resolution-consumer \
+            --bin gwt1_generate_verified_report_candidate
+
+      - name: Run verified-final-artifact reconstruction tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-semantic-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-semantic-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features trusted-resolution-consumer \
+            gwt1_verified_final_artifact::tests
+
+      - name: Run one-way report projection tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-semantic-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-semantic-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features trusted-resolution-consumer \
+            gwt1_verified_report_projection::tests
+
+      - name: Run trusted final-consumer adapter tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-consumer-semantic-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-consumer-semantic-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features trusted-resolution-consumer \
+            gwt1_final_consumer_candidate::tests
