@@ -4,15 +4,10 @@
 
 //! Independent structural verifier for retained validity-capacity evidence.
 //!
-//! This executable runs no experiment. It verifies the retained v1/v2 artifact
-//! pair as a complete lineage before v3 is allowed to summarize it:
-//!
-//! - every v1 and v2 canonical SHA-256 chain link;
-//! - exact record grammar and observation counts for the requested protocol;
-//! - exact subject/protocol headers and complete fail-closed footers;
-//! - v2 source/bundle/base-verification theorem flags;
-//! - v2's base commitment against the *actual retained v1 bytes*, terminal
-//!   digest, record count, and capacity/control observation counts.
+//! This executable runs no experiment. It verifies retained v1/v2 artifacts as
+//! a complete lineage before v3 is allowed to summarize them. In addition to
+//! chain integrity, it independently reconstructs the declared protocol plans
+//! and requires exact ordered `(case, seed)` coverage.
 
 #[path = "support/evidence_sha256.rs"]
 mod evidence_sha256;
@@ -22,10 +17,14 @@ use std::env;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use symthaea_hdc_ltc::{ValidityCapacityControlPlan, ValidityCapacityPlan};
+use symthaea_hdc_ltc::{
+    ValidityCapacityAxis, ValidityCapacityCase, ValidityCapacityControlAxis,
+    ValidityCapacityControlCase, ValidityCapacityControlPlan, ValidityCapacityPlan,
+};
 
 const V1_CHAIN_DOMAIN: &str = "symthaea:hdc-ltc:validity-capacity:evidence-chain:v1";
 const V2_CHAIN_DOMAIN: &str = "symthaea:hdc-ltc:validity-capacity:evidence-chain:v2";
+const PLAN_DOMAIN: &str = "symthaea:hdc-ltc:validity-capacity:plan:v1";
 
 type AnyError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
@@ -81,8 +80,6 @@ fn main() -> Result<(), AnyError> {
     let (subject_sha, protocol, v1_path, v2_path) = parse_args()?;
     let capacity_plan = protocol.capacity_plan();
     let control_plan = protocol.control_plan();
-    let expected_capacity = checked_product(capacity_plan.cases.len(), capacity_plan.replicate_seeds.len())?;
-    let expected_controls = checked_product(control_plan.cases.len(), control_plan.replicate_seeds.len())?;
     let v1_bytes = fs::read(&v1_path)?;
     let v2_bytes = fs::read(&v2_path)?;
 
@@ -90,14 +87,14 @@ fn main() -> Result<(), AnyError> {
         &v1_bytes,
         &subject_sha,
         protocol,
-        expected_capacity,
-        expected_controls,
+        &capacity_plan,
+        &control_plan,
     )?;
     let v2_terminal = verify_v2(
         &v2_bytes,
         &subject_sha,
         protocol,
-        expected_capacity,
+        &capacity_plan,
         &v1,
     )?;
 
@@ -109,8 +106,9 @@ fn main() -> Result<(), AnyError> {
     println!("V1_RECORD_COUNT={}", v1.record_count);
     println!("V2_SHA256={}", evidence_sha256::sha256_hex(&v2_bytes));
     println!("V2_TERMINAL_RECORD_DIGEST={v2_terminal}");
-    println!("CAPACITY_OBSERVATION_COUNT={expected_capacity}");
-    println!("CONTROL_OBSERVATION_COUNT={expected_controls}");
+    println!("CAPACITY_OBSERVATION_COUNT={}", v1.capacity_count);
+    println!("CONTROL_OBSERVATION_COUNT={}", v1.control_count);
+    println!("PLAN_PAYLOADS_AND_ORDERED_IDENTITIES_VERIFIED=true");
     Ok(())
 }
 
@@ -118,10 +116,12 @@ fn verify_v1(
     bytes: &[u8],
     subject_sha: &str,
     protocol: Protocol,
-    expected_capacity: u64,
-    expected_controls: u64,
+    capacity_plan: &ValidityCapacityPlan,
+    control_plan: &ValidityCapacityControlPlan,
 ) -> Result<VerifiedV1, AnyError> {
     let records = parse_and_verify_chain(bytes, V1_CHAIN_DOMAIN)?;
+    let expected_capacity = checked_product(capacity_plan.cases.len(), capacity_plan.replicate_seeds.len())?;
+    let expected_controls = checked_product(control_plan.cases.len(), control_plan.replicate_seeds.len())?;
     let expected_record_count = 4_u64
         .checked_add(expected_capacity)
         .and_then(|value| value.checked_add(expected_controls))
@@ -137,25 +137,53 @@ fn verify_v1(
     require_kind(&records, 0, "header")?;
     require_kind(&records, 1, "capacity_plan")?;
     require_kind(&records, 2, "control_plan")?;
-    for index in 0..expected_capacity as usize {
-        require_kind(&records, 3 + index, "capacity_observation")?;
+
+    let expected_capacity_plan = capacity_plan_value(capacity_plan);
+    let expected_control_plan = control_plan_value(control_plan);
+    if payload(&records[1])? != &expected_capacity_plan {
+        return Err(other("v1 capacity_plan payload differs from declared protocol").into());
     }
-    let control_start = 3 + expected_capacity as usize;
-    for index in 0..expected_controls as usize {
-        require_kind(&records, control_start + index, "control_observation")?;
+    if payload(&records[2])? != &expected_control_plan {
+        return Err(other("v1 control_plan payload differs from declared protocol").into());
     }
-    let footer_index = records.len() - 1;
-    require_kind(&records, footer_index, "footer")?;
 
     let header = payload(&records[0])?;
+    let expected_capacity_plan_digest = digest_value(PLAN_DOMAIN, &expected_capacity_plan)?;
+    let expected_control_plan_digest = digest_value(PLAN_DOMAIN, &expected_control_plan)?;
     if header["evidence_version"].as_str() != Some("hls-validity-capacity-evidence-v1")
         || header["chain_domain"].as_str() != Some(V1_CHAIN_DOMAIN)
         || header["subject_commit_sha"].as_str() != Some(subject_sha)
         || header["protocol"].as_str() != Some(protocol.label())
+        || header["capacity_plan_sha256"].as_str() != Some(expected_capacity_plan_digest.as_str())
+        || header["control_plan_sha256"].as_str() != Some(expected_control_plan_digest.as_str())
     {
-        return Err(other("v1 header does not match requested subject/protocol").into());
+        return Err(other("v1 header does not match subject/protocol/plan commitments").into());
     }
 
+    let mut index = 3_usize;
+    for &case in &capacity_plan.cases {
+        for &seed in &capacity_plan.replicate_seeds {
+            require_kind(&records, index, "capacity_observation")?;
+            require_capacity_identity(payload(&records[index])?, case, seed, "v1 capacity")?;
+            index += 1;
+        }
+    }
+    for &case in &control_plan.cases {
+        for &seed in &control_plan.replicate_seeds {
+            require_kind(&records, index, "control_observation")?;
+            require_control_identity(payload(&records[index])?, case, seed)?;
+            index += 1;
+        }
+    }
+
+    let footer_index = records.len() - 1;
+    if index != footer_index {
+        return Err(other(format!(
+            "v1 observation grammar ended at record {index}, footer is {footer_index}"
+        ))
+        .into());
+    }
+    require_kind(&records, footer_index, "footer")?;
     let footer = payload(&records[footer_index])?;
     if footer["complete"].as_bool() != Some(true)
         || footer["subject_unchanged"].as_bool() != Some(true)
@@ -183,10 +211,12 @@ fn verify_v2(
     bytes: &[u8],
     subject_sha: &str,
     protocol: Protocol,
-    expected_falsification: u64,
+    capacity_plan: &ValidityCapacityPlan,
     v1: &VerifiedV1,
 ) -> Result<String, AnyError> {
     let records = parse_and_verify_chain(bytes, V2_CHAIN_DOMAIN)?;
+    let expected_falsification =
+        checked_product(capacity_plan.cases.len(), capacity_plan.replicate_seeds.len())?;
     let expected_record_count = 3_u64
         .checked_add(expected_falsification)
         .ok_or_else(|| other("v2 expected record count overflow"))?;
@@ -200,12 +230,6 @@ fn verify_v2(
 
     require_kind(&records, 0, "header")?;
     require_kind(&records, 1, "base_evidence_commitment")?;
-    for index in 0..expected_falsification as usize {
-        require_kind(&records, 2 + index, "falsification_observation")?;
-    }
-    let footer_index = records.len() - 1;
-    require_kind(&records, footer_index, "footer")?;
-
     let header = payload(&records[0])?;
     if header["evidence_version"].as_str() != Some("hls-validity-capacity-evidence-v2")
         || header["chain_domain"].as_str() != Some(V2_CHAIN_DOMAIN)
@@ -226,9 +250,26 @@ fn verify_v2(
         || base["hash_chain_verified"].as_bool() != Some(true)
         || base["fresh_isolated_build"].as_bool() != Some(true)
     {
-        return Err(other("v2 base commitment does not match the retained verified v1 artifact").into());
+        return Err(other("v2 base commitment does not match retained verified v1 bytes").into());
     }
 
+    let mut index = 2_usize;
+    for &case in &capacity_plan.cases {
+        for &seed in &capacity_plan.replicate_seeds {
+            require_kind(&records, index, "falsification_observation")?;
+            require_capacity_identity(payload(&records[index])?, case, seed, "v2 falsification")?;
+            index += 1;
+        }
+    }
+
+    let footer_index = records.len() - 1;
+    if index != footer_index {
+        return Err(other(format!(
+            "v2 falsification grammar ended at record {index}, footer is {footer_index}"
+        ))
+        .into());
+    }
+    require_kind(&records, footer_index, "footer")?;
     let footer = payload(&records[footer_index])?;
     if footer["complete"].as_bool() != Some(true)
         || footer["subject_unchanged"].as_bool() != Some(true)
@@ -244,6 +285,39 @@ fn verify_v2(
     }
 
     Ok(required_str(&records[footer_index], "record_digest")?.to_owned())
+}
+
+fn require_capacity_identity(
+    observation: &Value,
+    expected_case: ValidityCapacityCase,
+    expected_seed: u64,
+    label: &str,
+) -> Result<(), AnyError> {
+    if observation.get("case") != Some(&capacity_case_value(expected_case))
+        || observation.get("seed").and_then(Value::as_u64) != Some(expected_seed)
+    {
+        return Err(other(format!(
+            "{label} identity mismatch: expected case={expected_case:?}, seed={expected_seed}"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+fn require_control_identity(
+    observation: &Value,
+    expected_case: ValidityCapacityControlCase,
+    expected_seed: u64,
+) -> Result<(), AnyError> {
+    if observation.get("case") != Some(&control_case_value(expected_case))
+        || observation.get("seed").and_then(Value::as_u64) != Some(expected_seed)
+    {
+        return Err(other(format!(
+            "v1 control identity mismatch: expected case={expected_case:?}, seed={expected_seed}"
+        ))
+        .into());
+    }
+    Ok(())
 }
 
 fn parse_and_verify_chain(bytes: &[u8], domain: &str) -> Result<Vec<Value>, AnyError> {
@@ -269,7 +343,7 @@ fn parse_and_verify_chain(bytes: &[u8], domain: &str) -> Result<Vec<Value>, AnyE
             .into());
         }
         let kind = required_str(&record, "kind")?;
-        let payload = record
+        let payload_value = record
             .get("payload")
             .cloned()
             .ok_or_else(|| other("record payload missing"))?;
@@ -278,7 +352,7 @@ fn parse_and_verify_chain(bytes: &[u8], domain: &str) -> Result<Vec<Value>, AnyE
             "sequence": sequence,
             "previous_digest": previous,
             "kind": kind,
-            "payload": payload,
+            "payload": payload_value,
         });
         let expected_digest = digest_value(domain, &envelope)?;
         if recorded_digest != expected_digest {
@@ -347,6 +421,64 @@ fn canonicalize(value: &Value) -> Value {
         }
         _ => value.clone(),
     }
+}
+
+fn capacity_axis_label(axis: ValidityCapacityAxis) -> &'static str {
+    match axis {
+        ValidityCapacityAxis::Smoke => "smoke",
+        ValidityCapacityAxis::Dimension => "dimension",
+        ValidityCapacityAxis::KeyCount => "key_count",
+        ValidityCapacityAxis::CandidateCount => "candidate_count",
+        ValidityCapacityAxis::Horizon => "horizon",
+        ValidityCapacityAxis::SpanLength => "span_length",
+    }
+}
+
+fn control_axis_label(axis: ValidityCapacityControlAxis) -> &'static str {
+    match axis {
+        ValidityCapacityControlAxis::Smoke => "smoke",
+        ValidityCapacityControlAxis::SemanticRunLength => "semantic_run_length",
+        ValidityCapacityControlAxis::WriteSegmentation => "write_segmentation",
+    }
+}
+
+fn capacity_case_value(case: ValidityCapacityCase) -> Value {
+    json!({
+        "axis": capacity_axis_label(case.axis),
+        "dim": case.dim,
+        "key_count": case.key_count,
+        "candidate_count": case.candidate_count,
+        "horizon": case.horizon,
+        "span_length": case.span_length,
+    })
+}
+
+fn control_case_value(case: ValidityCapacityControlCase) -> Value {
+    json!({
+        "axis": control_axis_label(case.axis),
+        "dim": case.dim,
+        "key_count": case.key_count,
+        "candidate_count": case.candidate_count,
+        "horizon": case.horizon,
+        "semantic_run_length": case.semantic_run_length,
+        "write_segment_length": case.write_segment_length,
+    })
+}
+
+fn capacity_plan_value(plan: &ValidityCapacityPlan) -> Value {
+    json!({
+        "plan": "validity_capacity",
+        "cases": plan.cases.iter().copied().map(capacity_case_value).collect::<Vec<_>>(),
+        "replicate_seeds": plan.replicate_seeds.clone(),
+    })
+}
+
+fn control_plan_value(plan: &ValidityCapacityControlPlan) -> Value {
+    json!({
+        "plan": "validity_capacity_controls",
+        "cases": plan.cases.iter().copied().map(control_case_value).collect::<Vec<_>>(),
+        "replicate_seeds": plan.replicate_seeds.clone(),
+    })
 }
 
 fn checked_product(left: usize, right: usize) -> Result<u64, AnyError> {
@@ -466,6 +598,16 @@ mod tests {
             )
             .unwrap(),
             4
+        );
+    }
+
+    #[test]
+    fn plan_payload_digests_are_deterministic() {
+        let plan = Protocol::Smoke.capacity_plan();
+        let value = capacity_plan_value(&plan);
+        assert_eq!(
+            digest_value(PLAN_DOMAIN, &value).unwrap(),
+            digest_value(PLAN_DOMAIN, &value).unwrap()
         );
     }
 }
