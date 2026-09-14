@@ -33,6 +33,7 @@ use crate::validity_capacity_theory::{
     ValidityCapacityNullModel, ValidityCapacityTheoryError,
 };
 use crate::validity_interval_memory::{ValidityIntervalMemory, ValidityMemoryError};
+use std::collections::HashSet;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -79,6 +80,9 @@ pub struct ValidityCapacityScoreMomentResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidityCapacityScoreMomentError {
+    EmptyCases,
+    EmptySeeds,
+    DuplicateSeed(u64),
     Capacity(String),
     Memory(String),
     Theory(String),
@@ -88,6 +92,9 @@ pub enum ValidityCapacityScoreMomentError {
 impl fmt::Display for ValidityCapacityScoreMomentError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::EmptyCases => write!(f, "capacity score oracle requires at least one case"),
+            Self::EmptySeeds => write!(f, "capacity score oracle requires replicate seeds"),
+            Self::DuplicateSeed(seed) => write!(f, "capacity score oracle contains duplicate seed {seed}"),
             Self::Capacity(error) => write!(f, "capacity score oracle case error: {error}"),
             Self::Memory(error) => write!(f, "capacity score oracle memory error: {error}"),
             Self::Theory(error) => write!(f, "capacity score oracle theory error: {error}"),
@@ -119,23 +126,10 @@ impl From<ValidityCapacityError> for ValidityCapacityScoreMomentError {
 pub fn measure_validity_capacity_score_moments(
     plan: &ValidityCapacityPlan,
 ) -> Result<ValidityCapacityScoreMomentResult, ValidityCapacityScoreMomentError> {
-    // Reuse the primary runner's public validation surface without depending on
-    // its private synthetic state. Running it would duplicate the full workload,
-    // so validation is mirrored below at the case level instead.
-    if plan.cases.is_empty() {
-        return Err(ValidityCapacityScoreMomentError::Capacity(
-            "validity capacity plan requires at least one case".to_string(),
-        ));
-    }
-    if plan.replicate_seeds.is_empty() {
-        return Err(ValidityCapacityScoreMomentError::Capacity(
-            "validity capacity plan requires replicate seeds".to_string(),
-        ));
-    }
+    validate_plan(plan)?;
 
     let mut observations = Vec::with_capacity(plan.cases.len() * plan.replicate_seeds.len());
     for &case in &plan.cases {
-        validate_case(case)?;
         for &seed in &plan.replicate_seeds {
             observations.push(measure_case(case, seed)?);
         }
@@ -327,6 +321,25 @@ fn ratio_or_infinity(observed: f64, predicted: f64) -> f64 {
     }
 }
 
+fn validate_plan(plan: &ValidityCapacityPlan) -> Result<(), ValidityCapacityScoreMomentError> {
+    if plan.cases.is_empty() {
+        return Err(ValidityCapacityScoreMomentError::EmptyCases);
+    }
+    if plan.replicate_seeds.is_empty() {
+        return Err(ValidityCapacityScoreMomentError::EmptySeeds);
+    }
+    let mut seeds = HashSet::new();
+    for &seed in &plan.replicate_seeds {
+        if !seeds.insert(seed) {
+            return Err(ValidityCapacityScoreMomentError::DuplicateSeed(seed));
+        }
+    }
+    for &case in &plan.cases {
+        validate_case(case)?;
+    }
+    Ok(())
+}
+
 fn validate_case(case: ValidityCapacityCase) -> Result<(), ValidityCapacityScoreMomentError> {
     if case.dim == 0 {
         return Err(ValidityCapacityScoreMomentError::Capacity(
@@ -427,5 +440,15 @@ mod tests {
                     && observation.null_distractor_noise_variance == distractor
             }));
         }
+    }
+
+    #[test]
+    fn duplicate_seed_is_rejected_before_measurement() {
+        let mut plan = ValidityCapacityPlan::smoke();
+        plan.replicate_seeds.push(plan.replicate_seeds[0]);
+        assert!(matches!(
+            measure_validity_capacity_score_moments(&plan),
+            Err(ValidityCapacityScoreMomentError::DuplicateSeed(_))
+        ));
     }
 }
