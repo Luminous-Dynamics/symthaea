@@ -27,10 +27,9 @@
 //! - Direct ActivePrimitive evidence preservation with HDC identity auditing
 //! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 //! - Candidate-specific typed epistemic grounding bound to exact primitive identity
-//! - Verified reasoning-chain IntegrationProxy history isolated from legacy feedback aggregates
-//! - Matched counterfactual IntegrationProxy operator envelopes over exact live contender sets
-//! - Compatibility-preserving baseline-vs-matched V3 evidence-impact telemetry
-//! - Live candidate identity binding from exact ActivePrimitive records without changing score inputs
+//! - Verified reasoning-chain local-transition history isolated from legacy feedback aggregates
+//! - Exact live candidate identity binding without changing legacy scoring inputs
+//! - Matched transition-geometry diagnostics that do not mutate canonical objective evidence
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -52,7 +51,6 @@ pub mod reasoning_integration_history;
 pub mod reasoning_kernel;
 pub mod reasoning_kernel_v2;
 pub mod reasoning_live_primitive_evidence;
-pub mod reasoning_matched_integration_probe;
 pub mod reasoning_meta_control_probe;
 pub mod reasoning_meta_state;
 pub mod reasoning_metacognition;
@@ -61,8 +59,7 @@ pub mod reasoning_objective_evidence;
 pub mod reasoning_objective_plumbing_probe;
 pub mod reasoning_qualification;
 pub mod reasoning_shadow_meta;
-pub mod reasoning_shadow_meta_identity;
-pub mod reasoning_shadow_meta_matched;
+pub mod reasoning_transition_geometry_shadow;
 
 pub use causal_consciousness::{
     CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
@@ -151,11 +148,6 @@ pub use reasoning_live_primitive_evidence::{
     LivePrimitiveEvidenceError, LivePrimitiveEvidenceProfile, LivePrimitiveEvidenceReport,
     RegistryPrimitiveMetadata, LIVE_PRIMITIVE_EVIDENCE_BRIDGE_VERSION,
 };
-pub use reasoning_matched_integration_probe::{
-    plan_active_primitive_with_matched_integration, probe_active_primitive_integration,
-    MatchedIntegrationProbeError, MatchedIntegrationProbeProfile, MatchedIntegrationProbeReport,
-    MatchedOperatorObservation, MATCHED_INTEGRATION_PROBE_VERSION, MATCHED_TRANSFORMATION_PANEL,
-};
 pub use reasoning_meta_control_probe::{
     run_meta_control_probe, MetaControlObservation, MetaControlProbeReport,
     META_CONTROL_PROBE_VERSION,
@@ -197,12 +189,12 @@ pub use reasoning_shadow_meta::{
     ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, V3ShadowObservation,
     V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
 };
-pub use reasoning_shadow_meta_identity::{
-    CandidateIdentityBindingReport,
-    IdentityBoundShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner,
-    LIVE_META_IDENTITY_BINDING_VERSION,
-};
-pub use reasoning_shadow_meta_matched::{
-    MatchedShadowQualifiedMetaReasoner, MatchedShadowStats, MatchedV3ShadowObservation,
-    MATCHED_META_SHADOW_VERSION,
+pub use reasoning_transition_geometry_shadow::{
+    measure_transition_geometry, CandidateIdentityBindingReport, CandidateTransitionGeometry,
+    TransitionGeometryError, TransitionGeometryReport,
+    TransitionGeometryShadowObservation, TransitionGeometryShadowQualifiedMetaReasoner as ShadowQualifiedMetaReasoner,
+    TransitionGeometryShadowStats, TransitionOperatorObservation,
+    LIVE_META_IDENTITY_BINDING_VERSION, TRANSITION_GEOMETRY_PANEL,
+    TRANSITION_GEOMETRY_PANEL_VERSION, TRANSITION_GEOMETRY_SCALE,
+    TRANSITION_GEOMETRY_SHADOW_VERSION,
 };
