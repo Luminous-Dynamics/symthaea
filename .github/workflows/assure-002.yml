@@ -128,3 +128,48 @@ jobs:
           path: target/assure-002-rustfmt/
           if-no-files-found: error
           retention-days: 1
+
+  apply-rustfmt-parent:
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feat/assure-002-preregistration
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Verify exact unformatted source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object crates/core/symthaea-assurance-campaign/src/lib.rs)" = "a47191a2d627da34743eaf595daad467a98fb27c"
+          test "$(git hash-object crates/core/symthaea-assurance-campaign/tests/assure002.rs)" = "9823e28bf8f4525d7cebec4defaa4e71744156ac"
+          test -z "$(git status --porcelain)"
+      - name: Install exact formatter only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
+          rustup override set 1.96.0
+          rustfmt --version
+      - name: Reproduce reviewed formatter outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+          test "$(sha256sum crates/core/symthaea-assurance-campaign/src/lib.rs | cut -d' ' -f1)" = "997f0c3974fe309b98acde96bdc97c6dab9b48ff4c27f5d87f5308ed20ced0c9"
+          test "$(sha256sum crates/core/symthaea-assurance-campaign/tests/assure002.rs | cut -d' ' -f1)" = "92880d555e1520aa4873fc5d0d1bda0b795f5a846d66c6fa0ba0e4c06b43af55"
+          ACTUAL="$(git diff --name-only | sort)"
+          EXPECTED="$(printf '%s\n%s\n' 'crates/core/symthaea-assurance-campaign/src/lib.rs' 'crates/core/symthaea-assurance-campaign/tests/assure002.rs' | sort)"
+          test "$ACTUAL" = "$EXPECTED"
+          git diff --check
+      - name: Commit exact formatter repair only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/core/symthaea-assurance-campaign/src/lib.rs crates/core/symthaea-assurance-campaign/tests/assure002.rs
+          git commit -m "style(assurance): apply Rust 1.96 formatting"
+          git push origin HEAD:feat/assure-002-preregistration
