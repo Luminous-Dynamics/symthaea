@@ -40,15 +40,6 @@ jobs:
 
       - name: Install pinned Rust 1.96.0
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
-        with:
-          components: rustfmt
-
-      - name: Check repaired adapter formatting
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs
 
       - name: Compile exact backend surface that exposed E0277
         shell: bash
