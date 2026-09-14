@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: Checkout exact successor root R2
+      - name: Checkout exact successor root R-star
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: edca5d5039b2cb48198dcb7034ab888f23c6448a
+          ref: d3f68bd64a75fc6781b5c1ed5ccfb6b9a28d217b
           fetch-depth: 0
           persist-credentials: false
 
@@ -27,18 +27,19 @@ jobs:
         run: |
           set -euo pipefail
           old_root="726d2be515e52eeff6c3f32a137e42a2648e35c7"
-          new_root="edca5d5039b2cb48198dcb7034ab888f23c6448a"
+          new_root="d3f68bd64a75fc6781b5c1ed5ccfb6b9a28d217b"
           test "$(git rev-parse HEAD)" = "$new_root"
-          test "$(git rev-parse HEAD^{tree})" = "799d529d5c5674d0baba9c368fdd6a2a5bcee85a"
-          test "$(git rev-parse HEAD~2)" = "$old_root"
+          test "$(git rev-parse HEAD^{tree})" = "f3ab1e2e8c7a120f74b3e06d1a551ca076e4d64c"
+          test "$(git rev-parse HEAD~4)" = "$old_root"
+          test "$(git rev-list --count "$old_root..$new_root")" -eq 4
 
           mapfile -t changed < <(git diff --name-only "$old_root" "$new_root")
           test "${#changed[@]}" -eq 2
           test "${changed[0]}" = ".github/workflows/butlin-gwt1-causal-trusted-builder.yml"
           test "${changed[1]}" = ".github/workflows/butlin-gwt1-trusted-builder.yml"
 
-          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-trusted-builder.yml)" = "e75a7348cefaa493e6de53fae660c65769e89bb2"
-          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-causal-trusted-builder.yml)" = "a1f4d481a06a9a4f72905e18b5a8000cb3e5ff9e"
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-trusted-builder.yml)" = "f310d563f8942e61f7cee1b18773d8cdd3b5f501"
+          test "$(git rev-parse HEAD:.github/workflows/butlin-gwt1-causal-trusted-builder.yml)" = "dc8c92e03ae97e6f3086a77959b842caf7ea95a0"
 
           # Scientific/evidence code and archive policy remain byte-identical to old R.
           test "$(git rev-parse HEAD:.github/scripts/evidence_archive_admission.py)" = "4a7228ab25fcd512d3b038bab29d5f10e0f22eaa"
@@ -51,7 +52,7 @@ jobs:
           test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs)" = "1e1a68a05235b043255a9e3ae690f7193708b9d7"
           test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
-      - name: Audit outcome-neutral workflow semantics
+      - name: Audit outcome-neutral and complete-bundle workflow semantics
         shell: bash
         run: |
           set -euo pipefail
@@ -80,7 +81,10 @@ jobs:
               assert 'unexpected exit status $status' in text, name
               assert 'if: always()' not in text, name
               assert "needs.qualify.result == 'success'" in text, name
-              assert "steps.bundle.outputs.has_evidence == 'true'" in text, name
+              assert 'has_evidence' not in text, name
+              assert 'after completed qualification:' in text, name
+              assert 'exit 1' in text, name
+              assert 'artifact_name: ${{ steps.bundle.outputs.artifact_name }}' in text, name
               assert 'cargo run --locked' in text, name
               assert '--deny-self-hosted-runners' in text, name
 
@@ -94,7 +98,7 @@ jobs:
                   assert path in text, (name, path)
           PY
 
-      - name: Exercise frozen exit-status/outcome theorem
+      - name: Exercise frozen exit-status and completeness theorem
         shell: bash
         run: |
           set -euo pipefail
@@ -112,6 +116,14 @@ jobs:
             expected="$(classify "$status")" || return 1
             test "$observed" = "$expected"
           }
+          require_complete() {
+            local dir="$1"
+            shift
+            local file
+            for file in "$@"; do
+              test -f "$dir/$file" || return 1
+            done
+          }
 
           accept_pair 0 Qualified
           accept_pair 20 NotDemonstrated
@@ -123,10 +135,17 @@ jobs:
           ! accept_pair 2 Inconclusive
           ! accept_pair 99 Qualified
 
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          touch "$tmp/raw.json" "$tmp/envelope.json" "$tmp/resolution.json" "$tmp/outcome.txt"
+          require_complete "$tmp" raw.json envelope.json resolution.json outcome.txt
+          rm "$tmp/resolution.json"
+          ! require_complete "$tmp" raw.json envelope.json resolution.json outcome.txt
+
       - name: Install pinned Rust 1.96.0
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
 
-      - name: Compile direct producer and verifier at exact R2
+      - name: Compile direct producer and verifier at exact R-star
         shell: bash
         env:
           CARGO_HOME: ${{ runner.temp }}/gwt1-outcome-neutral-cargo-home
@@ -136,7 +155,7 @@ jobs:
           cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_qualification
           cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_verify_evidence
 
-      - name: Compile causal producer and verifier at exact R2
+      - name: Compile causal producer and verifier at exact R-star
         shell: bash
         env:
           CARGO_HOME: ${{ runner.temp }}/gwt1-outcome-neutral-cargo-home
@@ -146,7 +165,7 @@ jobs:
           cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_causal_qualification
           cargo check --locked -p symthaea-psych-bench --features symthaea-backend --bin gwt1_verify_causal_evidence
 
-      - name: Run unchanged repaired adapter tests at exact R2
+      - name: Run unchanged repaired adapter tests at exact R-star
         shell: bash
         env:
           CARGO_HOME: ${{ runner.temp }}/gwt1-outcome-neutral-cargo-home
