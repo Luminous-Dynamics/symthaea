@@ -229,10 +229,8 @@ fn rel_001_sequence_fixed_symmetry_and_covariance_are_distinct_claims() {
     assert_ne!(g_rho_x.values, rho_g_x.values);
 
     // Covariance is a different statement: rho' = g rho g^-1.
-    let rho_prime_gx = permute_continuous(
-        &permute_continuous(&gx, &inverse).permute(1),
-        &permutation,
-    );
+    let rho_prime_gx =
+        permute_continuous(&permute_continuous(&gx, &inverse).permute(1), &permutation);
     assert_eq!(g_rho_x.values, rho_prime_gx.values);
 }
 
