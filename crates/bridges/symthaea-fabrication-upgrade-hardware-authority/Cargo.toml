@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-fabrication-upgrade-hardware-authority"
+version = "0.1.0"
+edition = "2024"
+description = "Clock-governed machine hardware reauthorization for hardened fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
+symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgrade-authority" }
+symthaea-fabrication-upgrade-probation-authority = { path = "../symthaea-fabrication-upgrade-probation-authority" }
+symthaea-fabrication-upgrade-probation-telemetry = { path = "../symthaea-fabrication-upgrade-probation-telemetry" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
