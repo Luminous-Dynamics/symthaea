@@ -1,0 +1,76 @@
+name: CORE-ID-001 Production Repair Materializer
+
+on:
+  push:
+    branches:
+      - prepare/core-id-001-production-replacement
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  materialize:
+    name: Materialize rustfmt and lockfile repair only
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      SUBJECT_SHA: 31d6fe9c03147ef8fed7fccf826d6a9a9a548e4e
+      PACKAGE: symthaea-identity
+      SOURCE: crates/core/symthaea-identity/src/lib.rs
+      MANIFEST: crates/core/symthaea-identity/Cargo.toml
+      LOCKFILE: Cargo.lock
+
+    steps:
+      - name: Checkout frozen red-evidence subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact frozen input
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Apply demonstrated rustfmt repair
+        run: cargo fmt -p "$PACKAGE"
+
+      - name: Regenerate workspace lockfile for new crate membership
+        run: cargo generate-lockfile
+
+      - name: Enforce repair scope
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git status --porcelain=v1 | sed -E 's/^.. //' | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "$LOCKFILE"
+          test "${changed[1]}" = "$SOURCE"
+          test -z "$(git diff --name-only -- "$MANIFEST")"
+          cargo fmt -p "$PACKAGE" -- --check
+          git diff --check
+
+      - name: Record candidate digests
+        run: |
+          set -euo pipefail
+          sha256sum "$MANIFEST" "$SOURCE" "$LOCKFILE" | tee core-id-production-repair-files.sha256
+          git diff -- "$SOURCE" "$LOCKFILE" > core-id-production-repair.patch
+
+      - name: Upload exact replacement inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-id-001-production-replacement-inputs
+          path: |
+            crates/core/symthaea-identity/Cargo.toml
+            crates/core/symthaea-identity/src/lib.rs
+            Cargo.lock
+            core-id-production-repair-files.sha256
+            core-id-production-repair.patch
+          if-no-files-found: error
