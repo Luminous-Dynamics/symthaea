@@ -3,13 +3,14 @@
 //! Threshold-authorized live lineage for fabrication containment state.
 //!
 //! `FabricationContainmentState` is durable evidence data, but it is serializable and therefore is
-//! not by itself live authority. This bridge establishes an opaque authority chain whose genesis is
-//! canonical and whose successors must pass the kernel's strict hash-linked successor theorem.
+//! not live authority on its own. This bridge establishes an opaque authority chain whose genesis
+//! is the exact canonical kernel genesis and whose successors must pass the strict hash-linked
+//! kernel successor theorem.
 //!
-//! Successor authorization is deliberately non-circular: the threshold ceremony must have been
-//! qualified against the *previous* authorized compromise tracker, while the current witnessed
-//! trust-snapshot head must also commit that exact previous containment-state/tracker digest. The
-//! proposed successor cannot omit a prior compromise in order to make its own signers eligible.
+//! Successor authorization is deliberately non-circular: the threshold ceremony must be qualified
+//! against the *previous* authorized compromise tracker, while the current witnessed trust head
+//! must commit that exact previous containment state and tracker. A proposed successor therefore
+//! cannot erase a compromise to make its own authorizing signers eligible.
 
 #![deny(unsafe_code)]
 
@@ -302,6 +303,32 @@ pub fn prepare_clock_governed_containment_genesis_v1(
     if !is_canonical_genesis(state) {
         violations.push(ContainmentStateAuthorityError::NonCanonicalGenesis);
     }
+
+    let state_digest = match digest_containment_state(state) {
+        Ok(value) => value,
+        Err(error) => {
+            violations.push(ContainmentStateAuthorityError::StateInvalid(format!(
+                "{error:?}"
+            )));
+            Sha256Digest([0; 32])
+        }
+    };
+    let tracker_digest = match digest_signer_compromise_tracker(&state.signer_compromise_tracker) {
+        Ok(value) => value,
+        Err(error) => {
+            violations.push(ContainmentStateAuthorityError::StateInvalid(format!(
+                "{error:?}"
+            )));
+            Sha256Digest([0; 32])
+        }
+    };
+    if trust_head.containment_state_digest() != state_digest {
+        violations.push(ContainmentStateAuthorityError::TrustHeadContainmentMismatch);
+    }
+    if trust_head.compromise_tracker_digest() != tracker_digest {
+        violations.push(ContainmentStateAuthorityError::TrustHeadCompromiseTrackerMismatch);
+    }
+
     if !violations.is_empty() {
         return Err(violations);
     }
@@ -310,9 +337,7 @@ pub fn prepare_clock_governed_containment_genesis_v1(
         state,
         None,
         None,
-        digest_signer_compromise_tracker(&state.signer_compromise_tracker).map_err(|error| {
-            vec![ContainmentStateAuthorityError::StateInvalid(format!("{error:?}"))]
-        })?,
+        tracker_digest,
         trust_head,
         threshold_policy,
         observation_basis,
@@ -377,7 +402,7 @@ pub fn authorize_clock_governed_containment_state_v1(
     prepared: PreparedContainmentStateAuthorityV1,
     ceremony: &ClockGovernedThresholdCeremonyV1,
 ) -> Result<ClockGovernedContainmentStateV1, ContainmentStateAuthorityError> {
-    if ceremony.purpose() != prepared.purpose {
+    if ceremony.purpose() != prepared.purpose.as_str() {
         return Err(ContainmentStateAuthorityError::CeremonyPurposeMismatch);
     }
     if ceremony.payload_digest() != prepared.signing_payload_digest() {
@@ -396,6 +421,9 @@ pub fn authorize_clock_governed_containment_state_v1(
         return Err(ContainmentStateAuthorityError::ClockEnvelopeMismatch);
     }
 
+    // A successor may introduce a compromise record for one of the ceremony signers. If that
+    // compromise may already be effective anywhere in the authorization interval, the same signer
+    // cannot authorize the state that declares it compromised.
     for (algorithm, key_id) in ceremony.signers() {
         for compromise in prepared
             .proposed_state
@@ -503,7 +531,7 @@ fn build_prepared(
         proposed_state_digest: proposed_state_digest.to_hex(),
         proposed_generation: state.generation,
         previous_authority_id: previous_authority_id.map(|value| value.to_hex()),
-        previous_state_digest: previous_state_digest.map(Sha256Digest::to_hex),
+        previous_state_digest: previous_state_digest.map(|value| value.to_hex()),
         previous_compromise_tracker_digest: previous_compromise_tracker_digest.to_hex(),
         proposed_compromise_tracker_digest: proposed_compromise_tracker_digest.to_hex(),
         trust_head_id: trust_head.id().to_hex(),
@@ -544,7 +572,7 @@ fn is_canonical_genesis(state: &FabricationContainmentState) -> bool {
         state.release_resilience_generation,
         state.release_resilience_state_digest,
     )
-    .is_ok_and(|canonical| canonical == *state)
+    .is_ok_and(|canonical| &canonical == state)
 }
 
 fn valid_threshold_policy(policy: &ThresholdCeremonyPolicy) -> bool {
