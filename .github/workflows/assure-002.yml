@@ -86,3 +86,9 @@ jobs:
           set -euo pipefail
           git diff -- Cargo.lock
           git diff --exit-code -- Cargo.lock
+      - name: Prove tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
