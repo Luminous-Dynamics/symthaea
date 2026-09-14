@@ -29,10 +29,11 @@ pub const GWT1_VERIFIED_FINAL_ARTIFACT_SCHEMA_V1: &str =
 
 /// Opaque read-only authority token for one reconstructed final GWT-1 artifact.
 ///
-/// Deliberately does not implement `Serialize` or `Deserialize`. Persisted
-/// authority is the signed final archive plus its verification material, not a
-/// serialized copy of this in-memory capability.
-#[derive(Debug, Clone)]
+/// Deliberately implements neither `Clone` nor serde traits. Authority is the
+/// one verified in-memory capability produced by the trusted consumer path;
+/// persisted authority remains the signed final archive and its verification
+/// material.
+#[derive(Debug)]
 pub struct VerifiedGwt1ResolvedArtifactV1 {
     schema: &'static str,
     final_archive_sha256: String,
@@ -167,10 +168,9 @@ fn gwt1_claims_functional_support(view: &ButlinResolvedEvidenceViewV2) -> bool {
 /// Complete the pure reconstruction theorem after cryptographic verification,
 /// bounded final-archive admission, and source replay have succeeded.
 ///
-/// This constructor is intentionally crate-internal. The future trusted
-/// consumer verifier is the only code allowed to call it after establishing
-/// the external authority roots.
-pub(crate) fn verify_gwt1_final_reconstruction_v1(
+/// Kept module-private so there is exactly one future authority-minting call
+/// site: the cryptographic consumer verifier implemented alongside this theorem.
+fn verify_gwt1_final_reconstruction_v1(
     final_archive_sha256: &str,
     stored_base_report: &ButlinIndicatorReport,
     stored_resolved_view: &ButlinResolvedEvidenceViewV2,
@@ -326,7 +326,8 @@ mod tests {
             },
         };
         let disposition = classify_gwt1_evidence_disposition_v1(&view).expect("disposition");
-        let internal_verification = br#"[{"verificationResult":{"signature":{"certificate":"fixture"}}}]"#.to_vec();
+        let internal_verification =
+            br#"[{"verificationResult":{"signature":{"certificate":"fixture"}}}]"#.to_vec();
         let stored_candidate = trusted_resolution_candidate_for_test(
             base_report.clone(),
             view.clone(),
@@ -378,7 +379,8 @@ mod tests {
             &recomputed,
         )
         .expect("exact reconstruction");
-        assert_eq!(token.final_archive_sha256(), "d".repeat(64));
+        let digest = "d".repeat(64);
+        assert_eq!(token.final_archive_sha256(), digest.as_str());
         assert_eq!(
             token.resolved_gwt1_outcome(),
             EvidenceOutcome::Supported(SupportTier::Observed)
