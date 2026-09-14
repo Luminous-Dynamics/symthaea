@@ -1,0 +1,79 @@
+name: Epistemic hardening
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-engineering/**"
+      - "crates/domains/symthaea-materials/**"
+      - "crates/domains/symthaea-nuclear/**"
+      - "crates/domains/symthaea-nuclear-forensics/**"
+      - "crates/domains/symthaea-process-discovery/**"
+      - "crates/domains/symthaea-quantum-chemistry/**"
+      - "crates/domains/symthaea-thermofluids/**"
+      - "scripts/check-epistemic-authority.py"
+      - ".github/workflows/epistemic-hardening.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: epistemic-hardening-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.94.0
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify epistemic authority contracts
+        run: python3 scripts/check-epistemic-authority.py
+
+      - name: Resolve locked workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1
+
+      - name: Check formatting for hardened scientific crates
+        run: >-
+          cargo fmt
+          -p symthaea-engineering
+          -p symthaea-materials
+          -p symthaea-nuclear
+          -p symthaea-nuclear-forensics
+          -p symthaea-process-discovery
+          -p symthaea-quantum-chemistry
+          -p symthaea-thermofluids
+          -- --check
+
+      - name: Test hardened scientific crates
+        run: >-
+          cargo test --locked --all-targets --all-features
+          -p symthaea-engineering
+          -p symthaea-materials
+          -p symthaea-nuclear
+          -p symthaea-nuclear-forensics
+          -p symthaea-process-discovery
+          -p symthaea-quantum-chemistry
+          -p symthaea-thermofluids
+
+      - name: Lint hardened scientific crates
+        run: >-
+          cargo clippy --locked --all-targets --all-features
+          -p symthaea-engineering
+          -p symthaea-materials
+          -p symthaea-nuclear
+          -p symthaea-nuclear-forensics
+          -p symthaea-process-discovery
+          -p symthaea-quantum-chemistry
+          -p symthaea-thermofluids
+          -- -D warnings
