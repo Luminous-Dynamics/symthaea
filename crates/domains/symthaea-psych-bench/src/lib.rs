@@ -55,6 +55,7 @@ pub mod adapter;
 pub mod benchmarks;
 pub mod claim_contract;
 pub mod harness;
+pub mod regression_contract;
 pub mod substrate_transfer;
 pub mod wm;
 

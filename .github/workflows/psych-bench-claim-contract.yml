@@ -2,11 +2,14 @@ name: Psych-Bench Claim Contract
 
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - psych-bench/typed-claim-class
     paths:
       - '.github/workflows/psych-bench-claim-contract.yml'
       - 'scripts/ci/strict_clippy_paths.py'
       - 'crates/domains/symthaea-psych-bench/src/claim_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/src/regression_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/security/**'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
@@ -18,7 +21,7 @@ permissions:
 
 jobs:
   claim-contract:
-    name: Exact-subject claim contract
+    name: Exact-subject evidence contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 
@@ -50,19 +53,16 @@ jobs:
           rustc --version --verbose
           cargo --version
 
-      # Formatting is kept diagnostic in this focused semantic lane. A direct
-      # rustfmt invocation on lib.rs recursively walked unrelated modules and
-      # blocked claim-contract execution on pre-existing architecture.rs drift.
-      # Repository-wide style qualification remains independent evidence.
       - name: Contract format diagnostic
         continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
           rustfmt --edition 2024 --check \
-            crates/domains/symthaea-psych-bench/src/claim_contract.rs
+            crates/domains/symthaea-psych-bench/src/claim_contract.rs \
+            crates/domains/symthaea-psych-bench/src/regression_contract.rs
 
-      - name: Compile claim contract
+      - name: Compile evidence contracts
         shell: bash
         run: |
           set -euo pipefail
@@ -74,16 +74,17 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib claim_contract::tests -- --nocapture
 
-      # `-D warnings` over the package's transitive dependency graph previously
-      # failed on unrelated evidence-plane lint debt after this exact claim
-      # module had already compiled and passed all focused regressions. Keep
-      # dependency compile failures authoritative, but make lint authority match
-      # the source surface this job claims to qualify.
+      - name: Execute regression-contract regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib regression_contract::tests -- --nocapture
+
       - name: Strict focused Clippy
         shell: bash
         run: |
           set -euo pipefail
-          report="$RUNNER_TEMP/claim-clippy.jsonl"
+          report="$RUNNER_TEMP/evidence-contracts-clippy.jsonl"
           set +e
           cargo clippy --locked -p symthaea-psych-bench --lib --no-deps \
             --message-format=json > "$report"
@@ -91,7 +92,8 @@ jobs:
           set -e
           python3 scripts/ci/strict_clippy_paths.py \
             "$report" \
-            crates/domains/symthaea-psych-bench/src/claim_contract.rs
+            crates/domains/symthaea-psych-bench/src/claim_contract.rs \
+            crates/domains/symthaea-psych-bench/src/regression_contract.rs
           test "$cargo_status" -eq 0
 
       - name: Postflight exact-subject immutability
