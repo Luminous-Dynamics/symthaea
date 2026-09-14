@@ -1,0 +1,29 @@
+[package]
+name = "symthaea-assurance-linux-tpm-ima-current-anchor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Current-head composition for ledger-relative Linux TPM2 plus IMA assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "ima", "attestation", "assurance"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-acceptance-ledger-head-currentness = { path = "../../domains/symthaea-assurance-acceptance-ledger-head-currentness" }
+symthaea-assurance-linux-tpm-ima-ledger-anchor = { path = "../symthaea-assurance-linux-tpm-ima-ledger-anchor" }
+symthaea-assurance-tpm2-attestation-possession = { path = "../../domains/symthaea-assurance-tpm2-attestation-possession" }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+sha2 = { workspace = true }
+symthaea-assurance-tpm-ima-pcr-binding = { path = "../symthaea-assurance-tpm-ima-pcr-binding" }
+symthaea-assurance-tpm2-checkquote-adapter = { path = "../symthaea-assurance-tpm2-checkquote-adapter" }
+symthaea-assurance-tpm2-platform-qualification = { path = "../../domains/symthaea-assurance-tpm2-platform-qualification" }
+symthaea-assurance-tpm2-possession-policy-binding = { path = "../../domains/symthaea-assurance-tpm2-possession-policy-binding" }
+symthaea-linux-ima-replay = { path = "../../domains/symthaea-linux-ima-replay" }
