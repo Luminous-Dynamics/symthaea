@@ -516,7 +516,7 @@ impl CognitiveLoopService {
                 && self.stats.total_cycles == 500
             {
                 let mut experiment =
-                crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical(
+                    crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical(
                 );
                 match experiment.run() {
                     Ok(results) => {
@@ -600,6 +600,16 @@ impl CognitiveLoopService {
         // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
+        // Clone the processor's exact current active records before borrowing the shadow reasoner
+        // mutably. This preserves activation strength/reason/duration and immutable primitive
+        // identity for V3 measurement without changing the historical candidate builder below.
+        let active_primitive_snapshot: Vec<crate::consciousness::ActivePrimitive> = self
+            .primitive_tier
+            .primitive_processor
+            .as_ref()
+            .and_then(|processor| processor.current())
+            .map(|current| current.all_active().into_iter().cloned().collect())
+            .unwrap_or_default();
         let (meta_reasoning_confidence, meta_reasoning_insights) = if let Some(ref mut reasoner) =
             self.primitive_tier.meta_cognitive_reasoner
         {
@@ -623,7 +633,12 @@ impl CognitiveLoopService {
                         .collect();
                 let mut chain =
                     crate::consciousness::primitive_reasoning::ReasoningChain::new(hv16_cached);
-                match reasoner.meta_reason(input, candidates, &mut chain) {
+                match reasoner.meta_reason_with_active_evidence(
+                    input,
+                    candidates,
+                    &active_primitive_snapshot,
+                    &mut chain,
+                ) {
                     Ok(result) => (result.meta_confidence, result.meta_insights.len()),
                     Err(_) => (0.5, 0),
                 }
