@@ -9,5 +9,13 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
-[lints]
-workspace = true
+# PARADOX-001 is intentionally a standalone qualification workspace so its
+# dependency and lock surface stay independent of unrelated repository crates.
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
