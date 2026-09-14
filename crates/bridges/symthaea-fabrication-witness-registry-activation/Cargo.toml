@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-fabrication-witness-registry-activation"
+version = "0.1.0"
+edition = "2024"
+description = "Fresh-clock activation for authorized transparency witness registry successors"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-witness-registry-lineage = { path = "../symthaea-fabrication-witness-registry-lineage" }
+symthaea-fabrication-trust-snapshot-head = { path = "../symthaea-fabrication-trust-snapshot-head" }
+symthaea-fabrication-containment-state-authority = { path = "../symthaea-fabrication-containment-state-authority" }
+symthaea-fabrication-containment-head = { path = "../symthaea-fabrication-containment-head" }
+symthaea-fabrication-witness-authority = { path = "../symthaea-fabrication-witness-authority" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
