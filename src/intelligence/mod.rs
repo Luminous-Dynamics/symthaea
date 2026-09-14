@@ -25,6 +25,7 @@
 //! - Live primitive identity recovery with explicit objective-evidence gaps
 //! - Append-only evidence acquisition sessions with hash-chained deterministic replanning
 //! - Direct ActivePrimitive evidence preservation with HDC identity auditing
+//! - Live V3 ActivePrimitive shadow telemetry without behavior authority
 
 pub mod athena;
 pub mod causal_consciousness;
@@ -165,5 +166,5 @@ pub use reasoning_qualification::{
 };
 pub use reasoning_shadow_meta::{
     ObjectiveSpread, ShadowMetaObservation, ShadowMetaStats, ShadowQualifiedMetaReasoner,
-    LIVE_META_SHADOW_VERSION,
+    V3ShadowObservation, V3ShadowOutcomeKind, LIVE_META_SHADOW_VERSION,
 };
