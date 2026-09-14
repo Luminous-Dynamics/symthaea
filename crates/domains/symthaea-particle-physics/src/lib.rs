@@ -16,6 +16,8 @@
 //!   force semantics, Kennedy-Pendleton heat-bath, and overrelaxation cycles
 //! - **Canonical gauge persistence**: versioned big-endian IEEE-754 link bytes
 //!   with exact site/link/matrix ordering for checkpoint/configuration identity
+//! - **Canonical checkpoint records**: versioned campaign/chain/RNG/profile
+//!   authority bytes with independent-oracle parity before cryptographic hashing
 //! - **Spatial APE operator construction**: synchronous spatial-only APE smearing
 //!   with deterministic SU(3) polar projection and untouched temporal links
 //! - **Mixed/off-axis Wilson measurement**: original temporal links plus APE
@@ -43,6 +45,7 @@ pub mod decay_widths;
 pub mod field_quantization;
 pub mod general_relativity;
 pub mod lattice_bresenham_wilson;
+pub mod lattice_checkpoint;
 pub mod lattice_cubic_wilson;
 pub mod lattice_gauge;
 pub mod lattice_gauge_encoding;
@@ -77,6 +80,13 @@ pub use lattice_bresenham_wilson::{
     BresenhamWilsonError, average_bresenham_mixed_wilson_loop,
     average_cubic_bresenham_mixed_wilson_loop, bresenham_mixed_wilson_loop,
     bresenham_spatial_transporter, generalized_bresenham_steps,
+};
+pub use lattice_checkpoint::{
+    CheckpointChildDisposition, CheckpointRecordError, CheckpointRestoreExpectation,
+    LQCD_CHECKPOINT_COMMITMENT_TAG, LQCD_CHECKPOINT_RECORD_ID, LQCD_CHECKPOINT_RECORD_TAG,
+    LQCD_SEED_COMMITMENT_TAG, LqcdCheckpointRecordV1, checkpoint_commitment_preimage,
+    classify_checkpoint_child, decode_checkpoint_record, encode_checkpoint_record,
+    seed_commitment_preimage, validate_restore_authority,
 };
 pub use lattice_cubic_wilson::{
     CUBIC_SIGNED_PERMUTATION_ORBIT_ID, CubicOrbitWilsonError,
