@@ -1,0 +1,308 @@
+name: MANIFOLD-006N-BD Clippy Failure Diagnostic Replay
+
+on:
+  push:
+    branches:
+      - audit/manifold-006n-bd-clippy-diagnostic
+    paths:
+      - '.github/workflows/manifold-006n-bd-clippy-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUBJECT_SHA: ee79f86a6d431c462ae8701094a3e29be88c4a5e
+  ARTIFACT_DIR: artifacts/manifold-006n-bd
+
+jobs:
+  diagnose:
+    name: Reproduce and capture frozen N-B Clippy failure
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out diagnostic control plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          ref: ${{ github.sha }}
+          path: control
+          persist-credentials: false
+
+      - name: Check out exact frozen N-B subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 1
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          persist-credentials: false
+
+      - name: Bind control plane and tested subject
+        run: |
+          set -euo pipefail
+          mkdir -p "$ARTIFACT_DIR"
+          test "$(git -C control rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git -C subject status --porcelain)"
+
+          control_tree="$(git -C control rev-parse HEAD^{tree})"
+          subject_tree="$(git -C subject rev-parse HEAD^{tree})"
+          workflow_sha256="$(sha256sum control/.github/workflows/manifold-006n-bd-clippy-diagnostic.yml | awk '{print $1}')"
+          robust_source_sha256="$(sha256sum subject/crates/core/symthaea-core/src/robust_reachability.rs | awk '{print $1}')"
+          cargo_lock_sha256="$(sha256sum subject/Cargo.lock | awk '{print $1}')"
+
+          {
+            echo "schema=symthaea.manifold-006n-bd.environment.v1"
+            echo "authority=diagnostic-only"
+            echo "qualification_granted=false"
+            echo "control_sha=$GITHUB_SHA"
+            echo "control_tree_sha=$control_tree"
+            echo "workflow_sha256=$workflow_sha256"
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "subject_tree_sha=$subject_tree"
+            echo "robust_source_sha256=$robust_source_sha256"
+            echo "cargo_lock_sha256=$cargo_lock_sha256"
+            echo "runner_label=ubuntu-24.04"
+            echo "checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02"
+          } > "$ARTIFACT_DIR/environment.txt"
+
+      - name: Install exact Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component clippy
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          {
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "clippy=$(cargo clippy --version)"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=${ImageOS:-unknown}"
+            echo "image_version=${ImageVersion:-unknown}"
+          } >> "$ARTIFACT_DIR/environment.txt"
+
+      - name: Replay exact failing Clippy command verbatim
+        run: |
+          set -uo pipefail
+          out="$GITHUB_WORKSPACE/$ARTIFACT_DIR"
+          cd subject
+          set +e
+          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-exact-target" \
+            cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings \
+            > "$out/clippy-exact.stdout.txt" \
+            2> "$out/clippy-exact.stderr.txt"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$out/clippy-exact.exit-code.txt"
+
+      - name: Replay with machine-readable diagnostics
+        run: |
+          set -uo pipefail
+          out="$GITHUB_WORKSPACE/$ARTIFACT_DIR"
+          cd subject
+          set +e
+          CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006n-bd-json-target" \
+            cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings \
+            > "$out/clippy-json.stdout.jsonl" \
+            2> "$out/clippy-json.stderr.txt"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$out/clippy-json.exit-code.txt"
+
+      - name: Normalize compiler diagnostics
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006n-bd')
+          records = []
+          unparsable = 0
+
+          for raw in root.joinpath('clippy-json.stdout.jsonl').read_text(errors='replace').splitlines():
+              try:
+                  event = json.loads(raw)
+              except json.JSONDecodeError:
+                  unparsable += 1
+                  continue
+              if event.get('reason') != 'compiler-message':
+                  continue
+              msg = event.get('message') or {}
+              code_obj = msg.get('code') or {}
+              spans = []
+              for span in msg.get('spans') or []:
+                  if not span.get('is_primary'):
+                      continue
+                  spans.append({
+                      'file': span.get('file_name'),
+                      'line_start': span.get('line_start'),
+                      'line_end': span.get('line_end'),
+                      'column_start': span.get('column_start'),
+                      'column_end': span.get('column_end'),
+                      'suggested_replacement': span.get('suggested_replacement'),
+                      'suggestion_applicability': span.get('suggestion_applicability'),
+                  })
+              records.append({
+                  'level': msg.get('level'),
+                  'code': code_obj.get('code'),
+                  'message': msg.get('message'),
+                  'spans': spans,
+                  'rendered': msg.get('rendered'),
+              })
+
+          relevant = [r for r in records if r['level'] in {'error', 'warning'}]
+          clippy = [r for r in relevant if (r.get('code') or '').startswith('clippy::')]
+          payload = {
+              'schema': 'symthaea.manifold-006n-bd.clippy-diagnostics.v1',
+              'authority': 'diagnostic-only',
+              'subject_sha': 'ee79f86a6d431c462ae8701094a3e29be88c4a5e',
+              'compiler_message_count': len(records),
+              'relevant_diagnostic_count': len(relevant),
+              'clippy_diagnostic_count': len(clippy),
+              'clippy_codes': sorted({r['code'] for r in clippy}),
+              'unparsable_stdout_line_count': unparsable,
+              'diagnostics': relevant,
+          }
+          root.joinpath('clippy-diagnostics.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Prove tested tracked checkout remained immutable
+        run: |
+          set -euo pipefail
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git -C subject status --porcelain --untracked-files=no)"
+          git -C subject diff --exit-code --
+          git -C subject diff --cached --exit-code --
+
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006n-bd')
+          env = dict(
+              line.split('=', 1)
+              for line in root.joinpath('environment.txt').read_text().splitlines()
+              if '=' in line
+          )
+          current_head = subprocess.check_output(
+              ['git', '-C', 'subject', 'rev-parse', 'HEAD'], text=True
+          ).strip()
+          current_tree = subprocess.check_output(
+              ['git', '-C', 'subject', 'rev-parse', 'HEAD^{tree}'], text=True
+          ).strip()
+          payload = {
+              'schema': 'symthaea.manifold-006n-bd.execution-integrity.v1',
+              'subject_sha': current_head,
+              'preflight_tree_sha': env['subject_tree_sha'],
+              'postflight_tree_sha': current_tree,
+              'head_unchanged': current_head == os.environ['SUBJECT_SHA'],
+              'tree_identity_unchanged': current_tree == env['subject_tree_sha'],
+              'tracked_worktree_clean': True,
+              'index_clean': True,
+              'untracked_build_and_evidence_outputs_excluded_from_immutability_claim': True,
+              'verdict': 'PASS',
+          }
+          assert payload['head_unchanged']
+          assert payload['tree_identity_unchanged']
+          root.joinpath('execution-integrity.json').write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Emit diagnostic replay receipt
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          root = Path('artifacts/manifold-006n-bd')
+          exact_status = int(root.joinpath('clippy-exact.exit-code.txt').read_text().strip())
+          json_status = int(root.joinpath('clippy-json.exit-code.txt').read_text().strip())
+          diagnostics = json.loads(root.joinpath('clippy-diagnostics.json').read_text())
+          integrity = json.loads(root.joinpath('execution-integrity.json').read_text())
+
+          raw_exact = root.joinpath('clippy-exact.stdout.txt').read_bytes() + root.joinpath('clippy-exact.stderr.txt').read_bytes()
+          raw_json = root.joinpath('clippy-json.stdout.jsonl').read_bytes() + root.joinpath('clippy-json.stderr.txt').read_bytes()
+
+          reproduced = (
+              exact_status != 0
+              and json_status != 0
+              and diagnostics['relevant_diagnostic_count'] > 0
+              and integrity['verdict'] == 'PASS'
+          )
+          receipt = {
+              'schema': 'symthaea.manifold-006n-bd.diagnostic-replay.v1',
+              'authority': 'diagnostic-only',
+              'qualification_granted': False,
+              'control_sha': os.environ['GITHUB_SHA'].lower(),
+              'tested_subject_sha': os.environ['SUBJECT_SHA'].lower(),
+              'exact_command': 'cargo clippy --locked -p symthaea-core --no-default-features --lib -- -D warnings',
+              'exact_command_exit_code': exact_status,
+              'json_replay_exit_code': json_status,
+              'relevant_diagnostic_count': diagnostics['relevant_diagnostic_count'],
+              'clippy_diagnostic_count': diagnostics['clippy_diagnostic_count'],
+              'clippy_codes': diagnostics['clippy_codes'],
+              'exact_raw_sha256': hashlib.sha256(raw_exact).hexdigest(),
+              'json_raw_sha256': hashlib.sha256(raw_json).hexdigest(),
+              'tracked_checkout_immutability': integrity['verdict'],
+              'source_repair_authorized': reproduced,
+              'verdict': 'PASS_DIAGNOSTIC_REPRODUCTION' if reproduced else 'FAIL_DIAGNOSTIC_REPRODUCTION',
+          }
+          root.joinpath('report.json').write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + '\n'
+          )
+          PY
+
+      - name: Hash diagnostic capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          cd "$ARTIFACT_DIR"
+          : > SHA256SUMS
+          for file in \
+            environment.txt \
+            clippy-exact.stdout.txt \
+            clippy-exact.stderr.txt \
+            clippy-exact.exit-code.txt \
+            clippy-json.stdout.jsonl \
+            clippy-json.stderr.txt \
+            clippy-json.exit-code.txt \
+            clippy-diagnostics.json \
+            execution-integrity.json \
+            report.json; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" >> SHA256SUMS
+            fi
+          done
+
+      - name: Upload diagnostic capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006n-bd-clippy-diagnostic-${{ env.SUBJECT_SHA }}-${{ github.sha }}
+          path: artifacts/manifold-006n-bd/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Require faithful diagnostic reproduction
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = Path('artifacts/manifold-006n-bd/report.json')
+          if not report.exists():
+              raise SystemExit('diagnostic report missing')
+          data = json.loads(report.read_text())
+          if data.get('verdict') != 'PASS_DIAGNOSTIC_REPRODUCTION':
+              raise SystemExit(f"diagnostic replay failed closed: {data.get('verdict')}")
+          PY
