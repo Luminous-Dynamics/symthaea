@@ -74,6 +74,8 @@ jobs:
           cargo fmt --manifest-path crates/core/symthaea-assurance-semantics/Cargo.toml
           cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
           git diff --check
+          git diff --exit-code "$SEMANTICS_PARENT" -- crates/core/symthaea-assurance-semantics
+          printf '%s\n' 'qualified semantics subtree identity: PASS'
 
       - name: Static preflight — execute no candidate code
         shell: bash
