@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-tpm2-fd-pinned-checkquote"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "File-descriptor-pinned execution identity for TPM2 checkquote assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "attestation", "nix", "assurance"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-tpm2-checkquote-adapter = { path = "../symthaea-assurance-tpm2-checkquote-adapter" }
+symthaea-assurance-tpm2-attestation-possession = { path = "../../domains/symthaea-assurance-tpm2-attestation-possession" }
