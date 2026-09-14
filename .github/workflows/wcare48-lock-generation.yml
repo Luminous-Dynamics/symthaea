@@ -1,0 +1,92 @@
+name: WCARE-48 Observed Lock Generation
+
+on:
+  push:
+    branches:
+      - wcare-48-observed-lock-generation
+    paths:
+      - .github/workflows/wcare48-lock-generation.yml
+      - scripts/wcare48-generate-lock.sh
+      - docs/release/evidence/WCARE48_LOCK_GENERATION_PROTOCOL_V1.md
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wcare48-lock-generation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    if: github.repository == 'Luminous-Dynamics/symthaea'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact PREPARED subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify exact PREPARED checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_NAME" = "wcare-48-observed-lock-generation"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD^)" = "0321a22986e5c6bf1a6b099d30dc75ccc33d9deb"
+          test ! -e tools/wcare42_builder_attestation_verifier/Cargo.lock
+          ! git cat-file -e HEAD:tools/wcare42_builder_attestation_verifier/Cargo.lock 2>/dev/null
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Install exact Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup override set 1.96.0
+          rustc --version
+          cargo --version
+
+      - name: Generate and preflight standalone lock
+        shell: bash
+        env:
+          WCARE48_PREPARED_HEAD: ${{ github.sha }}
+          WCARE48_RUN_ID: ${{ github.run_id }}
+          WCARE48_RUN_NUMBER: ${{ github.run_number }}
+          WCARE48_RUN_ATTEMPT: ${{ github.run_attempt }}
+          WCARE48_REPOSITORY: ${{ github.repository }}
+          WCARE48_REF_NAME: ${{ github.ref_name }}
+          WCARE48_WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: bash scripts/wcare48-generate-lock.sh
+
+      - name: Commit exact generated evidence
+        shell: bash
+        env:
+          WCARE48_PREPARED_HEAD: ${{ github.sha }}
+          WCARE48_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          LOCK="tools/wcare42_builder_attestation_verifier/Cargo.lock"
+          RECEIPT="docs/release/evidence/WCARE48_LOCK_GENERATION_RECEIPT_V1.json"
+
+          EXPECTED_STATUS="$(printf '?? %s\n?? %s\n' "$RECEIPT" "$LOCK" | sort)"
+          ACTUAL_STATUS="$(git status --porcelain=v1 --untracked-files=all | sort)"
+          test "$ACTUAL_STATUS" = "$EXPECTED_STATUS"
+
+          git add -- "$LOCK" "$RECEIPT"
+          EXPECTED_NAMES="$(printf '%s\n%s\n' "$RECEIPT" "$LOCK" | sort)"
+          ACTUAL_NAMES="$(git diff --cached --name-only | sort)"
+          test "$ACTUAL_NAMES" = "$EXPECTED_NAMES"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit \
+            -m "evidence(wcare48): add observed standalone lock candidate" \
+            -m "Prepared-Head: $WCARE48_PREPARED_HEAD" \
+            -m "GitHub-Run-Id: $WCARE48_RUN_ID"
+
+          test "$(git rev-parse HEAD^)" = "$WCARE48_PREPARED_HEAD"
+          test "$(git diff --name-only HEAD^ HEAD | sort)" = "$EXPECTED_NAMES"
+          git push origin "HEAD:$GITHUB_REF_NAME"
