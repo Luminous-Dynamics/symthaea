@@ -164,6 +164,50 @@ for sensitive in \
   fi
 done
 
+# Independent coverage theorem: target problem IDs and policy problem IDs must be exactly equal,
+# with one canonical and one random row per target. Equal aggregate counts are not sufficient.
+python3 - "$SYMTHAEA_ARC_TARGET_BUNDLE_PATH" "$SYMTHAEA_ARC_POLICY_RESULTS_PATH" <<'PY'
+import collections
+import json
+import sys
+
+target_path, report_path = sys.argv[1:]
+with open(target_path, "r", encoding="utf-8") as handle:
+    target_bundle = json.load(handle)
+with open(report_path, "r", encoding="utf-8") as handle:
+    report = json.load(handle)
+
+target_ids = [row.get("problem_id") for row in target_bundle.get("targets", [])]
+if not target_ids or any(not isinstance(value, str) or not value for value in target_ids):
+    raise SystemExit("target bundle contains invalid problem IDs")
+if len(target_ids) != len(set(target_ids)):
+    raise SystemExit("target bundle contains duplicate problem IDs")
+
+allowed = {"canonical-order-v1", "uniform-random-without-replacement-v1"}
+pairs = collections.defaultdict(list)
+for row in report.get("tasks", []):
+    problem_id = row.get("problem_id")
+    policy_id = row.get("policy_id")
+    if problem_id not in set(target_ids):
+        raise SystemExit(f"policy report references non-target problem {problem_id!r}")
+    if policy_id not in allowed:
+        raise SystemExit(f"policy report contains unsupported policy {policy_id!r}")
+    pairs[problem_id].append(policy_id)
+
+if set(pairs) != set(target_ids):
+    missing = sorted(set(target_ids).difference(pairs))
+    extra = sorted(set(pairs).difference(target_ids))
+    raise SystemExit(f"target/policy problem set mismatch: missing={missing}, extra={extra}")
+for problem_id in sorted(target_ids):
+    policies = pairs[problem_id]
+    if len(policies) != 2 or set(policies) != allowed:
+        raise SystemExit(f"{problem_id} does not have exactly one row per frozen policy: {policies}")
+if report.get("test_cases_evaluated") != len(target_ids):
+    raise SystemExit("policy report test_cases_evaluated does not match target count")
+if len(report.get("tasks", [])) != 2 * len(target_ids):
+    raise SystemExit("policy report row count does not equal two rows per target")
+PY
+
 # Stage C: evaluator-only processes. The primary evaluator gets real targets and independently
 # replays each policy action/seal. A separate verifier recomputes the full exhaustive reference.
 "$evaluator_bin"
