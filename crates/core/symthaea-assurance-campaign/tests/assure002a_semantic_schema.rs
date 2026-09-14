@@ -92,9 +92,11 @@ fn validation_profile_schema_change_makes_ordering_lineage_incomparable() {
 #[test]
 fn ordering_lineage_requires_source_profile_and_epoch_identity() {
     let profile = commitment("ordering-profile", "canonical-text-v1", 'a');
-    let baseline = OrderingLineageIdentityV1::new(id("transparency-log-a"), profile.clone(), 1);
+    let baseline =
+        OrderingLineageIdentityV1::new(id("transparency-log-a"), profile.clone(), 1);
     let same = OrderingLineageIdentityV1::new(id("transparency-log-a"), profile.clone(), 1);
-    let other_source = OrderingLineageIdentityV1::new(id("transparency-log-b"), profile.clone(), 1);
+    let other_source =
+        OrderingLineageIdentityV1::new(id("transparency-log-b"), profile.clone(), 1);
     let other_epoch = OrderingLineageIdentityV1::new(id("transparency-log-a"), profile, 2);
     assert!(baseline.is_comparable_with(&same));
     assert!(!baseline.is_comparable_with(&other_source));
