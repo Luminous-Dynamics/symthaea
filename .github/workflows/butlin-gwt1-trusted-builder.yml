@@ -84,13 +84,35 @@ jobs:
           SYMTHAEA_GWT1_EVIDENCE_DIR: ${{ runner.temp }}/gwt1-direct-evidence
         run: |
           set -euo pipefail
+          set +e
           cargo run --locked -p symthaea-psych-bench \
             --features symthaea-backend \
             --bin gwt1_qualification
+          status=$?
+          set -e
+
+          case "$status" in
+            0) expected_outcome="Qualified" ;;
+            20) expected_outcome="NotDemonstrated" ;;
+            21) expected_outcome="Contradicted" ;;
+            22) expected_outcome="Inconclusive" ;;
+            *)
+              echo "Direct qualification infrastructure failure: unexpected exit status $status" >&2
+              exit "$status"
+              ;;
+          esac
+
+          outcome_file="$SYMTHAEA_GWT1_EVIDENCE_DIR/outcome.txt"
+          test -f "$outcome_file"
+          observed_outcome="$(tr -d '\r\n' < "$outcome_file")"
+          if [[ "$observed_outcome" != "$expected_outcome" ]]; then
+            echo "Direct qualification exit/outcome mismatch: status=$status expected=$expected_outcome observed=$observed_outcome" >&2
+            exit 2
+          fi
+          echo "Direct scientific outcome: $expected_outcome (exit $status); continuing to independent verification."
 
       - name: Package isolated candidate evidence
         id: bundle
-        if: always()
         shell: bash
         env:
           EVIDENCE_SUBJECT_SHA: ${{ inputs.evidence_subject_sha }}
@@ -151,7 +173,7 @@ jobs:
           echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
 
       - name: Upload unattested intermediate bundle
-        if: always() && steps.bundle.outputs.has_evidence == 'true'
+        if: steps.bundle.outputs.has_evidence == 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.bundle.outputs.artifact_name }}
@@ -164,7 +186,7 @@ jobs:
   attest:
     name: Independently verify and attest evidence
     needs: qualify
-    if: always() && needs.qualify.outputs.has_evidence == 'true'
+    if: needs.qualify.result == 'success' && needs.qualify.outputs.has_evidence == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
