@@ -1,0 +1,106 @@
+name: ASSURE-002A exact lock repair
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/assure-002a-lock-repair.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assure-002a-lock-repair
+  cancel-in-progress: true
+
+jobs:
+  repair-lock:
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.event.pull_request.head.repo.full_name == 'Luminous-Dynamics/symthaea' &&
+      github.event.pull_request.head.ref == 'repair/assure-002a-lock-parity' &&
+      github.event.pull_request.base.ref == 'feat/assure-002a-semantics-core' &&
+      github.actor == 'Tristan-Stoltz-ERC'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: feat/assure-002a-semantics-core
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Prove exact target and starting lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "b1e3e5540ad3b4516d931dcc1453f5d6fb5fb3c0"
+          test "$(git hash-object Cargo.lock)" = "f6a734f8c32af393cef723670c7882b95312baf9"
+          test -z "$(git status --porcelain)"
+
+      - name: Apply reviewed one-stanza lock transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('Cargo.lock')
+          text = path.read_text(encoding='utf-8')
+          anchor = '''[[package]]
+          name = "symthaea-assurance-core"
+          version = "0.1.0"
+          dependencies = [
+           "sha2 0.10.9",
+           "thiserror 1.0.69",
+          ]
+
+          [[package]]
+          name = "symthaea-astronomy"
+          '''
+          replacement = '''[[package]]
+          name = "symthaea-assurance-core"
+          version = "0.1.0"
+          dependencies = [
+           "sha2 0.10.9",
+           "thiserror 1.0.69",
+          ]
+
+          [[package]]
+          name = "symthaea-assurance-semantics"
+          version = "0.1.0"
+          dependencies = [
+           "sha2 0.10.9",
+           "symthaea-assurance-core",
+           "thiserror 1.0.69",
+          ]
+
+          [[package]]
+          name = "symthaea-astronomy"
+          '''
+          if text.count(anchor) != 1:
+              raise SystemExit(f'expected exactly one reviewed anchor, found {text.count(anchor)}')
+          if 'name = "symthaea-assurance-semantics"' in text:
+              raise SystemExit('semantic package stanza already present')
+          path.write_text(text.replace(anchor, replacement, 1), encoding='utf-8')
+          PY
+
+          test "$(sha256sum Cargo.lock | cut -d' ' -f1)" = "391b766f3f812f2d4c1a5b6a377ce1bcdeb5b7e2f88213078c88dab21846274a"
+          test "$(git diff --name-only)" = "Cargo.lock"
+          git diff --check
+          git diff -- Cargo.lock
+
+      - name: Commit exact Cargo.lock repair only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "b1e3e5540ad3b4516d931dcc1453f5d6fb5fb3c0"
+          test "$(git diff --name-only)" = "Cargo.lock"
+          test "$(sha256sum Cargo.lock | cut -d' ' -f1)" = "391b766f3f812f2d4c1a5b6a377ce1bcdeb5b7e2f88213078c88dab21846274a"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          git diff --cached --name-only | grep -qx 'Cargo.lock'
+          git commit -m 'chore(assurance): reconcile ASSURE-002A lock identity'
+          git push origin HEAD:feat/assure-002a-semantics-core
