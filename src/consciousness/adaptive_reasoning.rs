@@ -182,7 +182,7 @@ impl ReasoningState {
 }
 
 /// Action: (Primitive, TransformationType) pair
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReasoningAction {
     pub primitive_name: String,
     pub transformation: TransformationType,
@@ -619,3 +619,5 @@ mod tests {
         assert_eq!(agent.replay_buffer.len(), 1);
     }
 }
+
+pub mod qualification;
