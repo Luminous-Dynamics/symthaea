@@ -1,0 +1,147 @@
+name: REL Finite Symmetry Oracle Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-invariance-finite-oracle.py"
+      - ".github/workflows/rel-finite-oracle-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-finite-oracle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
+
+jobs:
+  exact-subject:
+    name: Exact-subject finite REL oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind subject and stacked scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          if [ -n "${EXPECTED_BASE}" ]; then
+            git cat-file -e "${EXPECTED_BASE}^{commit}"
+            mapfile -t changed < <(git diff --name-only "${EXPECTED_BASE}" HEAD | sort)
+            expected=(
+              ".github/rel/rel-invariance-finite-oracle.py"
+              ".github/workflows/rel-finite-oracle-qualification.yml"
+            )
+            mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+            test "${changed[*]}" = "${expected_sorted[*]}"
+          fi
+          printf 'head=%s\nbase=%s\ntree=%s\n' \
+            "$(git rev-parse HEAD)" "${EXPECTED_BASE}" "$(git rev-parse HEAD^{tree})"
+
+      - name: Bind source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            .github/rel/rel-invariance-finite-oracle.py \
+            .github/workflows/rel-finite-oracle-qualification.yml
+          git rev-parse \
+            HEAD:.github/rel/rel-invariance-finite-oracle.py \
+            HEAD:.github/workflows/rel-finite-oracle-qualification.yml
+
+      - name: Compile oracle
+        shell: bash
+        run: python3 -m py_compile .github/rel/rel-invariance-finite-oracle.py
+
+      - name: Execute oracle twice and require determinism
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/rel/rel-invariance-finite-oracle.py > "${RUNNER_TEMP}/oracle-a.json"
+          python3 .github/rel/rel-invariance-finite-oracle.py > "${RUNNER_TEMP}/oracle-b.json"
+          cmp "${RUNNER_TEMP}/oracle-a.json" "${RUNNER_TEMP}/oracle-b.json"
+          python3 -m json.tool "${RUNNER_TEMP}/oracle-a.json" >/dev/null
+          cat "${RUNNER_TEMP}/oracle-a.json"
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/rel/__pycache__
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Build qualification receipt
+        shell: bash
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/rel-finite-oracle-receipt.json
+          ORACLE_PATH: ${{ runner.temp }}/oracle-a.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          sources = [
+              ".github/rel/rel-invariance-finite-oracle.py",
+              ".github/workflows/rel-finite-oracle-qualification.yml",
+          ]
+
+          def cmd(*args: str) -> str:
+              return subprocess.check_output(args, text=True).strip()
+
+          def sha256(path: str) -> str:
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+          oracle = json.loads(pathlib.Path(os.environ["ORACLE_PATH"]).read_text())
+          receipt = {
+              "schema": "symthaea.rel.finite-symmetry-oracle-qualification.v1",
+              "authority": "MeasurementOnly",
+              "subject_head": cmd("git", "rev-parse", "HEAD"),
+              "subject_tree": cmd("git", "rev-parse", "HEAD^{tree}"),
+              "expected_head": os.environ["EXPECTED_HEAD"],
+              "expected_base": os.environ.get("EXPECTED_BASE", ""),
+              "sources_sha256": {path: sha256(path) for path in sources},
+              "sources_git_blob": {
+                  path: cmd("git", "rev-parse", f"HEAD:{path}") for path in sources
+              },
+              "oracle_sha256": sha256(os.environ["ORACLE_PATH"]),
+              "oracle_result": oracle,
+              "phases": {
+                  "python_compile": "passed",
+                  "oracle_execution_a": "passed",
+                  "oracle_execution_b": "passed",
+                  "deterministic_output": "passed",
+                  "checkout_immutable": True,
+              },
+          }
+          pathlib.Path(os.environ["RECEIPT_PATH"]).write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload oracle and receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-finite-oracle-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/oracle-a.json
+            ${{ runner.temp }}/rel-finite-oracle-receipt.json
+          retention-days: 30
+          if-no-files-found: error
