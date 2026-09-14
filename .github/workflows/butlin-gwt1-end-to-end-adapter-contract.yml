@@ -1,0 +1,62 @@
+name: Butlin GWT-1 End-to-End Adapter Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-end-to-end-adapter-contract.yml"
+      - "crates/domains/symthaea-psych-bench/Cargo.toml"
+      - "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify GWT-1 end-to-end adapter repair
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Audit exact map-lookup repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_end_to_end.rs")
+          source = path.read_text()
+          body = source.split("fn changed_specialists(", 1)[1].split("\nfn derive_receipt(", 1)[0]
+          assert body.count(".get(**id)") == 2, body
+          assert ".get(*id)" not in body, body
+          assert "GWT1_SPECIALISTS_V1" in body
+          assert ".filter(|id|" in body
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Compile exact backend surface that exposed E0277
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-adapter-contract-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-adapter-contract-target
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --features symthaea-backend --lib
+
+      - name: Run GWT-1 end-to-end adapter tests
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/gwt1-adapter-contract-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/gwt1-adapter-contract-target
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench \
+            --features symthaea-backend \
+            gwt1_end_to_end::tests
