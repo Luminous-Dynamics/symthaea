@@ -1,0 +1,34 @@
+{
+  "schema": "butlin-evidence-archive-admission-profile-v1",
+  "profile_id": "gwt1-consumer-authority-closure-archive-v1",
+  "root": "gwt1-consumer-authority-closure",
+  "canonical_uid": 0,
+  "canonical_gid": 0,
+  "canonical_mtime": 0,
+  "max_archive_bytes": 134217728,
+  "max_tar_stream_bytes": 167772160,
+  "max_member_bytes": 33554432,
+  "max_total_unpacked_bytes": 134217728,
+  "members": [
+    {"path":"gwt1-consumer-authority-closure","kind":"directory","mode":493},
+    {"path":"gwt1-consumer-authority-closure/authority","kind":"directory","mode":493},
+    {"path":"gwt1-consumer-authority-closure/source","kind":"directory","mode":493},
+
+    {"path":"gwt1-consumer-authority-closure/SHA256SUMS","kind":"file","mode":420,"allow_empty":false,"max_bytes":262144},
+    {"path":"gwt1-consumer-authority-closure/archive_admission_engine.py","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/archive_admission_profile.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/closure.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/closure_verifier_profile.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+
+    {"path":"gwt1-consumer-authority-closure/source/consumer_provenance.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/source/consumer_verifier_profile.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/source/promotion_verifier_profile.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/source/promotion_authority.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+
+    {"path":"gwt1-consumer-authority-closure/authority/fresh_report_archive_verification.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":16777216},
+    {"path":"gwt1-consumer-authority-closure/authority/fresh_report_archive_admission.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/authority/fresh_final_archive_admission.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":1048576},
+    {"path":"gwt1-consumer-authority-closure/authority/fresh_promotion_capsule_verification.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":16777216},
+    {"path":"gwt1-consumer-authority-closure/authority/fresh_promotion_profile_verification.json","kind":"file","mode":420,"allow_empty":false,"max_bytes":16777216}
+  ]
+}
