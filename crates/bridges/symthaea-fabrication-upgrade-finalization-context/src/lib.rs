@@ -24,9 +24,7 @@ use symthaea_fabrication_key_continuity_authority::{
 use symthaea_fabrication_upgrade_authority::{
     ClockGovernedUpgradeHandoffIdV1, ClockGovernedUpgradeHandoffV1,
 };
-use symthaea_fabrication_upgrade_hardware_authority::{
-    ClockGovernedHardwareReauthorizationIdV1, ClockGovernedHardwareReauthorizationV1,
-};
+use symthaea_fabrication_upgrade_hardware_authority::ClockGovernedHardwareReauthorizationV1;
 use symthaea_fabrication_upgrade_probation_authority::{
     ClockGovernedUpgradeProbationClearanceIdV1, ClockGovernedUpgradeProbationClearanceV1,
 };
@@ -131,6 +129,10 @@ impl QualifiedUpgradeFinalizationContextV1 {
         self.id.as_digest()
     }
 
+    pub fn context_policy_digest(&self) -> Sha256Digest {
+        self.context_policy_digest
+    }
+
     pub fn governance_view_id(&self) -> ContainmentCurrentWitnessRegistryHeadIdV1 {
         self.governance_view_id
     }
@@ -149,6 +151,18 @@ impl QualifiedUpgradeFinalizationContextV1 {
 
     pub fn no_rollback_id(&self) -> CurrentNoRollbackUpgradeAuthorityIdV1 {
         self.no_rollback_id
+    }
+
+    pub fn operational_state_digest(&self) -> Sha256Digest {
+        self.operational_state_digest
+    }
+
+    pub fn operational_state_generation(&self) -> u64 {
+        self.operational_state_generation
+    }
+
+    pub fn operational_lineage_digest(&self) -> Sha256Digest {
+        self.operational_lineage_digest
     }
 
     pub fn handoff_id(&self) -> ClockGovernedUpgradeHandoffIdV1 {
@@ -195,6 +209,18 @@ impl QualifiedUpgradeFinalizationContextV1 {
         self.current_trust_snapshot_sequence
     }
 
+    pub fn current_containment_state_digest(&self) -> Sha256Digest {
+        self.current_containment_state_digest
+    }
+
+    pub fn current_compromise_tracker_digest(&self) -> Sha256Digest {
+        self.current_compromise_tracker_digest
+    }
+
+    pub fn current_containment_generation(&self) -> u64 {
+        self.current_containment_generation
+    }
+
     pub fn current_clock_envelope_id(&self) -> ClockGovernanceEvaluationEnvelopeIdV1 {
         self.current_clock_envelope_id
     }
@@ -205,6 +231,14 @@ impl QualifiedUpgradeFinalizationContextV1 {
 
     pub fn finalization_deadline_unix_ms(&self) -> u64 {
         self.finalization_deadline_unix_ms
+    }
+
+    pub fn probation_clearance_expires_at_unix_ms(&self) -> u64 {
+        self.probation_clearance_expires_at_unix_ms
+    }
+
+    pub fn earliest_hardware_expiry_unix_ms(&self) -> u64 {
+        self.earliest_hardware_expiry_unix_ms
     }
 }
 
@@ -381,7 +415,10 @@ pub fn qualify_upgrade_finalization_context_v1(
         violations.push(UpgradeFinalizationContextError::KeyContinuityMismatch);
     }
 
-    if current_basis.id() != governance_view.observation_operational_basis_id() {
+    if current_basis.id() != governance_view.observation_operational_basis_id()
+        || current_basis.id() != retention_head.observation_operational_basis_id()
+        || current_basis.id() != no_rollback.observation_operational_basis_id()
+    {
         violations.push(UpgradeFinalizationContextError::ObservationBasisMismatch);
     }
     let current_clock = match derive_clock_governance_evaluation_envelope_v1(current_basis) {
