@@ -9,22 +9,19 @@
 //! plan content-addressed later
 //!     != preregistered earlier
 //!
+//! semantic label frozen
+//!     != semantic definition frozen
+//!
 //! self-declared timestamp
 //!     != durable ordering evidence
 //!
 //! registration receipt exists
 //!     != registration is current
-//!
-//! evidence exists after registration
-//!     != evidence is bound to that registration
 //! ```
 //!
-//! This crate is deliberately a structural/canonical kernel. It binds an exact
-//! campaign plan to ASSURE-001 subject identity, represents externally supplied
-//! monotonic ordering receipts, resolves a unique current registration, and
-//! admits only evidence whose production and admission statements are ordered
-//! after that exact registration. It does not authenticate the external
-//! ordering authority by itself; adapters/verifiers must establish that trust.
+//! This crate binds exact campaign semantics before admitted evidence begins.
+//! It represents external monotonic ordering structurally but deliberately does
+//! not authenticate the external ordering provider itself.
 
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -42,8 +39,12 @@ pub enum CampaignError {
     EmptyEvidenceKinds,
     #[error("duplicate registered evidence kind: {0}")]
     DuplicateEvidenceKind(String),
-    #[error("duplicate campaign identifier in {set}: {id}")]
-    DuplicateStableId { set: &'static str, id: String },
+    #[error("custom evidence kind requires an exact semantic definition commitment")]
+    CustomEvidenceRequiresDefinition,
+    #[error("duplicate semantic identifier in {set}: {id}")]
+    DuplicateSemanticId { set: &'static str, id: String },
+    #[error("support criterion exceeds campaign support ceiling")]
+    SupportCriterionAboveCeiling,
     #[error("claim does not bind the supplied ASSURE-001 subject")]
     ClaimSubjectMismatch,
     #[error("ordering epoch must be non-zero")]
@@ -104,6 +105,86 @@ pub enum CampaignError {
     Subject(#[from] SubjectError),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SemanticCommitmentV1 {
+    semantic_id: StableId,
+    definition_digest: DigestSha256,
+}
+
+impl SemanticCommitmentV1 {
+    pub fn new(semantic_id: StableId, definition_digest: DigestSha256) -> Self {
+        Self {
+            semantic_id,
+            definition_digest,
+        }
+    }
+
+    pub fn semantic_id(&self) -> &StableId {
+        &self.semantic_id
+    }
+
+    pub fn definition_digest(&self) -> &DigestSha256 {
+        &self.definition_digest
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceRequirementV1 {
+    Builtin(EvidenceKind),
+    Custom(SemanticCommitmentV1),
+}
+
+impl EvidenceRequirementV1 {
+    pub fn builtin(kind: EvidenceKind) -> Result<Self, CampaignError> {
+        if matches!(kind, EvidenceKind::Custom(_)) {
+            return Err(CampaignError::CustomEvidenceRequiresDefinition);
+        }
+        Ok(Self::Builtin(kind))
+    }
+
+    pub fn custom(semantic: SemanticCommitmentV1) -> Self {
+        Self::Custom(semantic)
+    }
+
+    pub fn core_kind(&self) -> EvidenceKind {
+        match self {
+            Self::Builtin(kind) => kind.clone(),
+            Self::Custom(semantic) => EvidenceKind::Custom(semantic.semantic_id.clone()),
+        }
+    }
+
+    fn canonical_name(&self) -> String {
+        evidence_kind_name(&self.core_kind())
+    }
+
+    fn definition_digest(&self) -> Option<&DigestSha256> {
+        match self {
+            Self::Builtin(_) => None,
+            Self::Custom(semantic) => Some(&semantic.definition_digest),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SupportCriterionV1 {
+    tier: SupportTier,
+    criterion: SemanticCommitmentV1,
+}
+
+impl SupportCriterionV1 {
+    pub fn new(tier: SupportTier, criterion: SemanticCommitmentV1) -> Self {
+        Self { tier, criterion }
+    }
+
+    pub fn tier(&self) -> SupportTier {
+        self.tier
+    }
+
+    pub fn criterion(&self) -> &SemanticCommitmentV1 {
+        &self.criterion
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ReproductionRequirementV1 {
     NotRequired,
@@ -128,12 +209,13 @@ pub struct CampaignPlanV1 {
     subject_core_id: DigestSha256,
     maximum_support: SupportTier,
     reproduction_requirement: ReproductionRequirementV1,
-    evidence_kinds: Vec<EvidenceKind>,
-    controls: Vec<StableId>,
-    failure_conditions: Vec<StableId>,
-    contradiction_conditions: Vec<StableId>,
-    inconclusive_conditions: Vec<StableId>,
-    invalidation_conditions: Vec<StableId>,
+    evidence_requirements: Vec<EvidenceRequirementV1>,
+    support_criteria: Vec<SupportCriterionV1>,
+    controls: Vec<SemanticCommitmentV1>,
+    failure_conditions: Vec<SemanticCommitmentV1>,
+    contradiction_conditions: Vec<SemanticCommitmentV1>,
+    inconclusive_conditions: Vec<SemanticCommitmentV1>,
+    invalidation_conditions: Vec<SemanticCommitmentV1>,
 }
 
 impl CampaignPlanV1 {
@@ -145,22 +227,24 @@ impl CampaignPlanV1 {
         subject: &AiSubjectManifest,
         maximum_support: SupportTier,
         reproduction_requirement: ReproductionRequirementV1,
-        evidence_kinds: Vec<EvidenceKind>,
-        controls: Vec<StableId>,
-        failure_conditions: Vec<StableId>,
-        contradiction_conditions: Vec<StableId>,
-        inconclusive_conditions: Vec<StableId>,
-        invalidation_conditions: Vec<StableId>,
+        evidence_requirements: Vec<EvidenceRequirementV1>,
+        support_criteria: Vec<SupportCriterionV1>,
+        controls: Vec<SemanticCommitmentV1>,
+        failure_conditions: Vec<SemanticCommitmentV1>,
+        contradiction_conditions: Vec<SemanticCommitmentV1>,
+        inconclusive_conditions: Vec<SemanticCommitmentV1>,
+        invalidation_conditions: Vec<SemanticCommitmentV1>,
     ) -> Result<Self, CampaignError> {
         let subject_core_id = subject.core_subject_id()?;
         if claim.subject_id() != &subject_core_id {
             return Err(CampaignError::ClaimSubjectMismatch);
         }
 
-        let evidence_kinds = canonical_evidence_kinds(evidence_kinds)?;
-        if evidence_kinds.is_empty() {
+        let evidence_requirements = canonical_evidence_requirements(evidence_requirements)?;
+        if evidence_requirements.is_empty() {
             return Err(CampaignError::EmptyEvidenceKinds);
         }
+        let support_criteria = canonical_support_criteria(support_criteria, maximum_support)?;
 
         Ok(Self {
             plan_key,
@@ -170,18 +254,19 @@ impl CampaignPlanV1 {
             subject_core_id,
             maximum_support,
             reproduction_requirement,
-            evidence_kinds,
-            controls: canonical_ids("controls", controls)?,
-            failure_conditions: canonical_ids("failure-conditions", failure_conditions)?,
-            contradiction_conditions: canonical_ids(
+            evidence_requirements,
+            support_criteria,
+            controls: canonical_semantics("controls", controls)?,
+            failure_conditions: canonical_semantics("failure-conditions", failure_conditions)?,
+            contradiction_conditions: canonical_semantics(
                 "contradiction-conditions",
                 contradiction_conditions,
             )?,
-            inconclusive_conditions: canonical_ids(
+            inconclusive_conditions: canonical_semantics(
                 "inconclusive-conditions",
                 inconclusive_conditions,
             )?,
-            invalidation_conditions: canonical_ids(
+            invalidation_conditions: canonical_semantics(
                 "invalidation-conditions",
                 invalidation_conditions,
             )?,
@@ -212,8 +297,12 @@ impl CampaignPlanV1 {
         self.reproduction_requirement
     }
 
-    pub fn evidence_kinds(&self) -> &[EvidenceKind] {
-        &self.evidence_kinds
+    pub fn evidence_requirements(&self) -> &[EvidenceRequirementV1] {
+        &self.evidence_requirements
+    }
+
+    pub fn support_criteria(&self) -> &[SupportCriterionV1] {
+        &self.support_criteria
     }
 
     pub fn core_plan(&self) -> QualificationPlan {
@@ -221,7 +310,10 @@ impl CampaignPlanV1 {
             self.plan_key.clone(),
             self.claim_digest.clone(),
             self.maximum_support,
-            self.invalidation_conditions.iter().cloned().collect(),
+            self.invalidation_conditions
+                .iter()
+                .map(|condition| condition.semantic_id.clone())
+                .collect(),
         )
     }
 
@@ -248,20 +340,25 @@ impl CampaignPlanV1 {
             "reproduction-requirement",
             self.reproduction_requirement.canonical_name(),
         );
-        append_evidence_kinds(&mut out, &self.evidence_kinds);
-        append_ids(&mut out, "control", &self.controls);
-        append_ids(&mut out, "failure-condition", &self.failure_conditions);
-        append_ids(
+        append_evidence_requirements(&mut out, &self.evidence_requirements);
+        append_support_criteria(&mut out, &self.support_criteria);
+        append_semantics(&mut out, "control", &self.controls);
+        append_semantics(
+            &mut out,
+            "failure-condition",
+            &self.failure_conditions,
+        );
+        append_semantics(
             &mut out,
             "contradiction-condition",
             &self.contradiction_conditions,
         );
-        append_ids(
+        append_semantics(
             &mut out,
             "inconclusive-condition",
             &self.inconclusive_conditions,
         );
-        append_ids(
+        append_semantics(
             &mut out,
             "invalidation-condition",
             &self.invalidation_conditions,
@@ -274,14 +371,16 @@ impl CampaignPlanV1 {
     }
 
     fn registers_kind(&self, kind: &EvidenceKind) -> bool {
-        self.evidence_kinds.iter().any(|registered| registered == kind)
+        self.evidence_requirements
+            .iter()
+            .any(|requirement| requirement.core_kind() == *kind)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OrderingReceiptV1 {
     source: StableId,
-    validation_profile: StableId,
+    validation_profile: SemanticCommitmentV1,
     epoch: u64,
     sequence: u64,
     statement_digest: DigestSha256,
@@ -291,7 +390,7 @@ pub struct OrderingReceiptV1 {
 impl OrderingReceiptV1 {
     pub fn new(
         source: StableId,
-        validation_profile: StableId,
+        validation_profile: SemanticCommitmentV1,
         epoch: u64,
         sequence: u64,
         statement_digest: DigestSha256,
@@ -317,7 +416,7 @@ impl OrderingReceiptV1 {
         &self.source
     }
 
-    pub fn validation_profile(&self) -> &StableId {
+    pub fn validation_profile(&self) -> &SemanticCommitmentV1 {
         &self.validation_profile
     }
 
@@ -339,7 +438,12 @@ impl OrderingReceiptV1 {
         field(
             &mut out,
             "validation-profile",
-            self.validation_profile.as_str(),
+            self.validation_profile.semantic_id.as_str(),
+        );
+        field(
+            &mut out,
+            "validation-profile-definition",
+            self.validation_profile.definition_digest.as_str(),
         );
         field(&mut out, "epoch", &self.epoch.to_string());
         field(&mut out, "sequence", &self.sequence.to_string());
@@ -969,30 +1073,54 @@ impl CampaignEvidenceLedgerV1 {
     }
 }
 
-fn canonical_evidence_kinds(
-    mut kinds: Vec<EvidenceKind>,
-) -> Result<Vec<EvidenceKind>, CampaignError> {
-    kinds.sort_by_cached_key(evidence_kind_name);
-    for pair in kinds.windows(2) {
-        if pair[0] == pair[1] {
-            return Err(CampaignError::DuplicateEvidenceKind(
-                evidence_kind_name(&pair[0]),
-            ));
+fn canonical_evidence_requirements(
+    mut requirements: Vec<EvidenceRequirementV1>,
+) -> Result<Vec<EvidenceRequirementV1>, CampaignError> {
+    requirements.sort_by_cached_key(EvidenceRequirementV1::canonical_name);
+    for pair in requirements.windows(2) {
+        if pair[0].core_kind() == pair[1].core_kind() {
+            return Err(CampaignError::DuplicateEvidenceKind(pair[0].canonical_name()));
         }
     }
-    Ok(kinds)
+    Ok(requirements)
 }
 
-fn canonical_ids(
+fn canonical_support_criteria(
+    mut criteria: Vec<SupportCriterionV1>,
+    maximum_support: SupportTier,
+) -> Result<Vec<SupportCriterionV1>, CampaignError> {
+    for criterion in &criteria {
+        if criterion.tier > maximum_support {
+            return Err(CampaignError::SupportCriterionAboveCeiling);
+        }
+    }
+    criteria.sort_by(|left, right| {
+        left.tier
+            .cmp(&right.tier)
+            .then_with(|| left.criterion.semantic_id.cmp(&right.criterion.semantic_id))
+    });
+    let mut ids = BTreeSet::new();
+    for criterion in &criteria {
+        if !ids.insert(criterion.criterion.semantic_id.clone()) {
+            return Err(CampaignError::DuplicateSemanticId {
+                set: "support-criteria",
+                id: criterion.criterion.semantic_id.as_str().to_owned(),
+            });
+        }
+    }
+    Ok(criteria)
+}
+
+fn canonical_semantics(
     set: &'static str,
-    mut values: Vec<StableId>,
-) -> Result<Vec<StableId>, CampaignError> {
-    values.sort();
+    mut values: Vec<SemanticCommitmentV1>,
+) -> Result<Vec<SemanticCommitmentV1>, CampaignError> {
+    values.sort_by(|left, right| left.semantic_id.cmp(&right.semantic_id));
     for pair in values.windows(2) {
-        if pair[0] == pair[1] {
-            return Err(CampaignError::DuplicateStableId {
+        if pair[0].semantic_id == pair[1].semantic_id {
+            return Err(CampaignError::DuplicateSemanticId {
                 set,
-                id: pair[0].as_str().to_owned(),
+                id: pair[0].semantic_id.as_str().to_owned(),
             });
         }
     }
@@ -1035,17 +1163,55 @@ fn next_evidence_root(
     digest_canonical(out.as_bytes())
 }
 
-fn append_evidence_kinds(out: &mut String, kinds: &[EvidenceKind]) {
-    field(out, "evidence-kind-count", &kinds.len().to_string());
-    for kind in kinds {
-        field(out, "evidence-kind", &evidence_kind_name(kind));
+fn append_evidence_requirements(out: &mut String, requirements: &[EvidenceRequirementV1]) {
+    field(
+        out,
+        "evidence-kind-count",
+        &requirements.len().to_string(),
+    );
+    for requirement in requirements {
+        field(out, "evidence-kind", &requirement.canonical_name());
+        field(
+            out,
+            "evidence-kind-definition",
+            requirement
+                .definition_digest()
+                .map(DigestSha256::as_str)
+                .unwrap_or(""),
+        );
     }
 }
 
-fn append_ids(out: &mut String, label: &str, ids: &[StableId]) {
-    field(out, &format!("{label}-count"), &ids.len().to_string());
-    for id in ids {
-        field(out, label, id.as_str());
+fn append_support_criteria(out: &mut String, criteria: &[SupportCriterionV1]) {
+    field(out, "support-criterion-count", &criteria.len().to_string());
+    for criterion in criteria {
+        field(
+            out,
+            "support-criterion-tier",
+            support_tier_name(criterion.tier),
+        );
+        field(
+            out,
+            "support-criterion-id",
+            criterion.criterion.semantic_id.as_str(),
+        );
+        field(
+            out,
+            "support-criterion-definition",
+            criterion.criterion.definition_digest.as_str(),
+        );
+    }
+}
+
+fn append_semantics(out: &mut String, label: &str, values: &[SemanticCommitmentV1]) {
+    field(out, &format!("{label}-count"), &values.len().to_string());
+    for value in values {
+        field(out, &format!("{label}-id"), value.semantic_id.as_str());
+        field(
+            out,
+            &format!("{label}-definition"),
+            value.definition_digest.as_str(),
+        );
     }
 }
 
