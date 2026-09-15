@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-static-fd-exec-launch"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Retained-fd execveat launch primitive for qualified static verifier ELF images"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "execveat", "runtime", "linux"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+nix = { version = "0.26.4", default-features = false, features = ["fs", "process"] }
+symthaea-assurance-nix-bound-in-process-runtime = { path = "../symthaea-assurance-nix-bound-in-process-runtime" }
+symthaea-assurance-static-elf-launch-profile = { path = "../symthaea-assurance-static-elf-launch-profile" }
