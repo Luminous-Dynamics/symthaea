@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-closure-backed-continuous-verifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bind continuous verifier execution to a Nix-closure-backed runtime policy"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["nix", "assurance", "attestation", "runtime"]
+categories = ["development-tools", "os"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-nix-runtime-policy-binding = { path = "../symthaea-assurance-nix-runtime-policy-binding" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
