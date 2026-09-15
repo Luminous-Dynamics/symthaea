@@ -12,12 +12,18 @@
 //! each preregistered case across seeds only and deliberately exposes descriptive
 //! statistics rather than p-values, confidence claims or a success threshold.
 //! Raw per-seed observations remain authoritative.
+//!
+//! Repeated axis anchors are also treated as aliases of one numeric condition,
+//! not additional replication. If two labeled cases share the same
+//! `(dimension, key_count, candidate_count, horizon, span_length)` tuple, then
+//! their same-seed falsification observations must agree bit-for-bit on every
+//! axis-independent metric before any aggregation is emitted.
 
 use crate::validity_capacity::{ValidityCapacityCase, ValidityCapacityPlan};
 use crate::validity_capacity_falsification::{
     ValidityCapacityFalsificationObservation, ValidityCapacityFalsificationResult,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -70,6 +76,11 @@ pub enum ValidityCapacitySeedAggregationError {
         case: ValidityCapacityCase,
         seed: u64,
     },
+    ConditionAliasMismatch {
+        reference_case: ValidityCapacityCase,
+        alias_case: ValidityCapacityCase,
+        seed: u64,
+    },
     NonFiniteMetric {
         case: ValidityCapacityCase,
         seed: u64,
@@ -94,6 +105,14 @@ impl fmt::Display for ValidityCapacitySeedAggregationError {
                 f,
                 "seed aggregation is missing frozen observation: case={case:?}, seed={seed}"
             ),
+            Self::ConditionAliasMismatch {
+                reference_case,
+                alias_case,
+                seed,
+            } => write!(
+                f,
+                "same-seed numeric-condition aliases disagree: reference={reference_case:?}, alias={alias_case:?}, seed={seed}"
+            ),
             Self::NonFiniteMetric { case, seed, metric } => write!(
                 f,
                 "seed aggregation metric {metric} is non-finite for case={case:?}, seed={seed}"
@@ -110,6 +129,11 @@ impl std::error::Error for ValidityCapacitySeedAggregationError {}
 /// Output order is exactly `plan.cases` order. Within each summary, source values
 /// are collected in exactly `plan.replicate_seeds` order before deterministic
 /// sorting for the median. Hash-map iteration order is never an output dependency.
+///
+/// Before summarizing, repeated labeled cases with the same numeric condition are
+/// checked as deterministic aliases. Their same-seed observations must be exactly
+/// equal at the integer level and bit-equal for every floating-point field after
+/// ignoring only `case.axis`.
 pub fn aggregate_validity_capacity_by_seed(
     plan: &ValidityCapacityPlan,
     result: &ValidityCapacityFalsificationResult,
@@ -122,6 +146,7 @@ pub fn aggregate_validity_capacity_by_seed(
     }
 
     validate_observation_set(plan, result)?;
+    validate_condition_aliases(result)?;
 
     let mut observations = Vec::with_capacity(plan.cases.len());
     for &case in &plan.cases {
@@ -239,6 +264,104 @@ fn validate_observation_set(
     Ok(())
 }
 
+fn validate_condition_aliases(
+    result: &ValidityCapacityFalsificationResult,
+) -> Result<(), ValidityCapacitySeedAggregationError> {
+    type NumericCondition = (usize, usize, usize, u64, u64);
+    let mut first_by_condition_seed: HashMap<
+        (NumericCondition, u64),
+        &ValidityCapacityFalsificationObservation,
+    > = HashMap::new();
+
+    for observation in &result.observations {
+        let condition = numeric_condition(observation.case);
+        let key = (condition, observation.seed);
+        if let Some(reference) = first_by_condition_seed.get(&key) {
+            if !axis_independent_observation_bits_equal(reference, observation) {
+                return Err(ValidityCapacitySeedAggregationError::ConditionAliasMismatch {
+                    reference_case: reference.case,
+                    alias_case: observation.case,
+                    seed: observation.seed,
+                });
+            }
+        } else {
+            first_by_condition_seed.insert(key, observation);
+        }
+    }
+
+    Ok(())
+}
+
+fn numeric_condition(case: ValidityCapacityCase) -> (usize, usize, usize, u64, u64) {
+    (
+        case.dim,
+        case.key_count,
+        case.candidate_count,
+        case.horizon,
+        case.span_length,
+    )
+}
+
+fn axis_independent_observation_bits_equal(
+    left: &ValidityCapacityFalsificationObservation,
+    right: &ValidityCapacityFalsificationObservation,
+) -> bool {
+    if numeric_condition(left.case) != numeric_condition(right.case)
+        || left.seed != right.seed
+        || left.total_queries != right.total_queries
+    {
+        return false;
+    }
+
+    let left_values = [
+        left.empirical_accuracy,
+        left.predicted_accuracy,
+        left.accuracy_residual,
+        left.accuracy_integration_refinement_delta,
+        left.target_mean_bias,
+        left.target_mean_squared_residual,
+        left.target_mse_ratio_to_null,
+        left.vocabulary_distractor_mean_bias,
+        left.vocabulary_distractor_mean_squared_residual,
+        left.vocabulary_distractor_mse_ratio_to_null,
+        left.shadow_distractor_mean_bias,
+        left.shadow_distractor_mean_squared_residual,
+        left.shadow_distractor_mse_ratio_to_null,
+        left.max_abs_shadow_candidate_similarity,
+        left.vocabulary_minus_shadow_mse,
+        left.vocabulary_minus_shadow_mse_ratio,
+        left.vocabulary_minus_shadow_variance,
+        left.mean_true_margin,
+        left.smallest_true_margin,
+    ];
+    let right_values = [
+        right.empirical_accuracy,
+        right.predicted_accuracy,
+        right.accuracy_residual,
+        right.accuracy_integration_refinement_delta,
+        right.target_mean_bias,
+        right.target_mean_squared_residual,
+        right.target_mse_ratio_to_null,
+        right.vocabulary_distractor_mean_bias,
+        right.vocabulary_distractor_mean_squared_residual,
+        right.vocabulary_distractor_mse_ratio_to_null,
+        right.shadow_distractor_mean_bias,
+        right.shadow_distractor_mean_squared_residual,
+        right.shadow_distractor_mse_ratio_to_null,
+        right.max_abs_shadow_candidate_similarity,
+        right.vocabulary_minus_shadow_mse,
+        right.vocabulary_minus_shadow_mse_ratio,
+        right.vocabulary_minus_shadow_variance,
+        right.mean_true_margin,
+        right.smallest_true_margin,
+    ];
+
+    left_values
+        .iter()
+        .zip(right_values.iter())
+        .all(|(left, right)| left.to_bits() == right.to_bits())
+}
+
 fn summarize_metric<F>(
     case: ValidityCapacityCase,
     observations: &[&ValidityCapacityFalsificationObservation],
@@ -310,6 +433,7 @@ fn summarize_values(values: &[f64]) -> SeedMetricSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::validity_capacity::{ValidityCapacityAxis, ValidityCapacityCase};
     use crate::validity_capacity_falsification::measure_validity_capacity_falsification_surface;
 
     #[test]
@@ -387,5 +511,71 @@ mod tests {
             aggregate_validity_capacity_by_seed(&plan, &raw),
             Err(ValidityCapacitySeedAggregationError::UnexpectedObservation { .. })
         ));
+    }
+
+    #[test]
+    fn same_seed_axis_aliases_must_match_bit_for_bit() {
+        let first_case = ValidityCapacityCase {
+            axis: ValidityCapacityAxis::Dimension,
+            dim: 64,
+            key_count: 2,
+            candidate_count: 2,
+            horizon: 8,
+            span_length: 2,
+        };
+        let alias_case = ValidityCapacityCase {
+            axis: ValidityCapacityAxis::Horizon,
+            ..first_case
+        };
+        let plan = ValidityCapacityPlan {
+            cases: vec![first_case, alias_case],
+            replicate_seeds: vec![7],
+        };
+        let first = falsification_fixture(first_case, 7);
+        let alias = falsification_fixture(alias_case, 7);
+        let consistent = ValidityCapacityFalsificationResult {
+            observations: vec![first.clone(), alias.clone()],
+        };
+        assert!(aggregate_validity_capacity_by_seed(&plan, &consistent).is_ok());
+
+        let mut changed = alias;
+        changed.accuracy_residual = f64::from_bits(changed.accuracy_residual.to_bits() ^ 1);
+        let inconsistent = ValidityCapacityFalsificationResult {
+            observations: vec![first, changed],
+        };
+        assert!(matches!(
+            aggregate_validity_capacity_by_seed(&plan, &inconsistent),
+            Err(ValidityCapacitySeedAggregationError::ConditionAliasMismatch { .. })
+        ));
+    }
+
+    fn falsification_fixture(
+        case: ValidityCapacityCase,
+        seed: u64,
+    ) -> ValidityCapacityFalsificationObservation {
+        ValidityCapacityFalsificationObservation {
+            case,
+            seed,
+            total_queries: 8,
+            empirical_accuracy: 0.75,
+            predicted_accuracy: 0.7,
+            accuracy_residual: 0.05,
+            accuracy_integration_refinement_delta: 1.0e-12,
+            target_mean_bias: 0.01,
+            target_mean_squared_residual: 0.2,
+            target_mse_ratio_to_null: 1.1,
+            vocabulary_distractor_mean_bias: -0.02,
+            vocabulary_distractor_mean_squared_residual: 0.3,
+            vocabulary_distractor_mse_ratio_to_null: 1.2,
+            shadow_distractor_mean_bias: 0.03,
+            shadow_distractor_mean_squared_residual: 0.25,
+            shadow_distractor_mse_ratio_to_null: 1.0,
+            max_abs_shadow_candidate_similarity: 0.04,
+            vocabulary_minus_shadow_mse: 0.05,
+            vocabulary_minus_shadow_mse_ratio: 1.2,
+            vocabulary_minus_shadow_variance: 0.01,
+            mean_true_margin: 0.4,
+            smallest_true_margin: -0.1,
+        }
     }
 }
