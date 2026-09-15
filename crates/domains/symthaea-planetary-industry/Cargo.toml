@@ -7,3 +7,4 @@ description = "Evidence-bearing neutral ontology for off-Earth industrial proces
 
 [dependencies]
 serde = { workspace = true }
+symthaea-identity = { path = "../../core/symthaea-identity" }

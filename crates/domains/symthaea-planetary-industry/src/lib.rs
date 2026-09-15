@@ -8,9 +8,11 @@
 //! separate from steady-cycle recovery. PIE-002B projects neutral utility
 //! declarations without inventing aggregation semantics, PIE-002D binds a
 //! complete electrical projection to explicit recovery/storage/supply facts,
-//! and PIE-002E validates and freshly projects the exact process value supplied
-//! to a composition invocation before binding it. None of these layers evaluates
-//! feasibility or establishes persistence currentness. Chemistry, detailed
+//! PIE-002E validates and freshly projects the exact process value supplied to
+//! a composition invocation before binding it, and PIE-002F requires explicit
+//! validated provenance for every external electrical supply/recovery fact.
+//! None of these layers evaluates feasibility or establishes persistence
+//! currentness, evidence applicability, or factual truth. Chemistry, detailed
 //! thermodynamics, equipment reproduction, optimization, and control authority
 //! belong to later layers.
 
@@ -24,6 +26,7 @@ mod types;
 mod utility_accounting;
 mod utility_binding;
 mod utility_composition;
+mod utility_evidence_context;
 mod utility_projection;
 
 pub use graph::*;
@@ -33,6 +36,7 @@ pub use types::*;
 pub use utility_accounting::*;
 pub use utility_binding::*;
 pub use utility_composition::*;
+pub use utility_evidence_context::*;
 pub use utility_projection::*;
 
 #[cfg(test)]
