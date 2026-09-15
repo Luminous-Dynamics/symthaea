@@ -1,0 +1,62 @@
+name: REGEN Subject Identity Interop
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/regen-subject-id-oracle.py'
+      - 'scripts/fixtures/regen_subject_ids_v1.json'
+      - '.github/workflows/regen-subject-id-interop.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/regen-subject-id-oracle.py'
+      - 'scripts/fixtures/regen_subject_ids_v1.json'
+      - '.github/workflows/regen-subject-id-interop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  subject-id-interop:
+    name: Independent REGEN identity oracle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact subject
+        shell: bash
+        env:
+          TARGET_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'target_sha=%s\nactual_sha=%s\n' "$TARGET_SHA" "$actual"
+          test "$actual" = "$TARGET_SHA"
+
+      - name: Record Python identity
+        run: python3 --version
+
+      - name: Syntax check without writing bytecode
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('scripts/regen-subject-id-oracle.py')
+          compile(path.read_text(encoding='utf-8'), str(path), 'exec')
+          PY
+
+      - name: Execute independent golden-vector campaign
+        run: python3 scripts/regen-subject-id-oracle.py
+
+      - name: Diff and checkout hygiene
+        shell: bash
+        run: |
+          git diff --check
+          test -z "$(git status --short)"

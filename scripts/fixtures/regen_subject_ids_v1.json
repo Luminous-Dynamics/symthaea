@@ -1,0 +1,137 @@
+{
+  "schema": "mycelix.regen.subject-id-golden-v1",
+  "valid": [
+    {
+      "kind": "site",
+      "token": "garden-01",
+      "canonical": "regen:v1:site:garden-01"
+    },
+    {
+      "kind": "soil-plot",
+      "token": "north-bed-01",
+      "canonical": "regen:v1:soil-plot:north-bed-01"
+    },
+    {
+      "kind": "biomass-lot",
+      "token": "orchard-prunings-2026-01",
+      "canonical": "regen:v1:biomass-lot:orchard-prunings-2026-01"
+    },
+    {
+      "kind": "biochar-batch",
+      "token": "kiln-a-2026-01",
+      "canonical": "regen:v1:biochar-batch:kiln-a-2026-01"
+    },
+    {
+      "kind": "compost-batch",
+      "token": "compost-2026-01",
+      "canonical": "regen:v1:compost-batch:compost-2026-01"
+    },
+    {
+      "kind": "co-composted-amendment-batch",
+      "token": "char-compost-2026-01",
+      "canonical": "regen:v1:co-composted-amendment-batch:char-compost-2026-01"
+    },
+    {
+      "kind": "recipe",
+      "token": "soil-loop-01",
+      "canonical": "regen:v1:recipe:soil-loop-01"
+    },
+    {
+      "kind": "field-trial",
+      "token": "trial-2026-01",
+      "canonical": "regen:v1:field-trial:trial-2026-01"
+    },
+    {
+      "kind": "treatment-arm",
+      "token": "control-01",
+      "canonical": "regen:v1:treatment-arm:control-01"
+    },
+    {
+      "kind": "facility",
+      "token": "community-yard-01",
+      "canonical": "regen:v1:facility:community-yard-01"
+    },
+    {
+      "kind": "project",
+      "token": "regen-pilot-01",
+      "canonical": "regen:v1:project:regen-pilot-01"
+    },
+    {
+      "kind": "quality-profile",
+      "token": "community-biochar-01",
+      "canonical": "regen:v1:quality-profile:community-biochar-01"
+    },
+    {
+      "kind": "evidence-bundle",
+      "token": "trial-2026-01-baseline",
+      "canonical": "regen:v1:evidence-bundle:trial-2026-01-baseline"
+    }
+  ],
+  "invalid": [
+    {
+      "kind": "site",
+      "canonical": "regen:v1:site:Garden-01",
+      "reason": "uppercase-token"
+    },
+    {
+      "kind": "soil-plot",
+      "canonical": "regen:v1:site:north-bed-01",
+      "reason": "wrong-kind-prefix"
+    },
+    {
+      "kind": "biomass-lot",
+      "canonical": "orchard-prunings-2026-01",
+      "reason": "missing-canonical-prefix"
+    },
+    {
+      "kind": "biochar-batch",
+      "canonical": "regen:v1:biochar-batch:kiln:a",
+      "reason": "token-colon"
+    },
+    {
+      "kind": "compost-batch",
+      "canonical": "regen:v1:compost-batch:-batch",
+      "reason": "leading-punctuation"
+    },
+    {
+      "kind": "co-composted-amendment-batch",
+      "canonical": "regen:v1:co-composted-amendment-batch:é",
+      "reason": "non-ascii-token"
+    },
+    {
+      "kind": "recipe",
+      "canonical": "regen:v1:recipe:soil-loop-",
+      "reason": "trailing-punctuation"
+    },
+    {
+      "kind": "field-trial",
+      "canonical": "regen:v1:field-trial:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reason": "token-too-long"
+    },
+    {
+      "kind": "treatment-arm",
+      "canonical": "regen:v1:treatment-arm:Control",
+      "reason": "uppercase-token"
+    },
+    {
+      "kind": "facility",
+      "canonical": "regen:v1:facility:community yard",
+      "reason": "whitespace"
+    },
+    {
+      "kind": "project",
+      "canonical": "regen:v1:project:regen/pilot",
+      "reason": "slash"
+    },
+    {
+      "kind": "quality-profile",
+      "canonical": "regen:v2:quality-profile:community-biochar-01",
+      "reason": "wrong-schema-revision"
+    },
+    {
+      "kind": "evidence-bundle",
+      "canonical": "regen:v1:evidence-bundle:",
+      "reason": "empty-token"
+    }
+  ]
+}
