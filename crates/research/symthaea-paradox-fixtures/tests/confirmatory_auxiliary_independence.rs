@@ -11,8 +11,8 @@
 //!    fixture and hidden-context C6 fixture generated from the same latent trial.
 
 use symthaea_paradox_fixtures::{
-    ClaimPolarity, Condition, FixtureGenerator, CONFIRMATORY_SEEDS,
-    CONFIRMATORY_TRIALS_PER_CONDITION,
+    CONFIRMATORY_SEEDS, CONFIRMATORY_TRIALS_PER_CONDITION, ClaimPolarity, Condition,
+    FixtureGenerator,
 };
 
 const NONCAUSAL_CONDITIONS: [Condition; 5] = [
