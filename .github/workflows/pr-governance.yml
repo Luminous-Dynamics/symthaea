@@ -1,0 +1,52 @@
+name: PR Governance
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-governance-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  governance:
+    name: Governance Check (Class A/B Changes)
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout PR merge context
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check for safety-critical changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/check-class-a-changes.sh --ci
+
+      - name: Preserve Showroom hygiene on draft PRs
+        shell: bash
+        run: bash .github/scripts/check-showroom-hygiene.sh
+
+      - name: Record governance evidence
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          {
+            echo "pr_number=${PR_NUMBER}"
+            echo "pr_head_sha=${PR_HEAD_SHA}"
+            echo "pr_base_sha=${PR_BASE_SHA}"
+            echo "pr_draft=${PR_DRAFT}"
+            echo "governance_check=pass"
+            echo "showroom_hygiene_check=pass"
+          } | tee pr-governance-receipt.txt
