@@ -9,4 +9,5 @@ jobs:
   superseded:
     runs-on: ubuntu-slim
     steps:
-      - run: echo 'Superseded by the replacement A qualification lane; preserved branch history remains diagnostic evidence.'
+      - name: Preserve superseded diagnostic lineage
+        run: echo 'The exact-formatter experiment was superseded before interpretation. Replacement A self-verifies formatting under Rust 1.96.'
