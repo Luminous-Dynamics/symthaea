@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.spine.000b.operation-observer-ids.v1",
+  "authority": "measurement-only",
+  "id_zero_reserved": true,
+  "append_only": true,
+  "reuse_forbidden": true,
+  "operations": [
+    {"observer_id": 1, "operation_id": "feedback.adjust_confidence"},
+    {"observer_id": 2, "operation_id": "feedback.scale_lr"},
+    {"observer_id": 3, "operation_id": "feedback.adjust_exploration"},
+    {"observer_id": 4, "operation_id": "emotion_contagion.add_clamped_arousal"},
+    {"observer_id": 5, "operation_id": "emotion_contagion.add_clamped_valence"},
+    {"observer_id": 6, "operation_id": "feedback.adjust_exploration.request_exploration"},
+    {"observer_id": 7, "operation_id": "episodic_memory.consolidate_recent"},
+    {"observer_id": 8, "operation_id": "stats.increment_anomaly_detected_count"},
+    {"observer_id": 9, "operation_id": "feedback.scale_confidence.anomaly"},
+    {"observer_id": 10, "operation_id": "quality.set_subsystem_veto"},
+    {"observer_id": 11, "operation_id": "feedback.scale_lr.request_rest"},
+    {"observer_id": 12, "operation_id": "network.broadcast_swarm_state"},
+    {"observer_id": 13, "operation_id": "emotion_contagion.add_clamped_urgency_arousal"},
+    {"observer_id": 14, "operation_id": "feedback.scale_exploration.urgency_escalation"},
+    {"observer_id": 15, "operation_id": "quality.set_request_geodesic"},
+    {"observer_id": 16, "operation_id": "vision.select_best_geodesic"},
+    {"observer_id": 17, "operation_id": "vision.populate_mental_movie"},
+    {"observer_id": 18, "operation_id": "quality.clear_request_geodesic"}
+  ]
+}
