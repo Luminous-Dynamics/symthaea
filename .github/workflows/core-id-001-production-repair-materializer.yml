@@ -1,4 +1,4 @@
-name: CORE-ID-001 Production Repair Materializer
+name: CORE-ID-001 Production R2 Builder
 
 on:
   push:
@@ -7,70 +7,192 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  materialize:
-    name: Materialize rustfmt and lockfile repair only
+  build-r2:
+    name: Build minimal one-commit CORE-ID R2 subject
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
-      SUBJECT_SHA: 31d6fe9c03147ef8fed7fccf826d6a9a9a548e4e
+      PARENT_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+      RED_SUBJECT_SHA: 31d6fe9c03147ef8fed7fccf826d6a9a9a548e4e
+      TARGET_BRANCH: feat/core-id-001-production-identity-crate-r2
       PACKAGE: symthaea-identity
       SOURCE: crates/core/symthaea-identity/src/lib.rs
       MANIFEST: crates/core/symthaea-identity/Cargo.toml
       LOCKFILE: Cargo.lock
+      EXPECTED_MANIFEST_SHA256: 40ac82fdc83b088be6f4ec5541f363002aab5ca94702c8efadfe2c81dc47fed0
+      EXPECTED_FORMATTED_SOURCE_SHA256: 9b16b782186623dbe8ebdb1783c24eb6454f807fc4b9ce21856b02916228ff4b
 
     steps:
-      - name: Checkout frozen red-evidence subject
-        uses: actions/checkout@v4
+      - name: Checkout exact production parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ env.SUBJECT_SHA }}
-          fetch-depth: 2
+          ref: ${{ env.PARENT_SHA }}
+          fetch-depth: 1
 
-      - name: Verify exact frozen input
+      - name: Verify immutable parent and fetch frozen red subject
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD)" = "$PARENT_SHA"
           test -z "$(git status --porcelain)"
+          git fetch --no-tags --depth=1 origin "$RED_SUBJECT_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$RED_SUBJECT_SHA"
 
-      - name: Install Rust 1.96.0
-        uses: dtolnay/rust-toolchain@1.96.0
-        with:
-          components: rustfmt
-
-      - name: Apply demonstrated rustfmt repair
-        run: cargo fmt -p "$PACKAGE"
-
-      - name: Regenerate workspace lockfile for new crate membership
-        run: cargo generate-lockfile
-
-      - name: Enforce repair scope
+      - name: Import only frozen CORE-ID implementation files
         run: |
           set -euo pipefail
-          mapfile -t changed < <(git status --porcelain=v1 | sed -E 's/^.. //' | sort)
-          printf '%s\n' "${changed[@]}"
-          test "${#changed[@]}" -eq 2
-          test "${changed[0]}" = "$LOCKFILE"
-          test "${changed[1]}" = "$SOURCE"
-          test -z "$(git diff --name-only -- "$MANIFEST")"
+          mkdir -p "$(dirname "$SOURCE")"
+          git show "$RED_SUBJECT_SHA:$MANIFEST" > "$MANIFEST"
+          git show "$RED_SUBJECT_SHA:$SOURCE" > "$SOURCE"
+          test "$(sha256sum "$MANIFEST" | awk '{print $1}')" = "$EXPECTED_MANIFEST_SHA256"
+
+      - name: Install exact Rust qualification toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Apply deterministic Rust 1.96 formatting
+        run: |
+          set -euo pipefail
+          cargo fmt -p "$PACKAGE"
+          test "$(sha256sum "$SOURCE" | awk '{print $1}')" = "$EXPECTED_FORMATTED_SOURCE_SHA256"
+
+      - name: Insert only the required workspace-package lock entry
+        run: |
+          set -euo pipefail
+          cp "$LOCKFILE" "$RUNNER_TEMP/Cargo.lock.before"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          lock = Path("Cargo.lock")
+          before = lock.read_text()
+          package_name = 'name = "symthaea-identity"'
+          anchor = '[[package]]\nname = "symthaea-information-theory"'
+          stanza = '''[[package]]
+          name = "symthaea-identity"
+          version = "0.1.0"
+          dependencies = [
+           "serde",
+           "serde_json",
+          ]
+
+          '''
+          if package_name in before:
+              raise SystemExit("symthaea-identity unexpectedly already exists in parent lockfile")
+          if before.count(anchor) != 1:
+              raise SystemExit("lockfile insertion anchor is not unique")
+          lock.write_text(before.replace(anchor, stanza + anchor, 1))
+          PY
+
+      - name: Prove lockfile mutation is exactly one package stanza
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          before = Path(os.environ["RUNNER_TEMP"], "Cargo.lock.before").read_text()
+          after = Path("Cargo.lock").read_text()
+          anchor = '[[package]]\nname = "symthaea-information-theory"'
+          stanza = '''[[package]]
+          name = "symthaea-identity"
+          version = "0.1.0"
+          dependencies = [
+           "serde",
+           "serde_json",
+          ]
+
+          '''
+          expected = before.replace(anchor, stanza + anchor, 1)
+          if after != expected:
+              raise SystemExit("Cargo.lock contains changes beyond the single frozen package stanza")
+          if after.count('name = "symthaea-identity"') != 1:
+              raise SystemExit("expected exactly one symthaea-identity package entry")
+          PY
+          sha256sum "$LOCKFILE" > "$RUNNER_TEMP/core-id-r2-lockfile.sha256"
+
+      - name: Run locked package qualification gates
+        run: |
+          set -euo pipefail
           cargo fmt -p "$PACKAGE" -- --check
-          git diff --check
+          cargo check -p "$PACKAGE" --all-targets --locked
+          cargo test -p "$PACKAGE" --all-targets --locked
+          cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+          test "$(sha256sum "$LOCKFILE" | awk '{print $1}')" = "$(awk '{print $1}' "$RUNNER_TEMP/core-id-r2-lockfile.sha256")"
 
-      - name: Record candidate digests
+      - name: Enforce exact candidate scope
         run: |
           set -euo pipefail
-          sha256sum "$MANIFEST" "$SOURCE" "$LOCKFILE" | tee core-id-production-repair-files.sha256
-          git diff -- "$SOURCE" "$LOCKFILE" > core-id-production-repair.patch
+          git add "$LOCKFILE" "$MANIFEST" "$SOURCE"
+          mapfile -t changed < <(git diff --cached --name-only | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "$LOCKFILE"
+          test "${changed[1]}" = "$MANIFEST"
+          test "${changed[2]}" = "$SOURCE"
+          test -z "$(git diff --name-only)"
+          test -z "$(git ls-files --others --exclude-standard)"
+          git diff --cached --check
 
-      - name: Upload exact replacement inputs
-        uses: actions/upload-artifact@v4
+      - name: Commit immutable R2 candidate
+        id: candidate
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(identity): add CORE-ID-001 canonical identifier primitive (r2)"
+          subject_sha="$(git rev-parse HEAD)"
+          parent_sha="$(git rev-parse HEAD^)"
+          tree_sha="$(git rev-parse HEAD^{tree})"
+          test "$parent_sha" = "$PARENT_SHA"
+          echo "subject_sha=$subject_sha" >> "$GITHUB_OUTPUT"
+          echo "tree_sha=$tree_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify branch is still at exact parent and publish candidate
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$remote_sha" = "$PARENT_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+      - name: Record immutable candidate receipt
+        env:
+          SUBJECT_SHA: ${{ steps.candidate.outputs.subject_sha }}
+          TREE_SHA: ${{ steps.candidate.outputs.tree_sha }}
+        run: |
+          set -euo pipefail
+          manifest_sha="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+          source_sha="$(sha256sum "$SOURCE" | awk '{print $1}')"
+          lock_sha="$(sha256sum "$LOCKFILE" | awk '{print $1}')"
+          cat > core-id-001-r2-builder-receipt.json <<EOF
+          {
+            "contract": "CORE-ID-001-PRODUCTION-R2-BUILDER-v1",
+            "parent_sha": "$PARENT_SHA",
+            "red_evidence_subject_sha": "$RED_SUBJECT_SHA",
+            "subject_sha": "$SUBJECT_SHA",
+            "tree_sha": "$TREE_SHA",
+            "target_branch": "$TARGET_BRANCH",
+            "rust_toolchain": "1.96.0",
+            "manifest_sha256": "$manifest_sha",
+            "source_sha256": "$source_sha",
+            "lockfile_sha256": "$lock_sha",
+            "lockfile_mutation": "single symthaea-identity package stanza only",
+            "semantic_claim": "candidate construction only; external exact-subject qualification still required"
+          }
+          EOF
+          git show --format=fuller --stat HEAD > core-id-001-r2-commit.txt
+          git diff "$PARENT_SHA"..HEAD -- "$LOCKFILE" "$MANIFEST" "$SOURCE" > core-id-001-r2.patch
+          cat core-id-001-r2-builder-receipt.json
+
+      - name: Upload R2 construction evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: core-id-001-production-replacement-inputs
+          name: core-id-001-production-r2-construction-evidence
           path: |
-            crates/core/symthaea-identity/Cargo.toml
-            crates/core/symthaea-identity/src/lib.rs
-            Cargo.lock
-            core-id-production-repair-files.sha256
-            core-id-production-repair.patch
+            core-id-001-r2-builder-receipt.json
+            core-id-001-r2-commit.txt
+            core-id-001-r2.patch
           if-no-files-found: error
