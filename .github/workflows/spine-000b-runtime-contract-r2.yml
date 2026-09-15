@@ -12,6 +12,7 @@ on:
       - 'docs/research/SPINE_000B_RUNTIME_RECEIPT_CONTRACT_R2.md'
       - 'scripts/verify_spine_000b_runtime_contract_r2.py'
       - 'src/cognitive_loop/subsystem_trait.rs'
+      - 'src/cognitive_loop/cycle_phase_dynamics/mod.rs'
 
 permissions:
   contents: read
@@ -59,7 +60,7 @@ jobs:
       - name: Syntax-check verifier
         run: python3 -m py_compile scripts/verify_spine_000b_runtime_contract_r2.py
 
-      - name: Verify contract against current production seams
+      - name: Verify contract against live production seams
         run: python3 scripts/verify_spine_000b_runtime_contract_r2.py
 
       - name: Seal contract evidence
@@ -68,10 +69,11 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/spine-000b-runtime-contract-r2
           {
-            echo "schema=symthaea.spine.000b.runtime-contract-r2.v1"
+            echo "schema=symthaea.spine.000b.runtime-contract-r2.v2"
             echo "git_head=$(git rev-parse HEAD)"
             echo "git_tree=$(git write-tree)"
             echo "base_subject=fa7b68645dd2109abb12c70f493e50e16c5740a4"
+            echo "live_execution_seam=cycle_phase_dynamics::run_subsystem"
             echo "authority=measurement-only"
             echo "runtime_evidence_claimed=false"
             echo "causal_load_claimed=false"
@@ -79,6 +81,7 @@ jobs:
           cp /tmp/spine_r2_changed artifacts/spine-000b-runtime-contract-r2/changed-files.txt
           sha256sum \
             src/cognitive_loop/subsystem_trait.rs \
+            src/cognitive_loop/cycle_phase_dynamics/mod.rs \
             docs/research/SPINE_000B_RUNTIME_RECEIPT_CONTRACT_R2.md \
             scripts/verify_spine_000b_runtime_contract_r2.py \
             artifacts/spine-000b-runtime-contract-r2/subject.txt \
