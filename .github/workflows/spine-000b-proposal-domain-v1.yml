@@ -1,0 +1,113 @@
+name: SPINE-000B Proposal Domain v1
+
+on:
+  push:
+    branches:
+      - research/spine-000b-proposal-domain-v1
+  pull_request:
+    branches:
+      - research/spine-000b-application-registry-r1
+    paths:
+      - '.github/workflows/spine-000b-proposal-domain-v1.yml'
+      - 'docs/research/SPINE_000B_PROPOSAL_DOMAIN_V1.md'
+      - 'scripts/spine_000b_proposal_domain_v1.py'
+
+permissions:
+  contents: read
+
+jobs:
+  proposal-domain:
+    name: Freeze proposal qualification domain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > /tmp/spine_n1_expected_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_n1_pre_status
+          test ! -s /tmp/spine_n1_pre_status
+
+      - name: Constrain N1 subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=a3f6a2da882600f4d5d32f76a3c0eda0701e0712
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base"..HEAD | sort > /tmp/spine_n1_changed
+          cat > /tmp/spine_n1_allowed <<'EOF'
+          .github/workflows/spine-000b-proposal-domain-v1.yml
+          docs/research/SPINE_000B_PROPOSAL_DOMAIN_V1.md
+          scripts/spine_000b_proposal_domain_v1.py
+          EOF
+          sort -o /tmp/spine_n1_allowed /tmp/spine_n1_allowed
+          comm -23 /tmp/spine_n1_changed /tmp/spine_n1_allowed > /tmp/spine_n1_unexpected
+          if test -s /tmp/spine_n1_unexpected; then
+            echo 'Unexpected SPINE-000B-N1 subject files:' >&2
+            cat /tmp/spine_n1_unexpected >&2
+            exit 1
+          fi
+
+      - name: Syntax-check classifier and registry
+        run: |
+          python3 -m py_compile scripts/spine_000b_proposal_domain_v1.py
+          python3 -m json.tool docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json >/dev/null
+
+      - name: Execute proposal-domain negative controls
+        run: python3 scripts/spine_000b_proposal_domain_v1.py --self-test
+
+      - name: Prove source-bound non-mutation boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'if !output.is_neutral()' src/cognitive_loop/subsystem_trait.rs >/dev/null
+          grep -F 'self.outputs.push((name, output));' src/cognitive_loop/subsystem_trait.rs >/dev/null
+          grep -F '.map(|(_, o)| o.lr_modulation.max(0.01).ln())' src/cognitive_loop/subsystem_trait.rs >/dev/null
+          git diff --exit-code -- src/cognitive_loop/subsystem_trait.rs
+
+      - name: Seal exact-head evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000b-n1
+          {
+            echo 'schema=symthaea.spine.000b.proposal-domain.v1'
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_index_tree=$(git write-tree)"
+            echo 'base_application_registry=a3f6a2da882600f4d5d32f76a3c0eda0701e0712'
+            echo 'authority=measurement-only'
+            echo 'status=PROPOSAL_DOMAIN_CONTRACT_QUALIFIED'
+            echo 'production_behavior_changed=false'
+            echo 'runtime_evidence_claimed=false'
+            echo 'causal_load_claimed=false'
+          } > artifacts/spine-000b-n1/subject.txt
+          cp /tmp/spine_n1_changed artifacts/spine-000b-n1/changed-files.txt
+          sha256sum \
+            docs/research/SPINE_000B_PROPOSAL_DOMAIN_V1.md \
+            scripts/spine_000b_proposal_domain_v1.py \
+            docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json \
+            src/cognitive_loop/subsystem_trait.rs \
+            artifacts/spine-000b-n1/subject.txt \
+            > artifacts/spine-000b-n1/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_n1_expected_head)"
+          git status --porcelain=v1 > /tmp/spine_n1_post_status
+          test ! -s /tmp/spine_n1_post_status
+
+      - name: Upload N1 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-n1-${{ github.sha }}
+          path: artifacts/spine-000b-n1/
+          retention-days: 90
