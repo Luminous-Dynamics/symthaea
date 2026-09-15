@@ -1,0 +1,100 @@
+name: SPINE-000B Runtime Contract R2
+
+on:
+  push:
+    branches:
+      - research/spine-000b-runtime-contract-r2
+  pull_request:
+    branches:
+      - research/spine-000b-p0-identity
+    paths:
+      - '.github/workflows/spine-000b-runtime-contract-r2.yml'
+      - 'docs/research/SPINE_000B_RUNTIME_RECEIPT_CONTRACT_R2.md'
+      - 'scripts/verify_spine_000b_runtime_contract_r2.py'
+      - 'src/cognitive_loop/subsystem_trait.rs'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Static contract/source consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > /tmp/spine_r2_expected_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_r2_pre_status
+          test ! -s /tmp/spine_r2_pre_status
+
+      - name: Constrain subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fa7b68645dd2109abb12c70f493e50e16c5740a4
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base"..HEAD | sort > /tmp/spine_r2_changed
+          cat > /tmp/spine_r2_allowed <<'EOF'
+          .github/workflows/spine-000b-runtime-contract-r2.yml
+          docs/research/SPINE_000B_RUNTIME_RECEIPT_CONTRACT_R2.md
+          scripts/verify_spine_000b_runtime_contract_r2.py
+          EOF
+          sort -o /tmp/spine_r2_allowed /tmp/spine_r2_allowed
+          comm -23 /tmp/spine_r2_changed /tmp/spine_r2_allowed > /tmp/spine_r2_unexpected
+          if test -s /tmp/spine_r2_unexpected; then
+            echo 'Unexpected runtime-contract files:' >&2
+            cat /tmp/spine_r2_unexpected >&2
+            exit 1
+          fi
+
+      - name: Syntax-check verifier
+        run: python3 -m py_compile scripts/verify_spine_000b_runtime_contract_r2.py
+
+      - name: Verify contract against current production seams
+        run: python3 scripts/verify_spine_000b_runtime_contract_r2.py
+
+      - name: Seal contract evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000b-runtime-contract-r2
+          {
+            echo "schema=symthaea.spine.000b.runtime-contract-r2.v1"
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_tree=$(git write-tree)"
+            echo "base_subject=fa7b68645dd2109abb12c70f493e50e16c5740a4"
+            echo "authority=measurement-only"
+            echo "runtime_evidence_claimed=false"
+            echo "causal_load_claimed=false"
+          } > artifacts/spine-000b-runtime-contract-r2/subject.txt
+          cp /tmp/spine_r2_changed artifacts/spine-000b-runtime-contract-r2/changed-files.txt
+          sha256sum \
+            src/cognitive_loop/subsystem_trait.rs \
+            docs/research/SPINE_000B_RUNTIME_RECEIPT_CONTRACT_R2.md \
+            scripts/verify_spine_000b_runtime_contract_r2.py \
+            artifacts/spine-000b-runtime-contract-r2/subject.txt \
+            > artifacts/spine-000b-runtime-contract-r2/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_r2_expected_head)"
+          git status --porcelain=v1 > /tmp/spine_r2_post_status
+          test ! -s /tmp/spine_r2_post_status
+
+      - name: Upload contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-runtime-contract-r2-${{ github.sha }}
+          path: artifacts/spine-000b-runtime-contract-r2/
+          retention-days: 90
