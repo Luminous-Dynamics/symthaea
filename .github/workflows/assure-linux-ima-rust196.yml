@@ -1,0 +1,180 @@
+name: ASSURE Linux IMA Rust 1.96 Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/qualification/assure-linux-ima-rust196-qualify.sh'
+      - '.github/workflows/assure-linux-ima-rust196.yml'
+      - 'crates/domains/symthaea-linux-ima-replay/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-linux-ima-rust196-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: c8f27155e43572476140e321282081d3414fd555
+  PRODUCT_PARENT: 29eb017a2e5b3fda7731ec946439c3096b51cceb
+
+jobs:
+  qualify:
+    name: Exact-head Linux IMA replay repair
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Prove exact subject and two-layer topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          expected_base='${{ github.event.pull_request.base.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test "$expected_base" = "$PRODUCT_PARENT"
+
+          # Product is exactly one ordinary commit above frozen #2958.
+          test "$(git rev-parse "$PRODUCT_HEAD^")" = "$PRODUCT_PARENT"
+          test "$(git rev-list --count "$PRODUCT_PARENT".."$PRODUCT_HEAD")" = "1"
+          test "$(git rev-list --parents -n 1 "$PRODUCT_HEAD" | awk '{print NF}')" = "2"
+
+          # Qualification is exactly one ordinary plumbing commit above the product.
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_HEAD"
+          test "$(git rev-list --count "$PRODUCT_HEAD"..HEAD)" = "1"
+          test "$(git rev-list --parents -n 1 HEAD | awk '{print NF}')" = "2"
+
+          {
+            echo 'qualification_revision=assure-linux-ima-rust196-v2-unit-arm'
+            echo 'capsule_contract_revision=assure-linux-ima-rust196-v1'
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "pull_request=${{ github.event.pull_request.number }}"
+            echo "subject_sha=$actual"
+            echo "subject_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "product_head=$PRODUCT_HEAD"
+            echo "product_tree=$(git rev-parse "$PRODUCT_HEAD^{tree}")"
+            echo "product_parent=$PRODUCT_PARENT"
+            echo "product_source_blob=$(git rev-parse "$PRODUCT_HEAD:crates/domains/symthaea-linux-ima-replay/src/lib.rs")"
+            echo "source_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "workflow_sha256=$(sha256sum .github/workflows/assure-linux-ima-rust196.yml | awk '{print $1}')"
+            echo "contract_sha256=$(sha256sum .github/qualification/assure-linux-ima-rust196-qualify.sh | awk '{print $1}')"
+            echo 'checkout_action=11d5960a326750d5838078e36cf38b85af677262'
+            echo 'upload_artifact_action=ea165f8d65b6e75b540449e92b4886f43607fa02'
+            echo 'runner_image=ubuntu-24.04'
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } > "$RUNNER_TEMP/assure-linux-ima-rust196-receipt.txt"
+
+          git rev-parse HEAD > "$RUNNER_TEMP/pre-head"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/pre-tree"
+          sha256sum Cargo.lock | awk '{print $1}' > "$RUNNER_TEMP/pre-lock"
+
+      - name: Prove product is the explicit unit-valued compiler repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status "$PRODUCT_PARENT" "$PRODUCT_HEAD" > "$RUNNER_TEMP/product-delta.txt"
+          cat "$RUNNER_TEMP/product-delta.txt"
+          test "$(cat "$RUNNER_TEMP/product-delta.txt")" = $'M\tcrates/domains/symthaea-linux-ima-replay/src/lib.rs'
+
+          git diff --unified=3 "$PRODUCT_PARENT" "$PRODUCT_HEAD" -- \
+            crates/domains/symthaea-linux-ima-replay/src/lib.rs \
+            > "$RUNNER_TEMP/product.patch"
+          cat "$RUNNER_TEMP/product.patch"
+          python3 - "$RUNNER_TEMP/product.patch" <<'PY'
+          import pathlib
+          import sys
+
+          patch = pathlib.Path(sys.argv[1]).read_text()
+          body = [
+              line
+              for line in patch.splitlines()
+              if line.startswith(('+', '-')) and not line.startswith(('+++', '---'))
+          ]
+          expected = [
+              '-                None => hasher.update(&[0]),',
+              '+                None => {',
+              '+                    hasher.update(&[0]);',
+              '+                }',
+          ]
+          if body != expected:
+              raise SystemExit(f"unexpected source patch body: {body!r}")
+          print('ima_product_patch=PASS explicit_unit_none_arm')
+          PY
+
+      - name: Prove qualification commit is plumbing-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-status "$PRODUCT_HEAD" HEAD > "$RUNNER_TEMP/qualification-delta.txt"
+          cat "$RUNNER_TEMP/qualification-delta.txt"
+          python3 - "$RUNNER_TEMP/qualification-delta.txt" <<'PY'
+          import pathlib
+          import sys
+
+          expected = {
+              ('A', '.github/qualification/assure-linux-ima-rust196-qualify.sh'),
+              ('A', '.github/workflows/assure-linux-ima-rust196.yml'),
+          }
+          actual = set()
+          for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+              status, path = line.split('\t')
+              actual.add((status, path))
+          if actual != expected:
+              raise SystemExit(f"qualification delta mismatch: {actual!r}")
+          print('qualification_delta=PASS files=2')
+          PY
+
+      - name: Execute pinned IMA qualification contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/qualification/assure-linux-ima-rust196-qualify.sh \
+            2>&1 | tee "$RUNNER_TEMP/assure-linux-ima-rust196-contract.log"
+
+      - name: Prove checkout and source lock unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/pre-head")"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat "$RUNNER_TEMP/pre-tree")"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-lock")"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo 'postflight_immutable=PASS' >> "$RUNNER_TEMP/assure-linux-ima-rust196-receipt.txt"
+
+      - name: Upload exact-head qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-linux-ima-rust196-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/assure-linux-ima-rust196-receipt.txt
+            ${{ runner.temp }}/product-delta.txt
+            ${{ runner.temp }}/product.patch
+            ${{ runner.temp }}/qualification-delta.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-contract.log
+            ${{ runner.temp }}/assure-linux-ima-rust196/source-census.tsv
+            ${{ runner.temp }}/assure-linux-ima-rust196/Cargo.lock.source
+            ${{ runner.temp }}/assure-linux-ima-rust196/Cargo.lock.capsule
+            ${{ runner.temp }}/assure-linux-ima-rust196/lock-audit.json
+            .github/workflows/assure-linux-ima-rust196.yml
+            .github/qualification/assure-linux-ima-rust196-qualify.sh
+          if-no-files-found: ignore
+          retention-days: 90
