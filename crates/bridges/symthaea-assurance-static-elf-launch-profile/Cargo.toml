@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-assurance-static-elf-launch-profile"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Exact loader-free ELF profile assurance for a Nix-bound verifier executable"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "elf", "runtime", "nix"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-nix-bound-in-process-runtime = { path = "../symthaea-assurance-nix-bound-in-process-runtime" }
