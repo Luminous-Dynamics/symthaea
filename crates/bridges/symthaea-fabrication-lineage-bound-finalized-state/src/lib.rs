@@ -9,11 +9,9 @@
 #![deny(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
 use symthaea_fabrication_kernel::crypto_digest::{Sha256, Sha256Digest};
-use symthaea_fabrication_kernel::upgrade_handoff::{
-    UpgradeEndpoint, digest_upgrade_endpoint,
-};
+use symthaea_fabrication_kernel::hardware_reauthorization::MAX_HARDWARE_ID_BYTES;
+use symthaea_fabrication_kernel::upgrade_handoff::{UpgradeEndpoint, digest_upgrade_endpoint};
 use symthaea_fabrication_kernel::upgrade_tracker::UpgradeStage;
 use symthaea_fabrication_lineage_bound_finalization_authorization::{
     AuthorizedLineageBoundFinalizationIdV1, AuthorizedLineageBoundFinalizationV1,
@@ -222,14 +220,10 @@ pub fn finalize_lineage_bound_upgrade_v1(
     }
     let mut machine_ids = execution_permit.machine_ids().to_vec();
     machine_ids.sort();
-    let unique = machine_ids.iter().cloned().collect::<BTreeSet<_>>();
-    if unique.len() != machine_ids.len() {
-        let duplicate = machine_ids
-            .windows(2)
-            .find(|pair| pair[0] == pair[1])
-            .map(|pair| pair[0].clone())
-            .unwrap_or_default();
-        return Err(LineageBoundFinalizedStateError::DuplicateMachine(duplicate));
+    for pair in machine_ids.windows(2) {
+        if pair[0] == pair[1] {
+            return Err(LineageBoundFinalizedStateError::DuplicateMachine(pair[0].clone()));
+        }
     }
 
     let record = LineageBoundUpgradeFinalizationRecordV1 {
@@ -340,26 +334,31 @@ fn validate_record(
             return Err(LineageBoundFinalizedStateError::InvalidRecord(name));
         }
     }
-    if record.lineage_handoff_id.trim().is_empty()
-        || record.inner_handoff_id.trim().is_empty()
-        || record.authorization_id.trim().is_empty()
-        || record.context_id.trim().is_empty()
-        || record.execution_permit_id.trim().is_empty()
-        || record.state_binding_id.trim().is_empty()
-        || record.no_rollback_id.trim().is_empty()
-        || record.fresh_clock_envelope_id.trim().is_empty()
-        || record.fresh_operational_basis_id.trim().is_empty()
-    {
-        return Err(LineageBoundFinalizedStateError::InvalidRecord("identifier"));
+    for value in [
+        record.lineage_handoff_id.as_str(),
+        record.inner_handoff_id.as_str(),
+        record.authorization_id.as_str(),
+        record.context_id.as_str(),
+        record.execution_permit_id.as_str(),
+        record.state_binding_id.as_str(),
+        record.no_rollback_id.as_str(),
+        record.fresh_clock_envelope_id.as_str(),
+        record.fresh_operational_basis_id.as_str(),
+    ] {
+        if !canonical_hex_id(value) {
+            return Err(LineageBoundFinalizedStateError::InvalidRecord("identifier"));
+        }
     }
     if record.hardware_authority_count == 0
         || usize::try_from(record.hardware_authority_count).ok() != Some(record.machine_ids.len())
     {
         return Err(LineageBoundFinalizedStateError::InvalidRecord("hardware_count"));
     }
-    let unique = record.machine_ids.iter().collect::<BTreeSet<_>>();
-    if unique.len() != record.machine_ids.len() {
-        return Err(LineageBoundFinalizedStateError::InvalidRecord("duplicate_machine"));
+    if record.machine_ids.iter().any(|value| invalid_machine_id(value)) {
+        return Err(LineageBoundFinalizedStateError::InvalidRecord("machine_id"));
+    }
+    if record.machine_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err(LineageBoundFinalizedStateError::InvalidRecord("machine_order"));
     }
     record
         .successor_endpoint
@@ -371,6 +370,20 @@ fn validate_record(
         return Err(LineageBoundFinalizedStateError::InvalidRecord("successor_endpoint_digest"));
     }
     Ok(())
+}
+
+fn canonical_hex_id(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn invalid_machine_id(value: &str) -> bool {
+    value.trim().is_empty()
+        || value != value.trim()
+        || value.len() > MAX_HARDWARE_ID_BYTES
+        || value.chars().any(char::is_control)
 }
 
 fn hash_serializable<T: Serialize + ?Sized>(
