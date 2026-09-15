@@ -52,6 +52,7 @@
 #![deny(unsafe_code)]
 
 pub mod ablation_contract;
+pub mod ablation_contrast;
 pub mod ablation_export;
 pub mod ablation_paper_view;
 pub mod adapter;
