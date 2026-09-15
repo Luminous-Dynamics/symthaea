@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-nix-runtime-closure"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Verified-at-assessment Nix runtime closure assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["nix", "assurance", "reproducibility", "security"]
+categories = ["development-tools", "os"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+symthaea-assurance-fd-pinned-executable = { path = "../symthaea-assurance-fd-pinned-executable" }
