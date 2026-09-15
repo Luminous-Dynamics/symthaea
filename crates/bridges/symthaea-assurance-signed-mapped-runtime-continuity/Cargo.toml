@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-signed-mapped-runtime-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bind every signed verifier runtime checkpoint to a qualified mapped Nix executable observation"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "runtime", "nix", "attestation"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-closure-backed-in-process-continuous = { path = "../symthaea-assurance-closure-backed-in-process-continuous" }
+symthaea-assurance-observed-mapped-nix-executable-runtime = { path = "../symthaea-assurance-observed-mapped-nix-executable-runtime" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
