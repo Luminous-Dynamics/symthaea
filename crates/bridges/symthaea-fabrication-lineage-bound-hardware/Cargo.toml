@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-hardware"
+version = "0.1.0"
+edition = "2024"
+description = "Hardware reauthorization preserving globally-current finalized predecessor lineage"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-lineage-bound-probation-telemetry = { path = "../symthaea-fabrication-lineage-bound-probation-telemetry" }
+symthaea-fabrication-lineage-bound-upgrade-handoff = { path = "../symthaea-fabrication-lineage-bound-upgrade-handoff" }
+symthaea-fabrication-lineage-bound-upgrade-probation = { path = "../symthaea-fabrication-lineage-bound-upgrade-probation" }
+symthaea-fabrication-upgrade-hardware-authority = { path = "../symthaea-fabrication-upgrade-hardware-authority" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
