@@ -7,11 +7,13 @@ on:
       - psych-bench/typed-ablation-interventions
       - psych-bench/typed-ablation-export
       - psych-bench/paper-ablation-provenance
+      - psych-bench/ablation-contrast-sets
     paths:
       - '.github/workflows/psych-bench-ablation-contract.yml'
       - 'crates/domains/symthaea-psych-bench/src/ablation_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/ablation_contrast.rs'
       - 'crates/domains/symthaea-psych-bench/src/ablation_export.rs'
+      - 'crates/domains/symthaea-psych-bench/src/ablation_factorial.rs'
       - 'crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs'
       - 'crates/domains/symthaea-psych-bench/src/harness/config.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
@@ -65,6 +67,7 @@ jobs:
             crates/domains/symthaea-psych-bench/src/ablation_contract.rs \
             crates/domains/symthaea-psych-bench/src/ablation_contrast.rs \
             crates/domains/symthaea-psych-bench/src/ablation_export.rs \
+            crates/domains/symthaea-psych-bench/src/ablation_factorial.rs \
             crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs
 
       - name: Compile psych-bench library
@@ -84,6 +87,12 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib ablation_contrast::tests -- --nocapture
+
+      - name: Execute raw-factorial-estimator regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib ablation_factorial::tests -- --nocapture
 
       - name: Execute typed-ablation-export regressions
         shell: bash
@@ -111,6 +120,7 @@ jobs:
             crates/domains/symthaea-psych-bench/src/ablation_contract.rs \
             crates/domains/symthaea-psych-bench/src/ablation_contrast.rs \
             crates/domains/symthaea-psych-bench/src/ablation_export.rs \
+            crates/domains/symthaea-psych-bench/src/ablation_factorial.rs \
             crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs <<'PY'
           import json
           import sys
