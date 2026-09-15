@@ -1,58 +1,12 @@
 name: MANIFOLD-006D-A Rustfmt Diagnostic
 
 on:
-  push:
-    branches: [audit/manifold-006d-a-rustfmt-diagnostic]
   workflow_dispatch:
 
 permissions: {contents: read}
 
 jobs:
-  format:
+  superseded:
     runs-on: ubuntu-slim
-    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with: {fetch-depth: 3, persist-credentials: false}
-      - name: Install exact Rust 1.96 formatter
-        run: |
-          set -euo pipefail
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 --component rustfmt
-          source "$HOME/.cargo/env"
-          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
-          rustfmt --version
-      - name: Produce exact formatted candidate bytes
-        run: |
-          set -euo pipefail
-          source "$HOME/.cargo/env"
-          out="$RUNNER_TEMP/manifold-006d-a-rustfmt"; mkdir -p "$out/before" "$out/after"
-          files=(
-            crates/core/symthaea-core/src/two_stage_robust_reachability.rs
-            crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs
-          )
-          for f in "${files[@]}"; do
-            cp "$f" "$out/before/$(basename "$f")"
-            rustfmt --edition 2024 "$f"
-            cp "$f" "$out/after/$(basename "$f")"
-          done
-          {
-            echo schema=symthaea.manifold-006d-a.rustfmt-diagnostic.v2
-            echo diagnostic_control_sha=$(git rev-parse HEAD)
-            echo failed_a_subject_sha=$(git rev-parse HEAD^^)
-            echo rustc=$(rustc --version)
-            echo rustfmt=$(rustfmt --version)
-            for f in "${files[@]}"; do
-              b=$(basename "$f")
-              echo before_${b}_sha256=$(sha256sum "$out/before/$b" | awk '{print $1}')
-              echo after_${b}_sha256=$(sha256sum "$out/after/$b" | awk '{print $1}')
-            done
-          } > "$out/environment.txt"
-          diff -u "$out/before/two_stage_robust_reachability.rs" "$out/after/two_stage_robust_reachability.rs" > "$out/two_stage.diff" || true
-          diff -u "$out/before/manifold_006d_a_information_pattern.rs" "$out/after/manifold_006d_a_information_pattern.rs" > "$out/test.diff" || true
-      - name: Upload exact formatter outputs
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: manifold-006d-a-rustfmt-${{ github.sha }}
-          path: ${{ runner.temp }}/manifold-006d-a-rustfmt/
-          if-no-files-found: error
-          retention-days: 90
+      - run: echo 'Superseded by the replacement A qualification lane; preserved branch history remains diagnostic evidence.'
