@@ -1,0 +1,28 @@
+{
+  "authority": "NON_AUTHORITATIVE_DIAGNOSTIC",
+  "authority_boundary": "debugging aid only; never an input to qualification gates, terminal disposition, positive-receipt eligibility, or canonical receipt digest",
+  "canonical_attempt_sha256": "1548750b2c944fbc07a2ab81724c816f35207b444bf02834869aab2fe709b694",
+  "failure": {
+    "captured_output_bytes": 2659,
+    "command": "+ cargo clippy --locked -p symthaea-particle-physics --all-targets -- -D warnings (cwd=/home/runner/work/symthaea/symthaea/subject)",
+    "gate": "clippy",
+    "gate_exit_code": null,
+    "gate_exit_code_note": "verifier-v2 records PASS/FAIL but does not emit the child process exit code; FAIL establishes a nonzero result",
+    "gate_state": "FAIL",
+    "output_tail": "+ cargo clippy --locked -p symthaea-particle-physics --all-targets -- -D warnings (cwd=/home/runner/work/symthaea/symthaea/subject)\n   Compiling serde_core v1.0.228\n   Compiling serde v1.0.228\n   Compiling zmij v1.0.21\n   Compiling serde_json v1.0.150\n    Checking itoa v1.0.18\n    Checking memchr v2.8.2\n    Checking symthaea-particle-physics v0.1.0 (/home/runner/work/symthaea/symthaea/subject/crates/domains/symthaea-particle-physics)\nerror: the loop variable `a` is used to index `sigma`\n   --> crates/domains/symthaea-particle-physics/src/symmetry_groups.rs:190:18\n    |\n190 |         for a in 0..3 {\n    |                  ^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_range_loop\n    = note: `-D clippy::needless-range-loop` implied by `-D warnings`\n    = help: to override `-D warnings` add `#[allow(clippy::needless_range_loop)]`\nhelp: consider using an iterator and enumerate()\n    |\n190 -         for a in 0..3 {\n190 +         for (a, <item>) in sigma.iter().enumerate() {\n    |\n\nerror: the loop variable `a` is used to index `sigma`\n   --> crates/domains/symthaea-particle-physics/src/symmetry_groups.rs:204:18\n    |\n204 |         for a in 0..3 {\n    |                  ^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_range_loop\nhelp: consider using an iterator and enumerate()\n    |\n204 -         for a in 0..3 {\n204 +         for (a, <item>) in sigma.iter().enumerate() {\n    |\n\nerror: the loop variable `i` is used to index `sigma`\n   --> crates/domains/symthaea-particle-physics/src/symmetry_groups.rs:205:22\n    |\n205 |             for i in 0..2 {\n    |                      ^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_range_loop\nhelp: consider using an iterator and enumerate()\n    |\n205 -             for i in 0..2 {\n205 +             for (i, <item>) in sigma.iter().enumerate().take(2) {\n    |\n\nerror: the loop variable `j` is used to index `sigma`\n   --> crates/domains/symthaea-particle-physics/src/symmetry_groups.rs:206:26\n    |\n206 |                 for j in 0..2 {\n    |                          ^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_range_loop\nhelp: consider using an iterator and enumerate()\n    |\n206 -                 for j in 0..2 {\n206 +                 for (j, <item>) in sigma.iter().enumerate().take(2) {\n    |\n\nerror: could not compile `symthaea-particle-physics` (lib test) due to 4 previous errors\n",
+    "qualifier_exit_code": 1,
+    "raw_segment_bytes": 3813,
+    "redactions_applied": 0,
+    "sanitization_policy": "ansi-control-strip-plus-token-redaction-v1",
+    "sanitized_output_bytes": 2659,
+    "truncated": false
+  },
+  "producer": {
+    "path": "scripts/build-lqcd-fast-diagnostic.py",
+    "sha256": "9f191d437cc418c1d5e2bd8903f17e9a33a1b2b73bd22522ac5f9117af815874"
+  },
+  "schema_version": "symthaea.focused-qualification-diagnostic.v1",
+  "subject_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+  "terminal_disposition": "ClippyFailed",
+  "verifier_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3"
+}

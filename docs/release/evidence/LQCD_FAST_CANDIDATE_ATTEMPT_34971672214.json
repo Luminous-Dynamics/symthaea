@@ -1,0 +1,69 @@
+{
+  "authority_boundary": "candidate package conformance only; full CI remains workspace authority",
+  "gates": {
+    "base_binding": "PASS",
+    "cargo_metadata": "PASS",
+    "clippy": "FAIL",
+    "format": "PASS",
+    "governance": "PASS",
+    "postflight_subject_immutability": "PASS",
+    "postflight_verifier_immutability": "PASS",
+    "subject_binding": "PASS",
+    "tests": "PASS",
+    "verifier_binding": "PASS"
+  },
+  "positive_receipt_eligible": false,
+  "provider_attempt": {
+    "image_os": "ubuntu24",
+    "provider": "github-actions",
+    "run_attempt": "1",
+    "run_id": "34971672214",
+    "runner_arch": "X64",
+    "runner_os": "Linux",
+    "workflow": "LQCD Fast Lane"
+  },
+  "qualification_profile": {
+    "profile_id": "lqcd-particle-physics-focused-v2",
+    "recipe_semantics_sha256": "708bb303573d2a934fb806037f43880fa8c73ae53dc60f3081ef1e90bf55bd69",
+    "required_gates": [
+      "verifier_binding",
+      "subject_binding",
+      "base_binding",
+      "governance",
+      "cargo_metadata",
+      "format",
+      "tests",
+      "clippy",
+      "postflight_subject_immutability",
+      "postflight_verifier_immutability"
+    ]
+  },
+  "schema_version": "symthaea.focused-qualification-attempt.v2",
+  "subject": {
+    "checked_out_commit_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+    "checked_out_tree_sha": "aa2a8d4d7899fe226a58d50a195ba3c198c94b0a",
+    "class": "immutable_exact_head_package_focused",
+    "declared_inputs_sha256": "31871ba29f15b69e08a97308ed75bb795d324492faac5c6898b3ab9a0555c236",
+    "expected_head_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+    "provider_event_sha": "3be6c026192366b80ff5eebf6db4cd5aace7d6a7",
+    "qualification_base_sha": "6a74273f189b876919e5feee3418201e46bd6415",
+    "repository": "Luminous-Dynamics/symthaea",
+    "source_state": "exact_raw_head_clean"
+  },
+  "terminal_disposition": "ClippyFailed",
+  "toolchain": {
+    "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+    "clippy": "clippy 0.1.96 (ac68faa20c 2026-05-25)",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.0\nLLVM version: 22.1.2",
+    "rustfmt": "rustfmt 1.9.0-stable (ac68faa20c 2026-05-25)"
+  },
+  "verifier_authority": {
+    "checked_out_commit_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+    "checked_out_tree_sha": "aa2a8d4d7899fe226a58d50a195ba3c198c94b0a",
+    "declared_inputs_sha256": "350c8187a0b799285aff5fcd433be021a9b7f67babd8e9aa0a80ee3f60e1b3bd",
+    "expected_commit_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+    "expected_tree_sha": "aa2a8d4d7899fe226a58d50a195ba3c198c94b0a",
+    "source_state": "exact_verifier_clean"
+  },
+  "verifier_error": null
+}
