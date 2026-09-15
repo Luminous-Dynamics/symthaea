@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-critical-exec-preserved-authority"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Critical exec-preserved process authority observation for a confirmed static verifier"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "linux", "authority", "runtime"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+symthaea-assurance-ptrace-static-exec-confirmation = { path = "../symthaea-assurance-ptrace-static-exec-confirmation" }
