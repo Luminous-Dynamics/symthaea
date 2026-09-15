@@ -400,7 +400,7 @@ impl OracleReport {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy,PartialEq, Eq)]
 pub enum FixtureError {
     NonFiniteReliability,
     ReliabilityOutOfRange,
@@ -475,6 +475,9 @@ impl FixtureGenerator {
         let signal_b = signal_a ^ 0x6D2B;
         let target_is_a = trial_mix & 1 == 0;
         let target_context = if target_is_a { context_a } else { context_b };
+        let non_target_context = if target_is_a { context_b } else { context_a };
+        let target_polarity = if target_is_a { orientation } else { opposite };
+        let competing_polarity = target_polarity.opposite();
         let context_signal = if target_is_a { signal_a } else { signal_b };
 
         let claim = |slot,
@@ -511,13 +514,13 @@ impl FixtureGenerator {
 
         let (prior_expectation, events, truth) = match condition {
             Condition::CoherentControl => (
-                orientation,
+                target_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -527,7 +530,7 @@ impl FixtureGenerator {
                         1,
                         source_b,
                         fault_b,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -537,7 +540,7 @@ impl FixtureGenerator {
                         2,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -548,13 +551,13 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::SurpriseOnly => (
-                opposite,
+                competing_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -564,7 +567,7 @@ impl FixtureGenerator {
                         1,
                         source_b,
                         fault_b,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -574,7 +577,7 @@ impl FixtureGenerator {
                         2,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -585,13 +588,13 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::TransientConflict => (
-                opposite,
+                competing_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -601,7 +604,7 @@ impl FixtureGenerator {
                         1,
                         source_b,
                         fault_b,
-                        opposite,
+                        competing_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -611,7 +614,7 @@ impl FixtureGenerator {
                         2,
                         source_b,
                         fault_b,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         Some(1),
                         false,
@@ -622,37 +625,37 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::PersistentResolvable => (
-                opposite,
+                competing_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
-                        Some(context_a),
+                        Some(target_context),
                     )?,
                     claim(
                         1,
                         source_b,
                         fault_b,
-                        opposite,
+                        competing_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
-                        Some(context_b),
+                        Some(non_target_context),
                     )?,
                     claim(
                         2,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
-                        Some(context_a),
+                        Some(target_context),
                     )?,
                     auxiliary(Some(target_context))?,
                 ],
@@ -664,13 +667,13 @@ impl FixtureGenerator {
                 },
             ),
             Condition::PersistentIrreducible => (
-                opposite,
+                competing_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -680,7 +683,7 @@ impl FixtureGenerator {
                         1,
                         source_b,
                         fault_b,
-                        opposite,
+                        competing_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -690,7 +693,7 @@ impl FixtureGenerator {
                         2,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -701,13 +704,13 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::SelfReferentialConflict => (
-                orientation,
+                target_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::SelfPrediction,
                         None,
                         false,
@@ -717,7 +720,7 @@ impl FixtureGenerator {
                         1,
                         source_b,
                         fault_b,
-                        opposite,
+                        competing_polarity,
                         EventRole::WorldEvidence,
                         None,
                         true,
@@ -727,7 +730,7 @@ impl FixtureGenerator {
                         2,
                         source_b,
                         fault_b,
-                        opposite,
+                        competing_polarity,
                         EventRole::WorldEvidence,
                         None,
                         true,
@@ -738,13 +741,13 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::OntologyFailure => (
-                opposite,
+                competing_polarity,
                 [
                     claim(
                         0,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -754,7 +757,7 @@ impl FixtureGenerator {
                         1,
                         source_b,
                         fault_b,
-                        opposite,
+                        competing_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -764,7 +767,7 @@ impl FixtureGenerator {
                         2,
                         source_a,
                         fault_a,
-                        orientation,
+                        target_polarity,
                         EventRole::WorldEvidence,
                         None,
                         false,
@@ -774,9 +777,9 @@ impl FixtureGenerator {
                 ],
                 OracleTruth {
                     hidden_claim_contexts: [
-                        Some(context_a),
-                        Some(context_b),
-                        Some(context_a),
+                        Some(target_context),
+                        Some(non_target_context),
+                        Some(target_context),
                         None,
                     ],
                     latent_context_is_causal: true,
@@ -1501,6 +1504,26 @@ mod tests {
         let mut changed_support = report;
         changed_support.observatory.evidence_support = EvidenceSupport::new(1.0, 0.0).unwrap();
         assert_ne!(canonical, changed_support.canonical_bytes());
+    }
+
+    #[test]
+    fn common_latent_target_is_preserved_across_matched_conditions() {
+        for trial_index in 0..8 {
+            let seed = DEVELOPMENT_SEEDS[0];
+            let report = |condition| {
+                let fixture = FixtureGenerator::generate(condition, seed, trial_index).unwrap();
+                qualify_fixture(&fixture).unwrap()
+            };
+            let c0 = report(Condition::CoherentControl);
+            let c1 = report(Condition::SurpriseOnly);
+            let c2 = report(Condition::TransientConflict);
+            let c3 = report(Condition::PersistentResolvable);
+            let c6 = report(Condition::OntologyFailure);
+            assert_eq!(c0.target_polarity, c1.target_polarity);
+            assert_eq!(c1.target_polarity, c2.target_polarity);
+            assert_eq!(c2.target_polarity, c3.target_polarity);
+            assert_eq!(c3.target_polarity, c6.target_polarity);
+        }
     }
 
     #[test]
