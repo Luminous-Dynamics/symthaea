@@ -1,0 +1,114 @@
+name: SPINE-000D Contract
+
+on:
+  push:
+    branches:
+      - research/spine-000d-ablation-contract-v1
+  pull_request:
+    branches:
+      - research/spine-000b-p0-identity
+    paths:
+      - '.github/workflows/spine-000d-contract.yml'
+      - 'docs/research/SPINE_000D_CAUSAL_ABLATION_CONTRACT.md'
+      - 'docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json'
+      - 'scripts/verify_spine_000d_contract.py'
+      - 'scripts/validate_spine_000d_campaign.py'
+      - 'scripts/selftest_spine_000d_campaign_validator.py'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Preregistered causal-ablation semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > /tmp/spine_000d_expected_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_000d_pre_status
+          test ! -s /tmp/spine_000d_pre_status
+
+      - name: Constrain contract-only subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fa7b68645dd2109abb12c70f493e50e16c5740a4
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base"..HEAD | sort > /tmp/spine_000d_changed
+          cat > /tmp/spine_000d_allowed <<'EOF'
+          .github/workflows/spine-000d-contract.yml
+          docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json
+          docs/research/SPINE_000D_CAUSAL_ABLATION_CONTRACT.md
+          scripts/selftest_spine_000d_campaign_validator.py
+          scripts/validate_spine_000d_campaign.py
+          scripts/verify_spine_000d_contract.py
+          EOF
+          sort -o /tmp/spine_000d_allowed /tmp/spine_000d_allowed
+          comm -23 /tmp/spine_000d_changed /tmp/spine_000d_allowed > /tmp/spine_000d_unexpected
+          if test -s /tmp/spine_000d_unexpected; then
+            echo 'Unexpected SPINE-000D contract files:' >&2
+            cat /tmp/spine_000d_unexpected >&2
+            exit 1
+          fi
+
+      - name: Syntax-check contract instruments
+        run: |
+          python3 -m py_compile \
+            scripts/verify_spine_000d_contract.py \
+            scripts/validate_spine_000d_campaign.py \
+            scripts/selftest_spine_000d_campaign_validator.py
+          python3 -m json.tool docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json > /dev/null
+
+      - name: Verify frozen contract/schema
+        run: python3 scripts/verify_spine_000d_contract.py
+
+      - name: Exercise campaign preflight negative controls
+        run: python3 scripts/selftest_spine_000d_campaign_validator.py
+
+      - name: Seal contract evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000d-contract
+          {
+            echo "schema=symthaea.spine.000d.contract.v2"
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_tree=$(git write-tree)"
+            echo "base_subject=fa7b68645dd2109abb12c70f493e50e16c5740a4"
+            echo "authority=measurement-only"
+            echo "causal_results_claimed=false"
+          } > artifacts/spine-000d-contract/subject.txt
+          cp /tmp/spine_000d_changed artifacts/spine-000d-contract/changed-files.txt
+          sha256sum \
+            docs/research/SPINE_000D_CAUSAL_ABLATION_CONTRACT.md \
+            docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json \
+            scripts/verify_spine_000d_contract.py \
+            scripts/validate_spine_000d_campaign.py \
+            scripts/selftest_spine_000d_campaign_validator.py \
+            artifacts/spine-000d-contract/subject.txt \
+            > artifacts/spine-000d-contract/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_000d_expected_head)"
+          git status --porcelain=v1 > /tmp/spine_000d_post_status
+          test ! -s /tmp/spine_000d_post_status
+
+      - name: Upload contract evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000d-contract-${{ github.sha }}
+          path: artifacts/spine-000d-contract/
+          retention-days: 90
