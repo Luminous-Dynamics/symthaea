@@ -6,9 +6,11 @@ on:
       - main
       - psych-bench/typed-ablation-interventions
       - psych-bench/typed-ablation-export
+      - psych-bench/paper-ablation-provenance
     paths:
       - '.github/workflows/psych-bench-ablation-contract.yml'
       - 'crates/domains/symthaea-psych-bench/src/ablation_contract.rs'
+      - 'crates/domains/symthaea-psych-bench/src/ablation_contrast.rs'
       - 'crates/domains/symthaea-psych-bench/src/ablation_export.rs'
       - 'crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs'
       - 'crates/domains/symthaea-psych-bench/src/harness/config.rs'
@@ -61,6 +63,7 @@ jobs:
           set -euo pipefail
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/ablation_contract.rs \
+            crates/domains/symthaea-psych-bench/src/ablation_contrast.rs \
             crates/domains/symthaea-psych-bench/src/ablation_export.rs \
             crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs
 
@@ -75,6 +78,12 @@ jobs:
         run: |
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib ablation_contract::tests -- --nocapture
+
+      - name: Execute ablation-contrast regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib ablation_contrast::tests -- --nocapture
 
       - name: Execute typed-ablation-export regressions
         shell: bash
@@ -100,6 +109,7 @@ jobs:
           set -e
           python3 - "$report" \
             crates/domains/symthaea-psych-bench/src/ablation_contract.rs \
+            crates/domains/symthaea-psych-bench/src/ablation_contrast.rs \
             crates/domains/symthaea-psych-bench/src/ablation_export.rs \
             crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs <<'PY'
           import json
