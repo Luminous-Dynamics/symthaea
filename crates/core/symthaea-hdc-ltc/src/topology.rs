@@ -14,35 +14,27 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
-/// Canonical topology schema version.
 pub const TOPOLOGY_SCHEMA_VERSION: u16 = 1;
-/// Maximum length of a V1 symbolic topology token in UTF-8 bytes.
 pub const MAX_SYMBOLIC_TOKEN_BYTES: usize = 128;
 
 const TOPOLOGY_DOMAIN: &[u8] = b"symthaea-neuroarch-topology-v1\0";
 
-/// Stable circuit identity within one topology description.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct CircuitId(pub u32);
 
-/// Stable edge identity within one topology description.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct EdgeId(pub u64);
 
-/// Coarse or exact declared temporal class for a circuit.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TimescaleClass {
-    /// Stateless/external input surface with no local recurrent time constant.
     Stateless,
     Fast,
     Medium,
     Slow,
-    /// Exact declared custom timescale in nanoseconds.
     CustomNanos(u64),
 }
 
 impl TimescaleClass {
-    /// Convert a positive finite duration in seconds to a deterministic custom class.
     pub fn from_seconds(seconds: f32) -> Result<Self, TopologyError> {
         if !seconds.is_finite() || seconds <= 0.0 {
             return Err(TopologyError::InvalidTimescale);
@@ -63,7 +55,6 @@ impl TimescaleClass {
     }
 }
 
-/// Implementation family. Labels are descriptive, not evidence of function.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CircuitImplementation {
     ExternalInput,
@@ -71,38 +62,29 @@ pub enum CircuitImplementation {
     Named(String),
 }
 
-/// How a circuit combines its declared inbound routes.
-///
-/// This is target-level execution semantics. Route-local transforms such as HDC
-/// binding are described separately by [`EdgeTransform`].
+/// Target-level semantics for combining declared inbound routes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum InputMergePolicy {
-    /// Source surface with no declared inbound merge.
     None,
-    /// Exactly one effective inbound value is consumed.
     Single,
-    /// All declared inbound values are HDC-bundled by the target.
     BundleAll,
 }
 
-/// Static circuit metadata only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitDescriptor {
     pub id: CircuitId,
-    /// Neutral symbolic role label. Runtime code must not treat this as verified function.
+    /// Descriptive only; this label is not evidence that the circuit performs the named role.
     pub role: String,
     pub timescale_class: TimescaleClass,
     /// Total scalar state dimension represented by this circuit.
     pub state_dimension: u64,
-    /// Number of implementation units represented by the circuit.
+    /// Number of implementation units represented by this circuit.
     pub unit_count: u64,
     pub implementation: CircuitImplementation,
     pub input_merge_policy: InputMergePolicy,
-    /// Optional declarative modulation capability/profile identifier.
     pub modulation_profile: Option<String>,
 }
 
-/// Semantic route channel.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SemanticChannel {
     ExternalInput,
@@ -111,37 +93,34 @@ pub enum SemanticChannel {
     Named(String),
 }
 
-/// Declared route direction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EdgeDirection {
     Directed,
     Bidirectional,
 }
 
-/// Structural recurrence semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RecurrenceKind {
     FeedForward,
     Recurrent,
 }
 
-/// Communication-budget class. The incumbent currently has no explicit route budget.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum BudgetClass {
+    /// The incumbent has no explicit per-route communication budget.
     LegacyUnbounded,
     Local,
     Global,
     Named(String),
 }
 
-/// Route-local execution transform.
+/// Route-local execution transform. Multi-route merging belongs to the target circuit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EdgeTransform {
     Direct,
     Bind,
 }
 
-/// Static structural edge. Existence permits influence; it does not establish causal effect.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EdgeDescriptor {
     pub id: EdgeId,
@@ -154,17 +133,14 @@ pub struct EdgeDescriptor {
     pub transform: EdgeTransform,
 }
 
-/// Canonical descriptive topology.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopologyDescriptor {
     pub schema_version: u16,
     pub circuits: Vec<CircuitDescriptor>,
     pub edges: Vec<EdgeDescriptor>,
-    /// Whether multiple source/target routes are permitted when channels differ.
     pub allow_parallel_channels: bool,
 }
 
-/// BLAKE3 commitment to canonical topology bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TopologyCommitment(pub [u8; 32]);
 
@@ -181,7 +157,6 @@ impl fmt::Display for TopologyCommitment {
     }
 }
 
-/// Fail-closed topology validation/canonicalization errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TopologyError {
     UnsupportedSchemaVersion(u16),
@@ -211,7 +186,6 @@ impl fmt::Display for TopologyError {
 
 impl Error for TopologyError {}
 
-/// Common descriptive interface for candidate architectures.
 pub trait NeuroTopology {
     fn topology_descriptor(&self) -> Result<TopologyDescriptor, TopologyError>;
 
@@ -221,7 +195,6 @@ pub trait NeuroTopology {
 }
 
 impl TopologyDescriptor {
-    /// Validate structural semantics without mutating or normalizing the caller's value.
     pub fn validate(&self) -> Result<(), TopologyError> {
         if self.schema_version != TOPOLOGY_SCHEMA_VERSION {
             return Err(TopologyError::UnsupportedSchemaVersion(self.schema_version));
@@ -282,27 +255,26 @@ impl TopologyDescriptor {
             validate_budget(&edge.budget_class)?;
 
             let (source, target) = canonical_endpoints(edge);
-            let direction_tag = direction_tag(edge.direction);
-            let pair = (direction_tag, source, target);
+            let direction = direction_tag(edge.direction);
+            let pair = (direction, source, target);
             if !self.allow_parallel_channels && !endpoint_pairs.insert(pair) {
                 return Err(TopologyError::DuplicateStructuralEdge { source, target });
             }
             endpoint_pairs.insert(pair);
 
-            let channel_key = (direction_tag, source, target, edge.channel.clone());
+            let channel_key = (direction, source, target, edge.channel.clone());
             if !channel_edges.insert(channel_key) {
                 return Err(TopologyError::DuplicateChannelEdge { source, target });
             }
         }
-
         Ok(())
     }
 
-    /// Canonical bytes are independent of insertion order and contain no runtime state.
+    /// Return canonical bytes independent of circuit/edge insertion order and runtime state.
     ///
-    /// V1 symbolic labels are case-sensitive ASCII tokens. Bidirectional routes are
-    /// endpoint-normalized, so `A <-> B` and `B <-> A` have identical canonical bytes
-    /// when all other static fields, including edge identity, are equal.
+    /// V1 symbolic labels are case-sensitive bounded ASCII tokens. Bidirectional routes are
+    /// endpoint-normalized so `A <-> B` and `B <-> A` canonicalize identically when every
+    /// other static identity field, including the edge ID, is equal.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, TopologyError> {
         self.validate()?;
         let mut out = Vec::new();
@@ -311,7 +283,7 @@ impl TopologyDescriptor {
         out.push(u8::from(self.allow_parallel_channels));
 
         let mut circuits: Vec<&CircuitDescriptor> = self.circuits.iter().collect();
-        circuits.sort_by_key(|c| c.id);
+        circuits.sort_by_key(|circuit| circuit.id);
         push_len(&mut out, circuits.len())?;
         for circuit in circuits {
             encode_circuit(&mut out, circuit)?;
@@ -323,20 +295,18 @@ impl TopologyDescriptor {
         for edge in edges {
             encode_edge(&mut out, edge)?;
         }
-
         Ok(out)
     }
 
     pub fn commitment(&self) -> Result<TopologyCommitment, TopologyError> {
-        let bytes = self.canonical_bytes()?;
-        Ok(TopologyCommitment(*blake3::hash(&bytes).as_bytes()))
+        Ok(TopologyCommitment(*blake3::hash(&self.canonical_bytes()?).as_bytes()))
     }
 }
 
 /// Pure descriptive adapter for the current layered HDC/LTC incumbent.
 ///
-/// Random seed, learned weights, binding-vector values, and runtime state are deliberately
-/// excluded from the structural topology commitment. Those belong to subject/model identity.
+/// Seed, realized weights/binding vectors, learned parameters, and runtime state are excluded
+/// from topology identity. Benchmark subject/config receipts must bind those separately.
 impl NeuroTopology for HdcLtcUnifiedNetwork {
     fn topology_descriptor(&self) -> Result<TopologyDescriptor, TopologyError> {
         let config = self.config();
@@ -366,11 +336,6 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
                 .checked_mul(dim)
                 .ok_or(TopologyError::DimensionOverflow)?;
             let id = u32::try_from(idx + 1).map_err(|_| TopologyError::DimensionOverflow)?;
-            let input_merge_policy = if idx > 0 && config.skip_connections {
-                InputMergePolicy::BundleAll
-            } else {
-                InputMergePolicy::Single
-            };
             circuits.push(CircuitDescriptor {
                 id: CircuitId(id),
                 role: format!("layer:{idx}"),
@@ -378,7 +343,11 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
                 state_dimension,
                 unit_count: units,
                 implementation: CircuitImplementation::IncumbentHdcLtcLayer,
-                input_merge_policy,
+                input_merge_policy: if idx > 0 && config.skip_connections {
+                    InputMergePolicy::BundleAll
+                } else {
+                    InputMergePolicy::Single
+                },
                 modulation_profile: None,
             });
         }
@@ -667,6 +636,12 @@ mod tests {
         }
     }
 
+    fn reverse_endpoints(edge: &mut EdgeDescriptor) {
+        let source = edge.source;
+        edge.source = edge.target;
+        edge.target = source;
+    }
+
     fn generic_topology() -> TopologyDescriptor {
         TopologyDescriptor {
             schema_version: TOPOLOGY_SCHEMA_VERSION,
@@ -712,14 +687,14 @@ mod tests {
         let mut a = generic_topology();
         a.edges[0].direction = EdgeDirection::Bidirectional;
         let mut b = a.clone();
-        std::mem::swap(&mut b.edges[0].source, &mut b.edges[0].target);
+        reverse_endpoints(&mut b.edges[0]);
         assert_eq!(a.canonical_bytes().unwrap(), b.canonical_bytes().unwrap());
         assert_eq!(a.commitment().unwrap(), b.commitment().unwrap());
 
         let mut duplicate = a.clone();
         let mut reversed = a.edges[0].clone();
         reversed.id = EdgeId(11);
-        std::mem::swap(&mut reversed.source, &mut reversed.target);
+        reverse_endpoints(&mut reversed);
         duplicate.edges.push(reversed);
         assert!(matches!(
             duplicate.validate(),
@@ -814,8 +789,9 @@ mod tests {
     fn incumbent_skip_semantics_are_not_double_encoded() {
         let mut config = small_network_config();
         config.skip_connections = true;
-        let network = HdcLtcUnifiedNetwork::new(config, 42);
-        let topology = network.topology_descriptor().unwrap();
+        let topology = HdcLtcUnifiedNetwork::new(config, 42)
+            .topology_descriptor()
+            .unwrap();
 
         assert_eq!(
             topology.circuits[2].input_merge_policy,
@@ -837,7 +813,7 @@ mod tests {
     }
 
     #[test]
-    fn incumbent_layer_size_binding_and_skip_semantics_change_commitment() {
+    fn incumbent_structural_changes_change_commitment() {
         let base = small_network_config();
         let base_commit = HdcLtcUnifiedNetwork::new(base.clone(), 1)
             .topology_commitment()
@@ -878,8 +854,7 @@ mod tests {
         let input = ContinuousHV::new_random(128, 7);
         network.step(0.1, &input);
         network.step_with_timestamp(1.0, &input);
-        let after = network.topology_commitment().unwrap();
-        assert_eq!(before, after);
+        assert_eq!(before, network.topology_commitment().unwrap());
     }
 
     #[test]
