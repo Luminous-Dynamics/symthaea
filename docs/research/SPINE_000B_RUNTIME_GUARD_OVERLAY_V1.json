@@ -1,0 +1,102 @@
+{
+  "schema": "symthaea.spine.000b.runtime-guard-overlay.v1",
+  "authority": "measurement-only",
+  "causal_load_claimed": false,
+  "registry_path": "docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json",
+  "phase_c_source": "src/cognitive_loop/cycle_phase_output/mod.rs",
+  "witness_statuses": [
+    "TRUE",
+    "FALSE",
+    "NOT_EVALUATED",
+    "UNRESOLVED"
+  ],
+  "guard_result_classes": [
+    "NO_SOURCE_PROJECTION",
+    "FEATURE_INACTIVE",
+    "UNCONDITIONAL_CANDIDATE",
+    "GUARDED_TRUE_CANDIDATE",
+    "GUARDED_FALSE_NOT_EXPECTED",
+    "GUARD_OUTCOME_UNRESOLVED"
+  ],
+  "predicates": [
+    {
+      "predicate_id": 1,
+      "name": "vision_bridge_present",
+      "capture_moment": "RESOURCE_LOOKUP",
+      "source_anchor": "if let Some(ref mut bridge) = self.sensorimotor.vision_sensory.vision_bridge",
+      "depends_on_true": [],
+      "description": "Whether the exact production vision_bridge Option matched Some."
+    },
+    {
+      "predicate_id": 2,
+      "name": "geodesic_path_nonempty",
+      "capture_moment": "POST_OPERATION_RESULT",
+      "source_anchor": "if !path.is_empty()",
+      "depends_on_true": [1],
+      "description": "Whether the real select_best_geodesic result was non-empty."
+    },
+    {
+      "predicate_id": 3,
+      "name": "decoded_geodesic_frames_nonempty",
+      "capture_moment": "POST_OPERATION_RESULT",
+      "source_anchor": "if !frames.is_empty()",
+      "depends_on_true": [1, 2],
+      "description": "Whether the real decode_geodesic_to_frames_improved result was non-empty."
+    },
+    {
+      "predicate_id": 4,
+      "name": "node_id_present",
+      "capture_moment": "RESOURCE_LOOKUP",
+      "source_anchor": "self.node_id()",
+      "depends_on_true": [],
+      "evaluation_group": "broadcast_tuple",
+      "description": "Whether the production node_id() tuple element yielded Some."
+    },
+    {
+      "predicate_id": 5,
+      "name": "consciousness_hv_present",
+      "capture_moment": "RESOURCE_LOOKUP",
+      "source_anchor": "self.consciousness_hv()",
+      "depends_on_true": [],
+      "evaluation_group": "broadcast_tuple",
+      "description": "Whether the production consciousness_hv() tuple element yielded Some."
+    },
+    {
+      "predicate_id": 6,
+      "name": "intent_hv_present",
+      "capture_moment": "RESOURCE_LOOKUP",
+      "source_anchor": "self.last_intent_hv()",
+      "depends_on_true": [],
+      "evaluation_group": "broadcast_tuple",
+      "description": "Whether the production last_intent_hv() tuple element yielded Some."
+    },
+    {
+      "predicate_id": 7,
+      "name": "network_service_present",
+      "capture_moment": "RESOURCE_LOOKUP",
+      "source_anchor": "if let Some(svc) = self.network_service()",
+      "depends_on_true": [4, 5, 6],
+      "description": "Whether the network service lookup yielded Some after the broadcast tuple matched."
+    }
+  ],
+  "operations": [
+    {"operation_id": "feedback.adjust_confidence", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "feedback.scale_lr", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "feedback.adjust_exploration", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "emotion_contagion.add_clamped_arousal", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "emotion_contagion.add_clamped_valence", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "feedback.adjust_exploration.request_exploration", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "episodic_memory.consolidate_recent", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "stats.increment_anomaly_detected_count", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "feedback.scale_confidence.anomaly", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "quality.set_subsystem_veto", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "feedback.scale_lr.request_rest", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "network.broadcast_swarm_state", "guard_kind": "ALL_RUNTIME_PREDICATES", "predicate_ids": [4, 5, 6, 7]},
+    {"operation_id": "emotion_contagion.add_clamped_urgency_arousal", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "feedback.scale_exploration.urgency_escalation", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "quality.set_request_geodesic", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []},
+    {"operation_id": "vision.select_best_geodesic", "guard_kind": "ALL_RUNTIME_PREDICATES", "predicate_ids": [1]},
+    {"operation_id": "vision.populate_mental_movie", "guard_kind": "ALL_RUNTIME_PREDICATES", "predicate_ids": [1, 2, 3]},
+    {"operation_id": "quality.clear_request_geodesic", "guard_kind": "UNCONDITIONAL_AFTER_SOURCE", "predicate_ids": []}
+  ]
+}
