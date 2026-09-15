@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-assurance-tpm2-in-process-ecdsa"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "In-process TPM2 ECDSA P-256 quote signature assurance"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "attestation", "assurance", "cryptography"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+aws-lc-rs = "=1.17.0"
+base64 = "0.22"
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-tpm2-checkquote-adapter = { path = "../symthaea-assurance-tpm2-checkquote-adapter" }
+symthaea-assurance-tpm2-attestation-possession = { path = "../../domains/symthaea-assurance-tpm2-attestation-possession" }
