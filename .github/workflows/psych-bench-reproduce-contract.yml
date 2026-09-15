@@ -1,0 +1,148 @@
+name: Psych-Bench Reproduction Command Contract
+
+on:
+  pull_request:
+    branches:
+      - psych-bench/paper-path-contract
+    paths:
+      - '.github/workflows/psych-bench-reproduce-contract.yml'
+      - 'papers/evaluation/psych-bench/reproduce.sh'
+      - 'crates/domains/symthaea-psych-bench/examples/run_psych_benchmarks.rs'
+      - 'crates/domains/symthaea-psych-bench/examples/psych_bench_paper_data.rs'
+      - 'crates/domains/symthaea-psych-bench/examples/multi_seed_robustness.rs'
+      - 'crates/domains/symthaea-psych-bench/examples/qualia_confidence_report.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce-contract:
+    name: Exact-subject reproduction command contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Validate reproduction shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n papers/evaluation/psych-bench/reproduce.sh
+
+      - name: Verify every reproduction command matches implemented CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          script = Path('papers/evaluation/psych-bench/reproduce.sh').read_text()
+          core = Path('crates/domains/symthaea-psych-bench/examples/run_psych_benchmarks.rs').read_text()
+          paper = Path('crates/domains/symthaea-psych-bench/examples/psych_bench_paper_data.rs').read_text()
+          multi = Path('crates/domains/symthaea-psych-bench/examples/multi_seed_robustness.rs').read_text()
+          qualia = Path('crates/domains/symthaea-psych-bench/examples/qualia_confidence_report.rs').read_text()
+
+          for forbidden in ['--neuromod-only', '--seeds', 'out_neuromod.json', 'out_icc.json']:
+              if forbidden in script:
+                  raise SystemExit(f'unsupported legacy reproduction surface remains: {forbidden}')
+          if 'Psychometric reliability (ICC)' in script:
+              raise SystemExit('Qualia Confidence command is still mislabeled as ICC reliability')
+
+          core_cmd = re.compile(
+              r'run_psych_benchmarks\s*\\\s*\n'
+              r'\s*--package symthaea-psych-bench -- --json-output "\$HERE/out_default\.json"'
+          )
+          if not core_cmd.search(script):
+              raise SystemExit('core runner is not using its supported --json-output surface')
+          if '--json-output' not in core:
+              raise SystemExit('run_psych_benchmarks no longer exposes --json-output; requalify contract')
+          if re.search(r'--package symthaea-psych-bench --[^\n]*--seed', script.split('[2/4]', 1)[0]):
+              raise SystemExit('script must not claim unsupported core-runner --seed authority')
+
+          paper_cmd = re.compile(
+              r'psych_bench_paper_data\s*\\\s*\n'
+              r'\s*--package symthaea-psych-bench\s*\n'
+          )
+          if not paper_cmd.search(script):
+              raise SystemExit('paper CSV generator invocation has unexpected program arguments')
+          if 'std::env::args' in paper or 'env::args' in paper:
+              raise SystemExit('paper generator gained CLI parsing; requalify reproduction contract')
+
+          implemented_seed_line = 'let seeds: &[u64] = &[42, 123, 456, 789, 1024];'
+          if implemented_seed_line not in multi:
+              raise SystemExit('multi_seed_robustness fixed seed set changed')
+          if 'Multi-seed robustness (42, 123, 456, 789, 1024)' not in script:
+              raise SystemExit('script label does not match implemented multi-seed set')
+          multi_cmd = re.compile(
+              r'multi_seed_robustness\s*\\\s*\n'
+              r'\s*--package symthaea-psych-bench > "\$HERE/out_stability\.md"'
+          )
+          if not multi_cmd.search(script):
+              raise SystemExit('multi-seed command must capture its actual stdout Markdown')
+          if '--seeds' in multi or '"--out"' in multi:
+              raise SystemExit('multi_seed_robustness CLI changed; requalify contract')
+
+          for required in ['"--seed"', '"--json"']:
+              if required not in qualia:
+                  raise SystemExit(f'qualia_confidence_report no longer supports {required}')
+          if '"--out"' in qualia:
+              raise SystemExit('qualia_confidence_report output contract changed; requalify')
+          qualia_cmd = re.compile(
+              r'qualia_confidence_report\s*\\\s*\n'
+              r'\s*--package symthaea-psych-bench -- --seed 42 --json > '
+              r'"\$HERE/out_qualia_confidence\.json"'
+          )
+          if not qualia_cmd.search(script):
+              raise SystemExit('qualia command does not use its supported seed/json stdout surface')
+
+          if 'does not itself assert' not in script:
+              raise SystemExit('script must state its non-verification claim ceiling')
+          PY
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Compile exact reproduction executables without running them
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --example run_psych_benchmarks
+          cargo check --locked -p symthaea-psych-bench --example psych_bench_paper_data
+          cargo check --locked -p symthaea-psych-bench --example multi_seed_robustness
+          cargo check --locked -p symthaea-psych-bench --example qualia_confidence_report
+
+      - name: Postflight exact-subject immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
