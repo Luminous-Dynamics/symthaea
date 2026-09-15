@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-assurance-linux-tpm-ima-pcr-anchor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Fail-closed composition of verified TPM2 quote PCRs with canonical Linux IMA replay"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "ima", "attestation", "assurance"]
+categories = ["hardware-support", "authentication"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-tpm2-checkquote-adapter = { path = "../symthaea-assurance-tpm2-checkquote-adapter" }
+symthaea-assurance-tpm2-attestation-possession = { path = "../../domains/symthaea-assurance-tpm2-attestation-possession" }
+symthaea-assurance-tpm2-platform-qualification = { path = "../../domains/symthaea-assurance-tpm2-platform-qualification" }
+symthaea-assurance-tpm2-possession-policy-binding = { path = "../../domains/symthaea-assurance-tpm2-possession-policy-binding" }
+symthaea-linux-ima-replay = { path = "../../domains/symthaea-linux-ima-replay" }
+
+[dev-dependencies]
+sha2 = "0.10"
