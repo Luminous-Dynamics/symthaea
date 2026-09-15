@@ -46,7 +46,7 @@ fn lineage_specific_quorum_and_ordered_clock_ancestry_are_committed() {
 #[test]
 fn ordinary_live_upgrade_authority_does_not_reenter_the_api() {
     let source = include_str!("../src/lib.rs");
-    assert!(!source.contains("ClockGovernedUpgradeHandoffV1,"));
+    assert!(!source.contains("use symthaea_fabrication_upgrade_authority"));
     assert!(!source.contains("ClockGovernedUpgradeActivationPermitV1"));
     assert!(!source.contains("ClockGovernedUpgradeProbationClearanceV1"));
     assert!(!source.contains("AuthorizedUpgradeHandoff"));
