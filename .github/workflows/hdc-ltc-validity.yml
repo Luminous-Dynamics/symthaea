@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
           receipt="$RUNNER_TEMP/qualification-receipt.txt"
           {
-            printf 'qualification=hdc-ltc-validity-v6\n'
+            printf 'qualification=hdc-ltc-validity-v7\n'
             printf 'intended_subject_sha=%s\n' "${{ github.event.pull_request.head.sha || github.sha }}"
             printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
             printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
@@ -130,6 +130,23 @@ jobs:
               > "$RUNNER_TEMP/validity-capacity-v3.jsonl"
           printf 'SEED_SUMMARY_EVIDENCE_V3_SHA256=%s\n' \
             "$(sha256sum "$RUNNER_TEMP/validity-capacity-v3.jsonl" | awk '{print $1}')" \
+            >> "$RUNNER_TEMP/qualification-receipt.txt"
+
+      - name: Independently verify retained v3 seed-summary arithmetic
+        env:
+          CARGO_INCREMENTAL: "0"
+        run: |
+          set -euo pipefail
+          subject_sha="$(git rev-parse HEAD)"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/validity-v3-verify-target" \
+            cargo run --locked --quiet -p symthaea-hdc-ltc \
+              --example validity_capacity_evidence_v3_verify -- \
+              --subject-sha "$subject_sha" \
+              --protocol smoke \
+              --v2-evidence "$RUNNER_TEMP/validity-capacity-v2.jsonl" \
+              --v3-evidence "$RUNNER_TEMP/validity-capacity-v3.jsonl" \
+            | tee -a "$RUNNER_TEMP/qualification-receipt.txt"
+          printf 'v3_independent_summary_verification=passed\n' \
             >> "$RUNNER_TEMP/qualification-receipt.txt"
 
       - name: Verify qualification did not mutate subject
