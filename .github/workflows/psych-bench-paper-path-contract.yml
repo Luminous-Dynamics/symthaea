@@ -1,0 +1,125 @@
+name: Psych-Bench Paper Path Contract
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/psych-bench-paper-path-contract.yml'
+      - 'crates/papers'
+      - 'crates/domains/symthaea-psych-bench/examples/psych_bench_paper_data.rs'
+      - 'papers/evaluation/psych-bench/*.csv'
+      - 'papers/data/psych_bench/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  paper-path-contract:
+    name: Exact-subject paper data path contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Verify producer path resolves to canonical data root
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -L crates/papers
+          test "$(readlink crates/papers)" = '../papers'
+          canonical="$(realpath papers/data/psych_bench)"
+          producer="$(realpath crates/papers/data/psych_bench)"
+          test "$producer" = "$canonical"
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path('crates/domains/symthaea-psych-bench/examples/psych_bench_paper_data.rs').read_text()
+          start = source.index('fn output_dir() -> PathBuf')
+          end = source.index('\n}', start) + 2
+          body = source[start:end]
+          if body.count('.parent()') != 2:
+              raise SystemExit('paper-data output_dir parent depth changed; requalify path theorem')
+          pattern = re.compile(
+              r'CARGO_MANIFEST_DIR.*?\.parent\(\).*?\.parent\(\).*?'
+              r'\.join\("papers"\).*?\.join\("data"\).*?\.join\("psych_bench"\)',
+              re.S,
+          )
+          if not pattern.search(body):
+              raise SystemExit('paper-data output_dir shape no longer matches qualified compatibility path')
+          PY
+
+      - name: Verify paper CSV links resolve only to canonical data root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          paper = Path('papers/evaluation/psych-bench')
+          canonical = Path('papers/data/psych_bench').resolve(strict=True)
+          expected = sorted([
+              'ablation_domains.csv',
+              'cognitive_profile.csv',
+              'correlations.csv',
+              'neuromod_curves.csv',
+              'neuromod_profiles.csv',
+              'normative_forest.csv',
+              'normative_zscores.csv',
+              'reliability.csv',
+              'sat_arcfluid.csv',
+              'sat_curves.csv',
+              'sat_flanker.csv',
+              'sat_nback.csv',
+              'sat_stroop.csv',
+              'sat_visualsearch.csv',
+              'sat_wcst.csv',
+          ])
+          actual = sorted(path.name for path in paper.glob('*.csv'))
+          if actual != expected:
+              missing = sorted(set(expected) - set(actual))
+              extra = sorted(set(actual) - set(expected))
+              raise SystemExit(f'paper CSV surface drifted: missing={missing} extra={extra}')
+
+          for name in expected:
+              link = paper / name
+              if not link.is_symlink():
+                  raise SystemExit(f'{link} must remain a symlink')
+              wanted = f'../../data/psych_bench/{name}'
+              target = os.readlink(link)
+              if target != wanted:
+                  raise SystemExit(f'{link}: target={target!r}, expected={wanted!r}')
+              resolved = link.resolve(strict=True)
+              expected_resolved = (canonical / name).resolve(strict=True)
+              if resolved != expected_resolved:
+                  raise SystemExit(f'{link}: resolved outside canonical data root')
+          PY
+
+      - name: Postflight exact-subject immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
