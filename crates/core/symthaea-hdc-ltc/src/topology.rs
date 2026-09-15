@@ -16,6 +16,9 @@ use std::fmt;
 
 /// Canonical topology schema version.
 pub const TOPOLOGY_SCHEMA_VERSION: u16 = 1;
+/// Maximum length of a V1 symbolic topology token in UTF-8 bytes.
+pub const MAX_SYMBOLIC_TOKEN_BYTES: usize = 128;
+
 const TOPOLOGY_DOMAIN: &[u8] = b"symthaea-neuroarch-topology-v1\0";
 
 /// Stable circuit identity within one topology description.
@@ -68,6 +71,20 @@ pub enum CircuitImplementation {
     Named(String),
 }
 
+/// How a circuit combines its declared inbound routes.
+///
+/// This is target-level execution semantics. Route-local transforms such as HDC
+/// binding are described separately by [`EdgeTransform`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum InputMergePolicy {
+    /// Source surface with no declared inbound merge.
+    None,
+    /// Exactly one effective inbound value is consumed.
+    Single,
+    /// All declared inbound values are HDC-bundled by the target.
+    BundleAll,
+}
+
 /// Static circuit metadata only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CircuitDescriptor {
@@ -80,6 +97,7 @@ pub struct CircuitDescriptor {
     /// Number of implementation units represented by the circuit.
     pub unit_count: u64,
     pub implementation: CircuitImplementation,
+    pub input_merge_policy: InputMergePolicy,
     /// Optional declarative modulation capability/profile identifier.
     pub modulation_profile: Option<String>,
 }
@@ -116,13 +134,11 @@ pub enum BudgetClass {
     Named(String),
 }
 
-/// Execution-relevant transform applied on a declared edge.
+/// Route-local execution transform.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum EdgeTransform {
     Direct,
     Bind,
-    Bundle,
-    BindThenBundle,
 }
 
 /// Static structural edge. Existence permits influence; it does not establish causal effect.
@@ -144,7 +160,7 @@ pub struct TopologyDescriptor {
     pub schema_version: u16,
     pub circuits: Vec<CircuitDescriptor>,
     pub edges: Vec<EdgeDescriptor>,
-    /// Whether multiple source->target edges are permitted when channels differ.
+    /// Whether multiple source/target routes are permitted when channels differ.
     pub allow_parallel_channels: bool,
 }
 
@@ -182,6 +198,7 @@ pub enum TopologyError {
     InvalidTimescale,
     EmptyRole(CircuitId),
     EmptyNamedField,
+    InvalidSymbolicToken,
     FieldTooLong,
     DimensionOverflow,
 }
@@ -216,9 +233,10 @@ impl TopologyDescriptor {
             if !circuit_ids.insert(circuit.id) {
                 return Err(TopologyError::DuplicateCircuitId(circuit.id));
             }
-            if circuit.role.trim().is_empty() {
+            if circuit.role.is_empty() {
                 return Err(TopologyError::EmptyRole(circuit.id));
             }
+            validate_symbolic_token(&circuit.role)?;
             if circuit.state_dimension == 0 {
                 return Err(TopologyError::InvalidStateDimension(circuit.id));
             }
@@ -263,21 +281,17 @@ impl TopologyDescriptor {
             validate_channel(&edge.channel)?;
             validate_budget(&edge.budget_class)?;
 
-            let pair = (edge.source, edge.target);
+            let (source, target) = canonical_endpoints(edge);
+            let direction_tag = direction_tag(edge.direction);
+            let pair = (direction_tag, source, target);
             if !self.allow_parallel_channels && !endpoint_pairs.insert(pair) {
-                return Err(TopologyError::DuplicateStructuralEdge {
-                    source: edge.source,
-                    target: edge.target,
-                });
+                return Err(TopologyError::DuplicateStructuralEdge { source, target });
             }
             endpoint_pairs.insert(pair);
 
-            let channel_key = (edge.source, edge.target, edge.channel.clone());
+            let channel_key = (direction_tag, source, target, edge.channel.clone());
             if !channel_edges.insert(channel_key) {
-                return Err(TopologyError::DuplicateChannelEdge {
-                    source: edge.source,
-                    target: edge.target,
-                });
+                return Err(TopologyError::DuplicateChannelEdge { source, target });
             }
         }
 
@@ -285,6 +299,10 @@ impl TopologyDescriptor {
     }
 
     /// Canonical bytes are independent of insertion order and contain no runtime state.
+    ///
+    /// V1 symbolic labels are case-sensitive ASCII tokens. Bidirectional routes are
+    /// endpoint-normalized, so `A <-> B` and `B <-> A` have identical canonical bytes
+    /// when all other static fields, including edge identity, are equal.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, TopologyError> {
         self.validate()?;
         let mut out = Vec::new();
@@ -300,9 +318,7 @@ impl TopologyDescriptor {
         }
 
         let mut edges: Vec<&EdgeDescriptor> = self.edges.iter().collect();
-        edges.sort_by(|a, b| {
-            (a.source, a.target, &a.channel, a.id).cmp(&(b.source, b.target, &b.channel, b.id))
-        });
+        edges.sort_by_key(|edge| canonical_edge_sort_key(edge));
         push_len(&mut out, edges.len())?;
         for edge in edges {
             encode_edge(&mut out, edge)?;
@@ -340,13 +356,21 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
             state_dimension: dim,
             unit_count: 1,
             implementation: CircuitImplementation::ExternalInput,
+            input_merge_policy: InputMergePolicy::None,
             modulation_profile: None,
         });
 
         for (idx, &layer_size) in config.layer_sizes.iter().enumerate() {
             let units = u64::try_from(layer_size).map_err(|_| TopologyError::DimensionOverflow)?;
-            let state_dimension = units.checked_mul(dim).ok_or(TopologyError::DimensionOverflow)?;
+            let state_dimension = units
+                .checked_mul(dim)
+                .ok_or(TopologyError::DimensionOverflow)?;
             let id = u32::try_from(idx + 1).map_err(|_| TopologyError::DimensionOverflow)?;
+            let input_merge_policy = if idx > 0 && config.skip_connections {
+                InputMergePolicy::BundleAll
+            } else {
+                InputMergePolicy::Single
+            };
             circuits.push(CircuitDescriptor {
                 id: CircuitId(id),
                 role: format!("layer:{idx}"),
@@ -354,6 +378,7 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
                 state_dimension,
                 unit_count: units,
                 implementation: CircuitImplementation::IncumbentHdcLtcLayer,
+                input_merge_policy,
                 modulation_profile: None,
             });
         }
@@ -379,12 +404,6 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
             let target = CircuitId(
                 u32::try_from(layer_idx + 1).map_err(|_| TopologyError::DimensionOverflow)?,
             );
-            let transform = match (config.use_layer_binding, config.skip_connections) {
-                (true, true) => EdgeTransform::BindThenBundle,
-                (true, false) => EdgeTransform::Bind,
-                (false, true) => EdgeTransform::Bundle,
-                (false, false) => EdgeTransform::Direct,
-            };
             edges.push(EdgeDescriptor {
                 id: EdgeId(next_edge_id),
                 source,
@@ -393,7 +412,11 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
                 direction: EdgeDirection::Directed,
                 recurrence: RecurrenceKind::FeedForward,
                 budget_class: BudgetClass::LegacyUnbounded,
-                transform,
+                transform: if config.use_layer_binding {
+                    EdgeTransform::Bind
+                } else {
+                    EdgeTransform::Direct
+                },
             });
             next_edge_id += 1;
 
@@ -406,7 +429,7 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
                     direction: EdgeDirection::Directed,
                     recurrence: RecurrenceKind::FeedForward,
                     budget_class: BudgetClass::LegacyUnbounded,
-                    transform: EdgeTransform::Bundle,
+                    transform: EdgeTransform::Direct,
                 });
                 next_edge_id += 1;
             }
@@ -423,12 +446,29 @@ impl NeuroTopology for HdcLtcUnifiedNetwork {
     }
 }
 
-fn validate_named(value: &str) -> Result<(), TopologyError> {
-    if value.trim().is_empty() {
-        Err(TopologyError::EmptyNamedField)
-    } else {
-        Ok(())
+fn validate_symbolic_token(value: &str) -> Result<(), TopologyError> {
+    if value.is_empty() {
+        return Err(TopologyError::EmptyNamedField);
     }
+    if value.len() > MAX_SYMBOLIC_TOKEN_BYTES {
+        return Err(TopologyError::FieldTooLong);
+    }
+    if !value.is_ascii()
+        || !value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric()
+                || matches!(byte, b'_' | b'-' | b'.' | b':' | b'/')
+        })
+    {
+        return Err(TopologyError::InvalidSymbolicToken);
+    }
+    Ok(())
+}
+
+fn validate_named(value: &str) -> Result<(), TopologyError> {
+    if value.is_empty() {
+        return Err(TopologyError::EmptyNamedField);
+    }
+    validate_symbolic_token(value)
 }
 
 fn validate_impl(value: &CircuitImplementation) -> Result<(), TopologyError> {
@@ -450,6 +490,34 @@ fn validate_budget(value: &BudgetClass) -> Result<(), TopologyError> {
         validate_named(name)?;
     }
     Ok(())
+}
+
+fn direction_tag(direction: EdgeDirection) -> u8 {
+    match direction {
+        EdgeDirection::Directed => 0,
+        EdgeDirection::Bidirectional => 1,
+    }
+}
+
+fn canonical_endpoints(edge: &EdgeDescriptor) -> (CircuitId, CircuitId) {
+    if edge.direction == EdgeDirection::Bidirectional && edge.target < edge.source {
+        (edge.target, edge.source)
+    } else {
+        (edge.source, edge.target)
+    }
+}
+
+fn canonical_edge_sort_key(
+    edge: &EdgeDescriptor,
+) -> (u8, CircuitId, CircuitId, SemanticChannel, EdgeId) {
+    let (source, target) = canonical_endpoints(edge);
+    (
+        direction_tag(edge.direction),
+        source,
+        target,
+        edge.channel.clone(),
+        edge.id,
+    )
 }
 
 fn push_len(out: &mut Vec<u8>, value: usize) -> Result<(), TopologyError> {
@@ -502,6 +570,14 @@ fn encode_impl(out: &mut Vec<u8>, value: &CircuitImplementation) -> Result<(), T
     Ok(())
 }
 
+fn encode_merge_policy(out: &mut Vec<u8>, value: InputMergePolicy) {
+    out.push(match value {
+        InputMergePolicy::None => 0,
+        InputMergePolicy::Single => 1,
+        InputMergePolicy::BundleAll => 2,
+    });
+}
+
 fn encode_channel(out: &mut Vec<u8>, value: &SemanticChannel) -> Result<(), TopologyError> {
     match value {
         SemanticChannel::ExternalInput => out.push(0),
@@ -535,19 +611,18 @@ fn encode_circuit(out: &mut Vec<u8>, circuit: &CircuitDescriptor) -> Result<(), 
     out.extend_from_slice(&circuit.state_dimension.to_le_bytes());
     out.extend_from_slice(&circuit.unit_count.to_le_bytes());
     encode_impl(out, &circuit.implementation)?;
+    encode_merge_policy(out, circuit.input_merge_policy);
     push_opt_str(out, &circuit.modulation_profile)?;
     Ok(())
 }
 
 fn encode_edge(out: &mut Vec<u8>, edge: &EdgeDescriptor) -> Result<(), TopologyError> {
+    let (source, target) = canonical_endpoints(edge);
     out.extend_from_slice(&edge.id.0.to_le_bytes());
-    out.extend_from_slice(&edge.source.0.to_le_bytes());
-    out.extend_from_slice(&edge.target.0.to_le_bytes());
+    out.extend_from_slice(&source.0.to_le_bytes());
+    out.extend_from_slice(&target.0.to_le_bytes());
     encode_channel(out, &edge.channel)?;
-    out.push(match edge.direction {
-        EdgeDirection::Directed => 0,
-        EdgeDirection::Bidirectional => 1,
-    });
+    out.push(direction_tag(edge.direction));
     out.push(match edge.recurrence {
         RecurrenceKind::FeedForward => 0,
         RecurrenceKind::Recurrent => 1,
@@ -556,8 +631,6 @@ fn encode_edge(out: &mut Vec<u8>, edge: &EdgeDescriptor) -> Result<(), TopologyE
     out.push(match edge.transform {
         EdgeTransform::Direct => 0,
         EdgeTransform::Bind => 1,
-        EdgeTransform::Bundle => 2,
-        EdgeTransform::BindThenBundle => 3,
     });
     Ok(())
 }
@@ -576,6 +649,7 @@ mod tests {
             state_dimension: 64,
             unit_count: 1,
             implementation: CircuitImplementation::Named("test".to_string()),
+            input_merge_policy: InputMergePolicy::Single,
             modulation_profile: None,
         }
     }
@@ -634,38 +708,95 @@ mod tests {
     }
 
     #[test]
+    fn bidirectional_orientation_is_canonical() {
+        let mut a = generic_topology();
+        a.edges[0].direction = EdgeDirection::Bidirectional;
+        let mut b = a.clone();
+        std::mem::swap(&mut b.edges[0].source, &mut b.edges[0].target);
+        assert_eq!(a.canonical_bytes().unwrap(), b.canonical_bytes().unwrap());
+        assert_eq!(a.commitment().unwrap(), b.commitment().unwrap());
+
+        let mut duplicate = a.clone();
+        let mut reversed = a.edges[0].clone();
+        reversed.id = EdgeId(11);
+        std::mem::swap(&mut reversed.source, &mut reversed.target);
+        duplicate.edges.push(reversed);
+        assert!(matches!(
+            duplicate.validate(),
+            Err(TopologyError::DuplicateStructuralEdge { .. })
+        ));
+    }
+
+    #[test]
+    fn symbolic_tokens_are_unambiguous_and_bounded() {
+        let mut whitespace = generic_topology();
+        whitespace.circuits[0].role = "visual cortex".to_string();
+        assert_eq!(
+            whitespace.validate(),
+            Err(TopologyError::InvalidSymbolicToken)
+        );
+
+        let mut unicode = generic_topology();
+        unicode.circuits[0].role = "visuál".to_string();
+        assert_eq!(unicode.validate(), Err(TopologyError::InvalidSymbolicToken));
+
+        let mut too_long = generic_topology();
+        too_long.circuits[0].role = "a".repeat(MAX_SYMBOLIC_TOKEN_BYTES + 1);
+        assert_eq!(too_long.validate(), Err(TopologyError::FieldTooLong));
+    }
+
+    #[test]
     fn static_mutation_changes_commitment() {
         let a = generic_topology();
         let mut b = a.clone();
         b.circuits[0].state_dimension += 1;
         assert_ne!(a.commitment().unwrap(), b.commitment().unwrap());
+
+        let mut c = a.clone();
+        c.circuits[1].input_merge_policy = InputMergePolicy::BundleAll;
+        assert_ne!(a.commitment().unwrap(), c.commitment().unwrap());
     }
 
     #[test]
     fn rejects_dangling_duplicate_and_forbidden_self_edges() {
         let mut dangling = generic_topology();
         dangling.edges[0].target = CircuitId(99);
-        assert!(matches!(dangling.validate(), Err(TopologyError::DanglingTarget { .. })));
+        assert!(matches!(
+            dangling.validate(),
+            Err(TopologyError::DanglingTarget { .. })
+        ));
 
         let mut duplicate = generic_topology();
         duplicate.circuits.push(test_circuit(1, "duplicate"));
-        assert!(matches!(duplicate.validate(), Err(TopologyError::DuplicateCircuitId(_))));
+        assert!(matches!(
+            duplicate.validate(),
+            Err(TopologyError::DuplicateCircuitId(_))
+        ));
 
         let mut self_edge = generic_topology();
         self_edge.edges[0].target = self_edge.edges[0].source;
-        assert!(matches!(self_edge.validate(), Err(TopologyError::ForbiddenSelfEdge(_))));
+        assert!(matches!(
+            self_edge.validate(),
+            Err(TopologyError::ForbiddenSelfEdge(_))
+        ));
     }
 
     #[test]
     fn parallel_channels_are_explicit_policy() {
         let mut topology = generic_topology();
         topology.edges.push(test_edge(11, 1, 2, "y"));
-        assert!(matches!(topology.validate(), Err(TopologyError::DuplicateStructuralEdge { .. })));
+        assert!(matches!(
+            topology.validate(),
+            Err(TopologyError::DuplicateStructuralEdge { .. })
+        ));
         topology.allow_parallel_channels = true;
         assert!(topology.validate().is_ok());
 
         topology.edges.push(test_edge(12, 1, 2, "y"));
-        assert!(matches!(topology.validate(), Err(TopologyError::DuplicateChannelEdge { .. })));
+        assert!(matches!(
+            topology.validate(),
+            Err(TopologyError::DuplicateChannelEdge { .. })
+        ));
     }
 
     #[test]
@@ -673,7 +804,36 @@ mod tests {
         let config = small_network_config();
         let a = HdcLtcUnifiedNetwork::new(config.clone(), 1);
         let b = HdcLtcUnifiedNetwork::new(config, 999);
-        assert_eq!(a.topology_commitment().unwrap(), b.topology_commitment().unwrap());
+        assert_eq!(
+            a.topology_commitment().unwrap(),
+            b.topology_commitment().unwrap()
+        );
+    }
+
+    #[test]
+    fn incumbent_skip_semantics_are_not_double_encoded() {
+        let mut config = small_network_config();
+        config.skip_connections = true;
+        let network = HdcLtcUnifiedNetwork::new(config, 42);
+        let topology = network.topology_descriptor().unwrap();
+
+        assert_eq!(
+            topology.circuits[2].input_merge_policy,
+            InputMergePolicy::BundleAll
+        );
+        let inter_layer = topology
+            .edges
+            .iter()
+            .find(|edge| edge.source == CircuitId(1) && edge.target == CircuitId(2))
+            .unwrap();
+        assert_eq!(inter_layer.transform, EdgeTransform::Bind);
+        let skip = topology
+            .edges
+            .iter()
+            .find(|edge| edge.source == CircuitId(0) && edge.target == CircuitId(2))
+            .unwrap();
+        assert_eq!(skip.channel, SemanticChannel::SkipInput);
+        assert_eq!(skip.transform, EdgeTransform::Direct);
     }
 
     #[test]
@@ -687,21 +847,27 @@ mod tests {
         resized.layer_sizes[1] += 1;
         assert_ne!(
             base_commit,
-            HdcLtcUnifiedNetwork::new(resized, 1).topology_commitment().unwrap()
+            HdcLtcUnifiedNetwork::new(resized, 1)
+                .topology_commitment()
+                .unwrap()
         );
 
         let mut unbound = base.clone();
         unbound.use_layer_binding = false;
         assert_ne!(
             base_commit,
-            HdcLtcUnifiedNetwork::new(unbound, 1).topology_commitment().unwrap()
+            HdcLtcUnifiedNetwork::new(unbound, 1)
+                .topology_commitment()
+                .unwrap()
         );
 
         let mut skip = base;
         skip.skip_connections = true;
         assert_ne!(
             base_commit,
-            HdcLtcUnifiedNetwork::new(skip, 1).topology_commitment().unwrap()
+            HdcLtcUnifiedNetwork::new(skip, 1)
+                .topology_commitment()
+                .unwrap()
         );
     }
 
@@ -734,7 +900,10 @@ mod tests {
     fn incumbent_irregular_time_replay_parity_with_inspection() {
         let mut control = HdcLtcUnifiedNetwork::new(small_network_config(), 42);
         let mut observed = control.clone();
-        for (idx, timestamp) in [0.0, 0.011, 0.039, 0.1, 0.101, 0.8].into_iter().enumerate() {
+        for (idx, timestamp) in [0.0, 0.011, 0.039, 0.1, 0.101, 0.8]
+            .into_iter()
+            .enumerate()
+        {
             let input = ContinuousHV::new_random(128, 200 + idx as u64);
             let _ = observed.topology_descriptor().unwrap();
             control.step_with_timestamp(timestamp, &input);
