@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-finalization-state-binding"
+version = "0.1.0"
+edition = "2024"
+description = "Exact concrete-state binding for lineage-bound fabrication finalization execution"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-lineage-bound-current-no-rollback = { path = "../symthaea-fabrication-lineage-bound-current-no-rollback" }
+symthaea-fabrication-lineage-bound-finalization-authorization = { path = "../symthaea-fabrication-lineage-bound-finalization-authorization" }
+symthaea-fabrication-lineage-bound-finalization-execution = { path = "../symthaea-fabrication-lineage-bound-finalization-execution" }
+symthaea-fabrication-lineage-bound-upgrade-runtime = { path = "../symthaea-fabrication-lineage-bound-upgrade-runtime" }
+serde = { workspace = true }
+serde_json = { workspace = true }
