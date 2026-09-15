@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-fabrication-lineage-predecessor-certificate"
+version = "0.1.0"
+edition = "2024"
+description = "Portable threshold-certified predecessor roots for lineage-bound fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
+symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgrade-authority" }
+serde = { workspace = true }
+serde_json = { workspace = true }

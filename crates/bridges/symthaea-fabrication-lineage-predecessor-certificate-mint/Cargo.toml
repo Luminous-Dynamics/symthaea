@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-fabrication-lineage-predecessor-certificate-mint"
+version = "0.1.0"
+edition = "2024"
+description = "Mint portable predecessor certificates from globally current lineage-finalized roots"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-lineage-bound-finalized-head = { path = "../symthaea-fabrication-lineage-bound-finalized-head" }
+symthaea-fabrication-lineage-bound-global-upgrade-head = { path = "../symthaea-fabrication-lineage-bound-global-upgrade-head" }
+symthaea-fabrication-lineage-predecessor-certificate = { path = "../symthaea-fabrication-lineage-predecessor-certificate" }
+symthaea-fabrication-witness-registry-containment-bound = { path = "../symthaea-fabrication-witness-registry-containment-bound" }
+symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
