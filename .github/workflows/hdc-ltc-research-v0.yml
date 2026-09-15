@@ -1,0 +1,367 @@
+name: HDC-LTC research_v0 evidence production
+
+on:
+  workflow_dispatch:
+    inputs:
+      subject_sha:
+        description: "Exact 40-hex commit SHA to qualify and measure"
+        required: true
+        type: string
+      confirmation:
+        description: "Explicit execution gate"
+        required: true
+        default: DO_NOT_RUN
+        type: choice
+        options:
+          - DO_NOT_RUN
+          - EXECUTE_RESEARCH_V0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hdc-ltc-research-v0-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_CAPACITY_PLAN_SHA256: 023cb6eed3e0bfa487f23218af225889d5358d8e9b3ec6fb5db8ed12b97c3459
+  EXPECTED_CONTROL_PLAN_SHA256: d0d1912bff351817d12d1cc140bd481a6d291c0bb84a31b1dbf43b1edb9bf414
+  PINNED_RUST_VERSION: "1.96.0"
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  research-v0:
+    name: Exact-subject research_v0 evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: Initialize research execution attempt receipt
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/research-v0-attempt.txt"
+          {
+            printf 'qualification=hdc-ltc-research-v0-attempt-v4\n'
+            printf 'intended_subject_sha=%s\n' "${{ inputs.subject_sha }}"
+            printf 'workflow_definition_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'workflow_definition_commit=%s\n' "$GITHUB_SHA"
+            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'explicit_confirmation_required=true\n'
+            printf 'research_v0_execution_complete=false\n'
+          } > "$receipt"
+
+      - name: Validate explicit launch inputs and workflow ref
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "research_v0 must be dispatched from refs/heads/main" >&2
+            exit 2
+          }
+          [[ "$SUBJECT_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "subject_sha must be exactly 40 hexadecimal characters" >&2
+            exit 2
+          }
+          test "$CONFIRMATION" = "EXECUTE_RESEARCH_V0" || {
+            echo "research_v0 requires explicit EXECUTE_RESEARCH_V0 confirmation" >&2
+            exit 2
+          }
+          printf 'explicit_launch_gate=passed\n' >> "$RUNNER_TEMP/research-v0-attempt.txt"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.subject_sha }}
+          fetch-depth: 0
+
+      - name: Verify published subject and workflow-definition lineage
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          test "$(git rev-parse HEAD)" = "$subject_sha"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          git fetch --no-tags origin main:refs/remotes/origin/main
+
+          git merge-base --is-ancestor "$subject_sha" refs/remotes/origin/main || {
+            echo "subject $subject_sha is not reachable from origin/main" >&2
+            exit 1
+          }
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || {
+            echo "workflow-definition commit $GITHUB_SHA is not published on main" >&2
+            exit 1
+          }
+          git cat-file -e "$GITHUB_SHA:.github/workflows/hdc-ltc-research-v0.yml"
+
+          test -f crates/core/symthaea-hdc-ltc/examples/validity_capacity_evidence_v3.rs
+          test -f crates/core/symthaea-hdc-ltc/examples/validity_capacity_evidence_chain_verify.rs
+          test -f crates/core/symthaea-hdc-ltc/examples/validity_capacity_protocol_identity.rs
+          test -f scripts/run_hls_validity_evidence_v2.sh
+          {
+            printf 'checked_out_subject_sha=%s\n' "$(git rev-parse HEAD)"
+            printf 'checked_out_subject_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'published_lineage_gate=passed\n'
+          } >> "$RUNNER_TEMP/research-v0-attempt.txt"
+
+      - name: Install exact Rust toolchain without third-party action
+        run: |
+          set -euo pipefail
+          command -v rustup >/dev/null
+          rustup toolchain install "$PINNED_RUST_VERSION" \
+            --profile minimal --component clippy --no-self-update
+          rustup default "$PINNED_RUST_VERSION"
+          test "$(rustc --version | awk '{print $2}')" = "$PINNED_RUST_VERSION"
+          rustc -Vv
+          cargo -V
+          {
+            printf 'runner_label=ubuntu-24.04\n'
+            printf 'runner_image_os=%s\n' "${ImageOS:-unknown}"
+            printf 'runner_image_version=%s\n' "${ImageVersion:-unknown}"
+            printf 'rust_version=%s\n' "$PINNED_RUST_VERSION"
+            printf 'rustc=%s\n' "$(rustc -V)"
+            printf 'rustc_commit_hash=%s\n' "$(rustc -Vv | sed -n 's/^commit-hash: //p')"
+            printf 'rustc_commit_date=%s\n' "$(rustc -Vv | sed -n 's/^commit-date: //p')"
+            printf 'cargo=%s\n' "$(cargo -V)"
+          } >> "$RUNNER_TEMP/research-v0-attempt.txt"
+
+      - name: Initialize evidence manifest
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/validity-smoke" "$RUNNER_TEMP/validity-research-v0"
+          subject_sha="${SUBJECT_SHA,,}"
+          workflow_definition_sha256="$(git show "$GITHUB_SHA":.github/workflows/hdc-ltc-research-v0.yml | sha256sum | awk '{print $1}')"
+          manifest="$RUNNER_TEMP/research-v0-manifest.txt"
+          {
+            printf 'qualification=hdc-ltc-research-v0-v4\n'
+            printf 'subject_sha=%s\n' "$subject_sha"
+            printf 'subject_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'workflow_definition_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'workflow_definition_commit=%s\n' "$GITHUB_SHA"
+            printf 'workflow_definition_sha256=%s\n' "$workflow_definition_sha256"
+            printf 'workflow_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'workflow_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'runner_label=ubuntu-24.04\n'
+            printf 'runner_image_os=%s\n' "${ImageOS:-unknown}"
+            printf 'runner_image_version=%s\n' "${ImageVersion:-unknown}"
+            printf 'kernel=%s\n' "$(uname -srvmo)"
+            printf 'os_release_sha256=%s\n' "$(sha256sum /etc/os-release | awk '{print $1}')"
+            printf 'cc=%s\n' "$(cc --version | head -n1)"
+            printf 'ld=%s\n' "$(ld --version | head -n1)"
+            printf 'checkout_action_sha=11d5960a326750d5838078e36cf38b85af677262\n'
+            printf 'upload_artifact_action_sha=ea165f8d65b6e75b540449e92b4886f43607fa02\n'
+            printf 'cache_used=false\n'
+            printf 'rust_version=%s\n' "$PINNED_RUST_VERSION"
+            printf 'cargo=%s\n' "$(cargo -V)"
+            printf 'rustc=%s\n' "$(rustc -V)"
+            printf 'rustc_commit_hash=%s\n' "$(rustc -Vv | sed -n 's/^commit-hash: //p')"
+            printf 'rustc_commit_date=%s\n' "$(rustc -Vv | sed -n 's/^commit-date: //p')"
+            printf 'cargo_lock_sha256=%s\n' "$(sha256sum Cargo.lock | awk '{print $1}')"
+            printf 'expected_capacity_plan_sha256=%s\n' "$EXPECTED_CAPACITY_PLAN_SHA256"
+            printf 'expected_control_plan_sha256=%s\n' "$EXPECTED_CONTROL_PLAN_SHA256"
+            printf 'interpretation=none\n'
+            printf 'scientific_claim=none\n'
+          } > "$manifest"
+          printf 'scientific_manifest_initialized=true\n' >> "$RUNNER_TEMP/research-v0-attempt.txt"
+
+      - name: Verify frozen research_v0 protocol identity before execution
+        run: |
+          set -euo pipefail
+          identity="$({
+            CARGO_TARGET_DIR="$RUNNER_TEMP/protocol-identity-target" \
+              cargo run --locked --quiet -p symthaea-hdc-ltc \
+                --example validity_capacity_protocol_identity
+          })"
+          printf '%s\n' "$identity" | tee -a "$RUNNER_TEMP/research-v0-manifest.txt"
+          printf '%s\n' "$identity" | grep -Fx \
+            "CAPACITY_PLAN_SHA256=$EXPECTED_CAPACITY_PLAN_SHA256"
+          printf '%s\n' "$identity" | grep -Fx \
+            "CONTROL_PLAN_SHA256=$EXPECTED_CONTROL_PLAN_SHA256"
+          test "$(printf '%s\n' "$identity" | wc -l)" -eq 2
+          printf 'protocol_identity_gate=passed\n' >> "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Same-run all-target qualification
+        run: |
+          set -euo pipefail
+          CARGO_TARGET_DIR="$RUNNER_TEMP/qualification-test-target" \
+            cargo test --locked -p symthaea-hdc-ltc --all-targets
+          CARGO_TARGET_DIR="$RUNNER_TEMP/qualification-clippy-target" \
+            cargo clippy --locked -p symthaea-hdc-ltc --all-targets -- -D warnings
+
+      - name: Produce prerequisite smoke v1/v2 evidence
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          printf 'evidence_phase=smoke\n' >> "$RUNNER_TEMP/research-v0-manifest.txt"
+          scripts/run_hls_validity_evidence_v2.sh \
+            --subject-sha "$subject_sha" \
+            --protocol smoke \
+            --base-evidence-out "$RUNNER_TEMP/validity-smoke/v1.jsonl" \
+            --supplement-out "$RUNNER_TEMP/validity-smoke/v2.jsonl" \
+            | tee -a "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Independently verify prerequisite smoke v1/v2 artifact pair
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/smoke-chain-verify-target" \
+            cargo run --locked --quiet -p symthaea-hdc-ltc \
+              --example validity_capacity_evidence_chain_verify -- \
+              --subject-sha "$subject_sha" \
+              --protocol smoke \
+              --v1-evidence "$RUNNER_TEMP/validity-smoke/v1.jsonl" \
+              --v2-evidence "$RUNNER_TEMP/validity-smoke/v2.jsonl" \
+            | tee -a "$RUNNER_TEMP/research-v0-manifest.txt"
+          printf 'smoke_artifact_pair_gate=passed\n' >> "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Derive prerequisite smoke v3 evidence
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/smoke-v3-target" \
+            cargo run --locked --quiet -p symthaea-hdc-ltc \
+              --example validity_capacity_evidence_v3 -- \
+              --subject-sha "$subject_sha" \
+              --protocol smoke \
+              --v2-evidence "$RUNNER_TEMP/validity-smoke/v2.jsonl" \
+              > "$RUNNER_TEMP/validity-smoke/v3.jsonl" \
+              2> >(tee -a "$RUNNER_TEMP/research-v0-manifest.txt" >&2)
+          printf 'SMOKE_EVIDENCE_V3_SHA256=%s\n' \
+            "$(sha256sum "$RUNNER_TEMP/validity-smoke/v3.jsonl" | awk '{print $1}')" \
+            >> "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Smoke postflight gate
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          test "$(git rev-parse HEAD)" = "$subject_sha"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          printf 'smoke_gate=passed\n' >> "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Produce frozen research_v0 v1/v2 evidence
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          CARGO_PROFILE_DEV_OPT_LEVEL: "3"
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          {
+            printf 'evidence_phase=research-v0\n'
+            printf 'research_cargo_profile=dev\n'
+            printf 'research_cargo_profile_dev_opt_level=3\n'
+            printf 'research_dev_overflow_checks=enabled_by_profile_default\n'
+          } >> "$RUNNER_TEMP/research-v0-manifest.txt"
+          scripts/run_hls_validity_evidence_v2.sh \
+            --subject-sha "$subject_sha" \
+            --protocol research-v0 \
+            --base-evidence-out "$RUNNER_TEMP/validity-research-v0/v1.jsonl" \
+            --supplement-out "$RUNNER_TEMP/validity-research-v0/v2.jsonl" \
+            | tee -a "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Independently verify frozen research_v0 v1/v2 artifact pair
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/research-chain-verify-target" \
+            cargo run --locked --quiet -p symthaea-hdc-ltc \
+              --example validity_capacity_evidence_chain_verify -- \
+              --subject-sha "$subject_sha" \
+              --protocol research-v0 \
+              --v1-evidence "$RUNNER_TEMP/validity-research-v0/v1.jsonl" \
+              --v2-evidence "$RUNNER_TEMP/validity-research-v0/v2.jsonl" \
+            | tee -a "$RUNNER_TEMP/research-v0-manifest.txt"
+          printf 'research_v0_artifact_pair_gate=passed\n' >> "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Derive frozen research_v0 v3 evidence
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          CARGO_TARGET_DIR="$RUNNER_TEMP/research-v3-target" \
+            cargo run --locked --quiet -p symthaea-hdc-ltc \
+              --example validity_capacity_evidence_v3 -- \
+              --subject-sha "$subject_sha" \
+              --protocol research-v0 \
+              --v2-evidence "$RUNNER_TEMP/validity-research-v0/v2.jsonl" \
+              > "$RUNNER_TEMP/validity-research-v0/v3.jsonl" \
+              2> >(tee -a "$RUNNER_TEMP/research-v0-manifest.txt" >&2)
+          printf 'RESEARCH_V0_EVIDENCE_V3_SHA256=%s\n' \
+            "$(sha256sum "$RUNNER_TEMP/validity-research-v0/v3.jsonl" | awk '{print $1}')" \
+            >> "$RUNNER_TEMP/research-v0-manifest.txt"
+
+      - name: Final exact-subject immutability gate
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          subject_sha="${SUBJECT_SHA,,}"
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$subject_sha"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          {
+            printf 'final_subject_sha=%s\n' "$actual_sha"
+            printf 'final_checkout_clean=true\n'
+            printf 'research_v0_execution_complete=true\n'
+            printf 'interpretation_performed=false\n'
+            printf 'scientific_claim=none\n'
+          } >> "$RUNNER_TEMP/research-v0-manifest.txt"
+          printf 'research_v0_execution_complete=true\n' >> "$RUNNER_TEMP/research-v0-attempt.txt"
+
+      - name: Finalize research execution attempt receipt
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'workflow_job_status=%s\n' "$JOB_STATUS"
+            printf 'attempt_receipt_finalized=true\n'
+          } >> "$RUNNER_TEMP/research-v0-attempt.txt"
+
+      - name: Retain complete smoke and research_v0 evidence
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hdc-ltc-research-v0-${{ inputs.subject_sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            ${{ runner.temp }}/research-v0-attempt.txt
+            ${{ runner.temp }}/research-v0-manifest.txt
+            ${{ runner.temp }}/validity-smoke/v1.jsonl
+            ${{ runner.temp }}/validity-smoke/v2.jsonl
+            ${{ runner.temp }}/validity-smoke/v3.jsonl
+            ${{ runner.temp }}/validity-research-v0/v1.jsonl
+            ${{ runner.temp }}/validity-research-v0/v2.jsonl
+            ${{ runner.temp }}/validity-research-v0/v3.jsonl
+
+      - name: Retain incomplete research_v0 diagnostics
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hdc-ltc-research-v0-incomplete-${{ inputs.subject_sha }}-run-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 90
+          path: |
+            ${{ runner.temp }}/research-v0-attempt.txt
+            ${{ runner.temp }}/research-v0-manifest.txt
+            ${{ runner.temp }}/validity-smoke/v1.jsonl
+            ${{ runner.temp }}/validity-smoke/v2.jsonl
+            ${{ runner.temp }}/validity-smoke/v3.jsonl
+            ${{ runner.temp }}/validity-research-v0/v1.jsonl
+            ${{ runner.temp }}/validity-research-v0/v2.jsonl
+            ${{ runner.temp }}/validity-research-v0/v3.jsonl
