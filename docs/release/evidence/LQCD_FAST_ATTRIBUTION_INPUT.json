@@ -1,0 +1,72 @@
+{
+  "schema_version": "symthaea.lqcd.fast-lane.attribution-input.v1",
+  "source": "github_compare_commits",
+  "transitions": [
+    {
+      "ahead_by": 2,
+      "base_sha": "4bad8af72ff775e7c869b6df83faba718a339a36",
+      "files": [
+        {
+          "additions": 170,
+          "deletions": 0,
+          "path": ".github/workflows/lqcd-fast.yml",
+          "status": "added"
+        },
+        {
+          "additions": 406,
+          "deletions": 0,
+          "path": "scripts/qualify-lqcd-fast.py",
+          "status": "added"
+        }
+      ],
+      "head_sha": "6a74273f189b876919e5feee3418201e46bd6415",
+      "name": "main_base_to_receipt_safe_fast_lane"
+    },
+    {
+      "ahead_by": 1,
+      "base_sha": "6a74273f189b876919e5feee3418201e46bd6415",
+      "files": [
+        {
+          "additions": 29,
+          "deletions": 2,
+          "path": ".github/workflows/lqcd-fast.yml",
+          "status": "modified"
+        },
+        {
+          "additions": 291,
+          "deletions": 0,
+          "path": "scripts/build-lqcd-fast-diagnostic.py",
+          "status": "added"
+        }
+      ],
+      "head_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+      "name": "receipt_safe_to_diagnostic_sidecar"
+    },
+    {
+      "ahead_by": 3,
+      "base_sha": "4bad8af72ff775e7c869b6df83faba718a339a36",
+      "files": [
+        {
+          "additions": 197,
+          "deletions": 0,
+          "path": ".github/workflows/lqcd-fast.yml",
+          "status": "added"
+        },
+        {
+          "additions": 291,
+          "deletions": 0,
+          "path": "scripts/build-lqcd-fast-diagnostic.py",
+          "status": "added"
+        },
+        {
+          "additions": 406,
+          "deletions": 0,
+          "path": "scripts/qualify-lqcd-fast.py",
+          "status": "added"
+        }
+      ],
+      "head_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+      "name": "cumulative_main_base_to_diagnostic_sidecar"
+    }
+  ]
+}

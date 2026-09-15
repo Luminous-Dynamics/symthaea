@@ -1,0 +1,65 @@
+{
+  "global": {
+    "all_changed_paths_classified": true,
+    "all_transitions_zero_scientific_subject_input_delta": true,
+    "base_execution_required_for_inherited_failure_claim": true,
+    "candidate_caused_rust_lint_established": false,
+    "candidate_rust_repair_authorized": false,
+    "structural_theorem": "The observed fast-lane/diagnostic lineage changed verifier or diagnostic bytes only; it did not change package/Cargo/lock/toolchain inputs. Therefore the known head-level Clippy failure is a conformance observation, not evidence of a candidate-caused Rust regression.",
+    "typed_lint_identity_required_before_any_repair": true
+  },
+  "input_sha256": "ce1ab1ae181737fd496e64a4d14c2c3a51901dbf62559ff7bd753fdf5f7595cf",
+  "schema_version": "symthaea.lqcd.fast-lane.attribution-result.v1",
+  "synthetic_controls_passed": true,
+  "transition_count": 3,
+  "transitions": [
+    {
+      "base_sha": "4bad8af72ff775e7c869b6df83faba718a339a36",
+      "buckets": {"governance": [], "other": [], "scientific_subject": [], "verifier_or_diagnostic": [".github/workflows/lqcd-fast.yml", "scripts/qualify-lqcd-fast.py"]},
+      "candidate_caused_rust_lint_established": false,
+      "candidate_rust_repair_authorized": false,
+      "canonical_qualifier_changed": true,
+      "changed_file_count": 2,
+      "changed_paths": [".github/workflows/lqcd-fast.yml", "scripts/qualify-lqcd-fast.py"],
+      "classification": "VerifierProfileDeltaWithoutSubjectDelta",
+      "diagnostic_changed": false,
+      "head_sha": "6a74273f189b876919e5feee3418201e46bd6415",
+      "name": "main_base_to_receipt_safe_fast_lane",
+      "reason": "No package/Cargo/lock/toolchain subject input changed; a head-level Clippy failure cannot by itself establish candidate-caused Rust regression.",
+      "scientific_subject_input_delta": false,
+      "workflow_changed": true
+    },
+    {
+      "base_sha": "6a74273f189b876919e5feee3418201e46bd6415",
+      "buckets": {"governance": [], "other": [], "scientific_subject": [], "verifier_or_diagnostic": [".github/workflows/lqcd-fast.yml", "scripts/build-lqcd-fast-diagnostic.py"]},
+      "candidate_caused_rust_lint_established": false,
+      "candidate_rust_repair_authorized": false,
+      "canonical_qualifier_changed": false,
+      "changed_file_count": 2,
+      "changed_paths": [".github/workflows/lqcd-fast.yml", "scripts/build-lqcd-fast-diagnostic.py"],
+      "classification": "VerifierOperationalDeltaWithoutSubjectDelta",
+      "diagnostic_changed": true,
+      "head_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+      "name": "receipt_safe_to_diagnostic_sidecar",
+      "reason": "No package/Cargo/lock/toolchain subject input changed; a head-level Clippy failure cannot by itself establish candidate-caused Rust regression.",
+      "scientific_subject_input_delta": false,
+      "workflow_changed": true
+    },
+    {
+      "base_sha": "4bad8af72ff775e7c869b6df83faba718a339a36",
+      "buckets": {"governance": [], "other": [], "scientific_subject": [], "verifier_or_diagnostic": [".github/workflows/lqcd-fast.yml", "scripts/build-lqcd-fast-diagnostic.py", "scripts/qualify-lqcd-fast.py"]},
+      "candidate_caused_rust_lint_established": false,
+      "candidate_rust_repair_authorized": false,
+      "canonical_qualifier_changed": true,
+      "changed_file_count": 3,
+      "changed_paths": [".github/workflows/lqcd-fast.yml", "scripts/build-lqcd-fast-diagnostic.py", "scripts/qualify-lqcd-fast.py"],
+      "classification": "VerifierProfileDeltaWithoutSubjectDelta",
+      "diagnostic_changed": true,
+      "head_sha": "5242b44b50df491a71b047f3c144bdfd8af9afc3",
+      "name": "cumulative_main_base_to_diagnostic_sidecar",
+      "reason": "No package/Cargo/lock/toolchain subject input changed; a head-level Clippy failure cannot by itself establish candidate-caused Rust regression.",
+      "scientific_subject_input_delta": false,
+      "workflow_changed": true
+    }
+  ]
+}
