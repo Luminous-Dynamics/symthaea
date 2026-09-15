@@ -108,8 +108,8 @@ fn main() -> Result<(), AnyError> {
     let v2 = verify_chain(&v2_bytes, V2_CHAIN_DOMAIN)?;
     let v3 = verify_chain(&v3_bytes, V3_CHAIN_DOMAIN)?;
 
-    verify_v2_header_footer(&v2, &subject_sha, protocol, &plan)?;
-    verify_v3_header_footer(&v3, &subject_sha, protocol, &plan, &v2)?;
+    verify_v2_grammar_and_identity(&v2, &subject_sha, protocol, &plan)?;
+    verify_v3_grammar_and_identity(&v3, &subject_sha, protocol, &plan, &v2)?;
 
     let raw = collect_v2_metric_vectors(&v2, &plan)?;
     verify_v3_summaries(&v3, &plan, &raw)?;
@@ -192,6 +192,12 @@ fn verify_chain(bytes: &[u8], domain: &str) -> Result<VerifiedChain, AnyError> {
 
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
         let record: Value = serde_json::from_str(line)?;
+        if record.as_object().map(|map| map.len()) != Some(5) {
+            return Err(other(format!(
+                "hash-chain record shape drifted at sequence {expected_sequence}"
+            ))
+            .into());
+        }
         let sequence = required_u64(&record, "sequence")?;
         if sequence != expected_sequence {
             return Err(other(format!(
@@ -245,16 +251,29 @@ fn verify_chain(bytes: &[u8], domain: &str) -> Result<VerifiedChain, AnyError> {
     })
 }
 
-fn verify_v2_header_footer(
+fn verify_v2_grammar_and_identity(
     v2: &VerifiedChain,
     subject_sha: &str,
     protocol: Protocol,
     plan: &ValidityCapacityPlan,
 ) -> Result<(), AnyError> {
-    let header = v2
-        .records
-        .first()
-        .ok_or_else(|| other("v2 header missing"))?;
+    let expected_observations = plan
+        .cases
+        .len()
+        .checked_mul(plan.replicate_seeds.len())
+        .ok_or_else(|| other("v2 expected observation count overflow"))?;
+    let expected_records = expected_observations
+        .checked_add(3)
+        .ok_or_else(|| other("v2 expected record count overflow"))?;
+    if v2.records.len() != expected_records {
+        return Err(other(format!(
+            "v2 record count mismatch: actual={}, expected={expected_records}",
+            v2.records.len()
+        ))
+        .into());
+    }
+
+    let header = &v2.records[0];
     if header.kind != "header"
         || header.payload["evidence_version"].as_str() != Some(V2_VERSION)
         || header.payload["chain_domain"].as_str() != Some(V2_CHAIN_DOMAIN)
@@ -263,32 +282,26 @@ fn verify_v2_header_footer(
     {
         return Err(other("v2 header identity mismatch").into());
     }
-
-    let expected_observations = plan
-        .cases
-        .len()
-        .checked_mul(plan.replicate_seeds.len())
-        .ok_or_else(|| other("v2 expected observation count overflow"))?;
-    let observed = v2
-        .records
-        .iter()
-        .filter(|record| record.kind == "falsification_observation")
-        .count();
-    if observed != expected_observations {
-        return Err(other(format!(
-            "v2 falsification count mismatch: actual={observed}, expected={expected_observations}"
-        ))
-        .into());
+    if v2.records[1].kind != "base_evidence_commitment" {
+        return Err(other("v2 record 1 must be base_evidence_commitment").into());
+    }
+    for (index, record) in v2.records[2..2 + expected_observations].iter().enumerate() {
+        if record.kind != "falsification_observation" {
+            return Err(other(format!(
+                "v2 record {} must be falsification_observation, got {:?}",
+                index + 2,
+                record.kind
+            ))
+            .into());
+        }
     }
 
-    let footer = v2
-        .records
-        .last()
-        .ok_or_else(|| other("v2 footer missing"))?;
+    let footer = &v2.records[expected_records - 1];
     if footer.kind != "footer"
         || footer.payload["complete"].as_bool() != Some(true)
         || footer.payload["subject_unchanged"].as_bool() != Some(true)
         || footer.payload["checkout_clean"].as_bool() != Some(true)
+        || footer.payload["interpretation"].as_str() != Some("not_performed_by_runner")
         || footer.payload["scientific_claim"].as_str() != Some("none")
         || footer.payload["falsification_observation_count"].as_u64()
             != Some(expected_observations as u64)
@@ -298,17 +311,27 @@ fn verify_v2_header_footer(
     Ok(())
 }
 
-fn verify_v3_header_footer(
+fn verify_v3_grammar_and_identity(
     v3: &VerifiedChain,
     subject_sha: &str,
     protocol: Protocol,
     plan: &ValidityCapacityPlan,
     v2: &VerifiedChain,
 ) -> Result<(), AnyError> {
-    let header = v3
-        .records
-        .first()
-        .ok_or_else(|| other("v3 header missing"))?;
+    let expected_records = plan
+        .cases
+        .len()
+        .checked_add(2)
+        .ok_or_else(|| other("v3 expected record count overflow"))?;
+    if v3.records.len() != expected_records {
+        return Err(other(format!(
+            "v3 record count mismatch: actual={}, expected={expected_records}",
+            v3.records.len()
+        ))
+        .into());
+    }
+
+    let header = &v3.records[0];
     if header.kind != "header"
         || header.payload["evidence_version"].as_str() != Some(V3_VERSION)
         || header.payload["chain_domain"].as_str() != Some(V3_CHAIN_DOMAIN)
@@ -331,27 +354,23 @@ fn verify_v3_header_footer(
         return Err(other("v3 header identity or parent-linkage mismatch").into());
     }
 
-    let observed = v3
-        .records
-        .iter()
-        .filter(|record| record.kind == "seed_aggregate_observation")
-        .count();
-    if observed != plan.cases.len() {
-        return Err(other(format!(
-            "v3 aggregate count mismatch: actual={observed}, expected={}",
-            plan.cases.len()
-        ))
-        .into());
+    for (index, record) in v3.records[1..1 + plan.cases.len()].iter().enumerate() {
+        if record.kind != "seed_aggregate_observation" {
+            return Err(other(format!(
+                "v3 record {} must be seed_aggregate_observation, got {:?}",
+                index + 1,
+                record.kind
+            ))
+            .into());
+        }
     }
 
-    let footer = v3
-        .records
-        .last()
-        .ok_or_else(|| other("v3 footer missing"))?;
+    let footer = &v3.records[expected_records - 1];
     if footer.kind != "footer"
         || footer.payload["complete"].as_bool() != Some(true)
         || footer.payload["subject_unchanged"].as_bool() != Some(true)
         || footer.payload["checkout_clean"].as_bool() != Some(true)
+        || footer.payload["interpretation"].as_str() != Some("not_performed_by_runner")
         || footer.payload["scientific_claim"].as_str() != Some("none")
         || footer.payload["aggregate_observation_count"].as_u64()
             != Some(plan.cases.len() as u64)
@@ -365,14 +384,10 @@ fn collect_v2_metric_vectors(
     v2: &VerifiedChain,
     plan: &ValidityCapacityPlan,
 ) -> Result<HashMap<(ValidityCapacityCase, u64), [f64; 10]>, AnyError> {
-    let observations = v2
-        .records
-        .iter()
-        .filter(|record| record.kind == "falsification_observation")
-        .collect::<Vec<_>>();
-
+    let observations = &v2.records[2..v2.records.len() - 1];
     let mut expected_index = 0_usize;
     let mut result = HashMap::with_capacity(observations.len());
+
     for &case in &plan.cases {
         for &seed in &plan.replicate_seeds {
             let record = observations
@@ -393,16 +408,19 @@ fn collect_v2_metric_vectors(
             }
 
             let metrics = [
-                float_value_at(&record.payload, &["accuracy", "empirical_minus_null"] )?,
-                float_value_at(&record.payload, &["target_null_residuals", "mean_bias"] )?,
-                float_value_at(&record.payload, &["target_null_residuals", "mse_ratio_to_null"] )?,
-                float_value_at(&record.payload, &["vocabulary_distractor", "mean_bias"] )?,
-                float_value_at(&record.payload, &["vocabulary_distractor", "mse_ratio_to_null"] )?,
-                float_value_at(&record.payload, &["matched_never_written_shadow", "mean_bias"] )?,
-                float_value_at(&record.payload, &["matched_never_written_shadow", "mse_ratio_to_null"] )?,
-                float_value_at(&record.payload, &["paired_residuals", "vocabulary_minus_shadow_mse"] )?,
-                float_value_at(&record.payload, &["paired_residuals", "vocabulary_minus_shadow_variance"] )?,
-                float_value_at(&record.payload, &["signed_true_margin", "mean"] )?,
+                float_value_at(&record.payload, &["accuracy", "empirical_minus_null"])?,
+                float_value_at(&record.payload, &["target_null_residuals", "mean_bias"])?,
+                float_value_at(&record.payload, &["target_null_residuals", "mse_ratio_to_null"])?,
+                float_value_at(&record.payload, &["vocabulary_distractor", "mean_bias"])?,
+                float_value_at(&record.payload, &["vocabulary_distractor", "mse_ratio_to_null"])?,
+                float_value_at(&record.payload, &["matched_never_written_shadow", "mean_bias"])?,
+                float_value_at(&record.payload, &["matched_never_written_shadow", "mse_ratio_to_null"])?,
+                float_value_at(&record.payload, &["paired_residuals", "vocabulary_minus_shadow_mse"])?,
+                float_value_at(
+                    &record.payload,
+                    &["paired_residuals", "vocabulary_minus_shadow_variance"],
+                )?,
+                float_value_at(&record.payload, &["signed_true_margin", "mean"])?,
             ];
             if result.insert((case, seed), metrics).is_some() {
                 return Err(other(format!(
@@ -429,17 +447,13 @@ fn verify_v3_summaries(
     plan: &ValidityCapacityPlan,
     raw: &HashMap<(ValidityCapacityCase, u64), [f64; 10]>,
 ) -> Result<(), AnyError> {
-    let summaries = v3
-        .records
-        .iter()
-        .filter(|record| record.kind == "seed_aggregate_observation")
-        .collect::<Vec<_>>();
+    let summaries = &v3.records[1..v3.records.len() - 1];
 
     for (case_index, &case) in plan.cases.iter().enumerate() {
         let record = summaries
             .get(case_index)
             .ok_or_else(|| other("v3 summary order ended early"))?;
-        if record.payload.as_object().map(Map::len) != Some(12) {
+        if record.payload.as_object().map(|map| map.len()) != Some(12) {
             return Err(other(format!(
                 "v3 summary payload shape drifted at case index {case_index}"
             ))
@@ -551,7 +565,7 @@ fn verify_summary_object(
     case: ValidityCapacityCase,
     metric_name: &str,
 ) -> Result<(), AnyError> {
-    if value.as_object().map(Map::len) != Some(9) {
+    if value.as_object().map(|map| map.len()) != Some(9) {
         return Err(other(format!(
             "v3 metric summary shape drifted: case={case:?}, metric={metric_name}"
         ))
@@ -641,7 +655,7 @@ fn float_value_at(root: &Value, path: &[&str]) -> Result<f64, AnyError> {
 }
 
 fn decode_float(value: &Value) -> Result<f64, AnyError> {
-    if value.as_object().map(Map::len) != Some(2) {
+    if value.as_object().map(|map| map.len()) != Some(2) {
         return Err(other("float encoding must contain exactly decimal and bits").into());
     }
     let bits = required_str(value, "bits")?;
@@ -668,6 +682,9 @@ fn decode_float(value: &Value) -> Result<f64, AnyError> {
 }
 
 fn parse_case(value: &Value) -> Result<ValidityCapacityCase, AnyError> {
+    if value.as_object().map(|map| map.len()) != Some(6) {
+        return Err(other("validity-capacity case shape drifted").into());
+    }
     Ok(ValidityCapacityCase {
         axis: parse_axis(required_str(value, "axis")?)?,
         dim: required_usize(value, "dim")?,
