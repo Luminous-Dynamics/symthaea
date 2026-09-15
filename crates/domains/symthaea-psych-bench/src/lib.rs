@@ -56,6 +56,7 @@ pub mod benchmarks;
 pub mod harness;
 pub mod substrate_transfer;
 pub mod suite_identity;
+pub mod suite_manifest;
 pub mod wm;
 
 #[cfg(feature = "neuroevolution")]
