@@ -13,6 +13,6 @@ symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgra
 symthaea-fabrication-upgrade-finalized-head = { path = "../symthaea-fabrication-upgrade-finalized-head" }
 symthaea-fabrication-witness-registry-containment-bound = { path = "../symthaea-fabrication-witness-registry-containment-bound" }
 symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
-symthaea-trust-kernel = { path = "../../symthaea-trust-kernel" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
 serde = { workspace = true }
 serde_json = { workspace = true }
