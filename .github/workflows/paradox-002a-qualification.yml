@@ -1,0 +1,126 @@
+name: PARADOX-002A Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/research/symthaea-paradox-fixtures/**'
+      - 'docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT.md'
+      - '.github/workflows/paradox-002a-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-002a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PARADOX001_SHA: 3f8e53e4d6b89895dc5097b2dccfe4f3868d53f9
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 64
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Bind subject, parent, and allowed qualification surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git merge-base --is-ancestor "${PARADOX001_SHA}" HEAD
+          git diff --exit-code "${PARADOX001_SHA}" HEAD -- crates/research/symthaea-structured-inconsistency
+
+          unexpected="$(
+            git diff --name-only "${PARADOX001_SHA}" HEAD -- \
+              | grep -Ev '^(crates/research/symthaea-paradox-fixtures/|docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT\.md$|\.github/workflows/paradox-002a-qualification\.yml$)' \
+              || true
+          )"
+          if [[ -n "${unexpected}" ]]; then
+            printf 'unexpected PARADOX-002A diff surface:\n%s\n' "${unexpected}" >&2
+            exit 1
+          fi
+
+          test -f docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT.md
+          test -f crates/research/symthaea-paradox-fixtures/Cargo.toml
+          test -f crates/research/symthaea-paradox-fixtures/Cargo.lock
+          test -f crates/research/symthaea-paradox-fixtures/rust-toolchain.toml
+          test -f crates/research/symthaea-paradox-fixtures/src/lib.rs
+          test -f crates/research/symthaea-paradox-fixtures/src/bin/qualification_census.rs
+          test -f crates/research/symthaea-paradox-fixtures/tests/confirmatory_auxiliary_independence.rs
+
+          lock=crates/research/symthaea-paradox-fixtures/Cargo.lock
+          test "$(grep -c '^\[\[package\]\]$' "${lock}")" -eq 2
+          grep -Fxq 'name = "symthaea-paradox-fixtures"' "${lock}"
+          grep -Fxq 'name = "symthaea-structured-inconsistency"' "${lock}"
+          ! grep -Eq '^(source|checksum) = ' "${lock}"
+
+      - name: Format
+        run: cargo fmt --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml -- --check
+
+      - name: Check offline
+        run: cargo check --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
+
+      - name: Test fixture census and negative controls offline
+        run: cargo test --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
+
+      - name: Commit complete confirmatory census
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/research/symthaea-paradox-fixtures/Cargo.toml
+          receipt_dir="${RUNNER_TEMP}/paradox-002a-census"
+          mkdir -p "${receipt_dir}"
+
+          cargo run --locked --offline --quiet --manifest-path "${manifest}" --bin qualification_census \
+            > "${receipt_dir}/census-a.bin"
+          cargo run --locked --offline --quiet --manifest-path "${manifest}" --bin qualification_census \
+            > "${receipt_dir}/census-b.bin"
+
+          cmp -s "${receipt_dir}/census-a.bin" "${receipt_dir}/census-b.bin"
+          bytes="$(wc -c < "${receipt_dir}/census-a.bin")"
+          test "${bytes}" -gt 0
+          digest="$(sha256sum "${receipt_dir}/census-a.bin" | awk '{print $1}')"
+          printf 'PARADOX-002A confirmatory-census-v1 records=7168 bytes=%s sha256=%s subject=%s\n' \
+            "${bytes}" "${digest}" "${SUBJECT_SHA}"
+
+      - name: Strict Clippy offline
+        run: cargo clippy --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml --all-targets -- -D warnings
+
+      - name: Architecture and claim-boundary source audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=crates/research/symthaea-paradox-fixtures/src/lib.rs
+          census=crates/research/symthaea-paradox-fixtures/src/bin/qualification_census.rs
+          guard=crates/research/symthaea-paradox-fixtures/tests/confirmatory_auxiliary_independence.rs
+          grep -Fq 'does not measure or classify consciousness' "$file"
+          grep -Fq 'Generator code never consumes this report.' "$file"
+          grep -Fq 'condition label, expected response, or oracle truth' "$file"
+          grep -Fq 'PARADOX001_QUALIFIED_SHA' "$file"
+          grep -Fq 'SYMT-PARADOX-002A-CONFIRMATORY-CENSUS-V1' "$census"
+          grep -Fq 'matched_auxiliary_cue_has_no_deterministic_polarity_mapping_per_confirmatory_seed' "$guard"
+          grep -Fq 'c3_and_c6_share_causal_context_cue_without_sharing_visibility' "$guard"
+          ! grep -Eq 'rand::|thread_rng|OsRng|getrandom|SystemTime|Instant::|std::net|reqwest|tokio|crate::cognitive_loop|crate::consciousness|GlobalWorkspace|CognitiveLoopService' "$file" "$census" "$guard"
+          ! grep -Eq 'candidate_recruitment_index[^;]*([<>]=?|==)' "$file"
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git diff --exit-code "${PARADOX001_SHA}" HEAD -- crates/research/symthaea-structured-inconsistency
