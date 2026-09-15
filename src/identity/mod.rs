@@ -8,4 +8,7 @@
 
 mod mfdi_bridge;
 
+#[cfg(all(test, feature = "identity"))]
+mod rekor_v2_fixture_verifier;
+
 pub use mfdi_bridge::*;
