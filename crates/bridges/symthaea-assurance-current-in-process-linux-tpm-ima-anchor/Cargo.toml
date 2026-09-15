@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-current-in-process-linux-tpm-ima-anchor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Current Linux TPM+IMA assurance bound to in-process quote verification"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["tpm", "ima", "attestation", "assurance"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-linux-tpm-ima-current-anchor = { path = "../symthaea-assurance-linux-tpm-ima-current-anchor" }
+symthaea-assurance-tpm2-in-process-ecdsa = { path = "../symthaea-assurance-tpm2-in-process-ecdsa" }
