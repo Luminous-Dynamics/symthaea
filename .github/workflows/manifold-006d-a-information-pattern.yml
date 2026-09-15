@@ -1,0 +1,425 @@
+name: MANIFOLD-006D-A Information-Pattern Waist
+
+on:
+  push:
+    branches: [impl/manifold-006d-a-information-pattern-waist]
+    paths:
+      - '.github/workflows/manifold-006d-a-information-pattern.yml'
+      - 'crates/core/symthaea-core/src/lib.rs'
+      - 'crates/core/symthaea-core/src/two_stage_robust_reachability.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs'
+  pull_request:
+    paths:
+      - '.github/workflows/manifold-006d-a-information-pattern.yml'
+      - 'crates/core/symthaea-core/src/lib.rs'
+      - 'crates/core/symthaea-core/src/two_stage_robust_reachability.rs'
+      - 'crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs'
+  workflow_dispatch:
+
+permissions: {contents: read}
+
+env:
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PREREG_PARENT: c0f5776d28d321d46801ca0f9620a622d35ca28c
+  PREREG_PARENT_TREE: fcd38683fd65952e72768273f51703323c5508aa
+  NUMERICAL_PARENT: ee79f86a6d431c462ae8701094a3e29be88c4a5e
+  NUMERICAL_PARENT_TREE: 645b1644112a822c79b97bcd9eb226cc604b3af8
+  PREREG_RUN: '34919856614'
+  PREREG_ARTIFACT_ID: '10377995319'
+  PREREG_ARTIFACT_SHA256: c98edc977228a0946d3a1a961ef45ff02f5fad2a87beed093726639a4924b214
+  PREREG_JSON_SHA256: 4092b971b29a64a7eb622e5fdee1f80d0bafbe7b9e6dc6513995f692ac74371b
+  PREREG_VALIDATOR_SHA256: da7745b862f43260d77a86b452cebccbc174fa4fb032d13000de26b4e3572700
+  PREREG_WORKFLOW_SHA256: a8865e357efa698346c1d5035807ac72fdc91afdbddf3729d17af9b7b4f6a8f5
+  PREREG_ID: fa62084a562a061445c74088914616480efc6008d2a16db56b23e9340612337e
+  POLICY_CLASSES_ID: 9f8b34bc346d5691c363de6ff4a94110f492e3fecc48ed1f4d6233de9d98cfe9
+  EMBEDDING_ID: 2e59b1770da35a1df87000916cf1bedc73de9756731dcd154ce8e8702bff57f1
+  QUALIFIED_KERNEL_SHA256: cffe5574d000a44a87a757a788d08cb7ba474810e9c6a3d860d57ac57352eb3c
+  EXPECTED_BASELINE_DIAGNOSTIC_COUNT: '158'
+  EXPECTED_BASELINE_DIAGNOSTIC_SET_SHA256: adcb216a9848ba66eef74b1fd682d856a16233a90aebf294ff3a0cf2b3fc8fac
+  FAILED_A_SUBJECT: e00e36123546960c07f9030253b57b1348aaad0b
+  FAILED_A_RUN: '34958877854'
+  FAILED_A_ARTIFACT_ID: '10392462415'
+  FAILED_A_ARTIFACT_SHA256: 1e008a471820288061bffb137dddb3888fa4a469242f2ab46e2f09060d0bf9b2
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact A subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 3
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          persist-credentials: false
+
+      - name: Check out exact preregistration parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          ref: ${{ env.PREREG_PARENT }}
+          path: parent
+          persist-credentials: false
+
+      - name: Bind exact lineage and four-file A surface
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-a"; mkdir -p "$out"
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git -C subject rev-parse HEAD^)" = "$PREREG_PARENT"
+          test "$(git -C subject rev-parse "$PREREG_PARENT^{tree}")" = "$PREREG_PARENT_TREE"
+          test "$(git -C subject rev-parse "$PREREG_PARENT^")" = "$NUMERICAL_PARENT"
+          test "$(git -C subject rev-parse "$NUMERICAL_PARENT^{tree}")" = "$NUMERICAL_PARENT_TREE"
+          test "$(git -C subject rev-list --count "$PREREG_PARENT..HEAD")" = 1
+          test "$(git -C parent rev-parse HEAD)" = "$PREREG_PARENT"
+          test "$(git -C parent rev-parse HEAD^{tree})" = "$PREREG_PARENT_TREE"
+          test -z "$(git -C subject status --porcelain)"
+          test -z "$(git -C parent status --porcelain)"
+          git -C subject diff --name-only "$PREREG_PARENT" HEAD | sort > "$out/changed-files.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          actual=Path('artifacts/manifold-006d-a/changed-files.txt').read_text().splitlines()
+          expected=sorted([
+              '.github/workflows/manifold-006d-a-information-pattern.yml',
+              'crates/core/symthaea-core/src/lib.rs',
+              'crates/core/symthaea-core/src/two_stage_robust_reachability.rs',
+              'crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs',
+          ])
+          assert actual == expected, (actual, expected)
+          PY
+          {
+            echo schema=symthaea.manifold-006d-a.environment.v2
+            echo subject_sha=$SUBJECT_SHA
+            echo subject_tree_sha=$(git -C subject rev-parse HEAD^{tree})
+            echo prereg_parent_sha=$PREREG_PARENT
+            echo prereg_parent_tree=$PREREG_PARENT_TREE
+            echo numerical_parent_sha=$NUMERICAL_PARENT
+            echo numerical_parent_tree=$NUMERICAL_PARENT_TREE
+            echo prereg_run=$PREREG_RUN
+            echo prereg_artifact_id=$PREREG_ARTIFACT_ID
+            echo prereg_artifact_sha256=$PREREG_ARTIFACT_SHA256
+            echo prereg_id=$PREREG_ID
+            echo policy_classes_id=$POLICY_CLASSES_ID
+            echo embedding_id=$EMBEDDING_ID
+            echo superseded_failed_a_subject=$FAILED_A_SUBJECT
+            echo superseded_failed_a_run=$FAILED_A_RUN
+            echo superseded_failed_a_artifact_id=$FAILED_A_ARTIFACT_ID
+            echo superseded_failed_a_artifact_sha256=$FAILED_A_ARTIFACT_SHA256
+          } > "$out/environment.txt"
+
+      - name: Bind audited preregistration and qualified kernel bytes
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-a"
+          test "$(sha256sum subject/scripts/qualification/manifold_006d_preregistration.json | awk '{print $1}')" = "$PREREG_JSON_SHA256"
+          test "$(sha256sum subject/scripts/qualification/manifold_006d_preregistration.py | awk '{print $1}')" = "$PREREG_VALIDATOR_SHA256"
+          test "$(sha256sum subject/.github/workflows/manifold-006d-preregistration.yml | awk '{print $1}')" = "$PREREG_WORKFLOW_SHA256"
+          test "$(sha256sum subject/crates/core/symthaea-core/src/certified_interval.rs | awk '{print $1}')" = "$QUALIFIED_KERNEL_SHA256"
+          cmp -s subject/scripts/qualification/manifold_006d_preregistration.json parent/scripts/qualification/manifold_006d_preregistration.json
+          cmp -s subject/scripts/qualification/manifold_006d_preregistration.py parent/scripts/qualification/manifold_006d_preregistration.py
+          cmp -s subject/.github/workflows/manifold-006d-preregistration.yml parent/.github/workflows/manifold-006d-preregistration.yml
+          cmp -s subject/crates/core/symthaea-core/src/certified_interval.rs parent/crates/core/symthaea-core/src/certified_interval.rs
+          {
+            echo prereg_json_sha256=$PREREG_JSON_SHA256
+            echo prereg_validator_sha256=$PREREG_VALIDATOR_SHA256
+            echo prereg_workflow_sha256=$PREREG_WORKFLOW_SHA256
+            echo qualified_kernel_sha256=$QUALIFIED_KERNEL_SHA256
+          } >> "$out/environment.txt"
+
+      - name: Enforce pre-theorem source boundary and exact lib export
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, re, subprocess
+          from pathlib import Path
+          root=Path('artifacts/manifold-006d-a')
+          module=Path('subject/crates/core/symthaea-core/src/two_stage_robust_reachability.rs').read_text()
+          forbidden=['CertifiedRobust','CertifiedNotRobust','VerifiedPolicyClassInclusion','StrictReachabilityEnlargement']
+          present=[token for token in forbidden if token in module]
+          assert not present, present
+          assert 'use sha3::' not in module
+          assert 'use blake3::Hasher;' in module
+          assert re.search(r'(?m)^\s*fn issue\(', module)
+          assert 'pub(crate) fn issue(' not in module
+          assert 'stage: 1,' in module
+          assert 'PreregisteredSha3Identity' in module
+          assert 'PreregisteredSemanticVersion' in module
+          assert 'MANIFOLD_006D_PREREGISTRATION' in module
+          diff=subprocess.check_output([
+              'git','-C','subject','diff','--unified=0',
+              'HEAD^','HEAD','--','crates/core/symthaea-core/src/lib.rs'
+          ],text=True)
+          added=[line[1:] for line in diff.splitlines() if line.startswith('+') and not line.startswith('+++')]
+          assert added == [
+              '/// Typed two-stage information-pattern semantics for MANIFOLD-006D-A.',
+              'pub mod two_stage_robust_reachability;',
+          ], added
+          assert subprocess.run([
+              'cmp','-s',
+              'subject/crates/core/symthaea-core/src/robust_reachability.rs',
+              'parent/crates/core/symthaea-core/src/robust_reachability.rs'
+          ]).returncode == 0
+          receipt={
+              'schema':'symthaea.manifold-006d-a.source-boundary.v2',
+              'new_theorem_authority_tokens':present,
+              'runtime_identity_algorithm':'blake3',
+              'external_preregistration_identity_domain':'typed canonical sha3-256 hex evidence',
+              'identity_equivalence_claimed':False,
+              'observation_minting':'module-private',
+              'observation_stage_bound':1,
+              'existing_one_stage_solver_modified':False,
+              'lib_export_delta_exact':True,
+              'verdict':'PASS',
+          }
+          root.joinpath('source-boundary.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Install exact Rust 1.96 toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.96.0
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          {
+            echo rustc=$(rustc --version)
+            echo cargo=$(cargo --version)
+            echo rustfmt=$(rustfmt --version)
+            echo clippy=$(cargo clippy --version)
+            echo python=$(python3 --version 2>&1)
+            echo cargo_lock_sha256=$(sha256sum subject/Cargo.lock | awk '{print $1}')
+            echo runner_os=$RUNNER_OS
+            echo runner_arch=$RUNNER_ARCH
+            echo image_os=${ImageOS:-unknown}
+            echo image_version=${ImageVersion:-unknown}
+          } >> "$GITHUB_WORKSPACE/artifacts/manifold-006d-a/environment.txt"
+
+      - name: Check only A-owned Rust formatting
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            subject/crates/core/symthaea-core/src/two_stage_robust_reachability.rs \
+            subject/crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('artifacts/manifold-006d-a/format.json').write_text(json.dumps({
+              'schema':'symthaea.manifold-006d-a.format.v2',
+              'rust_files_checked':[
+                  'crates/core/symthaea-core/src/two_stage_robust_reachability.rs',
+                  'crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs',
+              ],
+              'lib_rs_recursive_formatting_intentionally_excluded':True,
+              'verdict':'PASS',
+          },indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Compile and execute only the A semantic waist
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-a"
+          target="$RUNNER_TEMP/manifold-006d-a-subject-target"
+          CARGO_TARGET_DIR="$target" cargo check --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --lib 2>&1 | tee "$out/cargo-check.txt"
+          CARGO_TARGET_DIR="$target" cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --lib two_stage_robust_reachability::tests 2>&1 | tee "$out/unit-tests.txt"
+          CARGO_TARGET_DIR="$target" cargo test --manifest-path subject/Cargo.toml --locked -p symthaea-core --no-default-features --test manifold_006d_a_information_pattern 2>&1 | tee "$out/integration-tests.txt"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('artifacts/manifold-006d-a/build-tests.json').write_text(json.dumps({
+              'schema':'symthaea.manifold-006d-a.build-tests.v2',
+              'core_lib_check':True,
+              'focused_unit_tests':True,
+              'focused_integration_tests':True,
+              'verdict':'PASS',
+          },indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Replay strict Clippy from exact subject and parent roots
+        run: |
+          set -uo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-a"
+          set +e
+          (
+            cd subject
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006d-a-subject-clippy" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings
+          ) > "$out/subject-clippy.jsonl" 2> "$out/subject-clippy.stderr.txt"
+          subject_status=$?
+          (
+            cd parent
+            CARGO_TARGET_DIR="$RUNNER_TEMP/manifold-006d-a-parent-clippy" \
+              cargo clippy --locked -p symthaea-core --no-default-features --lib --message-format=json -- -D warnings
+          ) > "$out/parent-clippy.jsonl" 2> "$out/parent-clippy.stderr.txt"
+          parent_status=$?
+          set -e
+          printf '%s\n' "$subject_status" > "$out/subject-clippy.exit-code.txt"
+          printf '%s\n' "$parent_status" > "$out/parent-clippy.exit-code.txt"
+
+      - name: Require exact inherited strict-lint baseline and zero A delta
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          from collections import Counter
+          from pathlib import Path
+          root=Path('artifacts/manifold-006d-a')
+          def normalize(path):
+              records=[]
+              for raw in path.read_text(errors='replace').splitlines():
+                  try: event=json.loads(raw)
+                  except json.JSONDecodeError: continue
+                  if event.get('reason') != 'compiler-message': continue
+                  msg=event.get('message') or {}
+                  if msg.get('level') not in {'error','warning'}: continue
+                  primary=next((s for s in (msg.get('spans') or []) if s.get('is_primary')), {})
+                  records.append({
+                      'code':(msg.get('code') or {}).get('code'),
+                      'message':msg.get('message'),
+                      'primary_file':primary.get('file_name'),
+                  })
+              return records
+          def sig(record):
+              return (record.get('code'),record.get('message'),record.get('primary_file'))
+          def canonical_hash(records):
+              rows=sorted([sig(r) for r in records],key=lambda row: tuple('' if x is None else x for x in row))
+              return hashlib.sha256(json.dumps(rows,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
+          subject=normalize(root/'subject-clippy.jsonl')
+          parent=normalize(root/'parent-clippy.jsonl')
+          sc=Counter(sig(r) for r in subject); pc=Counter(sig(r) for r in parent)
+          added=list((sc-pc).elements()); removed=list((pc-sc).elements())
+          sh=canonical_hash(subject); ph=canonical_hash(parent)
+          expected_count=int(os.environ['EXPECTED_BASELINE_DIAGNOSTIC_COUNT'])
+          expected_hash=os.environ['EXPECTED_BASELINE_DIAGNOSTIC_SET_SHA256']
+          assert len(parent) == expected_count, (len(parent),expected_count)
+          assert len(subject) == expected_count, (len(subject),expected_count)
+          assert ph == expected_hash, (ph,expected_hash)
+          assert sh == expected_hash, (sh,expected_hash)
+          assert not added, added
+          assert not removed, removed
+          subject_exit=int((root/'subject-clippy.exit-code.txt').read_text().strip())
+          parent_exit=int((root/'parent-clippy.exit-code.txt').read_text().strip())
+          assert subject_exit != 0 and parent_exit != 0
+          payload={
+              'schema':'symthaea.manifold-006d-a.differential-lint.v2',
+              'subject_sha':os.environ['SUBJECT_SHA'],
+              'parent_sha':os.environ['PREREG_PARENT'],
+              'subject_global_strict_clippy_clean':False,
+              'parent_global_strict_clippy_clean':False,
+              'inherited_baseline_diagnostic_count':expected_count,
+              'subject_diagnostic_set_sha256':sh,
+              'parent_diagnostic_set_sha256':ph,
+              'added_subject_diagnostic_count':0,
+              'removed_subject_diagnostic_count':0,
+              'candidate_introduced_new_strict_lint_diagnostics':False,
+              'candidate_removed_or_masked_baseline_diagnostics':False,
+              'verdict':'PASS',
+          }
+          root.joinpath('differential-lint.json').write_text(json.dumps(payload,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Prove post-execution subject and parent immutability
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-a"
+          subject_tree="$(awk -F= '$1=="subject_tree_sha" {print $2}' "$out/environment.txt")"
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git -C subject rev-parse HEAD^{tree})" = "$subject_tree"
+          test "$(git -C subject rev-parse HEAD^)" = "$PREREG_PARENT"
+          test -z "$(git -C subject status --porcelain)"
+          git -C subject diff --exit-code --
+          git -C subject diff --cached --exit-code --
+          test "$(git -C parent rev-parse HEAD)" = "$PREREG_PARENT"
+          test "$(git -C parent rev-parse HEAD^{tree})" = "$PREREG_PARENT_TREE"
+          test -z "$(git -C parent status --porcelain)"
+          git -C parent diff --exit-code --
+          git -C parent diff --cached --exit-code --
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('artifacts/manifold-006d-a/execution-integrity.json').write_text(json.dumps({
+              'schema':'symthaea.manifold-006d-a.execution-integrity.v2',
+              'subject_exact_run_head':True,
+              'subject_tree_unchanged':True,
+              'subject_clean_including_untracked':True,
+              'parent_exact_head_and_tree':True,
+              'parent_clean_including_untracked':True,
+              'evidence_outside_git_worktrees':True,
+              'verdict':'PASS',
+          },indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Emit 006D-A qualification receipt
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path('artifacts/manifold-006d-a')
+          source=json.loads((root/'source-boundary.json').read_text())
+          lint=json.loads((root/'differential-lint.json').read_text())
+          integrity=json.loads((root/'execution-integrity.json').read_text())
+          assert source['verdict']=='PASS' and lint['verdict']=='PASS' and integrity['verdict']=='PASS'
+          receipt={
+              'schema':'symthaea.manifold-006d-a.qualification.v2',
+              'subject_sha':os.environ['SUBJECT_SHA'],
+              'parent_sha':os.environ['PREREG_PARENT'],
+              'preregistration_id':os.environ['PREREG_ID'],
+              'preregistration_run':int(os.environ['PREREG_RUN']),
+              'preregistration_artifact_id':int(os.environ['PREREG_ARTIFACT_ID']),
+              'preregistration_artifact_sha256':os.environ['PREREG_ARTIFACT_SHA256'],
+              'policy_classes_id':os.environ['POLICY_CLASSES_ID'],
+              'embedding_id':os.environ['EMBEDDING_ID'],
+              'superseded_failed_attempt':{
+                  'subject_sha':os.environ['FAILED_A_SUBJECT'],
+                  'run_id':int(os.environ['FAILED_A_RUN']),
+                  'artifact_id':int(os.environ['FAILED_A_ARTIFACT_ID']),
+                  'artifact_sha256':os.environ['FAILED_A_ARTIFACT_SHA256'],
+                  'classification':'format-control-plane-red-before-semantic-execution',
+              },
+              'typed_information_pattern_waist_qualified':True,
+              'theorem_executed':False,
+              'robust_feasibility_authority':False,
+              'robust_infeasibility_authority':False,
+              'policy_class_inclusion_authority':False,
+              'strict_separation_authority':False,
+              'runtime_prereg_identity_equivalence_claimed':False,
+              'successor_006d_b_authorized_without_independent_audit':False,
+              'promotion_rule':'independent audit of this exact capsule required before 006D-B',
+              'verdict':'PASS_006D_A',
+          }
+          root.joinpath('receipt.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Hash qualification capsule
+        if: always()
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-a"; mkdir -p "$out"; cd "$out"
+          : > SHA256SUMS
+          for f in *; do [ "$f" = SHA256SUMS ] || [ -d "$f" ] || sha256sum "$f" >> SHA256SUMS; done
+
+      - name: Upload qualification capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: manifold-006d-a-${{ env.SUBJECT_SHA }}
+          path: artifacts/manifold-006d-a/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Require qualified A without theorem promotion
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('artifacts/manifold-006d-a')
+          required=['environment.txt','changed-files.txt','source-boundary.json','format.json','build-tests.json','differential-lint.json','execution-integrity.json','receipt.json','SHA256SUMS']
+          assert all((root/name).exists() for name in required), [name for name in required if not (root/name).exists()]
+          r=json.loads((root/'receipt.json').read_text())
+          assert r['verdict']=='PASS_006D_A'
+          assert r['typed_information_pattern_waist_qualified'] is True
+          for key in ['theorem_executed','robust_feasibility_authority','robust_infeasibility_authority','policy_class_inclusion_authority','strict_separation_authority','runtime_prereg_identity_equivalence_claimed','successor_006d_b_authorized_without_independent_audit']:
+              assert r[key] is False, key
+          PY

@@ -105,6 +105,8 @@ pub mod planar_configuration;
 pub mod reachability;
 /// Analytic bounded-disturbance robust terminal-set reachability.
 pub mod robust_reachability;
+/// Typed two-stage information-pattern semantics for MANIFOLD-006D-A.
+pub mod two_stage_robust_reachability;
 /// Deterministic seeded bounded RRT with no infeasibility authority.
 pub mod sampling_reachability;
 /// Optional smooth-manifold refinement over planner-neutral metric spaces.
