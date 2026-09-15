@@ -12,6 +12,8 @@ on:
       - 'docs/research/SPINE_000D_CAUSAL_ABLATION_CONTRACT.md'
       - 'docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json'
       - 'scripts/verify_spine_000d_contract.py'
+      - 'scripts/validate_spine_000d_campaign.py'
+      - 'scripts/selftest_spine_000d_campaign_validator.py'
 
 permissions:
   contents: read
@@ -47,6 +49,8 @@ jobs:
           .github/workflows/spine-000d-contract.yml
           docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json
           docs/research/SPINE_000D_CAUSAL_ABLATION_CONTRACT.md
+          scripts/selftest_spine_000d_campaign_validator.py
+          scripts/validate_spine_000d_campaign.py
           scripts/verify_spine_000d_contract.py
           EOF
           sort -o /tmp/spine_000d_allowed /tmp/spine_000d_allowed
@@ -59,11 +63,17 @@ jobs:
 
       - name: Syntax-check contract instruments
         run: |
-          python3 -m py_compile scripts/verify_spine_000d_contract.py
+          python3 -m py_compile \
+            scripts/verify_spine_000d_contract.py \
+            scripts/validate_spine_000d_campaign.py \
+            scripts/selftest_spine_000d_campaign_validator.py
           python3 -m json.tool docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json > /dev/null
 
       - name: Verify frozen contract/schema
         run: python3 scripts/verify_spine_000d_contract.py
+
+      - name: Exercise campaign preflight negative controls
+        run: python3 scripts/selftest_spine_000d_campaign_validator.py
 
       - name: Seal contract evidence
         shell: bash
@@ -71,7 +81,7 @@ jobs:
           set -euo pipefail
           mkdir -p artifacts/spine-000d-contract
           {
-            echo "schema=symthaea.spine.000d.contract.v1"
+            echo "schema=symthaea.spine.000d.contract.v2"
             echo "git_head=$(git rev-parse HEAD)"
             echo "git_tree=$(git write-tree)"
             echo "base_subject=fa7b68645dd2109abb12c70f493e50e16c5740a4"
@@ -83,6 +93,8 @@ jobs:
             docs/research/SPINE_000D_CAUSAL_ABLATION_CONTRACT.md \
             docs/research/SPINE_000D_CAMPAIGN_MANIFEST.schema.json \
             scripts/verify_spine_000d_contract.py \
+            scripts/validate_spine_000d_campaign.py \
+            scripts/selftest_spine_000d_campaign_validator.py \
             artifacts/spine-000d-contract/subject.txt \
             > artifacts/spine-000d-contract/SHA256SUMS
 
