@@ -1,10 +1,13 @@
 [
   {
+    "coverage_tags": [
+      "zero.empty"
+    ],
     "cycle_number": 1,
     "description": "0 contributors (empty collector)",
     "expected_integrated": {
-      "arousal_delta": 0.0,
-      "confidence_delta": 0.0,
+      "arousal_delta": 0,
+      "confidence_delta": 0,
       "exact_bits": {
         "arousal_delta_bits": 0,
         "confidence_delta_bits": 0,
@@ -14,11 +17,11 @@
         "n_contributors": 0,
         "valence_delta_bits": 0
       },
-      "exploration_delta": 0.0,
+      "exploration_delta": 0,
       "flags": 0,
-      "lr_modulation": 1.0,
+      "lr_modulation": 1,
       "n_contributors": 0,
-      "valence_delta": 0.0
+      "valence_delta": 0
     },
     "expected_report": {
       "admitted_proposal_count": 0,
@@ -42,6 +45,9 @@
     "name": "case_00_empty"
   },
   {
+    "coverage_tags": [
+      "one.confidence_only"
+    ],
     "cycle_number": 2,
     "description": "1 contributor (confidence delta only)",
     "expected_integrated": {
@@ -125,6 +131,9 @@
     "name": "case_01_single_confidence"
   },
   {
+    "coverage_tags": [
+      "one.lr_only"
+    ],
     "cycle_number": 3,
     "description": "1 contributor (LR modulation only)",
     "expected_integrated": {
@@ -208,7 +217,268 @@
     "name": "case_02_single_lr"
   },
   {
+    "coverage_tags": [
+      "one.exploration_only"
+    ],
     "cycle_number": 4,
+    "description": "1 contributor (exploration delta only)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 4600427019358961664,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.375,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 1,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 4,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 4600427019358961664,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "exploration_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4600427019358961664,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4600427019358961664,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "exploration_delta": 0.375,
+        "subsystem_name": "sub_a"
+      }
+    ],
+    "name": "case_03_single_exploration"
+  },
+  {
+    "coverage_tags": [
+      "one.arousal_only"
+    ],
+    "cycle_number": 5,
+    "description": "1 contributor (arousal f32 only)",
+    "expected_integrated": {
+      "arousal_delta": 0.25,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 1048576000,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 1,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 5,
+      "integrated_all": {
+        "arousal_delta_bits": 1048576000,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "arousal_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1048576000,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 1048576000,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "arousal_delta": 0.25,
+        "subsystem_name": "sub_a"
+      }
+    ],
+    "name": "case_04_single_arousal"
+  },
+  {
+    "coverage_tags": [
+      "one.valence_only"
+    ],
+    "cycle_number": 6,
+    "description": "1 contributor (valence f32 only)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 3187671040
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 1,
+      "valence_delta": -0.125
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 6,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 1,
+        "valence_delta_bits": 3187671040
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 3187671040
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 3187671040
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "subsystem_name": "sub_a",
+        "valence_delta": -0.125
+      }
+    ],
+    "name": "case_05_single_valence"
+  },
+  {
+    "coverage_tags": [
+      "one.flag_only"
+    ],
+    "cycle_number": 7,
     "description": "1 contributor (flag only)",
     "expected_integrated": {
       "arousal_delta": 0.0,
@@ -232,7 +502,7 @@
       "admitted_proposal_count": 1,
       "authority": "measurement-only",
       "causal_load_claimed": false,
-      "cycle_number": 4,
+      "cycle_number": 7,
       "integrated_all": {
         "arousal_delta_bits": 0,
         "confidence_delta_bits": 0,
@@ -286,11 +556,103 @@
         "subsystem_name": "sub_a"
       }
     ],
-    "name": "case_03_single_flag"
+    "name": "case_06_single_flag"
   },
   {
-    "cycle_number": 5,
-    "description": "2 contributors (equal confidence delta)",
+    "coverage_tags": [
+      "one.mixed_scalar_flag"
+    ],
+    "cycle_number": 8,
+    "description": "1 contributor (mixed scalar plus flags)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.125,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4593671619917905920,
+        "exploration_delta_bits": 0,
+        "flags": 3,
+        "lr_modulation_bits": 4607632778762754458,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 3,
+      "lr_modulation": 1.1,
+      "n_contributors": 1,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 1,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 8,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4593671619917905920,
+        "exploration_delta_bits": 0,
+        "flags": 3,
+        "lr_modulation_bits": 4607632778762754458,
+        "n_contributors": 1,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4593671619917905920,
+            "exploration_delta_bits": 0,
+            "flags": 3,
+            "lr_modulation_bits": 4607632778762754458,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 0,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4593671619917905920,
+            "exploration_delta_bits": 0,
+            "flags": 3,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607632778762754458,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 3
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "confidence_delta": 0.125,
+        "flags": 3,
+        "lr_modulation": 1.1,
+        "subsystem_name": "sub_a"
+      }
+    ],
+    "name": "case_07_single_mixed_scalar_flag"
+  },
+  {
+    "coverage_tags": [
+      "two.identical_scalar"
+    ],
+    "cycle_number": 9,
+    "description": "2 contributors (identical confidence deltas)",
     "expected_integrated": {
       "arousal_delta": 0.0,
       "confidence_delta": 0.25,
@@ -313,7 +675,7 @@
       "admitted_proposal_count": 2,
       "authority": "measurement-only",
       "causal_load_claimed": false,
-      "cycle_number": 5,
+      "cycle_number": 9,
       "integrated_all": {
         "arousal_delta_bits": 0,
         "confidence_delta_bits": 4598175219545276416,
@@ -404,11 +766,14 @@
         "subsystem_name": "sub_b"
       }
     ],
-    "name": "case_04_two_equal_confidence"
+    "name": "case_08_two_identical_scalar"
   },
   {
-    "cycle_number": 6,
-    "description": "2 contributors (unequal confidence delta)",
+    "coverage_tags": [
+      "two.unequal_scalar"
+    ],
+    "cycle_number": 10,
+    "description": "2 contributors (unequal confidence deltas)",
     "expected_integrated": {
       "arousal_delta": 0.0,
       "confidence_delta": 0.0,
@@ -431,7 +796,7 @@
       "admitted_proposal_count": 2,
       "authority": "measurement-only",
       "causal_load_claimed": false,
-      "cycle_number": 6,
+      "cycle_number": 10,
       "integrated_all": {
         "arousal_delta_bits": 0,
         "confidence_delta_bits": 0,
@@ -526,10 +891,259 @@
         "subsystem_name": "sub_b"
       }
     ],
-    "name": "case_05_two_unequal_confidence"
+    "name": "case_09_two_unequal_scalar"
   },
   {
-    "cycle_number": 7,
+    "coverage_tags": [
+      "two.shared_flag"
+    ],
+    "cycle_number": 11,
+    "description": "2 contributors (same shared flag)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 4,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 4,
+      "lr_modulation": 1.0,
+      "n_contributors": 2,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 11,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 4,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": false,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": false,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "flags": 4,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "flags": 4,
+        "subsystem_name": "sub_b"
+      }
+    ],
+    "name": "case_10_two_shared_flag"
+  },
+  {
+    "coverage_tags": [
+      "two.unique_flag"
+    ],
+    "cycle_number": 12,
+    "description": "2 contributors (one unique flag plus independent scalar contributor)",
+    "expected_integrated": {
+      "arousal_delta": 0.0,
+      "confidence_delta": 0.05,
+      "exact_bits": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4587366580439587226,
+        "exploration_delta_bits": 0,
+        "flags": 1,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 1,
+      "lr_modulation": 1.0,
+      "n_contributors": 2,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 12,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 4587366580439587226,
+        "exploration_delta_bits": 0,
+        "flags": 1,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "confidence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4587366580439587226,
+            "exploration_delta_bits": 0,
+            "flags": 1,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4591870180066957722,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 1,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 1
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4587366580439587226,
+            "exploration_delta_bits": 0,
+            "flags": 1,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 1,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4591870180066957722,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "flags": 1,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "confidence_delta": 0.1,
+        "subsystem_name": "sub_b"
+      }
+    ],
+    "name": "case_11_two_unique_flag"
+  },
+  {
+    "coverage_tags": [
+      "two.mixed_shared_unique_flags"
+    ],
+    "cycle_number": 13,
     "description": "2 contributors (overlapping and unique flags)",
     "expected_integrated": {
       "arousal_delta": 0.0,
@@ -553,7 +1167,7 @@
       "admitted_proposal_count": 2,
       "authority": "measurement-only",
       "causal_load_claimed": false,
-      "cycle_number": 7,
+      "cycle_number": 13,
       "integrated_all": {
         "arousal_delta_bits": 0,
         "confidence_delta_bits": 0,
@@ -644,42 +1258,303 @@
         "subsystem_name": "sub_b"
       }
     ],
-    "name": "case_06_two_mixed_flags"
+    "name": "case_12_two_mixed_flags"
   },
   {
-    "cycle_number": 8,
-    "description": "4 contributors (multi-subsystem mixed signals)",
+    "coverage_tags": [
+      "two.lr_geometric_mean"
+    ],
+    "cycle_number": 14,
+    "description": "2 contributors (LR geometric mean)",
     "expected_integrated": {
-      "arousal_delta": 0.012500000186264515,
+      "arousal_delta": 0.0,
       "confidence_delta": 0.0,
       "exact_bits": {
-        "arousal_delta_bits": 1011666125,
+        "arousal_delta_bits": 0,
         "confidence_delta_bits": 0,
-        "exploration_delta_bits": 4585565140588639027,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607002071995196757,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "exploration_delta": 0.0,
+      "flags": 0,
+      "lr_modulation": 0.9797958971132712,
+      "n_contributors": 2,
+      "valence_delta": 0.0
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 14,
+      "integrated_all": {
+        "arousal_delta_bits": 0,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 0,
+        "flags": 0,
+        "lr_modulation_bits": 4607002071995196757,
+        "n_contributors": 2,
+        "valence_delta_bits": 0
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "lr_modulation_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607002071995196757,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4605380978949069210,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4608083138725491507,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [
+            "lr_modulation_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607002071995196757,
+            "n_contributors": 2,
+            "valence_delta_bits": 0
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4608083138725491507,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4605380978949069210,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "lr_modulation": 1.2,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "lr_modulation": 0.8,
+        "subsystem_name": "sub_b"
+      }
+    ],
+    "name": "case_13_two_lr_geometric_mean"
+  },
+  {
+    "coverage_tags": [
+      "two.mixed_f64_f32"
+    ],
+    "cycle_number": 15,
+    "description": "2 contributors (mixed f64 and f32 channels)",
+    "expected_integrated": {
+      "arousal_delta": 0.125,
+      "confidence_delta": 0.0625,
+      "exact_bits": {
+        "arousal_delta_bits": 1040187392,
+        "confidence_delta_bits": 4589168020290535424,
+        "exploration_delta_bits": 13821547256400052224,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 3170893824
+      },
+      "exploration_delta": -0.25,
+      "flags": 0,
+      "lr_modulation": 1.0,
+      "n_contributors": 2,
+      "valence_delta": -0.0625
+    },
+    "expected_report": {
+      "admitted_proposal_count": 2,
+      "authority": "measurement-only",
+      "causal_load_claimed": false,
+      "cycle_number": 15,
+      "integrated_all": {
+        "arousal_delta_bits": 1040187392,
+        "confidence_delta_bits": 4589168020290535424,
+        "exploration_delta_bits": 13821547256400052224,
+        "flags": 0,
+        "lr_modulation_bits": 4607182418800017408,
+        "n_contributors": 2,
+        "valence_delta_bits": 3170893824
+      },
+      "receipts": [
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1040187392,
+            "confidence_delta_bits": 4589168020290535424,
+            "exploration_delta_bits": 13821547256400052224,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 3170893824
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 13826050856027422720,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 3187671040
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 1048576000,
+            "confidence_delta_bits": 4593671619917905920,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 0
+          },
+          "subsystem_name": "sub_a",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1040187392,
+            "confidence_delta_bits": 4589168020290535424,
+            "exploration_delta_bits": 13821547256400052224,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 2,
+            "valence_delta_bits": 3170893824
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 1048576000,
+            "confidence_delta_bits": 4593671619917905920,
+            "exploration_delta_bits": 0,
+            "flags": 0,
+            "lr_modulation_bits": 4607182418800017408,
+            "n_contributors": 1,
+            "valence_delta_bits": 0
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 13826050856027422720,
+            "flags": 0,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 3187671040
+          },
+          "subsystem_name": "sub_b",
+          "uniquely_contributed_flags": 0
+        }
+      ],
+      "runtime_evidence_claimed": false,
+      "schema": "symthaea.spine.000b.influence-oracle.v1"
+    },
+    "input_proposals": [
+      {
+        "arousal_delta": 0.25,
+        "confidence_delta": 0.125,
+        "subsystem_name": "sub_a"
+      },
+      {
+        "exploration_delta": -0.5,
+        "subsystem_name": "sub_b",
+        "valence_delta": -0.125
+      }
+    ],
+    "name": "case_14_two_mixed_f64_f32"
+  },
+  {
+    "coverage_tags": [
+      "n.mixed_all_channels"
+    ],
+    "cycle_number": 16,
+    "description": "4 contributors (mixed all channels and overlapping flags)",
+    "expected_integrated": {
+      "arousal_delta": 0.0062500000931322575,
+      "confidence_delta": 0.0,
+      "exact_bits": {
+        "arousal_delta_bits": 1003277517,
+        "confidence_delta_bits": 0,
+        "exploration_delta_bits": 4584664420663164928,
         "flags": 7,
-        "lr_modulation_bits": 4607344584530892508,
+        "lr_modulation_bits": 4607136783343759112,
         "n_contributors": 4,
-        "valence_delta_bits": 3167538381
+        "valence_delta_bits": 3154116608
       },
       "exploration_delta": 0.0375,
       "flags": 7,
-      "lr_modulation": 1.0360080256445405,
+      "lr_modulation": 0.9949330030470055,
       "n_contributors": 4,
-      "valence_delta": -0.02500000037252903
+      "valence_delta": -0.012500000186264515
     },
     "expected_report": {
       "admitted_proposal_count": 4,
       "authority": "measurement-only",
       "causal_load_claimed": false,
-      "cycle_number": 8,
+      "cycle_number": 16,
       "integrated_all": {
-        "arousal_delta_bits": 1011666125,
+        "arousal_delta_bits": 1003277517,
         "confidence_delta_bits": 0,
-        "exploration_delta_bits": 4585565140588639027,
+        "exploration_delta_bits": 4584664420663164928,
         "flags": 7,
-        "lr_modulation_bits": 4607344584530892508,
+        "lr_modulation_bits": 4607136783343759112,
         "n_contributors": 4,
-        "valence_delta_bits": 3167538381
+        "valence_delta_bits": 3154116608
       },
       "receipts": [
         {
@@ -691,112 +1566,34 @@
             "valence_delta_bits"
           ],
           "integrated_all": {
-            "arousal_delta_bits": 1011666125,
+            "arousal_delta_bits": 1003277517,
             "confidence_delta_bits": 0,
-            "exploration_delta_bits": 4585565140588639027,
+            "exploration_delta_bits": 4584664420663164928,
             "flags": 7,
-            "lr_modulation_bits": 4607344584530892508,
+            "lr_modulation_bits": 4607136783343759112,
             "n_contributors": 4,
-            "valence_delta_bits": 3167538381
+            "valence_delta_bits": 3154116608
           },
           "integrated_without_subject": {
-            "arousal_delta_bits": 0,
-            "confidence_delta_bits": 13808336697493098769,
-            "exploration_delta_bits": 4587366580439587225,
-            "flags": 6,
-            "lr_modulation_bits": 4607060684968453475,
+            "arousal_delta_bits": 3177058304,
+            "confidence_delta_bits": 13805114655236941484,
+            "exploration_delta_bits": 4587366580439587226,
+            "flags": 7,
+            "lr_modulation_bits": 4606769332113770626,
             "n_contributors": 3,
-            "valence_delta_bits": 3171453065
+            "valence_delta_bits": 3159709014
           },
           "integration_changed": true,
           "proposal": {
             "arousal_delta_bits": 1028443341,
             "confidence_delta_bits": 4591870180066957722,
             "exploration_delta_bits": 0,
-            "flags": 1,
+            "flags": 5,
             "is_neutral": false,
             "lr_modulation_bits": 4608083138725491507,
             "valence_delta_bits": 0
           },
           "subsystem_name": "manager_alpha",
-          "uniquely_contributed_flags": 1
-        },
-        {
-          "changed_channels": [
-            "confidence_delta_bits",
-            "lr_modulation_bits",
-            "exploration_delta_bits",
-            "arousal_delta_bits",
-            "valence_delta_bits"
-          ],
-          "integrated_all": {
-            "arousal_delta_bits": 1011666125,
-            "confidence_delta_bits": 0,
-            "exploration_delta_bits": 4585565140588639027,
-            "flags": 7,
-            "lr_modulation_bits": 4607344584530892508,
-            "n_contributors": 4,
-            "valence_delta_bits": 3167538381
-          },
-          "integrated_without_subject": {
-            "arousal_delta_bits": 1015580809,
-            "confidence_delta_bits": 13812840297120469265,
-            "exploration_delta_bits": 4587366580439587225,
-            "flags": 5,
-            "lr_modulation_bits": 4607764478583459885,
-            "n_contributors": 3,
-            "valence_delta_bits": 0
-          },
-          "integration_changed": true,
-          "proposal": {
-            "arousal_delta_bits": 0,
-            "confidence_delta_bits": 4596373779694328218,
-            "exploration_delta_bits": 0,
-            "flags": 2,
-            "is_neutral": false,
-            "lr_modulation_bits": 4605380978949069210,
-            "valence_delta_bits": 3184315597
-          },
-          "subsystem_name": "manager_beta",
-          "uniquely_contributed_flags": 2
-        },
-        {
-          "changed_channels": [
-            "confidence_delta_bits",
-            "lr_modulation_bits",
-            "exploration_delta_bits",
-            "arousal_delta_bits",
-            "valence_delta_bits"
-          ],
-          "integrated_all": {
-            "arousal_delta_bits": 1011666125,
-            "confidence_delta_bits": 0,
-            "exploration_delta_bits": 4585565140588639027,
-            "flags": 7,
-            "lr_modulation_bits": 4607344584530892508,
-            "n_contributors": 4,
-            "valence_delta_bits": 3167538381
-          },
-          "integrated_without_subject": {
-            "arousal_delta_bits": 1015580809,
-            "confidence_delta_bits": 4593971859893063953,
-            "exploration_delta_bits": 4587366580439587225,
-            "flags": 7,
-            "lr_modulation_bits": 4607399927159204360,
-            "n_contributors": 3,
-            "valence_delta_bits": 3171453065
-          },
-          "integration_changed": true,
-          "proposal": {
-            "arousal_delta_bits": 0,
-            "confidence_delta_bits": 13824249416176474522,
-            "exploration_delta_bits": 0,
-            "flags": 0,
-            "is_neutral": false,
-            "lr_modulation_bits": 4607182418800017408,
-            "valence_delta_bits": 0
-          },
-          "subsystem_name": "manager_delta",
           "uniquely_contributed_flags": 0
         },
         {
@@ -808,35 +1605,113 @@
             "valence_delta_bits"
           ],
           "integrated_all": {
-            "arousal_delta_bits": 1011666125,
+            "arousal_delta_bits": 1003277517,
             "confidence_delta_bits": 0,
-            "exploration_delta_bits": 4585565140588639027,
+            "exploration_delta_bits": 4584664420663164928,
             "flags": 7,
-            "lr_modulation_bits": 4607344584530892508,
+            "lr_modulation_bits": 4607136783343759112,
             "n_contributors": 4,
-            "valence_delta_bits": 3167538381
+            "valence_delta_bits": 3154116608
           },
           "integrated_without_subject": {
-            "arousal_delta_bits": 1015580809,
-            "confidence_delta_bits": 13808336697493098769,
-            "exploration_delta_bits": 0,
-            "flags": 3,
-            "lr_modulation_bits": 4607060684968453475,
+            "arousal_delta_bits": 1016070144,
+            "confidence_delta_bits": 13811178926341055829,
+            "exploration_delta_bits": 4589168020290535424,
+            "flags": 7,
+            "lr_modulation_bits": 4607608286710396944,
             "n_contributors": 3,
-            "valence_delta_bits": 3171453065
+            "valence_delta_bits": 1023969417
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 0,
+            "confidence_delta_bits": 4596373779694328218,
+            "exploration_delta_bits": 0,
+            "flags": 4,
+            "is_neutral": false,
+            "lr_modulation_bits": 4605380978949069210,
+            "valence_delta_bits": 3184315597
+          },
+          "subsystem_name": "manager_beta",
+          "uniquely_contributed_flags": 0
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1003277517,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4584664420663164928,
+            "flags": 7,
+            "lr_modulation_bits": 4607136783343759112,
+            "n_contributors": 4,
+            "valence_delta_bits": 3154116608
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 1007192201,
+            "confidence_delta_bits": 13817122681009053632,
+            "exploration_delta_bits": 0,
+            "flags": 5,
+            "lr_modulation_bits": 4606769332113770626,
+            "n_contributors": 3,
+            "valence_delta_bits": 3165301419
           },
           "integration_changed": true,
           "proposal": {
             "arousal_delta_bits": 0,
             "confidence_delta_bits": 4591870180066957722,
             "exploration_delta_bits": 4594572339843380019,
-            "flags": 4,
+            "flags": 2,
             "is_neutral": false,
             "lr_modulation_bits": 4608083138725491507,
             "valence_delta_bits": 0
           },
           "subsystem_name": "manager_gamma",
-          "uniquely_contributed_flags": 4
+          "uniquely_contributed_flags": 2
+        },
+        {
+          "changed_channels": [
+            "confidence_delta_bits",
+            "lr_modulation_bits",
+            "exploration_delta_bits",
+            "arousal_delta_bits",
+            "valence_delta_bits"
+          ],
+          "integrated_all": {
+            "arousal_delta_bits": 1003277517,
+            "confidence_delta_bits": 0,
+            "exploration_delta_bits": 4584664420663164928,
+            "flags": 7,
+            "lr_modulation_bits": 4607136783343759112,
+            "n_contributors": 4,
+            "valence_delta_bits": 3154116608
+          },
+          "integrated_without_subject": {
+            "arousal_delta_bits": 1014956032,
+            "confidence_delta_bits": 4593671619917905920,
+            "exploration_delta_bits": 4589168020290535424,
+            "flags": 7,
+            "lr_modulation_bits": 4607136783343759112,
+            "n_contributors": 3,
+            "valence_delta_bits": 3182075904
+          },
+          "integration_changed": true,
+          "proposal": {
+            "arousal_delta_bits": 3167538381,
+            "confidence_delta_bits": 13824249416176474522,
+            "exploration_delta_bits": 0,
+            "flags": 1,
+            "is_neutral": false,
+            "lr_modulation_bits": 4607182418800017408,
+            "valence_delta_bits": 1028443341
+          },
+          "subsystem_name": "manager_delta",
+          "uniquely_contributed_flags": 0
         }
       ],
       "runtime_evidence_claimed": false,
@@ -846,13 +1721,13 @@
       {
         "arousal_delta": 0.05,
         "confidence_delta": 0.1,
-        "flags": 1,
+        "flags": 5,
         "lr_modulation": 1.2,
         "subsystem_name": "manager_alpha"
       },
       {
         "confidence_delta": 0.2,
-        "flags": 2,
+        "flags": 4,
         "lr_modulation": 0.8,
         "subsystem_name": "manager_beta",
         "valence_delta": -0.1
@@ -860,17 +1735,19 @@
       {
         "confidence_delta": 0.1,
         "exploration_delta": 0.15,
-        "flags": 4,
+        "flags": 2,
         "lr_modulation": 1.2,
         "subsystem_name": "manager_gamma"
       },
       {
+        "arousal_delta": -0.025,
         "confidence_delta": -0.4,
-        "flags": 0,
+        "flags": 1,
         "lr_modulation": 1.0,
-        "subsystem_name": "manager_delta"
+        "subsystem_name": "manager_delta",
+        "valence_delta": 0.05
       }
     ],
-    "name": "case_07_n_contributors_multi"
+    "name": "case_15_n_contributors_multi"
   }
 ]
