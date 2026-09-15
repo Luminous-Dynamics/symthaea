@@ -59,6 +59,7 @@ pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
 pub use topology::{
     BudgetClass, CircuitDescriptor, CircuitId, CircuitImplementation, EdgeDescriptor, EdgeDirection,
-    EdgeId, EdgeTransform, NeuroTopology, RecurrenceKind, SemanticChannel, TimescaleClass,
-    TopologyCommitment, TopologyDescriptor, TopologyError, TOPOLOGY_SCHEMA_VERSION,
+    EdgeId, EdgeTransform, InputMergePolicy, MAX_SYMBOLIC_TOKEN_BYTES, NeuroTopology,
+    RecurrenceKind, SemanticChannel, TimescaleClass, TOPOLOGY_SCHEMA_VERSION, TopologyCommitment,
+    TopologyDescriptor, TopologyError,
 };
