@@ -35,6 +35,9 @@ pub mod gwt1_qualification;
 #[cfg(feature = "trusted-resolution-authority")]
 #[doc(hidden)]
 pub mod gwt1_trusted_resolution;
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub mod gwt1_verified_final_artifact;
 pub mod indicators;
 pub mod qualification_design;
 pub mod qualification_runtime;
@@ -102,6 +105,13 @@ pub use gwt1_qualification::{
 pub use gwt1_trusted_resolution::{
     GWT1_TRUSTED_RESOLUTION_CANDIDATE_SCHEMA_V1, Gwt1TrustedResolutionCandidateErrorV1,
     Gwt1TrustedResolutionCandidateV1, generate_gwt1_trusted_resolution_candidate_v1,
+};
+#[cfg(feature = "trusted-resolution-consumer")]
+#[doc(hidden)]
+pub use gwt1_verified_final_artifact::{
+    GWT1_AUTHORITATIVE_REPORT_SCHEMA_V1, GWT1_VERIFIED_RESOLVED_ARTIFACT_SCHEMA_V1,
+    Gwt1AuthoritativeReportV1, VerifiedGwt1ResolvedArtifactV1,
+    render_verified_gwt1_authoritative_report_v1,
 };
 pub use indicators::ButlinIndicatorSuite;
 pub use qualification_design::{
