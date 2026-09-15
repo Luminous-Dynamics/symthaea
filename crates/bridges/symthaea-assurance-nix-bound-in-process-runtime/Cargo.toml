@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-nix-bound-in-process-runtime"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bind current in-process TPM verifier identity to a verified Nix closure and runtime policy"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["nix", "tpm", "assurance", "runtime"]
+categories = ["cryptography", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-current-in-process-linux-tpm-ima-anchor = { path = "../symthaea-assurance-current-in-process-linux-tpm-ima-anchor" }
+symthaea-assurance-nix-runtime-closure = { path = "../symthaea-assurance-nix-runtime-closure" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
