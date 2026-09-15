@@ -14,7 +14,7 @@
 //!
 //! This crate replaces both:
 //! - **Weight matrices** become weight *hypervectors* via HDC binding (element-wise multiply)
-//! - **ODE integration** becomes a closed-form exponential interpolation (O(1) per jump)
+//! - **ODE integration** becomes a closed-form exponential interpolation (O(1) per time jump)
 //!
 //! The result: a single neuron with a 16,384-dimensional state that can jump to
 //! *any* time horizon in O(D) operations.
@@ -51,8 +51,14 @@ pub mod config;
 pub mod continuous_hv;
 pub mod network;
 pub mod neuron;
+pub mod topology;
 
 pub use config::{Activation, NetworkConfig, NeuronConfig};
 pub use continuous_hv::{ContinuousHV, HDC_DIMENSION};
 pub use network::{HdcLtcUnifiedNetwork, StepTimingConfig};
 pub use neuron::HdcLtcUnifiedNeuron;
+pub use topology::{
+    BudgetClass, CircuitDescriptor, CircuitId, CircuitImplementation, EdgeDescriptor, EdgeDirection,
+    EdgeId, EdgeTransform, NeuroTopology, RecurrenceKind, SemanticChannel, TimescaleClass,
+    TopologyCommitment, TopologyDescriptor, TopologyError, TOPOLOGY_SCHEMA_VERSION,
+};
