@@ -1,0 +1,85 @@
+name: SPINE-000B Execution Eligibility R1
+
+on:
+  pull_request:
+    paths:
+      - 'docs/research/SPINE_000B_EXECUTION_ELIGIBILITY_R1.md'
+      - 'scripts/verify_spine_000b_execution_eligibility_r1.py'
+      - '.github/workflows/spine-000b-execution-eligibility-r1.yml'
+      - 'scripts/spine_000b_observation_commitment_v2.py'
+      - 'src/cognitive_loop/subsystem_trait.rs'
+      - 'src/cognitive_loop/cycle_phase_dynamics/mod.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  execution-eligibility:
+    runs-on: ubuntu-slim
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Record exact subject
+        run: |
+          set -euo pipefail
+          mkdir -p spine-evidence
+          {
+            echo "head=$(git rev-parse HEAD)"
+            echo "tree=$(git write-tree)"
+            echo "authority=measurement-only"
+            echo "runtime_observer_completeness_claimed=false"
+            echo "causal_load_claimed=false"
+          } | tee spine-evidence/subject.txt
+
+      - name: Verify tranche scope
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA"...HEAD | sort > spine-evidence/changed-files.txt
+          cat > /tmp/expected-files.txt <<'EOF'
+          .github/workflows/spine-000b-execution-eligibility-r1.yml
+          docs/research/SPINE_000B_EXECUTION_ELIGIBILITY_R1.md
+          scripts/verify_spine_000b_execution_eligibility_r1.py
+          EOF
+          sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt spine-evidence/changed-files.txt
+
+      - name: Syntax and execution-semantics qualification
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/verify_spine_000b_execution_eligibility_r1.py
+          python scripts/verify_spine_000b_execution_eligibility_r1.py \
+            | tee spine-evidence/verification.txt
+
+      - name: Seal upstream/source hashes
+        run: |
+          set -euo pipefail
+          sha256sum \
+            docs/research/SPINE_000B_EXECUTION_ELIGIBILITY_R1.md \
+            scripts/verify_spine_000b_execution_eligibility_r1.py \
+            scripts/spine_000b_observation_commitment_v2.py \
+            src/cognitive_loop/subsystem_trait.rs \
+            src/cognitive_loop/cycle_phase_dynamics/mod.rs \
+            > spine-evidence/sha256.txt
+          cat spine-evidence/sha256.txt
+
+      - name: Prove checkout immutability
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-execution-eligibility-r1-${{ github.sha }}
+          path: spine-evidence/
+          if-no-files-found: error
