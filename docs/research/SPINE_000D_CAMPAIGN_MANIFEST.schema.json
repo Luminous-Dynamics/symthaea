@@ -11,6 +11,8 @@
     "subject",
     "target_subsystem",
     "intervention_arms",
+    "arm_order_policy",
+    "rng_alignment_policy",
     "workload_rule",
     "initial_state_rule",
     "scheduler_state_rule",
@@ -65,23 +67,65 @@
     "static_overlap_refs": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
       "default": []
     },
     "runtime_influence_evidence_refs": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true,
       "default": []
     },
     "intervention_arms": {
       "type": "array",
-      "minItems": 2,
+      "minItems": 3,
       "uniqueItems": true,
       "items": {
         "enum": ["FULL", "OUTPUT_SHAM", "DISABLED", "STATE_FROZEN"]
       },
       "allOf": [
-        {"contains": {"const": "FULL"}},
-        {"contains": {"enum": ["OUTPUT_SHAM", "DISABLED", "STATE_FROZEN"]}}
+        {"contains": {"const": "FULL"}, "minContains": 1, "maxContains": 1},
+        {"contains": {"const": "OUTPUT_SHAM"}, "minContains": 1, "maxContains": 1},
+        {"contains": {"const": "DISABLED"}, "minContains": 1, "maxContains": 1}
+      ]
+    },
+    "arm_order_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["COUNTERBALANCED", "DETERMINISTIC_ROTATION", "RANDOMIZED_FROZEN_SEED", "FIXED_JUSTIFIED"]
+        },
+        "seed": {"type": ["integer", "null"]},
+        "details": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "RANDOMIZED_FROZEN_SEED"}}, "required": ["kind"]},
+          "then": {"required": ["seed"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "FIXED_JUSTIFIED"}}, "required": ["kind"]},
+          "then": {"required": ["details"]}
+        }
+      ]
+    },
+    "rng_alignment_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["MATCHED_STREAMS", "DECLARED_DIVERGENCE"]
+        },
+        "details": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "DECLARED_DIVERGENCE"}}, "required": ["kind"]},
+          "then": {"required": ["details"]}
+        }
       ]
     },
     "workload_rule": {
@@ -92,6 +136,8 @@
         "kind": {"enum": ["FROZEN_EXPLICIT", "FROZEN_GENERATOR"]},
         "workload_ids": {
           "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
           "items": {"type": "string", "minLength": 1}
         },
         "generator_subject_sha256": {
@@ -102,7 +148,17 @@
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "FROZEN_EXPLICIT"}}, "required": ["kind"]},
+          "then": {"required": ["workload_ids"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "FROZEN_GENERATOR"}}, "required": ["kind"]},
+          "then": {"required": ["generator_subject_sha256", "materialized_workload_sha256"]}
+        }
+      ]
     },
     "initial_state_rule": {
       "type": "object",
@@ -111,10 +167,16 @@
       "properties": {
         "kind": {"enum": ["FRESH_GENESIS", "FROZEN_CHECKPOINT"]},
         "checkpoint_sha256": {
-          "type": ["string", "null"],
+          "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "FROZEN_CHECKPOINT"}}, "required": ["kind"]},
+          "then": {"required": ["checkpoint_sha256"]}
+        }
+      ]
     },
     "scheduler_state_rule": {
       "type": "string",
@@ -151,8 +213,14 @@
         "kind": {
           "enum": ["SMALL_PRIMARY_FAMILY", "HIERARCHICAL", "FDR", "FWER", "OTHER_FROZEN"]
         },
-        "details": {"type": "string"}
-      }
+        "details": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "OTHER_FROZEN"}}, "required": ["kind"]},
+          "then": {"required": ["details"]}
+        }
+      ]
     },
     "confidence_interval_policy": {
       "type": "object",
@@ -163,8 +231,21 @@
           "enum": ["EXACT_DETERMINISTIC", "PAIRED_BOOTSTRAP", "PAIRED_PARAMETRIC", "OTHER_FROZEN"]
         },
         "level": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
-        "details": {"type": "string"}
-      }
+        "details": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"kind": {"enum": ["PAIRED_BOOTSTRAP", "PAIRED_PARAMETRIC"]}},
+            "required": ["kind"]
+          },
+          "then": {"required": ["level"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "OTHER_FROZEN"}}, "required": ["kind"]},
+          "then": {"required": ["details"]}
+        }
+      ]
     },
     "interaction_followup_rule": {
       "type": "object",
@@ -174,6 +255,7 @@
         "triggers": {
           "type": "array",
           "minItems": 1,
+          "uniqueItems": true,
           "items": {
             "enum": [
               "STATIC_OVERLAP",
@@ -185,8 +267,14 @@
             ]
           }
         },
-        "details": {"type": "string"}
-      }
+        "details": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"triggers": {"contains": {"const": "OTHER_FROZEN"}}}, "required": ["triggers"]},
+          "then": {"required": ["details"]}
+        }
+      ]
     },
     "stopping_rule": {
       "type": "object",
@@ -195,8 +283,18 @@
       "properties": {
         "kind": {"enum": ["FIXED_N", "FROZEN_SEQUENTIAL"]},
         "n_pairs": {"type": "integer", "minimum": 1},
-        "details": {"type": "string"}
-      }
+        "details": {"type": "string", "minLength": 1}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"kind": {"const": "FIXED_N"}}, "required": ["kind"]},
+          "then": {"required": ["n_pairs"]}
+        },
+        {
+          "if": {"properties": {"kind": {"const": "FROZEN_SEQUENTIAL"}}, "required": ["kind"]},
+          "then": {"required": ["details"]}
+        }
+      ]
     },
     "classification_scope_fields": {
       "type": "array",
@@ -229,9 +327,22 @@
           "required": ["kind"],
           "properties": {
             "kind": {"enum": ["EXACT", "ABSOLUTE_SESOI", "RELATIVE_SESOI", "NONINFERIORITY"]},
-            "bound": {"type": ["number", "null"]},
-            "details": {"type": "string"}
-          }
+            "bound": {"type": "number"},
+            "details": {"type": "string", "minLength": 1}
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {"kind": {"enum": ["ABSOLUTE_SESOI", "RELATIVE_SESOI", "NONINFERIORITY"]}},
+                "required": ["kind"]
+              },
+              "then": {"required": ["bound"]}
+            },
+            {
+              "if": {"properties": {"kind": {"const": "EXACT"}}, "required": ["kind"]},
+              "then": {"not": {"required": ["bound"]}}
+            }
+          ]
         }
       }
     }
