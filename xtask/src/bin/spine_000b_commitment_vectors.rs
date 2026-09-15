@@ -76,6 +76,7 @@ struct Application<'a> {
     destination_id: &'a str,
     source_tag: u8,
     source_flag: u32,
+    source_condition: u8,
     applied: bool,
     applied_argument: Option<CanonicalValue>,
     state_change_status: u8,
@@ -190,7 +191,6 @@ fn encode_execution(value: &Execution<'_>) -> Result<Vec<u8>> {
         bail!("duplicate overlap ref");
     }
     let ref_count = u16::try_from(refs.len()).context("overlap ref count overflow")?;
-
     let mut out = Vec::new();
     out.extend_from_slice(&value.cycle_number.to_le_bytes());
     push_string(&mut out, value.subsystem_identity, "identity")?;
@@ -217,11 +217,7 @@ fn encode_execution(value: &Execution<'_>) -> Result<Vec<u8>> {
 
 fn encode_integration(value: &Integration<'_>) -> Result<Vec<u8>> {
     let mut subjects = value.subjects.clone();
-    subjects.sort_unstable_by(|a, b| {
-        a.subsystem_identity
-            .as_bytes()
-            .cmp(b.subsystem_identity.as_bytes())
-    });
+    subjects.sort_unstable_by(|a, b| a.subsystem_identity.as_bytes().cmp(b.subsystem_identity.as_bytes()));
     for pair in subjects.windows(2) {
         if pair[0].subsystem_identity == pair[1].subsystem_identity {
             bail!("duplicate integration subject identity");
@@ -230,7 +226,6 @@ fn encode_integration(value: &Integration<'_>) -> Result<Vec<u8>> {
     if value.admitted_count as usize != subjects.len() {
         bail!("admitted_count must equal subject_count");
     }
-
     let mut out = Vec::new();
     out.extend_from_slice(&value.cycle_number.to_le_bytes());
     out.extend_from_slice(&value.admitted_count.to_le_bytes());
@@ -308,8 +303,15 @@ fn encode_application(value: &Application<'_>) -> Result<Vec<u8>> {
     if value.source_tag > 5 {
         bail!("unknown application source tag");
     }
-    if value.source_tag != 5 && value.source_flag != 0 {
-        bail!("scalar application must have source_flag=0");
+    if value.source_condition > 2 {
+        bail!("unknown application source condition");
+    }
+    if value.source_tag != 5 {
+        if value.source_flag != 0 || value.source_condition != 0 {
+            bail!("scalar application source semantics invalid");
+        }
+    } else if value.source_flag == 0 || !matches!(value.source_condition, 1 | 2) {
+        bail!("flag application source semantics invalid");
     }
     if value.state_change_status > 2 {
         bail!("unknown state-change tag");
@@ -320,7 +322,6 @@ fn encode_application(value: &Application<'_>) -> Result<Vec<u8>> {
             _ => bail!("observed state change requires compatible before/after"),
         }
     }
-
     let mut out = Vec::new();
     out.extend_from_slice(&value.cycle_number.to_le_bytes());
     out.extend_from_slice(&value.application_index.to_le_bytes());
@@ -328,6 +329,7 @@ fn encode_application(value: &Application<'_>) -> Result<Vec<u8>> {
     push_string(&mut out, value.destination_id, "destination")?;
     out.push(value.source_tag);
     out.extend_from_slice(&value.source_flag.to_le_bytes());
+    out.push(value.source_condition);
     push_bool(&mut out, value.applied);
     encode_optional_value(&value.applied_argument, &mut out);
     out.push(value.state_change_status);
@@ -346,11 +348,9 @@ fn sha256(domain: &[u8], bytes: &[u8]) -> [u8; 32] {
 fn execution_digest(value: &Execution<'_>) -> Result<[u8; 32]> {
     Ok(sha256(EXECUTION_DOMAIN, &encode_execution(value)?))
 }
-
 fn integration_digest(value: &Integration<'_>) -> Result<[u8; 32]> {
     Ok(sha256(INTEGRATION_DOMAIN, &encode_integration(value)?))
 }
-
 fn application_digest(value: &Application<'_>) -> Result<[u8; 32]> {
     Ok(sha256(APPLICATION_DOMAIN, &encode_application(value)?))
 }
@@ -365,26 +365,18 @@ fn encode_cycle(
         bail!("integration/envelope cycle mismatch");
     }
     let mut executions = executions.to_vec();
-    executions.sort_unstable_by(|a, b| {
-        a.subsystem_identity
-            .as_bytes()
-            .cmp(b.subsystem_identity.as_bytes())
-    });
+    executions.sort_unstable_by(|a, b| a.subsystem_identity.as_bytes().cmp(b.subsystem_identity.as_bytes()));
     for pair in executions.windows(2) {
         if pair[0].subsystem_identity == pair[1].subsystem_identity {
             bail!("duplicate execution identity");
         }
     }
-    if executions.iter().any(|record| record.cycle_number != cycle_number) {
+    if executions.iter().any(|r| r.cycle_number != cycle_number) {
         bail!("execution/envelope cycle mismatch");
     }
-
     let mut applications = applications.to_vec();
-    applications.sort_unstable_by_key(|record| record.application_index);
-    if applications
-        .iter()
-        .any(|record| record.cycle_number != cycle_number)
-    {
+    applications.sort_unstable_by_key(|r| r.application_index);
+    if applications.iter().any(|r| r.cycle_number != cycle_number) {
         bail!("application/envelope cycle mismatch");
     }
     for (index, application) in applications.iter().enumerate() {
@@ -392,7 +384,6 @@ fn encode_cycle(
             bail!("application indices must be contiguous from zero");
         }
     }
-
     let mut out = Vec::new();
     out.extend_from_slice(&cycle_number.to_le_bytes());
     out.extend_from_slice(&u32::try_from(executions.len())?.to_le_bytes());
@@ -425,8 +416,7 @@ fn hex_decode_32(value: &str) -> Result<[u8; 32]> {
     }
     let mut out = [0u8; 32];
     for (index, chunk) in value.as_bytes().chunks_exact(2).enumerate() {
-        let text = std::str::from_utf8(chunk)?;
-        out[index] = u8::from_str_radix(text, 16)?;
+        out[index] = u8::from_str_radix(std::str::from_utf8(chunk)?, 16)?;
     }
     Ok(out)
 }
@@ -496,16 +486,10 @@ fn sample() -> (
     let integration = Integration {
         cycle_number: 7,
         admitted_count: 1,
-        integrated_all: IntegratedBits {
-            proposal,
-            n_contributors: 1,
-        },
+        integrated_all: IntegratedBits { proposal, n_contributors: 1 },
         subjects: vec![Influence {
             subsystem_identity: "manager_z",
-            integrated_without_subject: IntegratedBits {
-                proposal: neutral,
-                n_contributors: 0,
-            },
+            integrated_without_subject: IntegratedBits { proposal: neutral, n_contributors: 0 },
             changed_channel_mask: 1,
             uniquely_contributed_flags: 1,
             integration_changed: true,
@@ -518,6 +502,7 @@ fn sample() -> (
         destination_id: "prediction_confidence",
         source_tag: 0,
         source_flag: 0,
+        source_condition: 0,
         applied: true,
         applied_argument: Some(CanonicalValue::F32Bits(0.25f32.to_bits())),
         state_change_status: 1,
@@ -531,6 +516,7 @@ fn sample() -> (
         destination_id: "fep.episodic_memory",
         source_tag: 5,
         source_flag: 2,
+        source_condition: 1,
         applied: true,
         applied_argument: None,
         state_change_status: 2,
@@ -550,19 +536,13 @@ fn main() -> Result<()> {
     if vectors.get("authority").and_then(Value::as_str) != Some("measurement-only") {
         bail!("vector authority boundary changed");
     }
-
     let (ea, eb, integration, app0, app1) = sample();
     let ea_bytes = encode_execution(&ea)?;
     let eb_bytes = encode_execution(&eb)?;
     let integration_bytes = encode_integration(&integration)?;
     let app0_bytes = encode_application(&app0)?;
     let app1_bytes = encode_application(&app1)?;
-    let cycle_bytes = encode_cycle(
-        7,
-        &[ea.clone(), eb.clone()],
-        &integration,
-        &[app0.clone(), app1.clone()],
-    )?;
+    let cycle_bytes = encode_cycle(7, &[ea.clone(), eb.clone()], &integration, &[app0.clone(), app1.clone()])?;
 
     assert_hex(&vectors, "execution_a_bytes_hex", &ea_bytes)?;
     assert_hex(&vectors, "execution_b_bytes_hex", &eb_bytes)?;
@@ -571,55 +551,39 @@ fn main() -> Result<()> {
     assert_hex(&vectors, "application_1_bytes_hex", &app1_bytes)?;
     assert_hex(&vectors, "cycle_bytes_hex", &cycle_bytes)?;
 
-    let ea_digest = sha256(EXECUTION_DOMAIN, &ea_bytes);
-    let eb_digest = sha256(EXECUTION_DOMAIN, &eb_bytes);
-    let integration_hash = sha256(INTEGRATION_DOMAIN, &integration_bytes);
-    let app0_digest = sha256(APPLICATION_DOMAIN, &app0_bytes);
-    let app1_digest = sha256(APPLICATION_DOMAIN, &app1_bytes);
-    let cycle_digest = sha256(CYCLE_DOMAIN, &cycle_bytes);
-
-    for (key, digest) in [
-        ("execution_a_sha256", ea_digest),
-        ("execution_b_sha256", eb_digest),
-        ("integration_sha256", integration_hash),
-        ("application_0_sha256", app0_digest),
-        ("application_1_sha256", app1_digest),
-        ("cycle_sha256", cycle_digest),
-    ] {
+    let digests = [
+        ("execution_a_sha256", sha256(EXECUTION_DOMAIN, &ea_bytes)),
+        ("execution_b_sha256", sha256(EXECUTION_DOMAIN, &eb_bytes)),
+        ("integration_sha256", sha256(INTEGRATION_DOMAIN, &integration_bytes)),
+        ("application_0_sha256", sha256(APPLICATION_DOMAIN, &app0_bytes)),
+        ("application_1_sha256", sha256(APPLICATION_DOMAIN, &app1_bytes)),
+        ("cycle_sha256", sha256(CYCLE_DOMAIN, &cycle_bytes)),
+    ];
+    for (key, digest) in digests {
         assert_hex(&vectors, key, &digest)?;
     }
 
+    let cycle_digest = sha256(CYCLE_DOMAIN, &cycle_bytes);
     let subject_digest = hex_decode_32(expected(&vectors, "subject_manifest_sha256")?)?;
     let root0 = sha256(GENESIS_DOMAIN, &subject_digest);
     assert_hex(&vectors, "genesis_root_sha256", &root0)?;
     let mut link = Vec::with_capacity(64);
     link.extend_from_slice(&root0);
     link.extend_from_slice(&cycle_digest);
-    let root1 = sha256(CHAIN_DOMAIN, &link);
-    assert_hex(&vectors, "chain_root_after_cycle_sha256", &root1)?;
+    assert_hex(&vectors, "chain_root_after_cycle_sha256", &sha256(CHAIN_DOMAIN, &link))?;
 
-    // Execution input order is not semantic.
-    let reversed = encode_cycle(
-        7,
-        &[eb.clone(), ea.clone()],
-        &integration,
-        &[app0.clone(), app1.clone()],
-    )?;
+    let reversed = encode_cycle(7, &[eb.clone(), ea.clone()], &integration, &[app0.clone(), app1.clone()])?;
     if reversed != cycle_bytes {
         bail!("execution input order changed canonical cycle bytes");
     }
-
-    // Application semantic order is load-bearing.
     let mut swapped0 = app0.clone();
     let mut swapped1 = app1.clone();
     swapped0.application_index = 1;
     swapped1.application_index = 0;
-    let changed = encode_cycle(7, &[ea.clone(), eb.clone()], &integration, &[swapped0, swapped1])?;
-    if changed == cycle_bytes {
+    if encode_cycle(7, &[ea.clone(), eb.clone()], &integration, &[swapped0, swapped1])? == cycle_bytes {
         bail!("application index change failed to change canonical cycle bytes");
     }
 
-    // The actual applied operand and operation identity are canonical evidence.
     let mut changed_arg = app0.clone();
     changed_arg.applied_argument = Some(CanonicalValue::F32Bits(0.25f32.to_bits() ^ 1));
     if application_digest(&changed_arg)? == application_digest(&app0)? {
@@ -630,8 +594,17 @@ fn main() -> Result<()> {
     if application_digest(&changed_operation)? == application_digest(&app0)? {
         bail!("operation_id change did not change application digest");
     }
+    let mut changed_condition = app1.clone();
+    changed_condition.source_condition = 2;
+    if application_digest(&changed_condition)? == application_digest(&app1)? {
+        bail!("source_condition change did not change application digest");
+    }
 
-    // Reject noncanonical paths and unknown outcome tags.
+    let mut bad_scalar = app0.clone();
+    bad_scalar.source_condition = 1;
+    if encode_application(&bad_scalar).is_ok() {
+        bail!("scalar/condition mismatch was accepted");
+    }
     let mut bad_path = ea.clone();
     bad_path.source_path = "../escape.rs";
     if encode_execution(&bad_path).is_ok() {
@@ -643,7 +616,6 @@ fn main() -> Result<()> {
         bail!("unknown outcome tag was accepted");
     }
 
-    // Exercise every CanonicalValue tag independently of the golden sample.
     let values = [
         CanonicalValue::F64Bits(1),
         CanonicalValue::F32Bits(2),
