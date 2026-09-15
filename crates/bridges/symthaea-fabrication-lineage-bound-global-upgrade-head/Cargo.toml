@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-global-upgrade-head"
+version = "0.1.0"
+edition = "2024"
+description = "Global finalized-sequence currentness and predecessor roots for lineage-bound fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-lineage-bound-finalized-head = { path = "../symthaea-fabrication-lineage-bound-finalized-head" }
+symthaea-fabrication-lineage-bound-finalized-state = { path = "../symthaea-fabrication-lineage-bound-finalized-state" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
