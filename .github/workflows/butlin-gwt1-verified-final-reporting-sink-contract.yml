@@ -22,7 +22,7 @@ jobs:
       - name: Checkout exact reporting-sink subject
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: a2e7313862eb8bf1ddef1c55f821540ed15d863f
+          ref: aa346907c54e9798cf8c8f7ea3a6d8dfe83e274c
           fetch-depth: 0
           persist-credentials: false
 
@@ -31,7 +31,7 @@ jobs:
         run: |
           set -euo pipefail
           parent="764ff149ab947a890175489e2f999fbbda5ff3a7"
-          subject="a2e7313862eb8bf1ddef1c55f821540ed15d863f"
+          subject="aa346907c54e9798cf8c8f7ea3a6d8dfe83e274c"
           test "$(git rev-parse HEAD)" = "$subject"
           test "$(git rev-parse HEAD^)" = "$parent"
           test "$(git rev-list --count "$parent..$subject")" -eq 1
@@ -43,7 +43,7 @@ jobs:
           test "${changed[2]}" = "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
 
           test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/Cargo.toml)" = "59b0a567df20922cf962f6ee52d4ec0e2bb39be1"
-          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs)" = "0a53eec67ffa656d7c2b010957fc8ec8b9cd8d7a"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs)" = "b8404dee91d402dcea1cec575cc95faa97cf05c7"
           test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs)" = "77bd96a0a632a801b84e51e2cb5d9577beb3fd92"
           test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
@@ -74,10 +74,10 @@ jobs:
           production = sink.split('#[cfg(test)]', 1)[0]
           assert 'use serde::Serialize;' in production
           assert 'pub struct VerifiedGwt1ResolvedArtifactV1 {' in production
-          body = production.split('pub struct VerifiedGwt1ResolvedArtifactV1 {', 1)[1].split('\n}', 1)[0]
-          field_lines = [line.strip() for line in body.splitlines() if ':' in line and not line.strip().startswith('//')]
-          assert field_lines
-          assert all(not line.startswith('pub ') for line in field_lines), field_lines
+          token_body = production.split('pub struct VerifiedGwt1ResolvedArtifactV1 {', 1)[1].split('\n}', 1)[0]
+          token_fields = [line.strip() for line in token_body.splitlines() if ':' in line and not line.strip().startswith('//')]
+          assert token_fields
+          assert all(not line.startswith('pub ') for line in token_fields), token_fields
 
           prefix = production.split('pub struct VerifiedGwt1ResolvedArtifactV1', 1)[0]
           attrs = prefix.rsplit('\n\n', 1)[-1]
@@ -96,6 +96,12 @@ jobs:
 
           assert '#[derive(Debug, Clone, PartialEq, Eq, Serialize)]\npub struct Gwt1AuthoritativeReportV1 {' in production
           assert '#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]' not in production
+          report_body = production.split('pub struct Gwt1AuthoritativeReportV1 {', 1)[1].split('\n}', 1)[0]
+          report_fields = [line.strip() for line in report_body.splitlines() if ':' in line and not line.strip().startswith('//')]
+          assert report_fields
+          assert all(not line.startswith('pub ') for line in report_fields), report_fields
+          assert 'impl Gwt1AuthoritativeReportV1 {' in production
+
           assert 'pub fn render_verified_gwt1_authoritative_report_v1(\n    verified: &VerifiedGwt1ResolvedArtifactV1,' in production
           assert 'verified: &ButlinResolvedEvidenceViewV2' not in production
           assert 'verified: bool' not in production
@@ -105,11 +111,16 @@ jobs:
           assert 'GWT1_VERIFIED_RESOLVED_ARTIFACT_SCHEMA_V1' in production
           assert 'GWT1_AUTHORITATIVE_REPORT_SCHEMA_V1' in production
 
-          # Before the test module the only brace-opening token sites are the
-          # declaration and the two impl blocks (Debug + accessors). A fourth
-          # site would be a production struct literal and therefore a mint path.
-          literal_sites = [m.start() for m in re.finditer(r'VerifiedGwt1ResolvedArtifactV1\s*\{', production)]
-          assert len(literal_sites) == 3, literal_sites
+          # Before the test module the opaque token has only its declaration and
+          # two impl blocks (Debug + accessors); there is no production literal.
+          token_sites = [m.start() for m in re.finditer(r'VerifiedGwt1ResolvedArtifactV1\s*\{', production)]
+          assert len(token_sites) == 3, token_sites
+
+          # The report projection has one declaration, one accessor impl, and
+          # exactly one literal in the verified renderer. Extra literal sites
+          # would create a parallel production minting path.
+          report_sites = [m.start() for m in re.finditer(r'Gwt1AuthoritativeReportV1\s*\{', production)]
+          assert len(report_sites) == 3, report_sites
           PY
 
       - name: Install pinned Rust 1.96.0
@@ -225,7 +236,33 @@ jobs:
           rm -f "$probe"
           test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
-      - name: Prove rendered report projection is output-only
+      - name: Prove external code cannot construct the report projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="crates/domains/symthaea-psych-bench/src/bin/__gwt1_report_must_not_construct.rs"
+          trap 'rm -f "$probe"' EXIT
+          cat > "$probe" <<'RS'
+          use symthaea_psych_bench::benchmarks::butlin::Gwt1AuthoritativeReportV1;
+          fn main() {
+              let _forged = Gwt1AuthoritativeReportV1 {};
+          }
+          RS
+          set +e
+          cargo check --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            --bin __gwt1_report_must_not_construct \
+            > /tmp/gwt1-report-construction-probe.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'Gwt1AuthoritativeReportV1' /tmp/gwt1-report-construction-probe.log
+          grep -E 'private|cannot construct' /tmp/gwt1-report-construction-probe.log
+          rm -f "$probe"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove rendered report projection cannot be deserialized
         shell: bash
         run: |
           set -euo pipefail
