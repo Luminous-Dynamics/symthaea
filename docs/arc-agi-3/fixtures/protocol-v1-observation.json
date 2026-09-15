@@ -1,0 +1,18 @@
+{
+  "game_id": "oracle-game-v1",
+  "state": "NOT_FINISHED",
+  "levels_completed": 1,
+  "win_levels": 7,
+  "action_input": {
+    "id": "ACTION1",
+    "data": {},
+    "reasoning": {"note": "provenance-only client payload"}
+  },
+  "guid": "oracle-guid",
+  "full_reset": false,
+  "available_actions": [6, 1, 4, 2],
+  "frame": [
+    [[0, 1, 0], [2, 3, 2]],
+    [[0, 1, 0], [2, 4, 2]]
+  ]
+}
