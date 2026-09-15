@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-scientific-view-control-plane-occurrence-authority"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Deployment-owned store-authority qualification for SCI-014 control-plane occurrences"
+
+[dependencies]
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-scientific-view-control-plane-occurrence = { path = "../symthaea-scientific-view-control-plane-occurrence" }
+symthaea-scientific-view-profile = { path = "../symthaea-scientific-view-profile" }
+
+[dev-dependencies]
+symthaea-scientific-view-control-plane = { path = "../symthaea-scientific-view-control-plane" }
