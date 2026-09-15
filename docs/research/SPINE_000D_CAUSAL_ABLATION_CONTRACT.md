@@ -48,7 +48,6 @@ Every campaign freezes a machine-readable manifest before any intervention resul
 CausalCampaignManifest
   schema
   authority = measurement-only
-  causal_claim_scope_version
 
   campaign_id
   subject
@@ -65,7 +64,9 @@ CausalCampaignManifest
   runtime_influence_evidence_refs[]
 
   intervention_arms[]
-  seed_or_workload_generation_rule
+  arm_order_policy
+  rng_alignment_policy
+  workload_rule
   initial_state_rule
   scheduler_state_rule
 
@@ -73,20 +74,29 @@ CausalCampaignManifest
   secondary_observables[]
   safety_hard_gates[]
 
-  metric_direction_or_utility[]
-  equivalence_bounds[]
   multiplicity_policy
   confidence_interval_policy
   interaction_followup_rule
   stopping_rule
 
-  result_fields_allowed
-  preregistration_hash
+  classification_scope_fields
 ```
 
 The manifest is immutable once evidence execution starts.
 
+The machine-readable JSON Schema is authoritative for required fields and conditional requirements. Prose must not be used to weaken a schema requirement after evidence begins.
+
 ## 3. Intervention arms answer different questions
+
+The three base arms are mandatory for the first SPINE-000D causal campaign:
+
+```text
+FULL
+OUTPUT_SHAM
+DISABLED
+```
+
+`STATE_FROZEN` is optional.
 
 ### FULL
 
@@ -126,22 +136,62 @@ state-learning / adaptation effect
 
 STATE_FROZEN is optional and must be justified per subsystem because checkpoint semantics differ.
 
-## 4. Interventions must not silently alter unrelated scheduling
+## 4. Interventions must not silently alter unrelated execution
 
 An arm must change only the preregistered intervention surface.
 
 Examples of prohibited confounds:
 
-- disabling target S also changes manager ordering;
+- disabling target S also changes unrelated manager ordering;
 - sham output changes urgency/scheduler cadence;
-- instrumentation changes random-number consumption;
+- instrumentation changes random-number consumption without declaration;
 - one arm runs different features;
 - arms use shared mutable subsystem state;
 - one arm inherits caches from another.
 
 When exact preservation is impossible, the difference becomes part of the intervention definition and must be declared before evidence.
 
-## 5. Paired execution is the default design
+## 5. Arm-order policy is mandatory
+
+Execution order can confound latency, thermal state, cache warmth, allocator state, and long-lived external services.
+
+Every campaign freezes one arm-order policy before evidence:
+
+```text
+COUNTERBALANCED
+DETERMINISTIC_ROTATION
+RANDOMIZED_FROZEN_SEED
+FIXED_JUSTIFIED
+```
+
+`RANDOMIZED_FROZEN_SEED` requires its ordering seed to be frozen in the manifest.
+
+`FIXED_JUSTIFIED` requires a written justification and should not be used for performance claims unless order effects are independently shown negligible or are part of the explicit scope.
+
+Never always run FULL first and intervention second merely for convenience when latency/CPU/memory is a primary observable.
+
+## 6. RNG alignment policy is mandatory
+
+Interventions can change control flow and therefore random-number consumption. A later random draw difference can masquerade as subsystem causality.
+
+Every campaign freezes one of:
+
+```text
+MATCHED_STREAMS
+DECLARED_DIVERGENCE
+```
+
+### MATCHED_STREAMS
+
+Use domain-separated/random streams or another qualified method so unrelated stochastic consumers remain aligned across arms.
+
+### DECLARED_DIVERGENCE
+
+Exact stream alignment is infeasible and the divergence is part of the intervention. The manifest must describe where divergence begins and causal claims are scoped accordingly.
+
+Do not silently assume equal genesis seeds imply equal stochastic trajectories after different control-flow paths.
+
+## 7. Paired execution is the default design
 
 For each seed/workload pair, compare arms from matched initial conditions:
 
@@ -166,18 +216,26 @@ D_i = metric(intervention_i) - metric(control_i)
 
 Primary inference uses paired differences whenever the metric permits.
 
-## 6. Workload and seed selection
+## 8. Workload and seed selection
 
-Campaigns may use either:
+Campaigns use either:
 
-1. a frozen explicit workload/seed set; or
-2. a frozen untouched generation rule whose materialized set is hashed before result inspection.
+1. `FROZEN_EXPLICIT` — a frozen non-empty set of workload IDs; or
+2. `FROZEN_GENERATOR` — a frozen generator subject plus the hash of its materialized workload before result inspection.
+
+The manifest must contain the data required by the chosen mode. A label without its underlying IDs/hashes is not a valid preregistration.
 
 Do not add seeds only after seeing an inconvenient result unless the stopping rule preregistered sequential sampling.
 
 If a result depends on a single seed or input, the claim must remain correspondingly narrow.
 
-## 7. Primary vs secondary observables
+## 9. Initial-state and scheduler state are evidence subjects
+
+`FRESH_GENESIS` and `FROZEN_CHECKPOINT` are distinct initial-state modes.
+
+A frozen checkpoint mode requires an exact checkpoint hash. Scheduler state must also be defined explicitly so an arm is not compared from a different manager cadence or health state.
+
+## 10. Primary vs secondary observables
 
 Every campaign freezes a small primary set.
 
@@ -198,7 +256,9 @@ memory usage
 
 Secondary/exploratory telemetry may be broad, but it cannot silently become a primary success criterion after results are known.
 
-## 8. Safety and authority gates remain separate
+Each observable freezes an equivalence rule at preregistration time.
+
+## 11. Safety and authority gates remain separate
 
 Hard safety/authority outcomes are not averaged into a utility score.
 
@@ -219,7 +279,7 @@ performance_result
 
 as separate fields.
 
-## 9. Difference is not benefit
+## 12. Difference is not benefit
 
 `CAUSAL_EFFECT_DETECTED` only means the intervention changes the measured observable.
 
@@ -242,11 +302,20 @@ CAUSALLY_ACTIVE_DIRECTION_UNRESOLVED
 
 not beneficial/harmful.
 
-## 10. Null claims require equivalence evidence
+## 13. Null claims require equivalence evidence
 
 A nonsignificant difference is `INCONCLUSIVE`, not null.
 
-Every primary metric eligible for a null/equivalence claim must have a preregistered smallest effect size of interest (SESOI), exact deterministic tolerance, or non-inferiority bound.
+Every primary metric eligible for a null/equivalence claim has one of:
+
+```text
+EXACT
+ABSOLUTE_SESOI
+RELATIVE_SESOI
+NONINFERIORITY
+```
+
+Non-exact rules require an explicit numeric bound in the frozen manifest. `EXACT` intentionally has no numeric bound.
 
 Possible outcomes:
 
@@ -260,7 +329,7 @@ Only `EQUIVALENT_WITHIN_BOUND` supports a scoped `CONNECTED_NULL`-style conclusi
 
 For exact deterministic outputs, equivalence may be literal bit/identity equality where appropriate. For noisy metrics, use an appropriate paired equivalence procedure with frozen bounds.
 
-## 11. Effect sizes and uncertainty are mandatory
+## 14. Effect sizes and uncertainty are mandatory
 
 Where statistical replication is used, report:
 
@@ -273,13 +342,13 @@ sample count
 
 Do not report p-values alone.
 
-Where exact deterministic replay applies, report exact differences and replay identity instead of artificial inferential statistics.
+A paired statistical confidence policy must freeze its confidence level before evidence. Exact deterministic campaigns use `EXACT_DETERMINISTIC` rather than artificial inferential statistics.
 
-## 12. Multiplicity policy is frozen before evidence
+## 15. Multiplicity policy is frozen before evidence
 
 Testing many subsystems across many metrics creates a discovery problem.
 
-A campaign must choose one of:
+A campaign chooses one of:
 
 - a small preregistered primary family;
 - hierarchical gatekeeping;
@@ -287,9 +356,11 @@ A campaign must choose one of:
 - family-wise error control;
 - another justified frozen policy.
 
+`OTHER_FROZEN` requires its method to be specified before evidence.
+
 Exploratory signals may be reported but must be labeled exploratory.
 
-## 13. Redundancy and synergy require interaction follow-up
+## 16. Redundancy and synergy require interaction follow-up
 
 Single-module ablation is insufficient to infer independence.
 
@@ -314,9 +385,9 @@ Interpretation examples:
 
 The exact interaction model depends on the metric and must be frozen before the follow-up run.
 
-## 14. Interaction follow-up trigger
+## 17. Interaction follow-up trigger
 
-A campaign manifest must freeze when interaction testing is required.
+A campaign manifest freezes when interaction testing is required.
 
 Recommended triggers include:
 
@@ -326,7 +397,9 @@ Recommended triggers include:
 - unexpected sign reversal;
 - large residual unexplained by single-subsystem effects.
 
-## 15. Legacy inline paths can mask manager ablations
+A custom trigger requires frozen details.
+
+## 18. Legacy inline paths can mask manager ablations
 
 SPINE-000C overlap evidence is part of causal interpretation.
 
@@ -339,7 +412,7 @@ INCONCLUSIVE
 
 Do not call S globally null unless the masking path is addressed by a matched follow-up or the scope explicitly includes the overlap condition.
 
-## 16. Acute output effect vs chronic state effect
+## 19. Acute output effect vs chronic state effect
 
 Compare intervention contrasts intentionally:
 
@@ -356,7 +429,7 @@ OUTPUT_SHAM vs DISABLED
 
 This three-arm decomposition is particularly valuable during migration from inline behavior to proposal-based managers.
 
-## 17. Cost-aware causal value
+## 20. Cost-aware causal value
 
 A subsystem may be causally active but operationally inefficient.
 
@@ -371,9 +444,11 @@ memory
 energy proxy if qualified
 ```
 
+Arm ordering is part of the preregistered performance design; do not interpret order-confounded measurements as intrinsic subsystem cost.
+
 Do not equate `LOAD_BEARING` with `cost-effective`.
 
-## 18. Canonical PairedRunReceipt
+## 21. Canonical PairedRunReceipt
 
 ```text
 PairedRunReceipt
@@ -386,10 +461,12 @@ PairedRunReceipt
   workload_id
   seed
   arm
+  arm_execution_ordinal
 
   initial_state_digest
   input_digest
   scheduler_state_digest
+  rng_alignment_evidence
 
   safety_outcomes
   primary_observables
@@ -402,7 +479,7 @@ PairedRunReceipt
 
 Wall-clock/host metadata may live in a separate noncanonical runtime envelope when exact semantic replay is required.
 
-## 19. Canonical ContrastReceipt
+## 22. Canonical ContrastReceipt
 
 ```text
 ContrastReceipt
@@ -427,7 +504,7 @@ ContrastReceipt
 
 No classification field may omit the scope tuple.
 
-## 20. Classification vocabulary
+## 23. Classification vocabulary
 
 Allowed scoped classifications:
 
@@ -445,7 +522,7 @@ SAFETY_GATE_FAILED
 
 `CONNECTED_NULL` may appear only as a higher-level summary of one or more `EQUIVALENT_WITHIN_BOUND` results with their scopes preserved.
 
-## 21. Harness sensitivity controls
+## 24. Harness sensitivity controls
 
 Before trusting a campaign harness, include controls that prove it can detect both no-effect and known-effect cases.
 
@@ -459,19 +536,17 @@ Use a reversible synthetic harness perturbation or another preregistered known-e
 
 Do not use an unqualified cognitive subsystem as the sole positive control.
 
-## 22. Stopping rules
+## 25. Stopping rules
 
-Freeze the rule before evidence, for example:
+Freeze the rule before evidence.
 
-```text
-fixed N paired seeds/workloads
-```
+`FIXED_N` requires the exact paired sample count.
 
-or a justified sequential rule with frozen boundaries.
+`FROZEN_SEQUENTIAL` requires its boundaries and continuation/termination rule to be specified in the manifest.
 
 Never stop simply when a desired significance threshold first appears.
 
-## 23. Evidence lineage
+## 26. Evidence lineage
 
 The campaign evidence manifest binds at minimum:
 
@@ -480,6 +555,8 @@ Git HEAD
 Git tree
 intervention implementation
 campaign manifest
+arm-order policy
+RNG-alignment policy
 workload/seed materialization
 Cargo.toml
 Cargo.lock
@@ -489,9 +566,9 @@ relevant SPINE-000B runtime receipt schema/version
 static overlap census version
 ```
 
-If subject code or intervention semantics change after evidence begins, start a new evidence lineage.
+If subject code, intervention semantics, order policy, RNG policy, or primary analysis semantics change after evidence begins, start a new evidence lineage.
 
-## 24. Claim boundary
+## 27. Claim boundary
 
 SPINE-000D may establish only scoped causal claims such as:
 
@@ -499,22 +576,24 @@ SPINE-000D may establish only scoped causal claims such as:
 
 It does not establish that S is universally necessary or beneficial.
 
-## 25. Exit gate before first campaign
+## 28. Exit gate before first campaign
 
 No first SPINE-000D campaign runs until all are frozen:
 
 1. exact subject/environment;
 2. target subsystem and overlap context;
-3. intervention arms;
-4. seed/workload rule;
-5. initial-state rule;
-6. primary/secondary observables;
-7. safety hard gates;
-8. metric directions/utility;
-9. equivalence bounds;
-10. multiplicity policy;
-11. confidence/effect-estimation policy;
-12. interaction follow-up trigger;
-13. stopping rule;
-14. evidence manifest/postflight rules;
-15. classification vocabulary and scope serialization.
+3. mandatory FULL + OUTPUT_SHAM + DISABLED arms, plus optional STATE_FROZEN;
+4. arm-order/counterbalancing policy;
+5. RNG-alignment/divergence policy;
+6. seed/workload rule and required IDs/hashes;
+7. initial-state and scheduler-state rules;
+8. primary/secondary observables;
+9. safety hard gates;
+10. metric directions/utility;
+11. exact or bounded equivalence rules;
+12. multiplicity policy;
+13. confidence/effect-estimation policy;
+14. interaction follow-up trigger;
+15. stopping rule with required fixed N or sequential details;
+16. evidence manifest/postflight rules;
+17. classification vocabulary and scope serialization.
