@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-paradox-fixtures"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Deterministic matched structured-inconsistency fixtures for Symthaea PARADOX-002A"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+symthaea-structured-inconsistency = { path = "../symthaea-structured-inconsistency" }
+
+# Keep PARADOX-002A's qualification surface independent of unrelated workspace churn.
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"

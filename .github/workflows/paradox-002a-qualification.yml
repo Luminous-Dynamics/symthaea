@@ -1,0 +1,82 @@
+name: PARADOX-002A Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/research/symthaea-paradox-fixtures/**'
+      - 'docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT.md'
+      - '.github/workflows/paradox-002a-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-002a-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  PARADOX001_SHA: 3f8e53e4d6b89895dc5097b2dccfe4f3868d53f9
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 64
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Bind subject, parent, and frozen measurement layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git merge-base --is-ancestor "${PARADOX001_SHA}" HEAD
+          git diff --exit-code "${PARADOX001_SHA}" HEAD -- crates/research/symthaea-structured-inconsistency
+          test -f docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT.md
+          test -f crates/research/symthaea-paradox-fixtures/Cargo.toml
+          test -f crates/research/symthaea-paradox-fixtures/Cargo.lock
+          test -f crates/research/symthaea-paradox-fixtures/rust-toolchain.toml
+          test -f crates/research/symthaea-paradox-fixtures/src/lib.rs
+
+      - name: Format
+        run: cargo fmt --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml -- --check
+
+      - name: Check
+        run: cargo check --locked --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
+
+      - name: Test fixture census and negative controls
+        run: cargo test --locked --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml --all-targets -- -D warnings
+
+      - name: Architecture and claim-boundary source audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=crates/research/symthaea-paradox-fixtures/src/lib.rs
+          grep -Fq 'does not measure or classify consciousness' "$file"
+          grep -Fq 'Generator code never consumes this report.' "$file"
+          grep -Fq 'condition label, expected response, or oracle truth' "$file"
+          grep -Fq 'PARADOX001_QUALIFIED_SHA' "$file"
+          ! grep -Eq 'rand::|thread_rng|OsRng|getrandom|SystemTime|Instant::|std::net|reqwest|tokio|crate::cognitive_loop|crate::consciousness|GlobalWorkspace|CognitiveLoopService' "$file"
+          ! grep -Eq 'candidate_recruitment_index[^;]*([<>]=?|==)' "$file"
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git diff --exit-code "${PARADOX001_SHA}" HEAD -- crates/research/symthaea-structured-inconsistency
