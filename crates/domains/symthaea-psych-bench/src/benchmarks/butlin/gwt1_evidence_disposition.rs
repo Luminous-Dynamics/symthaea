@@ -7,8 +7,7 @@
 //! independently established lower-tier support when a later causal lineage is
 //! negative or inconclusive. That is the correct evidence-composition rule, but
 //! a consumer that reads only the final `resolved_outcome` can accidentally
-//! collapse materially different epistemic states into the same `Observed`
-//! label.
+//! collapse materially different epistemic states into the same support label.
 //!
 //! This module therefore derives a *diagnostic* disposition from an already
 //! resolved V2 view. It creates no promotion authority and never upgrades an
@@ -16,11 +15,15 @@
 //!
 //! ```text
 //! resolved support floor = strongest independently established support
-//! causal disposition      = what the higher-tier causal method established
+//! direct disposition      = what the direct method established
+//! causal disposition      = what the causal method established
 //! ```
 //!
 //! A causal contradiction may therefore coexist with a retained direct
-//! `Observed` support floor without being hidden or softened.
+//! `Observed` support floor without being hidden or softened. Likewise, a
+//! negative causal result can remain visible when direct evidence itself is
+//! non-positive; that combination retains the lower architectural floor and
+//! grants no causal promotion.
 
 use serde::{Deserialize, Serialize};
 
@@ -50,6 +53,15 @@ pub enum Gwt1EvidenceDispositionV1 {
     /// The causal experiment could not be interpreted under its protocol.
     /// Independent direct `Observed` evidence remains the resolved support floor.
     CausalInconclusiveRetainsObserved,
+    /// The causal experiment did not demonstrate its prediction and direct evidence
+    /// did not independently establish `Observed`. Both method results remain visible.
+    CausalNotDemonstratedWithoutDirectObservation,
+    /// The causal experiment contradicted its prediction and direct evidence did not
+    /// independently establish `Observed`. No causal support is granted.
+    CausalContradictedWithoutDirectObservation,
+    /// The causal experiment was inconclusive and direct evidence did not independently
+    /// establish `Observed`. Both method results require explicit follow-up.
+    CausalInconclusiveWithoutDirectObservation,
     /// Direct qualification itself did not demonstrate GWT-1.
     DirectNotDemonstrated,
     /// Direct qualification itself contradicted the preregistered direct theorem.
@@ -67,7 +79,7 @@ pub struct Gwt1EvidenceDispositionSummaryV1 {
     pub resolved_outcome: EvidenceOutcome,
     pub disposition: Gwt1EvidenceDispositionV1,
     /// True only when the causal protocol produced a genuine contradiction while
-    /// a lower direct tier remains independently established.
+    /// a lower support floor remains independently established.
     pub has_causal_contradiction: bool,
     /// True when the causal lane exists but still requires follow-up before a
     /// positive/negative causal interpretation can be made.
@@ -102,8 +114,12 @@ impl std::fmt::Display for Gwt1EvidenceDispositionErrorV1 {
                 "GWT-1 disposition requires V2 resolved view schema, observed {observed:?}"
             ),
             Self::MissingDirectLineage => write!(f, "GWT-1 disposition requires a direct lineage"),
-            Self::DuplicateDirectLineage => write!(f, "GWT-1 disposition found duplicate direct lineages"),
-            Self::DuplicateCausalLineage => write!(f, "GWT-1 disposition found duplicate causal lineages"),
+            Self::DuplicateDirectLineage => {
+                write!(f, "GWT-1 disposition found duplicate direct lineages")
+            }
+            Self::DuplicateCausalLineage => {
+                write!(f, "GWT-1 disposition found duplicate causal lineages")
+            }
             Self::InvalidDirectOutcome { observed } => write!(
                 f,
                 "GWT-1 direct lineage has impossible disposition outcome {observed:?}"
@@ -113,11 +129,11 @@ impl std::fmt::Display for Gwt1EvidenceDispositionErrorV1 {
                 resolved_outcome,
             } => write!(
                 f,
-                "GWT-1 direct lineage must resolve exactly to its own outcome: lineage={lineage_outcome:?}, resolved={resolved_outcome:?}"
+                "GWT-1 direct lineage transition is inconsistent: lineage={lineage_outcome:?}, resolved={resolved_outcome:?}"
             ),
             Self::CausalRequiresDirectObserved { observed } => write!(
                 f,
-                "GWT-1 causal disposition requires direct Observed support, observed {observed:?}"
+                "positive GWT-1 causal support requires direct Observed support, observed {observed:?}"
             ),
             Self::InvalidCausalOutcome { observed } => write!(
                 f,
@@ -137,27 +153,54 @@ impl std::fmt::Display for Gwt1EvidenceDispositionErrorV1 {
 
 impl std::error::Error for Gwt1EvidenceDispositionErrorV1 {}
 
+fn classify_direct_state(
+    direct: &IndicatorEvidenceLineageV2,
+) -> Result<Gwt1EvidenceDispositionV1, Gwt1EvidenceDispositionErrorV1> {
+    match direct.lineage_outcome {
+        EvidenceOutcome::Supported(SupportTier::Observed) => {
+            if direct.resolved_outcome != EvidenceOutcome::Supported(SupportTier::Observed) {
+                return Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectTransition {
+                    lineage_outcome: direct.lineage_outcome,
+                    resolved_outcome: direct.resolved_outcome,
+                });
+            }
+            Ok(Gwt1EvidenceDispositionV1::DirectObservedPendingCausal)
+        }
+        EvidenceOutcome::NotDemonstrated => {
+            if direct.resolved_outcome != direct.base_outcome {
+                return Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectTransition {
+                    lineage_outcome: direct.lineage_outcome,
+                    resolved_outcome: direct.resolved_outcome,
+                });
+            }
+            Ok(Gwt1EvidenceDispositionV1::DirectNotDemonstrated)
+        }
+        EvidenceOutcome::Contradicted => {
+            if direct.resolved_outcome != direct.base_outcome {
+                return Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectTransition {
+                    lineage_outcome: direct.lineage_outcome,
+                    resolved_outcome: direct.resolved_outcome,
+                });
+            }
+            Ok(Gwt1EvidenceDispositionV1::DirectContradicted)
+        }
+        EvidenceOutcome::Inconclusive => {
+            if direct.resolved_outcome != direct.base_outcome {
+                return Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectTransition {
+                    lineage_outcome: direct.lineage_outcome,
+                    resolved_outcome: direct.resolved_outcome,
+                });
+            }
+            Ok(Gwt1EvidenceDispositionV1::DirectInconclusive)
+        }
+        observed => Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectOutcome { observed }),
+    }
+}
+
 fn classify_direct_only(
     direct: &IndicatorEvidenceLineageV2,
 ) -> Result<Gwt1EvidenceDispositionSummaryV1, Gwt1EvidenceDispositionErrorV1> {
-    if direct.lineage_outcome != direct.resolved_outcome {
-        return Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectTransition {
-            lineage_outcome: direct.lineage_outcome,
-            resolved_outcome: direct.resolved_outcome,
-        });
-    }
-
-    let disposition = match direct.lineage_outcome {
-        EvidenceOutcome::Supported(SupportTier::Observed) => {
-            Gwt1EvidenceDispositionV1::DirectObservedPendingCausal
-        }
-        EvidenceOutcome::NotDemonstrated => Gwt1EvidenceDispositionV1::DirectNotDemonstrated,
-        EvidenceOutcome::Contradicted => Gwt1EvidenceDispositionV1::DirectContradicted,
-        EvidenceOutcome::Inconclusive => Gwt1EvidenceDispositionV1::DirectInconclusive,
-        observed => {
-            return Err(Gwt1EvidenceDispositionErrorV1::InvalidDirectOutcome { observed });
-        }
-    };
+    let disposition = classify_direct_state(direct)?;
 
     Ok(Gwt1EvidenceDispositionSummaryV1 {
         schema: GWT1_EVIDENCE_DISPOSITION_SCHEMA_V1.to_string(),
@@ -174,13 +217,7 @@ fn classify_with_causal(
     direct: &IndicatorEvidenceLineageV2,
     causal: &IndicatorEvidenceLineageV2,
 ) -> Result<Gwt1EvidenceDispositionSummaryV1, Gwt1EvidenceDispositionErrorV1> {
-    if direct.lineage_outcome != EvidenceOutcome::Supported(SupportTier::Observed)
-        || direct.resolved_outcome != EvidenceOutcome::Supported(SupportTier::Observed)
-    {
-        return Err(Gwt1EvidenceDispositionErrorV1::CausalRequiresDirectObserved {
-            observed: direct.resolved_outcome,
-        });
-    }
+    classify_direct_state(direct)?;
 
     if causal.base_outcome != direct.resolved_outcome {
         return Err(Gwt1EvidenceDispositionErrorV1::InvalidCausalTransition {
@@ -190,29 +227,51 @@ fn classify_with_causal(
         });
     }
 
+    let direct_observed = direct.lineage_outcome == EvidenceOutcome::Supported(SupportTier::Observed)
+        && direct.resolved_outcome == EvidenceOutcome::Supported(SupportTier::Observed);
+
     let (disposition, expected_resolved, has_causal_contradiction, causal_follow_up_required) =
         match causal.lineage_outcome {
-            EvidenceOutcome::Supported(SupportTier::CausallySupported) => (
-                Gwt1EvidenceDispositionV1::CausallySupported,
-                EvidenceOutcome::Supported(SupportTier::CausallySupported),
-                false,
-                false,
-            ),
+            EvidenceOutcome::Supported(SupportTier::CausallySupported) => {
+                if !direct_observed {
+                    return Err(Gwt1EvidenceDispositionErrorV1::CausalRequiresDirectObserved {
+                        observed: direct.resolved_outcome,
+                    });
+                }
+                (
+                    Gwt1EvidenceDispositionV1::CausallySupported,
+                    EvidenceOutcome::Supported(SupportTier::CausallySupported),
+                    false,
+                    false,
+                )
+            }
             EvidenceOutcome::NotDemonstrated => (
-                Gwt1EvidenceDispositionV1::CausalNotDemonstratedRetainsObserved,
-                EvidenceOutcome::Supported(SupportTier::Observed),
+                if direct_observed {
+                    Gwt1EvidenceDispositionV1::CausalNotDemonstratedRetainsObserved
+                } else {
+                    Gwt1EvidenceDispositionV1::CausalNotDemonstratedWithoutDirectObservation
+                },
+                direct.resolved_outcome,
                 false,
                 false,
             ),
             EvidenceOutcome::Contradicted => (
-                Gwt1EvidenceDispositionV1::CausalContradictedRetainsObserved,
-                EvidenceOutcome::Supported(SupportTier::Observed),
+                if direct_observed {
+                    Gwt1EvidenceDispositionV1::CausalContradictedRetainsObserved
+                } else {
+                    Gwt1EvidenceDispositionV1::CausalContradictedWithoutDirectObservation
+                },
+                direct.resolved_outcome,
                 true,
                 false,
             ),
             EvidenceOutcome::Inconclusive => (
-                Gwt1EvidenceDispositionV1::CausalInconclusiveRetainsObserved,
-                EvidenceOutcome::Supported(SupportTier::Observed),
+                if direct_observed {
+                    Gwt1EvidenceDispositionV1::CausalInconclusiveRetainsObserved
+                } else {
+                    Gwt1EvidenceDispositionV1::CausalInconclusiveWithoutDirectObservation
+                },
+                direct.resolved_outcome,
                 false,
                 true,
             ),
@@ -244,7 +303,7 @@ fn classify_with_causal(
 ///
 /// This function does not verify evidence artifacts, attestations, or promotion
 /// authority. Those checks belong to the V1/V2 resolution path that produced the
-/// view. It only prevents downstream consumers from erasing higher-tier causal
+/// view. It only prevents downstream consumers from erasing method-specific
 /// null/contradictory/inconclusive information when displaying the retained
 /// support floor.
 pub fn classify_gwt1_evidence_disposition_v1(
@@ -358,6 +417,15 @@ mod tests {
         )
     }
 
+    fn direct_negative(outcome: EvidenceOutcome) -> IndicatorEvidenceLineageV2 {
+        lineage(
+            EvidenceLineageKindV1::DirectQualification,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+            outcome,
+            EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+        )
+    }
+
     #[test]
     fn direct_observed_without_causal_lineage_is_explicitly_pending() {
         let summary = classify_gwt1_evidence_disposition_v1(&view(vec![direct_observed()]))
@@ -453,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn direct_negative_states_remain_distinct() {
+    fn direct_negative_states_remain_distinct_while_architectural_floor_is_retained() {
         for (outcome, disposition) in [
             (
                 EvidenceOutcome::NotDemonstrated,
@@ -468,29 +536,78 @@ mod tests {
                 Gwt1EvidenceDispositionV1::DirectInconclusive,
             ),
         ] {
-            let summary = classify_gwt1_evidence_disposition_v1(&view(vec![lineage(
-                EvidenceLineageKindV1::DirectQualification,
-                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-                outcome,
-                outcome,
-            )]))
-            .expect("valid direct negative disposition");
+            let summary = classify_gwt1_evidence_disposition_v1(&view(vec![direct_negative(outcome)]))
+                .expect("valid direct negative disposition");
             assert_eq!(summary.disposition, disposition);
+            assert_eq!(summary.direct_outcome, outcome);
+            assert_eq!(
+                summary.resolved_outcome,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly)
+            );
+        }
+    }
+
+    #[test]
+    fn all_negative_direct_causal_pairs_are_preserved_without_promotion() {
+        let direct_outcomes = [
+            EvidenceOutcome::NotDemonstrated,
+            EvidenceOutcome::Contradicted,
+            EvidenceOutcome::Inconclusive,
+        ];
+        let causal_cases = [
+            (
+                EvidenceOutcome::NotDemonstrated,
+                Gwt1EvidenceDispositionV1::CausalNotDemonstratedWithoutDirectObservation,
+                false,
+                false,
+            ),
+            (
+                EvidenceOutcome::Contradicted,
+                Gwt1EvidenceDispositionV1::CausalContradictedWithoutDirectObservation,
+                true,
+                false,
+            ),
+            (
+                EvidenceOutcome::Inconclusive,
+                Gwt1EvidenceDispositionV1::CausalInconclusiveWithoutDirectObservation,
+                false,
+                true,
+            ),
+        ];
+
+        for direct_outcome in direct_outcomes {
+            for (causal_outcome, expected_disposition, contradiction, follow_up) in causal_cases {
+                let summary = classify_gwt1_evidence_disposition_v1(&view(vec![
+                    direct_negative(direct_outcome),
+                    lineage(
+                        EvidenceLineageKindV1::CausalQualification,
+                        EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+                        causal_outcome,
+                        EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
+                    ),
+                ]))
+                .expect("valid paired negative disposition");
+
+                assert_eq!(summary.direct_outcome, direct_outcome);
+                assert_eq!(summary.causal_outcome, Some(causal_outcome));
+                assert_eq!(summary.disposition, expected_disposition);
+                assert_eq!(summary.has_causal_contradiction, contradiction);
+                assert_eq!(summary.causal_follow_up_required, follow_up);
+                assert_eq!(
+                    summary.resolved_outcome,
+                    EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly)
+                );
+            }
         }
     }
 
     #[test]
     fn positive_causal_outcome_cannot_leapfrog_direct_observed() {
         let result = classify_gwt1_evidence_disposition_v1(&view(vec![
-            lineage(
-                EvidenceLineageKindV1::DirectQualification,
-                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
-                EvidenceOutcome::NotDemonstrated,
-                EvidenceOutcome::NotDemonstrated,
-            ),
+            direct_negative(EvidenceOutcome::NotDemonstrated),
             lineage(
                 EvidenceLineageKindV1::CausalQualification,
-                EvidenceOutcome::NotDemonstrated,
+                EvidenceOutcome::Supported(SupportTier::ArchitecturalOnly),
                 EvidenceOutcome::Supported(SupportTier::CausallySupported),
                 EvidenceOutcome::Supported(SupportTier::CausallySupported),
             ),
