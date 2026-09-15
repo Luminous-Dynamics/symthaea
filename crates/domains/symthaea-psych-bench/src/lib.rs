@@ -56,6 +56,8 @@ pub mod benchmarks;
 pub mod harness;
 pub mod substrate_transfer;
 pub mod suite_identity;
+#[path = "harness/suite_bound_snapshot.rs"]
+pub mod suite_bound_snapshot;
 pub mod wm;
 
 #[cfg(feature = "neuroevolution")]
