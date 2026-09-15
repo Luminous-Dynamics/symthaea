@@ -202,8 +202,7 @@ impl StructuredInconsistencyObservatory {
 
         // Persistence increases the descriptive load of the same disagreement
         // without making external surprise part of internal conflict.
-        let conflict_load =
-            input.internal_disagreement * (0.5 + 0.5 * input.persistence);
+        let conflict_load = input.internal_disagreement * (0.5 + 0.5 * input.persistence);
 
         // Equal weights are frozen in PARADOX-001. This is intentionally a
         // transparent stratification statistic rather than a fitted model.
@@ -309,9 +308,7 @@ mod tests {
         assert_eq!(high_surprise.integration_coherence, 1.0);
         assert_eq!(high_disagreement.external_surprise, 0.0);
         assert!(high_disagreement.conflict_load > high_surprise.conflict_load);
-        assert!(
-            high_disagreement.integration_coherence < high_surprise.integration_coherence
-        );
+        assert!(high_disagreement.integration_coherence < high_surprise.integration_coherence);
     }
 
     #[test]
@@ -334,10 +331,11 @@ mod tests {
         ));
 
         assert!(persistent.conflict_load > transient.conflict_load);
-        assert!(
-            persistent.candidate_recruitment_index > transient.candidate_recruitment_index
+        assert!(persistent.candidate_recruitment_index > transient.candidate_recruitment_index);
+        assert_eq!(
+            persistent.integration_coherence,
+            transient.integration_coherence
         );
-        assert_eq!(persistent.integration_coherence, transient.integration_coherence);
     }
 
     #[test]
@@ -360,12 +358,16 @@ mod tests {
         ));
 
         assert_eq!(ordinary.external_surprise, reflexive.external_surprise);
-        assert_eq!(ordinary.internal_disagreement, reflexive.internal_disagreement);
-        assert_eq!(ordinary.integration_coherence, reflexive.integration_coherence);
-        assert_eq!(ordinary.conflict_load, reflexive.conflict_load);
-        assert!(
-            reflexive.candidate_recruitment_index > ordinary.candidate_recruitment_index
+        assert_eq!(
+            ordinary.internal_disagreement,
+            reflexive.internal_disagreement
         );
+        assert_eq!(
+            ordinary.integration_coherence,
+            reflexive.integration_coherence
+        );
+        assert_eq!(ordinary.conflict_load, reflexive.conflict_load);
+        assert!(reflexive.candidate_recruitment_index > ordinary.candidate_recruitment_index);
     }
 
     #[test]
@@ -379,10 +381,7 @@ mod tests {
             support(0.0, 0.4).polarity(),
             EvidencePolarity::SupportsNegationOnly
         );
-        assert_eq!(
-            support(0.3, 0.4).polarity(),
-            EvidencePolarity::SupportsBoth
-        );
+        assert_eq!(support(0.3, 0.4).polarity(), EvidencePolarity::SupportsBoth);
     }
 
     #[test]
@@ -443,7 +442,10 @@ mod tests {
             first.candidate_recruitment_index.to_bits(),
             second.candidate_recruitment_index.to_bits()
         );
-        assert_eq!(first.conflict_load.to_bits(), second.conflict_load.to_bits());
+        assert_eq!(
+            first.conflict_load.to_bits(),
+            second.conflict_load.to_bits()
+        );
     }
 
     #[test]
