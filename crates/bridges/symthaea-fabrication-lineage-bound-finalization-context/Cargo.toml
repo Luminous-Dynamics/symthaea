@@ -1,0 +1,22 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-finalization-context"
+version = "0.1.0"
+edition = "2024"
+description = "Pre-finalization context preserving global upgrade predecessor provenance"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-evidence-retention-head = { path = "../symthaea-fabrication-evidence-retention-head" }
+symthaea-fabrication-key-continuity-authority = { path = "../symthaea-fabrication-key-continuity-authority" }
+symthaea-fabrication-lineage-bound-current-no-rollback = { path = "../symthaea-fabrication-lineage-bound-current-no-rollback" }
+symthaea-fabrication-lineage-bound-hardware = { path = "../symthaea-fabrication-lineage-bound-hardware" }
+symthaea-fabrication-lineage-bound-probation-telemetry = { path = "../symthaea-fabrication-lineage-bound-probation-telemetry" }
+symthaea-fabrication-lineage-bound-upgrade-handoff = { path = "../symthaea-fabrication-lineage-bound-upgrade-handoff" }
+symthaea-fabrication-lineage-bound-upgrade-probation = { path = "../symthaea-fabrication-lineage-bound-upgrade-probation" }
+symthaea-fabrication-lineage-bound-upgrade-runtime = { path = "../symthaea-fabrication-lineage-bound-upgrade-runtime" }
+symthaea-fabrication-witness-registry-containment-bound = { path = "../symthaea-fabrication-witness-registry-containment-bound" }
+symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
