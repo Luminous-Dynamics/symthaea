@@ -1,0 +1,102 @@
+name: SPINE-000B Observation Commitment v2
+
+on:
+  pull_request:
+    paths:
+      - 'docs/research/SPINE_000B_OBSERVATION_COMMITMENT_V2.md'
+      - 'scripts/spine_000b_observation_commitment_v2.py'
+      - 'scripts/verify_spine_000b_observation_commitment_v2.py'
+      - 'tests/fixtures/spine_000b_observation_commitment_v2_vectors.json'
+      - 'xtask/src/bin/spine_000b_observation_vectors.rs'
+      - '.github/workflows/spine-000b-observation-commitment-v2.yml'
+      - 'src/cognitive_loop/subsystem_trait.rs'
+      - 'docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md'
+      - 'docs/research/SPINE_000B_RUNTIME_GUARD_OVERLAY_V1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c2-observation-commitment:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Record exact subject
+        run: |
+          set -euo pipefail
+          mkdir -p spine-evidence
+          {
+            echo "head=$(git rev-parse HEAD)"
+            echo "tree=$(git write-tree)"
+            echo "authority=measurement-only"
+            echo "runtime_evidence_claimed=false"
+            echo "causal_load_claimed=false"
+          } | tee spine-evidence/subject.txt
+
+      - name: Verify tranche scope
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA"...HEAD | sort > spine-evidence/changed-files.txt
+          cat > /tmp/expected-files.txt <<'EOF'
+          .github/workflows/spine-000b-observation-commitment-v2.yml
+          docs/research/SPINE_000B_OBSERVATION_COMMITMENT_V2.md
+          scripts/spine_000b_observation_commitment_v2.py
+          scripts/verify_spine_000b_observation_commitment_v2.py
+          tests/fixtures/spine_000b_observation_commitment_v2_vectors.json
+          xtask/src/bin/spine_000b_observation_vectors.rs
+          EOF
+          sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt spine-evidence/changed-files.txt
+
+      - name: Python reference qualification
+        run: |
+          set -euo pipefail
+          python -m py_compile \
+            scripts/spine_000b_observation_commitment_v2.py \
+            scripts/verify_spine_000b_observation_commitment_v2.py
+          python scripts/verify_spine_000b_observation_commitment_v2.py \
+            | tee spine-evidence/python-verification.txt
+
+      - name: Independent Rust vector qualification
+        run: |
+          set -euo pipefail
+          cargo run -q -p xtask --bin spine_000b_observation_vectors \
+            | tee spine-evidence/rust-verification.txt
+
+      - name: Seal subject hashes
+        run: |
+          set -euo pipefail
+          sha256sum \
+            docs/research/SPINE_000B_OBSERVATION_COMMITMENT_V2.md \
+            scripts/spine_000b_observation_commitment_v2.py \
+            scripts/verify_spine_000b_observation_commitment_v2.py \
+            tests/fixtures/spine_000b_observation_commitment_v2_vectors.json \
+            xtask/src/bin/spine_000b_observation_vectors.rs \
+            src/cognitive_loop/subsystem_trait.rs \
+            docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md \
+            docs/research/SPINE_000B_RUNTIME_GUARD_OVERLAY_V1.json \
+            > spine-evidence/sha256.txt
+          cat spine-evidence/sha256.txt
+
+      - name: Prove checkout immutability
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-observation-commitment-v2-${{ github.sha }}
+          path: spine-evidence/
+          if-no-files-found: error
