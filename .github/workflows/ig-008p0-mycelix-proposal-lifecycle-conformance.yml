@@ -1,0 +1,162 @@
+name: IG-008P0 Mycelix Proposal Lifecycle Conformance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig008p0_mycelix_proposal_lifecycle_oracle.py"
+      - "docs/research/IG_008P0_MYCELIX_PROPOSAL_LIFECYCLE_CONFORMANCE.md"
+      - ".github/workflows/ig-008p0-mycelix-proposal-lifecycle-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-proposal-lifecycle-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      MYCELIX_EVIDENCE_HEAD: 6ddca81103c52408421e2e31da4b4dee0c0b2762
+      MYCELIX_PRODUCTION_SUBJECT: fca2c107a1ea5108823ce617ba4111b6f7f77230
+      MYCELIX_SAME_TREE_MAIN: 31ede2365b81365bb119cd9351b2739119974130
+      MYCELIX_PROFILE_SHA256: 7f42e2a8df25df94112d23f261d1f3ffe299d46d37cb3a5a6fe02aca0aa6c108
+      MYCELIX_CORPUS_SHA256: 13eaaa988c73d29d67bccf7381f6f72cabd4eb7be090f36f0b444978cc708324
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix proposal evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_EVIDENCE_HEAD }}
+          path: _mycelix_proposal
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_proposal/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_proposal rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_proposal status --porcelain)"
+
+      - name: Bind Mycelix Proposal source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _mycelix_proposal hash-object mycelix-governance/zomes/proposals/coordinator/src/lib.rs)" = "eb8358353ee259ef9c3b46617a61d3439f1c714c"
+          test "$(git -C _mycelix_proposal hash-object mycelix-governance/zomes/proposals/integrity/src/lib.rs)" = "986bc0526aec8d37436efbe5ba798bc41705e3cf"
+
+      - name: Syntax compile independent implementations
+        run: |
+          python -m py_compile scripts/ig008p0_mycelix_proposal_lifecycle_oracle.py
+          python -m py_compile _mycelix_proposal/mycelix-governance/scripts/validate_ig007p0_proposal_lifecycle_profile.py
+          python -m py_compile _mycelix_proposal/mycelix-governance/scripts/ig007p1_proposal_lifecycle_counterexamples.py
+
+      - name: Qualify Mycelix P0 prerequisite twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_proposal/mycelix-governance/profiles/observed/proposal-lifecycle-fca2c107-v1.json
+          python _mycelix_proposal/mycelix-governance/scripts/validate_ig007p0_proposal_lifecycle_profile.py --profile "$PROFILE" --self-test > /tmp/ig008p0-mycelix-profile-1.json
+          python _mycelix_proposal/mycelix-governance/scripts/validate_ig007p0_proposal_lifecycle_profile.py --profile "$PROFILE" --self-test > /tmp/ig008p0-mycelix-profile-2.json
+          cmp /tmp/ig008p0-mycelix-profile-1.json /tmp/ig008p0-mycelix-profile-2.json
+
+      - name: Run Mycelix P1 oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_proposal/mycelix-governance/profiles/observed/proposal-lifecycle-fca2c107-v1.json
+          python _mycelix_proposal/mycelix-governance/scripts/ig007p1_proposal_lifecycle_counterexamples.py --profile "$PROFILE" --self-test > /tmp/ig008p0-mycelix-self-1.json
+          python _mycelix_proposal/mycelix-governance/scripts/ig007p1_proposal_lifecycle_counterexamples.py --profile "$PROFILE" --self-test > /tmp/ig008p0-mycelix-self-2.json
+          cmp /tmp/ig008p0-mycelix-self-1.json /tmp/ig008p0-mycelix-self-2.json
+          python _mycelix_proposal/mycelix-governance/scripts/ig007p1_proposal_lifecycle_counterexamples.py --profile "$PROFILE" --corpus > /tmp/ig008p0-mycelix-corpus.json
+
+      - name: Run independent Symthaea oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_proposal/mycelix-governance/profiles/observed/proposal-lifecycle-fca2c107-v1.json
+          python scripts/ig008p0_mycelix_proposal_lifecycle_oracle.py --profile "$PROFILE" --self-test > /tmp/ig008p0-symthaea-self-1.json
+          python scripts/ig008p0_mycelix_proposal_lifecycle_oracle.py --profile "$PROFILE" --self-test > /tmp/ig008p0-symthaea-self-2.json
+          cmp /tmp/ig008p0-symthaea-self-1.json /tmp/ig008p0-symthaea-self-2.json
+          python scripts/ig008p0_mycelix_proposal_lifecycle_oracle.py --profile "$PROFILE" --corpus > /tmp/ig008p0-symthaea-corpus.json
+
+      - name: Require byte-identical cross-implementation corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp /tmp/ig008p0-mycelix-corpus.json /tmp/ig008p0-symthaea-corpus.json
+
+      - name: Assert frozen commitments and provenance ceilings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          def read(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+
+          profile = read('/tmp/ig008p0-mycelix-profile-1.json')
+          mycelix = read('/tmp/ig008p0-mycelix-self-1.json')
+          symthaea = read('/tmp/ig008p0-symthaea-self-1.json')
+          corpus = read('/tmp/ig008p0-symthaea-corpus.json')
+
+          assert profile['validated'] is True
+          assert profile['self_test'] is True
+          assert profile['authority_class'] == 'ObservedSourceBound'
+          assert profile['profile_id'] == 'mycelix-proposal-lifecycle-observed-fca2c107-v1'
+          assert profile['profile_content_sha256'] == '7f42e2a8df25df94112d23f261d1f3ffe299d46d37cb3a5a6fe02aca0aa6c108'
+          assert profile['known_gap_issue'] == 66
+
+          assert mycelix['authority'] == 'MeasurementOnly'
+          assert mycelix['schema'] == 'mycelix-proposal-lifecycle-counterexamples-v1'
+          assert mycelix['profile_sha256'] == profile['profile_content_sha256']
+          assert mycelix['corpus_sha256'] == '13eaaa988c73d29d67bccf7381f6f72cabd4eb7be090f36f0b444978cc708324'
+          assert mycelix['counterexample_count'] == 5
+          assert mycelix['issue'] == 66
+
+          assert symthaea['authority'] == 'MeasurementOnly'
+          assert symthaea['conformance_class'] == 'CrossImplementationConformance'
+          assert symthaea['mycelix_evidence_head'] == '6ddca81103c52408421e2e31da4b4dee0c0b2762'
+          assert symthaea['mycelix_production_subject'] == 'fca2c107a1ea5108823ce617ba4111b6f7f77230'
+          assert symthaea['same_tree_main'] == '31ede2365b81365bb119cd9351b2739119974130'
+          assert symthaea['profile_sha256'] == profile['profile_content_sha256']
+          assert symthaea['corpus_sha256'] == mycelix['corpus_sha256']
+          assert symthaea['counterexample_count'] == 5
+          assert symthaea['issue'] == 66
+          assert corpus['corpus_sha256'] == symthaea['corpus_sha256']
+          PY
+
+      - name: Verify both checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_proposal rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_proposal diff --exit-code
+          git -C _mycelix_proposal diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_proposal status --porcelain)"
