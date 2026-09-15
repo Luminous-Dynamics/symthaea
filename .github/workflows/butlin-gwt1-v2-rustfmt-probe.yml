@@ -1,0 +1,54 @@
+name: Butlin GWT-1 V2 Rustfmt Probe
+
+on:
+  push:
+    branches:
+      - butlin/gwt1-v2-method-outcome-rustfmt-probe-v1
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe exact two-file rustfmt delta
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 764ff149ab947a890175489e2f999fbbda5ff3a7
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only the semantic surface and emit exact patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          p1="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_evidence_disposition.rs"
+          p2="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs"
+
+          rustfmt --edition 2024 "$p1" "$p2"
+
+          mapfile -t changed < <(git diff --name-only)
+          for path in "${changed[@]}"; do
+            case "$path" in
+              "$p1"|"$p2") ;;
+              *)
+                echo "ERROR: rustfmt escaped the approved two-file semantic surface: $path" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          git diff --check
+          echo "RUSTFMT_CHANGED_COUNT=${#changed[@]}"
+          printf 'RUSTFMT_CHANGED_PATH=%s\n' "${changed[@]}"
+          echo '---BEGIN_RUSTFMT_PATCH---'
+          git diff -- "$p1" "$p2"
+          echo '---END_RUSTFMT_PATCH---'
