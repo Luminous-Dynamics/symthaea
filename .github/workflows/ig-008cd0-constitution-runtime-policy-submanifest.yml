@@ -1,0 +1,225 @@
+name: IG-008CD0 Constitution Runtime Policy Submanifest
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/manifests/mycelix-constitution-runtime-policy-downstream-observed-fca2c107-v1.json"
+      - "scripts/ig008cd0_validate_constitution_runtime_policy_submanifest.py"
+      - "docs/research/IG_008CD0_CONSTITUTION_RUNTIME_POLICY_DOWNSTREAM_SUBMANIFEST.md"
+      - ".github/workflows/ig-008cd0-constitution-runtime-policy-submanifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-constitution-runtime-policy-submanifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      EXPECTED_PARENT: 594ac1a765131d242c01b71859ff28cb2fe71b1a
+      MANIFEST_SHA256: 157402e76abffd3849dc6d2001a7c0bbde296e80ab6a7f5c77c8f3e288302183
+      MYCELIX_CP_HEAD: 3232d611d8833b03eba9f5412f5d7cb0cf89d4e1
+      SYMTHAEA_CP_HEAD: 3f6bd4210690b79734b71bd4168ce843aeda1036
+      MYCELIX_CFG_HEAD: 88922e7950ddf030026b5d4d2b06e0ed63727692
+      SYMTHAEA_CFG_HEAD: c66296a29e27633f470d18568c9a7de3fae5c624
+      MYCELIX_SYNC_HEAD: abb277cc39418e43e80d48e8a4a57bc7c939d9e4
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout exact submanifest subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SUBJECT }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout exact ConstitutionParameter Mycelix evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_CP_HEAD }}
+          path: _evidence/mycelix-cp
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact ConstitutionParameter Symthaea conformance
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYMTHAEA_CP_HEAD }}
+          path: _evidence/symthaea-cp
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact GovernanceConfig Mycelix evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_CFG_HEAD }}
+          path: _evidence/mycelix-cfg
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact GovernanceConfig Symthaea conformance
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SYMTHAEA_CFG_HEAD }}
+          path: _evidence/symthaea-cfg
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact ConstitutionBridgeSync Mycelix evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_SYNC_HEAD }}
+          path: _evidence/mycelix-sync
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Isolate evidence checkouts from subject status
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_evidence/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subject and isolated four-file child
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git merge-base --is-ancestor "$EXPECTED_PARENT" HEAD
+          test "$(git rev-list --count "$EXPECTED_PARENT"..HEAD)" = "4"
+          git diff --name-only "$EXPECTED_PARENT"..HEAD | sort > /tmp/changed.txt
+          cat > /tmp/expected.txt <<'EOF'
+          .github/workflows/ig-008cd0-constitution-runtime-policy-submanifest.yml
+          docs/research/IG_008CD0_CONSTITUTION_RUNTIME_POLICY_DOWNSTREAM_SUBMANIFEST.md
+          docs/research/manifests/mycelix-constitution-runtime-policy-downstream-observed-fca2c107-v1.json
+          scripts/ig008cd0_validate_constitution_runtime_policy_submanifest.py
+          EOF
+          sort -o /tmp/expected.txt /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+          test -z "$(git status --porcelain)"
+
+      - name: Verify exact evidence heads
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _evidence/mycelix-cp rev-parse HEAD)" = "$MYCELIX_CP_HEAD"
+          test "$(git -C _evidence/symthaea-cp rev-parse HEAD)" = "$SYMTHAEA_CP_HEAD"
+          test "$(git -C _evidence/mycelix-cfg rev-parse HEAD)" = "$MYCELIX_CFG_HEAD"
+          test "$(git -C _evidence/symthaea-cfg rev-parse HEAD)" = "$SYMTHAEA_CFG_HEAD"
+          test "$(git -C _evidence/mycelix-sync rev-parse HEAD)" = "$MYCELIX_SYNC_HEAD"
+
+      - name: Replay ConstitutionParameter corpus cross-implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_evidence/mycelix-cp/mycelix-governance/profiles/observed/constitution-parameter-fca2c107-v1.json
+          MYC=_evidence/mycelix-cp/mycelix-governance/scripts/ig007cp1_constitution_parameter_counterexamples.py
+          SYM=_evidence/symthaea-cp/scripts/ig008cp0_mycelix_constitution_parameter_oracle.py
+          python "$MYC" --profile "$PROFILE" --self-test > /tmp/cp-myc-self.json
+          python "$SYM" --profile "$PROFILE" --self-test > /tmp/cp-sym-self.json
+          python "$MYC" --profile "$PROFILE" --corpus > /tmp/cp-myc.json
+          python "$SYM" --profile "$PROFILE" --corpus > /tmp/cp-sym.json
+          cmp /tmp/cp-myc.json /tmp/cp-sym.json
+
+      - name: Replay GovernanceConfig corpus cross-implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_evidence/mycelix-cfg/mycelix-governance/profiles/observed/governance-config-fca2c107-v1.json
+          MYC=_evidence/mycelix-cfg/mycelix-governance/scripts/ig007c1_governance_config_counterexamples.py
+          SYM=_evidence/symthaea-cfg/scripts/ig008c0_mycelix_config_oracle.py
+          python "$MYC" --profile "$PROFILE" --self-test > /tmp/cfg-myc-self.json
+          python "$SYM" --profile "$PROFILE" --self-test > /tmp/cfg-sym-self.json
+          python "$MYC" --profile "$PROFILE" --corpus > /tmp/cfg-myc.json
+          python "$SYM" --profile "$PROFILE" --corpus > /tmp/cfg-sym.json
+          cmp /tmp/cfg-myc.json /tmp/cfg-sym.json
+
+      - name: Replay ConstitutionBridgeSync corpus cross-implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_evidence/mycelix-sync/mycelix-governance/profiles/observed/constitution-bridge-sync-fca2c107-v1.json
+          MYC=_evidence/mycelix-sync/mycelix-governance/scripts/ig007cs1_constitution_bridge_sync_counterexamples.py
+          SYM=scripts/ig008cs0_mycelix_constitution_sync_oracle.py
+          python "$MYC" --profile "$PROFILE" --self-test > /tmp/sync-myc-self.json
+          python "$SYM" --profile "$PROFILE" --self-test > /tmp/sync-sym-self.json
+          python "$MYC" --profile "$PROFILE" --corpus > /tmp/sync-myc.json
+          python "$SYM" --profile "$PROFILE" --corpus > /tmp/sync-sym.json
+          cmp /tmp/sync-myc.json /tmp/sync-sym.json
+
+      - name: Assert exact component evidence identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          def read(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+          cp = read('/tmp/cp-sym-self.json')
+          cfg = read('/tmp/cfg-sym-self.json')
+          sync = read('/tmp/sync-sym-self.json')
+          assert cp['conformance_class'] == 'CrossImplementationConformance'
+          assert cp['profile_sha256'] == '770552d12489df1d2cdf8b0af676b01ea9a3da21940f70ed8a71910deaa35009'
+          assert cp['corpus_sha256'] == 'b37be9d2e3fd0cbec3696a19327c26dc4ba7062ec089ad92ad99bc28a11fea8e'
+          assert cfg['conformance_class'] == 'CrossImplementationConformance'
+          assert cfg['profile_sha256'] == 'de4435a69356557b1812f8beb46d654c66b9c957be9d18c64bd0431f92546d5a'
+          assert cfg['corpus_sha256'] == '3009e97529934fa8f470769de5615dcfda17bde0e942683e939d2b733430a216'
+          assert sync['conformance_class'] == 'CrossImplementationConformance'
+          assert sync['profile_sha256'] == '60daae86044098561fa8e41bcdf6f695ab41234760be4b7e235d2780271b681e'
+          assert sync['corpus_sha256'] == '2ca6d79212cfd0acae1e974c8390d564bab06821050d8eacbc32f437630ef60b'
+          PY
+
+      - name: Validate submanifest twice byte-identically
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST=docs/research/manifests/mycelix-constitution-runtime-policy-downstream-observed-fca2c107-v1.json
+          VALIDATOR=scripts/ig008cd0_validate_constitution_runtime_policy_submanifest.py
+          python "$VALIDATOR" --manifest "$MANIFEST" --self-test > /tmp/submanifest-1.json
+          python "$VALIDATOR" --manifest "$MANIFEST" --self-test > /tmp/submanifest-2.json
+          cmp /tmp/submanifest-1.json /tmp/submanifest-2.json
+
+      - name: Assert exact submanifest ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          with open('/tmp/submanifest-1.json', encoding='utf-8') as f:
+              r = json.load(f)
+          assert r['validated'] is True
+          assert r['authority_class'] == 'ObservedCompositeSubslice'
+          assert r['claim_ceiling'] == 'ObservedConstitutionRuntimePolicySliceOnly'
+          assert r['coverage_definition'] == 'SourceObservedMechanismRepresentedNotPropertySatisfied'
+          assert r['scope'] == 'ConstitutionRuntimePolicyDownstreamV1'
+          assert r['manifest_content_sha256'] == '157402e76abffd3849dc6d2001a7c0bbde296e80ab6a7f5c77c8f3e288302183'
+          assert r['production_subject'] == 'fca2c107a1ea5108823ce617ba4111b6f7f77230'
+          assert r['mechanism_count'] == 3
+          assert r['known_issues'] == [943, 944, 1002]
+          assert r['unestablished_property_count'] == 8
+          assert r['self_test'] is True
+          PY
+
+      - name: Verify every checkout immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          for d in mycelix-cp symthaea-cp mycelix-cfg symthaea-cfg mycelix-sync; do
+            git -C "_evidence/$d" diff --exit-code
+            git -C "_evidence/$d" diff --cached --exit-code
+            test -z "$(git -C "_evidence/$d" status --porcelain)"
+          done
