@@ -1,0 +1,133 @@
+name: Psych-Bench Declarative Suite Manifest
+
+on:
+  pull_request:
+    branches:
+      - psych-bench/executable-suite-identity
+    paths:
+      - '.github/workflows/psych-bench-suite-manifest.yml'
+      - 'crates/domains/symthaea-psych-bench/src/suite_manifest.rs'
+      - 'crates/domains/symthaea-psych-bench/src/suite_identity.rs'
+      - 'crates/domains/symthaea-psych-bench/src/lib.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  push:
+    branches:
+      - psych-bench/benchmark-suite-identity
+    paths:
+      - '.github/workflows/psych-bench-suite-manifest.yml'
+      - 'crates/domains/symthaea-psych-bench/src/suite_manifest.rs'
+      - 'crates/domains/symthaea-psych-bench/src/suite_identity.rs'
+      - 'crates/domains/symthaea-psych-bench/src/lib.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  suite-manifest:
+    name: Exact-subject declarative suite manifest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Suite manifest format diagnostic
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/src/suite_manifest.rs
+
+      - name: Compile psych-bench library
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --lib
+
+      - name: Execute suite-manifest regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib suite_manifest::tests -- --nocapture
+
+      - name: Strict focused Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/suite-manifest-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --lib --no-deps \
+            --message-format=json > "$report"
+          cargo_status=$?
+          set -e
+          python3 - "$report" crates/domains/symthaea-psych-bench/src/suite_manifest.rs <<'PY'
+          import json
+          import sys
+
+          report = sys.argv[1]
+          targets = sys.argv[2:]
+          failures = []
+          with open(report, encoding='utf-8') as stream:
+              for raw in stream:
+                  try:
+                      event = json.loads(raw)
+                  except json.JSONDecodeError:
+                      continue
+                  message = event.get('message')
+                  if not isinstance(message, dict) or message.get('level') not in {'warning', 'error'}:
+                      continue
+                  for span in message.get('spans') or []:
+                      if not span.get('is_primary'):
+                          continue
+                      filename = span.get('file_name', '')
+                      if any(filename == target or filename.endswith('/' + target) for target in targets):
+                          code = (message.get('code') or {}).get('code') or 'rustc'
+                          failures.append(
+                              f"{filename}:{span.get('line_start', '?')}: {message['level']}[{code}]: {message.get('message', '')}"
+                          )
+                          break
+          if failures:
+              print('focused Clippy diagnostics on declarative suite manifest:', file=sys.stderr)
+              print('\n'.join(failures), file=sys.stderr)
+              raise SystemExit(1)
+          PY
+          test "$cargo_status" -eq 0
+
+      - name: Postflight exact-subject immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
