@@ -118,6 +118,8 @@ mod v2_external_high_water_witness_chain;
 mod v2_external_witness_publication_envelope;
 #[cfg(test)]
 mod v2_external_log_trust_state;
+#[cfg(test)]
+mod v2_sigstore_tuf_fixture_capsule;
 #[cfg(all(test, feature = "symthaea-backend"))]
 mod v2_preheldout_custody;
 #[cfg(all(test, feature = "symthaea-backend"))]
