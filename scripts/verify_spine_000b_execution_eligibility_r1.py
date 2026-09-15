@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import math
 import struct
+import sys
 from pathlib import Path
 
 DOC = Path("docs/research/SPINE_000B_EXECUTION_ELIGIBILITY_R1.md")
@@ -28,6 +29,7 @@ def load_c2():
     if spec is None or spec.loader is None:
         fail("could not load C2 oracle module")
     module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -220,7 +222,7 @@ def self_test() -> None:
     )
     for receipt in valid_rows:
         validate_execution_semantics(receipt)
-        receipt.canonical_bytes()  # C2 structural validation must agree.
+        receipt.canonical_bytes()
 
     expect_reject(
         lambda: validate_execution_semantics(
@@ -259,7 +261,6 @@ def self_test() -> None:
         "health-disabled with proposal",
     )
 
-    # Reserved-only is byte-distinct from exact neutral while remaining production-neutral.
     exact_receipt = make_receipt(
         c2, outcome="EXECUTED_NEUTRAL", eligible=True, emitted=True, admitted=False, proposal=neutral
     )
