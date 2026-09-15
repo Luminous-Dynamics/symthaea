@@ -54,5 +54,9 @@ name = "validity_capacity_evidence_chain_verify"
 path = "examples/validity_capacity_evidence_chain_verify.rs"
 
 [[example]]
+name = "validity_capacity_evidence_v3_verify"
+path = "examples/validity_capacity_evidence_v3_verify.rs"
+
+[[example]]
 name = "validity_capacity_protocol_identity"
 path = "examples/validity_capacity_protocol_identity.rs"
