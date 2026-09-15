@@ -9,6 +9,7 @@ on:
       - research/spine-000b-p0-identity
     paths:
       - '.github/workflows/spine-000b-p1r.yml'
+      - 'docs/research/SPINE_000B_P1R_QUALIFICATION.md'
       - 'scripts/verify_spine_000b_p1r_contract.py'
       - 'scripts/generate_spine_golden_fixtures.py'
       - 'scripts/spine_000b_influence_oracle.py'
@@ -47,6 +48,7 @@ jobs:
           git diff --name-only "$base"..HEAD | sort > /tmp/spine_p1r_changed
           cat > /tmp/spine_p1r_allowed <<'EOF'
           .github/workflows/spine-000b-p1r.yml
+          docs/research/SPINE_000B_P1R_QUALIFICATION.md
           scripts/generate_spine_golden_fixtures.py
           scripts/verify_spine_000b_p1r_contract.py
           src/cognitive_loop/subsystem_trait.rs
@@ -106,6 +108,7 @@ jobs:
             scripts/spine_000b_influence_oracle.py \
             scripts/generate_spine_golden_fixtures.py \
             scripts/verify_spine_000b_p1r_contract.py \
+            docs/research/SPINE_000B_P1R_QUALIFICATION.md \
             tests/fixtures/spine_000b_golden_fixtures.json \
             Cargo.toml \
             Cargo.lock \
