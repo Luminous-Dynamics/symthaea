@@ -9,19 +9,42 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: assure-002g-rustfmt-1.96-oracle
+  cancel-in-progress: true
+
+env:
+  ORACLE_SOURCE_HEAD: 74f3e31aef5d540f2e286d7970a6b632e9330318
+
 jobs:
   oracle:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.ORACLE_SOURCE_HEAD }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prove exact historical source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected_source_head=%s\nactual_source_head=%s\n' "$ORACLE_SOURCE_HEAD" "$actual"
+          test "$actual" = "$ORACLE_SOURCE_HEAD"
+          git diff --exit-code
 
       - name: Install exact formatter
         shell: bash
         run: |
           set -euo pipefail
+          if ! command -v rustup >/dev/null 2>&1; then
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+            export PATH="$HOME/.cargo/bin:$PATH"
+            printf '%s\n' "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          fi
           rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
           rustup override set 1.96.0
           rustc --version --verbose
@@ -32,8 +55,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p target/assure-002g-rustfmt-oracle
-          printf 'oracle_source_head=%s\n' "$(git rev-parse HEAD^)" > target/assure-002g-rustfmt-oracle/MANIFEST.txt
-          printf 'workflow_head=%s\n' "$(git rev-parse HEAD)" >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          printf 'oracle_source_head=%s\n' "$(git rev-parse HEAD)" > target/assure-002g-rustfmt-oracle/MANIFEST.txt
           printf 'before_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs | cut -d' ' -f1)" >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
 
       - name: Apply Rust 1.96 rustfmt
