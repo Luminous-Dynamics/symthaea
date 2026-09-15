@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-finalized-state"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic terminal authority for lineage-bound fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-lineage-bound-finalization-authorization = { path = "../symthaea-fabrication-lineage-bound-finalization-authorization" }
+symthaea-fabrication-lineage-bound-finalization-execution = { path = "../symthaea-fabrication-lineage-bound-finalization-execution" }
+symthaea-fabrication-lineage-bound-finalization-state-binding = { path = "../symthaea-fabrication-lineage-bound-finalization-state-binding" }
+symthaea-fabrication-lineage-bound-upgrade-handoff = { path = "../symthaea-fabrication-lineage-bound-upgrade-handoff" }
+serde = { workspace = true }
+serde_json = { workspace = true }
