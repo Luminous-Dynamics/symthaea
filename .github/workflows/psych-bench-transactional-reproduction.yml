@@ -1,0 +1,260 @@
+name: Psych-Bench Transactional Reproduction
+
+on:
+  pull_request:
+    branches:
+      - psych-bench/reproduction-command-contract
+    paths:
+      - '.github/workflows/psych-bench-transactional-reproduction.yml'
+      - 'papers/evaluation/psych-bench/reproduce.sh'
+      - 'crates/domains/symthaea-psych-bench/examples/reproduction_receipt.rs'
+      - 'crates/domains/symthaea-psych-bench/examples/psych_bench_paper_data.rs'
+      - 'crates/domains/symthaea-psych-bench/Cargo.toml'
+      - 'Cargo.lock'
+  push:
+    branches:
+      - psych-bench/transactional-reproduction-receipt
+  workflow_dispatch:
+
+concurrency:
+  # Use the same branch key for automatic push + PR events. The later event
+  # supersedes the earlier one instead of consuming two runners for one head.
+  # Deliberate manual dispatches remain unique and non-cancellable.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+permissions:
+  contents: read
+
+jobs:
+  transactional-reproduction:
+    name: Exact-subject transactional reproduction contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Bind exact subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha || github.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test -z "$(git status --porcelain)"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          printf 'qualified_subject=%s\n' "$actual"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Enforce shell and Rust formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n papers/evaluation/psych-bench/reproduce.sh
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-psych-bench/examples/reproduction_receipt.rs
+
+      - name: Reject staging inside canonical paper trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          for forbidden in \
+            "$GITHUB_WORKSPACE/papers/data/psych_bench/reproduction-escape" \
+            "$GITHUB_WORKSPACE/papers/evaluation/psych-bench/reproduction-escape"
+          do
+            set +e
+            output="$(papers/evaluation/psych-bench/reproduce.sh \
+              --self-test --output-dir "$forbidden" 2>&1)"
+            status=$?
+            set -e
+            test "$status" -ne 0
+            grep -F 'output directory must resolve outside canonical paper trees' <<<"$output"
+            test ! -e "$forbidden"
+          done
+
+      - name: Bind expected CSV census to generator source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          source = Path(
+              'crates/domains/symthaea-psych-bench/examples/psych_bench_paper_data.rs'
+          ).read_text()
+          expected = {
+              'ablation_domains.csv',
+              'cognitive_profile.csv',
+              'correlations.csv',
+              'neuromod_curves.csv',
+              'neuromod_profiles.csv',
+              'normative_zscores.csv',
+              'reliability.csv',
+              'sat_arcfluid.csv',
+              'sat_curves.csv',
+              'sat_flanker.csv',
+              'sat_nback.csv',
+              'sat_stroop.csv',
+              'sat_visualsearch.csv',
+              'sat_wcst.csv',
+          }
+
+          direct = set(re.findall(r'out\.join\("([^"]+\.csv)"\)', source))
+          marker = 'let name_map = ['
+          if marker not in source:
+              raise SystemExit('paper generator SAT filename map is missing')
+          tail = source.split(marker, 1)[1]
+          block = tail.split('];', 1)[0]
+          mapped = set(re.findall(r'\(\s*"[^"]+"\s*,\s*"([^"]+\.csv)"\s*\)', block))
+          actual = direct | mapped
+          if direct & mapped:
+              raise SystemExit(f'duplicate direct/mapped generated CSV names: {sorted(direct & mapped)}')
+          if actual != expected:
+              raise SystemExit(
+                  'paper generator CSV census drifted; '
+                  f'missing={sorted(expected - actual)} extra={sorted(actual - expected)}'
+              )
+          if len(direct) != 8 or len(mapped) != 6:
+              raise SystemExit(
+                  f'expected 8 direct + 6 SAT CSV outputs, found {len(direct)} + {len(mapped)}'
+              )
+          PY
+
+      - name: Compile and unit-test receipt helper
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target/psych-bench-reproduction-build/${{ steps.subject.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench --example reproduction_receipt
+          cargo test --locked -p symthaea-psych-bench --example reproduction_receipt
+
+      - name: Execute transactional synthetic self-test
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target/psych-bench-reproduction-build/${{ steps.subject.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/psych-bench-reproduction-selftest"
+          rm -rf "$out"
+          papers/evaluation/psych-bench/reproduce.sh --self-test --output-dir "$out"
+          test -f "$out/reproduction_receipt.json"
+          test -f "$out/promotion_manifest.json"
+          python3 - "$out" '${{ steps.subject.outputs.sha }}' <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          subject = sys.argv[2]
+          receipt = json.loads((root / 'reproduction_receipt.json').read_text())
+          promotion = json.loads((root / 'promotion_manifest.json').read_text())
+          assert receipt['schema_version'] == 'psych-bench-reproduction-receipt-v1'
+          assert receipt['mode'] == 'self_test'
+          assert receipt['source_subject'] == subject
+          assert receipt['digest_algorithm'] == 'blake3-256'
+          assert receipt['suite_binding']['status'] == 'unbound'
+          assert len(receipt['steps']) == 4
+          assert all(step['exit_code'] == 0 for step in receipt['steps'])
+          assert len(receipt['artifacts']) == 17
+          assert len(promotion['entries']) == 14
+          assert all(
+              entry['canonical_path'].startswith('papers/data/psych_bench/')
+              for entry in promotion['entries']
+          )
+          PY
+
+      - name: Tampered staged artifact fails independent verification
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target/psych-bench-reproduction-build/${{ steps.subject.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/psych-bench-reproduction-selftest"
+          printf '\ntampered\n' >> "$out/artifacts/out_default.json"
+          set +e
+          cargo run --locked --quiet -p symthaea-psych-bench \
+            --example reproduction_receipt -- \
+            verify self_test "$out/artifacts" "$out/step-journal.tsv" \
+            '${{ steps.subject.outputs.sha }}' '${{ steps.subject.outputs.tree }}' \
+            papers/evaluation/psych-bench/reproduce.sh Cargo.lock \
+            "$out/rustc-version.txt" "$out/cargo-version.txt" \
+            "$out/reproduction_receipt.json" "$out/promotion_manifest.json"
+          status=$?
+          set -e
+          test "$status" -ne 0
+
+      - name: Strict focused Clippy
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target/psych-bench-reproduction-build/${{ steps.subject.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/reproduction-receipt-clippy.jsonl"
+          set +e
+          cargo clippy --locked -p symthaea-psych-bench --example reproduction_receipt \
+            --no-deps --message-format=json > "$report"
+          cargo_status=$?
+          set -e
+          python3 - "$report" <<'PY'
+          import json
+          import sys
+
+          target = 'crates/domains/symthaea-psych-bench/examples/reproduction_receipt.rs'
+          failures = []
+          with open(sys.argv[1], encoding='utf-8') as stream:
+              for raw in stream:
+                  try:
+                      event = json.loads(raw)
+                  except json.JSONDecodeError:
+                      continue
+                  message = event.get('message')
+                  if not isinstance(message, dict) or message.get('level') not in {'warning', 'error'}:
+                      continue
+                  for span in message.get('spans') or []:
+                      if not span.get('is_primary'):
+                          continue
+                      filename = span.get('file_name', '')
+                      if filename == target or filename.endswith('/' + target):
+                          code = (message.get('code') or {}).get('code') or 'rustc'
+                          failures.append(
+                              f"{filename}:{span.get('line_start', '?')}: {message['level']}[{code}]: {message.get('message', '')}"
+                          )
+                          break
+          if failures:
+              print('focused Clippy diagnostics on reproduction receipt helper:', file=sys.stderr)
+              print('\n'.join(failures), file=sys.stderr)
+              raise SystemExit(1)
+          PY
+          test "$cargo_status" -eq 0
+
+      - name: Prove canonical paper data remained untouched
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- papers/data/psych_bench papers/evaluation/psych-bench
+
+      - name: Postflight exact-subject immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = '${{ steps.subject.outputs.sha }}'
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
