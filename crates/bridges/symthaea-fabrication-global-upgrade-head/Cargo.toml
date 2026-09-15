@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-fabrication-global-upgrade-head"
+version = "0.1.0"
+edition = "2024"
+description = "Global same-view currentness and predecessor roots for finalized fabrication upgrades"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-upgrade-authority = { path = "../symthaea-fabrication-upgrade-authority" }
+symthaea-fabrication-upgrade-finalized-head = { path = "../symthaea-fabrication-upgrade-finalized-head" }
+symthaea-fabrication-upgrade-finalized-state = { path = "../symthaea-fabrication-upgrade-finalized-state" }
+serde = { workspace = true }
+serde_json = { workspace = true }
