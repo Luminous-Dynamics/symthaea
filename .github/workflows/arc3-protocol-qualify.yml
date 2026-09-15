@@ -1,0 +1,110 @@
+name: ARC3 Protocol Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arc3-protocol-qualify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc3-protocol-qualify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: ba5454fc821a90fe7a00c0d202e3eee02c7b81f0
+  CARGO_TERM_COLOR: always
+
+jobs:
+  oracle:
+    name: Independent protocol oracle
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Run independent canonicalization oracle
+        run: python3 scripts/arc3_protocol_oracle.py
+
+  rust-module-proof:
+    name: Rust protocol module proof
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Build minimal exact-source proof crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_dir="$RUNNER_TEMP/arc3-protocol-proof"
+          mkdir -p "$proof_dir/src"
+          cp crates/domains/symthaea-psych-bench/src/benchmarks/reasoning/arc3_protocol.rs \
+            "$proof_dir/src/lib.rs"
+          cat > "$proof_dir/Cargo.toml" <<'EOF'
+          [package]
+          name = "arc3-protocol-exact-source-proof"
+          version = "0.0.0"
+          edition = "2024"
+          rust-version = "1.94"
+          publish = false
+
+          [dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          blake3 = "1.5"
+          EOF
+          cd "$proof_dir"
+          cargo test --lib --locked 2>/dev/null || {
+            # No lock exists on first execution. Generate it from the declared
+            # dependency families, then require the actual test execution.
+            cargo generate-lockfile
+            cargo test --lib --locked
+          }
+
+      - name: Cross-check independent oracle
+        run: python3 scripts/arc3_protocol_oracle.py
+
+  rust-contract:
+    name: Rust protocol contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format affected crate
+        run: cargo fmt -p symthaea-psych-bench -- --check
+
+      - name: Check affected crate
+        run: cargo check -p symthaea-psych-bench
+
+      - name: Test ARC3 protocol contract
+        run: cargo test -p symthaea-psych-bench arc3_protocol --lib
+
+      - name: Cross-check independent oracle
+        run: python3 scripts/arc3_protocol_oracle.py
