@@ -44,9 +44,10 @@ fn current_head_projection_uses_exact_lineage_head_view() {
 #[test]
 fn adapter_does_not_mint_or_deserialize_live_authority() {
     let source = include_str!("../src/lib.rs");
+    assert!(source.contains("#![deny(unsafe_code)]"));
     assert!(!source.contains("Serialize"));
     assert!(!source.contains("Deserialize"));
     assert!(!source.contains("Sha256Digest(["));
     assert!(!source.contains("from_hex"));
-    assert!(!source.contains("unsafe"));
+    assert!(!source.contains("unsafe {"));
 }
