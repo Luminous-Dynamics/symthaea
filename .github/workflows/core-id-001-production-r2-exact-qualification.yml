@@ -1,0 +1,410 @@
+name: CORE-ID-001 Production R2 Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/core-id-001-production-r2-f660afb7
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-id-001-production-r2-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Qualify immutable CORE-ID-001 production R2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: f660afb7b0bf57f7cc52785d4436d0952cb779aa
+      PARENT_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+      TREE_SHA: 98f6a97f425bbdbefc6dbd4322856301807f1660
+      ORACLE_SHA: da3b0e04018f57d9edec6898324964839c36ff09
+      PACKAGE: symthaea-identity
+      SOURCE: crates/core/symthaea-identity/src/lib.rs
+      MANIFEST: crates/core/symthaea-identity/Cargo.toml
+      LOCKFILE: Cargo.lock
+      EXPECTED_SOURCE_SHA256: 9b16b782186623dbe8ebdb1783c24eb6454f807fc4b9ce21856b02916228ff4b
+      EXPECTED_MANIFEST_SHA256: 40ac82fdc83b088be6f4ec5541f363002aab5ca94702c8efadfe2c81dc47fed0
+      EXPECTED_LOCKFILE_SHA256: 53f515bafd61d2c36e1ee8f181ab82d99c04027db9d8649cf80e86423415e109
+      ORACLE_PY: scripts/core-canonical-identity-oracle.py
+      ORACLE_RS: scripts/core-canonical-identity-oracle.rs
+      ORACLE_VECTORS: docs/release/evidence/CORE_ID_001_GOLDEN_VECTORS.tsv
+      ORACLE_PROFILE: docs/release/evidence/CORE_ID_001_CANONICAL_IDENTITY_PROFILE.md
+      EXPECTED_ORACLE_PY_SHA256: 76a666f6c3323feccae2a26487364bcd8c7345bc505ba2c396e774903aff0062
+      EXPECTED_ORACLE_RS_SHA256: 734c3b4860519a9415917ca442688fb68e67341196baed23a4b62208f7ce4940
+      EXPECTED_VECTORS_SHA256: 142f9dfec85cc0e63bb24e609900010db2f3f69a8b73a6a4314b3cb16f72db71
+      EXPECTED_PROFILE_SHA256: b6ebd5923e5bc2c29252e7e6a2ee1c3dac01f2bed012ea025547fd7448e03268
+
+    steps:
+      - name: Checkout exact immutable product subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact identity, ancestry, tree, scope, and product digests
+        id: identity
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$TREE_SHA"
+
+          mapfile -t changed < <(git diff --name-only "$PARENT_SHA".."$SUBJECT_SHA" | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "$LOCKFILE"
+          test "${changed[1]}" = "$MANIFEST"
+          test "${changed[2]}" = "$SOURCE"
+
+          test "$(sha256sum "$SOURCE" | awk '{print $1}')" = "$EXPECTED_SOURCE_SHA256"
+          test "$(sha256sum "$MANIFEST" | awk '{print $1}')" = "$EXPECTED_MANIFEST_SHA256"
+          test "$(sha256sum "$LOCKFILE" | awk '{print $1}')" = "$EXPECTED_LOCKFILE_SHA256"
+          git diff --check "$PARENT_SHA".."$SUBJECT_SHA"
+
+      - name: Bind exact qualified CORE-ID-001 theorem dependency
+        id: oracle_dependency
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$ORACLE_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$ORACLE_SHA"
+
+          git show "$ORACLE_SHA:$ORACLE_PY" > "$RUNNER_TEMP/core-id-oracle.py"
+          git show "$ORACLE_SHA:$ORACLE_RS" > "$RUNNER_TEMP/core-id-oracle.rs"
+          git show "$ORACLE_SHA:$ORACLE_VECTORS" > "$RUNNER_TEMP/core-id-vectors.tsv"
+          git show "$ORACLE_SHA:$ORACLE_PROFILE" > "$RUNNER_TEMP/core-id-profile.md"
+
+          test "$(sha256sum "$RUNNER_TEMP/core-id-oracle.py" | awk '{print $1}')" = "$EXPECTED_ORACLE_PY_SHA256"
+          test "$(sha256sum "$RUNNER_TEMP/core-id-oracle.rs" | awk '{print $1}')" = "$EXPECTED_ORACLE_RS_SHA256"
+          test "$(sha256sum "$RUNNER_TEMP/core-id-vectors.tsv" | awk '{print $1}')" = "$EXPECTED_VECTORS_SHA256"
+          test "$(sha256sum "$RUNNER_TEMP/core-id-profile.md" | awk '{print $1}')" = "$EXPECTED_PROFILE_SHA256"
+
+      - name: Install exact Rust qualification toolchain
+        id: toolchain_install
+        continue-on-error: true
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Verify exact Rust toolchain identity
+        id: toolchain_identity
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | tee "$RUNNER_TEMP/rustc-version.txt"
+          cargo --version | tee "$RUNNER_TEMP/cargo-version.txt"
+          rustfmt --version | tee "$RUNNER_TEMP/rustfmt-version.txt"
+          clippy-driver --version | tee "$RUNNER_TEMP/clippy-version.txt"
+          grep -F 'rustc 1.96.0' "$RUNNER_TEMP/rustc-version.txt"
+          grep -F 'cargo 1.96.0' "$RUNNER_TEMP/cargo-version.txt"
+
+      - name: Rustfmt exact product package
+        id: rustfmt
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Locked all-targets check
+        id: check
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Locked all-targets tests
+        id: tests
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p "$PACKAGE" --all-targets --locked
+
+      - name: Strict locked Clippy
+        id: clippy
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Execute qualified vectors and exhaustive edge profile against production API
+        id: oracle_conformance
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$RUNNER_TEMP/core-id-vectors.tsv"
+          mkdir -p "crates/core/$PACKAGE/tests"
+
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          src = Path(os.environ["RUNNER_TEMP"]) / "core-id-vectors.tsv"
+          dst = Path("crates/core/symthaea-identity/tests/qualified_core_id_vectors.rs")
+
+          rows = []
+          for raw in src.read_text().splitlines():
+              if not raw or raw.startswith("#"):
+                  continue
+              name, max_bytes, hex_utf8, expected = raw.split("\t")
+              max_bytes = int(max_bytes)
+              if max_bytes != 4096:
+                  raise SystemExit(f"unexpected vector byte budget for {name}: {max_bytes}")
+              if expected not in {"accept", "reject"}:
+                  raise SystemExit(f"unexpected vector expectation for {name}: {expected}")
+              data = bytes.fromhex(hex_utf8)
+              byte_expr = ", ".join(f"0x{b:02x}" for b in data)
+              rows.append(
+                  f"        ({json.dumps(name)}, vec![{byte_expr}], {str(expected == 'accept').lower()}),"
+              )
+
+          if len(rows) != 71:
+              raise SystemExit(f"expected 71 qualified vectors, found {len(rows)}")
+
+          test_src = """\
+          use symthaea_identity::{
+              CanonicalIdentifier, CANONICAL_LEXICAL_ID_V1_PROFILE,
+          };
+
+          type Id4096 = CanonicalIdentifier<4096>;
+
+          #[test]
+          fn qualified_71_vectors_match_exactly() {
+              assert_eq!(
+                  Id4096::PROFILE,
+                  "symthaea.core.canonical-lexical-id.v1"
+              );
+              assert_eq!(
+                  CANONICAL_LEXICAL_ID_V1_PROFILE,
+                  "symthaea.core.canonical-lexical-id.v1"
+              );
+
+              let cases: Vec<(&str, Vec<u8>, bool)> = vec![
+          """ + "\n".join(rows) + """
+              ];
+
+              assert_eq!(cases.len(), 71);
+              for (name, bytes, should_accept) in cases {
+                  let result = Id4096::from_utf8_bytes(bytes.clone());
+                  assert_eq!(
+                      result.is_ok(),
+                      should_accept,
+                      "qualified vector {name} produced unexpected admission result"
+                  );
+                  if let Ok(identifier) = result {
+                      assert_eq!(
+                          identifier.as_bytes(),
+                          bytes.as_slice(),
+                          "qualified vector {name} changed accepted bytes"
+                      );
+                  }
+              }
+          }
+
+          fn expected_v1_edge_whitespace(ch: char) -> bool {
+              matches!(
+                  ch as u32,
+                  0x0009..=0x000D
+                      | 0x0020
+                      | 0x0085
+                      | 0x00A0
+                      | 0x1680
+                      | 0x2000..=0x200A
+                      | 0x2028
+                      | 0x2029
+                      | 0x202F
+                      | 0x205F
+                      | 0x3000
+              )
+          }
+
+          #[test]
+          fn every_unicode_scalar_matches_the_frozen_edge_profile() {
+              for codepoint in 0..=0x10_FFFF {
+                  let Some(ch) = char::from_u32(codepoint) else {
+                      continue;
+                  };
+
+                  let mut leading = String::new();
+                  leading.push(ch);
+                  leading.push('x');
+
+                  let mut trailing = String::from("x");
+                  trailing.push(ch);
+
+                  let expected_reject =
+                      expected_v1_edge_whitespace(ch) || codepoint < 0x20 || codepoint == 0x7F;
+
+                  assert_eq!(
+                      Id4096::new(leading).is_err(),
+                      expected_reject,
+                      "leading scalar U+{codepoint:04X}"
+                  );
+                  assert_eq!(
+                      Id4096::new(trailing).is_err(),
+                      expected_reject,
+                      "trailing scalar U+{codepoint:04X}"
+                  );
+              }
+          }
+
+          #[test]
+          fn serde_revalidates_instead_of_bypassing_admission() {
+              let valid: Id4096 = serde_json::from_str(r#""Process-A""#).unwrap();
+              assert_eq!(valid.as_str(), "Process-A");
+
+              assert!(serde_json::from_str::<Id4096>(r#"" p1""#).is_err());
+              assert!(serde_json::from_str::<Id4096>(r#""p1\u0000""#).is_err());
+          }
+          """
+
+          dst.write_text(test_src)
+          PY
+
+          cargo test -p "$PACKAGE" --test qualified_core_id_vectors --locked
+          rm -f "crates/core/$PACKAGE/tests/qualified_core_id_vectors.rs"
+          rmdir "crates/core/$PACKAGE/tests" 2>/dev/null || true
+
+      - name: Prove private state is not constructible by an external crate
+        id: privacy
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "crates/core/$PACKAGE/tests"
+          cat > "crates/core/$PACKAGE/tests/private_field_probe.rs" <<'RS'
+          use symthaea_identity::CanonicalIdentifier;
+
+          #[test]
+          fn external_code_cannot_construct_private_state() {
+              let _ = CanonicalIdentifier::<4096> {
+                  value: String::from("p1"),
+              };
+          }
+          RS
+
+          set +e
+          cargo test -p "$PACKAGE" --test private_field_probe --no-run --locked \
+            > "$RUNNER_TEMP/private-field.log" 2>&1
+          status=$?
+          set -e
+
+          cat "$RUNNER_TEMP/private-field.log"
+          test "$status" -ne 0
+          grep -E 'field .*value.*private|private field' "$RUNNER_TEMP/private-field.log"
+
+          rm -f "crates/core/$PACKAGE/tests/private_field_probe.rs"
+          rmdir "crates/core/$PACKAGE/tests" 2>/dev/null || true
+
+      - name: Prove qualification leaves immutable subject clean
+        id: clean_checkout
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$TREE_SHA"
+          test "$(sha256sum "$SOURCE" | awk '{print $1}')" = "$EXPECTED_SOURCE_SHA256"
+          test "$(sha256sum "$MANIFEST" | awk '{print $1}')" = "$EXPECTED_MANIFEST_SHA256"
+          test "$(sha256sum "$LOCKFILE" | awk '{print $1}')" = "$EXPECTED_LOCKFILE_SHA256"
+
+      - name: Record machine-readable qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > core-id-001-production-r2-qualification.json <<EOF
+          {
+            "contract": "CORE-ID-001-PRODUCTION-R2-EXACT-QUALIFICATION-v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "parent_sha": "$PARENT_SHA",
+            "tree_sha": "$TREE_SHA",
+            "qualified_oracle_subject_sha": "$ORACLE_SHA",
+            "profile": "symthaea.core.canonical-lexical-id.v1",
+            "rust_toolchain": "1.96.0",
+            "product_digests": {
+              "source_sha256": "$EXPECTED_SOURCE_SHA256",
+              "manifest_sha256": "$EXPECTED_MANIFEST_SHA256",
+              "lockfile_sha256": "$EXPECTED_LOCKFILE_SHA256"
+            },
+            "oracle_digests": {
+              "python_sha256": "$EXPECTED_ORACLE_PY_SHA256",
+              "rust_sha256": "$EXPECTED_ORACLE_RS_SHA256",
+              "vectors_sha256": "$EXPECTED_VECTORS_SHA256",
+              "profile_sha256": "$EXPECTED_PROFILE_SHA256"
+            },
+            "gates": {
+              "identity": "${{ steps.identity.outcome }}",
+              "oracle_dependency": "${{ steps.oracle_dependency.outcome }}",
+              "toolchain_install": "${{ steps.toolchain_install.outcome }}",
+              "toolchain_identity": "${{ steps.toolchain_identity.outcome }}",
+              "rustfmt": "${{ steps.rustfmt.outcome }}",
+              "check_all_targets_locked": "${{ steps.check.outcome }}",
+              "test_all_targets_locked": "${{ steps.tests.outcome }}",
+              "clippy_all_targets_deny_warnings_locked": "${{ steps.clippy.outcome }}",
+              "qualified_oracle_conformance": "${{ steps.oracle_conformance.outcome }}",
+              "external_private_state_probe": "${{ steps.privacy.outcome }}",
+              "clean_checkout": "${{ steps.clean_checkout.outcome }}"
+            },
+            "claims": {
+              "lexical_profile_conformance": true,
+              "accepted_bytes_preserved": true,
+              "serde_admission_revalidated": true,
+              "private_state_external_construction_blocked": true,
+              "namespace_uniqueness": false,
+              "unicode_spoof_defense": false,
+              "provenance_or_authenticity": false,
+              "currentness": false,
+              "authorization": false
+            }
+          }
+          EOF
+          cat core-id-001-production-r2-qualification.json
+
+      - name: Upload exact qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: core-id-001-production-r2-exact-qualification
+          path: |
+            core-id-001-production-r2-qualification.json
+            ${{ runner.temp }}/rustc-version.txt
+            ${{ runner.temp }}/cargo-version.txt
+            ${{ runner.temp }}/rustfmt-version.txt
+            ${{ runner.temp }}/clippy-version.txt
+            ${{ runner.temp }}/private-field.log
+          if-no-files-found: error
+
+      - name: Enforce qualification outcome
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.identity.outcome }}" = success
+          test "${{ steps.oracle_dependency.outcome }}" = success
+          test "${{ steps.toolchain_install.outcome }}" = success
+          test "${{ steps.toolchain_identity.outcome }}" = success
+          test "${{ steps.rustfmt.outcome }}" = success
+          test "${{ steps.check.outcome }}" = success
+          test "${{ steps.tests.outcome }}" = success
+          test "${{ steps.clippy.outcome }}" = success
+          test "${{ steps.oracle_conformance.outcome }}" = success
+          test "${{ steps.privacy.outcome }}" = success
+          test "${{ steps.clean_checkout.outcome }}" = success
