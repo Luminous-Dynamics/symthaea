@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-assurance-bootstrap-executable-mapping-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Supervisor-observed executable mapping continuity across the confined verifier bootstrap"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "ptrace", "runtime", "memory", "linux"]
+categories = ["development-tools", "os"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-bootstrap-syscall-confinement = { path = "../symthaea-assurance-bootstrap-syscall-confinement" }
+symthaea-assurance-ptrace-static-exec-confirmation = { path = "../symthaea-assurance-ptrace-static-exec-confirmation" }
+
+[target.'cfg(all(target_os = "linux", target_arch = "x86_64", any(target_env = "gnu", target_env = "musl")))'.dependencies]
+nix = { version = "0.26.4", features = ["fs"] }
