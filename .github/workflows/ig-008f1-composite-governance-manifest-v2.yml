@@ -1,0 +1,240 @@
+name: IG-008F1 Composite Governance Manifest v2
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/manifests/mycelix-observed-composite-fca2c107-v1.json"
+      - "docs/research/manifests/mycelix-observed-composite-fca2c107-v2.json"
+      - "scripts/ig008f0_validate_composite_manifest.py"
+      - "scripts/ig008f1_validate_composite_manifest_v2.py"
+      - "scripts/ig008a0_mycelix_adapter_oracle.py"
+      - "scripts/ig008s0_mycelix_threshold_signing_oracle.py"
+      - "scripts/ig008e0_mycelix_execution_oracle.py"
+      - "docs/research/IG_008F1_COMPOSITE_GOVERNANCE_MANIFEST_V2.md"
+      - ".github/workflows/ig-008f1-composite-governance-manifest-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-composite-manifest-v2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      PRODUCTION_SUBJECT: fca2c107a1ea5108823ce617ba4111b6f7f77230
+      VOTING_EVIDENCE_HEAD: 4b4e27910a98ad393e5a508e54e0f73c48c19107
+      SIGNING_EVIDENCE_HEAD: a580915d588338077ce6196514c43e24052f86cd
+      EXECUTION_EVIDENCE_HEAD: 197714209c60503f0fba4143409da383bc9cbf83
+      V1_SHA256: 366b87944e74fe01369b78a8a7ea1c34f6dee05237583a47d86e5999b93b150c
+      V2_SHA256: e3b42dbd7dacaa2f44de8bc330e85ff7d624f291d27c4a303fbaccf57091e541
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix voting evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.VOTING_EVIDENCE_HEAD }}
+          path: _mycelix_voting
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix signing evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.SIGNING_EVIDENCE_HEAD }}
+          path: _mycelix_signing
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix execution evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.EXECUTION_EVIDENCE_HEAD }}
+          path: _mycelix_execution
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkouts
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_voting/' '_mycelix_signing/' '_mycelix_execution/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_voting rev-parse HEAD)" = "$VOTING_EVIDENCE_HEAD"
+          test "$(git -C _mycelix_signing rev-parse HEAD)" = "$SIGNING_EVIDENCE_HEAD"
+          test "$(git -C _mycelix_execution rev-parse HEAD)" = "$EXECUTION_EVIDENCE_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_voting status --porcelain)"
+          test -z "$(git -C _mycelix_signing status --porcelain)"
+          test -z "$(git -C _mycelix_execution status --porcelain)"
+
+      - name: Bind exact source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _mycelix_voting hash-object mycelix-governance/zomes/voting/coordinator/src/lib.rs)" = "969b845e6186cbcad507c742a718060844f82eb2"
+          test "$(git -C _mycelix_voting hash-object mycelix-governance/zomes/voting/integrity/src/lib.rs)" = "658562c8dfaf6a2f1b97a7bfd5cf0fc8a5ab6e66"
+
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/threshold-signing/coordinator/src/lib.rs)" = "3449df8b03a4dd1774a5f22756d06931c72855b2"
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/threshold-signing/integrity/src/lib.rs)" = "3fec8344635600c044a494fa72bbbfe408fbe5ec"
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/proposals/coordinator/src/lib.rs)" = "eb8358353ee259ef9c3b46617a61d3439f1c714c"
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/execution/coordinator/src/lib.rs)" = "3dbb8a8f69b377e494ccf24164c94bd80f54e0ef"
+
+          test "$(git -C _mycelix_execution hash-object mycelix-governance/zomes/execution/coordinator/src/lib.rs)" = "3dbb8a8f69b377e494ccf24164c94bd80f54e0ef"
+          test "$(git -C _mycelix_execution hash-object mycelix-governance/zomes/execution/integrity/src/lib.rs)" = "657edaee9a314f100a0c4b1609a4596cf243e61d"
+
+      - name: Syntax compile all validators and oracles
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/ig008a0_mycelix_adapter_oracle.py
+          python -m py_compile scripts/ig008s0_mycelix_threshold_signing_oracle.py
+          python -m py_compile scripts/ig008e0_mycelix_execution_oracle.py
+          python -m py_compile scripts/ig008f0_validate_composite_manifest.py
+          python -m py_compile scripts/ig008f1_validate_composite_manifest_v2.py
+          python -m py_compile _mycelix_voting/mycelix-governance/scripts/validate_ig007a3_observed_profile_v2.py
+          python -m py_compile _mycelix_voting/mycelix-governance/scripts/ig007a4_delegation_counterexamples.py
+          python -m py_compile _mycelix_signing/mycelix-governance/scripts/validate_ig007s0_threshold_signing_profile.py
+          python -m py_compile _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py
+          python -m py_compile _mycelix_execution/mycelix-governance/scripts/validate_ig007e0_execution_profile.py
+          python -m py_compile _mycelix_execution/mycelix-governance/scripts/ig007e1_execution_counterexamples.py
+
+      - name: Cross-qualify voting component
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_voting/mycelix-governance/profiles/observed/voting-fca2c107-v2.json
+          python _mycelix_voting/mycelix-governance/scripts/validate_ig007a3_observed_profile_v2.py --profile "$PROFILE" --self-test > /tmp/voting-profile.json
+          python _mycelix_voting/mycelix-governance/scripts/ig007a4_delegation_counterexamples.py --profile "$PROFILE" --self-test > /tmp/voting-mycelix-self.json
+          python _mycelix_voting/mycelix-governance/scripts/ig007a4_delegation_counterexamples.py --profile "$PROFILE" --corpus > /tmp/voting-mycelix-corpus.json
+          python scripts/ig008a0_mycelix_adapter_oracle.py --profile "$PROFILE" --self-test > /tmp/voting-symthaea-self.json
+          python scripts/ig008a0_mycelix_adapter_oracle.py --profile "$PROFILE" --corpus > /tmp/voting-symthaea-corpus.json
+          cmp /tmp/voting-mycelix-corpus.json /tmp/voting-symthaea-corpus.json
+
+      - name: Cross-qualify threshold-signing component
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_signing/mycelix-governance/profiles/observed/threshold-signing-fca2c107-v1.json
+          python _mycelix_signing/mycelix-governance/scripts/validate_ig007s0_threshold_signing_profile.py --profile "$PROFILE" --self-test > /tmp/signing-profile.json
+          python _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py --profile "$PROFILE" --self-test > /tmp/signing-mycelix-self.json
+          python _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py --profile "$PROFILE" --corpus > /tmp/signing-mycelix-corpus.json
+          python scripts/ig008s0_mycelix_threshold_signing_oracle.py --profile "$PROFILE" --self-test > /tmp/signing-symthaea-self.json
+          python scripts/ig008s0_mycelix_threshold_signing_oracle.py --profile "$PROFILE" --corpus > /tmp/signing-symthaea-corpus.json
+          cmp /tmp/signing-mycelix-corpus.json /tmp/signing-symthaea-corpus.json
+
+      - name: Cross-qualify execution component
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_execution/mycelix-governance/profiles/observed/execution-fca2c107-v1.json
+          python _mycelix_execution/mycelix-governance/scripts/validate_ig007e0_execution_profile.py --profile "$PROFILE" --self-test > /tmp/execution-profile.json
+          python _mycelix_execution/mycelix-governance/scripts/ig007e1_execution_counterexamples.py --profile "$PROFILE" --self-test > /tmp/execution-mycelix-self.json
+          python _mycelix_execution/mycelix-governance/scripts/ig007e1_execution_counterexamples.py --profile "$PROFILE" --corpus > /tmp/execution-mycelix-corpus.json
+          python scripts/ig008e0_mycelix_execution_oracle.py --profile "$PROFILE" --self-test > /tmp/execution-symthaea-self.json
+          python scripts/ig008e0_mycelix_execution_oracle.py --profile "$PROFILE" --corpus > /tmp/execution-symthaea-corpus.json
+          cmp /tmp/execution-mycelix-corpus.json /tmp/execution-symthaea-corpus.json
+
+      - name: Validate v1 predecessor and v2 twice byte-identically
+        shell: bash
+        run: |
+          set -euo pipefail
+          V1=docs/research/manifests/mycelix-observed-composite-fca2c107-v1.json
+          V2=docs/research/manifests/mycelix-observed-composite-fca2c107-v2.json
+          python scripts/ig008f0_validate_composite_manifest.py --manifest "$V1" --self-test > /tmp/composite-v1.json
+          python scripts/ig008f1_validate_composite_manifest_v2.py --manifest "$V2" --predecessor "$V1" --self-test > /tmp/composite-v2-1.json
+          python scripts/ig008f1_validate_composite_manifest_v2.py --manifest "$V2" --predecessor "$V1" --self-test > /tmp/composite-v2-2.json
+          cmp /tmp/composite-v2-1.json /tmp/composite-v2-2.json
+
+      - name: Assert exact component and monotonic composite commitments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          def read(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+
+          vp = read('/tmp/voting-profile.json')
+          vm = read('/tmp/voting-mycelix-self.json')
+          vs = read('/tmp/voting-symthaea-self.json')
+          sp = read('/tmp/signing-profile.json')
+          sm = read('/tmp/signing-mycelix-self.json')
+          ss = read('/tmp/signing-symthaea-self.json')
+          ep = read('/tmp/execution-profile.json')
+          em = read('/tmp/execution-mycelix-self.json')
+          es = read('/tmp/execution-symthaea-self.json')
+          v1 = read('/tmp/composite-v1.json')
+          v2 = read('/tmp/composite-v2-1.json')
+          manifest = read('docs/research/manifests/mycelix-observed-composite-fca2c107-v2.json')
+
+          assert vp['profile_content_sha256'] == '680af4668889c299b7e0d74531f44894a64a384be71778bca54d3f21ca80ac01'
+          assert vm['corpus_sha256'] == 'ee5e7649a773f564b443320689f465080d4641a0f4f09f13c0c49a7087d6dc10'
+          assert vs['corpus_sha256'] == vm['corpus_sha256']
+
+          assert sp['profile_content_sha256'] == 'c15dfd860b759747938af2a13129d729fa0af1e75284418c9ea6b9c172f643ac'
+          assert sm['corpus_sha256'] == '0f6532ae8e2c2e421da625592dbb3b38aa2b90c5342f46f3a305bdbec89b0269'
+          assert ss['corpus_sha256'] == sm['corpus_sha256']
+          assert ss['conformance_class'] == 'CrossImplementationConformance'
+
+          assert ep['profile_content_sha256'] == 'c977bdcef9e5faac83351050999451432b618d5cc523bece804eba5dd1ae81f6'
+          assert em['corpus_sha256'] == '0c6669e44d6d18396ede43324f5cf3abbb25ddd3a2a9f59abb2c8a3699ba5fd4'
+          assert es['corpus_sha256'] == em['corpus_sha256']
+
+          assert v1['manifest_content_sha256'] == '366b87944e74fe01369b78a8a7ea1c34f6dee05237583a47d86e5999b93b150c'
+          assert v2['manifest_content_sha256'] == 'e3b42dbd7dacaa2f44de8bc330e85ff7d624f291d27c4a303fbaccf57091e541'
+          assert v2['predecessor_manifest_sha256'] == v1['manifest_content_sha256']
+          assert v2['component_count'] == 3
+          assert v2['new_component'] == 'ThresholdSigning'
+          assert v2['coverage_definition'] == 'SourceObservedMechanismRepresentedNotPropertySatisfied'
+          assert v2['uncovered_stage_count'] == 4
+          assert v2['authority_class'] == 'ObservedCompositeSlice'
+          assert v2['claim_ceiling'] == 'ObservedCompositeSliceOnly'
+
+          assert manifest['predecessor_manifest']['manifest_content_sha256'] == v1['manifest_content_sha256']
+          assert {c['production_subject'] for c in manifest['components']} == {'fca2c107a1ea5108823ce617ba4111b6f7f77230'}
+          assert {c['role'] for c in manifest['components']} == {'Voting', 'ThresholdSigning', 'Execution'}
+          assert 'threshold_signing_as_independent_mechanism_profile' not in manifest['uncovered_stages']
+          assert 'proposal_creation_and_lifecycle_as_independent_profile' in manifest['uncovered_stages']
+          assert 'no_secure_threshold_signing_claim' in manifest['non_claims']
+          PY
+
+      - name: Verify all checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_voting rev-parse HEAD)" = "$VOTING_EVIDENCE_HEAD"
+          test "$(git -C _mycelix_signing rev-parse HEAD)" = "$SIGNING_EVIDENCE_HEAD"
+          test "$(git -C _mycelix_execution rev-parse HEAD)" = "$EXECUTION_EVIDENCE_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_voting diff --exit-code
+          git -C _mycelix_voting diff --cached --exit-code
+          git -C _mycelix_signing diff --exit-code
+          git -C _mycelix_signing diff --cached --exit-code
+          git -C _mycelix_execution diff --exit-code
+          git -C _mycelix_execution diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_voting status --porcelain)"
+          test -z "$(git -C _mycelix_signing status --porcelain)"
+          test -z "$(git -C _mycelix_execution status --porcelain)"
