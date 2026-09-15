@@ -9,10 +9,7 @@ on:
       - research/spine-000b-p0-identity
     paths:
       - '.github/workflows/spine-000b-p1r.yml'
-      - 'docs/research/SPINE_000B_P1R_QUALIFICATION.md'
-      - 'docs/research/SPINE_000B_P1R_LOCAL_AI_HANDOFF.md'
-      - 'docs/research/SPINE_000B_P1R_EXIT_GATES.md'
-      - 'docs/research/SPINE_000B_P1R_STATUS.md'
+      - 'docs/research/SPINE_000B_P1R_*.md'
       - 'scripts/verify_spine_000b_p1r_contract.py'
       - 'scripts/generate_spine_golden_fixtures.py'
       - 'scripts/spine_000b_influence_oracle.py'
@@ -49,19 +46,19 @@ jobs:
           base=fa7b68645dd2109abb12c70f493e50e16c5740a4
           git merge-base --is-ancestor "$base" HEAD
           git diff --name-only "$base"..HEAD | sort > /tmp/spine_p1r_changed
-          cat > /tmp/spine_p1r_allowed <<'EOF'
-          .github/workflows/spine-000b-p1r.yml
-          docs/research/SPINE_000B_P1R_EXIT_GATES.md
-          docs/research/SPINE_000B_P1R_LOCAL_AI_HANDOFF.md
-          docs/research/SPINE_000B_P1R_QUALIFICATION.md
-          docs/research/SPINE_000B_P1R_STATUS.md
-          scripts/generate_spine_golden_fixtures.py
-          scripts/verify_spine_000b_p1r_contract.py
-          src/cognitive_loop/subsystem_trait.rs
-          tests/fixtures/spine_000b_golden_fixtures.json
-          EOF
-          sort -o /tmp/spine_p1r_allowed /tmp/spine_p1r_allowed
-          comm -23 /tmp/spine_p1r_changed /tmp/spine_p1r_allowed > /tmp/spine_p1r_unexpected
+          : > /tmp/spine_p1r_unexpected
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/spine-000b-p1r.yml|\
+              docs/research/SPINE_000B_P1R_*.md|\
+              scripts/generate_spine_golden_fixtures.py|\
+              scripts/verify_spine_000b_p1r_contract.py|\
+              src/cognitive_loop/subsystem_trait.rs|\
+              tests/fixtures/spine_000b_golden_fixtures.json)
+                ;;
+              *) echo "$path" >> /tmp/spine_p1r_unexpected ;;
+            esac
+          done < /tmp/spine_p1r_changed
           if test -s /tmp/spine_p1r_unexpected; then
             echo 'Unexpected P1R subject files:' >&2
             cat /tmp/spine_p1r_unexpected >&2
@@ -109,15 +106,12 @@ jobs:
             echo "causal_load_claimed=false"
           } > artifacts/spine-000b-p1r/subject.txt
           cp /tmp/spine_p1r_changed artifacts/spine-000b-p1r/changed-files.txt
+          find docs/research -maxdepth 1 -type f -name 'SPINE_000B_P1R_*.md' -print0 | sort -z | xargs -0 sha256sum > artifacts/spine-000b-p1r/P1R_DOC_SHA256SUMS
           sha256sum \
             src/cognitive_loop/subsystem_trait.rs \
             scripts/spine_000b_influence_oracle.py \
             scripts/generate_spine_golden_fixtures.py \
             scripts/verify_spine_000b_p1r_contract.py \
-            docs/research/SPINE_000B_P1R_QUALIFICATION.md \
-            docs/research/SPINE_000B_P1R_LOCAL_AI_HANDOFF.md \
-            docs/research/SPINE_000B_P1R_EXIT_GATES.md \
-            docs/research/SPINE_000B_P1R_STATUS.md \
             tests/fixtures/spine_000b_golden_fixtures.json \
             Cargo.toml \
             Cargo.lock \
