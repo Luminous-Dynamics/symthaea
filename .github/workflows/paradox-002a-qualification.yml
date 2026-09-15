@@ -35,7 +35,7 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt,clippy
 
-      - name: Bind subject, parent, and frozen measurement layer
+      - name: Bind subject, parent, and allowed qualification surface
         shell: bash
         run: |
           set -euo pipefail
@@ -43,6 +43,17 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=all)"
           git merge-base --is-ancestor "${PARADOX001_SHA}" HEAD
           git diff --exit-code "${PARADOX001_SHA}" HEAD -- crates/research/symthaea-structured-inconsistency
+
+          unexpected="$(
+            git diff --name-only "${PARADOX001_SHA}" HEAD -- \
+              | grep -Ev '^(crates/research/symthaea-paradox-fixtures/|docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT\.md$|\.github/workflows/paradox-002a-qualification\.yml$)' \
+              || true
+          )"
+          if [[ -n "${unexpected}" ]]; then
+            printf 'unexpected PARADOX-002A diff surface:\n%s\n' "${unexpected}" >&2
+            exit 1
+          fi
+
           test -f docs/research/PARADOX_002A_MATCHED_FIXTURE_CONTRACT.md
           test -f crates/research/symthaea-paradox-fixtures/Cargo.toml
           test -f crates/research/symthaea-paradox-fixtures/Cargo.lock
@@ -50,17 +61,23 @@ jobs:
           test -f crates/research/symthaea-paradox-fixtures/src/lib.rs
           test -f crates/research/symthaea-paradox-fixtures/tests/confirmatory_auxiliary_independence.rs
 
+          lock=crates/research/symthaea-paradox-fixtures/Cargo.lock
+          test "$(grep -c '^\[\[package\]\]$' "${lock}")" -eq 2
+          grep -Fxq 'name = "symthaea-paradox-fixtures"' "${lock}"
+          grep -Fxq 'name = "symthaea-structured-inconsistency"' "${lock}"
+          ! grep -Eq '^(source|checksum) = ' "${lock}"
+
       - name: Format
         run: cargo fmt --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml -- --check
 
-      - name: Check
-        run: cargo check --locked --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
+      - name: Check offline
+        run: cargo check --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
 
-      - name: Test fixture census and negative controls
-        run: cargo test --locked --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
+      - name: Test fixture census and negative controls offline
+        run: cargo test --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
 
-      - name: Strict Clippy
-        run: cargo clippy --locked --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml --all-targets -- -D warnings
+      - name: Strict Clippy offline
+        run: cargo clippy --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml --all-targets -- -D warnings
 
       - name: Architecture and claim-boundary source audit
         shell: bash
