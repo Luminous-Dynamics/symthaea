@@ -332,7 +332,10 @@ pub enum ResolutionClass {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OracleReport {
     pub external_surprise: f64,
+    /// True when genuine incompatible support occurred at any point in the sequence.
     pub internal_disagreement: bool,
+    /// True only when incompatible support remains active at the decision boundary.
+    pub final_unresolved_disagreement: bool,
     pub conflict_persistence: f64,
     pub independent_conflict_sources: bool,
     pub self_referential: bool,
@@ -348,9 +351,10 @@ pub struct OracleReport {
 
 impl OracleReport {
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(136);
+        let mut out = Vec::with_capacity(144);
         push_u64(&mut out, self.external_surprise.to_bits());
         push_u8(&mut out, u8::from(self.internal_disagreement));
+        push_u8(&mut out, u8::from(self.final_unresolved_disagreement));
         push_u64(&mut out, self.conflict_persistence.to_bits());
         push_u8(&mut out, u8::from(self.independent_conflict_sources));
         push_u8(&mut out, u8::from(self.self_referential));
@@ -799,6 +803,14 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
     validate_resource_contract(fixture)?;
 
     let events = &fixture.agent_view.events;
+    if fixture.condition == Condition::OntologyFailure
+        && events.iter().any(|event| event.visible_context.is_some())
+    {
+        return Err(QualificationError::ContractViolation(
+            "C6 must not expose explicit context tokens in AgentView",
+        ));
+    }
+
     let mut active = [false; 4];
     let mut conflict_slots = 0u8;
     let mut independent_conflict_sources = true;
@@ -825,6 +837,7 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
 
     let final_snapshot = active_polarities(events, &active);
     let internal_disagreement = conflict_slots > 0;
+    let final_unresolved_disagreement = final_snapshot.has_both;
     let conflict_persistence = f64::from(conflict_slots) / events.len() as f64;
     let external_surprise = first_world_polarity(events).map_or(0.0, |polarity| {
         if polarity == fixture.agent_view.prior_expectation {
@@ -842,11 +855,11 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
             .any(|event| event.role == EventRole::WorldEvidence && event.caused_by_self_prediction);
 
     let explicit_context_resolution = visible_context_resolution(fixture, &active).is_some();
-    let ontology_failure = internal_disagreement
+    let ontology_failure = final_unresolved_disagreement
         && fixture.truth.latent_context_is_causal
         && !fixture.truth.context_dimension_available
         && hidden_context_resolution(fixture, &active).is_some();
-    let irreducible = internal_disagreement
+    let irreducible = final_unresolved_disagreement
         && !explicit_context_resolution
         && !ontology_failure
         && !self_referential;
@@ -935,6 +948,7 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
     let report = OracleReport {
         external_surprise,
         internal_disagreement,
+        final_unresolved_disagreement,
         conflict_persistence,
         independent_conflict_sources,
         self_referential,
@@ -1142,6 +1156,10 @@ fn validate_condition_contract(
                 "C0 must not contain conflict",
             )?;
             require(
+                !report.final_unresolved_disagreement,
+                "C0 must not end in unresolved conflict",
+            )?;
+            require(
                 report.expected_response == ExpectedResponse::Commit,
                 "C0 must admit commitment",
             )?;
@@ -1156,12 +1174,20 @@ fn validate_condition_contract(
                 "C1 must not contain simultaneous P/not-P support",
             )?;
             require(
+                !report.final_unresolved_disagreement,
+                "C1 must not end in unresolved conflict",
+            )?;
+            require(
                 report.expected_response == ExpectedResponse::Commit,
                 "C1 must resolve without contradiction handling",
             )?;
         }
         Condition::TransientConflict => {
             require(report.internal_disagreement, "C2 must contain conflict")?;
+            require(
+                !report.final_unresolved_disagreement,
+                "C2 conflict must be resolved by the decision boundary",
+            )?;
             require(
                 report.conflict_persistence > 0.0 && report.conflict_persistence < 0.5,
                 "C2 conflict must be transient",
@@ -1173,6 +1199,10 @@ fn validate_condition_contract(
         }
         Condition::PersistentResolvable => {
             require(report.internal_disagreement, "C3 must contain conflict")?;
+            require(
+                report.final_unresolved_disagreement,
+                "C3 must retain incompatible support before contextual resolution",
+            )?;
             require(
                 report.conflict_persistence >= 0.5,
                 "C3 conflict must persist",
@@ -1193,6 +1223,10 @@ fn validate_condition_contract(
         Condition::PersistentIrreducible => {
             require(report.internal_disagreement, "C4 must contain conflict")?;
             require(
+                report.final_unresolved_disagreement,
+                "C4 must end in unresolved conflict",
+            )?;
+            require(
                 report.conflict_persistence >= 0.5,
                 "C4 conflict must persist",
             )?;
@@ -1205,6 +1239,10 @@ fn validate_condition_contract(
         Condition::SelfReferentialConflict => {
             require(report.internal_disagreement, "C5 must contain conflict")?;
             require(
+                report.final_unresolved_disagreement,
+                "C5 must retain the reflexive disagreement at decision time",
+            )?;
+            require(
                 report.self_referential,
                 "C5 must contain causal self-reference",
             )?;
@@ -1215,6 +1253,10 @@ fn validate_condition_contract(
         }
         Condition::OntologyFailure => {
             require(report.internal_disagreement, "C6 must contain conflict")?;
+            require(
+                report.final_unresolved_disagreement,
+                "C6 must retain unresolved conflict under the visible representation",
+            )?;
             require(
                 !report.explicit_context_resolution,
                 "C6 must not expose its hidden context directly",
@@ -1449,14 +1491,38 @@ mod tests {
 
         assert!(is_zero(c0.external_surprise));
         assert!(!c0.internal_disagreement);
+        assert!(!c0.final_unresolved_disagreement);
         assert!(is_one(c1.external_surprise));
         assert!(!c1.internal_disagreement);
+        assert!(!c1.final_unresolved_disagreement);
         assert!(c2.internal_disagreement);
+        assert!(!c2.final_unresolved_disagreement);
         assert!(c2.conflict_persistence < c3.conflict_persistence);
+        assert!(c3.final_unresolved_disagreement);
         assert!(c3.explicit_context_resolution);
+        assert!(c4.final_unresolved_disagreement);
         assert!(c4.irreducible);
+        assert!(c5.final_unresolved_disagreement);
         assert!(c5.self_referential);
+        assert!(c6.final_unresolved_disagreement);
         assert!(c6.ontology_failure);
+    }
+
+    #[test]
+    fn transient_conflict_resolves_before_decision_boundary() {
+        let fixture = FixtureGenerator::generate(Condition::TransientConflict, 2, 0).unwrap();
+        let report = qualify_fixture(&fixture).unwrap();
+        assert!(report.internal_disagreement);
+        assert!(!report.final_unresolved_disagreement);
+        assert_eq!(report.expected_response, ExpectedResponse::Commit);
+        assert_eq!(
+            report.resolution_class,
+            ResolutionClass::CurrentRepresentation
+        );
+        assert_eq!(
+            report.observatory.resolution,
+            ResolutionState::ResolvedWithoutRevision
+        );
     }
 
     #[test]
@@ -1510,6 +1576,13 @@ mod tests {
     fn ontology_failure_rejects_direct_context_disclosure() {
         let mut fixture = FixtureGenerator::generate(Condition::OntologyFailure, 2, 0).unwrap();
         fixture.agent_view.events[3].visible_context = fixture.truth.target_context;
+        assert!(qualify_fixture(&fixture).is_err());
+    }
+
+    #[test]
+    fn ontology_failure_rejects_any_explicit_context_token() {
+        let mut fixture = FixtureGenerator::generate(Condition::OntologyFailure, 2, 0).unwrap();
+        fixture.agent_view.events[0].visible_context = Some(ContextToken(77));
         assert!(qualify_fixture(&fixture).is_err());
     }
 
