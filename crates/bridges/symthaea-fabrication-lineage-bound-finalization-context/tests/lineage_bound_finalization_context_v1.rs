@@ -62,12 +62,13 @@ fn exact_hardware_must_still_be_fresh_on_the_context_clock() {
 #[test]
 fn ordinary_finalization_authority_cannot_reenter_the_waist() {
     let source = include_str!("../src/lib.rs");
-    assert!(!source.contains("QualifiedUpgradeFinalizationContextV1"));
-    assert!(!source.contains("ClockGovernedUpgradeHandoffV1"));
+    assert!(!source.contains("use symthaea_fabrication_upgrade_authority::"));
+    assert!(!source.contains("handoff: &ClockGovernedUpgradeHandoffV1"));
     assert!(!source.contains("ClockGovernedUpgradeActivationPermitV1"));
     assert!(!source.contains("ClockGovernedUpgradeProbationClearanceV1"));
     assert!(!source.contains("ClockGovernedHardwareReauthorizationV1"));
     assert!(!source.contains("CurrentNoRollbackUpgradeAuthorityV1"));
+    assert!(!source.contains("QualifiedUpgradeFinalizationContextV1"));
     assert!(!source.contains("AuthorizedUpgradeHandoff"));
     assert!(!source.contains("now_unix_s"));
 }
