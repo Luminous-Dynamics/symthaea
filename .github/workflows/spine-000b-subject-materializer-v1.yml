@@ -1,0 +1,164 @@
+name: SPINE-000B Subject Materializer v1
+
+on:
+  pull_request:
+    paths:
+      - 'docs/research/SPINE_000B_SUBJECT_MATERIALIZER_V1.md'
+      - 'scripts/spine_000b_subject_materializer_v1.py'
+      - 'tests/fixtures/spine_000b_m1a_campaign_input.json'
+      - '.github/workflows/spine-000b-subject-materializer-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  m1a-materializer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Prepare external evidence directory
+        run: |
+          set -euo pipefail
+          echo "EVIDENCE_DIR=${RUNNER_TEMP}/spine-m1a-evidence" >> "$GITHUB_ENV"
+          echo "MATERIALIZED_DIR=${RUNNER_TEMP}/spine-m1a-materialized" >> "$GITHUB_ENV"
+          mkdir -p "${RUNNER_TEMP}/spine-m1a-evidence"
+
+      - name: Record exact subject
+        run: |
+          set -euo pipefail
+          {
+            echo "head=$(git rev-parse HEAD)"
+            echo "tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "status_before=$(git status --porcelain --untracked-files=all | wc -l)"
+            echo "authority=measurement-only"
+            echo "runtime_evidence_claimed=false"
+            echo "causal_load_claimed=false"
+          } | tee "$EVIDENCE_DIR/subject.txt"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Verify tranche scope
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git diff --name-only "$BASE_SHA"...HEAD | sort > "$EVIDENCE_DIR/changed-files.txt"
+          cat > /tmp/expected-files.txt <<'EOF'
+          .github/workflows/spine-000b-subject-materializer-v1.yml
+          docs/research/SPINE_000B_SUBJECT_MATERIALIZER_V1.md
+          scripts/spine_000b_subject_materializer_v1.py
+          tests/fixtures/spine_000b_m1a_campaign_input.json
+          EOF
+          sort -o /tmp/expected-files.txt /tmp/expected-files.txt
+          diff -u /tmp/expected-files.txt "$EVIDENCE_DIR/changed-files.txt"
+
+      - name: Materialize real clean-checkout subject
+        run: |
+          set -euo pipefail
+          python scripts/spine_000b_subject_materializer_v1.py materialize \
+            --config tests/fixtures/spine_000b_m1a_campaign_input.json \
+            --out-dir "$MATERIALIZED_DIR" \
+            | tee "$EVIDENCE_DIR/materialize.txt"
+          cp "$MATERIALIZED_DIR"/* "$EVIDENCE_DIR"/
+
+      - name: Verify materialized subject against checkout
+        run: |
+          set -euo pipefail
+          python scripts/spine_000b_subject_materializer_v1.py verify \
+            --manifest "$MATERIALIZED_DIR/subject-manifest.json" \
+            --bin "$MATERIALIZED_DIR/subject-manifest.bin" \
+            --digest "$MATERIALIZED_DIR/subject-manifest.sha256" \
+            | tee "$EVIDENCE_DIR/drift-verification.txt"
+
+      - name: Negative controls
+        run: |
+          set -euo pipefail
+
+          # Output inside the repository must fail before creating the directory.
+          if python scripts/spine_000b_subject_materializer_v1.py materialize \
+            --config tests/fixtures/spine_000b_m1a_campaign_input.json \
+            --out-dir ./spine-m1a-illegal-output >/tmp/m1a-inside.out 2>/tmp/m1a-inside.err; then
+            echo "inside-repo output control unexpectedly passed" >&2
+            exit 1
+          fi
+          test ! -e ./spine-m1a-illegal-output
+
+          # A real untracked file makes the qualified subject dirty.
+          touch .spine-m1a-dirty-control
+          if python scripts/spine_000b_subject_materializer_v1.py materialize \
+            --config tests/fixtures/spine_000b_m1a_campaign_input.json \
+            --out-dir "${RUNNER_TEMP}/spine-m1a-dirty-out" >/tmp/m1a-dirty.out 2>/tmp/m1a-dirty.err; then
+            echo "dirty-worktree control unexpectedly passed" >&2
+            rm -f .spine-m1a-dirty-control
+            exit 1
+          fi
+          rm -f .spine-m1a-dirty-control
+
+          # Missing additional bound file must fail.
+          python - <<'PY'
+          import json
+          p='tests/fixtures/spine_000b_m1a_campaign_input.json'
+          x=json.load(open(p))
+          x['additional_bound_files'].append('docs/research/DOES_NOT_EXIST_SPINE_CONTROL')
+          json.dump(x, open('/tmp/m1a-missing.json','w'))
+          PY
+          if python scripts/spine_000b_subject_materializer_v1.py materialize \
+            --config /tmp/m1a-missing.json \
+            --out-dir "${RUNNER_TEMP}/spine-m1a-missing-out" >/tmp/m1a-missing.out 2>/tmp/m1a-missing.err; then
+            echo "missing-bound-file control unexpectedly passed" >&2
+            exit 1
+          fi
+
+          # A tampered bound-file hash in the frozen transport must fail drift verification.
+          python - <<'PY'
+          import json
+          p='${{ runner.temp }}/spine-m1a-materialized/subject-manifest.json'
+          x=json.load(open(p))
+          x['bound_files'][0]['sha256']='00'*32
+          json.dump(x, open('/tmp/m1a-tampered-manifest.json','w'))
+          PY
+          if python scripts/spine_000b_subject_materializer_v1.py verify \
+            --manifest /tmp/m1a-tampered-manifest.json >/tmp/m1a-tampered.out 2>/tmp/m1a-tampered.err; then
+            echo "tampered-manifest control unexpectedly passed" >&2
+            exit 1
+          fi
+
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Seal implementation and bound-preparation surfaces
+        run: |
+          set -euo pipefail
+          sha256sum \
+            docs/research/SPINE_000B_SUBJECT_MATERIALIZER_V1.md \
+            scripts/spine_000b_subject_materializer_v1.py \
+            tests/fixtures/spine_000b_m1a_campaign_input.json \
+            docs/research/SPINE_000B_RUNTIME_SUBJECT_MANIFEST_V1.md \
+            scripts/spine_000b_subject_manifest_v1.py \
+            docs/research/SPINE_000B_MANAGER_ID_REGISTRY_V1.json \
+            src/cognitive_loop/subsystem_trait.rs \
+            src/cognitive_loop/cycle_phase_dynamics/mod.rs \
+            src/cognitive_loop/cycle_phase_output/mod.rs \
+            src/cognitive_loop/helpers/feedback_helpers.rs \
+            Cargo.toml Cargo.lock rust-toolchain.toml flake.lock \
+            > "$EVIDENCE_DIR/sha256.txt"
+          cat "$EVIDENCE_DIR/sha256.txt"
+
+      - name: Prove checkout immutability
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-subject-materializer-v1-${{ github.sha }}
+          path: ${{ runner.temp }}/spine-m1a-evidence/
+          if-no-files-found: error
