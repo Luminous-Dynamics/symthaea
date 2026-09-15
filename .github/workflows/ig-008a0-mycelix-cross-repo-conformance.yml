@@ -36,6 +36,12 @@ jobs:
           path: _mycelix_evidence
           fetch-depth: 1
 
+      - name: Isolate nested evidence checkout from parent status
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_evidence/' >> .git/info/exclude
+
       - name: Install Python 3.13.5
         uses: actions/setup-python@v5
         with:
