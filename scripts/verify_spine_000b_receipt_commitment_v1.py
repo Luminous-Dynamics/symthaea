@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 CONTRACT = Path("docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md")
-ORACLE = Path("scripts/spine_000b_receipt_commitment_oracle.py")
+ORACLE = Path("scripts/spine_000b_receipt_commitment_oracle_r1.py")
 VECTORS = Path("tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json")
 
 
@@ -38,6 +38,9 @@ def main() -> int:
         "RuntimeTelemetryEnvelope is noncanonical",
         "State application is cycle-level evidence, not per-subsystem causal attribution",
         "Contributor count is metadata",
+        "operation_id",
+        "applied_argument",
+        "actual operand",
         "FORMAT_FROZEN / RUST_EQUIVALENCE_PENDING",
     )
     for phrase in required_contract:
@@ -53,9 +56,12 @@ def main() -> int:
         'CHAIN_DOMAIN = b"symthaea.spine.000b.evidence-chain-link.v1\\0"',
         'struct.pack("<I"',
         'struct.pack("<Q"',
+        'record["operation_id"]',
+        'record.get("applied_argument")',
         "changed-channel reserved bits set",
         "application indices must be contiguous from zero",
         "duplicate execution identity",
+        "Actual applied operand is canonical evidence",
     )
     for phrase in required_oracle:
         if phrase not in oracle:
