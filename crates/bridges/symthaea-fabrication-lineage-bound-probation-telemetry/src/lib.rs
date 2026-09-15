@@ -17,9 +17,7 @@ use symthaea_fabrication_lineage_bound_upgrade_probation::{
     LineageBoundUpgradeProbationClearanceIdV1, LineageBoundUpgradeProbationClearanceV1,
 };
 use symthaea_fabrication_upgrade_probation_authority::SIGNED_UPGRADE_PROBATION_OBSERVATION_SCHEMA;
-use symthaea_fabrication_upgrade_probation_telemetry::{
-    ExactProbationTelemetryBundleV1, ProbationTelemetryBindingInputV1,
-};
+use symthaea_fabrication_upgrade_probation_telemetry::ProbationTelemetryBindingInputV1;
 
 pub const LINEAGE_BOUND_TELEMETRY_PROBATION_CLEARANCE_SCHEMA: &str =
     "symthaea.fabrication.lineage-bound-telemetry-probation-clearance.v1";
