@@ -52,6 +52,7 @@
 #![deny(unsafe_code)]
 
 pub mod ablation_contract;
+pub mod ablation_export;
 pub mod adapter;
 pub mod benchmarks;
 pub mod harness;
