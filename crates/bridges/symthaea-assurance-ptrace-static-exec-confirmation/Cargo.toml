@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-assurance-ptrace-static-exec-confirmation"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "PTRACE_EVENT_EXEC confirmation of an exact prepared static verifier image"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "linux", "ptrace", "runtime"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "=0.26.4", default-features = false, features = ["fs", "ptrace", "process", "signal"] }
+symthaea-assurance-static-fd-exec-launch = { path = "../symthaea-assurance-static-fd-exec-launch" }
