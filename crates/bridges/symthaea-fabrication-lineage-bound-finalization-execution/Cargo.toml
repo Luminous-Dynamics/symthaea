@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-finalization-execution"
+version = "0.1.0"
+edition = "2024"
+description = "Fresh execution permission for lineage-bound irreversible fabrication finalization"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-evidence-retention-head = { path = "../symthaea-fabrication-evidence-retention-head" }
+symthaea-fabrication-lineage-bound-current-no-rollback = { path = "../symthaea-fabrication-lineage-bound-current-no-rollback" }
+symthaea-fabrication-lineage-bound-finalization-authorization = { path = "../symthaea-fabrication-lineage-bound-finalization-authorization" }
+symthaea-fabrication-lineage-bound-finalization-context = { path = "../symthaea-fabrication-lineage-bound-finalization-context" }
+symthaea-fabrication-lineage-bound-hardware = { path = "../symthaea-fabrication-lineage-bound-hardware" }
+symthaea-fabrication-upgrade-finalized-head = { path = "../symthaea-fabrication-upgrade-finalized-head" }
+symthaea-fabrication-upgrade-operational-head = { path = "../symthaea-fabrication-upgrade-operational-head" }
+symthaea-fabrication-witness-registry-containment-bound = { path = "../symthaea-fabrication-witness-registry-containment-bound" }
+symthaea-fabrication-witness-registry-head = { path = "../symthaea-fabrication-witness-registry-head" }
+symthaea-trust-kernel = { path = "../../core/symthaea-trust-kernel" }
+serde = { workspace = true }
+serde_json = { workspace = true }
