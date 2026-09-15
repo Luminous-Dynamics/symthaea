@@ -60,6 +60,8 @@ pub(crate) mod value_kind {
     pub const U64: u8 = 3;
     pub const U32: u8 = 4;
     pub const BOOL: u8 = 5;
+    /// C1 supports this canonical value, but the v1 POD event intentionally does
+    /// not: a 32-byte digest does not fit the 64-bit inline value slots.
     pub const DIGEST32: u8 = 6;
 }
 
@@ -148,8 +150,8 @@ pub(crate) struct ProposalBitsV2 {
     pub reserved: u32,
 }
 
-/// Raw Stage-A manager event. Fixed at 64 bytes on all supported Rust targets by
-/// explicit primitive widths and padding; no pointers or `usize` enter the record.
+/// Raw Stage-A manager event. Fixed at 64 bytes by explicit primitive widths and
+/// padding; no pointers or `usize` enter the record.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(C)]
 pub(crate) struct ManagerExecutionEventV1 {
@@ -201,7 +203,7 @@ pub(crate) struct GuardWitnessEventV1 {
     pub _padding: [u8; 3],
 }
 
-const _: [(); 48] = [(); size_of::<ProposalBitsV2>()];
+const _: [(); 40] = [(); size_of::<ProposalBitsV2>()];
 const _: [(); 64] = [(); size_of::<ManagerExecutionEventV1>()];
 const _: [(); 56] = [(); size_of::<ApplicationEventV1>()];
 const _: [(); 16] = [(); size_of::<GuardWitnessEventV1>()];
@@ -308,10 +310,15 @@ pub(crate) enum RawEventError {
     InvalidSourceTag,
     InvalidSourceCondition,
     InvalidValueKind,
+    InvalidInlineValue,
     InvalidStateChangeStatus,
     InvalidExecutionTruthTable,
     InvalidNeutralityLabel,
     InvalidGuardOutcome,
+    InvalidSequence,
+    InvalidPadding,
+    InvalidAbsentProposalPayload,
+    InvalidApplicationObservation,
 }
 
 #[inline]
@@ -320,9 +327,14 @@ fn bool_byte(v: u8) -> bool {
 }
 
 #[inline]
+fn padding_zero<const N: usize>(padding: &[u8; N]) -> bool {
+    padding.iter().all(|&b| b == 0)
+}
+
+#[inline]
 fn proposal_is_neutral(p: ProposalBitsV2) -> bool {
     // Deliberately matches current production `SubsystemOutput::is_neutral()`:
-    // `_reserved` is not part of behavioral neutrality, while C2 still commits it.
+    // `reserved` is not part of behavioral neutrality, while C2 still commits it.
     f64::from_bits(p.confidence_delta_bits) == 0.0
         && f64::from_bits(p.lr_modulation_bits) == 1.0
         && f64::from_bits(p.exploration_delta_bits) == 0.0
@@ -331,10 +343,30 @@ fn proposal_is_neutral(p: ProposalBitsV2) -> bool {
         && p.flags == 0
 }
 
+#[inline]
+fn validate_inline_value(kind: u8, bits: u64, allow_none: bool) -> Result<(), RawEventError> {
+    match kind {
+        value_kind::NONE if allow_none && bits == 0 => Ok(()),
+        value_kind::F64_BITS | value_kind::U64 => Ok(()),
+        value_kind::F32_BITS | value_kind::U32 if bits >> 32 == 0 => Ok(()),
+        value_kind::BOOL if bits <= 1 => Ok(()),
+        // DIGEST32 requires a future wider/raw-indirect event format; never truncate.
+        value_kind::DIGEST32 => Err(RawEventError::InvalidValueKind),
+        value_kind::NONE => Err(RawEventError::InvalidInlineValue),
+        _ => Err(RawEventError::InvalidInlineValue),
+    }
+}
+
 pub(crate) fn validate_manager_event(event: &ManagerExecutionEventV1) -> Result<(), RawEventError> {
     use execution_outcome::*;
     if !(1..=manager_id::MAX_V1).contains(&event.manager_id) {
         return Err(RawEventError::InvalidManagerId);
+    }
+    if event.sequence as usize >= MANAGER_EVENT_CAPACITY {
+        return Err(RawEventError::InvalidSequence);
+    }
+    if !padding_zero(&event._padding) {
+        return Err(RawEventError::InvalidPadding);
     }
     if event.outcome > FAILED_OTHER {
         return Err(RawEventError::InvalidOutcome);
@@ -362,7 +394,11 @@ pub(crate) fn validate_manager_event(event: &ManagerExecutionEventV1) -> Result<
         return Err(RawEventError::InvalidExecutionTruthTable);
     }
 
-    if event.proposal_present == 1 {
+    if event.proposal_present == 0 {
+        if event.proposal != ProposalBitsV2::default() {
+            return Err(RawEventError::InvalidAbsentProposalPayload);
+        }
+    } else {
         let neutral = proposal_is_neutral(event.proposal);
         if (event.outcome == EXECUTED_NEUTRAL && !neutral)
             || (event.outcome == EXECUTED_NON_NEUTRAL && neutral)
@@ -377,16 +413,19 @@ pub(crate) fn validate_application_event(event: &ApplicationEventV1) -> Result<(
     if !(1..=operation_id::MAX_V1).contains(&event.operation_id) {
         return Err(RawEventError::InvalidOperationId);
     }
+    if event.application_index as usize >= APPLICATION_EVENT_CAPACITY {
+        return Err(RawEventError::InvalidSequence);
+    }
+    if !padding_zero(&event._padding) {
+        return Err(RawEventError::InvalidPadding);
+    }
     if event.source_tag > application_source::FLAG {
         return Err(RawEventError::InvalidSourceTag);
     }
     if event.source_condition > source_condition::FLAG_CLEAR {
         return Err(RawEventError::InvalidSourceCondition);
     }
-    if event.argument_kind > value_kind::DIGEST32 || event.observation_kind > value_kind::DIGEST32 {
-        return Err(RawEventError::InvalidValueKind);
-    }
-    if !bool_byte(event.applied) {
+    if event.applied != 1 {
         return Err(RawEventError::InvalidBool);
     }
     if event.state_change_status > state_change_status::NOT_OBSERVED_AT_BOUNDARY {
@@ -401,12 +440,31 @@ pub(crate) fn validate_application_event(event: &ApplicationEventV1) -> Result<(
     } else if event.source_flag != 0 || event.source_condition != source_condition::SCALAR_NON_IDENTITY {
         return Err(RawEventError::InvalidSourceCondition);
     }
+
+    validate_inline_value(event.argument_kind, event.applied_argument_bits, true)?;
+    if event.state_change_status == state_change_status::NOT_OBSERVED_AT_BOUNDARY {
+        if event.observation_kind != value_kind::NONE || event.before_bits != 0 || event.after_bits != 0 {
+            return Err(RawEventError::InvalidApplicationObservation);
+        }
+    } else {
+        if event.observation_kind == value_kind::NONE {
+            return Err(RawEventError::InvalidApplicationObservation);
+        }
+        validate_inline_value(event.observation_kind, event.before_bits, false)?;
+        validate_inline_value(event.observation_kind, event.after_bits, false)?;
+    }
     Ok(())
 }
 
 pub(crate) fn validate_guard_event(event: &GuardWitnessEventV1) -> Result<(), RawEventError> {
     if !(1..=predicate_id::MAX_V1).contains(&event.predicate_id) {
         return Err(RawEventError::InvalidPredicateId);
+    }
+    if event.witness_index as usize >= GUARD_EVENT_CAPACITY {
+        return Err(RawEventError::InvalidSequence);
+    }
+    if !padding_zero(&event._padding) {
+        return Err(RawEventError::InvalidPadding);
     }
     if !matches!(event.outcome, guard_outcome::FALSE | guard_outcome::TRUE) {
         return Err(RawEventError::InvalidGuardOutcome);
@@ -432,7 +490,7 @@ mod tests {
 
     #[test]
     fn frozen_record_sizes() {
-        assert_eq!(size_of::<ProposalBitsV2>(), 48);
+        assert_eq!(size_of::<ProposalBitsV2>(), 40);
         assert_eq!(size_of::<ManagerExecutionEventV1>(), 64);
         assert_eq!(size_of::<ApplicationEventV1>(), 56);
         assert_eq!(size_of::<GuardWitnessEventV1>(), 16);
@@ -493,6 +551,20 @@ mod tests {
     }
 
     #[test]
+    fn absent_proposal_payload_must_be_zero() {
+        let good = ManagerExecutionEventV1 {
+            manager_id: manager_id::DRIVE_MANAGER,
+            outcome: execution_outcome::SKIPPED_SCHEDULE,
+            urgency: urgency::CRUISE,
+            ..Default::default()
+        };
+        assert_eq!(validate_manager_event(&good), Ok(()));
+        let mut bad = good;
+        bad.proposal.flags = 1;
+        assert_eq!(validate_manager_event(&bad), Err(RawEventError::InvalidAbsentProposalPayload));
+    }
+
+    #[test]
     fn invalid_raw_tags_fail_closed() {
         let mut manager = ManagerExecutionEventV1 {
             manager_id: 1,
@@ -509,7 +581,7 @@ mod tests {
     }
 
     #[test]
-    fn application_source_condition_rules_fail_closed() {
+    fn application_source_condition_and_inline_value_rules_fail_closed() {
         let scalar = ApplicationEventV1 {
             operation_id: operation_id::FEEDBACK_ADJUST_CONFIDENCE,
             source_tag: application_source::CONFIDENCE_DELTA,
@@ -532,12 +604,42 @@ mod tests {
             source_flag: 1 << 3,
             source_condition: source_condition::FLAG_SET,
             argument_kind: value_kind::BOOL,
+            applied_argument_bits: 1,
             observation_kind: value_kind::BOOL,
+            before_bits: 0,
+            after_bits: 1,
             applied: 1,
             state_change_status: state_change_status::CHANGED,
             ..Default::default()
         };
         assert_eq!(validate_application_event(&flag), Ok(()));
+
+        let mut digest = flag;
+        digest.argument_kind = value_kind::DIGEST32;
+        assert_eq!(validate_application_event(&digest), Err(RawEventError::InvalidValueKind));
+
+        let mut bad_bool = flag;
+        bad_bool.after_bits = 2;
+        assert_eq!(validate_application_event(&bad_bool), Err(RawEventError::InvalidInlineValue));
+    }
+
+    #[test]
+    fn unobserved_application_requires_zero_observation_slots() {
+        let complex = ApplicationEventV1 {
+            operation_id: operation_id::EPISODIC_MEMORY_CONSOLIDATE_RECENT,
+            source_tag: application_source::FLAG,
+            source_flag: 1 << 1,
+            source_condition: source_condition::FLAG_SET,
+            argument_kind: value_kind::F64_BITS,
+            applied: 1,
+            state_change_status: state_change_status::NOT_OBSERVED_AT_BOUNDARY,
+            observation_kind: value_kind::NONE,
+            ..Default::default()
+        };
+        assert_eq!(validate_application_event(&complex), Ok(()));
+        let mut bad = complex;
+        bad.before_bits = 1;
+        assert_eq!(validate_application_event(&bad), Err(RawEventError::InvalidApplicationObservation));
     }
 
     #[test]
