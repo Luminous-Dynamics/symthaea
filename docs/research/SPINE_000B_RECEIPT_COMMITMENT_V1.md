@@ -1,10 +1,10 @@
 # SPINE-000B — Canonical Runtime Receipt Commitment v1
 
-**Status:** preregistered byte-level evidence-identity contract; runtime implementation pending
+**Status:** preregistered byte-level evidence-identity contract; runtime instrumentation pending
 
 **Authority:** measurement-only
 
-**Issue:** #3255
+**Issues:** #3255, #3261
 
 This contract freezes how canonical SPINE-000B runtime evidence is converted to bytes and committed with SHA-256. It is intentionally defined before production runtime receipts exist.
 
@@ -65,18 +65,16 @@ General rules:
 - no leading/trailing whitespace;
 - no Unicode normalization step exists because non-ASCII is rejected.
 
-`subsystem_identity` is limited to 1..=128 bytes and `[A-Za-z0-9_.:-]+`.
+`subsystem_identity`, `operation_id`, and `destination_id` are limited to 1..=128 bytes and `[A-Za-z0-9_.:-]+`.
 
 `source_path` is a repo-relative POSIX path limited to 1..=512 bytes using `[A-Za-z0-9_./-]+`; it must not start with `/`, contain `\\`, contain an empty path segment, or contain `.` / `..` segments.
-
-`destination_id` is limited to 1..=128 bytes and `[A-Za-z0-9_.:-]+`.
 
 ## 3. Domain separation
 
 Each digest is SHA-256 over a NUL-terminated ASCII domain tag followed by canonical bytes.
 
 ```text
-EXECUTION_DOMAIN  = "symthaea.spine.000b.execution-receipt.v1\0"
+EXECUTION_DOMAIN   = "symthaea.spine.000b.execution-receipt.v1\0"
 INTEGRATION_DOMAIN = "symthaea.spine.000b.cycle-integration.v1\0"
 APPLICATION_DOMAIN = "symthaea.spine.000b.state-application.v1\0"
 CYCLE_DOMAIN       = "symthaea.spine.000b.cycle-evidence.v1\0"
@@ -253,28 +251,36 @@ integration_digest = SHA256(INTEGRATION_DOMAIN || integration_bytes)
 
 State application is cycle-level evidence, not per-subsystem causal attribution.
 
+The record binds both **what production operation executed** and the **actual operand that crossed the application boundary**. This distinction is load-bearing because current Phase C casts several integrated `f64` values to `f32` before invoking feedback helpers.
+
 Canonical bytes after `APPLICATION_DOMAIN`:
 
 ```text
 cycle_number          u64
 application_index     u32
+operation_id          canonical string <=128
 destination_id        canonical string <=128
 source_tag            u8
 source_flag           u32   # zero unless source_tag=FLAG
-applied                bool
-state_change_status    u8
-before                 Optional<CanonicalValue>
-after                  Optional<CanonicalValue>
+applied               bool
+applied_argument      Optional<CanonicalValue>
+state_change_status   u8
+before                Optional<CanonicalValue>
+after                 Optional<CanonicalValue>
 ```
 
 Rules:
 
 - `application_index` is assigned at the production application boundary and defines semantic order.
 - indices within one cycle must be unique and contiguous from 0.
+- `operation_id` identifies the production operation (for example `feedback.adjust_confidence`) separately from the observed destination field.
 - `source_flag` must be zero for scalar source tags.
+- `applied_argument` is the exact post-cast/post-constant operand presented to the operation. It is `None` only when the operation has no stable scalar/digest operand at that boundary.
+- for the current helper-backed `confidence_delta`, `lr_modulation`, and `exploration_delta` applications, `applied_argument` is `F32_BITS` because Phase C casts the integrated `f64` to `f32`.
 - `UNCHANGED` / `CHANGED` require compatible `before` and `after` values.
 - `NOT_OBSERVED_AT_BOUNDARY` may use `None` values for side effects that cannot be represented as a stable scalar/digest at that boundary.
 - `applied=true` does not imply `state_change_status=CHANGED`.
+- before/after values are observed around the real operation; they are not recomputed from `applied_argument`.
 
 Digest:
 
@@ -310,7 +316,7 @@ Digest:
 cycle_digest = SHA256(CYCLE_DOMAIN || cycle_bytes)
 ```
 
-Reordering input execution records before canonical sorting MUST NOT change `cycle_digest`. Reordering application indices MUST change it or fail validation.
+Reordering input execution records before canonical sorting MUST NOT change `cycle_digest`. Changing semantic application indices MUST change it or fail validation.
 
 ## 11. Append-only evidence chain
 
@@ -370,11 +376,13 @@ Before runtime evidence uses this format, independent implementations must estab
 5. `duration_ns` changed -> canonical digest unchanged;
 6. execution input order changed -> cycle digest unchanged after canonical sort;
 7. state-application order/index changed -> digest changes or validation rejects;
-8. unknown tag rejected;
-9. invalid/overlong identity/path rejected;
-10. count overflow rejected;
-11. genesis/chain vector reproduced independently;
-12. exact byte vector reproduced independently, not only final SHA-256.
+8. changing `operation_id` changes the application digest;
+9. changing one bit of `applied_argument` changes the application digest;
+10. unknown tag rejected;
+11. invalid/overlong identity/path rejected;
+12. count overflow rejected;
+13. genesis/chain vector reproduced independently;
+14. exact byte vector reproduced independently, not only final SHA-256.
 
 ## 15. Qualification boundary
 
@@ -382,4 +390,4 @@ The contract/oracle tranche can establish only:
 
 > The SPINE-000B receipt identity protocol is frozen and an independent oracle deterministically maps synthetic records to canonical bytes and SHA-256 commitments.
 
-Full C1 qualification additionally requires an independent Rust implementation to reproduce the frozen canonical byte vectors and digests exactly. Until then, report `FORMAT_FROZEN / RUST_EQUIVALENCE_PENDING`.
+Full C1 qualification additionally requires an independent Rust implementation to reproduce the frozen canonical byte vectors and digests exactly. Until that exact-head run passes, report `FORMAT_FROZEN / RUST_EQUIVALENCE_PENDING`.
