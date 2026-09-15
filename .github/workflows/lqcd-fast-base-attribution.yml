@@ -1,0 +1,204 @@
+# Exact-base conformance attribution for the frozen LQCD fast-lane failure.
+# This workflow never mutates the scientific subject. It reuses the current
+# verifier bytes/profile against an older immutable subject commit so a
+# head-level Clippy failure can be classified as inherited vs candidate-caused.
+
+name: LQCD Base Attribution
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/lqcd-fast-base-attribution.yml'
+  workflow_dispatch:
+    inputs:
+      subject_sha:
+        description: 'Exact immutable subject SHA to qualify'
+        required: true
+        type: string
+      qualification_base_sha:
+        description: 'Exact parent/base SHA for ancestry + governance binding'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lqcd-base-attribution-${{ github.event.pull_request.number || inputs.subject_sha || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  FROZEN_ATTRIBUTION_SUBJECT_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+  FROZEN_ATTRIBUTION_BASE_SHA: a81955b838de5fcc46c7b277dfd1fe11bcafb87f
+
+jobs:
+  qualify-base:
+    name: LQCD exact-base attribution qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout verifier authority
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.workflow_sha }}
+          path: verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve immutable attribution subject
+        id: subject
+        shell: bash
+        env:
+          DISPATCH_SUBJECT_SHA: ${{ inputs.subject_sha }}
+          DISPATCH_BASE_SHA: ${{ inputs.qualification_base_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            subject="$FROZEN_ATTRIBUTION_SUBJECT_SHA"
+            base="$FROZEN_ATTRIBUTION_BASE_SHA"
+          else
+            subject="$DISPATCH_SUBJECT_SHA"
+            base="$DISPATCH_BASE_SHA"
+          fi
+          [[ "$subject" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$base" =~ ^[0-9a-f]{40}$ ]]
+          test "$subject" != "$base"
+          echo "sha=$subject" >> "$GITHUB_OUTPUT"
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact attribution subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.subject.outputs.sha }}
+          path: subject
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pinned actions and canonical verifier bytes
+        id: verifier
+        shell: bash
+        env:
+          EXPECTED_VERIFIER_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          workflow="$GITHUB_WORKSPACE/verifier/.github/workflows/lqcd-fast-base-attribution.yml"
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" "$workflow")" -eq 2
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" "$workflow")" -eq 3
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' "$workflow"; then
+            echo 'mutable major-version GitHub Action tag found in LQCD base-attribution lane' >&2
+            exit 1
+          fi
+          test -f "$GITHUB_WORKSPACE/verifier/scripts/qualify-lqcd-fast.py"
+          test -f "$GITHUB_WORKSPACE/verifier/.github/workflows/lqcd-fast.yml"
+          actual="$(git -C "$GITHUB_WORKSPACE/verifier" rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_VERIFIER_SHA"
+          tree="$(git -C "$GITHUB_WORKSPACE/verifier" rev-parse 'HEAD^{tree}')"
+          echo "sha=$actual" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare exact attribution base in subject repository
+        shell: bash
+        env:
+          BASE_SHA: ${{ steps.subject.outputs.base }}
+        run: |
+          set -euo pipefail
+          git -C "$GITHUB_WORKSPACE/subject" fetch --no-tags origin "$BASE_SHA"
+          test "$(git -C "$GITHUB_WORKSPACE/subject" cat-file -t "$BASE_SHA")" = commit
+          git -C "$GITHUB_WORKSPACE/subject" merge-base --is-ancestor "$BASE_SHA" "${{ steps.subject.outputs.sha }}"
+
+      - name: Install subject-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE/subject"
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          rustc -Vv
+          cargo -V
+          rustfmt -V
+          cargo clippy -V
+
+      - name: Qualify exact attribution subject
+        id: qualify
+        env:
+          QUALIFIED_SHA: ${{ steps.subject.outputs.sha }}
+          QUALIFICATION_BASE_SHA: ${{ steps.subject.outputs.base }}
+          VERIFIER_AUTHORITY_SHA: ${{ steps.verifier.outputs.sha }}
+          VERIFIER_AUTHORITY_TREE: ${{ steps.verifier.outputs.tree }}
+          LQCD_SUBJECT_DIR: ${{ github.workspace }}/subject
+          LQCD_VERIFIER_DIR: ${{ github.workspace }}/verifier
+          LQCD_QUALIFICATION_DIR: ${{ runner.temp }}/lqcd-base-attribution-v1
+          CARGO_TARGET_DIR: ${{ runner.temp }}/lqcd-base-attribution-target
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 "$GITHUB_WORKSPACE/verifier/scripts/qualify-lqcd-fast.py" 2>&1 \
+            | tee "$RUNNER_TEMP/lqcd-base-attribution-console.log"
+
+      - name: Build non-authoritative attribution diagnostic
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          python3 "$GITHUB_WORKSPACE/verifier/scripts/build-lqcd-fast-diagnostic.py" \
+            --attempt "$RUNNER_TEMP/lqcd-base-attribution-v1/attempt.json" \
+            --log "$RUNNER_TEMP/lqcd-base-attribution-console.log" \
+            --output "$RUNNER_TEMP/lqcd-base-attribution-v1/diagnostic.json"
+
+      - name: Publish attribution attempt digest
+        if: always()
+        shell: bash
+        env:
+          ATTEMPT: ${{ runner.temp }}/lqcd-base-attribution-v1/attempt.json
+        run: |
+          set -euo pipefail
+          if [[ -f "$ATTEMPT" ]]; then
+            digest="$(sha256sum "$ATTEMPT" | awk '{print $1}')"
+            echo "LQCD base-attribution attempt_sha256=$digest"
+          else
+            echo 'No base-attribution attempt record was produced.' >&2
+            exit 1
+          fi
+
+      - name: Upload attribution attempt evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lqcd-base-attribution-attempt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lqcd-base-attribution-v1/attempt.json
+            ${{ runner.temp }}/lqcd-base-attribution-v1/attempt.json.sha256
+            ${{ runner.temp }}/lqcd-base-attribution-v1/subject-inputs.tsv
+            ${{ runner.temp }}/lqcd-base-attribution-v1/verifier-inputs.tsv
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Upload attribution diagnostic
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lqcd-base-attribution-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lqcd-base-attribution-v1/diagnostic.json
+            ${{ runner.temp }}/lqcd-base-attribution-v1/diagnostic.json.sha256
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Upload positive attribution receipt
+        if: always() && steps.qualify.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lqcd-base-attribution-positive-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lqcd-base-attribution-v1/positive-receipt.json
+            ${{ runner.temp }}/lqcd-base-attribution-v1/positive-receipt.json.sha256
+          if-no-files-found: error
+          retention-days: 90
