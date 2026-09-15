@@ -5,10 +5,12 @@ on:
     branches:
       - main
       - psych-bench/typed-ablation-interventions
+      - psych-bench/typed-ablation-export
     paths:
       - '.github/workflows/psych-bench-ablation-contract.yml'
       - 'crates/domains/symthaea-psych-bench/src/ablation_contract.rs'
       - 'crates/domains/symthaea-psych-bench/src/ablation_export.rs'
+      - 'crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs'
       - 'crates/domains/symthaea-psych-bench/src/harness/config.rs'
       - 'crates/domains/symthaea-psych-bench/src/lib.rs'
       - 'crates/domains/symthaea-psych-bench/Cargo.toml'
@@ -59,7 +61,8 @@ jobs:
           set -euo pipefail
           rustfmt --edition 2024 --check \
             crates/domains/symthaea-psych-bench/src/ablation_contract.rs \
-            crates/domains/symthaea-psych-bench/src/ablation_export.rs
+            crates/domains/symthaea-psych-bench/src/ablation_export.rs \
+            crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs
 
       - name: Compile psych-bench library
         shell: bash
@@ -79,6 +82,12 @@ jobs:
           set -euo pipefail
           cargo test --locked -p symthaea-psych-bench --lib ablation_export::tests -- --nocapture
 
+      - name: Execute paper-projection regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib ablation_paper_view::tests -- --nocapture
+
       - name: Strict focused Clippy
         shell: bash
         run: |
@@ -91,7 +100,8 @@ jobs:
           set -e
           python3 - "$report" \
             crates/domains/symthaea-psych-bench/src/ablation_contract.rs \
-            crates/domains/symthaea-psych-bench/src/ablation_export.rs <<'PY'
+            crates/domains/symthaea-psych-bench/src/ablation_export.rs \
+            crates/domains/symthaea-psych-bench/src/ablation_paper_view.rs <<'PY'
           import json
           import sys
 
