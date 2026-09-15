@@ -40,7 +40,7 @@ fn main() {
     net.set_timing_config(timing_config);
 
     // Replay timestamps: mix of irregular, too small, too large, and backward jumps
-    let timestamps = vec![
+    let timestamps = [
         0.0, 0.002, // dt = 0.002 (below min_dt, should clamp to 0.005)
         0.150, // dt = 0.148 (valid)
         0.150, // dt = 0.000 (below min_dt, should clamp to 0.005)

@@ -100,7 +100,7 @@ impl ValidityCapacityAccuracyNullModel {
 }
 
 fn integrate_cleanup_accuracy(model: &ValidityCapacityNullModel, intervals: usize) -> f64 {
-    debug_assert!(intervals > 0 && intervals % 2 == 0);
+    debug_assert!(intervals > 0 && intervals.is_multiple_of(2));
     let lower = -INTEGRATION_BOUND;
     let upper = INTEGRATION_BOUND;
     let step = (upper - lower) / intervals as f64;
@@ -203,7 +203,7 @@ mod tests {
             (64, 0.985_556_192_959_088_1),
             (128, 0.892_433_735_974_979_3),
             (256, 0.709_945_549_531_542_3),
-            (512, 0.524_039_710_809_305_0),
+            (512, 0.524_039_710_809_305),
         ];
         for (horizon, reference) in references {
             let model = ValidityCapacityAccuracyNullModel::new(4096, 8, 8, horizon).unwrap();

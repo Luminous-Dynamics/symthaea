@@ -387,10 +387,10 @@ fn validate_case(case: ValidityCapacityControlCase) -> Result<(), ValidityCapaci
     if case.write_segment_length == 0 {
         return Err(ValidityCapacityControlError::ZeroWriteSegmentLength);
     }
-    if case.horizon % case.semantic_run_length != 0 {
+    if !case.horizon.is_multiple_of(case.semantic_run_length) {
         return Err(ValidityCapacityControlError::SemanticRunDoesNotDivideHorizon);
     }
-    if case.semantic_run_length % case.write_segment_length != 0 {
+    if !case.semantic_run_length.is_multiple_of(case.write_segment_length) {
         return Err(ValidityCapacityControlError::WriteSegmentDoesNotDivideSemanticRun);
     }
     if case.axis == ValidityCapacityControlAxis::SemanticRunLength

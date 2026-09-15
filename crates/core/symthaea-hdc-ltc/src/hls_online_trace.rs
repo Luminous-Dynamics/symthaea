@@ -212,7 +212,7 @@ pub fn step_with_eligibility(
     let mut candidate_state = vec![0.0_f32; dim];
     let mut next_trace = trace.clone();
 
-    for i in 0..dim {
+    for (i, candidate) in candidate_state.iter_mut().enumerate() {
         let local = local_transition_derivatives(
             &config,
             dt,
@@ -226,7 +226,7 @@ pub fn step_with_eligibility(
             parameters.gate_bias.values[i],
         );
 
-        candidate_state[i] = local.next_state;
+        *candidate = local.next_state;
         next_trace.recurrent_weight.values[i] = local.d_state_d_previous
             * trace.recurrent_weight.values[i]
             + local.d_state_d_recurrent_weight;

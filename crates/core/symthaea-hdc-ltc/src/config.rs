@@ -194,7 +194,7 @@ mod tests {
         for i in -100..=100 {
             let x = i as f32 * 0.1;
             let ft = fast_tanh(x);
-            assert!(ft >= -1.0 && ft <= 1.0, "fast_tanh({}) = {}", x, ft);
+            assert!((-1.0..=1.0).contains(&ft), "fast_tanh({}) = {}", x, ft);
         }
     }
 
@@ -208,7 +208,7 @@ mod tests {
         for i in -100..=100 {
             let x = i as f32 * 0.1;
             let ft = fast_tanh(x);
-            assert!(ft >= -1.0 && ft <= 1.0, "Out of range at x={}: {}", x, ft);
+            assert!((-1.0..=1.0).contains(&ft), "Out of range at x={}: {}", x, ft);
             assert!(ft >= prev, "Not monotonic at x={}: {} < {}", x, ft, prev);
             prev = ft;
         }
