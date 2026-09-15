@@ -351,7 +351,7 @@ pub struct OracleReport {
 
 impl OracleReport {
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(144);
+        let mut out = Vec::with_capacity(176);
         push_u64(&mut out, self.external_surprise.to_bits());
         push_u8(&mut out, u8::from(self.internal_disagreement));
         push_u8(&mut out, u8::from(self.final_unresolved_disagreement));
@@ -365,6 +365,19 @@ impl OracleReport {
         push_u8(&mut out, self.expected_response as u8);
         push_u8(&mut out, self.resolution_class as u8);
         push_optional_polarity(&mut out, self.target_polarity);
+        push_u8(&mut out, encode_inconsistency_kind(self.observatory.kind));
+        push_u64(
+            &mut out,
+            self.observatory.evidence_support.proposition().to_bits(),
+        );
+        push_u64(
+            &mut out,
+            self.observatory.evidence_support.negation().to_bits(),
+        );
+        push_u8(
+            &mut out,
+            encode_resolution_state(self.observatory.resolution),
+        );
         push_u64(&mut out, self.observatory.external_surprise.to_bits());
         push_u64(&mut out, self.observatory.internal_disagreement.to_bits());
         push_u64(&mut out, self.observatory.uncertainty.to_bits());
@@ -572,7 +585,7 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::TransientConflict => (
-                orientation,
+                opposite,
                 [
                     claim(
                         0,
@@ -609,7 +622,7 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::PersistentResolvable => (
-                orientation,
+                opposite,
                 [
                     claim(
                         0,
@@ -651,7 +664,7 @@ impl FixtureGenerator {
                 },
             ),
             Condition::PersistentIrreducible => (
-                orientation,
+                opposite,
                 [
                     claim(
                         0,
@@ -725,7 +738,7 @@ impl FixtureGenerator {
                 OracleTruth::non_contextual(),
             ),
             Condition::OntologyFailure => (
-                orientation,
+                opposite,
                 [
                     claim(
                         0,
@@ -1183,6 +1196,10 @@ fn validate_condition_contract(
             )?;
         }
         Condition::TransientConflict => {
+            require(
+                is_one(report.external_surprise),
+                "C2 must match C1 high surprise",
+            )?;
             require(report.internal_disagreement, "C2 must contain conflict")?;
             require(
                 !report.final_unresolved_disagreement,
@@ -1198,6 +1215,10 @@ fn validate_condition_contract(
             )?;
         }
         Condition::PersistentResolvable => {
+            require(
+                is_one(report.external_surprise),
+                "C3 must match C2 high surprise",
+            )?;
             require(report.internal_disagreement, "C3 must contain conflict")?;
             require(
                 report.final_unresolved_disagreement,
@@ -1221,6 +1242,10 @@ fn validate_condition_contract(
             )?;
         }
         Condition::PersistentIrreducible => {
+            require(
+                is_one(report.external_surprise),
+                "C4 must match C3 high surprise",
+            )?;
             require(report.internal_disagreement, "C4 must contain conflict")?;
             require(
                 report.final_unresolved_disagreement,
@@ -1237,6 +1262,10 @@ fn validate_condition_contract(
             )?;
         }
         Condition::SelfReferentialConflict => {
+            require(
+                is_one(report.external_surprise),
+                "C5 must carry the same high-surprise background",
+            )?;
             require(report.internal_disagreement, "C5 must contain conflict")?;
             require(
                 report.final_unresolved_disagreement,
@@ -1252,6 +1281,10 @@ fn validate_condition_contract(
             )?;
         }
         Condition::OntologyFailure => {
+            require(
+                is_one(report.external_surprise),
+                "C6 must match persistent-conflict high surprise",
+            )?;
             require(report.internal_disagreement, "C6 must contain conflict")?;
             require(
                 report.final_unresolved_disagreement,
@@ -1314,6 +1347,30 @@ fn mix64(mut x: u64) -> u64 {
     x ^= x >> 27;
     x = x.wrapping_mul(0x94D0_49BB_1331_11EB);
     x ^ (x >> 31)
+}
+
+const fn encode_inconsistency_kind(value: InconsistencyKind) -> u8 {
+    match value {
+        InconsistencyKind::PredictionError => 0,
+        InconsistencyKind::Ambiguity => 1,
+        InconsistencyKind::ActionConflict => 2,
+        InconsistencyKind::EvidenceContradiction => 3,
+        InconsistencyKind::Underdetermination => 4,
+        InconsistencyKind::SelfReferentialConflict => 5,
+        InconsistencyKind::OntologyFailure => 6,
+        InconsistencyKind::FormalParadox => 7,
+    }
+}
+
+const fn encode_resolution_state(value: ResolutionState) -> u8 {
+    match value {
+        ResolutionState::Stable => 0,
+        ResolutionState::TransientConflict => 1,
+        ResolutionState::PersistentUnresolved => 2,
+        ResolutionState::ResolvedWithoutRevision => 3,
+        ResolutionState::ResolvedByRepresentationRevision => 4,
+        ResolutionState::IrreducibleUnderCurrentModel => 5,
+    }
 }
 
 const fn encode_evidence_polarity(value: EvidencePolarity) -> u8 {
@@ -1427,6 +1484,26 @@ mod tests {
     }
 
     #[test]
+    fn oracle_canonical_bytes_bind_observatory_semantics() {
+        let fixture =
+            FixtureGenerator::generate(Condition::PersistentIrreducible, 2, 0).unwrap();
+        let report = qualify_fixture(&fixture).unwrap();
+        let canonical = report.canonical_bytes();
+
+        let mut changed_kind = report.clone();
+        changed_kind.observatory.kind = InconsistencyKind::Ambiguity;
+        assert_ne!(canonical, changed_kind.canonical_bytes());
+
+        let mut changed_resolution = report.clone();
+        changed_resolution.observatory.resolution = ResolutionState::Stable;
+        assert_ne!(canonical, changed_resolution.canonical_bytes());
+
+        let mut changed_support = report;
+        changed_support.observatory.evidence_support = EvidenceSupport::new(1.0, 0.0).unwrap();
+        assert_ne!(canonical, changed_support.canonical_bytes());
+    }
+
+    #[test]
     fn c3_resolution_is_agent_visible_but_c6_context_is_hidden() {
         let c3 = FixtureGenerator::generate(Condition::PersistentResolvable, 2, 0).unwrap();
         let c6 = FixtureGenerator::generate(Condition::OntologyFailure, 2, 0).unwrap();
@@ -1495,17 +1572,34 @@ mod tests {
         assert!(is_one(c1.external_surprise));
         assert!(!c1.internal_disagreement);
         assert!(!c1.final_unresolved_disagreement);
+        assert!(is_one(c2.external_surprise));
         assert!(c2.internal_disagreement);
         assert!(!c2.final_unresolved_disagreement);
+        assert!(is_one(c3.external_surprise));
+        assert_eq!(c2.external_surprise.to_bits(), c3.external_surprise.to_bits());
         assert!(c2.conflict_persistence < c3.conflict_persistence);
         assert!(c3.final_unresolved_disagreement);
         assert!(c3.explicit_context_resolution);
+        assert!(is_one(c4.external_surprise));
+        assert_eq!(c3.external_surprise.to_bits(), c4.external_surprise.to_bits());
         assert!(c4.final_unresolved_disagreement);
         assert!(c4.irreducible);
+        assert!(is_one(c5.external_surprise));
         assert!(c5.final_unresolved_disagreement);
         assert!(c5.self_referential);
+        assert!(is_one(c6.external_surprise));
+        assert_eq!(c4.external_surprise.to_bits(), c6.external_surprise.to_bits());
         assert!(c6.final_unresolved_disagreement);
         assert!(c6.ontology_failure);
+    }
+
+    #[test]
+    fn surprise_is_matched_across_noncontrol_conditions() {
+        for condition in ALL_CONDITIONS.into_iter().skip(1) {
+            let fixture = FixtureGenerator::generate(condition, 2, 0).unwrap();
+            let report = qualify_fixture(&fixture).unwrap();
+            assert!(is_one(report.external_surprise));
+        }
     }
 
     #[test]
