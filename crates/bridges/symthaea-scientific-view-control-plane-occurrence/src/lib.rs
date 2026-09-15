@@ -18,6 +18,8 @@
 
 #![forbid(unsafe_code)]
 
+pub mod wire;
+
 use sha2::{Digest, Sha256};
 use std::error::Error as StdError;
 use symthaea_scientific_view_control_plane::CandidateScientificViewControlPlaneTransitionV1;
