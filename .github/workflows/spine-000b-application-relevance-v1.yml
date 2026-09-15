@@ -1,0 +1,115 @@
+name: SPINE-000B Application Relevance Projection v1
+
+on:
+  push:
+    branches:
+      - research/spine-000b-application-relevance-v1
+  pull_request:
+    branches:
+      - research/spine-000b-integration-lowering-domain-v1
+    paths:
+      - '.github/workflows/spine-000b-application-relevance-v1.yml'
+      - 'docs/research/SPINE_000B_APPLICATION_RELEVANCE_PROJECTION_V1.md'
+      - 'scripts/spine_000b_application_relevance_projection_v1.py'
+      - 'scripts/spine_000b_integration_lowering_domain_v1.py'
+      - 'docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json'
+
+permissions:
+  contents: read
+
+jobs:
+  r2:
+    name: Qualify application relevance projection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$GITHUB_SHA" > /tmp/spine_r2_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_r2_pre_status
+          test ! -s /tmp/spine_r2_pre_status
+
+      - name: Constrain R2 subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=f0fffdc26279f56e3b4c6ba641c39ed6ffd7de4d
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base"..HEAD | sort > /tmp/spine_r2_changed
+          : > /tmp/spine_r2_unexpected
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/spine-000b-application-relevance-v1.yml|\
+              docs/research/SPINE_000B_APPLICATION_RELEVANCE_PROJECTION_V1.md|\
+              scripts/spine_000b_application_relevance_projection_v1.py)
+                ;;
+              *) echo "$path" >> /tmp/spine_r2_unexpected ;;
+            esac
+          done < /tmp/spine_r2_changed
+          if test -s /tmp/spine_r2_unexpected; then
+            echo 'Unexpected R2 subject files:' >&2
+            cat /tmp/spine_r2_unexpected >&2
+            exit 1
+          fi
+
+      - name: Syntax-check bound instruments
+        run: |
+          python3 -m py_compile scripts/spine_000b_integration_lowering_domain_v1.py
+          python3 -m py_compile scripts/spine_000b_application_relevance_projection_v1.py
+
+      - name: Revalidate N2 and registry
+        run: |
+          python3 scripts/verify_spine_000b_application_registry_v1.py
+          python3 scripts/spine_000b_integration_lowering_domain_v1.py --self-test
+
+      - name: Execute R2 projection controls
+        run: python3 scripts/spine_000b_application_relevance_projection_v1.py --self-test
+
+      - name: Seal exact-head evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000b-r2
+          {
+            echo 'schema=symthaea.spine.000b.application-relevance-projection.v1'
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_index_tree=$(git write-tree)"
+            echo 'base_subject=f0fffdc26279f56e3b4c6ba641c39ed6ffd7de4d'
+            echo 'authority=measurement-only'
+            echo 'actual_execution_claimed=false'
+            echo 'counterfactual_execution_claimed=false'
+            echo 'state_change_claimed=false'
+            echo 'causal_load_claimed=false'
+          } > artifacts/spine-000b-r2/subject.txt
+          cp /tmp/spine_r2_changed artifacts/spine-000b-r2/changed-files.txt
+          sha256sum \
+            docs/research/SPINE_000B_APPLICATION_RELEVANCE_PROJECTION_V1.md \
+            scripts/spine_000b_application_relevance_projection_v1.py \
+            scripts/spine_000b_integration_lowering_domain_v1.py \
+            docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json \
+            Cargo.toml Cargo.lock \
+            artifacts/spine-000b-r2/subject.txt \
+            > artifacts/spine-000b-r2/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_r2_head)"
+          git status --porcelain=v1 > /tmp/spine_r2_post_status
+          test ! -s /tmp/spine_r2_post_status
+
+      - name: Upload R2 evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-r2-${{ github.sha }}
+          path: artifacts/spine-000b-r2/
+          retention-days: 90
