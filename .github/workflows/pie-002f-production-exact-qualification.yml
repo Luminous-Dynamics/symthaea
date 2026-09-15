@@ -1,0 +1,241 @@
+name: PIE-002F Production Exact Qualification
+
+on:
+  push:
+    branches:
+      - qualify/pie-002f-production-b4f60d20
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pie-002f-production-b4f60d20
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Qualify exact PIE-002F production subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: b4f60d20f62d53c4c938fa808901739537ff533a
+      SUBJECT_TREE: 8346e7c8873c1a178a8ebb755963d47c2de7bf84
+      PARENT_SHA: d6bf30de475ffac2a2720ee71c7faa08f8c0dd52
+      PARENT_TREE: 335927ddf2a69d7168bdfdf88c0f96ac15a5e58e
+      PIE_G_SUBJECT: 459f671be180871b7dce9b508bdaa971d087f35a
+      CORE_ID_SUBJECT: f660afb7b0bf57f7cc52785d4436d0952cb779aa
+      F_ORACLE_SUBJECT: 391619e9822ad5367dc80a538a9cfa76620366e4
+      F_ORACLE_BLOB: fdcb02c5099d5d6801821ed7b827b7f506448840
+      CORE_ID_SOURCE_BLOB: ab6e720dce40c902aed249b01470d75bfb9cb945
+      CORE_ID_MANIFEST_BLOB: 9b7edb74f39fcf445175e00bbf6215a6fdb1f5dd
+      CORE_ID_LOCK_BLOB: ebca57ffef9aea8c5e0f72f59937236de3c72a77
+      PRODUCT_MANIFEST_BLOB: 85551db039b16eb57f5768b1214f1c0260657899
+      PRODUCT_LIB_BLOB: dc265c8e72908fe770d85e31ae2349d0cc36c216
+      PRODUCT_MODULE_BLOB: e7d3f9d907a726f48c5a56e5e763a8229bfcc2b1
+      HISTORICAL_TYPES_BLOB: 9a50afb90abc81197026244fa28dc48b854614fa
+      PACKAGE: symthaea-planetary-industry
+      MANIFEST: crates/domains/symthaea-planetary-industry/Cargo.toml
+      LIB: crates/domains/symthaea-planetary-industry/src/lib.rs
+      MODULE: crates/domains/symthaea-planetary-industry/src/utility_evidence_context.rs
+      TYPES: crates/domains/symthaea-planetary-industry/src/types.rs
+
+    steps:
+      - name: Checkout exact immutable product subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Exact identity, ancestry, tree, and scope
+        id: identity
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SUBJECT_TREE"
+          test "$(git rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git rev-parse "$PARENT_SHA^{tree}")" = "$PARENT_TREE"
+          test "$(git show -s --format=%P "$PARENT_SHA")" = "$PIE_G_SUBJECT $CORE_ID_SUBJECT"
+
+          mapfile -t changed < <(git diff --name-only "$PARENT_SHA".."$SUBJECT_SHA" | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "$MANIFEST"
+          test "${changed[1]}" = "$LIB"
+          test "${changed[2]}" = "$MODULE"
+
+          test "$(git rev-parse "$SUBJECT_SHA:$MANIFEST")" = "$PRODUCT_MANIFEST_BLOB"
+          test "$(git rev-parse "$SUBJECT_SHA:$LIB")" = "$PRODUCT_LIB_BLOB"
+          test "$(git rev-parse "$SUBJECT_SHA:$MODULE")" = "$PRODUCT_MODULE_BLOB"
+          git diff --check "$PARENT_SHA".."$SUBJECT_SHA"
+
+      - name: Bind qualified oracle, CORE-ID product, and historical DTO compatibility
+        id: dependencies
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$F_ORACLE_SUBJECT"
+          test "$(git rev-parse "$F_ORACLE_SUBJECT:scripts/pie-evidence-bearing-utility-context-oracle.py")" = "$F_ORACLE_BLOB"
+
+          test "$(git rev-parse "$SUBJECT_SHA:crates/core/symthaea-identity/src/lib.rs")" = "$CORE_ID_SOURCE_BLOB"
+          test "$(git rev-parse "$SUBJECT_SHA:crates/core/symthaea-identity/Cargo.toml")" = "$CORE_ID_MANIFEST_BLOB"
+          test "$(git rev-parse "$SUBJECT_SHA:Cargo.lock")" = "$CORE_ID_LOCK_BLOB"
+
+          # PIE-002F is a successor boundary; the historical raw-string DTO is
+          # deliberately not retyped or rewritten in place.
+          test "$(git rev-parse "$SUBJECT_SHA:$TYPES")" = "$HISTORICAL_TYPES_BLOB"
+          test "$(git rev-parse "$PIE_G_SUBJECT:$TYPES")" = "$HISTORICAL_TYPES_BLOB"
+
+      - name: Enforce PIE-002F source authority boundary
+        id: source_boundary
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'symthaea-identity = { path = "../../core/symthaea-identity" }' "$MANIFEST"
+          grep -Fq 'CanonicalIdentifier' "$MODULE"
+          grep -Fq 'item.validate()?' "$MODULE"
+          grep -Fq 'MAX_UTILITY_FACT_EVIDENCE_REFS: usize = 64' "$MODULE"
+          grep -Fq 'MAX_UTILITY_EVIDENCE_TEXT_BYTES: usize = 4096' "$MODULE"
+          grep -Fq 'ElectricalSupplyRecoveryContext {' "$MODULE"
+          grep -Fq 'Evidence-bearing does not imply truth, freshness, independence, applicability' "$MODULE"
+          ! grep -Fq 'evaluate_electrical_utility' "$MODULE"
+          ! grep -Fq 'UtilityFeasibility' "$MODULE"
+          ! grep -Eq 'Applicability(Result|Receipt|Status)|FactApplicability|PIE-002I|PIE_002I' "$MODULE"
+
+      - name: Install exact Rust qualification toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Rustfmt
+        id: rustfmt
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p "$PACKAGE" -- --check
+
+      - name: Locked all-targets check
+        id: check
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Locked all-targets tests
+        id: test
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p "$PACKAGE" --all-targets --locked
+
+      - name: Strict locked Clippy
+        id: clippy
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Immutable postflight
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Record exact qualification receipt
+        if: always()
+        shell: bash
+        env:
+          IDENTITY: ${{ steps.identity.outcome }}
+          DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          SOURCE_BOUNDARY: ${{ steps.source_boundary.outcome }}
+          RUSTFMT: ${{ steps.rustfmt.outcome }}
+          CHECK: ${{ steps.check.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+          POSTFLIGHT: ${{ steps.postflight.outcome }}
+        run: |
+          set -euo pipefail
+          manifest_sha="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+          lib_sha="$(sha256sum "$LIB" | awk '{print $1}')"
+          module_sha="$(sha256sum "$MODULE" | awk '{print $1}')"
+          types_sha="$(sha256sum "$TYPES" | awk '{print $1}')"
+          cat > pie-002f-production-qualification-receipt.json <<EOF
+          {
+            "contract": "PIE-002F-PRODUCTION-EXACT-QUALIFICATION-v1",
+            "subject_sha": "$SUBJECT_SHA",
+            "subject_tree": "$SUBJECT_TREE",
+            "parent_sha": "$PARENT_SHA",
+            "parent_tree": "$PARENT_TREE",
+            "qualified_pie_g_parent": "$PIE_G_SUBJECT",
+            "qualified_core_id_parent": "$CORE_ID_SUBJECT",
+            "qualified_f_oracle_subject": "$F_ORACLE_SUBJECT",
+            "rust_toolchain": "1.96.0",
+            "manifest_sha256": "$manifest_sha",
+            "lib_sha256": "$lib_sha",
+            "module_sha256": "$module_sha",
+            "historical_types_sha256": "$types_sha",
+            "gates": {
+              "identity": "$IDENTITY",
+              "qualified_dependencies": "$DEPENDENCIES",
+              "source_boundary": "$SOURCE_BOUNDARY",
+              "rustfmt": "$RUSTFMT",
+              "check_all_targets_locked": "$CHECK",
+              "test_all_targets_locked": "$TEST",
+              "clippy_all_targets_deny_warnings_locked": "$CLIPPY",
+              "clean_checkout": "$POSTFLIGHT"
+            },
+            "claims": {
+              "all_nine_external_facts_require_explicit_provenance": true,
+              "canonical_evidence_ids_use_qualified_core_id": true,
+              "bare_pie_002d_context_projection_is_explicit": true,
+              "historical_evidence_ref_wire_type_retyped": false,
+              "evidence_truth_established": false,
+              "evidence_freshness_established": false,
+              "evidence_independence_established": false,
+              "evidence_applicability_established": false,
+              "feasibility_established": false,
+              "execution_authority_granted": false
+            }
+          }
+          EOF
+          cat pie-002f-production-qualification-receipt.json
+
+      - name: Upload exact qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pie-002f-production-exact-qualification
+          path: pie-002f-production-qualification-receipt.json
+          if-no-files-found: error
+
+      - name: Enforce final qualification outcome
+        if: always()
+        shell: bash
+        env:
+          IDENTITY: ${{ steps.identity.outcome }}
+          DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          SOURCE_BOUNDARY: ${{ steps.source_boundary.outcome }}
+          RUSTFMT: ${{ steps.rustfmt.outcome }}
+          CHECK: ${{ steps.check.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          CLIPPY: ${{ steps.clippy.outcome }}
+          POSTFLIGHT: ${{ steps.postflight.outcome }}
+        run: |
+          set -euo pipefail
+          for gate in "$IDENTITY" "$DEPENDENCIES" "$SOURCE_BOUNDARY" "$RUSTFMT" "$CHECK" "$TEST" "$CLIPPY" "$POSTFLIGHT"; do
+            test "$gate" = success
+          done
