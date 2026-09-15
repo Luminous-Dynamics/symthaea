@@ -10,7 +10,7 @@ on:
     paths:
       - '.github/workflows/spine-000b-receipt-commitment-v1.yml'
       - 'docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md'
-      - 'scripts/spine_000b_receipt_commitment_oracle_r1.py'
+      - 'scripts/spine_000b_receipt_commitment_oracle.py'
       - 'scripts/verify_spine_000b_receipt_commitment_v1.py'
       - 'tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json'
       - 'xtask/src/bin/spine_000b_commitment_vectors.rs'
@@ -49,7 +49,7 @@ jobs:
           cat > /tmp/spine_c1_allowed <<'EOF'
           .github/workflows/spine-000b-receipt-commitment-v1.yml
           docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md
-          scripts/spine_000b_receipt_commitment_oracle_r1.py
+          scripts/spine_000b_receipt_commitment_oracle.py
           scripts/verify_spine_000b_receipt_commitment_v1.py
           tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json
           xtask/src/bin/spine_000b_commitment_vectors.rs
@@ -62,10 +62,10 @@ jobs:
             exit 1
           fi
 
-      - name: Syntax-check independent Python instruments
+      - name: Syntax-check independent instruments
         run: |
           python3 -m py_compile \
-            scripts/spine_000b_receipt_commitment_oracle_r1.py \
+            scripts/spine_000b_receipt_commitment_oracle.py \
             scripts/verify_spine_000b_receipt_commitment_v1.py
           python3 -m json.tool tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json > /dev/null
 
@@ -91,13 +91,14 @@ jobs:
             echo "status=CROSS_IMPLEMENTATION_EQUIVALENCE"
             echo "python_oracle=true"
             echo "rust_vector_verifier=true"
+            echo "source_condition_protocol=true"
             echo "runtime_evidence_claimed=false"
             echo "causal_load_claimed=false"
           } > artifacts/spine-000b-c1/subject.txt
           cp /tmp/spine_c1_changed artifacts/spine-000b-c1/changed-files.txt
           sha256sum \
             docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md \
-            scripts/spine_000b_receipt_commitment_oracle_r1.py \
+            scripts/spine_000b_receipt_commitment_oracle.py \
             scripts/verify_spine_000b_receipt_commitment_v1.py \
             tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json \
             xtask/src/bin/spine_000b_commitment_vectors.rs \
