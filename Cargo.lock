@@ -19152,6 +19152,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-identity"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-information-theory"
 version = "0.1.0"
 
@@ -19612,13 +19620,6 @@ dependencies = [
 [[package]]
 name = "symthaea-physiology"
 version = "0.1.0"
-
-[[package]]
-name = "symthaea-planetary-industry"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "symthaea-population"
