@@ -1,0 +1,148 @@
+name: SPINE-000B P1R Equivalence
+
+on:
+  push:
+    branches:
+      - research/spine-000b-p1r-audit-hardening
+  pull_request:
+    branches:
+      - research/spine-000b-p0-identity
+    paths:
+      - '.github/workflows/spine-000b-p1r.yml'
+      - 'docs/research/SPINE_000B_P1R_*.md'
+      - 'scripts/verify_spine_000b_p1r_contract.py'
+      - 'scripts/generate_spine_golden_fixtures.py'
+      - 'scripts/spine_000b_influence_oracle.py'
+      - 'scripts/run_spine_000b_p1r_rust_harness.py'
+      - 'tests/fixtures/spine_000b_golden_fixtures.json'
+      - 'src/cognitive_loop/subsystem_trait.rs'
+      - 'src/cognitive_loop/mod.rs'
+
+permissions:
+  contents: read
+
+jobs:
+  p1r:
+    name: Complete Rust↔oracle equivalence surface
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > /tmp/spine_p1r_expected_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_p1r_pre_status
+          test ! -s /tmp/spine_p1r_pre_status
+          sha256sum src/cognitive_loop/subsystem_trait.rs | awk '{print $1}' > /tmp/spine_p1r_production_source_sha
+
+      - name: Constrain P1R subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=fa7b68645dd2109abb12c70f493e50e16c5740a4
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base"..HEAD | sort > /tmp/spine_p1r_changed
+          : > /tmp/spine_p1r_unexpected
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/spine-000b-p1r.yml|\
+              docs/research/SPINE_000B_P1R_*.md|\
+              scripts/generate_spine_golden_fixtures.py|\
+              scripts/run_spine_000b_p1r_rust_harness.py|\
+              scripts/verify_spine_000b_p1r_contract.py|\
+              src/cognitive_loop/subsystem_trait.rs|\
+              tests/fixtures/spine_000b_golden_fixtures.json)
+                ;;
+              *) echo "$path" >> /tmp/spine_p1r_unexpected ;;
+            esac
+          done < /tmp/spine_p1r_changed
+          if test -s /tmp/spine_p1r_unexpected; then
+            echo 'Unexpected P1R subject files:' >&2
+            cat /tmp/spine_p1r_unexpected >&2
+            exit 1
+          fi
+
+      - name: Syntax-check independent instruments
+        run: |
+          python3 -m py_compile \
+            scripts/spine_000b_influence_oracle.py \
+            scripts/generate_spine_golden_fixtures.py \
+            scripts/run_spine_000b_p1r_rust_harness.py \
+            scripts/verify_spine_000b_p1r_contract.py
+
+      - name: Require complete preregistered coverage and strict harness
+        run: python3 scripts/verify_spine_000b_p1r_contract.py
+
+      - name: Require independent Python oracle
+        run: python3 scripts/spine_000b_influence_oracle.py --self-test
+
+      - name: Regenerate fixtures and prove no drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          before=$(sha256sum tests/fixtures/spine_000b_golden_fixtures.json | awk '{print $1}')
+          python3 scripts/generate_spine_golden_fixtures.py
+          after=$(sha256sum tests/fixtures/spine_000b_golden_fixtures.json | awk '{print $1}')
+          test "$before" = "$after"
+          git diff --exit-code -- tests/fixtures/spine_000b_golden_fixtures.json
+
+      - name: Execute strict production Rust collector equivalence harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run_spine_000b_p1r_rust_harness.py
+          test "$(sha256sum src/cognitive_loop/subsystem_trait.rs | awk '{print $1}')" = "$(cat /tmp/spine_p1r_production_source_sha)"
+          git diff --exit-code -- src/cognitive_loop/subsystem_trait.rs
+
+      - name: Seal exact-head evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000b-p1r
+          {
+            echo "schema=symthaea.spine.000b.p1r-equivalence.v1"
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_index_tree=$(git write-tree)"
+            echo "base_subject=fa7b68645dd2109abb12c70f493e50e16c5740a4"
+            echo "production_source_sha256=$(cat /tmp/spine_p1r_production_source_sha)"
+            echo "fixture_cases=16"
+            echo "rust_surface=production_OutputCollector_via_test_only_injection"
+            echo "authority=measurement-only"
+            echo "runtime_evidence_claimed=false"
+            echo "causal_load_claimed=false"
+          } > artifacts/spine-000b-p1r/subject.txt
+          cp /tmp/spine_p1r_changed artifacts/spine-000b-p1r/changed-files.txt
+          find docs/research -maxdepth 1 -type f -name 'SPINE_000B_P1R_*.md' -print0 | sort -z | xargs -0 -r sha256sum > artifacts/spine-000b-p1r/P1R_DOC_SHA256SUMS
+          sha256sum \
+            src/cognitive_loop/subsystem_trait.rs \
+            scripts/spine_000b_influence_oracle.py \
+            scripts/generate_spine_golden_fixtures.py \
+            scripts/run_spine_000b_p1r_rust_harness.py \
+            scripts/verify_spine_000b_p1r_contract.py \
+            tests/fixtures/spine_000b_golden_fixtures.json \
+            Cargo.toml \
+            Cargo.lock \
+            artifacts/spine-000b-p1r/subject.txt \
+            > artifacts/spine-000b-p1r/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_p1r_expected_head)"
+          git status --porcelain=v1 > /tmp/spine_p1r_post_status
+          test ! -s /tmp/spine_p1r_post_status
+
+      - name: Upload P1R evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-p1r-${{ github.sha }}
+          path: artifacts/spine-000b-p1r/
+          retention-days: 90
