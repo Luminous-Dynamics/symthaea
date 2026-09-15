@@ -1,0 +1,51 @@
+{
+  "schema": "symthaea.rq006.integration-manifest.v1",
+  "program": "RQ-006 calibrated metacognition",
+  "product_head": "601cab4d7f1759dc573ad75c93e943e114a4c3b4",
+  "authority_mode": "MeasurementOnly",
+  "behavior_authority": "historical-meta-reasoner",
+  "milestone_heads": [
+    {
+      "pr": 2795,
+      "role": "evidence-seeking-v3-planner",
+      "sha": "8cf36db7f3e70e2eec85b2a9a4d7650f4835614d"
+    },
+    {
+      "pr": 2803,
+      "role": "live-primitive-identity-without-fabricated-evidence",
+      "sha": "45b559d9a46960a9d8e68497ba3f0d3c170b3d53"
+    },
+    {
+      "pr": 2811,
+      "role": "append-only-evidence-acquisition-session",
+      "sha": "67439d7ba7ac4e18c74df4bff10fed7711913dc3"
+    },
+    {
+      "pr": 2814,
+      "role": "active-primitive-evidence-adapter",
+      "sha": "ddc28bccd074af8a713c532c6adf5b5f0d15a92d"
+    },
+    {
+      "pr": 2827,
+      "role": "live-v3-shadow",
+      "sha": "8cb8d91b309230731b7cba2a26b293bc574a4fd7"
+    },
+    {
+      "pr": 2846,
+      "role": "typed-candidate-epistemic-grounding",
+      "sha": "109ce76c18ab831ed0706a556248e3b454dd91df"
+    },
+    {
+      "pr": 2851,
+      "role": "bounded-objective-evidence-and-refinement",
+      "sha": "601cab4d7f1759dc573ad75c93e943e114a4c3b4"
+    }
+  ],
+  "nonclaims": [
+    "production V3 behavior authority",
+    "general intelligence",
+    "superhuman reasoning",
+    "consciousness",
+    "scientific validity of unqualified measurement producers"
+  ]
+}

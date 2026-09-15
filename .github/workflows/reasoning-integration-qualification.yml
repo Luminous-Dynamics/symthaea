@@ -1,0 +1,357 @@
+name: Reasoning Integration Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/reasoning-integration-qualification.yml'
+      - '.github/qualification/rq006-integration-manifest.json'
+      - '.github/qualification/rq006-example-targets.toml.fragment'
+      - '.github/qualification/rq006-integration-qualify.sh'
+      - 'Cargo.toml'
+      - 'examples/benchmark_metacognitive_context.rs'
+      - 'examples/build_reasoning_capability_matrix.rs'
+      - 'src/intelligence/**'
+      - 'src/cognitive_loop/accessors/consciousness.rs'
+      - 'src/cognitive_loop/cycle_subsystems.rs'
+      - 'src/cognitive_loop/primitive_tier.rs'
+      - 'src/consciousness/epistemic_conflict/calibrator.rs'
+      - 'src/consciousness/unified_intelligence.rs'
+
+permissions:
+  contents: read
+
+# One heavyweight integration candidate per PR. A synchronize event for a newer exact
+# head supersedes the older candidate instead of leaving every historical head queued.
+concurrency:
+  group: rq006-reasoning-integration-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RQ006_PRODUCT_HEAD: 601cab4d7f1759dc573ad75c93e943e114a4c3b4
+
+jobs:
+  qualify:
+    name: Exact-head RQ-006 integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Capture exact integration subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          base='${{ github.event.pull_request.base.sha }}'
+          product="$RQ006_PRODUCT_HEAD"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          git fetch --no-tags origin "$base"
+          git cat-file -e "$product^{commit}"
+
+          # The integration subject is not merely a descendant of product/base. It must be
+          # the explicit two-parent convergence object: product first, current base second.
+          read -r -a parents <<< "$(git show -s --format='%P' HEAD)"
+          test "${#parents[@]}" -eq 2
+          test "${parents[0]}" = "$product"
+          test "${parents[1]}" = "$base"
+
+          git merge-base --is-ancestor "$product" HEAD
+          merge_base="$(git merge-base HEAD "$base")"
+          test "$merge_base" = "$base"
+          test "$(git rev-list --count HEAD.."$base")" = "0"
+          {
+            echo "qualification_revision=reasoning-integration-v12-remediation-retention"
+            echo "repository=${GITHUB_REPOSITORY}"
+            echo "pull_request=${{ github.event.pull_request.number }}"
+            echo "expected_subject_sha=$expected"
+            echo "actual_subject_sha=$actual"
+            echo "subject_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "parent_count=${#parents[@]}"
+            echo "first_parent=${parents[0]}"
+            echo "second_parent=${parents[1]}"
+            echo "base_sha=$base"
+            echo "merge_base=$merge_base"
+            echo "product_head=$product"
+            echo "product_tree=$(git rev-parse "$product^{tree}")"
+            echo "product_manifest_blob=$(git rev-parse "$product:Cargo.toml")"
+            echo "metacognition_probe_blob=$(git rev-parse "$product:examples/benchmark_metacognitive_context.rs")"
+            echo "matrix_builder_blob=$(git rev-parse "$product:examples/build_reasoning_capability_matrix.rs")"
+            echo "commits_ahead=$(git rev-list --count "$base"..HEAD)"
+            echo "integration_commits_after_product=$(git rev-list --count "$product"..HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "product_manifest_sha256=$(sha256sum Cargo.toml | awk '{print $1}')"
+            echo "qualification_workflow_sha256=$(sha256sum .github/workflows/reasoning-integration-qualification.yml | awk '{print $1}')"
+            echo "lineage_manifest_sha256=$(sha256sum .github/qualification/rq006-integration-manifest.json | awk '{print $1}')"
+            echo "target_overlay_sha256=$(sha256sum .github/qualification/rq006-example-targets.toml.fragment | awk '{print $1}')"
+            echo "qualification_contract_sha256=$(sha256sum .github/qualification/rq006-integration-qualify.sh | awk '{print $1}')"
+            echo "concurrency_policy=rq006-reasoning-integration-pr-${{ github.event.pull_request.number }}"
+            echo "checkout_action=11d5960a326750d5838078e36cf38b85af677262"
+            echo "upload_artifact_action=ea165f8d65b6e75b540449e92b4886f43607fa02"
+            echo "runner_image=ubuntu-24.04"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } > "$RUNNER_TEMP/reasoning-integration-receipt.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/pre-head"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/pre-tree"
+          sha256sum Cargo.lock | awk '{print $1}' > "$RUNNER_TEMP/pre-lock"
+          sha256sum Cargo.toml | awk '{print $1}' > "$RUNNER_TEMP/pre-manifest"
+
+      - name: Validate frozen RQ-006 lineage manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import re
+          import subprocess
+          from pathlib import Path
+
+          manifest = json.loads(Path('.github/qualification/rq006-integration-manifest.json').read_text())
+          expected_product = '601cab4d7f1759dc573ad75c93e943e114a4c3b4'
+          if manifest.get('schema') != 'symthaea.rq006.integration-manifest.v1':
+              raise SystemExit('unexpected integration manifest schema')
+          if manifest.get('product_head') != expected_product:
+              raise SystemExit('integration manifest product head mismatch')
+          if manifest.get('authority_mode') != 'MeasurementOnly':
+              raise SystemExit('integration manifest attempted to promote V3 authority')
+          if manifest.get('behavior_authority') != 'historical-meta-reasoner':
+              raise SystemExit('integration manifest behavior authority changed')
+
+          milestones = manifest.get('milestone_heads', [])
+          if not milestones or milestones[-1].get('sha') != expected_product:
+              raise SystemExit('integration manifest must terminate at the frozen product head')
+          prs = [m.get('pr') for m in milestones]
+          shas = [m.get('sha') for m in milestones]
+          if len(prs) != len(set(prs)) or len(shas) != len(set(shas)):
+              raise SystemExit('duplicate PR or SHA in integration lineage manifest')
+
+          for milestone in milestones:
+              sha = milestone.get('sha', '')
+              if not re.fullmatch(r'[0-9a-f]{40}', sha):
+                  raise SystemExit(f'noncanonical milestone SHA: {sha!r}')
+              subprocess.run(['git', 'cat-file', '-e', f'{sha}^{{commit}}'], check=True)
+              subprocess.run(['git', 'merge-base', '--is-ancestor', sha, expected_product], check=True)
+          print(f'lineage_manifest=PASS milestones={len(milestones)}')
+          PY
+
+      - name: Prove frozen product bytes are untouched by integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          product="$RQ006_PRODUCT_HEAD"
+          product_paths=(
+            Cargo.toml
+            examples/benchmark_metacognitive_context.rs
+            examples/build_reasoning_capability_matrix.rs
+            src/cognitive_loop/accessors/consciousness.rs
+            src/cognitive_loop/cycle_subsystems.rs
+            src/cognitive_loop/primitive_tier.rs
+            src/consciousness/epistemic_conflict/calibrator.rs
+            src/consciousness/unified_intelligence.rs
+            src/intelligence
+          )
+          git diff --exit-code "$product" HEAD -- "${product_paths[@]}"
+          echo 'frozen_product_bytes=PASS'
+
+      - name: Prove exact qualification-only convergence delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          product="$RQ006_PRODUCT_HEAD"
+          git diff --name-status "$product" HEAD > "$RUNNER_TEMP/product-to-integration.txt"
+          cat "$RUNNER_TEMP/product-to-integration.txt"
+          python3 - "$RUNNER_TEMP/product-to-integration.txt" <<'PY'
+          import pathlib
+          import sys
+
+          expected = {
+              ('A', '.github/qualification/rq006-example-targets.toml.fragment'),
+              ('A', '.github/qualification/rq006-integration-manifest.json'),
+              ('A', '.github/qualification/rq006-integration-qualify.sh'),
+              ('A', '.github/workflows/reasoning-integration-qualification.yml'),
+          }
+          actual = set()
+          for raw in pathlib.Path(sys.argv[1]).read_text().splitlines():
+              fields = raw.split('\t')
+              if len(fields) != 2:
+                  raise SystemExit(f'unexpected product→integration diff row: {raw!r}')
+              actual.add((fields[0], fields[1]))
+          if actual != expected:
+              missing = sorted(expected - actual)
+              extra = sorted(actual - expected)
+              raise SystemExit(f'qualification-only delta mismatch; missing={missing!r} extra={extra!r}')
+          print('qualification_only_delta=PASS files=4')
+          PY
+
+      - name: Prove integration diff is reasoning-scoped
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='${{ github.event.pull_request.base.sha }}'
+          mapfile -t changed < <(git diff --name-only "$base"...HEAD)
+          printf '%s\n' "${changed[@]}" | tee "$RUNNER_TEMP/changed-paths.txt"
+          python3 - "${changed[@]}" <<'PY'
+          import sys
+
+          exact = {
+              '.github/workflows/reasoning-integration-qualification.yml',
+              '.github/qualification/rq006-integration-manifest.json',
+              '.github/qualification/rq006-example-targets.toml.fragment',
+              '.github/qualification/rq006-integration-qualify.sh',
+              'Cargo.toml',
+              'examples/benchmark_metacognitive_context.rs',
+              'examples/build_reasoning_capability_matrix.rs',
+              'src/cognitive_loop/accessors/consciousness.rs',
+              'src/cognitive_loop/cycle_subsystems.rs',
+              'src/cognitive_loop/primitive_tier.rs',
+              'src/consciousness/epistemic_conflict/calibrator.rs',
+              'src/consciousness/unified_intelligence.rs',
+          }
+          def allowed(path: str) -> bool:
+              return path in exact or path.startswith('src/intelligence/')
+
+          bad = [path for path in sys.argv[1:] if not allowed(path)]
+          if bad:
+              print('Out-of-scope integration paths:', file=sys.stderr)
+              for path in bad:
+                  print(f'  {path}', file=sys.stderr)
+              raise SystemExit(1)
+          PY
+          git diff --quiet "$base"...HEAD -- Cargo.lock
+
+      - name: Require committed product manifest conservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$RQ006_PRODUCT_HEAD" HEAD -- Cargo.toml
+          test "$(sha256sum Cargo.toml | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-manifest")"
+          echo 'committed_product_manifest=FROZEN'
+
+      - name: Ratchet V3 shadow-only behavior authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          shadow = Path('src/intelligence/reasoning_shadow_meta.rs').read_text()
+          cycle = Path('src/cognitive_loop/cycle_subsystems.rs').read_text()
+
+          start = shadow.index('    pub fn meta_reason_with_active_evidence(')
+          end = shadow.index('    /// Compatibility view for existing typed accessors.', start)
+          body = shadow[start:end]
+          ordered = [
+              'let legacy_result = self.legacy.meta_reason(query, primitives, chain)?;',
+              'self.observe_shadow(&legacy_result, shadow_candidates);',
+              'self.observe_v3_shadow(&legacy_result, active_primitives, &candidate_ids);',
+              'Ok(legacy_result)',
+          ]
+          positions = []
+          for needle in ordered:
+              pos = body.find(needle)
+              if pos < 0:
+                  raise SystemExit(f'missing shadow-authority invariant: {needle}')
+              positions.append(pos)
+          if positions != sorted(positions):
+              raise SystemExit('legacy/shadow/return ordering changed in meta_reason_with_active_evidence')
+
+          if 'meta_reason_with_active_evidence(' not in cycle:
+              raise SystemExit('live cognitive loop no longer calls the shadow-only wrapper')
+          if 'Ok(result) => (result.meta_confidence, result.meta_insights.len())' not in cycle:
+              raise SystemExit('live meta feedback no longer derives from the wrapper returned result')
+          for forbidden in ('last_v3_shadow_observation', 'V3ShadowObservation', 'v3_selected'):
+              if forbidden in cycle:
+                  raise SystemExit(f'live behavior path started consuming V3 telemetry: {forbidden}')
+
+          print('shadow_only_behavior_authority=PASS')
+          PY
+
+      - name: Execute pinned RQ-006 qualification contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/qualification/rq006-integration-qualify.sh \
+            2>&1 | tee "$RUNNER_TEMP/rq006-qualification-contract.txt"
+
+      - name: Prove checkout, product manifest, and lockfile remained immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/pre-head")"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat "$RUNNER_TEMP/pre-tree")"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-lock")"
+          test "$(sha256sum Cargo.toml | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-manifest")"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo 'qualification_result=PASS' >> "$RUNNER_TEMP/reasoning-integration-receipt.txt"
+
+      - name: Bind optional Rustfmt remediation evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          remediation="$RUNNER_TEMP/rq006-rustfmt-remediation"
+          receipt="$RUNNER_TEMP/reasoning-integration-receipt.txt"
+          if [[ ! -d "$remediation" ]]; then
+            echo 'rustfmt_remediation_state=NOT_GENERATED' >> "$receipt"
+            exit 0
+          fi
+
+          for file in \
+            formatted-paths.txt \
+            formatted-census.tsv \
+            rustfmt.patch \
+            remediation-receipt.txt; do
+            test -f "$remediation/$file"
+          done
+          test -d "$remediation/files"
+
+          find "$remediation/files" -type f -print0 \
+            | LC_ALL=C sort -z \
+            | xargs -0 sha256sum \
+            > "$remediation/formatted-files-sha256.txt"
+
+          {
+            echo 'rustfmt_remediation_state=GENERATED_RED'
+            echo "rustfmt_remediation_paths_sha256=$(sha256sum "$remediation/formatted-paths.txt" | awk '{print $1}')"
+            echo "rustfmt_remediation_census_sha256=$(sha256sum "$remediation/formatted-census.tsv" | awk '{print $1}')"
+            echo "rustfmt_remediation_patch_sha256=$(sha256sum "$remediation/rustfmt.patch" | awk '{print $1}')"
+            echo "rustfmt_remediation_receipt_sha256=$(sha256sum "$remediation/remediation-receipt.txt" | awk '{print $1}')"
+            echo "rustfmt_remediation_files_manifest_sha256=$(sha256sum "$remediation/formatted-files-sha256.txt" | awk '{print $1}')"
+          } >> "$receipt"
+
+      - name: Upload integration receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: reasoning-integration-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/reasoning-integration-receipt.txt
+            ${{ runner.temp }}/changed-paths.txt
+            ${{ runner.temp }}/product-to-integration.txt
+            ${{ runner.temp }}/rq006-qualification-contract.txt
+            ${{ runner.temp }}/rq006-cargo-metadata.json
+            ${{ runner.temp }}/rq006-rustfmt-remediation
+            .github/workflows/reasoning-integration-qualification.yml
+            .github/qualification/rq006-integration-manifest.json
+            .github/qualification/rq006-example-targets.toml.fragment
+            .github/qualification/rq006-integration-qualify.sh
+          if-no-files-found: ignore
+          retention-days: 90
