@@ -1,0 +1,10 @@
+{
+  "base_sha256": null,
+  "baseline_maintenance_scope_required": false,
+  "candidate_sha256": "62d63d94c6714a4ea91c19f187223a4716b93a526018e6d7d8e49deeae6d02df",
+  "claim_ceiling": "engineering causal attribution only",
+  "classification": "BaseComparisonUnavailable",
+  "reason": "no exact-base normalized evidence supplied",
+  "rust_repair_authorized": false,
+  "schema_version": "symthaea.lqcd.fast-lint-attribution.v1"
+}
