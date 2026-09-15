@@ -18,6 +18,7 @@ on:
       - 'scripts/check-class-a-changes.sh'
       - 'scripts/qualify-lqcd-fast.py'
       - 'scripts/build-lqcd-fast-diagnostic.py'
+      - 'scripts/build-lqcd-fast-diagnostic-v11.py'
       - '.github/workflows/lqcd-fast.yml'
   workflow_dispatch:
     inputs:
@@ -131,18 +132,24 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/lqcd-target
         shell: bash
         run: |
+          set +e
           set -o pipefail
           python3 "$GITHUB_WORKSPACE/verifier/scripts/qualify-lqcd-fast.py" 2>&1 \
             | tee "$RUNNER_TEMP/lqcd-qualifier-console.log"
+          status="${PIPESTATUS[0]}"
+          set -e
+          printf '%s\n' "$status" > "$RUNNER_TEMP/lqcd-qualifier-exit-status.txt"
+          exit "$status"
 
-      - name: Build non-authoritative qualification diagnostic
+      - name: Build non-authoritative qualification diagnostic v1.1
         if: always()
         continue-on-error: true
         shell: bash
         run: |
-          python3 "$GITHUB_WORKSPACE/verifier/scripts/build-lqcd-fast-diagnostic.py" \
+          python3 "$GITHUB_WORKSPACE/verifier/scripts/build-lqcd-fast-diagnostic-v11.py" \
             --attempt "$RUNNER_TEMP/lqcd-qualification-v2/attempt.json" \
             --log "$RUNNER_TEMP/lqcd-qualifier-console.log" \
+            --exit-status-file "$RUNNER_TEMP/lqcd-qualifier-exit-status.txt" \
             --output "$RUNNER_TEMP/lqcd-qualification-v2/diagnostic.json"
 
       - name: Publish attempt digest
