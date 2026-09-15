@@ -17,6 +17,7 @@ on:
       - '.cargo/**'
       - 'scripts/check-class-a-changes.sh'
       - 'scripts/qualify-lqcd-fast.py'
+      - 'scripts/build-lqcd-fast-diagnostic.py'
       - '.github/workflows/lqcd-fast.yml'
   workflow_dispatch:
     inputs:
@@ -73,7 +74,7 @@ jobs:
           set -euo pipefail
           workflow="$GITHUB_WORKSPACE/verifier/.github/workflows/lqcd-fast.yml"
           test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" "$workflow")" -eq 2
-          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" "$workflow")" -eq 2
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" "$workflow")" -eq 3
           if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' "$workflow"; then
             echo 'mutable major-version GitHub Action tag found in LQCD fast lane' >&2
             exit 1
@@ -128,7 +129,21 @@ jobs:
           LQCD_VERIFIER_DIR: ${{ github.workspace }}/verifier
           LQCD_QUALIFICATION_DIR: ${{ runner.temp }}/lqcd-qualification-v2
           CARGO_TARGET_DIR: ${{ runner.temp }}/lqcd-target
-        run: python3 "$GITHUB_WORKSPACE/verifier/scripts/qualify-lqcd-fast.py"
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 "$GITHUB_WORKSPACE/verifier/scripts/qualify-lqcd-fast.py" 2>&1 \
+            | tee "$RUNNER_TEMP/lqcd-qualifier-console.log"
+
+      - name: Build non-authoritative qualification diagnostic
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          python3 "$GITHUB_WORKSPACE/verifier/scripts/build-lqcd-fast-diagnostic.py" \
+            --attempt "$RUNNER_TEMP/lqcd-qualification-v2/attempt.json" \
+            --log "$RUNNER_TEMP/lqcd-qualifier-console.log" \
+            --output "$RUNNER_TEMP/lqcd-qualification-v2/diagnostic.json"
 
       - name: Publish attempt digest
         if: always()
@@ -157,6 +172,18 @@ jobs:
             ${{ runner.temp }}/lqcd-qualification-v2/verifier-inputs.tsv
           if-no-files-found: error
           retention-days: 90
+
+      - name: Upload non-authoritative qualification diagnostic
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lqcd-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/lqcd-qualification-v2/diagnostic.json
+            ${{ runner.temp }}/lqcd-qualification-v2/diagnostic.json.sha256
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Upload positive candidate receipt
         if: always() && steps.qualify.outcome == 'success'
