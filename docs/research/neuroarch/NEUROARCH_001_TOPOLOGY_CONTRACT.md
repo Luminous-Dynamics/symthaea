@@ -41,6 +41,7 @@ CircuitDescriptor
   role              // neutral symbolic label; no biological equivalence claim
   timescale_class   // e.g. Fast, Medium, Slow, Custom
   state_dimension
+  unit_count        // implementation units represented by this circuit
   implementation    // incumbent HDC-LTC, CfC, future island engine, etc.
   modulation_profile (optional declarative capabilities only)
 ```
@@ -60,7 +61,7 @@ EdgeDescriptor
   direction
   recurrence
   budget_class
-  merge_policy_hint (optional)
+  transform         // execution-relevant Direct/Bind/Bundle/... semantics
 ```
 
 A structural edge means only that influence is permitted by the architecture. It is not evidence that the source actually causes a downstream effect.
@@ -73,7 +74,7 @@ Topology construction must fail closed on:
 - duplicate canonical circuit IDs;
 - duplicate canonical edge IDs;
 - duplicate structural edges where the topology kind does not explicitly permit parallel channels;
-- invalid state dimensions;
+- invalid state dimensions or zero implementation-unit counts;
 - malformed timescale metadata;
 - forbidden self-edges unless the topology explicitly declares recurrent self-routing;
 - non-canonical or ambiguous identifiers.
@@ -90,17 +91,43 @@ Canonical form should sort circuits by stable circuit identity and edges by a st
 (source, target, channel, edge_id)
 ```
 
-Canonical bytes must bind all behaviorally relevant static fields. Cosmetic descriptions may be excluded only if documented.
+Canonical bytes must bind all behaviorally relevant static topology fields. Cosmetic descriptions may be excluded only if documented.
 
 Changing any of the following must change the topology commitment:
 
 - circuit count or identity;
-- circuit role/timescale/state dimension;
+- circuit role/timescale/state dimension/unit count;
 - edge source/target/channel;
 - recurrence semantics;
-- budget class or other execution-relevant route semantics.
+- budget class or execution-relevant transform semantics.
 
 Changing runtime state, counters, timestamps, or observations must **not** change it.
+
+The V1 implementation uses domain-separated canonical bytes and BLAKE3 for the topology commitment. A future change to canonical encoding or commitment semantics requires an explicit schema/version change rather than silent hash drift.
+
+## Topology identity vs subject/model identity
+
+The topology commitment answers **which static architecture is being described**. It is intentionally narrower than the complete experimental-subject identity.
+
+For the incumbent adapter, topology identity binds structural properties such as:
+
+- layer count and layer sizes;
+- HDC state dimensionality as represented by circuit state dimension;
+- declared inter-layer routes;
+- layer-binding enabled/disabled semantics;
+- skip-connection presence;
+- declared route transform/budget semantics;
+- declared timescale metadata.
+
+It deliberately does **not** bind:
+
+- random initialization seed;
+- realized random weight/binding-vector bytes;
+- learned/adapted parameter values;
+- current neuron/HDC state;
+- cached outputs, timestamps, counters, or observations.
+
+Those values belong to the benchmark's subject/model/config/runtime receipts. Therefore two subjects may share one topology commitment while having different parameter identities or seeds. Comparative evidence must bind both the topology commitment and the exact subject/config identity; neither may substitute for the other.
 
 ## Incumbent adapter
 
@@ -139,7 +166,9 @@ Required tests:
 7. topology inspection leaves live network state unchanged;
 8. incumbent fixed-step replay parity;
 9. incumbent irregular-time replay parity;
-10. runtime activity changes do not alter static topology commitment.
+10. runtime activity changes do not alter static topology commitment;
+11. changing incumbent seed alone does not change structural topology commitment;
+12. changing layer size, binding semantics, or skip connectivity does change topology commitment.
 
 ## Evidence boundary
 
