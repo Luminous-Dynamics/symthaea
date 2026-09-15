@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-assurance-launch-to-runtime-continuity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Compose ptrace-confirmed launch, critical authority, handoff challenge, and signed first runtime checkpoint"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "runtime", "attestation", "continuity"]
+categories = ["development-tools", "cryptography"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-ptrace-static-exec-confirmation = { path = "../symthaea-assurance-ptrace-static-exec-confirmation" }
+symthaea-assurance-critical-exec-preserved-authority = { path = "../symthaea-assurance-critical-exec-preserved-authority" }
+symthaea-assurance-launch-runtime-handoff-channel = { path = "../symthaea-assurance-launch-runtime-handoff-channel" }
+symthaea-assurance-launch-bound-first-runtime-observation = { path = "../symthaea-assurance-launch-bound-first-runtime-observation" }
+symthaea-assurance-fresh-mapped-runtime-continuity = { path = "../symthaea-assurance-fresh-mapped-runtime-continuity" }
