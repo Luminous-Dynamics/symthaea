@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-probation-telemetry"
+version = "0.1.0"
+edition = "2024"
+description = "Exact telemetry binding for lineage-bound fabrication upgrade probation"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-lineage-bound-upgrade-probation = { path = "../symthaea-fabrication-lineage-bound-upgrade-probation" }
+symthaea-fabrication-upgrade-probation-authority = { path = "../symthaea-fabrication-upgrade-probation-authority" }
+symthaea-fabrication-upgrade-probation-telemetry = { path = "../symthaea-fabrication-upgrade-probation-telemetry" }
+serde = { workspace = true }
+serde_json = { workspace = true }
