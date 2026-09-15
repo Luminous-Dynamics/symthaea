@@ -1,0 +1,89 @@
+{
+  "schema": "symthaea.ci-draft-global-admission-patch.v0",
+  "status": "staged-not-applied",
+  "repository": "Luminous-Dynamics/symthaea",
+  "source_commit": "4bad8af72ff775e7c869b6df83faba718a339a36",
+  "source_tree": "4884e38d1436427e406f8ae8f3cdba326765a36d",
+  "target_path": ".github/workflows/ci.yml",
+  "source_blob": "a48366076b30eb8e12d22c927a3b8bf333181409",
+  "patch_path": "docs/qualification-admissions/ci-draft-global-admission-v0.patch",
+  "observed_provider_state": {
+    "observed_at": "2026-09-15T17:43:51Z",
+    "queued_workflow_runs": 453,
+    "pending_workflow_runs": 2,
+    "in_progress_workflow_runs": 7
+  },
+  "policy": {
+    "draft_pull_request_broad_ci_group": "CI-draft-global-auto",
+    "draft_group_running_capacity": "one-running-by-concurrency-group",
+    "draft_group_pending_capacity": "one-newest-pending-by-provider-default",
+    "draft_group_cancel_in_progress": false,
+    "ready_for_review_triggers_broad_ci": true,
+    "ready_pull_requests_keep_per_ref_group": true,
+    "ready_pull_request_cancel_in_progress": true,
+    "workflow_dispatch_unique_group_semantics_unchanged": true,
+    "push_main_semantics_unchanged": true,
+    "scheduled_semantics_unchanged": true,
+    "focused_qualification_workflows_unchanged": true
+  },
+  "event_cases": [
+    {
+      "event": "pull_request",
+      "action": "synchronize",
+      "draft": true,
+      "broad_ci_group_class": "draft-global",
+      "cancel_in_progress": false
+    },
+    {
+      "event": "pull_request",
+      "action": "ready_for_review",
+      "draft": false,
+      "broad_ci_group_class": "per-ref",
+      "cancel_in_progress": true
+    },
+    {
+      "event": "pull_request",
+      "action": "synchronize",
+      "draft": false,
+      "broad_ci_group_class": "per-ref",
+      "cancel_in_progress": true
+    },
+    {
+      "event": "push",
+      "ref": "refs/heads/main",
+      "broad_ci_group_class": "per-ref",
+      "cancel_in_progress": true
+    },
+    {
+      "event": "workflow_dispatch",
+      "broad_ci_group_class": "unique-run-id",
+      "cancel_in_progress": true
+    },
+    {
+      "event": "schedule",
+      "broad_ci_group_class": "existing-ref-semantics",
+      "cancel_in_progress": true
+    }
+  ],
+  "expected_effect": [
+    "distinct draft PR heads no longer create distinct broad-CI concurrency groups",
+    "at most one draft broad-CI run executes while only the newest additional draft run remains pending",
+    "a new draft event does not cancel an already-running draft broad-CI job merely because another draft changed",
+    "transition to ready_for_review creates an exact per-ref broad-CI candidate",
+    "subsequent synchronize events on non-draft PRs retain exact per-ref broad CI and same-ref supersession",
+    "focused qualification workflow concurrency groups remain independent"
+  ],
+  "known_limitations": [
+    "converted_to_draft is not added as a trigger, so already-admitted ready broad CI is not retroactively cancelled when a PR returns to draft",
+    "this V0 reduces broad-CI queue replenishment but does not provide provider-level priority ordering for focused qualification lanes"
+  ],
+  "non_claims": [
+    "this staged artifact does not modify .github/workflows/ci.yml",
+    "this staged artifact does not cancel any existing workflow run",
+    "this staged artifact does not prove GitHub Actions provider recovery",
+    "this staged artifact does not guarantee provider scheduling fairness among eligible focused lanes",
+    "this staged artifact does not weaken merge or qualification theorem requirements",
+    "this staged artifact does not make skipped or cancelled broad CI equivalent to PASS",
+    "this staged artifact is not yet GitHub-workflow-parser-qualified"
+  ]
+}

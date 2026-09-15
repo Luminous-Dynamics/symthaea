@@ -1,0 +1,22 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -7,7 +7,8 @@ name: CI
+ on:
+   push:
+     branches: [main]
+   pull_request:
++    types: [opened, synchronize, reopened, ready_for_review]
+   workflow_dispatch:
+   schedule:
+     # Weekly psych-bench regression run: Sundays at 04:00 UTC
+@@ -34,7 +35,7 @@ concurrency:
+   # push and pull_request keep the supersede-on-new-commit behaviour, which is
+   # correct: only the newest commit's result matters and cancelling saves runner
+   # minutes. Only the deliberate path is made non-cancellable.
+-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+-  cancel-in-progress: true
++  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.draft == true && 'draft-global' || github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
++  cancel-in-progress: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft != true }}
+ 
+ env:
