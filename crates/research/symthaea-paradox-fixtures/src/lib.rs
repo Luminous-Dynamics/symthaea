@@ -400,7 +400,7 @@ impl OracleReport {
     }
 }
 
-#[derive(Debug, Clone, Copy,PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FixtureError {
     NonFiniteReliability,
     ReliabilityOutOfRange,
@@ -478,7 +478,8 @@ impl FixtureGenerator {
         let non_target_context = if target_is_a { context_b } else { context_a };
         let target_polarity = if target_is_a { orientation } else { opposite };
         let competing_polarity = target_polarity.opposite();
-        let context_signal = if target_is_a { signal_a } else { signal_b };
+        let causal_context_signal = if target_is_a { signal_a } else { signal_b };
+        let matched_context_signal = if trial_mix & 2 == 0 { signal_a } else { signal_b };
 
         let claim = |slot,
                      source_id,
@@ -501,13 +502,13 @@ impl FixtureGenerator {
                 visible_context,
             )
         };
-        let auxiliary = |visible_context| {
+        let auxiliary = |surface_signal, visible_context| {
             EvidenceEvent::context_signal(
                 3,
                 source_b,
                 fault_b,
                 0.9,
-                context_signal,
+                surface_signal,
                 visible_context,
             )
         };
@@ -546,7 +547,7 @@ impl FixtureGenerator {
                         false,
                         None,
                     )?,
-                    auxiliary(None)?,
+                    auxiliary(matched_context_signal, None)?,
                 ],
                 OracleTruth::non_contextual(),
             ),
@@ -583,7 +584,7 @@ impl FixtureGenerator {
                         false,
                         None,
                     )?,
-                    auxiliary(None)?,
+                    auxiliary(matched_context_signal, None)?,
                 ],
                 OracleTruth::non_contextual(),
             ),
@@ -620,7 +621,7 @@ impl FixtureGenerator {
                         false,
                         None,
                     )?,
-                    auxiliary(None)?,
+                    auxiliary(matched_context_signal, None)?,
                 ],
                 OracleTruth::non_contextual(),
             ),
@@ -657,7 +658,7 @@ impl FixtureGenerator {
                         false,
                         Some(target_context),
                     )?,
-                    auxiliary(Some(target_context))?,
+                    auxiliary(causal_context_signal, Some(target_context))?,
                 ],
                 OracleTruth {
                     hidden_claim_contexts: [None; 4],
@@ -699,7 +700,7 @@ impl FixtureGenerator {
                         false,
                         None,
                     )?,
-                    auxiliary(None)?,
+                    auxiliary(matched_context_signal, None)?,
                 ],
                 OracleTruth::non_contextual(),
             ),
@@ -736,7 +737,7 @@ impl FixtureGenerator {
                         true,
                         None,
                     )?,
-                    auxiliary(None)?,
+                    auxiliary(matched_context_signal, None)?,
                 ],
                 OracleTruth::non_contextual(),
             ),
@@ -773,7 +774,7 @@ impl FixtureGenerator {
                         false,
                         None,
                     )?,
-                    auxiliary(None)?,
+                    auxiliary(causal_context_signal, None)?,
                 ],
                 OracleTruth {
                     hidden_claim_contexts: [
