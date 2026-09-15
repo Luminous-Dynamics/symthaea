@@ -479,7 +479,11 @@ impl FixtureGenerator {
         let target_polarity = if target_is_a { orientation } else { opposite };
         let competing_polarity = target_polarity.opposite();
         let causal_context_signal = if target_is_a { signal_a } else { signal_b };
-        let matched_context_signal = if trial_mix & 2 == 0 { signal_a } else { signal_b };
+        let matched_context_signal = if trial_mix & 2 == 0 {
+            signal_a
+        } else {
+            signal_b
+        };
 
         let claim = |slot,
                      source_id,
@@ -1489,8 +1493,7 @@ mod tests {
 
     #[test]
     fn oracle_canonical_bytes_bind_observatory_semantics() {
-        let fixture =
-            FixtureGenerator::generate(Condition::PersistentIrreducible, 2, 0).unwrap();
+        let fixture = FixtureGenerator::generate(Condition::PersistentIrreducible, 2, 0).unwrap();
         let report = qualify_fixture(&fixture).unwrap();
         let canonical = report.canonical_bytes();
 
@@ -1600,19 +1603,28 @@ mod tests {
         assert!(c2.internal_disagreement);
         assert!(!c2.final_unresolved_disagreement);
         assert!(is_one(c3.external_surprise));
-        assert_eq!(c2.external_surprise.to_bits(), c3.external_surprise.to_bits());
+        assert_eq!(
+            c2.external_surprise.to_bits(),
+            c3.external_surprise.to_bits()
+        );
         assert!(c2.conflict_persistence < c3.conflict_persistence);
         assert!(c3.final_unresolved_disagreement);
         assert!(c3.explicit_context_resolution);
         assert!(is_one(c4.external_surprise));
-        assert_eq!(c3.external_surprise.to_bits(), c4.external_surprise.to_bits());
+        assert_eq!(
+            c3.external_surprise.to_bits(),
+            c4.external_surprise.to_bits()
+        );
         assert!(c4.final_unresolved_disagreement);
         assert!(c4.irreducible);
         assert!(is_one(c5.external_surprise));
         assert!(c5.final_unresolved_disagreement);
         assert!(c5.self_referential);
         assert!(is_one(c6.external_surprise));
-        assert_eq!(c4.external_surprise.to_bits(), c6.external_surprise.to_bits());
+        assert_eq!(
+            c4.external_surprise.to_bits(),
+            c6.external_surprise.to_bits()
+        );
         assert!(c6.final_unresolved_disagreement);
         assert!(c6.ontology_failure);
     }
