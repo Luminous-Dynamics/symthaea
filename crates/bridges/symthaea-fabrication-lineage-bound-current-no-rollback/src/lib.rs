@@ -22,9 +22,7 @@ use symthaea_fabrication_kernel::upgrade_operational_state::{
 use symthaea_fabrication_key_continuity_authority::{
     ClockGovernedKeyContinuityIdV1, ClockGovernedKeyContinuityV1,
 };
-use symthaea_fabrication_lineage_bound_hardware::{
-    LineageBoundHardwareReauthorizationIdV1, LineageBoundHardwareReauthorizationV1,
-};
+use symthaea_fabrication_lineage_bound_hardware::LineageBoundHardwareReauthorizationV1;
 use symthaea_fabrication_lineage_bound_probation_telemetry::{
     LineageBoundTelemetryProbationClearanceIdV1, LineageBoundTelemetryProbationClearanceV1,
 };
@@ -64,8 +62,8 @@ const PROBATION_TRACKER_DOMAIN: &[u8] =
     b"symthaea.fabrication.lineage-bound-probation-tracker.v1\0";
 const HARDWARE_SET_DOMAIN: &[u8] =
     b"symthaea.fabrication.lineage-bound-hardware-authority-set.v1\0";
-const CLOCK_LINEAGE_DOMAIN: &[u8] =
-    b"symthaea.fabrication.lineage-bound-operational-clock-lineage.v1\0";
+const OBSERVATION_CLOCK_LINEAGE_DOMAIN: &[u8] =
+    b"symthaea.fabrication.lineage-bound-operational-observation-clock-lineage.v1\0";
 const BINDING_DOMAIN: &[u8] =
     b"symthaea.fabrication.lineage-bound-operational-evidence-binding.v1\0";
 const OPERATIONAL_LINEAGE_DOMAIN: &[u8] =
@@ -107,13 +105,16 @@ pub struct LineageBoundOperationalEvidenceBindingV1 {
     retention_policy_sequence: u64,
     key_continuity_id: ClockGovernedKeyContinuityIdV1,
     key_snapshot_sequence: u64,
-    clock_continuity_digest: Sha256Digest,
-    clock_epoch: u64,
+    durable_clock_continuity_digest: Sha256Digest,
+    durable_clock_epoch: u64,
+    observation_clock_lineage_digest: Sha256Digest,
     activation_operational_basis_id: OperationalClockBasisIdV1,
     observation_operational_basis_id: OperationalClockBasisIdV1,
     observation_clock_envelope_id: ClockGovernanceEvaluationEnvelopeIdV1,
     governance_checkpoint_digest: Sha256Digest,
     transparency_log_digest: Sha256Digest,
+    activates_at_unix_ms: u64,
+    finalization_deadline_unix_ms: u64,
     evidence_ready_at_unix_ms: u64,
 }
 
@@ -141,13 +142,16 @@ impl LineageBoundOperationalEvidenceBindingV1 {
     pub fn retention_policy_sequence(&self) -> u64 { self.retention_policy_sequence }
     pub fn key_continuity_id(&self) -> ClockGovernedKeyContinuityIdV1 { self.key_continuity_id }
     pub fn key_snapshot_sequence(&self) -> u64 { self.key_snapshot_sequence }
-    pub fn clock_continuity_digest(&self) -> Sha256Digest { self.clock_continuity_digest }
-    pub fn clock_epoch(&self) -> u64 { self.clock_epoch }
+    pub fn durable_clock_continuity_digest(&self) -> Sha256Digest { self.durable_clock_continuity_digest }
+    pub fn durable_clock_epoch(&self) -> u64 { self.durable_clock_epoch }
+    pub fn observation_clock_lineage_digest(&self) -> Sha256Digest { self.observation_clock_lineage_digest }
     pub fn activation_operational_basis_id(&self) -> OperationalClockBasisIdV1 { self.activation_operational_basis_id }
     pub fn observation_operational_basis_id(&self) -> OperationalClockBasisIdV1 { self.observation_operational_basis_id }
     pub fn observation_clock_envelope_id(&self) -> ClockGovernanceEvaluationEnvelopeIdV1 { self.observation_clock_envelope_id }
     pub fn governance_checkpoint_digest(&self) -> Sha256Digest { self.governance_checkpoint_digest }
     pub fn transparency_log_digest(&self) -> Sha256Digest { self.transparency_log_digest }
+    pub fn activates_at_unix_ms(&self) -> u64 { self.activates_at_unix_ms }
+    pub fn finalization_deadline_unix_ms(&self) -> u64 { self.finalization_deadline_unix_ms }
     pub fn evidence_ready_at_unix_ms(&self) -> u64 { self.evidence_ready_at_unix_ms }
 }
 
@@ -186,6 +190,7 @@ pub struct LineageBoundCurrentNoRollbackV1 {
     hardware_authority_set_digest: Sha256Digest,
     hardware_authority_count: usize,
     key_continuity_id: ClockGovernedKeyContinuityIdV1,
+    observation_clock_lineage_digest: Sha256Digest,
     observation_operational_basis_id: OperationalClockBasisIdV1,
     observation_clock_envelope_id: ClockGovernanceEvaluationEnvelopeIdV1,
 }
@@ -215,6 +220,7 @@ impl LineageBoundCurrentNoRollbackV1 {
     pub fn hardware_authority_set_digest(&self) -> Sha256Digest { self.hardware_authority_set_digest }
     pub fn hardware_authority_count(&self) -> usize { self.hardware_authority_count }
     pub fn key_continuity_id(&self) -> ClockGovernedKeyContinuityIdV1 { self.key_continuity_id }
+    pub fn observation_clock_lineage_digest(&self) -> Sha256Digest { self.observation_clock_lineage_digest }
     pub fn observation_operational_basis_id(&self) -> OperationalClockBasisIdV1 { self.observation_operational_basis_id }
     pub fn observation_clock_envelope_id(&self) -> ClockGovernanceEvaluationEnvelopeIdV1 { self.observation_clock_envelope_id }
 }
@@ -322,13 +328,16 @@ struct EvidenceBindingCommitment {
     retention_policy_sequence: u64,
     key_continuity_id: String,
     key_snapshot_sequence: u64,
-    clock_continuity_digest: String,
-    clock_epoch: u64,
+    durable_clock_continuity_digest: String,
+    durable_clock_epoch: u64,
+    observation_clock_lineage_digest: String,
     activation_operational_basis_id: String,
     observation_operational_basis_id: String,
     observation_clock_envelope_id: String,
     governance_checkpoint_digest: String,
     transparency_log_digest: String,
+    activates_at_unix_ms: u64,
+    finalization_deadline_unix_ms: u64,
     evidence_ready_at_unix_ms: u64,
 }
 
@@ -367,6 +376,7 @@ struct CurrentNoRollbackCommitment {
     hardware_authority_set_digest: String,
     hardware_authority_count: usize,
     key_continuity_id: String,
+    observation_clock_lineage_digest: String,
     observation_operational_basis_id: String,
     observation_clock_envelope_id: String,
 }
@@ -591,7 +601,7 @@ pub fn derive_lineage_bound_operational_evidence_binding_v1(
         },
     )
     .map_err(|error| vec![error])?;
-    let clock_continuity_digest = digest_clock_lineage(
+    let observation_clock_lineage_digest = digest_observation_clock_lineage(
         activation_basis,
         activation_to_observation_clock_bridge,
         observation_basis,
@@ -622,13 +632,16 @@ pub fn derive_lineage_bound_operational_evidence_binding_v1(
         retention_policy_sequence: retention_head.sequence(),
         key_continuity_id: key_continuity.id().to_hex(),
         key_snapshot_sequence: registry_head.trust_snapshot_sequence(),
-        clock_continuity_digest: clock_continuity_digest.to_hex(),
-        clock_epoch: observation_basis.epoch(),
+        durable_clock_continuity_digest: activation.clock_lineage_digest().to_hex(),
+        durable_clock_epoch: activation_basis.epoch(),
+        observation_clock_lineage_digest: observation_clock_lineage_digest.to_hex(),
         activation_operational_basis_id: activation_basis.id().to_hex(),
         observation_operational_basis_id: observation_basis.id().to_hex(),
         observation_clock_envelope_id: observation_clock.id().to_hex(),
         governance_checkpoint_digest: governance_view.checkpoint_digest().to_hex(),
         transparency_log_digest: governance_view.transparency_log_digest().to_hex(),
+        activates_at_unix_ms: activation.activates_at_unix_ms(),
+        finalization_deadline_unix_ms: activation.finalization_deadline_unix_ms(),
         evidence_ready_at_unix_ms,
     };
     let id = LineageBoundOperationalEvidenceBindingIdV1(
@@ -659,13 +672,16 @@ pub fn derive_lineage_bound_operational_evidence_binding_v1(
         retention_policy_sequence: retention_head.sequence(),
         key_continuity_id: key_continuity.id(),
         key_snapshot_sequence: registry_head.trust_snapshot_sequence(),
-        clock_continuity_digest,
-        clock_epoch: observation_basis.epoch(),
+        durable_clock_continuity_digest: activation.clock_lineage_digest(),
+        durable_clock_epoch: activation_basis.epoch(),
+        observation_clock_lineage_digest,
         activation_operational_basis_id: activation_basis.id(),
         observation_operational_basis_id: observation_basis.id(),
         observation_clock_envelope_id: observation_clock.id(),
         governance_checkpoint_digest: governance_view.checkpoint_digest(),
         transparency_log_digest: governance_view.transparency_log_digest(),
+        activates_at_unix_ms: activation.activates_at_unix_ms(),
+        finalization_deadline_unix_ms: activation.finalization_deadline_unix_ms(),
         evidence_ready_at_unix_ms,
     })
 }
@@ -685,14 +701,14 @@ pub fn build_lineage_bound_no_rollback_operational_evidence_v1(
         hardware_reauthorization_tracker_digest: binding.hardware_authority_set_digest,
         retention_policy_digest: binding.retention_policy_digest,
         key_continuity_digest: binding.key_continuity_id.as_digest(),
-        clock_continuity_digest: binding.clock_continuity_digest,
+        clock_continuity_digest: binding.durable_clock_continuity_digest,
         probation_clearance_digest: Some(binding.probation_clearance_id.as_digest()),
         automatic_rollback_digest: None,
         probation_sequence: Some(binding.upgrade_cycle_sequence),
         reauthorized_machine_count,
         retention_policy_sequence: binding.retention_policy_sequence,
         key_snapshot_sequence: binding.key_snapshot_sequence,
-        clock_epoch: binding.clock_epoch,
+        clock_epoch: binding.durable_clock_epoch,
     })
 }
 
@@ -773,8 +789,8 @@ pub fn derive_lineage_bound_current_no_rollback_v1(
         if state.handoff_digest != binding.handoff_plan_digest {
             violations.push(LineageBoundCurrentNoRollbackError::HandoffDigestMismatch { index });
         }
-        if state.committed_at_unix_ms < binding.evidence_ready_at_unix_ms.min(u64::MAX) && index + 1 == states.len() {
-            violations.push(LineageBoundCurrentNoRollbackError::CandidateCommittedBeforeEvidence);
+        if state.committed_at_unix_ms < binding.activates_at_unix_ms {
+            violations.push(LineageBoundCurrentNoRollbackError::StateBeforeActivation { index });
         }
         if index > 0 {
             if let Err(error) = verify_upgrade_operational_state_successor(&states[index - 1], state) {
@@ -856,13 +872,13 @@ pub fn derive_lineage_bound_current_no_rollback_v1(
         (candidate.evidence.hardware_reauthorization_tracker_digest == binding.hardware_authority_set_digest, "hardware_reauthorization_tracker_digest"),
         (candidate.evidence.retention_policy_digest == binding.retention_policy_digest, "retention_policy_digest"),
         (candidate.evidence.key_continuity_digest == binding.key_continuity_id.as_digest(), "key_continuity_digest"),
-        (candidate.evidence.clock_continuity_digest == binding.clock_continuity_digest, "clock_continuity_digest"),
+        (candidate.evidence.clock_continuity_digest == binding.durable_clock_continuity_digest, "clock_continuity_digest"),
         (candidate.evidence.probation_clearance_digest == Some(binding.probation_clearance_id.as_digest()), "probation_clearance_digest"),
         (candidate.evidence.probation_sequence == Some(binding.upgrade_cycle_sequence), "probation_sequence"),
         (candidate.evidence.reauthorized_machine_count == expected_machine_count, "reauthorized_machine_count"),
         (candidate.evidence.retention_policy_sequence == binding.retention_policy_sequence, "retention_policy_sequence"),
         (candidate.evidence.key_snapshot_sequence == binding.key_snapshot_sequence, "key_snapshot_sequence"),
-        (candidate.evidence.clock_epoch == binding.clock_epoch, "clock_epoch"),
+        (candidate.evidence.clock_epoch == binding.durable_clock_epoch, "clock_epoch"),
     ] {
         if !matches {
             violations.push(LineageBoundCurrentNoRollbackError::CandidateEvidenceMismatch(name));
@@ -913,6 +929,7 @@ pub fn derive_lineage_bound_current_no_rollback_v1(
         hardware_authority_set_digest: binding.hardware_authority_set_digest.to_hex(),
         hardware_authority_count: binding.hardware_authority_count,
         key_continuity_id: binding.key_continuity_id.to_hex(),
+        observation_clock_lineage_digest: binding.observation_clock_lineage_digest.to_hex(),
         observation_operational_basis_id: binding.observation_operational_basis_id.to_hex(),
         observation_clock_envelope_id: binding.observation_clock_envelope_id.to_hex(),
     };
@@ -945,6 +962,7 @@ pub fn derive_lineage_bound_current_no_rollback_v1(
         hardware_authority_set_digest: binding.hardware_authority_set_digest,
         hardware_authority_count: binding.hardware_authority_count,
         key_continuity_id: binding.key_continuity_id,
+        observation_clock_lineage_digest: binding.observation_clock_lineage_digest,
         observation_operational_basis_id: binding.observation_operational_basis_id,
         observation_clock_envelope_id: binding.observation_clock_envelope_id,
     })
@@ -986,7 +1004,7 @@ fn verify_clock_lineage(
     Ok(())
 }
 
-fn digest_clock_lineage(
+fn digest_observation_clock_lineage(
     start: &OperationalClockBasisV1,
     bridge: &[OperationalClockBasisV1],
     end: &OperationalClockBasisV1,
@@ -996,7 +1014,7 @@ fn digest_clock_lineage(
         bridge_basis_ids: bridge.iter().map(|basis| basis.id().to_hex()).collect(),
         observation_basis_id: end.id().to_hex(),
     };
-    hash_serializable(CLOCK_LINEAGE_DOMAIN, &commitment)
+    hash_serializable(OBSERVATION_CLOCK_LINEAGE_DOMAIN, &commitment)
 }
 
 fn seconds_to_millis(value: u64) -> Result<u64, LineageBoundCurrentNoRollbackError> {
