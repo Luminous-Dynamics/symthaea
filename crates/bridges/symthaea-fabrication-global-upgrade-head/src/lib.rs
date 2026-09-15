@@ -30,17 +30,15 @@ use symthaea_fabrication_upgrade_authority::{
     ClockGovernedUpgradeHandoffIdV1, ClockGovernedUpgradeHandoffV1,
 };
 use symthaea_fabrication_upgrade_finalized_head::{
-    CURRENT_FINALIZED_UPGRADE_HEAD_SCHEMA, FINALIZED_UPGRADE_HEAD_LOG_KIND_PREFIX,
-    CurrentFinalizedUpgradeHeadIdV1, CurrentFinalizedUpgradeHeadV1,
-    FinalizedUpgradeHeadPublicationV1, build_finalized_upgrade_head_publication_v1,
-    digest_finalized_upgrade_head_publication_v1, finalized_upgrade_head_log_kind,
+    FINALIZED_UPGRADE_HEAD_LOG_KIND_PREFIX, CurrentFinalizedUpgradeHeadIdV1,
+    CurrentFinalizedUpgradeHeadV1, FinalizedUpgradeHeadPublicationV1,
+    build_finalized_upgrade_head_publication_v1, digest_finalized_upgrade_head_publication_v1,
+    finalized_upgrade_head_log_kind,
 };
 use symthaea_fabrication_upgrade_finalized_state::{
     ClockGovernedFinalizedUpgradeIdV1, ClockGovernedFinalizedUpgradeV1,
 };
-use symthaea_trust_kernel::{
-    ClockGovernanceEvaluationEnvelopeIdV1, OperationalClockBasisIdV1,
-};
+use symthaea_trust_kernel::{ClockGovernanceEvaluationEnvelopeIdV1, OperationalClockBasisIdV1};
 
 pub const FINALIZED_UPGRADE_STATE_LINEAGE_SCHEMA: &str =
     "symthaea.fabrication.finalized-upgrade-state-lineage.v1";
@@ -166,6 +164,21 @@ impl GlobalCurrentFinalizedUpgradeHeadV1 {
     }
     pub fn record_digest(&self) -> Sha256Digest {
         self.record_digest
+    }
+    pub fn candidate_publication_digest(&self) -> Sha256Digest {
+        self.candidate_publication_digest
+    }
+    pub fn candidate_publication_count(&self) -> usize {
+        self.candidate_publication_count
+    }
+    pub fn finalized_publication_count(&self) -> usize {
+        self.finalized_publication_count
+    }
+    pub fn unique_finalized_sequence_count(&self) -> usize {
+        self.unique_finalized_sequence_count
+    }
+    pub fn highest_finalization_sequence(&self) -> u64 {
+        self.highest_finalization_sequence
     }
     pub fn transparency_log_digest(&self) -> Sha256Digest {
         self.transparency_log_digest
@@ -400,7 +413,9 @@ pub fn verify_finalized_upgrade_state_lineage_v1(
     }
 
     let record = finalized.record();
-    let activated = states.last().expect("non-empty checked above");
+    let Some(activated) = states.last() else {
+        return Err(vec![GlobalFinalizedUpgradeHeadError::EmptyStateLineage]);
+    };
     let activated_digest = match digest_upgrade_state(activated) {
         Ok(value) => value,
         Err(error) => {
@@ -438,14 +453,15 @@ pub fn verify_finalized_upgrade_state_lineage_v1(
         finalization_record_digest: finalized.record_digest().to_hex(),
         states: commitments,
     };
-    let lineage_digest = hash_serializable(STATE_LINEAGE_DOMAIN, &commitment)
-        .map_err(|error| vec![error])?;
+    let lineage_digest =
+        hash_serializable(STATE_LINEAGE_DOMAIN, &commitment).map_err(|error| vec![error])?;
     let id = FinalizedUpgradeStateLineageIdV1(lineage_digest);
-    let genesis_state_digest = digest_upgrade_state(genesis)
-        .map_err(|error| vec![GlobalFinalizedUpgradeHeadError::StateInvalid {
+    let genesis_state_digest = digest_upgrade_state(genesis).map_err(|error| {
+        vec![GlobalFinalizedUpgradeHeadError::StateInvalid {
             index: 0,
             reason: format!("{error:?}"),
-        }])?;
+        }]
+    })?;
 
     Ok(FinalizedUpgradeStateLineageV1 {
         id,
@@ -561,7 +577,8 @@ pub fn qualify_global_current_finalized_upgrade_head_v1(
         if entry.subject_digest != publication_digest {
             violations.push(GlobalFinalizedUpgradeHeadError::PublicationDigestMismatch { index });
         }
-        if let Some(previous) = sequence_digests.insert(publication.finalization_sequence, publication_digest)
+        if let Some(previous) =
+            sequence_digests.insert(publication.finalization_sequence, publication_digest)
         {
             if previous != publication_digest {
                 violations.push(GlobalFinalizedUpgradeHeadError::FinalizedSequenceEquivocation {
@@ -718,6 +735,7 @@ fn hash_serializable<T: Serialize + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_fabrication_upgrade_finalized_head::CURRENT_FINALIZED_UPGRADE_HEAD_SCHEMA;
 
     #[test]
     fn public_live_types_are_not_deserializable_by_construction() {
@@ -729,6 +747,9 @@ mod tests {
 
     #[test]
     fn finalized_head_schema_stays_distinct_from_global_head_schema() {
-        assert_ne!(CURRENT_FINALIZED_UPGRADE_HEAD_SCHEMA, GLOBAL_CURRENT_FINALIZED_UPGRADE_HEAD_SCHEMA);
+        assert_ne!(
+            CURRENT_FINALIZED_UPGRADE_HEAD_SCHEMA,
+            GLOBAL_CURRENT_FINALIZED_UPGRADE_HEAD_SCHEMA
+        );
     }
 }
