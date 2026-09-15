@@ -1,0 +1,156 @@
+name: IG-008E0 Mycelix Execution Conformance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig008e0_mycelix_execution_oracle.py"
+      - "docs/research/IG_008E0_MYCELIX_EXECUTION_CONFORMANCE.md"
+      - ".github/workflows/ig-008e0-mycelix-execution-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-execution-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      MYCELIX_EVIDENCE_HEAD: 197714209c60503f0fba4143409da383bc9cbf83
+      MYCELIX_PROFILE_SHA256: c977bdcef9e5faac83351050999451432b618d5cc523bece804eba5dd1ae81f6
+      MYCELIX_CORPUS_SHA256: 0c6669e44d6d18396ede43324f5cf3abbb25ddd3a2a9f59abb2c8a3699ba5fd4
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix execution evidence subject
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_EVIDENCE_HEAD }}
+          path: _mycelix_execution_evidence
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkout from parent status
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_execution_evidence/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_execution_evidence rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_execution_evidence status --porcelain)"
+
+      - name: Bind Mycelix execution production source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _mycelix_execution_evidence hash-object mycelix-governance/zomes/execution/coordinator/src/lib.rs)" = "3dbb8a8f69b377e494ccf24164c94bd80f54e0ef"
+          test "$(git -C _mycelix_execution_evidence hash-object mycelix-governance/zomes/execution/integrity/src/lib.rs)" = "657edaee9a314f100a0c4b1609a4596cf243e61d"
+
+      - name: Syntax compile independent implementations
+        run: |
+          python -m py_compile scripts/ig008e0_mycelix_execution_oracle.py
+          python -m py_compile _mycelix_execution_evidence/mycelix-governance/scripts/validate_ig007e0_execution_profile.py
+          python -m py_compile _mycelix_execution_evidence/mycelix-governance/scripts/ig007e1_execution_counterexamples.py
+
+      - name: Qualify Mycelix execution-profile prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python _mycelix_execution_evidence/mycelix-governance/scripts/validate_ig007e0_execution_profile.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --self-test > /tmp/ig008e0-mycelix-profile.json
+
+      - name: Run Mycelix E1 oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python _mycelix_execution_evidence/mycelix-governance/scripts/ig007e1_execution_counterexamples.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --self-test > /tmp/ig008e0-mycelix-self-1.json
+          python _mycelix_execution_evidence/mycelix-governance/scripts/ig007e1_execution_counterexamples.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --self-test > /tmp/ig008e0-mycelix-self-2.json
+          cmp /tmp/ig008e0-mycelix-self-1.json /tmp/ig008e0-mycelix-self-2.json
+
+          python _mycelix_execution_evidence/mycelix-governance/scripts/ig007e1_execution_counterexamples.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --corpus > /tmp/ig008e0-mycelix-corpus.json
+
+      - name: Run independent Symthaea execution oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/ig008e0_mycelix_execution_oracle.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --self-test > /tmp/ig008e0-symthaea-self-1.json
+          python scripts/ig008e0_mycelix_execution_oracle.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --self-test > /tmp/ig008e0-symthaea-self-2.json
+          cmp /tmp/ig008e0-symthaea-self-1.json /tmp/ig008e0-symthaea-self-2.json
+
+          python scripts/ig008e0_mycelix_execution_oracle.py \
+            --profile _mycelix_execution_evidence/mycelix-governance/profiles/observed/execution-fca2c107-v1.json \
+            --corpus > /tmp/ig008e0-symthaea-corpus.json
+
+      - name: Require byte-identical cross-implementation corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp /tmp/ig008e0-mycelix-corpus.json /tmp/ig008e0-symthaea-corpus.json
+
+      - name: Assert frozen commitments and authority ceilings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          with open('/tmp/ig008e0-mycelix-profile.json', encoding='utf-8') as f:
+              profile = json.load(f)
+          with open('/tmp/ig008e0-mycelix-self-1.json', encoding='utf-8') as f:
+              mycelix = json.load(f)
+          with open('/tmp/ig008e0-symthaea-self-1.json', encoding='utf-8') as f:
+              symthaea = json.load(f)
+          with open('/tmp/ig008e0-symthaea-corpus.json', encoding='utf-8') as f:
+              corpus = json.load(f)
+
+          assert profile['authority_class'] == 'ObservedSourceBound'
+          assert profile['profile_content_sha256'] == 'c977bdcef9e5faac83351050999451432b618d5cc523bece804eba5dd1ae81f6'
+          assert mycelix['corpus_sha256'] == '0c6669e44d6d18396ede43324f5cf3abbb25ddd3a2a9f59abb2c8a3699ba5fd4'
+          assert symthaea['authority'] == 'MeasurementOnly'
+          assert symthaea['conformance_class'] == 'CrossImplementationConformance'
+          assert symthaea['profile_sha256'] == profile['profile_content_sha256']
+          assert symthaea['corpus_sha256'] == mycelix['corpus_sha256']
+          assert corpus['corpus_sha256'] == symthaea['corpus_sha256']
+          assert symthaea['counterexample_count'] == 5
+          PY
+
+      - name: Verify both checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_execution_evidence rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_execution_evidence diff --exit-code
+          git -C _mycelix_execution_evidence diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_execution_evidence status --porcelain)"
