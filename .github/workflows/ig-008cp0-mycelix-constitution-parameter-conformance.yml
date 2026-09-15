@@ -1,0 +1,153 @@
+name: IG-008CP0 Mycelix Constitution Parameter Conformance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig008cp0_mycelix_constitution_parameter_oracle.py"
+      - "docs/research/IG_008CP0_MYCELIX_CONSTITUTION_PARAMETER_CONFORMANCE.md"
+      - ".github/workflows/ig-008cp0-mycelix-constitution-parameter-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-constitution-parameter-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      MYCELIX_EVIDENCE_HEAD: 3232d611d8833b03eba9f5412f5d7cb0cf89d4e1
+      MYCELIX_PRODUCTION_SUBJECT: fca2c107a1ea5108823ce617ba4111b6f7f77230
+      MYCELIX_SAME_TREE_MAIN: 31ede2365b81365bb119cd9351b2739119974130
+      MYCELIX_PROFILE_SHA256: 770552d12489df1d2cdf8b0af676b01ea9a3da21940f70ed8a71910deaa35009
+      MYCELIX_CORPUS_SHA256: b37be9d2e3fd0cbec3696a19327c26dc4ba7062ec089ad92ad99bc28a11fea8e
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix CP evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_EVIDENCE_HEAD }}
+          path: _mycelix_cp
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_cp/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_cp rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_cp status --porcelain)"
+
+      - name: Bind exact Mycelix source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _mycelix_cp hash-object mycelix-governance/zomes/execution/coordinator/src/lib.rs)" = "3dbb8a8f69b377e494ccf24164c94bd80f54e0ef"
+          test "$(git -C _mycelix_cp hash-object mycelix-governance/zomes/constitution/coordinator/src/lib.rs)" = "923a1ce789c8319c79df7f33a9241af50804ec55"
+          test "$(git -C _mycelix_cp hash-object mycelix-governance/zomes/constitution/integrity/src/lib.rs)" = "f83a457a8ff40b0003c07dba9da598a478c5e6f6"
+
+      - name: Syntax compile independent implementations
+        run: |
+          python -m py_compile scripts/ig008cp0_mycelix_constitution_parameter_oracle.py
+          python -m py_compile _mycelix_cp/mycelix-governance/scripts/validate_ig007cp0_constitution_parameter_profile.py
+          python -m py_compile _mycelix_cp/mycelix-governance/scripts/ig007cp1_constitution_parameter_counterexamples.py
+
+      - name: Qualify Mycelix CP0 twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_cp/mycelix-governance/profiles/observed/constitution-parameter-fca2c107-v1.json
+          python _mycelix_cp/mycelix-governance/scripts/validate_ig007cp0_constitution_parameter_profile.py --profile "$PROFILE" --self-test > /tmp/cp-profile-1.json
+          python _mycelix_cp/mycelix-governance/scripts/validate_ig007cp0_constitution_parameter_profile.py --profile "$PROFILE" --self-test > /tmp/cp-profile-2.json
+          cmp /tmp/cp-profile-1.json /tmp/cp-profile-2.json
+
+      - name: Run Mycelix CP1 twice and emit corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_cp/mycelix-governance/profiles/observed/constitution-parameter-fca2c107-v1.json
+          python _mycelix_cp/mycelix-governance/scripts/ig007cp1_constitution_parameter_counterexamples.py --profile "$PROFILE" --self-test > /tmp/cp-mycelix-self-1.json
+          python _mycelix_cp/mycelix-governance/scripts/ig007cp1_constitution_parameter_counterexamples.py --profile "$PROFILE" --self-test > /tmp/cp-mycelix-self-2.json
+          cmp /tmp/cp-mycelix-self-1.json /tmp/cp-mycelix-self-2.json
+          python _mycelix_cp/mycelix-governance/scripts/ig007cp1_constitution_parameter_counterexamples.py --profile "$PROFILE" --corpus > /tmp/cp-mycelix-corpus.json
+
+      - name: Run independent Symthaea oracle twice and emit corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_cp/mycelix-governance/profiles/observed/constitution-parameter-fca2c107-v1.json
+          python scripts/ig008cp0_mycelix_constitution_parameter_oracle.py --profile "$PROFILE" --self-test > /tmp/cp-symthaea-self-1.json
+          python scripts/ig008cp0_mycelix_constitution_parameter_oracle.py --profile "$PROFILE" --self-test > /tmp/cp-symthaea-self-2.json
+          cmp /tmp/cp-symthaea-self-1.json /tmp/cp-symthaea-self-2.json
+          python scripts/ig008cp0_mycelix_constitution_parameter_oracle.py --profile "$PROFILE" --corpus > /tmp/cp-symthaea-corpus.json
+
+      - name: Require byte-identical cross-implementation corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp /tmp/cp-mycelix-corpus.json /tmp/cp-symthaea-corpus.json
+
+      - name: Assert exact commitments and authority ceilings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          def read(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+          profile = read('/tmp/cp-profile-1.json')
+          mycelix = read('/tmp/cp-mycelix-self-1.json')
+          symthaea = read('/tmp/cp-symthaea-self-1.json')
+          corpus = read('/tmp/cp-symthaea-corpus.json')
+          assert profile['authority_class'] == 'ObservedSourceBound'
+          assert profile['profile_id'] == 'mycelix-constitution-parameter-observed-fca2c107-v1'
+          assert profile['profile_content_sha256'] == '770552d12489df1d2cdf8b0af676b01ea9a3da21940f70ed8a71910deaa35009'
+          assert profile['known_gap_issue'] == 1002
+          assert mycelix['authority'] == 'MeasurementOnly'
+          assert mycelix['corpus_sha256'] == 'b37be9d2e3fd0cbec3696a19327c26dc4ba7062ec089ad92ad99bc28a11fea8e'
+          assert mycelix['counterexample_count'] == 5
+          assert symthaea['authority'] == 'MeasurementOnly'
+          assert symthaea['conformance_class'] == 'CrossImplementationConformance'
+          assert symthaea['mycelix_evidence_head'] == '3232d611d8833b03eba9f5412f5d7cb0cf89d4e1'
+          assert symthaea['mycelix_production_subject'] == 'fca2c107a1ea5108823ce617ba4111b6f7f77230'
+          assert symthaea['same_tree_main'] == '31ede2365b81365bb119cd9351b2739119974130'
+          assert symthaea['profile_sha256'] == profile['profile_content_sha256']
+          assert symthaea['corpus_sha256'] == mycelix['corpus_sha256']
+          assert symthaea['counterexample_count'] == 5
+          assert symthaea['issue'] == 1002
+          assert corpus['corpus_sha256'] == symthaea['corpus_sha256']
+          PY
+
+      - name: Verify both checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_cp rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_cp diff --exit-code
+          git -C _mycelix_cp diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_cp status --porcelain)"
