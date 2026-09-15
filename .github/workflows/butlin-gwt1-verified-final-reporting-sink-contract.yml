@@ -1,0 +1,277 @@
+name: Butlin GWT-1 Verified Final Reporting Sink Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-verified-final-reporting-sink-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify exact opaque final-reporting sink
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RUSTUP_TOOLCHAIN: "1.96.0"
+      CARGO_HOME: /tmp/gwt1-final-reporting-sink-cargo-home
+      CARGO_TARGET_DIR: /tmp/gwt1-final-reporting-sink-target
+    steps:
+      - name: Checkout exact reporting-sink subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: a2e7313862eb8bf1ddef1c55f821540ed15d863f
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact product delta and frozen blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="764ff149ab947a890175489e2f999fbbda5ff3a7"
+          subject="a2e7313862eb8bf1ddef1c55f821540ed15d863f"
+          test "$(git rev-parse HEAD)" = "$subject"
+          test "$(git rev-parse HEAD^)" = "$parent"
+          test "$(git rev-list --count "$parent..$subject")" -eq 1
+
+          mapfile -t changed < <(git diff --name-only "$parent" "$subject")
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "crates/domains/symthaea-psych-bench/Cargo.toml"
+          test "${changed[1]}" = "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs"
+          test "${changed[2]}" = "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs"
+
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/Cargo.toml)" = "59b0a567df20922cf962f6ee52d4ec0e2bb39be1"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs)" = "0a53eec67ffa656d7c2b010957fc8ec8b9cd8d7a"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs)" = "77bd96a0a632a801b84e51e2cb5d9577beb3fd92"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Audit privilege separation and one-way reporting types
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path("crates/domains/symthaea-psych-bench/Cargo.toml").read_text()
+          module = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs").read_text()
+          sink = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs").read_text()
+
+          assert 'trusted-resolution-authority = ["symthaea-backend"]' in manifest
+          assert 'trusted-resolution-consumer = []' in manifest
+          assert manifest.count('trusted-resolution-consumer') == 1
+          assert 'trusted-resolution-consumer = ["symthaea-backend"]' not in manifest
+          assert 'trusted-resolution-consumer = ["trusted-resolution-authority"]' not in manifest
+          assert 'trusted-resolution-authority = ["trusted-resolution-consumer"' not in manifest
+
+          assert '#[cfg(feature = "trusted-resolution-consumer")]\n#[doc(hidden)]\npub mod gwt1_verified_final_artifact;' in module
+          assert '#[cfg(feature = "trusted-resolution-consumer")]\n#[doc(hidden)]\npub use gwt1_verified_final_artifact::{' in module
+          assert 'VerifiedGwt1ResolvedArtifactV1' in module
+          assert 'render_verified_gwt1_authoritative_report_v1' in module
+
+          production = sink.split('#[cfg(test)]', 1)[0]
+          assert 'use serde::Serialize;' in production
+          assert 'pub struct VerifiedGwt1ResolvedArtifactV1 {' in production
+          body = production.split('pub struct VerifiedGwt1ResolvedArtifactV1 {', 1)[1].split('\n}', 1)[0]
+          field_lines = [line.strip() for line in body.splitlines() if ':' in line and not line.strip().startswith('//')]
+          assert field_lines
+          assert all(not line.startswith('pub ') for line in field_lines), field_lines
+
+          prefix = production.split('pub struct VerifiedGwt1ResolvedArtifactV1', 1)[0]
+          attrs = prefix.rsplit('\n\n', 1)[-1]
+          assert '#[derive' not in attrs
+          assert 'impl Serialize for VerifiedGwt1ResolvedArtifactV1' not in production
+          assert 'impl Deserialize' not in production or 'VerifiedGwt1ResolvedArtifactV1' not in production.split('impl Deserialize', 1)[-1][:200]
+
+          prohibited_constructors = [
+              'pub fn new(', 'pub(crate) fn new(', 'fn new(',
+              'pub fn from_', 'pub(crate) fn from_',
+              'pub fn verify_', 'pub(crate) fn verify_',
+              'pub fn mint_', 'pub(crate) fn mint_',
+          ]
+          for needle in prohibited_constructors:
+              assert needle not in production, needle
+
+          assert '#[derive(Debug, Clone, PartialEq, Eq, Serialize)]\npub struct Gwt1AuthoritativeReportV1 {' in production
+          assert '#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]' not in production
+          assert 'pub fn render_verified_gwt1_authoritative_report_v1(\n    verified: &VerifiedGwt1ResolvedArtifactV1,' in production
+          assert 'verified: &ButlinResolvedEvidenceViewV2' not in production
+          assert 'verified: bool' not in production
+          assert 'final_attestation_verification_bytes: Vec<u8>' in production
+          assert 'pub fn final_attestation_verification_bytes(&self) -> &[u8]' in production
+          assert 'consciousness_or_sentience_established: false' in production
+          assert 'GWT1_VERIFIED_RESOLVED_ARTIFACT_SCHEMA_V1' in production
+          assert 'GWT1_AUTHORITATIVE_REPORT_SCHEMA_V1' in production
+
+          # Before the test module the only brace-opening token sites are the
+          # declaration and the two impl blocks (Debug + accessors). A fourth
+          # site would be a production struct literal and therefore a mint path.
+          literal_sites = [m.start() for m in re.finditer(r'VerifiedGwt1ResolvedArtifactV1\s*\{', production)]
+          assert len(literal_sites) == 3, literal_sites
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master history @ 2026-09-12
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check exact toolchain and reporting-sink formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc_version="$(rustc --version)"
+          cargo_version="$(cargo --version)"
+          case "$rustc_version" in
+            "rustc 1.96.0 "*) ;;
+            *) echo "unexpected rustc: $rustc_version" >&2; exit 1 ;;
+          esac
+          case "$cargo_version" in
+            "cargo 1.96.0 "*) ;;
+            *) echo "unexpected cargo: $cargo_version" >&2; exit 1 ;;
+          esac
+          rustfmt --version
+          sink="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_verified_final_artifact.rs"
+          rustfmt --edition 2024 --check "$sink"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Compile consumer-only surface without backend or producer authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            --lib
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove producer authority is absent from consumer-only build
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="crates/domains/symthaea-psych-bench/src/bin/__gwt1_consumer_must_not_import_producer.rs"
+          trap 'rm -f "$probe"' EXIT
+          cat > "$probe" <<'RS'
+          use symthaea_psych_bench::benchmarks::butlin::generate_gwt1_trusted_resolution_candidate_v1;
+          fn main() {
+              let _ = generate_gwt1_trusted_resolution_candidate_v1;
+          }
+          RS
+          set +e
+          cargo check --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            --bin __gwt1_consumer_must_not_import_producer \
+            > /tmp/gwt1-consumer-producer-probe.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'generate_gwt1_trusted_resolution_candidate_v1' /tmp/gwt1-consumer-producer-probe.log
+          grep -E 'unresolved import|no .* in .*butlin' /tmp/gwt1-consumer-producer-probe.log
+          rm -f "$probe"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove external code cannot construct the opaque capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="crates/domains/symthaea-psych-bench/src/bin/__gwt1_consumer_must_not_construct_token.rs"
+          trap 'rm -f "$probe"' EXIT
+          cat > "$probe" <<'RS'
+          use symthaea_psych_bench::benchmarks::butlin::VerifiedGwt1ResolvedArtifactV1;
+          fn main() {
+              let _forged = VerifiedGwt1ResolvedArtifactV1 {};
+          }
+          RS
+          set +e
+          cargo check --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            --bin __gwt1_consumer_must_not_construct_token \
+            > /tmp/gwt1-consumer-construction-probe.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'VerifiedGwt1ResolvedArtifactV1' /tmp/gwt1-consumer-construction-probe.log
+          grep -E 'private|cannot construct' /tmp/gwt1-consumer-construction-probe.log
+          rm -f "$probe"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove external code cannot deserialize the opaque capability
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="crates/domains/symthaea-psych-bench/src/bin/__gwt1_consumer_must_not_deserialize_token.rs"
+          trap 'rm -f "$probe"' EXIT
+          cat > "$probe" <<'RS'
+          use symthaea_psych_bench::benchmarks::butlin::VerifiedGwt1ResolvedArtifactV1;
+          fn main() {
+              let _: VerifiedGwt1ResolvedArtifactV1 = serde_json::from_str("{}").unwrap();
+          }
+          RS
+          set +e
+          cargo check --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            --bin __gwt1_consumer_must_not_deserialize_token \
+            > /tmp/gwt1-consumer-deserialize-probe.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'VerifiedGwt1ResolvedArtifactV1' /tmp/gwt1-consumer-deserialize-probe.log
+          grep -E 'Deserialize|deserialize' /tmp/gwt1-consumer-deserialize-probe.log
+          rm -f "$probe"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove rendered report projection is output-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          probe="crates/domains/symthaea-psych-bench/src/bin/__gwt1_report_must_not_deserialize.rs"
+          trap 'rm -f "$probe"' EXIT
+          cat > "$probe" <<'RS'
+          use symthaea_psych_bench::benchmarks::butlin::Gwt1AuthoritativeReportV1;
+          fn main() {
+              let _: Gwt1AuthoritativeReportV1 = serde_json::from_str("{}").unwrap();
+          }
+          RS
+          set +e
+          cargo check --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            --bin __gwt1_report_must_not_deserialize \
+            > /tmp/gwt1-report-deserialize-probe.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'Gwt1AuthoritativeReportV1' /tmp/gwt1-report-deserialize-probe.log
+          grep -E 'Deserialize|deserialize' /tmp/gwt1-report-deserialize-probe.log
+          rm -f "$probe"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Run exact verified-reporting sink test set
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            gwt1_verified_final_artifact::tests -- --list \
+            | tee /tmp/gwt1-verified-reporting-tests.txt
+          grep -E '^benchmarks::butlin::gwt1_verified_final_artifact::tests::.*: test$' \
+            /tmp/gwt1-verified-reporting-tests.txt | LC_ALL=C sort \
+            > /tmp/gwt1-verified-reporting-tests.actual
+          cat > /tmp/gwt1-verified-reporting-tests.expected <<'EOF'
+          benchmarks::butlin::gwt1_verified_final_artifact::tests::renderer_never_claims_consciousness_or_sentience: test
+          benchmarks::butlin::gwt1_verified_final_artifact::tests::renderer_preserves_verified_authority_and_method_outcomes: test
+          benchmarks::butlin::gwt1_verified_final_artifact::tests::schemas_are_frozen: test
+          EOF
+          sed -i 's/^          //' /tmp/gwt1-verified-reporting-tests.expected
+          diff -u /tmp/gwt1-verified-reporting-tests.expected /tmp/gwt1-verified-reporting-tests.actual
+          cargo test --locked -p symthaea-psych-bench --lib \
+            --no-default-features \
+            --features trusted-resolution-consumer \
+            gwt1_verified_final_artifact::tests
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
