@@ -59,6 +59,7 @@ jobs:
           test -f crates/research/symthaea-paradox-fixtures/Cargo.lock
           test -f crates/research/symthaea-paradox-fixtures/rust-toolchain.toml
           test -f crates/research/symthaea-paradox-fixtures/src/lib.rs
+          test -f crates/research/symthaea-paradox-fixtures/src/bin/qualification_census.rs
           test -f crates/research/symthaea-paradox-fixtures/tests/confirmatory_auxiliary_independence.rs
 
           lock=crates/research/symthaea-paradox-fixtures/Cargo.lock
@@ -76,6 +77,26 @@ jobs:
       - name: Test fixture census and negative controls offline
         run: cargo test --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml
 
+      - name: Commit complete confirmatory census
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest=crates/research/symthaea-paradox-fixtures/Cargo.toml
+          receipt_dir="${RUNNER_TEMP}/paradox-002a-census"
+          mkdir -p "${receipt_dir}"
+
+          cargo run --locked --offline --quiet --manifest-path "${manifest}" --bin qualification_census \
+            > "${receipt_dir}/census-a.bin"
+          cargo run --locked --offline --quiet --manifest-path "${manifest}" --bin qualification_census \
+            > "${receipt_dir}/census-b.bin"
+
+          cmp -s "${receipt_dir}/census-a.bin" "${receipt_dir}/census-b.bin"
+          bytes="$(wc -c < "${receipt_dir}/census-a.bin")"
+          test "${bytes}" -gt 0
+          digest="$(sha256sum "${receipt_dir}/census-a.bin" | awk '{print $1}')"
+          printf 'PARADOX-002A confirmatory-census-v1 records=7168 bytes=%s sha256=%s subject=%s\n' \
+            "${bytes}" "${digest}" "${SUBJECT_SHA}"
+
       - name: Strict Clippy offline
         run: cargo clippy --locked --offline --manifest-path crates/research/symthaea-paradox-fixtures/Cargo.toml --all-targets -- -D warnings
 
@@ -84,14 +105,16 @@ jobs:
         run: |
           set -euo pipefail
           file=crates/research/symthaea-paradox-fixtures/src/lib.rs
+          census=crates/research/symthaea-paradox-fixtures/src/bin/qualification_census.rs
           guard=crates/research/symthaea-paradox-fixtures/tests/confirmatory_auxiliary_independence.rs
           grep -Fq 'does not measure or classify consciousness' "$file"
           grep -Fq 'Generator code never consumes this report.' "$file"
           grep -Fq 'condition label, expected response, or oracle truth' "$file"
           grep -Fq 'PARADOX001_QUALIFIED_SHA' "$file"
+          grep -Fq 'SYMT-PARADOX-002A-CONFIRMATORY-CENSUS-V1' "$census"
           grep -Fq 'matched_auxiliary_cue_has_no_deterministic_polarity_mapping_per_confirmatory_seed' "$guard"
           grep -Fq 'c3_and_c6_share_causal_context_cue_without_sharing_visibility' "$guard"
-          ! grep -Eq 'rand::|thread_rng|OsRng|getrandom|SystemTime|Instant::|std::net|reqwest|tokio|crate::cognitive_loop|crate::consciousness|GlobalWorkspace|CognitiveLoopService' "$file"
+          ! grep -Eq 'rand::|thread_rng|OsRng|getrandom|SystemTime|Instant::|std::net|reqwest|tokio|crate::cognitive_loop|crate::consciousness|GlobalWorkspace|CognitiveLoopService' "$file" "$census" "$guard"
           ! grep -Eq 'candidate_recruitment_index[^;]*([<>]=?|==)' "$file"
 
       - name: Postflight checkout immutability
