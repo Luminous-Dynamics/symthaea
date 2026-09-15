@@ -1,0 +1,169 @@
+name: IG-008CS0 Mycelix Constitution Sync Conformance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig008cs0_mycelix_constitution_sync_oracle.py"
+      - "docs/research/IG_008CS0_MYCELIX_CONSTITUTION_SYNC_CONFORMANCE.md"
+      - ".github/workflows/ig-008cs0-mycelix-constitution-sync-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-constitution-sync-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      MYCELIX_EVIDENCE_HEAD: abb277cc39418e43e80d48e8a4a57bc7c939d9e4
+      PROFILE_SHA256: 60daae86044098561fa8e41bcdf6f695ab41234760be4b7e235d2780271b681e
+      CORPUS_SHA256: 2ca6d79212cfd0acae1e974c8390d564bab06821050d8eacbc32f437630ef60b
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix sync evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_EVIDENCE_HEAD }}
+          path: _mycelix_sync
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_sync/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_sync rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_sync status --porcelain)"
+
+      - name: Bind constitution and complete bridge coordinator source census
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=_mycelix_sync
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/constitution/coordinator/src/lib.rs)" = "923a1ce789c8319c79df7f33a9241af50804ec55"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/attestation.rs)" = "6d7938084ba699b144ee5951966b1421c034f579"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/consciousness.rs)" = "d0acabf306594ab3ccfae220a9c9bd9aceed0ca6"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/consciousness_config.rs)" = "26da234e588bf26d0e25c10dbec34502e00c191a"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/consensus.rs)" = "3842dfa365953a01ca90bb79059da53f9cb00a6f"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/cross_cluster.rs)" = "3eb0ade8633d6e711fd266bca6eb2ebab616eac2"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/lib.rs)" = "fb278023c269a89f300504c18538ab85b09f1178"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/query.rs)" = "5a02812880a2fdaa8f3ed767a4686afc00c566f9"
+          test "$(git -C "$ROOT" hash-object mycelix-governance/zomes/bridge/coordinator/src/validation.rs)" = "9e13ba58939880738eccb997e54f729da7a11304"
+
+          find "$ROOT/mycelix-governance/zomes/bridge/coordinator/src" -maxdepth 1 -type f -name '*.rs' -printf '%f\n' | sort > /tmp/bridge-files.txt
+          cat > /tmp/bridge-expected.txt <<'EOF'
+          attestation.rs
+          consciousness.rs
+          consciousness_config.rs
+          consensus.rs
+          cross_cluster.rs
+          lib.rs
+          query.rs
+          validation.rs
+          EOF
+          sort -o /tmp/bridge-expected.txt /tmp/bridge-expected.txt
+          diff -u /tmp/bridge-expected.txt /tmp/bridge-files.txt
+
+          if grep -R -n -F 'update_phi_config' "$ROOT/mycelix-governance/zomes/bridge/coordinator/src"; then
+            echo 'frozen target-absence theorem violated' >&2
+            exit 1
+          fi
+          grep -F 'pub fn update_consciousness_config' "$ROOT/mycelix-governance/zomes/bridge/coordinator/src/consciousness_config.rs"
+
+      - name: Syntax compile independent implementations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile scripts/ig008cs0_mycelix_constitution_sync_oracle.py
+          python -m py_compile _mycelix_sync/mycelix-governance/scripts/validate_ig007cs0_constitution_bridge_sync_profile.py
+          python -m py_compile _mycelix_sync/mycelix-governance/scripts/ig007cs1_constitution_bridge_sync_counterexamples.py
+
+      - name: Revalidate Mycelix CS0 and run CS1 twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_sync/mycelix-governance/profiles/observed/constitution-bridge-sync-fca2c107-v1.json
+          P0=_mycelix_sync/mycelix-governance/scripts/validate_ig007cs0_constitution_bridge_sync_profile.py
+          P1=_mycelix_sync/mycelix-governance/scripts/ig007cs1_constitution_bridge_sync_counterexamples.py
+          python "$P0" --profile "$PROFILE" --self-test > /tmp/mycelix-profile.json
+          python "$P1" --profile "$PROFILE" --self-test > /tmp/mycelix-self-1.json
+          python "$P1" --profile "$PROFILE" --self-test > /tmp/mycelix-self-2.json
+          cmp /tmp/mycelix-self-1.json /tmp/mycelix-self-2.json
+          python "$P1" --profile "$PROFILE" --corpus > /tmp/mycelix-corpus.json
+
+      - name: Run independent Symthaea oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_sync/mycelix-governance/profiles/observed/constitution-bridge-sync-fca2c107-v1.json
+          python scripts/ig008cs0_mycelix_constitution_sync_oracle.py --profile "$PROFILE" --self-test > /tmp/symthaea-self-1.json
+          python scripts/ig008cs0_mycelix_constitution_sync_oracle.py --profile "$PROFILE" --self-test > /tmp/symthaea-self-2.json
+          cmp /tmp/symthaea-self-1.json /tmp/symthaea-self-2.json
+          python scripts/ig008cs0_mycelix_constitution_sync_oracle.py --profile "$PROFILE" --corpus > /tmp/symthaea-corpus.json
+
+      - name: Require byte-identical cross-implementation corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp /tmp/mycelix-corpus.json /tmp/symthaea-corpus.json
+
+      - name: Assert exact commitments and authority ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          def read(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+          p = read('/tmp/mycelix-profile.json')
+          m = read('/tmp/mycelix-self-1.json')
+          s = read('/tmp/symthaea-self-1.json')
+          c = read('/tmp/symthaea-corpus.json')
+          assert p['authority_class'] == 'ObservedSourceBound'
+          assert p['profile_content_sha256'] == '60daae86044098561fa8e41bcdf6f695ab41234760be4b7e235d2780271b681e'
+          assert p['known_gap_issues'] == [943, 944]
+          assert m['authority'] == 'MeasurementOnly'
+          assert m['corpus_sha256'] == '2ca6d79212cfd0acae1e974c8390d564bab06821050d8eacbc32f437630ef60b'
+          assert s['authority'] == 'MeasurementOnly'
+          assert s['conformance_class'] == 'CrossImplementationConformance'
+          assert s['mycelix_evidence_head'] == 'abb277cc39418e43e80d48e8a4a57bc7c939d9e4'
+          assert s['profile_sha256'] == p['profile_content_sha256']
+          assert s['corpus_sha256'] == m['corpus_sha256']
+          assert s['issues'] == [943, 944]
+          assert c['corpus_sha256'] == s['corpus_sha256']
+          PY
+
+      - name: Verify both checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_sync rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_sync diff --exit-code
+          git -C _mycelix_sync diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_sync status --porcelain)"
