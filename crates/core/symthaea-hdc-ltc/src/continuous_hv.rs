@@ -472,8 +472,8 @@ mod tests {
         let mixed_zero_seed = 0xC1BE_9B22_F808_E7C4;
         assert_eq!(mixed_role_seed(mixed_zero_seed), 0);
         let role = UnitaryRole::new(256, mixed_zero_seed);
-        assert!(role.as_slice().iter().any(|value| *value == -1.0));
-        assert!(role.as_slice().iter().any(|value| *value == 1.0));
+        assert!(role.as_slice().contains(&-1.0));
+        assert!(role.as_slice().contains(&1.0));
 
         let pathological_vector_seed = RNG_SEED_XOR;
         let vector = ContinuousHV::new_random(256, pathological_vector_seed);

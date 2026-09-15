@@ -452,8 +452,13 @@ mod tests {
         let seed = 91_337_u64;
         let first_seed = shadow_seed(seed, 0, 0);
         let colliding_candidate = UnitaryRole::new(dim, first_seed);
-        let (shadow, seeds, retries) =
-            construct_shadow_vocabulary(dim, seed, 1, &[colliding_candidate.clone()]).unwrap();
+        let (shadow, seeds, retries) = construct_shadow_vocabulary(
+            dim,
+            seed,
+            1,
+            std::slice::from_ref(&colliding_candidate),
+        )
+        .unwrap();
         assert_eq!(retries, 1);
         assert_eq!(shadow.len(), 1);
         assert_eq!(seeds.len(), 1);

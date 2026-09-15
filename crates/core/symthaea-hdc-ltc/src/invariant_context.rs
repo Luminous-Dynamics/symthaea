@@ -109,14 +109,14 @@ impl InvariantContextMixer {
         let inv_k = 1.0 / self.offsets.len() as f32;
         let mut context = vec![0.0_f32; self.dim];
 
-        for i in 0..self.dim {
+        for (i, value) in context.iter_mut().enumerate() {
             let mut sum = 0.0_f32;
             for (kernel, &offset) in self.offsets.iter().enumerate() {
                 let source = (i + offset) % self.dim;
                 let magnitude = 0.5 * (state.values[source].abs() + input.values[source].abs());
                 sum += self.weights[kernel].values[i] * magnitude;
             }
-            context[i] = sum * inv_k;
+            *value = sum * inv_k;
         }
 
         Ok(ContinuousHV::from_values(context))

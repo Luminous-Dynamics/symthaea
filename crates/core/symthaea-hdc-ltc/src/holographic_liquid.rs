@@ -34,17 +34,12 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Odd activations compatible with exact real bipolar binding equivariance.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum HlsActivation {
+    #[default]
     Tanh,
     Identity,
     BoundedTanh { bound: f32 },
-}
-
-impl Default for HlsActivation {
-    fn default() -> Self {
-        Self::Tanh
-    }
 }
 
 impl HlsActivation {
@@ -524,10 +519,10 @@ fn validate_config(config: &HlsConfig) -> Result<(), HlsError> {
     if config.state_norm_limit.is_nan() || config.state_norm_limit <= 0.0 {
         return Err(HlsError::InvalidParameter("state_norm_limit"));
     }
-    if let HlsActivation::BoundedTanh { bound } = config.activation {
-        if !bound.is_finite() {
-            return Err(HlsError::InvalidParameter("activation.bound"));
-        }
+    if let HlsActivation::BoundedTanh { bound } = config.activation
+        && !bound.is_finite()
+    {
+        return Err(HlsError::InvalidParameter("activation.bound"));
     }
     Ok(())
 }
