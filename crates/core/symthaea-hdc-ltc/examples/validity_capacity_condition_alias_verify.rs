@@ -15,7 +15,7 @@ use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use symthaea_hdc_ltc::{ValidityCapacityAxis, ValidityCapacityCase, ValidityCapacityPlan};
 
 type AnyError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -267,7 +267,7 @@ fn require_group(
 }
 
 fn verify_v2_alias_identity(
-    path: &PathBuf,
+    path: &Path,
     protocol: Protocol,
     plan: &ValidityCapacityPlan,
 ) -> Result<(), AnyError> {
