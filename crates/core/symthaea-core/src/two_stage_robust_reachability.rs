@@ -348,19 +348,20 @@ impl TwoStageInformationPattern1D {
 
 /// Exact stage-1 observation capability for the feedback information pattern.
 ///
-/// Construction is crate-private so external callers cannot mint observations by
-/// claiming arbitrary hidden state. Later theorem code must receive this capability
-/// from the declared stage chronology rather than a raw disturbance channel.
+/// Construction is module-private so callers outside this theorem module cannot mint
+/// observations by claiming arbitrary hidden state. Later theorem code must receive
+/// this capability from the declared stage chronology rather than a disturbance channel.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Stage1Observation1D {
     state: f64,
+    stage_index: u8,
     chronology_identity: RuntimeIdentity,
     information_pattern_identity: RuntimeIdentity,
 }
 
 impl Stage1Observation1D {
     #[allow(dead_code)]
-    pub(crate) fn issue(
+    fn issue(
         pattern: TwoStageInformationPattern1D,
         state: f64,
     ) -> Result<Self, TwoStageSemanticError> {
@@ -376,6 +377,7 @@ impl Stage1Observation1D {
         let chronology_identity = chronology_identity(pattern.chronology());
         Ok(Self {
             state,
+            stage_index: 1,
             chronology_identity,
             information_pattern_identity: pattern.runtime_identity(),
         })
@@ -384,6 +386,11 @@ impl Stage1Observation1D {
     /// Exact observed stage-1 state.
     pub fn state(&self) -> f64 {
         self.state
+    }
+
+    /// Causal boundary index at which this observation becomes available.
+    pub fn stage_index(&self) -> u8 {
+        self.stage_index
     }
 
     /// Runtime identity of the chronology that issued this observation.
@@ -429,6 +436,15 @@ impl ConstantStage1Policy1D {
     /// Constant action encoded by the policy.
     pub fn value(&self) -> f64 {
         self.value
+    }
+
+    /// Evaluate the already-selected constant policy on one sealed stage-1 observation.
+    ///
+    /// This is runtime policy semantics only. It has no actuator-admissibility or
+    /// robust-feasibility authority.
+    pub fn evaluate(&self, observation: Stage1Observation1D) -> Result<f64, TwoStageSemanticError> {
+        require_policy_observation(self.information_pattern_identity, observation)?;
+        Ok(self.value)
     }
 
     /// Feedback information-pattern runtime identity bound into this policy.
@@ -519,6 +535,24 @@ impl AffineStage1Policy1D {
         self.domain_upper
     }
 
+    /// Evaluate the already-selected affine policy on one sealed stage-1 observation.
+    ///
+    /// The declared observation domain is checked exactly. The returned binary64
+    /// value is operational policy output only; later theorem tranches must use
+    /// qualified interval arithmetic for actuator-image or terminal-set claims.
+    pub fn evaluate(&self, observation: Stage1Observation1D) -> Result<f64, TwoStageSemanticError> {
+        require_policy_observation(self.information_pattern_identity, observation)?;
+        let state = observation.state();
+        if state < self.domain_lower || state > self.domain_upper {
+            return Err(TwoStageSemanticError::ObservationOutsidePolicyDomain);
+        }
+        let value = self.gain.mul_add(state, self.bias);
+        if !value.is_finite() {
+            return Err(TwoStageSemanticError::NonFinitePolicyEvaluation);
+        }
+        Ok(canonical_zero(value))
+    }
+
     /// Feedback information-pattern runtime identity bound into this policy.
     pub fn information_pattern_identity(&self) -> RuntimeIdentity {
         self.information_pattern_identity
@@ -540,6 +574,14 @@ pub enum Stage1Policy1D {
 }
 
 impl Stage1Policy1D {
+    /// Evaluate this already-selected policy using only the sealed stage-1 observation.
+    pub fn evaluate(&self, observation: Stage1Observation1D) -> Result<f64, TwoStageSemanticError> {
+        match self {
+            Self::Constant(policy) => policy.evaluate(observation),
+            Self::Affine(policy) => policy.evaluate(observation),
+        }
+    }
+
     /// Runtime identity of the selected policy object.
     pub fn runtime_identity(&self) -> RuntimeIdentity {
         match self {
@@ -673,6 +715,15 @@ impl Stage1FeedbackStrategy1D {
         self.policy
     }
 
+    /// Evaluate the fixed second-stage policy without creating any new decision channel.
+    pub fn second_control_for(
+        &self,
+        observation: Stage1Observation1D,
+    ) -> Result<f64, TwoStageSemanticError> {
+        require_policy_observation(self.information_pattern_identity, observation)?;
+        self.policy.evaluate(observation)
+    }
+
     /// Feedback information-pattern runtime identity.
     pub fn information_pattern_identity(&self) -> RuntimeIdentity {
         self.information_pattern_identity
@@ -702,6 +753,24 @@ pub enum TwoStageSemanticError {
     /// A policy was bound to a different information pattern than the feedback strategy.
     #[error("stage-1 policy information-pattern identity mismatch")]
     PolicyPatternMismatch,
+    /// A sealed observation lies outside the policy's declared closed domain.
+    #[error("stage-1 observation lies outside the declared affine policy domain")]
+    ObservationOutsidePolicyDomain,
+    /// Binary64 runtime policy evaluation overflowed or otherwise became non-finite.
+    #[error("stage-1 runtime policy evaluation became non-finite")]
+    NonFinitePolicyEvaluation,
+}
+
+fn require_policy_observation(
+    expected_pattern: RuntimeIdentity,
+    observation: Stage1Observation1D,
+) -> Result<(), TwoStageSemanticError> {
+    if observation.stage_index() != 1
+        || observation.information_pattern_identity() != expected_pattern
+    {
+        return Err(TwoStageSemanticError::PolicyPatternMismatch);
+    }
+    Ok(())
 }
 
 fn chronology_identity(events: &[TwoStageChronologyEvent]) -> RuntimeIdentity {
@@ -753,11 +822,33 @@ mod tests {
         let feedback = TwoStageInformationPattern1D::stage1_exact_observation();
         let observation = Stage1Observation1D::issue(feedback, -0.0).expect("feedback observation");
         assert_eq!(observation.state().to_bits(), 0.0f64.to_bits());
+        assert_eq!(observation.stage_index(), 1);
         assert_eq!(observation.information_pattern_identity(), feedback.runtime_identity());
         assert_eq!(observation.chronology_identity(), chronology_identity(feedback.chronology()));
 
         let error = Stage1Observation1D::issue(TwoStageInformationPattern1D::open_loop(), 0.0)
             .expect_err("open loop has no stage-1 observation capability");
         assert_eq!(error, TwoStageSemanticError::ObservationPatternMismatch);
+    }
+
+    #[test]
+    fn fixed_policies_evaluate_only_the_sealed_stage1_capability() {
+        let pattern = TwoStageInformationPattern1D::stage1_exact_observation();
+        let observation = Stage1Observation1D::issue(pattern, 0.25).expect("sealed observation");
+
+        let constant = ConstantStage1Policy1D::new(-0.5).expect("constant policy");
+        assert_eq!(constant.evaluate(observation).unwrap(), -0.5);
+
+        let affine = AffineStage1Policy1D::new(-1.0, 0.0, -1.0, 1.0).expect("affine policy");
+        assert_eq!(affine.evaluate(observation).unwrap(), -0.25);
+
+        let outside = Stage1Observation1D::issue(pattern, 2.0).expect("sealed observation");
+        assert_eq!(
+            affine.evaluate(outside),
+            Err(TwoStageSemanticError::ObservationOutsidePolicyDomain)
+        );
+
+        let strategy = Stage1FeedbackStrategy1D::new(0.0, affine.into()).expect("fixed strategy");
+        assert_eq!(strategy.second_control_for(observation).unwrap(), -0.25);
     }
 }

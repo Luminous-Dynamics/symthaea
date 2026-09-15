@@ -7,38 +7,45 @@ on:
 permissions:
   contents: read
 
-env:
-  SUBJECT_SHA: e00e36123546960c07f9030253b57b1348aaad0b
-
 jobs:
   capture:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 1
-          ref: ${{ env.SUBJECT_SHA }}
           persist-credentials: false
+      - name: Bind exact diagnostic input
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          printf 'input_sha=%s\ninput_tree=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" > "$RUNNER_TEMP/manifold-006d-a-rustfmt-environment.txt"
       - name: Install exact Rust 1.96 formatter
         run: |
           set -euo pipefail
           rustup toolchain install 1.96.0 --profile minimal --component rustfmt
           rustup default 1.96.0
-          test "$(rustfmt --version | awk '{print $2}')" = 1.8.0-stable || rustfmt --version
-      - name: Format only the new A source and test
+          test "$(rustc --version | awk '{print $2}')" = 1.96.0
+          printf 'rustc=%s\nrustfmt=%s\n' "$(rustc --version)" "$(rustfmt --version)" >> "$RUNNER_TEMP/manifold-006d-a-rustfmt-environment.txt"
+      - name: Format only the new A source and focused integration test
         run: |
           set -euo pipefail
           rustfmt --edition 2024 crates/core/symthaea-core/src/two_stage_robust_reachability.rs
           rustfmt --edition 2024 crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs
-          mkdir -p "$RUNNER_TEMP/manifold-006d-a-rustfmt"
-          cp crates/core/symthaea-core/src/two_stage_robust_reachability.rs "$RUNNER_TEMP/manifold-006d-a-rustfmt/"
-          cp crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs "$RUNNER_TEMP/manifold-006d-a-rustfmt/"
-          sha256sum "$RUNNER_TEMP"/manifold-006d-a-rustfmt/*.rs > "$RUNNER_TEMP/manifold-006d-a-rustfmt/SHA256SUMS"
-          printf 'subject_sha=%s\nrustfmt=%s\n' "$SUBJECT_SHA" "$(rustfmt --version)" > "$RUNNER_TEMP/manifold-006d-a-rustfmt/environment.txt"
+          out="$RUNNER_TEMP/manifold-006d-a-rustfmt"
+          mkdir -p "$out"
+          cp crates/core/symthaea-core/src/two_stage_robust_reachability.rs "$out/"
+          cp crates/core/symthaea-core/tests/manifold_006d_a_information_pattern.rs "$out/"
+          cp "$RUNNER_TEMP/manifold-006d-a-rustfmt-environment.txt" "$out/environment.txt"
+          (
+            cd "$out"
+            sha256sum manifold_006d_a_information_pattern.rs two_stage_robust_reachability.rs environment.txt > SHA256SUMS
+          )
       - name: Upload exact formatter output
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: manifold-006d-a-rustfmt-${{ env.SUBJECT_SHA }}
+          name: manifold-006d-a-rustfmt-${{ github.sha }}
           path: ${{ runner.temp }}/manifold-006d-a-rustfmt/
           if-no-files-found: error
           retention-days: 30
