@@ -9,7 +9,8 @@
 
 use symthaea_structured_inconsistency::{
     EvidencePolarity, EvidenceSupport, InconsistencyKind, ObservationError, ResolutionState,
-    StructuredInconsistencyInput, StructuredInconsistencyObservatory, StructuredInconsistencyReport,
+    StructuredInconsistencyInput, StructuredInconsistencyObservatory,
+    StructuredInconsistencyReport,
 };
 
 /// Exact qualified PARADOX-001 subject on which PARADOX-002A is stacked.
@@ -449,7 +450,9 @@ impl FixtureGenerator {
         let fault_b = fault_a ^ 0x5A5A;
         let surface_cue = nonzero_u16((seed_mix >> 32) as u16);
         let query_cue = surface_cue ^ 0x7117;
-        let context_a = ContextToken(nonzero_u16((mix64(seed ^ 0xC6BC_2796_92B5_C323) >> 16) as u16));
+        let context_a = ContextToken(nonzero_u16(
+            (mix64(seed ^ 0xC6BC_2796_92B5_C323) >> 16) as u16,
+        ));
         let context_b = ContextToken(context_a.0 ^ 0xC003);
         let signal_a = nonzero_u16((mix64(seed ^ 0xD1B5_4A32_D192_ED03) >> 16) as u16);
         let signal_b = signal_a ^ 0x6D2B;
@@ -493,9 +496,36 @@ impl FixtureGenerator {
             Condition::CoherentControl => (
                 orientation,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(1, source_b, fault_b, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(2, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        2,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
                     auxiliary(None)?,
                 ],
                 OracleTruth::non_contextual(),
@@ -503,9 +533,36 @@ impl FixtureGenerator {
             Condition::SurpriseOnly => (
                 opposite,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(1, source_b, fault_b, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(2, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        2,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
                     auxiliary(None)?,
                 ],
                 OracleTruth::non_contextual(),
@@ -513,9 +570,36 @@ impl FixtureGenerator {
             Condition::TransientConflict => (
                 orientation,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(1, source_b, fault_b, opposite, EventRole::WorldEvidence, None, false, None)?,
-                    claim(2, source_b, fault_b, orientation, EventRole::WorldEvidence, Some(1), false, None)?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        opposite,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        2,
+                        source_b,
+                        fault_b,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        Some(1),
+                        false,
+                        None,
+                    )?,
                     auxiliary(None)?,
                 ],
                 OracleTruth::non_contextual(),
@@ -523,9 +607,36 @@ impl FixtureGenerator {
             Condition::PersistentResolvable => (
                 orientation,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, Some(context_a))?,
-                    claim(1, source_b, fault_b, opposite, EventRole::WorldEvidence, None, false, Some(context_b))?,
-                    claim(2, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, Some(context_a))?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        Some(context_a),
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        opposite,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        Some(context_b),
+                    )?,
+                    claim(
+                        2,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        Some(context_a),
+                    )?,
                     auxiliary(Some(target_context))?,
                 ],
                 OracleTruth {
@@ -538,9 +649,36 @@ impl FixtureGenerator {
             Condition::PersistentIrreducible => (
                 orientation,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(1, source_b, fault_b, opposite, EventRole::WorldEvidence, None, false, None)?,
-                    claim(2, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        opposite,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        2,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
                     auxiliary(None)?,
                 ],
                 OracleTruth::non_contextual(),
@@ -548,9 +686,36 @@ impl FixtureGenerator {
             Condition::SelfReferentialConflict => (
                 orientation,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::SelfPrediction, None, false, None)?,
-                    claim(1, source_b, fault_b, opposite, EventRole::WorldEvidence, None, true, None)?,
-                    claim(2, source_b, fault_b, opposite, EventRole::WorldEvidence, None, true, None)?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::SelfPrediction,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        opposite,
+                        EventRole::WorldEvidence,
+                        None,
+                        true,
+                        None,
+                    )?,
+                    claim(
+                        2,
+                        source_b,
+                        fault_b,
+                        opposite,
+                        EventRole::WorldEvidence,
+                        None,
+                        true,
+                        None,
+                    )?,
                     auxiliary(None)?,
                 ],
                 OracleTruth::non_contextual(),
@@ -558,13 +723,45 @@ impl FixtureGenerator {
             Condition::OntologyFailure => (
                 orientation,
                 [
-                    claim(0, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
-                    claim(1, source_b, fault_b, opposite, EventRole::WorldEvidence, None, false, None)?,
-                    claim(2, source_a, fault_a, orientation, EventRole::WorldEvidence, None, false, None)?,
+                    claim(
+                        0,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        1,
+                        source_b,
+                        fault_b,
+                        opposite,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
+                    claim(
+                        2,
+                        source_a,
+                        fault_a,
+                        orientation,
+                        EventRole::WorldEvidence,
+                        None,
+                        false,
+                        None,
+                    )?,
                     auxiliary(None)?,
                 ],
                 OracleTruth {
-                    hidden_claim_contexts: [Some(context_a), Some(context_b), Some(context_a), None],
+                    hidden_claim_contexts: [
+                        Some(context_a),
+                        Some(context_b),
+                        Some(context_a),
+                        None,
+                    ],
                     latent_context_is_causal: true,
                     context_dimension_available: false,
                     target_context: Some(target_context),
@@ -640,9 +837,9 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
     let self_referential = events
         .iter()
         .any(|event| event.role == EventRole::SelfPrediction && event.polarity.is_some())
-        && events.iter().any(|event| {
-            event.role == EventRole::WorldEvidence && event.caused_by_self_prediction
-        });
+        && events
+            .iter()
+            .any(|event| event.role == EventRole::WorldEvidence && event.caused_by_self_prediction);
 
     let explicit_context_resolution = visible_context_resolution(fixture, &active).is_some();
     let ontology_failure = internal_disagreement
@@ -723,8 +920,8 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
         }
     };
 
-    let observatory = StructuredInconsistencyObservatory::new().observe(
-        StructuredInconsistencyInput::new(
+    let observatory =
+        StructuredInconsistencyObservatory::new().observe(StructuredInconsistencyInput::new(
             kind,
             external_surprise,
             if internal_disagreement { 1.0 } else { 0.0 },
@@ -733,8 +930,7 @@ pub fn qualify_fixture(fixture: &Fixture) -> Result<OracleReport, QualificationE
             if self_referential { 1.0 } else { 0.0 },
             support,
             resolution,
-        )?,
-    );
+        )?);
 
     let report = OracleReport {
         external_surprise,
@@ -802,11 +998,9 @@ fn active_polarities(events: &[EvidenceEvent; 4], active: &[bool; 4]) -> ActiveP
 
     let has_both = proposition && negation;
     let independent_fault_domains = !has_both
-        || proposition_domains[..proposition_count].iter().any(|p| {
-            negation_domains[..negation_count]
-                .iter()
-                .any(|n| p != n)
-        });
+        || proposition_domains[..proposition_count]
+            .iter()
+            .any(|p| negation_domains[..negation_count].iter().any(|n| p != n));
 
     ActivePolaritySnapshot {
         proposition,
@@ -882,14 +1076,16 @@ fn validate_resource_contract(fixture: &Fixture) -> Result<(), QualificationErro
         events.len() == usize::from(MATCHED_RESOURCE_BUDGET.observation_count),
         "observation count differs from frozen budget",
     )?;
-    let claim_count = events.iter().filter(|event| event.polarity.is_some()).count();
+    let claim_count = events
+        .iter()
+        .filter(|event| event.polarity.is_some())
+        .count();
     require(
         claim_count == usize::from(MATCHED_RESOURCE_BUDGET.claim_event_count),
         "claim-event count differs from frozen budget",
     )?;
     require(
-        events.len() - claim_count
-            == usize::from(MATCHED_RESOURCE_BUDGET.auxiliary_event_count),
+        events.len() - claim_count == usize::from(MATCHED_RESOURCE_BUDGET.auxiliary_event_count),
         "auxiliary-event count differs from frozen budget",
     )?;
 
@@ -937,15 +1133,24 @@ fn validate_condition_contract(
 
     match condition {
         Condition::CoherentControl => {
-            require(is_zero(report.external_surprise), "C0 must have low surprise")?;
-            require(!report.internal_disagreement, "C0 must not contain conflict")?;
+            require(
+                is_zero(report.external_surprise),
+                "C0 must have low surprise",
+            )?;
+            require(
+                !report.internal_disagreement,
+                "C0 must not contain conflict",
+            )?;
             require(
                 report.expected_response == ExpectedResponse::Commit,
                 "C0 must admit commitment",
             )?;
         }
         Condition::SurpriseOnly => {
-            require(is_one(report.external_surprise), "C1 must have high surprise")?;
+            require(
+                is_one(report.external_surprise),
+                "C1 must have high surprise",
+            )?;
             require(
                 !report.internal_disagreement,
                 "C1 must not contain simultaneous P/not-P support",
@@ -999,7 +1204,10 @@ fn validate_condition_contract(
         }
         Condition::SelfReferentialConflict => {
             require(report.internal_disagreement, "C5 must contain conflict")?;
-            require(report.self_referential, "C5 must contain causal self-reference")?;
+            require(
+                report.self_referential,
+                "C5 must contain causal self-reference",
+            )?;
             require(
                 report.expected_response == ExpectedResponse::ReflexiveUpdate,
                 "C5 correct response must be reflexive update",
@@ -1196,8 +1404,14 @@ mod tests {
     fn c6_query_cue_does_not_encode_target_context() {
         let first = FixtureGenerator::generate(Condition::OntologyFailure, 3, 0).unwrap();
         let second = FixtureGenerator::generate(Condition::OntologyFailure, 3, 1).unwrap();
-        assert_eq!(first.agent_view().query_cue(), second.agent_view().query_cue());
-        assert_eq!(first.agent_view().events()[0].surface_cue(), second.agent_view().events()[0].surface_cue());
+        assert_eq!(
+            first.agent_view().query_cue(),
+            second.agent_view().query_cue()
+        );
+        assert_eq!(
+            first.agent_view().events()[0].surface_cue(),
+            second.agent_view().events()[0].surface_cue()
+        );
     }
 
     #[test]
@@ -1357,18 +1571,19 @@ mod tests {
             let report = qualify_fixture(&fixture).unwrap();
             assert_eq!(report.expected_response, ExpectedResponse::ReviseContext);
             assert!(report.target_polarity.is_some());
-            assert!(fixture
-                .agent_view()
-                .events()
-                .iter()
-                .all(|event| event.visible_context().is_none()));
+            assert!(
+                fixture
+                    .agent_view()
+                    .events()
+                    .iter()
+                    .all(|event| event.visible_context().is_none())
+            );
         }
     }
 
     #[test]
     fn irreducible_evidence_polarity_survives_paradox_001() {
-        let fixture =
-            FixtureGenerator::generate(Condition::PersistentIrreducible, 5, 0).unwrap();
+        let fixture = FixtureGenerator::generate(Condition::PersistentIrreducible, 5, 0).unwrap();
         let report = qualify_fixture(&fixture).unwrap();
         assert_eq!(
             report.observatory.evidence_polarity,
