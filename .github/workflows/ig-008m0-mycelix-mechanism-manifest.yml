@@ -1,0 +1,195 @@
+name: IG-008M0 Mycelix Mechanism Manifest
+
+on:
+  pull_request:
+    paths:
+      - "profiles/institutional/mycelix-governance-observed-fca2c107-bundle-v1.json"
+      - "scripts/ig008m0_mycelix_mechanism_manifest.py"
+      - "docs/research/IG_008M0_MYCELIX_OBSERVED_MECHANISM_MANIFEST.md"
+      - ".github/workflows/ig-008m0-mycelix-mechanism-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-composed-manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      VOTING_HEAD: 4b4e27910a98ad393e5a508e54e0f73c48c19107
+      EXECUTION_HEAD: 197714209c60503f0fba4143409da383bc9cbf83
+      CONFIG_HEAD: 88922e7950ddf030026b5d4d2b06e0ed63727692
+      MANIFEST_SHA256: a7bfe0a285dad6c83d2ac82a9edc7bba0c2a300532cba24a604411ca6c8e4e35
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix voting evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.VOTING_HEAD }}
+          path: _mycelix_voting
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix execution evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.EXECUTION_HEAD }}
+          path: _mycelix_execution
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix config evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.CONFIG_HEAD }}
+          path: _mycelix_config
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkouts from parent status
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_voting/' '_mycelix_execution/' '_mycelix_config/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_voting rev-parse HEAD)" = "$VOTING_HEAD"
+          test "$(git -C _mycelix_execution rev-parse HEAD)" = "$EXECUTION_HEAD"
+          test "$(git -C _mycelix_config rev-parse HEAD)" = "$CONFIG_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_voting status --porcelain)"
+          test -z "$(git -C _mycelix_execution status --porcelain)"
+          test -z "$(git -C _mycelix_config status --porcelain)"
+
+      - name: Bind exact Mycelix production-source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _mycelix_voting hash-object mycelix-governance/zomes/voting/coordinator/src/lib.rs)" = "969b845e6186cbcad507c742a718060844f82eb2"
+          test "$(git -C _mycelix_voting hash-object mycelix-governance/zomes/voting/integrity/src/lib.rs)" = "658562c8dfaf6a2f1b97a7bfd5cf0fc8a5ab6e66"
+          test "$(git -C _mycelix_execution hash-object mycelix-governance/zomes/execution/coordinator/src/lib.rs)" = "3dbb8a8f69b377e494ccf24164c94bd80f54e0ef"
+          test "$(git -C _mycelix_execution hash-object mycelix-governance/zomes/execution/integrity/src/lib.rs)" = "657edaee9a314f100a0c4b1609a4596cf243e61d"
+          test "$(git -C _mycelix_config hash-object mycelix-governance/zomes/bridge/coordinator/src/consciousness_config.rs)" = "26da234e588bf26d0e25c10dbec34502e00c191a"
+          test "$(git -C _mycelix_config hash-object mycelix-governance/zomes/bridge/integrity/src/lib.rs)" = "61b20610216e2fd69c701ecaea5322c448eda119"
+          test "$(git -C _mycelix_config hash-object mycelix-governance/zomes/proposals/coordinator/src/lib.rs)" = "eb8358353ee259ef9c3b46617a61d3439f1c714c"
+          test "$(git -C _mycelix_config hash-object mycelix-governance/zomes/proposals/integrity/src/lib.rs)" = "986bc0526aec8d37436efbe5ba798bc41705e3cf"
+
+      - name: Syntax compile all qualification oracles
+        run: |
+          python -m py_compile scripts/ig008a0_mycelix_adapter_oracle.py
+          python -m py_compile scripts/ig008e0_mycelix_execution_oracle.py
+          python -m py_compile scripts/ig008c0_mycelix_config_oracle.py
+          python -m py_compile scripts/ig008m0_mycelix_mechanism_manifest.py
+          python -m py_compile _mycelix_voting/mycelix-governance/scripts/validate_ig007a3_observed_profile_v2.py
+          python -m py_compile _mycelix_voting/mycelix-governance/scripts/ig007a4_delegation_counterexamples.py
+          python -m py_compile _mycelix_execution/mycelix-governance/scripts/validate_ig007e0_execution_profile.py
+          python -m py_compile _mycelix_execution/mycelix-governance/scripts/ig007e1_execution_counterexamples.py
+          python -m py_compile _mycelix_config/mycelix-governance/scripts/validate_ig007c0_governance_config_profile.py
+          python -m py_compile _mycelix_config/mycelix-governance/scripts/ig007c1_governance_config_counterexamples.py
+
+      - name: Qualify voting component independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_voting/mycelix-governance/profiles/observed/voting-fca2c107-v2.json
+          python _mycelix_voting/mycelix-governance/scripts/validate_ig007a3_observed_profile_v2.py --profile "$PROFILE" --self-test > /tmp/m-voting-profile.json
+          python _mycelix_voting/mycelix-governance/scripts/ig007a4_delegation_counterexamples.py --profile "$PROFILE" --corpus > /tmp/m-voting-corpus.json
+          python scripts/ig008a0_mycelix_adapter_oracle.py --profile "$PROFILE" --corpus > /tmp/s-voting-corpus.json
+          cmp /tmp/m-voting-corpus.json /tmp/s-voting-corpus.json
+
+      - name: Qualify execution component independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_execution/mycelix-governance/profiles/observed/execution-fca2c107-v1.json
+          python _mycelix_execution/mycelix-governance/scripts/validate_ig007e0_execution_profile.py --profile "$PROFILE" --self-test > /tmp/m-execution-profile.json
+          python _mycelix_execution/mycelix-governance/scripts/ig007e1_execution_counterexamples.py --profile "$PROFILE" --corpus > /tmp/m-execution-corpus.json
+          python scripts/ig008e0_mycelix_execution_oracle.py --profile "$PROFILE" --corpus > /tmp/s-execution-corpus.json
+          cmp /tmp/m-execution-corpus.json /tmp/s-execution-corpus.json
+
+      - name: Qualify config-authority component independently
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_config/mycelix-governance/profiles/observed/governance-config-fca2c107-v1.json
+          python _mycelix_config/mycelix-governance/scripts/validate_ig007c0_governance_config_profile.py --profile "$PROFILE" --self-test > /tmp/m-config-profile.json
+          python _mycelix_config/mycelix-governance/scripts/ig007c1_governance_config_counterexamples.py --profile "$PROFILE" --corpus > /tmp/m-config-corpus.json
+          python scripts/ig008c0_mycelix_config_oracle.py --profile "$PROFILE" --corpus > /tmp/s-config-corpus.json
+          cmp /tmp/m-config-corpus.json /tmp/s-config-corpus.json
+
+      - name: Validate composed manifest twice byte-identically
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST=profiles/institutional/mycelix-governance-observed-fca2c107-bundle-v1.json
+          python scripts/ig008m0_mycelix_mechanism_manifest.py --manifest "$MANIFEST" --self-test > /tmp/manifest-1.json
+          python scripts/ig008m0_mycelix_mechanism_manifest.py --manifest "$MANIFEST" --self-test > /tmp/manifest-2.json
+          cmp /tmp/manifest-1.json /tmp/manifest-2.json
+
+      - name: Assert component commitments and composition ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          def load(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+          vprof = load('/tmp/m-voting-profile.json')
+          eprof = load('/tmp/m-execution-profile.json')
+          cprof = load('/tmp/m-config-profile.json')
+          vcorp = load('/tmp/m-voting-corpus.json')
+          ecorp = load('/tmp/m-execution-corpus.json')
+          ccorp = load('/tmp/m-config-corpus.json')
+          manifest = load('/tmp/manifest-1.json')
+          assert vprof['profile_content_sha256'] == '680af4668889c299b7e0d74531f44894a64a384be71778bca54d3f21ca80ac01'
+          assert eprof['profile_content_sha256'] == 'c977bdcef9e5faac83351050999451432b618d5cc523bece804eba5dd1ae81f6'
+          assert cprof['profile_content_sha256'] == 'de4435a69356557b1812f8beb46d654c66b9c957be9d18c64bd0431f92546d5a'
+          assert vcorp['corpus_sha256'] == 'ee5e7649a773f564b443320689f465080d4641a0f4f09f13c0c49a7087d6dc10'
+          assert ecorp['corpus_sha256'] == '0c6669e44d6d18396ede43324f5cf3abbb25ddd3a2a9f59abb2c8a3699ba5fd4'
+          assert ccorp['corpus_sha256'] == '3009e97529934fa8f470769de5615dcfda17bde0e942683e939d2b733430a216'
+          assert manifest['manifest_content_sha256'] == 'a7bfe0a285dad6c83d2ac82a9edc7bba0c2a300532cba24a604411ca6c8e4e35'
+          assert manifest['authority_class'] == 'MeasurementOnly'
+          assert manifest['composition_class'] == 'PreparedComposition'
+          assert manifest['component_count'] == 3
+          assert manifest['unmodeled_surface_count'] == 12
+          assert manifest['qualification_ceiling'] == 'ComposedCrossImplementationConformance'
+          PY
+
+      - name: Verify all checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_voting rev-parse HEAD)" = "$VOTING_HEAD"
+          test "$(git -C _mycelix_execution rev-parse HEAD)" = "$EXECUTION_HEAD"
+          test "$(git -C _mycelix_config rev-parse HEAD)" = "$CONFIG_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_voting diff --exit-code
+          git -C _mycelix_voting diff --cached --exit-code
+          git -C _mycelix_execution diff --exit-code
+          git -C _mycelix_execution diff --cached --exit-code
+          git -C _mycelix_config diff --exit-code
+          git -C _mycelix_config diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_voting status --porcelain)"
+          test -z "$(git -C _mycelix_execution status --porcelain)"
+          test -z "$(git -C _mycelix_config status --porcelain)"
