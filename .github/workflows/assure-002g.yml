@@ -1,0 +1,137 @@
+name: ASSURE-002G Campaign Wire Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-assurance-campaign/vectors/**'
+      - 'crates/core/symthaea-assurance-campaign/tools/verify_campaign_vectors.py'
+      - 'crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs'
+      - '.github/workflows/assure-002g.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-002g-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    env:
+      QUALIFIED_INPUT: 9e236b9da1d15ce486d7d6c308ac5f748e8abe30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          python3 --version
+
+      - name: Prove exact candidate and qualified ancestry
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\nqualified_input=%s\n' "$EXPECTED_HEAD" "$ACTUAL_HEAD" "$QUALIFIED_INPUT"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          git merge-base --is-ancestor "$QUALIFIED_INPUT" HEAD
+          git diff --exit-code
+
+      - name: Enforce finite 002G mutation surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "$QUALIFIED_INPUT"..HEAD | tee /tmp/assure-002g-paths.txt
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/assure-002g.yml|\
+              crates/core/symthaea-assurance-campaign/vectors/campaign_v1.json|\
+              crates/core/symthaea-assurance-campaign/tools/verify_campaign_vectors.py|\
+              crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs)
+                ;;
+              *)
+                printf 'ASSURE-002G out-of-scope mutation: %s\n' "$path" >&2
+                exit 1
+                ;;
+            esac
+          done < /tmp/assure-002g-paths.txt
+
+      - name: Validate independent Python oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m json.tool crates/core/symthaea-assurance-campaign/vectors/campaign_v1.json >/dev/null
+          python3 -m py_compile crates/core/symthaea-assurance-campaign/tools/verify_campaign_vectors.py
+          python3 crates/core/symthaea-assurance-campaign/tools/verify_campaign_vectors.py
+
+      - name: Format
+        run: cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml -- --check
+
+      - name: Check
+        run: cargo check --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+
+      - name: Rust golden-vector conformance
+        run: cargo test --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --test golden_vectors
+
+      - name: Full campaign tests
+        run: cargo test --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --all-targets -- -D warnings
+
+      - name: Require committed lock parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
+
+      - name: Capture qualification manifest
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/assure-002g
+          {
+            printf 'candidate_head=%s\n' "$EXPECTED_HEAD"
+            printf 'qualified_input=%s\n' "$QUALIFIED_INPUT"
+            printf 'vectors_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/vectors/campaign_v1.json | cut -d' ' -f1)"
+            printf 'oracle_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/tools/verify_campaign_vectors.py | cut -d' ' -f1)"
+            printf 'rust_vectors_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs | cut -d' ' -f1)"
+            rustc --version
+            cargo --version
+            python3 --version
+          } > target/assure-002g/MANIFEST.txt
+          cat target/assure-002g/MANIFEST.txt
+
+      - name: Upload qualification manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-002g-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/assure-002g/MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Prove tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
