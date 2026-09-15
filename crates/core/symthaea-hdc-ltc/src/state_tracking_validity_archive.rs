@@ -15,9 +15,7 @@ use crate::state_tracking_benchmark::{
 };
 use crate::state_tracking_codec::{StateTrackingCodec, TrackingCodecError};
 use crate::temporal_phasor::{TemporalAlgebraError, TemporalAxis};
-use crate::validity_interval_memory::{
-    ValidityCleanupResult, ValidityIntervalMemory, ValidityMemoryError,
-};
+use crate::validity_interval_memory::{ValidityIntervalMemory, ValidityMemoryError};
 use std::fmt;
 
 #[derive(Debug)]

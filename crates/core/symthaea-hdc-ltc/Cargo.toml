@@ -44,3 +44,11 @@ path = "examples/validity_capacity_evidence.rs"
 [[example]]
 name = "validity_capacity_evidence_v2"
 path = "examples/validity_capacity_evidence_v2.rs"
+
+[[example]]
+name = "validity_capacity_evidence_v3"
+path = "examples/validity_capacity_evidence_v3.rs"
+
+[[example]]
+name = "validity_capacity_evidence_chain_verify"
+path = "examples/validity_capacity_evidence_chain_verify.rs"
