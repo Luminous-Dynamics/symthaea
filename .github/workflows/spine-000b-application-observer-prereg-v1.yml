@@ -1,0 +1,112 @@
+name: SPINE-000B Application Observer Preregistration v1
+
+on:
+  push:
+    branches:
+      - research/spine-000b-application-observer-prereg-v1
+  pull_request:
+    branches:
+      - research/spine-000b-application-relevance-v1
+    paths:
+      - '.github/workflows/spine-000b-application-observer-prereg-v1.yml'
+      - 'docs/research/SPINE_000B_APPLICATION_OBSERVER_COMPLETENESS_V1.md'
+      - 'docs/research/SPINE_000B_OPERATION_OBSERVER_IDS_V1.json'
+      - 'scripts/verify_spine_000b_application_observer_prereg_v1.py'
+      - 'docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json'
+      - 'src/cognitive_loop/cycle_phase_output/mod.rs'
+
+permissions:
+  contents: read
+
+jobs:
+  a1_static:
+    name: Freeze application observer architecture
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$GITHUB_SHA" > /tmp/spine_a1_head
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git status --porcelain=v1 > /tmp/spine_a1_pre_status
+          test ! -s /tmp/spine_a1_pre_status
+
+      - name: Constrain A1 preregistration surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=767cefa6988262d7daa5007661aa649737ba4d28
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base"..HEAD | sort > /tmp/spine_a1_changed
+          : > /tmp/spine_a1_unexpected
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/spine-000b-application-observer-prereg-v1.yml|\
+              docs/research/SPINE_000B_APPLICATION_OBSERVER_COMPLETENESS_V1.md|\
+              docs/research/SPINE_000B_OPERATION_OBSERVER_IDS_V1.json|\
+              scripts/verify_spine_000b_application_observer_prereg_v1.py)
+                ;;
+              *) echo "$path" >> /tmp/spine_a1_unexpected ;;
+            esac
+          done < /tmp/spine_a1_changed
+          if test -s /tmp/spine_a1_unexpected; then
+            echo 'Unexpected A1 preregistration files:' >&2
+            cat /tmp/spine_a1_unexpected >&2
+            exit 1
+          fi
+
+      - name: Syntax-check A1 verifier
+        run: python3 -m py_compile scripts/verify_spine_000b_application_observer_prereg_v1.py
+
+      - name: Revalidate Phase-C registry
+        run: python3 scripts/verify_spine_000b_application_registry_v1.py
+
+      - name: Execute A1 static preregistration gate
+        run: python3 scripts/verify_spine_000b_application_observer_prereg_v1.py
+
+      - name: Seal exact-head preregistration evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/spine-000b-a1-static
+          {
+            echo 'schema=symthaea.spine.000b.application-observer-prereg.v1'
+            echo "git_head=$(git rev-parse HEAD)"
+            echo "git_index_tree=$(git write-tree)"
+            echo 'base_subject=767cefa6988262d7daa5007661aa649737ba4d28'
+            echo 'authority=measurement-only'
+            echo 'runtime_observer_implemented=false'
+            echo 'dynamic_completeness_claimed=false'
+            echo 'causal_load_claimed=false'
+          } > artifacts/spine-000b-a1-static/subject.txt
+          cp /tmp/spine_a1_changed artifacts/spine-000b-a1-static/changed-files.txt
+          sha256sum \
+            docs/research/SPINE_000B_APPLICATION_OBSERVER_COMPLETENESS_V1.md \
+            docs/research/SPINE_000B_OPERATION_OBSERVER_IDS_V1.json \
+            scripts/verify_spine_000b_application_observer_prereg_v1.py \
+            docs/research/SPINE_000B_PHASE_C_APPLICATION_REGISTRY_V1.json \
+            src/cognitive_loop/cycle_phase_output/mod.rs \
+            artifacts/spine-000b-a1-static/subject.txt \
+            > artifacts/spine-000b-a1-static/SHA256SUMS
+
+      - name: Postflight checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat /tmp/spine_a1_head)"
+          git status --porcelain=v1 > /tmp/spine_a1_post_status
+          test ! -s /tmp/spine_a1_post_status
+
+      - name: Upload A1 preregistration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: spine-000b-a1-static-${{ github.sha }}
+          path: artifacts/spine-000b-a1-static/
+          retention-days: 90
