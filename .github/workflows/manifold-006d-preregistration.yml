@@ -1,0 +1,168 @@
+name: MANIFOLD-006D Preregistration Freeze v3
+on:
+  push:
+    branches: [prereg/manifold-006d-feedback-separation]
+    paths:
+      - .github/workflows/manifold-006d-preregistration.yml
+      - scripts/qualification/manifold_006d_preregistration.json
+      - scripts/qualification/manifold_006d_preregistration.py
+  workflow_dispatch:
+permissions: {contents: read}
+env:
+  PARENT_SHA: ee79f86a6d431c462ae8701094a3e29be88c4a5e
+  PARENT_TREE: 645b1644112a822c79b97bcd9eb226cc604b3af8
+  PREREG_ID: fa62084a562a061445c74088914616480efc6008d2a16db56b23e9340612337e
+  JSON_SHA: 4092b971b29a64a7eb622e5fdee1f80d0bafbe7b9e6dc6513995f692ac74371b
+  VALIDATOR_SHA: da7745b862f43260d77a86b452cebccbc174fa4fb032d13000de26b4e3572700
+  CLASSES_ID: 9f8b34bc346d5691c363de6ff4a94110f492e3fecc48ed1f4d6233de9d98cfe9
+  EMBED_ID: 2e59b1770da35a1df87000916cf1bedc73de9756731dcd154ce8e8702bff57f1
+  KERNEL_SHA: cffe5574d000a44a87a757a788d08cb7ba474810e9c6a3d860d57ac57352eb3c
+  CONTROL_REV: m006d.prereg-workflow.v3.5
+jobs:
+  freeze:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with: {fetch-depth: 2, path: source, persist-credentials: false}
+      - name: Bind one-commit preregistration surface
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-preregistration"; mkdir -p "$out"
+          test "$(git -C source rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C source rev-parse HEAD^)" = "$PARENT_SHA"
+          test "$(git -C source rev-parse "$PARENT_SHA^{tree}")" = "$PARENT_TREE"
+          test "$(git -C source rev-list --count "$PARENT_SHA..HEAD")" = 1
+          test -z "$(git -C source status --porcelain)"
+          git -C source diff --name-only "$PARENT_SHA" HEAD | sort > "$out/changed-files.txt"
+          python3 - <<'PY'
+          from pathlib import Path
+          a=Path('artifacts/manifold-006d-preregistration/changed-files.txt').read_text().splitlines()
+          e=sorted(['.github/workflows/manifold-006d-preregistration.yml','scripts/qualification/manifold_006d_preregistration.json','scripts/qualification/manifold_006d_preregistration.py'])
+          assert a==e,(a,e)
+          PY
+      - name: Prove no theorem machinery
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,re
+          from pathlib import Path
+          w=Path('source/.github/workflows/manifold-006d-preregistration.yml').read_text().lower(); v=Path('source/scripts/qualification/manifold_006d_preregistration.py').read_text()
+          for t in ['car'+'go','rust'+'c','py'+'test','n'+'ix','ju'+'st','ma'+'ke']: assert re.search(rf'\b{t}\b',w) is None,t
+          for p in [r'import\s+subprocess',r'from\s+subprocess',r'os\.system',r'\bPopen\b',r'import\s+socket',r'import\s+requests',r'import\s+urllib',r'symthaea_core']: assert re.search(p,v) is None,p
+          Path('artifacts/manifold-006d-preregistration/control.json').write_text(json.dumps({'schema':'m006d.prereg-control.v3','control_revision':'m006d.prereg-workflow.v3.5','only_three_control_files':True,'theorem_execution_permitted':False,'product_source_changed':False,'verdict':'PASS'},sort_keys=True,indent=2)+'\n')
+          PY
+      - name: Capture exact bytes and binding receipt
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-preregistration"
+          j=source/scripts/qualification/manifold_006d_preregistration.json
+          v=source/scripts/qualification/manifold_006d_preregistration.py
+          w=source/.github/workflows/manifold-006d-preregistration.yml
+          k=source/crates/core/symthaea-core/src/certified_interval.rs
+          cp "$j" "$out/preregistration.json"; cp "$v" "$out/validator.py"; cp "$w" "$out/workflow.yml"
+          export ACTUAL_JSON_SHA="$(sha256sum "$j"|awk '{print $1}')"
+          export ACTUAL_VALIDATOR_SHA="$(sha256sum "$v"|awk '{print $1}')"
+          export ACTUAL_KERNEL_SHA="$(sha256sum "$k"|awk '{print $1}')"
+          export ACTUAL_WORKFLOW_SHA="$(sha256sum "$w"|awk '{print $1}')"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          pairs={
+            'json':(os.environ['JSON_SHA'],os.environ['ACTUAL_JSON_SHA']),
+            'validator':(os.environ['VALIDATOR_SHA'],os.environ['ACTUAL_VALIDATOR_SHA']),
+            'kernel':(os.environ['KERNEL_SHA'],os.environ['ACTUAL_KERNEL_SHA']),
+          }
+          checks={k:{'expected_sha256':e,'actual_sha256':a,'match':e==a} for k,(e,a) in pairs.items()}
+          ok=all(x['match'] for x in checks.values())
+          r={'schema':'m006d.prereg-byte-bindings.v3','control_revision':os.environ['CONTROL_REV'],'bindings':checks,'workflow_sha256':os.environ['ACTUAL_WORKFLOW_SHA'],'verdict':'PASS' if ok else 'FAIL'}
+          Path('artifacts/manifold-006d-preregistration/byte-bindings.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          PY
+          { echo schema=m006d.prereg-env.v3; echo control_revision=$CONTROL_REV; echo control_sha=$(git -C source rev-parse HEAD); echo control_tree=$(git -C source rev-parse HEAD^{tree}); echo run_subject=$GITHUB_SHA; echo parent_sha=$PARENT_SHA; echo parent_tree=$PARENT_TREE; echo prereg_id=$PREREG_ID; echo json_sha=$JSON_SHA; echo validator_sha=$VALIDATOR_SHA; echo kernel_sha=$KERNEL_SHA; echo workflow_sha=$ACTUAL_WORKFLOW_SHA; echo classes_id=$CLASSES_ID; echo embed_id=$EMBED_ID; echo python=$(python3 --version 2>&1); echo image=${ImageOS:-unknown}/${ImageVersion:-unknown}; } > "$out/environment.txt"
+      - name: Validate frozen preregistration only
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-preregistration"
+          j=source/scripts/qualification/manifold_006d_preregistration.json; v=source/scripts/qualification/manifold_006d_preregistration.py
+          if ! python3 - <<'PY'
+          import json
+          from pathlib import Path
+          b=json.loads(Path('artifacts/manifold-006d-preregistration/byte-bindings.json').read_text())
+          raise SystemExit(0 if b['verdict']=='PASS' else 1)
+          PY
+          then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+          Path('artifacts/manifold-006d-preregistration/validator-status.json').write_text(json.dumps({'schema':'m006d.prereg-validator-status.v3','ran':False,'exit_code':None,'reason':'byte_binding_failed','receipt_present':False,'verdict':'FAIL'},sort_keys=True,indent=2)+'\n')
+          PY
+            : > "$out/validator.stdout"; : > "$out/validator.stderr"; exit 1
+          fi
+          set +e
+          python3 "$v" "$j" "$out/receipt.json" >"$out/validator.stdout" 2>"$out/validator.stderr"
+          status=$?
+          set -e
+          export VALIDATOR_EXIT="$status"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          code=int(os.environ['VALIDATOR_EXIT']); present=Path('artifacts/manifold-006d-preregistration/receipt.json').exists()
+          r={'schema':'m006d.prereg-validator-status.v3','ran':True,'exit_code':code,'reason':'completed','receipt_present':present,'verdict':'PASS' if code==0 and present else 'FAIL'}
+          Path('artifacts/manifold-006d-preregistration/validator-status.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          PY
+          exit "$status"
+      - name: Enforce v3 claim boundary
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path('artifacts/manifold-006d-preregistration/receipt.json').read_text())
+          assert r['verdict']=='PASS_PREREGISTRATION' and r['prereg_id']==os.environ['PREREG_ID']
+          assert r['classes_id']==os.environ['CLASSES_ID'] and r['embed_id']==os.environ['EMBED_ID']
+          assert r['strategy_fixed_before_disturbance'] and r['fresh_history_strategy_existential_forbidden']
+          assert r['derived_state_inference_boundary_frozen'] and r['strict_enlargement_requires_inclusion_and_strictness']
+          assert r['supersession_without_reinterpretation'] and not r['theorem_executed'] and not r['qualification_granted'] and not r['semantic_implementation_present']
+          PY
+      - name: Prove post-attempt checkout immutability
+        if: always()
+        run: |
+          set -euo pipefail
+          out="$GITHUB_WORKSPACE/artifacts/manifold-006d-preregistration"; mkdir -p "$out"
+          exact=false; parent=false; worktree=false; index=false
+          [ "$(git -C source rev-parse HEAD)" = "$GITHUB_SHA" ] && exact=true
+          [ "$(git -C source rev-parse HEAD^)" = "$PARENT_SHA" ] && parent=true
+          [ -z "$(git -C source status --porcelain)" ] && worktree=true
+          git -C source diff --cached --exit-code -- >/dev/null && index=true
+          export EXACT="$exact" PARENT_OK="$parent" WORKTREE="$worktree" INDEX="$index"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          b=lambda n: os.environ[n]=='true'; ok=all(b(n) for n in ['EXACT','PARENT_OK','WORKTREE','INDEX'])
+          r={'schema':'m006d.prereg-integrity.v3','exact_run_subject_bound':b('EXACT'),'exact_parent_bound':b('PARENT_OK'),'worktree_clean_including_untracked':b('WORKTREE'),'index_clean':b('INDEX'),'theorem_executed':False,'verdict':'PASS' if ok else 'FAIL'}
+          Path('artifacts/manifold-006d-preregistration/integrity.json').write_text(json.dumps(r,sort_keys=True,indent=2)+'\n')
+          raise SystemExit(0 if ok else 1)
+          PY
+      - name: Hash capsule
+        if: always()
+        run: |
+          out=artifacts/manifold-006d-preregistration; mkdir -p "$out"; cd "$out"; : > SHA256SUMS
+          for f in changed-files.txt control.json preregistration.json validator.py workflow.yml byte-bindings.json validator-status.json validator.stdout validator.stderr receipt.json environment.txt integrity.json; do [ ! -f "$f" ] || sha256sum "$f" >> SHA256SUMS; done
+      - name: Upload capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with: {name: 'manifold-006d-preregistration-v3-${{ github.sha }}', path: artifacts/manifold-006d-preregistration/, if-no-files-found: error, retention-days: 90}
+      - name: Require preregistration-only PASS
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('artifacts/manifold-006d-preregistration'); req=['receipt.json','integrity.json','control.json','environment.txt','byte-bindings.json','validator-status.json','SHA256SUMS']; assert all((p/x).exists() for x in req)
+          r=json.loads((p/'receipt.json').read_text()); i=json.loads((p/'integrity.json').read_text()); c=json.loads((p/'control.json').read_text()); b=json.loads((p/'byte-bindings.json').read_text()); v=json.loads((p/'validator-status.json').read_text())
+          assert b['verdict']=='PASS' and all(x['match'] for x in b['bindings'].values())
+          assert v['verdict']=='PASS' and v['ran'] and v['exit_code']==0 and v['receipt_present']
+          assert r['verdict']=='PASS_PREREGISTRATION' and not r['theorem_executed'] and not r['qualification_granted']
+          assert i['verdict']=='PASS' and i['exact_run_subject_bound'] and i['exact_parent_bound'] and i['worktree_clean_including_untracked'] and i['index_clean'] and not i['theorem_executed']
+          assert c['verdict']=='PASS' and not c['theorem_execution_permitted']
+          PY
