@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-assurance-launch-runtime-handoff-channel"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Kernel-identified supervisor-to-runtime launch challenge handoff"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "linux", "runtime", "handoff"]
+categories = ["development-tools", "cryptography"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+getrandom = { workspace = true }
+nix = { version = "=0.26.4", default-features = false, features = ["fs"] }
+symthaea-assurance-ptrace-static-exec-confirmation = { path = "../symthaea-assurance-ptrace-static-exec-confirmation" }
+symthaea-assurance-critical-exec-preserved-authority = { path = "../symthaea-assurance-critical-exec-preserved-authority" }
