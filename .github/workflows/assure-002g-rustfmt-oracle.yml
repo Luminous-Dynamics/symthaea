@@ -1,0 +1,69 @@
+name: ASSURE-002G Rustfmt 1.96 Oracle
+
+on:
+  push:
+    branches:
+      - 'diag/assure-002g-rustfmt-1.96-oracle'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  oracle:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install exact formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo fmt --version
+
+      - name: Capture pre-format identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/assure-002g-rustfmt-oracle
+          printf 'oracle_source_head=%s\n' "$(git rev-parse HEAD^)" > target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          printf 'workflow_head=%s\n' "$(git rev-parse HEAD)" >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          printf 'before_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs | cut -d' ' -f1)" >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+
+      - name: Apply Rust 1.96 rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+          git diff -- crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs > target/assure-002g-rustfmt-oracle/golden_vectors.rustfmt.diff
+          cp crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs target/assure-002g-rustfmt-oracle/golden_vectors.rs
+          printf 'after_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs | cut -d' ' -f1)" >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          printf 'changed_paths_begin\n' >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          git diff --name-only >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          printf 'changed_paths_end\n' >> target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          cat target/assure-002g-rustfmt-oracle/MANIFEST.txt
+          cat target/assure-002g-rustfmt-oracle/golden_vectors.rustfmt.diff
+
+      - name: Upload exact formatter output
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-002g-rustfmt-1.96-oracle
+          path: target/assure-002g-rustfmt-oracle/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Prove formatter mutation is narrow
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t changed < <(git diff --name-only)
+          printf 'rustfmt changed %d tracked path(s)\n' "${#changed[@]}"
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = 'crates/core/symthaea-assurance-campaign/tests/golden_vectors.rs'
