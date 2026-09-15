@@ -516,7 +516,7 @@ impl CognitiveLoopService {
                 && self.stats.total_cycles == 500
             {
                 let mut experiment =
-                crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical(
+                    crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical(
                 );
                 match experiment.run() {
                     Ok(results) => {
@@ -600,10 +600,25 @@ impl CognitiveLoopService {
         // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
+        let meta_reasoning_due = self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0;
+        // Clone the processor's exact current active records only when the meta-reasoner itself is
+        // due to run. This preserves activation strength/reason/duration and immutable primitive
+        // identity for V3 measurement without adding per-cycle clone overhead.
+        let active_primitive_snapshot: Vec<crate::consciousness::ActivePrimitive> =
+            if meta_reasoning_due {
+                self.primitive_tier
+                    .primitive_processor
+                    .as_ref()
+                    .and_then(|processor| processor.current())
+                    .map(|current| current.all_active().into_iter().cloned().collect())
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
         let (meta_reasoning_confidence, meta_reasoning_insights) = if let Some(ref mut reasoner) =
             self.primitive_tier.meta_cognitive_reasoner
         {
-            if self.stats.total_cycles % 47 == 0 && self.stats.total_cycles > 0 {
+            if meta_reasoning_due {
                 // Build lightweight candidate primitives from active set
                 let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
                     active_primitive_names
@@ -623,7 +638,12 @@ impl CognitiveLoopService {
                         .collect();
                 let mut chain =
                     crate::consciousness::primitive_reasoning::ReasoningChain::new(hv16_cached);
-                match reasoner.meta_reason(input, candidates, &mut chain) {
+                match reasoner.meta_reason_with_active_evidence(
+                    input,
+                    candidates,
+                    &active_primitive_snapshot,
+                    &mut chain,
+                ) {
                     Ok(result) => (result.meta_confidence, result.meta_insights.len()),
                     Err(_) => (0.5, 0),
                 }
