@@ -1,0 +1,160 @@
+name: IG-008F4 Composite Governance Manifest V5
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/manifests/mycelix-observed-composite-fca2c107-v5.json"
+      - "scripts/ig008f4_validate_composite_manifest_v5.py"
+      - "docs/research/IG_008F4_COMPOSITE_GOVERNANCE_MANIFEST_V5.md"
+      - ".github/workflows/ig-008f4-composite-governance-manifest-v5.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-composite-v5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      EXPECTED_PARENT: af73f6f0601c5ea3a2935fc62573078ce27a712f
+      V4_HEAD: d1e4be8780c519462cc222ce65c261828da965de
+      SUBMANIFEST_HEAD: af73f6f0601c5ea3a2935fc62573078ce27a712f
+      V4_SHA256: 993a17b4ab1e876beb7815f8e90fc137b8776c5dcce3b0d9e30da971b13a797f
+      SUBMANIFEST_SHA256: 157402e76abffd3849dc6d2001a7c0bbde296e80ab6a7f5c77c8f3e288302183
+      V5_SHA256: a63f9cd8a72824708925d6938ff6cffa2efda614794259cfe86189c27a4b44fe
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    steps:
+      - name: Checkout exact v5 subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SUBJECT }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout exact v4 predecessor evidence
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.V4_HEAD }}
+          path: _evidence/v4
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact constitutional downstream submanifest evidence
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBMANIFEST_HEAD }}
+          path: _evidence/constitution-runtime-policy
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Isolate evidence checkouts
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_evidence/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact v5 subject and four-file delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git merge-base --is-ancestor "$EXPECTED_PARENT" HEAD
+          test "$(git rev-list --count "$EXPECTED_PARENT"..HEAD)" = "4"
+          git diff --name-only "$EXPECTED_PARENT"..HEAD | sort > /tmp/changed.txt
+          cat > /tmp/expected.txt <<'EOF'
+          .github/workflows/ig-008f4-composite-governance-manifest-v5.yml
+          docs/research/IG_008F4_COMPOSITE_GOVERNANCE_MANIFEST_V5.md
+          docs/research/manifests/mycelix-observed-composite-fca2c107-v5.json
+          scripts/ig008f4_validate_composite_manifest_v5.py
+          EOF
+          sort -o /tmp/expected.txt /tmp/expected.txt
+          diff -u /tmp/expected.txt /tmp/changed.txt
+          test -z "$(git status --porcelain)"
+
+      - name: Verify exact predecessor and submanifest subjects
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _evidence/v4 rev-parse HEAD)" = "$V4_HEAD"
+          test "$(git -C _evidence/constitution-runtime-policy rev-parse HEAD)" = "$SUBMANIFEST_HEAD"
+          test -z "$(git -C _evidence/v4 status --porcelain)"
+          test -z "$(git -C _evidence/constitution-runtime-policy status --porcelain)"
+
+      - name: Independently validate exact nested submanifest subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT=_evidence/constitution-runtime-policy
+          MANIFEST="$ROOT/docs/research/manifests/mycelix-constitution-runtime-policy-downstream-observed-fca2c107-v1.json"
+          VALIDATOR="$ROOT/scripts/ig008cd0_validate_constitution_runtime_policy_submanifest.py"
+          python "$VALIDATOR" --manifest "$MANIFEST" --self-test > /tmp/sub-1.json
+          python "$VALIDATOR" --manifest "$MANIFEST" --self-test > /tmp/sub-2.json
+          cmp /tmp/sub-1.json /tmp/sub-2.json
+          python - <<'PY'
+          import json
+          with open('/tmp/sub-1.json', encoding='utf-8') as f:
+              r = json.load(f)
+          assert r['validated'] is True
+          assert r['manifest_content_sha256'] == '157402e76abffd3849dc6d2001a7c0bbde296e80ab6a7f5c77c8f3e288302183'
+          assert r['authority_class'] == 'ObservedCompositeSubslice'
+          assert r['claim_ceiling'] == 'ObservedConstitutionRuntimePolicySliceOnly'
+          assert r['mechanism_count'] == 3
+          assert r['known_issues'] == [943, 944, 1002]
+          assert r['unestablished_property_count'] == 8
+          PY
+
+      - name: Validate v5 twice against exact v4 and nested submanifest bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          V4=_evidence/v4/docs/research/manifests/mycelix-observed-composite-fca2c107-v4.json
+          SUB=_evidence/constitution-runtime-policy/docs/research/manifests/mycelix-constitution-runtime-policy-downstream-observed-fca2c107-v1.json
+          V5=docs/research/manifests/mycelix-observed-composite-fca2c107-v5.json
+          VALIDATOR=scripts/ig008f4_validate_composite_manifest_v5.py
+          python "$VALIDATOR" --v4 "$V4" --submanifest "$SUB" --v5 "$V5" --self-test > /tmp/v5-1.json
+          python "$VALIDATOR" --v4 "$V4" --submanifest "$SUB" --v5 "$V5" --self-test > /tmp/v5-2.json
+          cmp /tmp/v5-1.json /tmp/v5-2.json
+
+      - name: Assert exact v5 monotonicity and claim ceiling
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          with open('/tmp/v5-1.json', encoding='utf-8') as f:
+              r = json.load(f)
+          assert r['validated'] is True
+          assert r['manifest_id'] == 'mycelix-observed-composite-fca2c107-v5'
+          assert r['revision'] == 5
+          assert r['manifest_content_sha256'] == 'a63f9cd8a72824708925d6938ff6cffa2efda614794259cfe86189c27a4b44fe'
+          assert r['authority_class'] == 'ObservedCompositeSlice'
+          assert r['claim_ceiling'] == 'ObservedCompositeSliceOnly'
+          assert r['direct_component_count'] == 5
+          assert r['submanifest_count'] == 1
+          assert r['represented_but_unestablished_property_count'] == 8
+          assert r['uncovered_stages'] == ['treasury_credit_authorization_downstream', 'deployment_currentness']
+          assert r['taxonomy_correction_class'] == 'ScopeRefinementNotHistoricalInvalidation'
+          assert r['self_test'] is True
+          PY
+
+      - name: Verify all checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SUBJECT"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          for d in v4 constitution-runtime-policy; do
+            git -C "_evidence/$d" diff --exit-code
+            git -C "_evidence/$d" diff --cached --exit-code
+            test -z "$(git -C "_evidence/$d" status --porcelain)"
+          done
