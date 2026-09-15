@@ -12,6 +12,7 @@ on:
       - 'docs/research/SPINE_000B_P1R_QUALIFICATION.md'
       - 'docs/research/SPINE_000B_P1R_LOCAL_AI_HANDOFF.md'
       - 'docs/research/SPINE_000B_P1R_EXIT_GATES.md'
+      - 'docs/research/SPINE_000B_P1R_STATUS.md'
       - 'scripts/verify_spine_000b_p1r_contract.py'
       - 'scripts/generate_spine_golden_fixtures.py'
       - 'scripts/spine_000b_influence_oracle.py'
@@ -53,6 +54,7 @@ jobs:
           docs/research/SPINE_000B_P1R_EXIT_GATES.md
           docs/research/SPINE_000B_P1R_LOCAL_AI_HANDOFF.md
           docs/research/SPINE_000B_P1R_QUALIFICATION.md
+          docs/research/SPINE_000B_P1R_STATUS.md
           scripts/generate_spine_golden_fixtures.py
           scripts/verify_spine_000b_p1r_contract.py
           src/cognitive_loop/subsystem_trait.rs
@@ -115,6 +117,7 @@ jobs:
             docs/research/SPINE_000B_P1R_QUALIFICATION.md \
             docs/research/SPINE_000B_P1R_LOCAL_AI_HANDOFF.md \
             docs/research/SPINE_000B_P1R_EXIT_GATES.md \
+            docs/research/SPINE_000B_P1R_STATUS.md \
             tests/fixtures/spine_000b_golden_fixtures.json \
             Cargo.toml \
             Cargo.lock \
