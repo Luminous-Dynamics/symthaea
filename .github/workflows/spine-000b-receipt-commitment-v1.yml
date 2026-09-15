@@ -13,15 +13,16 @@ on:
       - 'scripts/spine_000b_receipt_commitment_oracle.py'
       - 'scripts/verify_spine_000b_receipt_commitment_v1.py'
       - 'tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json'
+      - 'xtask/src/bin/spine_000b_commitment_vectors.rs'
 
 permissions:
   contents: read
 
 jobs:
   commitment:
-    name: Freeze canonical receipt bytes and vectors
+    name: Cross-implementation canonical receipt equivalence
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +34,8 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "$GITHUB_SHA" > /tmp/spine_c1_expected_head
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git rev-parse HEAD > /tmp/spine_c1_observed_head
+          cmp /tmp/spine_c1_expected_head /tmp/spine_c1_observed_head
           git status --porcelain=v1 > /tmp/spine_c1_pre_status
           test ! -s /tmp/spine_c1_pre_status
 
@@ -50,6 +52,7 @@ jobs:
           scripts/spine_000b_receipt_commitment_oracle.py
           scripts/verify_spine_000b_receipt_commitment_v1.py
           tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json
+          xtask/src/bin/spine_000b_commitment_vectors.rs
           EOF
           sort -o /tmp/spine_c1_allowed /tmp/spine_c1_allowed
           comm -23 /tmp/spine_c1_changed /tmp/spine_c1_allowed > /tmp/spine_c1_unexpected
@@ -59,15 +62,20 @@ jobs:
             exit 1
           fi
 
-      - name: Syntax-check independent instruments
+      - name: Syntax-check independent Python instruments
         run: |
           python3 -m py_compile \
             scripts/spine_000b_receipt_commitment_oracle.py \
             scripts/verify_spine_000b_receipt_commitment_v1.py
           python3 -m json.tool tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json > /dev/null
 
-      - name: Verify contract and exact golden vectors
+      - name: Verify Python contract and exact golden vectors
         run: python3 scripts/verify_spine_000b_receipt_commitment_v1.py
+
+      - name: Verify independent Rust canonical bytes and digests
+        run: |
+          cargo run -p xtask --bin spine_000b_commitment_vectors -- \
+            tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json
 
       - name: Seal exact-head evidence
         shell: bash
@@ -77,11 +85,12 @@ jobs:
           {
             echo "schema=symthaea.spine.000b.receipt-commitment-contract.v1"
             echo "git_head=$(git rev-parse HEAD)"
-            echo "git_tree=$(git write-tree)"
+            echo "git_index_tree=$(git write-tree)"
             echo "base_runtime_contract=c4953c27ccd15eca868916567acbd9228924f4c4"
             echo "authority=measurement-only"
-            echo "status=FORMAT_FROZEN"
-            echo "rust_equivalence_pending=true"
+            echo "status=CROSS_IMPLEMENTATION_EQUIVALENCE"
+            echo "python_oracle=true"
+            echo "rust_vector_verifier=true"
             echo "runtime_evidence_claimed=false"
             echo "causal_load_claimed=false"
           } > artifacts/spine-000b-c1/subject.txt
@@ -91,6 +100,9 @@ jobs:
             scripts/spine_000b_receipt_commitment_oracle.py \
             scripts/verify_spine_000b_receipt_commitment_v1.py \
             tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json \
+            xtask/src/bin/spine_000b_commitment_vectors.rs \
+            xtask/Cargo.toml \
+            Cargo.lock \
             artifacts/spine-000b-c1/subject.txt \
             > artifacts/spine-000b-c1/SHA256SUMS
 
@@ -102,7 +114,7 @@ jobs:
           git status --porcelain=v1 > /tmp/spine_c1_post_status
           test ! -s /tmp/spine_c1_post_status
 
-      - name: Upload contract evidence
+      - name: Upload commitment evidence
         uses: actions/upload-artifact@v4
         with:
           name: spine-000b-c1-${{ github.sha }}
