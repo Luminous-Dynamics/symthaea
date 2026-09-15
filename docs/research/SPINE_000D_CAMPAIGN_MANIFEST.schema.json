@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/symthaea/spine-000d-campaign-manifest-v1.json",
+  "title": "SPINE-000D Causal Campaign Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "authority",
+    "campaign_id",
+    "subject",
+    "target_subsystem",
+    "intervention_arms",
+    "workload_rule",
+    "initial_state_rule",
+    "scheduler_state_rule",
+    "primary_observables",
+    "safety_hard_gates",
+    "multiplicity_policy",
+    "confidence_interval_policy",
+    "interaction_followup_rule",
+    "stopping_rule",
+    "classification_scope_fields"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.spine.000d.campaign-manifest.v1"
+    },
+    "authority": {
+      "const": "measurement-only"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_head",
+        "git_tree",
+        "subject_file_hashes",
+        "cargo_toml_sha256",
+        "cargo_lock_sha256",
+        "rust_toolchain"
+      ],
+      "properties": {
+        "git_head": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "git_tree": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "subject_file_hashes": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        },
+        "cargo_toml_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "cargo_lock_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "rust_toolchain": {"type": "string", "minLength": 1},
+        "environment_identity": {"type": ["string", "null"]}
+      }
+    },
+    "target_subsystem": {
+      "type": "string",
+      "minLength": 1
+    },
+    "static_overlap_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "default": []
+    },
+    "runtime_influence_evidence_refs": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "default": []
+    },
+    "intervention_arms": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["FULL", "OUTPUT_SHAM", "DISABLED", "STATE_FROZEN"]
+      },
+      "allOf": [
+        {"contains": {"const": "FULL"}},
+        {"contains": {"enum": ["OUTPUT_SHAM", "DISABLED", "STATE_FROZEN"]}}
+      ]
+    },
+    "workload_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["FROZEN_EXPLICIT", "FROZEN_GENERATOR"]},
+        "workload_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "generator_subject_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "materialized_workload_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "initial_state_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["FRESH_GENESIS", "FROZEN_CHECKPOINT"]},
+        "checkpoint_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "scheduler_state_rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primary_observables": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/observable"}
+    },
+    "secondary_observables": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/observable"},
+      "default": []
+    },
+    "safety_hard_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rule"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "rule": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "multiplicity_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["SMALL_PRIMARY_FAMILY", "HIERARCHICAL", "FDR", "FWER", "OTHER_FROZEN"]
+        },
+        "details": {"type": "string"}
+      }
+    },
+    "confidence_interval_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "enum": ["EXACT_DETERMINISTIC", "PAIRED_BOOTSTRAP", "PAIRED_PARAMETRIC", "OTHER_FROZEN"]
+        },
+        "level": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+        "details": {"type": "string"}
+      }
+    },
+    "interaction_followup_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["triggers"],
+      "properties": {
+        "triggers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "STATIC_OVERLAP",
+              "SHARED_INTEGRATION_CHANNEL",
+              "EQUIVALENT_SHARED_RESPONSIBILITY",
+              "SIGN_REVERSAL",
+              "LARGE_RESIDUAL",
+              "OTHER_FROZEN"
+            ]
+          }
+        },
+        "details": {"type": "string"}
+      }
+    },
+    "stopping_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["FIXED_N", "FROZEN_SEQUENTIAL"]},
+        "n_pairs": {"type": "integer", "minimum": 1},
+        "details": {"type": "string"}
+      }
+    },
+    "classification_scope_fields": {
+      "type": "array",
+      "const": [
+        "subject",
+        "workload",
+        "observable",
+        "intervention",
+        "comparison",
+        "evidence_lineage"
+      ]
+    }
+  },
+  "$defs": {
+    "observable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "direction", "equivalence_rule"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "kind": {
+          "enum": ["CONTINUOUS", "BINARY", "CATEGORICAL", "EXACT_IDENTITY", "COUNT", "RESOURCE"]
+        },
+        "direction": {
+          "enum": ["HIGHER_BETTER", "LOWER_BETTER", "NO_UTILITY_DIRECTION"]
+        },
+        "equivalence_rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"enum": ["EXACT", "ABSOLUTE_SESOI", "RELATIVE_SESOI", "NONINFERIORITY"]},
+            "bound": {"type": ["number", "null"]},
+            "details": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}
