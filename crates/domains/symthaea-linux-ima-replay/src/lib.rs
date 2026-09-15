@@ -157,7 +157,9 @@ impl ImaReplayPolicy {
                     hasher.update(&[1]);
                     hasher.update(&value);
                 }
-                None => hasher.update(&[0]),
+                None => {
+                    hasher.update(&[0]);
+                }
             }
         }
 
