@@ -1,0 +1,323 @@
+name: Butlin GWT-1 V2 Method Outcome Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/butlin-gwt1-v2-method-outcome-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify exact V2 method-outcome preservation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      RUSTUP_TOOLCHAIN: "1.96.0"
+      CARGO_HOME: /tmp/gwt1-v2-method-outcome-cargo-home
+      CARGO_TARGET_DIR: /tmp/gwt1-v2-method-outcome-target
+    steps:
+      - name: Checkout exact semantic correction
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: 764ff149ab947a890175489e2f999fbbda5ff3a7
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact semantic delta and trust roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="95a4cb91644e6c2f6f7847cb503207ce070c6887"
+          subject="764ff149ab947a890175489e2f999fbbda5ff3a7"
+          test "$(git rev-parse HEAD)" = "$subject"
+          test "$(git rev-parse HEAD^{tree})" = "6232ad593ada8ab78f2921db57a330577b3e1f9e"
+          test "$(git rev-parse HEAD~2)" = "$base"
+          test "$(git rev-list --count "$base..$subject")" -eq 2
+
+          mapfile -t changed < <(git diff --name-only "$base" "$subject")
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_evidence_disposition.rs"
+          test "${changed[1]}" = "crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs"
+
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs)" = "f4db54f1f5e5f13d878c1992348b18c2197d7479"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_evidence_disposition.rs)" = "1b2c3a587524e53279e97b40e07f65039a7e10c7"
+
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view.rs)" = "f996a349fa3163094d9e38f5520b200795967a6f"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_trusted_resolution.rs)" = "cd2ebb72ac1e7c9e84ec35f8deb859e934733f11"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs)" = "12cc922ede65fc287c954f4f5a79ce317eb1e216"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_trusted_resolution_candidate.rs)" = "c626bccc72042b0c646b070b7fc3e75f0296174f"
+          test "$(git rev-parse HEAD:crates/domains/symthaea-psych-bench/Cargo.toml)" = "2c3155057a4d4beed5c7f5af17e8caf4b37937ae"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Audit semantic preservation invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+
+          v1 = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view.rs").read_text()
+          resolver = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs").read_text()
+          disposition = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_evidence_disposition.rs").read_text()
+          trusted = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_trusted_resolution.rs").read_text()
+          module = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/mod.rs").read_text()
+          adapter = Path("crates/domains/symthaea-psych-bench/src/bin/gwt1_generate_trusted_resolution_candidate.rs").read_text()
+          manifest = Path("crates/domains/symthaea-psych-bench/Cargo.toml").read_text()
+
+          required_resolver = [
+              "lineage_outcome: direct.lineage_outcome",
+              "let lineage_outcome = causal.lineage_outcome;",
+              "EvidenceOutcome::NotDemonstrated",
+              "EvidenceOutcome::Contradicted",
+              "EvidenceOutcome::Inconclusive",
+              "direct_architectural_only_cannot_masquerade_as_method_result",
+              "v1_direct_negative_conversion_preserves_method_outcome_and_support_floor",
+              "v1_causal_negative_conversion_preserves_method_outcome_and_observed_floor",
+              "paired_negative_methods_preserve_both_results_and_architectural_floor",
+              "positive_causal_lineage_requires_observed_base",
+              "resolve_gwt1_causal_evidence_view_v1",
+              "V1 remains the authority/verifier path",
+          ]
+          for needle in required_resolver:
+              assert needle in resolver, needle
+
+          required_v1_trust_transfer = [
+              "validate_lineage(overlay)?;",
+              "if observed != overlay.base_outcome",
+              "EvidenceResolutionViewErrorV1::LineageInputMismatch",
+              "current_outcomes.insert(overlay.indicator_id.clone(), overlay.resolved_outcome)",
+              "resolve_gwt1_evidence_envelope_v1",
+          ]
+          for needle in required_v1_trust_transfer:
+              assert needle in v1, needle
+          assert "verify_gwt1_causal_promotion_package_v1" in trusted
+
+          assert "lineage_outcome: direct.resolved_outcome" not in resolver
+          assert "let causal_lineage_outcome = causal.resolved_outcome;" not in resolver
+
+          required_disposition = [
+              "CausalNotDemonstratedWithoutDirectObservation",
+              "CausalContradictedWithoutDirectObservation",
+              "CausalInconclusiveWithoutDirectObservation",
+              "all_negative_direct_causal_pairs_are_preserved_without_promotion",
+              "positive_causal_outcome_cannot_leapfrog_direct_observed",
+              "direct_negative_states_remain_distinct_while_architectural_floor_is_retained",
+          ]
+          for needle in required_disposition:
+              assert needle in disposition, needle
+
+          assert "CausalRequiresDirectObserved" in disposition
+          assert "positive GWT-1 causal support requires direct Observed support" in disposition
+
+          assert 'default = []' in manifest
+          assert 'trusted-resolution-authority = ["symthaea-backend"]' in manifest
+          assert '#[cfg(feature = "trusted-resolution-authority")]\n#[doc(hidden)]\npub mod gwt1_trusted_resolution;' in module
+          assert module.count('#[cfg(feature = "trusted-resolution-authority")]') >= 2
+          assert 'pub use gwt1_trusted_resolution::{' in module
+          assert '#[cfg(not(feature = "trusted-resolution-authority"))]\nfn main()' in adapter
+          assert 'requires --features trusted-resolution-authority' in adapter
+          assert '#[cfg(feature = "trusted-resolution-authority")]\nfn trusted_main()' in adapter
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master history @ 2026-09-12
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check exact toolchain and semantic-surface formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc_version="$(rustc --version)"
+          cargo_version="$(cargo --version)"
+          case "$rustc_version" in
+            "rustc 1.96.0 "*) ;;
+            *) echo "unexpected rustc: $rustc_version" >&2; exit 1 ;;
+          esac
+          case "$cargo_version" in
+            "cargo 1.96.0 "*) ;;
+            *) echo "unexpected cargo: $cargo_version" >&2; exit 1 ;;
+          esac
+          rustfmt --version
+          p1="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/gwt1_evidence_disposition.rs"
+          p2="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs"
+          rustfmt --edition 2024 --check "$p1" "$p2"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Prove feature-disabled adapter cannot mint a candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --locked -p symthaea-psych-bench \
+            --no-default-features \
+            --bin gwt1_generate_trusted_resolution_candidate
+
+          sandbox="${RUNNER_TEMP}/gwt1-v2-authority-disabled"
+          rm -rf "$sandbox"
+          mkdir -p "$sandbox/direct" "$sandbox/gh-config"
+          : > "$sandbox/promotion-capsule.json"
+          : > "$sandbox/promotion-attestation.json"
+          : > "$sandbox/fake-gh"
+          : > "$sandbox/fake-sha256sum"
+          chmod 700 "$sandbox/fake-gh" "$sandbox/fake-sha256sum"
+          output="$sandbox/output-must-not-exist"
+
+          export SYMTHAEA_GWT1_DIRECT_EVIDENCE_DIR="$sandbox/direct"
+          export GWT1_CAUSAL_PROMOTION_CAPSULE="$sandbox/promotion-capsule.json"
+          export GWT1_CAUSAL_PROMOTION_ATTESTATION_BUNDLE="$sandbox/promotion-attestation.json"
+          export GWT1_TRUSTED_GH_PATH="$sandbox/fake-gh"
+          export GWT1_TRUSTED_SHA256SUM_PATH="$sandbox/fake-sha256sum"
+          export GWT1_TRUSTED_GH_CONFIG_DIR="$sandbox/gh-config"
+          export GWT1_FINAL_RESOLUTION_OUTPUT_DIR="$output"
+
+          set +e
+          "$CARGO_TARGET_DIR/debug/gwt1_generate_trusted_resolution_candidate" \
+            >"$sandbox/stdout" 2>"$sandbox/stderr"
+          status=$?
+          set -e
+
+          test "$status" -eq 2
+          test ! -s "$sandbox/stdout"
+          printf '%s\n' \
+            'gwt1_generate_trusted_resolution_candidate requires --features trusted-resolution-authority' \
+            > "$sandbox/expected-stderr"
+          cmp "$sandbox/expected-stderr" "$sandbox/stderr"
+          test ! -e "$output"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Compile trusted final-resolution adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-psych-bench \
+            --features trusted-resolution-authority \
+            --bin gwt1_generate_trusted_resolution_candidate
+
+      - name: Run exact V2 resolver test set
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib \
+            resolution_view_v2::tests -- --list | tee /tmp/gwt1-v2-resolver-tests.txt
+          grep -E '^benchmarks::butlin::resolution_view_v2::tests::.*: test$' \
+            /tmp/gwt1-v2-resolver-tests.txt | LC_ALL=C sort > /tmp/gwt1-v2-resolver-tests.actual
+          cat > /tmp/gwt1-v2-resolver-tests.expected <<'EOF'
+          benchmarks::butlin::resolution_view_v2::tests::causal_contradiction_is_retained_without_erasing_observed: test
+          benchmarks::butlin::resolution_view_v2::tests::causal_inconclusive_is_retained_without_erasing_observed: test
+          benchmarks::butlin::resolution_view_v2::tests::causal_not_demonstrated_is_retained_without_erasing_observed: test
+          benchmarks::butlin::resolution_view_v2::tests::direct_architectural_only_cannot_masquerade_as_method_result: test
+          benchmarks::butlin::resolution_view_v2::tests::duplicate_lineage_is_rejected: test
+          benchmarks::butlin::resolution_view_v2::tests::negative_causal_lineage_cannot_demote_lower_tier: test
+          benchmarks::butlin::resolution_view_v2::tests::paired_negative_methods_preserve_both_results_and_architectural_floor: test
+          benchmarks::butlin::resolution_view_v2::tests::positive_causal_lineage_raises_observed_to_causal: test
+          benchmarks::butlin::resolution_view_v2::tests::positive_causal_lineage_requires_observed_base: test
+          benchmarks::butlin::resolution_view_v2::tests::v1_causal_negative_conversion_preserves_method_outcome_and_observed_floor: test
+          benchmarks::butlin::resolution_view_v2::tests::v1_direct_negative_conversion_preserves_method_outcome_and_support_floor: test
+          EOF
+          sed -i 's/^          //' /tmp/gwt1-v2-resolver-tests.expected
+          diff -u /tmp/gwt1-v2-resolver-tests.expected /tmp/gwt1-v2-resolver-tests.actual
+          cargo test --locked -p symthaea-psych-bench --lib \
+            resolution_view_v2::tests
+
+      - name: Run exact GWT-1 disposition test set
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib \
+            gwt1_evidence_disposition::tests -- --list | tee /tmp/gwt1-disposition-tests.txt
+          grep -E '^benchmarks::butlin::gwt1_evidence_disposition::tests::.*: test$' \
+            /tmp/gwt1-disposition-tests.txt | LC_ALL=C sort > /tmp/gwt1-disposition-tests.actual
+          cat > /tmp/gwt1-disposition-tests.expected <<'EOF'
+          benchmarks::butlin::gwt1_evidence_disposition::tests::all_negative_direct_causal_pairs_are_preserved_without_promotion: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::causal_contradiction_is_never_hidden_by_retained_observed: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::causal_inconclusive_is_explicit_follow_up_state: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::causal_not_demonstrated_retains_observed_without_becoming_pending: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::causal_support_is_distinct_from_retained_observed: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::direct_negative_states_remain_distinct_while_architectural_floor_is_retained: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::direct_observed_without_causal_lineage_is_explicitly_pending: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::duplicate_method_lineages_fail_closed: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::impossible_supported_tiers_are_rejected: test
+          benchmarks::butlin::gwt1_evidence_disposition::tests::positive_causal_outcome_cannot_leapfrog_direct_observed: test
+          EOF
+          sed -i 's/^          //' /tmp/gwt1-disposition-tests.expected
+          diff -u /tmp/gwt1-disposition-tests.expected /tmp/gwt1-disposition-tests.actual
+          cargo test --locked -p symthaea-psych-bench --lib \
+            gwt1_evidence_disposition::tests
+
+      - name: Run exact trusted-resolution test set
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-psych-bench --lib \
+            --features trusted-resolution-authority \
+            gwt1_trusted_resolution::tests -- --list | tee /tmp/gwt1-trusted-resolution-tests.txt
+          grep -E '^benchmarks::butlin::gwt1_trusted_resolution::tests::.*: test$' \
+            /tmp/gwt1-trusted-resolution-tests.txt | LC_ALL=C sort > /tmp/gwt1-trusted-resolution-tests.actual
+          cat > /tmp/gwt1-trusted-resolution-tests.expected <<'EOF'
+          benchmarks::butlin::gwt1_trusted_resolution::tests::candidate_schema_is_frozen: test
+          benchmarks::butlin::gwt1_trusted_resolution::tests::canonical_base_has_exactly_one_architectural_gwt1: test
+          benchmarks::butlin::gwt1_trusted_resolution::tests::io_error_is_human_readable: test
+          EOF
+          sed -i 's/^          //' /tmp/gwt1-trusted-resolution-tests.expected
+          diff -u /tmp/gwt1-trusted-resolution-tests.expected /tmp/gwt1-trusted-resolution-tests.actual
+          cargo test --locked -p symthaea-psych-bench --lib \
+            --features trusted-resolution-authority \
+            gwt1_trusted_resolution::tests
+
+      - name: Mutation control - direct method outcome must not collapse to resolved floor
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs"
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs")
+          text = path.read_text()
+          old = "lineage_outcome: direct.lineage_outcome,"
+          new = "lineage_outcome: direct.resolved_outcome,"
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          set +e
+          cargo test --locked -p symthaea-psych-bench --lib \
+            resolution_view_v2::tests::v1_direct_negative_conversion_preserves_method_outcome_and_support_floor \
+            > /tmp/gwt1-direct-mutation.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'v1_direct_negative_conversion_preserves_method_outcome_and_support_floor' /tmp/gwt1-direct-mutation.log
+          grep -F 'FAILED' /tmp/gwt1-direct-mutation.log
+          git checkout -- "$path"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Mutation control - causal method outcome must not collapse to resolved floor
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs"
+          /usr/bin/python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/domains/symthaea-psych-bench/src/benchmarks/butlin/resolution_view_v2.rs")
+          text = path.read_text()
+          old = "let lineage_outcome = causal.lineage_outcome;"
+          new = "let lineage_outcome = causal.resolved_outcome;"
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+          set +e
+          cargo test --locked -p symthaea-psych-bench --lib \
+            resolution_view_v2::tests::v1_causal_negative_conversion_preserves_method_outcome_and_observed_floor \
+            > /tmp/gwt1-causal-mutation.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -F 'v1_causal_negative_conversion_preserves_method_outcome_and_observed_floor' /tmp/gwt1-causal-mutation.log
+          grep -F 'FAILED' /tmp/gwt1-causal-mutation.log
+          git checkout -- "$path"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
