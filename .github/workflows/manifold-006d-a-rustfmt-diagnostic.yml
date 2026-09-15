@@ -9,20 +9,22 @@ permissions: {contents: read}
 
 jobs:
   format:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with: {fetch-depth: 2, persist-credentials: false}
-      - name: Install Rust 1.96 rustfmt
+        with: {fetch-depth: 3, persist-credentials: false}
+      - name: Install exact Rust 1.96 formatter
         run: |
           set -euo pipefail
-          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
-          rustup default 1.96.0
-          test "$(rustfmt --version | awk '{print $2}')" = 1.8.0-stable || true
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0 --component rustfmt
+          source "$HOME/.cargo/env"
+          test "$(rustc --version | awk '{print $2}')" = "1.96.0"
+          rustfmt --version
       - name: Produce exact formatted candidate bytes
         run: |
           set -euo pipefail
+          source "$HOME/.cargo/env"
           out="$RUNNER_TEMP/manifold-006d-a-rustfmt"; mkdir -p "$out/before" "$out/after"
           files=(
             crates/core/symthaea-core/src/two_stage_robust_reachability.rs
@@ -34,8 +36,10 @@ jobs:
             cp "$f" "$out/after/$(basename "$f")"
           done
           {
-            echo schema=symthaea.manifold-006d-a.rustfmt-diagnostic.v1
-            echo subject_sha=$(git rev-parse HEAD)
+            echo schema=symthaea.manifold-006d-a.rustfmt-diagnostic.v2
+            echo diagnostic_control_sha=$(git rev-parse HEAD)
+            echo failed_a_subject_sha=$(git rev-parse HEAD^^)
+            echo rustc=$(rustc --version)
             echo rustfmt=$(rustfmt --version)
             for f in "${files[@]}"; do
               b=$(basename "$f")
