@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-fabrication-lineage-bound-finalization-authorization"
+version = "0.1.0"
+edition = "2024"
+description = "Threshold authorization for lineage-bound irreversible upgrade finalization"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-fabrication-kernel = { path = "../../domains/symthaea-fabrication-kernel", default-features = false }
+symthaea-fabrication-lineage-bound-finalization-context = { path = "../symthaea-fabrication-lineage-bound-finalization-context" }
+symthaea-fabrication-trust-bridge = { path = "../symthaea-fabrication-trust-bridge" }
+serde = { workspace = true }
+serde_json = { workspace = true }
