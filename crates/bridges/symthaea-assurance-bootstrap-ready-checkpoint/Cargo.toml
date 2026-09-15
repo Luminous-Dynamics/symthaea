@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-assurance-bootstrap-ready-checkpoint"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Independently verified signed checkpoint-one release token for launch-bound verifier bootstrap"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "runtime", "checkpoint", "attestation", "bootstrap"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-launch-bound-first-runtime-observation = { path = "../symthaea-assurance-launch-bound-first-runtime-observation" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
