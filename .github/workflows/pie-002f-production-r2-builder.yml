@@ -1,0 +1,485 @@
+name: PIE-002F Production R2 Builder
+
+on:
+  push:
+    branches:
+      - prepare/pie-002f-production-r2-builder-v2
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-r2:
+    name: Build hardened one-commit PIE-002F R2 subject
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      PARENT_SHA: d6bf30de475ffac2a2720ee71c7faa08f8c0dd52
+      FAILED_SUBJECT_SHA: b4f60d20f62d53c4c938fa808901739537ff533a
+      TARGET_BRANCH: feat/pie-002f-production-evidence-context-r2
+      PACKAGE: symthaea-planetary-industry
+      MANIFEST: crates/domains/symthaea-planetary-industry/Cargo.toml
+      LIB: crates/domains/symthaea-planetary-industry/src/lib.rs
+      SOURCE: crates/domains/symthaea-planetary-industry/src/utility_evidence_context.rs
+
+    steps:
+      - name: Checkout exact convergence parent
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PARENT_SHA }}
+          fetch-depth: 1
+
+      - name: Verify immutable parent and fetch failed evidence subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PARENT_SHA"
+          test -z "$(git status --porcelain)"
+          git fetch --no-tags --depth=1 origin "$FAILED_SUBJECT_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$FAILED_SUBJECT_SHA"
+
+      - name: Import exact failed candidate product surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          git show "$FAILED_SUBJECT_SHA:$MANIFEST" > "$MANIFEST"
+          git show "$FAILED_SUBJECT_SHA:$LIB" > "$LIB"
+          git show "$FAILED_SUBJECT_SHA:$SOURCE" > "$SOURCE"
+
+      - name: Replace forgeable wrapper with validation-preserving boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("crates/domains/symthaea-planetary-industry/src/utility_evidence_context.rs")
+          source = path.read_text()
+          start_marker = "/// One explicit value together with the evidence records offered for that fact.\n"
+          end_marker = "/// Lossless PIE-002F validation receipt.\n"
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          replacement = r'''/// One explicit value together with the evidence records offered for that fact.
+///
+/// The state is intentionally private. Instances exposed by an
+/// [`EvidenceBearingElectricalSupplyRecoveryContext`] have already crossed that
+/// context's validation boundary; external code receives read-only accessors.
+#[derive(Debug, Clone, Serialize)]
+pub struct EvidenceBound<T> {
+    value: T,
+    evidence: Vec<EvidenceRef>,
+}
+
+impl<T> EvidenceBound<T> {
+    fn from_parts(value: T, evidence: Vec<EvidenceRef>) -> Self {
+        Self { value, evidence }
+    }
+
+    /// Borrow the exact value admitted for this fact.
+    pub fn value(&self) -> &T {
+        &self.value
+    }
+
+    /// Borrow provenance in the exact caller-supplied order.
+    pub fn evidence(&self) -> &[EvidenceRef] {
+        &self.evidence
+    }
+}
+
+/// Evidence-bearing form of all nine external facts required by PIE-002D.
+///
+/// This type is a validated in-memory witness for PIE-002F provenance binding,
+/// not a portable authority token. Its state is private, it deliberately does
+/// not implement `Deserialize`, and construction routes through [`Self::try_new`].
+/// Serialization is one-way and exists only for evidence/reporting surfaces.
+///
+/// External code cannot read or reconstruct private state directly:
+///
+/// ```compile_fail
+/// use symthaea_planetary_industry::EvidenceBearingElectricalSupplyRecoveryContext;
+/// fn cannot_read_private_state(context: &EvidenceBearingElectricalSupplyRecoveryContext) {
+///     let _ = &context.recoverable_energy_j;
+/// }
+/// ```
+///
+/// Deserialization cannot manufacture a validated witness:
+///
+/// ```compile_fail
+/// use serde::de::DeserializeOwned;
+/// use symthaea_planetary_industry::EvidenceBearingElectricalSupplyRecoveryContext;
+/// fn require_deserialize<T: DeserializeOwned>() {}
+/// fn proof() {
+///     require_deserialize::<EvidenceBearingElectricalSupplyRecoveryContext>();
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize)]
+pub struct EvidenceBearingElectricalSupplyRecoveryContext {
+    recoverable_energy_j: EvidenceBound<EnergyRangeJ>,
+    recovery_duration_s: EvidenceBound<DurationRangeS>,
+    storage_acceptance_j: EvidenceBound<EnergyRangeJ>,
+    storage_charge_power_w: EvidenceBound<PowerRangeW>,
+    storage_discharge_power_w: EvidenceBound<PowerRangeW>,
+    recovery_delivery_fraction: EvidenceBound<FractionRange>,
+    available_energy_capacity_j: EvidenceBound<EnergyRangeJ>,
+    available_sustained_power_w: EvidenceBound<PowerRangeW>,
+    available_peak_power_w: EvidenceBound<PowerRangeW>,
+}
+
+impl EvidenceBearingElectricalSupplyRecoveryContext {
+    /// Validate and bind all nine external numerical facts to explicit provenance.
+    ///
+    /// The intentionally explicit signature prevents field omission or implicit
+    /// defaults. Success establishes provenance structure only; it does not prove
+    /// truth, freshness, independence, applicability, feasibility, or authority.
+    #[allow(clippy::too_many_arguments)]
+    pub fn try_new(
+        recoverable_energy_j: EnergyRangeJ,
+        recoverable_energy_evidence: Vec<EvidenceRef>,
+        recovery_duration_s: DurationRangeS,
+        recovery_duration_evidence: Vec<EvidenceRef>,
+        storage_acceptance_j: EnergyRangeJ,
+        storage_acceptance_evidence: Vec<EvidenceRef>,
+        storage_charge_power_w: PowerRangeW,
+        storage_charge_power_evidence: Vec<EvidenceRef>,
+        storage_discharge_power_w: PowerRangeW,
+        storage_discharge_power_evidence: Vec<EvidenceRef>,
+        recovery_delivery_fraction: FractionRange,
+        recovery_delivery_fraction_evidence: Vec<EvidenceRef>,
+        available_energy_capacity_j: EnergyRangeJ,
+        available_energy_capacity_evidence: Vec<EvidenceRef>,
+        available_sustained_power_w: PowerRangeW,
+        available_sustained_power_evidence: Vec<EvidenceRef>,
+        available_peak_power_w: PowerRangeW,
+        available_peak_power_evidence: Vec<EvidenceRef>,
+    ) -> Result<Self, UtilityEvidenceContextError> {
+        let context = Self {
+            recoverable_energy_j: EvidenceBound::from_parts(
+                recoverable_energy_j,
+                recoverable_energy_evidence,
+            ),
+            recovery_duration_s: EvidenceBound::from_parts(
+                recovery_duration_s,
+                recovery_duration_evidence,
+            ),
+            storage_acceptance_j: EvidenceBound::from_parts(
+                storage_acceptance_j,
+                storage_acceptance_evidence,
+            ),
+            storage_charge_power_w: EvidenceBound::from_parts(
+                storage_charge_power_w,
+                storage_charge_power_evidence,
+            ),
+            storage_discharge_power_w: EvidenceBound::from_parts(
+                storage_discharge_power_w,
+                storage_discharge_power_evidence,
+            ),
+            recovery_delivery_fraction: EvidenceBound::from_parts(
+                recovery_delivery_fraction,
+                recovery_delivery_fraction_evidence,
+            ),
+            available_energy_capacity_j: EvidenceBound::from_parts(
+                available_energy_capacity_j,
+                available_energy_capacity_evidence,
+            ),
+            available_sustained_power_w: EvidenceBound::from_parts(
+                available_sustained_power_w,
+                available_sustained_power_evidence,
+            ),
+            available_peak_power_w: EvidenceBound::from_parts(
+                available_peak_power_w,
+                available_peak_power_evidence,
+            ),
+        };
+        validate_evidence_bearing_electrical_context(&context)?;
+        Ok(context)
+    }
+
+    /// Recoverable process energy and its provenance.
+    pub fn recoverable_energy_j(&self) -> &EvidenceBound<EnergyRangeJ> {
+        &self.recoverable_energy_j
+    }
+
+    /// Recovery duration and its provenance.
+    pub fn recovery_duration_s(&self) -> &EvidenceBound<DurationRangeS> {
+        &self.recovery_duration_s
+    }
+
+    /// Storage energy acceptance and its provenance.
+    pub fn storage_acceptance_j(&self) -> &EvidenceBound<EnergyRangeJ> {
+        &self.storage_acceptance_j
+    }
+
+    /// Storage charge-power acceptance and its provenance.
+    pub fn storage_charge_power_w(&self) -> &EvidenceBound<PowerRangeW> {
+        &self.storage_charge_power_w
+    }
+
+    /// Storage discharge-power capability and its provenance.
+    pub fn storage_discharge_power_w(&self) -> &EvidenceBound<PowerRangeW> {
+        &self.storage_discharge_power_w
+    }
+
+    /// Recovery delivery fraction and its provenance.
+    pub fn recovery_delivery_fraction(&self) -> &EvidenceBound<FractionRange> {
+        &self.recovery_delivery_fraction
+    }
+
+    /// Available energy capacity and its provenance.
+    pub fn available_energy_capacity_j(&self) -> &EvidenceBound<EnergyRangeJ> {
+        &self.available_energy_capacity_j
+    }
+
+    /// Available sustained power and its provenance.
+    pub fn available_sustained_power_w(&self) -> &EvidenceBound<PowerRangeW> {
+        &self.available_sustained_power_w
+    }
+
+    /// Available peak power and its provenance.
+    pub fn available_peak_power_w(&self) -> &EvidenceBound<PowerRangeW> {
+        &self.available_peak_power_w
+    }
+
+    /// Explicitly erase provenance and return the numerical PIE-002D context.
+    ///
+    /// This conversion is lossless for the nine numerical values but deliberately
+    /// drops provenance; callers that need provenance authority must retain this
+    /// witness or a validation receipt alongside the numerical context.
+    pub fn to_numeric_context(&self) -> ElectricalSupplyRecoveryContext {
+        ElectricalSupplyRecoveryContext {
+            recoverable_energy_j: self.recoverable_energy_j.value,
+            recovery_duration_s: self.recovery_duration_s.value,
+            storage_acceptance_j: self.storage_acceptance_j.value,
+            storage_charge_power_w: self.storage_charge_power_w.value,
+            storage_discharge_power_w: self.storage_discharge_power_w.value,
+            recovery_delivery_fraction: self.recovery_delivery_fraction.value,
+            available_energy_capacity_j: self.available_energy_capacity_j.value,
+            available_sustained_power_w: self.available_sustained_power_w.value,
+            available_peak_power_w: self.available_peak_power_w.value,
+        }
+    }
+
+    /// Revalidate the witness and emit a portable provenance receipt.
+    ///
+    /// The receipt records what passed validation; deserializing that receipt is
+    /// not equivalent to reconstructing this validated in-memory witness.
+    pub fn validation_receipt(
+        &self,
+    ) -> Result<EvidenceBearingContextReceipt, UtilityEvidenceContextError> {
+        validate_evidence_bearing_electrical_context(self)
+    }
+}
+
+'''
+          source = source[:start] + replacement + source[end:]
+
+          old_bare = '''    let bare_context = ElectricalSupplyRecoveryContext {
+        recoverable_energy_j: context.recoverable_energy_j.value,
+        recovery_duration_s: context.recovery_duration_s.value,
+        storage_acceptance_j: context.storage_acceptance_j.value,
+        storage_charge_power_w: context.storage_charge_power_w.value,
+        storage_discharge_power_w: context.storage_discharge_power_w.value,
+        recovery_delivery_fraction: context.recovery_delivery_fraction.value,
+        available_energy_capacity_j: context.available_energy_capacity_j.value,
+        available_sustained_power_w: context.available_sustained_power_w.value,
+        available_peak_power_w: context.available_peak_power_w.value,
+    };
+'''
+          if source.count(old_bare) != 1:
+              raise SystemExit("expected exactly one bare-context construction block")
+          source = source.replace(old_bare, "    let bare_context = context.to_numeric_context();\n", 1)
+
+          insert = r'''
+
+    #[test]
+    fn public_constructor_routes_through_the_same_validation_boundary() {
+        let raw = baseline_context();
+        let context = EvidenceBearingElectricalSupplyRecoveryContext::try_new(
+            raw.recoverable_energy_j.value,
+            raw.recoverable_energy_j.evidence.clone(),
+            raw.recovery_duration_s.value,
+            raw.recovery_duration_s.evidence.clone(),
+            raw.storage_acceptance_j.value,
+            raw.storage_acceptance_j.evidence.clone(),
+            raw.storage_charge_power_w.value,
+            raw.storage_charge_power_w.evidence.clone(),
+            raw.storage_discharge_power_w.value,
+            raw.storage_discharge_power_w.evidence.clone(),
+            raw.recovery_delivery_fraction.value,
+            raw.recovery_delivery_fraction.evidence.clone(),
+            raw.available_energy_capacity_j.value,
+            raw.available_energy_capacity_j.evidence.clone(),
+            raw.available_sustained_power_w.value,
+            raw.available_sustained_power_w.evidence.clone(),
+            raw.available_peak_power_w.value,
+            raw.available_peak_power_w.evidence.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            context.recoverable_energy_j().value().min.value(),
+            30.0
+        );
+        assert_eq!(
+            context.recoverable_energy_j().evidence()[0].evidence_id,
+            "study-a"
+        );
+        assert_eq!(
+            context.to_numeric_context().recovery_delivery_fraction,
+            FractionRange::new(0.8, 0.9).unwrap()
+        );
+    }
+
+    #[test]
+    fn public_constructor_rejects_missing_provenance() {
+        let raw = baseline_context();
+        let result = EvidenceBearingElectricalSupplyRecoveryContext::try_new(
+            raw.recoverable_energy_j.value,
+            Vec::new(),
+            raw.recovery_duration_s.value,
+            raw.recovery_duration_s.evidence.clone(),
+            raw.storage_acceptance_j.value,
+            raw.storage_acceptance_j.evidence.clone(),
+            raw.storage_charge_power_w.value,
+            raw.storage_charge_power_w.evidence.clone(),
+            raw.storage_discharge_power_w.value,
+            raw.storage_discharge_power_w.evidence.clone(),
+            raw.recovery_delivery_fraction.value,
+            raw.recovery_delivery_fraction.evidence.clone(),
+            raw.available_energy_capacity_j.value,
+            raw.available_energy_capacity_j.evidence.clone(),
+            raw.available_sustained_power_w.value,
+            raw.available_sustained_power_w.evidence.clone(),
+            raw.available_peak_power_w.value,
+            raw.available_peak_power_w.evidence.clone(),
+        );
+
+        assert!(matches!(
+            result,
+            Err(UtilityEvidenceContextError::MissingEvidence(
+                "recoverable_energy_j"
+            ))
+        ));
+    }
+'''
+          closing = source.rfind("\n}")
+          if closing < 0:
+              raise SystemExit("tests module closing brace not found")
+          source = source[:closing] + insert + source[closing:]
+
+          # Strong wrapper invariants are intentionally checked structurally here;
+          # the Rust doctests below provide the external-crate proof.
+          strong = source[source.index("pub struct EvidenceBound<T>"):source.index("/// Lossless PIE-002F validation receipt.")]
+          if "Deserialize" in strong:
+              raise SystemExit("strong PIE-002F wrappers must not implement Deserialize")
+          for forbidden in ("pub value:", "pub evidence:", "pub recoverable_energy_j:"):
+              if forbidden in strong:
+                  raise SystemExit(f"public validated state leaked: {forbidden}")
+          if "pub fn try_new(" not in strong:
+              raise SystemExit("validated public construction path missing")
+
+          path.write_text(source)
+          PY
+
+      - name: Install exact Rust qualification toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format only PIE-002F product crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p "$PACKAGE"
+
+      - name: Run locked product and opacity gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p "$PACKAGE" -- --check
+          cargo check -p "$PACKAGE" --all-targets --locked
+          cargo test -p "$PACKAGE" --all-targets --locked
+          cargo test -p "$PACKAGE" --doc --locked
+          cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Enforce exact product scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add "$MANIFEST" "$LIB" "$SOURCE"
+          mapfile -t changed < <(git diff --cached --name-only | sort)
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "$MANIFEST"
+          test "${changed[1]}" = "$LIB"
+          test "${changed[2]}" = "$SOURCE"
+          test -z "$(git diff --name-only)"
+          test -z "$(git ls-files --others --exclude-standard)"
+          git diff --cached --check
+
+      - name: Commit immutable R2 candidate
+        id: candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(pie): harden PIE-002F provenance witness (r2)"
+          subject_sha="$(git rev-parse HEAD)"
+          parent_sha="$(git rev-parse HEAD^)"
+          tree_sha="$(git rev-parse HEAD^{tree})"
+          test "$parent_sha" = "$PARENT_SHA"
+          echo "subject_sha=$subject_sha" >> "$GITHUB_OUTPUT"
+          echo "tree_sha=$tree_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify target branch immutability and publish candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | awk '{print $1}')"
+          test "$remote_sha" = "$PARENT_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+
+      - name: Record candidate-construction receipt
+        env:
+          SUBJECT_SHA: ${{ steps.candidate.outputs.subject_sha }}
+          TREE_SHA: ${{ steps.candidate.outputs.tree_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_sha="$(sha256sum "$MANIFEST" | awk '{print $1}')"
+          lib_sha="$(sha256sum "$LIB" | awk '{print $1}')"
+          source_sha="$(sha256sum "$SOURCE" | awk '{print $1}')"
+          cat > pie-002f-r2-builder-receipt.json <<EOF
+          {
+            "contract": "PIE-002F-PRODUCTION-R2-BUILDER-v1",
+            "parent_sha": "$PARENT_SHA",
+            "failed_evidence_subject_sha": "$FAILED_SUBJECT_SHA",
+            "subject_sha": "$SUBJECT_SHA",
+            "tree_sha": "$TREE_SHA",
+            "target_branch": "$TARGET_BRANCH",
+            "rust_toolchain": "1.96.0",
+            "manifest_sha256": "$manifest_sha",
+            "lib_sha256": "$lib_sha",
+            "source_sha256": "$source_sha",
+            "product_scope": ["$MANIFEST", "$LIB", "$SOURCE"],
+            "strong_wrapper_deserialize": false,
+            "strong_wrapper_public_state": false,
+            "external_opacity_doctests": true,
+            "semantic_claim": "candidate construction only; exact-subject qualification still required"
+          }
+          EOF
+          git show --format=fuller --stat HEAD > pie-002f-r2-commit.txt
+          git diff "$PARENT_SHA"..HEAD -- "$MANIFEST" "$LIB" "$SOURCE" > pie-002f-r2.patch
+          cat pie-002f-r2-builder-receipt.json
+
+      - name: Upload R2 construction evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: pie-002f-production-r2-construction-evidence
+          path: |
+            pie-002f-r2-builder-receipt.json
+            pie-002f-r2-commit.txt
+            pie-002f-r2.patch
+          if-no-files-found: error
