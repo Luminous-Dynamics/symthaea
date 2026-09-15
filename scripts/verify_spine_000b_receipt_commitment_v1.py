@@ -10,8 +10,9 @@ import tempfile
 from pathlib import Path
 
 CONTRACT = Path("docs/research/SPINE_000B_RECEIPT_COMMITMENT_V1.md")
-ORACLE = Path("scripts/spine_000b_receipt_commitment_oracle_r1.py")
+ORACLE = Path("scripts/spine_000b_receipt_commitment_oracle.py")
 VECTORS = Path("tests/fixtures/spine_000b_receipt_commitment_v1_vectors.json")
+RUST = Path("xtask/src/bin/spine_000b_commitment_vectors.rs")
 
 
 def fail(msg: str) -> None:
@@ -19,12 +20,13 @@ def fail(msg: str) -> None:
 
 
 def main() -> int:
-    for path in (CONTRACT, ORACLE, VECTORS):
+    for path in (CONTRACT, ORACLE, VECTORS, RUST):
         if not path.is_file():
             fail(f"missing subject file: {path}")
 
     contract = CONTRACT.read_text(encoding="utf-8")
     oracle = ORACLE.read_text(encoding="utf-8")
+    rust = RUST.read_text(encoding="utf-8")
     vectors = json.loads(VECTORS.read_text(encoding="utf-8"))
 
     required_contract = (
@@ -36,11 +38,15 @@ def main() -> int:
         "GENESIS_DOMAIN",
         "CHAIN_DOMAIN",
         "RuntimeTelemetryEnvelope is noncanonical",
-        "State application is cycle-level evidence, not per-subsystem causal attribution",
+        "State application is **cycle-level evidence, not per-subsystem causal attribution**",
         "Contributor count is metadata",
         "operation_id",
         "applied_argument",
         "actual operand",
+        "source_condition",
+        "SCALAR_NON_IDENTITY",
+        "FLAG_SET",
+        "FLAG_CLEAR",
         "FORMAT_FROZEN / RUST_EQUIVALENCE_PENDING",
     )
     for phrase in required_contract:
@@ -58,14 +64,27 @@ def main() -> int:
         'struct.pack("<Q"',
         'record["operation_id"]',
         'record.get("applied_argument")',
+        'record["source_condition"]',
+        '"FLAG_CLEAR": 2',
         "changed-channel reserved bits set",
         "application indices must be contiguous from zero",
         "duplicate execution identity",
-        "Actual applied operand is canonical evidence",
     )
     for phrase in required_oracle:
         if phrase not in oracle:
             fail(f"oracle missing required implementation surface: {phrase}")
+
+    required_rust = (
+        "source_condition: u8",
+        'push_string(&mut out, value.operation_id, "operation")',
+        "encode_optional_value(&value.applied_argument",
+        "scalar application source semantics invalid",
+        "flag application source semantics invalid",
+        "source_condition change did not change application digest",
+    )
+    for phrase in required_rust:
+        if phrase not in rust:
+            fail(f"Rust verifier missing required implementation surface: {phrase}")
 
     if vectors.get("schema") != "symthaea.spine.000b.receipt-commitment-v1-vectors":
         fail("unexpected vector schema")
@@ -96,13 +115,9 @@ def main() -> int:
             fail(f"wrong digest length: {key}")
 
     subprocess.run([sys.executable, str(ORACLE), "--self-test"], check=True)
-
     with tempfile.TemporaryDirectory() as td:
         regenerated = Path(td) / "vectors.json"
-        subprocess.run(
-            [sys.executable, str(ORACLE), "--emit-vectors", str(regenerated)],
-            check=True,
-        )
+        subprocess.run([sys.executable, str(ORACLE), "--emit-vectors", str(regenerated)], check=True)
         if regenerated.read_bytes() != VECTORS.read_bytes():
             fail("checked-in golden vectors drift from independent oracle")
 
