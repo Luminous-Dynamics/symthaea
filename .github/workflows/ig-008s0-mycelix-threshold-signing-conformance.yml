@@ -1,0 +1,152 @@
+name: IG-008S0 Mycelix Threshold Signing Conformance
+
+on:
+  pull_request:
+    paths:
+      - "scripts/ig008s0_mycelix_threshold_signing_oracle.py"
+      - "docs/research/IG_008S0_MYCELIX_THRESHOLD_SIGNING_CONFORMANCE.md"
+      - ".github/workflows/ig-008s0-mycelix-threshold-signing-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-threshold-signing-conformance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EXPECTED_SYMTHAEA_SUBJECT: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+      MYCELIX_EVIDENCE_HEAD: a580915d588338077ce6196514c43e24052f86cd
+      MYCELIX_PROFILE_SHA256: c15dfd860b759747938af2a13129d729fa0af1e75284418c9ea6b9c172f643ac
+      MYCELIX_CORPUS_SHA256: 0f6532ae8e2c2e421da625592dbb3b38aa2b90c5342f46f3a305bdbec89b0269
+
+    steps:
+      - name: Checkout exact Symthaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SYMTHAEA_SUBJECT }}
+          fetch-depth: 1
+
+      - name: Checkout exact Mycelix threshold-signing evidence
+        uses: actions/checkout@v4
+        with:
+          repository: Luminous-Dynamics/mycelix
+          ref: ${{ env.MYCELIX_EVIDENCE_HEAD }}
+          path: _mycelix_signing
+          fetch-depth: 1
+
+      - name: Isolate nested evidence checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' '_mycelix_signing/' >> .git/info/exclude
+
+      - name: Install Python 3.13.5
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13.5"
+
+      - name: Verify exact subjects and clean preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_signing rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_signing status --porcelain)"
+
+      - name: Bind Mycelix threshold-signing source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/threshold-signing/coordinator/src/lib.rs)" = "3449df8b03a4dd1774a5f22756d06931c72855b2"
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/threshold-signing/integrity/src/lib.rs)" = "3fec8344635600c044a494fa72bbbfe408fbe5ec"
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/proposals/coordinator/src/lib.rs)" = "eb8358353ee259ef9c3b46617a61d3439f1c714c"
+          test "$(git -C _mycelix_signing hash-object mycelix-governance/zomes/execution/coordinator/src/lib.rs)" = "3dbb8a8f69b377e494ccf24164c94bd80f54e0ef"
+
+      - name: Syntax compile independent implementations
+        run: |
+          python -m py_compile scripts/ig008s0_mycelix_threshold_signing_oracle.py
+          python -m py_compile _mycelix_signing/mycelix-governance/scripts/validate_ig007s0_threshold_signing_profile.py
+          python -m py_compile _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py
+
+      - name: Qualify Mycelix S0 prerequisite
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_signing/mycelix-governance/profiles/observed/threshold-signing-fca2c107-v1.json
+          python _mycelix_signing/mycelix-governance/scripts/validate_ig007s0_threshold_signing_profile.py --profile "$PROFILE" --self-test > /tmp/ig008s0-mycelix-profile.json
+
+      - name: Run Mycelix S1 oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_signing/mycelix-governance/profiles/observed/threshold-signing-fca2c107-v1.json
+          python _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py --profile "$PROFILE" --self-test > /tmp/ig008s0-mycelix-self-1.json
+          python _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py --profile "$PROFILE" --self-test > /tmp/ig008s0-mycelix-self-2.json
+          cmp /tmp/ig008s0-mycelix-self-1.json /tmp/ig008s0-mycelix-self-2.json
+          python _mycelix_signing/mycelix-governance/scripts/ig007s1_threshold_signing_counterexamples.py --profile "$PROFILE" --corpus > /tmp/ig008s0-mycelix-corpus.json
+
+      - name: Run independent Symthaea oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROFILE=_mycelix_signing/mycelix-governance/profiles/observed/threshold-signing-fca2c107-v1.json
+          python scripts/ig008s0_mycelix_threshold_signing_oracle.py --profile "$PROFILE" --self-test > /tmp/ig008s0-symthaea-self-1.json
+          python scripts/ig008s0_mycelix_threshold_signing_oracle.py --profile "$PROFILE" --self-test > /tmp/ig008s0-symthaea-self-2.json
+          cmp /tmp/ig008s0-symthaea-self-1.json /tmp/ig008s0-symthaea-self-2.json
+          python scripts/ig008s0_mycelix_threshold_signing_oracle.py --profile "$PROFILE" --corpus > /tmp/ig008s0-symthaea-corpus.json
+
+      - name: Require byte-identical cross-implementation corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp /tmp/ig008s0-mycelix-corpus.json /tmp/ig008s0-symthaea-corpus.json
+
+      - name: Assert frozen commitments and authority ceilings
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          def read(path):
+              with open(path, encoding='utf-8') as f:
+                  return json.load(f)
+
+          profile = read('/tmp/ig008s0-mycelix-profile.json')
+          mycelix = read('/tmp/ig008s0-mycelix-self-1.json')
+          symthaea = read('/tmp/ig008s0-symthaea-self-1.json')
+          corpus = read('/tmp/ig008s0-symthaea-corpus.json')
+
+          assert profile['authority_class'] == 'ObservedSourceBound'
+          assert profile['profile_content_sha256'] == 'c15dfd860b759747938af2a13129d729fa0af1e75284418c9ea6b9c172f643ac'
+          assert profile['known_gap_issues'] == [959, 960]
+
+          assert mycelix['authority'] == 'MeasurementOnly'
+          assert mycelix['corpus_sha256'] == '0f6532ae8e2c2e421da625592dbb3b38aa2b90c5342f46f3a305bdbec89b0269'
+          assert mycelix['counterexample_count'] == 5
+
+          assert symthaea['authority'] == 'MeasurementOnly'
+          assert symthaea['conformance_class'] == 'CrossImplementationConformance'
+          assert symthaea['mycelix_evidence_head'] == 'a580915d588338077ce6196514c43e24052f86cd'
+          assert symthaea['profile_sha256'] == profile['profile_content_sha256']
+          assert symthaea['corpus_sha256'] == mycelix['corpus_sha256']
+          assert symthaea['counterexample_count'] == 5
+          assert symthaea['issues'] == [959, 960]
+          assert corpus['corpus_sha256'] == symthaea['corpus_sha256']
+          PY
+
+      - name: Verify both checkouts immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SYMTHAEA_SUBJECT"
+          test "$(git -C _mycelix_signing rev-parse HEAD)" = "$MYCELIX_EVIDENCE_HEAD"
+          git diff --exit-code
+          git diff --cached --exit-code
+          git -C _mycelix_signing diff --exit-code
+          git -C _mycelix_signing diff --cached --exit-code
+          test -z "$(git status --porcelain)"
+          test -z "$(git -C _mycelix_signing status --porcelain)"
