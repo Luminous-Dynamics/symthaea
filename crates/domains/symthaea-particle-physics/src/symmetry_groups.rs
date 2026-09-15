@@ -187,8 +187,8 @@ mod tests {
     #[test]
     fn test_pauli_traceless() {
         let sigma = pauli_matrices();
-        for a in 0..3 {
-            let trace = sigma[a][0][0].re + sigma[a][1][1].re;
+        for (a, matrix) in sigma.iter().enumerate() {
+            let trace = matrix[0][0].re + matrix[1][1].re;
             assert!(
                 trace.abs() < 1e-14,
                 "σ_{} not traceless: Tr={}",
@@ -201,12 +201,11 @@ mod tests {
     #[test]
     fn test_pauli_hermitian() {
         let sigma = pauli_matrices();
-        for a in 0..3 {
-            for i in 0..2 {
-                for j in 0..2 {
+        for (a, matrix) in sigma.iter().enumerate() {
+            for (i, row) in matrix.iter().enumerate() {
+                for (j, &mij) in row.iter().enumerate() {
                     // Hermitian: M[i][j] = M[j][i]*
-                    let mij = sigma[a][i][j];
-                    let mji = sigma[a][j][i];
+                    let mji = matrix[j][i];
                     assert!(
                         (mij.re - mji.re).abs() < 1e-14 && (mij.im + mji.im).abs() < 1e-14,
                         "σ_{} not Hermitian at ({},{})",
