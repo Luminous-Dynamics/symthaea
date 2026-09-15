@@ -1,0 +1,39 @@
+{
+  "runtime_profile_id": "spine-m1a-selftest-v1",
+  "default_features": false,
+  "features": [],
+  "protocol_ids": [
+    "A1",
+    "C1",
+    "C2",
+    "C2R1",
+    "G1",
+    "I1",
+    "I1R1",
+    "M1",
+    "M1A",
+    "N1",
+    "N2",
+    "P1R",
+    "R2"
+  ],
+  "workload_id": "spine-m1a-selftest-workload-v1",
+  "workload_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "seeds": [
+    {"name": "genesis", "value": 123},
+    {"name": "workload", "value": 456}
+  ],
+  "cycle_start": 0,
+  "cycle_count": 16,
+  "stopping_rule_id": "fixed-cycle-count-v1",
+  "capacities": {
+    "manager": 64,
+    "application": 32,
+    "guard": 32
+  },
+  "qualification_policy_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "additional_bound_files": [
+    "docs/research/SPINE_000B_MANAGER_ID_REGISTRY_V1.md",
+    "scripts/spine_000b_subject_materializer_v1.py"
+  ]
+}
