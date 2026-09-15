@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use symthaea_hdc_ltc::{
-    ContinuousHV, HlsConfig, HlsEligibilityTrace, HolographicLiquidCell,
-    StateTrackingBenchmark, StateTrackingBenchmarkConfig, StateTrackingCodec, associative_query,
-    step_with_eligibility,
+    HlsConfig, HlsEligibilityTrace, HolographicLiquidCell, StateTrackingBenchmark,
+    StateTrackingBenchmarkConfig, StateTrackingCodec, associative_query, step_with_eligibility,
 };
 
 #[test]
