@@ -19614,6 +19614,13 @@ name = "symthaea-physiology"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-planetary-industry"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "symthaea-population"
 version = "0.1.0"
 dependencies = [
