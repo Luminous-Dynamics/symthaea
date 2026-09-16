@@ -5,7 +5,7 @@ Parent program: #3316
 
 ## Purpose
 
-NEUROARCH-001 introduces a neutral mesoscale description of Symthaea cognitive topology without changing any engine's production evolution path. The topology layer answers **what circuits and declared routes exist and which static execution semantics they carry**. It does not establish causal influence, biological realism, architectural benefit, or implementation identity by itself.
+NEUROARCH-001 introduces a neutral mesoscale description of Symthaea cognitive topology without changing any engine's production evolution path. The topology layer answers **what circuits and declared routes exist and which static execution semantics they carry**. It does not establish causal influence, biological realism, architectural benefit, or complete implementation identity by itself.
 
 The primary incumbent for Phase-I evidence is the HDC/LTC implementation actually used by active Symthaea consumers:
 
@@ -13,7 +13,7 @@ The primary incumbent for Phase-I evidence is the HDC/LTC implementation actuall
 symthaea-core::hdc::hdc_ltc_unified::HdcLtcUnifiedNetwork
 ```
 
-The historical standalone `symthaea-hdc-ltc` extraction is explicitly archived in the crate-truth registry and is outside the primary qualification surface unless a separate migration/compatibility effort revives it.
+The historical standalone `symthaea-hdc-ltc` extraction is explicitly archived in the crate-truth registry and is outside #3325's qualification surface unless a separate migration/compatibility effort revives it.
 
 ## Ownership
 
@@ -26,7 +26,7 @@ The active engine is observed through a read-only wrapper in `symthaea-neuroarch
 At minimum these identities remain distinct:
 
 1. **Topology / connectome identity** — declared static circuits, routes, merge semantics, and structural timescale metadata.
-2. **Subject/model/checkpoint identity** — exact implementation lineage, initialization profile, model configuration, and parameter/checkpoint identity.
+2. **Subject/model/checkpoint identity** — exact implementation lineage, initialization profile, exact model configuration, and parameter/checkpoint identity.
 3. **Trial/execution identity** — task fixture, ordered inputs, time-step stream, selected evolution method, build/toolchain/hardware profile, and run policy.
 4. **Runtime state** — mutable HDC/neuron state, cached outputs, evolution clocks, observations, and temporary snapshots.
 5. **Effectome** — causal influence measured by controlled perturbation.
@@ -54,14 +54,24 @@ CircuitDescriptor
   id
   role                 // descriptive symbolic label only
   timescale_class
-  state_dimension
-  unit_count
+  state_dimension      // state dimensions PER implementation unit
+  unit_count           // multiplicity of implementation units
   implementation
   input_merge_policy   // None | Single | BundleAll
   modulation_profile?  // declarative capability/profile only
 ```
 
+For resource accounting, total logical state dimensions are derived exactly once:
+
+```text
+total_logical_state_dimensions = state_dimension * unit_count
+```
+
+using checked multiplication. Adapters may not pre-multiply multiplicity into `state_dimension`.
+
 `role` is metadata, not verified function. Runtime systems may not treat a label such as `causal`, `self`, or `planning` as evidence that a circuit actually performs that function.
+
+An external-input descriptor is interface metadata. Its state dimension does not by itself establish a persistent memory allocation; transient input/message buffers are accounted separately by later receipts.
 
 ## Edge descriptor
 
@@ -80,6 +90,8 @@ EdgeDescriptor
 ```
 
 A structural edge means only that influence is permitted by the architecture. It is not evidence that the source actually causes a downstream effect.
+
+`LegacyUnbounded` means the incumbent API exposes no declared bounded communication budget for that route. It does **not** mean infinite physical or runtime capacity; measured packet/byte/operation use is a separate resource observation.
 
 ## Route transform vs target merge
 
@@ -147,17 +159,27 @@ Canonical form sorts circuits by stable circuit identity and edges by canonical 
 
 V1 uses a domain-separated BLAKE3 commitment.
 
+The external contract test includes a fixed canonical-byte golden vector. Any change to the domain separator, integer widths, field/tag ordering, enum tags, string framing, or other V1 encoding detail must therefore be an intentional schema decision rather than silent encoder drift.
+
 Changing structural properties such as these changes the commitment:
 
 - circuit count or identity;
-- layer size represented through unit/state dimensions;
-- role/timescale/implementation/merge-policy declarations;
+- `unit_count` multiplicity;
+- per-unit `state_dimension`;
+- role/declared-timescale/implementation/merge-policy declarations;
 - route source/target/channel/direction/recurrence;
 - route budget class;
 - route-local transform;
-- skip-connectivity structure.
+- skip-connectivity structure;
+- parallel-channel policy.
 
 Changing current runtime state, observations, cached outputs, learned weights, realized initialization vectors, or random seed does not change structural topology identity.
+
+## Timescale precision boundary
+
+The active adapter maps `UnifiedConfig.tau_base` to `TimescaleClass::CustomNanos` by rounding to the nearest nanosecond. That is the V1 **structural timescale declaration**, not an exact parameter hash.
+
+At sufficiently small τ, distinct adjacent `f32` values may share the same declared nanosecond topology value. The exact raw `tau_base` representation must therefore also be bound by subject/config identity. Equal topology commitments do not imply bit-identical temporal dynamics.
 
 ## Active field classification
 
@@ -165,15 +187,21 @@ Changing current runtime state, observations, cached outputs, learned weights, r
 
 Topology V1 binds the active incumbent's:
 
-- `UnifiedNetworkConfig.layer_sizes`;
-- `UnifiedConfig.dimension`;
-- `UnifiedConfig.tau_base` as declared timescale metadata;
+- `UnifiedNetworkConfig.layer_sizes` as circuit/unit multiplicity;
+- `UnifiedConfig.dimension` as per-unit state dimension;
+- `UnifiedConfig.tau_base` as nanosecond-quantized declared timescale metadata;
 - `UnifiedNetworkConfig.use_layer_binding`;
 - `UnifiedNetworkConfig.skip_connections`.
 
-Other behaviorally important fields—activation, interpolation/gating parameters, Fourier configuration, optimizer/learning parameters, initialization lineage, and realized parameter values—are **not ignored**. They are bound by exact subject/model/checkpoint identity rather than topology V1.
+Other behaviorally important fields—including exact `tau_base` bits, activation, interpolation/gating parameters, Fourier configuration, optimizer/learning parameters, initialization lineage, and realized parameter values—are **not ignored**. They are bound by exact subject/model/checkpoint identity rather than topology V1.
 
 Changing that classification after held-out evidence begins requires a new schema or evidence lineage.
+
+## Measurement-authority boundary
+
+Existing persistent-homology/TDA surfaces and Φ-like/consciousness estimators may be attached to later trials as explicitly identified secondary observables. They do not define static topology identity, do not establish consciousness, and have no authority to choose or promote the NEUROARCH tournament winner.
+
+In particular, an architecture may not be optimized for a proxy and then cite the same proxy as independent evidence that the chosen architecture is superior.
 
 ## Active incumbent adapter
 
@@ -198,7 +226,8 @@ The initial active-core profile is ordinary `evolve_closed_form` with fixed expl
 - snapshot before inspection equals snapshot after inspection;
 - an observed network and otherwise identical unobserved control produce the same output after each exercised closed-form step;
 - same static topology with different initialization seed has the same topology commitment but a different subject identity in the later benchmark receipt;
-- structural mutations such as layer size, binding, or skip connectivity change topology commitment.
+- structural mutations such as layer size, declared timescale, binding, or skip connectivity change topology commitment;
+- non-topological active-model changes such as activation, learning rate, or Fourier configuration do not silently change topology commitment and are instead receipt-bound as subject identity.
 
 ### No imported irregular-time claim
 
@@ -210,24 +239,28 @@ If active core later gains a timestamp-derived stepping profile, it requires its
 
 Required neutral-contract evidence:
 
-1. insertion-order-independent canonical bytes/commitment;
-2. behaviorally relevant static mutation changes commitment;
-3. dangling-edge rejection;
-4. duplicate-ID rejection;
-5. forbidden self-edge rejection;
-6. explicit parallel-channel policy;
-7. bidirectional orientation canonicalization;
-8. bounded canonical symbolic-token enforcement.
+1. fixed V1 canonical-byte golden vector;
+2. insertion-order-independent canonical bytes/commitment;
+3. every declared V1 circuit/edge identity field is commitment-bound;
+4. dangling-edge rejection;
+5. duplicate circuit/edge-ID rejection;
+6. forbidden non-recurrent self-edge rejection and explicit recurrent self-route acceptance;
+7. fail-closed parallel-channel policy;
+8. bidirectional orientation canonicalization;
+9. bounded canonical symbolic-token enforcement;
+10. invalid schema/zero state/zero unit/zero custom-timescale rejection.
 
 Required active-adapter evidence:
 
-9. active topology commitment is initialization-seed independent;
-10. active layer-size/binding/skip structural changes alter commitment;
-11. active skip connectivity is represented once through route + merge semantics;
-12. topology inspection preserves exact active `NetworkStateSnapshot` under zero tolerance where deterministic;
-13. active ordinary closed-form replay parity holds with inspection interleaved.
+11. active topology commitment is initialization-seed independent;
+12. per-unit `state_dimension` + `unit_count` accounting semantics are correct;
+13. active layer-size/declared-timescale/binding/skip structural changes alter commitment;
+14. active non-topological model fields do not alter commitment;
+15. active skip connectivity is represented once through route + merge semantics;
+16. topology inspection preserves exact active `NetworkStateSnapshot` under zero tolerance where deterministic;
+17. active ordinary closed-form replay parity holds with inspection interleaved.
 
-Additional execution profiles are separate claims, not automatically inherited from item 13.
+Additional execution profiles are separate claims, not automatically inherited from item 17.
 
 ## Lock/build qualification
 
@@ -239,7 +272,11 @@ The exact qualification lineage binds:
 - target/build profile;
 - executed test/format/clippy commands and results.
 
-Adding workspace crates without regenerating the lock is not a complete reproducibility capsule even if an unconstrained Cargo invocation can repair the lock transiently. The PR remains unqualified until the lock/build lineage is exact.
+Adding workspace crates without regenerating the lock is not a complete reproducibility capsule even if an unconstrained Cargo invocation can repair the lock transiently.
+
+The focused `.github/workflows/neuroarch-001-qualify.yml` workflow is read-only. Its lightweight contract job compiles the neutral crate, materializes Cargo's minimal lock update, rejects lock deletions/broad churn, runs focused formatting/tests/clippy, and uploads the generated lock + patch as evidence. Its active-adapter job attempts only the focused active-core parity/purity tests and clippy. A queued/no-step/timeout run is not PASS evidence.
+
+The generated lock must be inspected and committed to the branch before final exact-head qualification; an ephemeral runner-mutated lock does not qualify the branch itself.
 
 ## Evidence boundary
 
