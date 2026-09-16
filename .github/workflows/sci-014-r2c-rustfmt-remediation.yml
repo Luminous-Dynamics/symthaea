@@ -1,0 +1,137 @@
+name: SCI-014 R2C Exact Rustfmt Remediation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sci-014-r2c-rustfmt-remediation.yml"
+
+permissions:
+  contents: write
+
+env:
+  OLD_PRODUCT_HEAD: dc9cf2d506f51846a213170b415b8e6e48cd1cc0
+  PRODUCT_PARENT: d496b7e9c9df809f981740dea940dcdb01f9a6d2
+  PRODUCT_BRANCH: feat/sci-014-control-plane-occurrence-sqlite-v1
+  EXPECTED_LIB_BLOB: 574721499911234bf40b5231ce07d559ee8024da
+  EXPECTED_METADATA_TEST_BLOB: b95da10e3e24a445b93d8d142b8b5bb8be25a571
+  EXPECTED_SCHEMA_TEST_BLOB: bb40695beadf4ca5118f53e2b923129c685b83df
+  EXPECTED_STORE_TEST_BLOB: 37a43abf0aad5d11cd0389a7153cdc2aa88e1c94
+
+jobs:
+  remediate:
+    name: Rebuild exact R2C format-only successor
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact helper head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove one-use helper scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          mapfile -t helper_changed < <(git diff --name-only "$OLD_PRODUCT_HEAD" HEAD)
+          test "${#helper_changed[@]}" -eq 1
+          test "${helper_changed[0]}" = ".github/workflows/sci-014-r2c-rustfmt-remediation.yml"
+
+      - name: Checkout exact old R2C product with push credential
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.OLD_PRODUCT_HEAD }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove old product identity and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$OLD_PRODUCT_HEAD"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          mapfile -t changed < <(git diff --name-only "$PRODUCT_PARENT" "$OLD_PRODUCT_HEAD")
+          expected=(
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs
+          )
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${changed[@]}")
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Regenerate exact retained formatter projection
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-scientific-view-control-plane-occurrence-sqlite
+
+          mapfile -t mutated < <(git diff --name-only)
+          expected=(
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs
+          )
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${mutated[@]}")
+          test -z "$(git ls-files --others --exclude-standard)"
+
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs)" = "$EXPECTED_LIB_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs)" = "$EXPECTED_METADATA_TEST_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs)" = "$EXPECTED_SCHEMA_TEST_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs)" = "$EXPECTED_STORE_TEST_BLOB"
+
+      - name: Rebuild one-commit product over exact parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Tristan Stoltz"
+          git config user.email "tristan.stoltz@evolvingresonantcocreationism.com"
+
+          git reset --soft "$PRODUCT_PARENT"
+          git add --all
+
+          mapfile -t staged < <(git diff --cached --name-only "$PRODUCT_PARENT")
+          expected=(
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs
+          )
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${staged[@]}")
+
+          git commit -m "feat(science): add schema-bound SQLite occurrence persistence"
+          new_head="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          mapfile -t final_changed < <(git diff --name-only "$PRODUCT_PARENT" HEAD)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${final_changed[@]}")
+          {
+            echo "new_product_head=$new_head"
+            echo "new_product_tree=$(git rev-parse HEAD^{tree})"
+          } | tee "$RUNNER_TEMP/r2c-format-successor.txt"
+
+      - name: Move product branch only from exact old head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "refs/heads/$PRODUCT_BRANCH:refs/remotes/origin/$PRODUCT_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/$PRODUCT_BRANCH)" = "$OLD_PRODUCT_HEAD"
+          git push \
+            --force-with-lease="refs/heads/$PRODUCT_BRANCH:$OLD_PRODUCT_HEAD" \
+            origin "HEAD:refs/heads/$PRODUCT_BRANCH"
+
+      - name: Verify remote exact successor
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "refs/heads/$PRODUCT_BRANCH:refs/remotes/origin/$PRODUCT_BRANCH"
+          test "$(git rev-parse refs/remotes/origin/$PRODUCT_BRANCH)" = "$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
