@@ -1,0 +1,155 @@
+
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+fn qualification_digest(
+    report: &ImaReplayReport,
+    report_digest: &str,
+    policy_digest: &str,
+) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(QUALIFICATION_DIGEST_DOMAIN);
+    push_field(&mut hasher, report_digest);
+    push_field(&mut hasher, policy_digest);
+    push_field(&mut hasher, &report.measurement_list_digest);
+    push_u32(&mut hasher, report.expected_pcr);
+    hasher.update(&report.replayed_pcr);
+    push_u32(&mut hasher, report.record_count);
+    push_u32(&mut hasher, report.selected_pcr_record_count);
+    for measurement_id in &report.matched_required_measurements {
+        push_field(&mut hasher, measurement_id);
+    }
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+fn canonical_text(value: &str) -> bool {
+    !value.is_empty()
+        && value == value.trim()
+        && value.len() <= MAX_TEXT_BYTES
+        && !value.chars().any(char::is_control)
+}
+
+fn valid_refs(values: &[String]) -> bool {
+    !values.is_empty()
+        && values.len() <= MAX_EVIDENCE_REFS
+        && values.iter().all(|value| canonical_text(value))
+        && values.iter().collect::<BTreeSet<_>>().len() == values.len()
+}
+
+fn push_field(hasher: &mut blake3::Hasher, value: &str) {
+    hasher.update(&(value.len() as u64).to_le_bytes());
+    hasher.update(value.as_bytes());
+}
+
+fn push_u32(hasher: &mut blake3::Hasher, value: u32) {
+    hasher.update(&value.to_le_bytes());
+}
+
+fn push_u64(hasher: &mut blake3::Hasher, value: u64) {
+    hasher.update(&value.to_le_bytes());
+}
+
+fn push_sorted_refs(hasher: &mut blake3::Hasher, refs: &[String]) {
+    let mut refs = refs.to_vec();
+    refs.sort();
+    for reference in refs {
+        push_field(hasher, &reference);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const GOLDEN_HEX: &str = "0a000000e7236da53a1ad2d019fe5aab57da61002442b2cca64459b834d2ad94151f9d6306000000696d612d6e6763000000280000007368613235363a00ac6a53ce2193d74798af66f1749cab2c79157f6733aac20bc3666b1d32bd644a330000002f6e69782f73746f72652f61616161616161612d73796d74686165612d76657269666965722f62696e2f7665726966696572000a000000f6995fce7da011d68d46cd14185ffbb610ca6194cc2a37f1e2e7fb6462d8fc6a07000000696d612d73696777000000280000007368613235363a00aa7b55320f1f0507e52c681566e47ef4c752984b7a6f86d9f27aabfd331d367e320000002f6e69782f73746f72652f62626262626262622d76657269666965722d646570732f6c69622f6c696270726f6f662e736f0011000000030201746573742d7369676e6174757265";
+    const GOLDEN_FINAL_PCR: [u8; 32] =
+        hex32("093e0b931087c787da1b0561741c2cac75e749547ead4c6d7e71c4c13d2d746e");
+    const VERIFIER_DIGEST: [u8; 32] =
+        hex32("ac6a53ce2193d74798af66f1749cab2c79157f6733aac20bc3666b1d32bd644a");
+    const VERIFIER_NAME_DIGEST: [u8; 32] =
+        hex32("969022aed0ef2fcdb971244dde8ce36c6364eeb198a911671d6ac7114216da40");
+    const DEP_DIGEST: [u8; 32] =
+        hex32("aa7b55320f1f0507e52c681566e47ef4c752984b7a6f86d9f27aabfd331d367e");
+
+    const fn hex32(value: &str) -> [u8; 32] {
+        let bytes = value.as_bytes();
+        let mut out = [0u8; 32];
+        let mut index = 0;
+        while index < 32 {
+            out[index] = (nibble(bytes[index * 2]) << 4) | nibble(bytes[index * 2 + 1]);
+            index += 1;
+        }
+        out
+    }
+
+    const fn nibble(value: u8) -> u8 {
+        match value {
+            b'0'..=b'9' => value - b'0',
+            b'a'..=b'f' => value - b'a' + 10,
+            _ => panic!("invalid hex"),
+        }
+    }
+
+    fn decode_hex(value: &str) -> Vec<u8> {
+        let bytes = value.as_bytes();
+        assert_eq!(bytes.len() % 2, 0);
+        (0..bytes.len() / 2)
+            .map(|index| (nibble(bytes[index * 2]) << 4) | nibble(bytes[index * 2 + 1]))
+            .collect()
+    }
+
+    fn policy() -> ImaReplayPolicy {
+        ImaReplayPolicy {
+            schema_version: IMA_REPLAY_POLICY_SCHEMA_V1.into(),
+            policy_id: "policy:linux-ima-replay:golden-v1".into(),
+            expected_pcr: 10,
+            expected_initial_pcr: [0u8; 32],
+            allowed_templates: vec![SupportedImaTemplate::ImaNg, SupportedImaTemplate::ImaSig],
+            required_measurements: vec![
+                RequiredImaMeasurement {
+                    measurement_id: "verifier-executable".into(),
+                    event_sha256: VERIFIER_DIGEST,
+                    event_name_sha256: Some(VERIFIER_NAME_DIGEST),
+                },
+                RequiredImaMeasurement {
+                    measurement_id: "proof-dependency".into(),
+                    event_sha256: DEP_DIGEST,
+                    event_name_sha256: None,
+                },
+            ],
+            max_measurement_list_bytes: 1024 * 1024,
+            max_records: 64,
+            max_template_name_bytes: 64,
+            max_template_data_bytes: 4096,
+            max_field_bytes: 2048,
+            evidence_refs: vec!["linux-kernel:ima-canonical-format".into()],
+        }
+    }
+
+    #[test]
+    fn checked_in_golden_vector_replays_to_frozen_sha256_pcr() {
+        let bytes = decode_hex(GOLDEN_HEX);
+        let qualified = verify_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy()).unwrap();
+        assert_eq!(qualified.report.record_count, 2);
+        assert_eq!(qualified.report.selected_pcr_record_count, 2);
+        assert_eq!(qualified.report.replayed_pcr, GOLDEN_FINAL_PCR);
+        assert_eq!(
+            qualified.report.disposition,
+            ImaReplayDisposition::Qualified
+        );
+        assert_eq!(
+            qualified.verified().matched_required_measurements(),
+            &[
+                "proof-dependency".to_string(),
+                "verifier-executable".to_string()
+            ]
+        );
+        assert!(!qualified.grants_physical_authority());
+        assert!(!qualified.verified().grants_physical_authority());
+    }
+
+    #[test]
+    fn truncation_is_structurally_invalid() {
+        let mut bytes = decode_hex(GOLDEN_HEX);
+        bytes.pop();
+        let report = assess_canonical_ima_sha256(&by

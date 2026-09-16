@@ -1,0 +1,192 @@
+    self.max_template_name_bytes,
+            self.max_template_data_bytes,
+            self.max_field_bytes,
+        ] {
+            push_u32(&mut hasher, value);
+        }
+        push_sorted_refs(&mut hasher, &self.evidence_refs);
+        Some(format!("blake3:{}", hasher.finalize().to_hex()))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ImaReplayDisposition {
+    Invalid,
+    Blocked,
+    Qualified,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ImaReplayIssue {
+    InvalidPolicy,
+    EmptyMeasurementList,
+    MeasurementListTooLarge {
+        observed: u64,
+        maximum: u64,
+    },
+    RecordLimitExceeded,
+    TruncatedRecord {
+        record_index: u32,
+        stage: String,
+    },
+    TemplateNameTooLarge {
+        record_index: u32,
+        observed: u32,
+    },
+    InvalidTemplateName {
+        record_index: u32,
+    },
+    UnsupportedTemplate {
+        record_index: u32,
+        template_name: String,
+    },
+    TemplateDataTooLarge {
+        record_index: u32,
+        observed: u32,
+    },
+    FieldTooLarge {
+        record_index: u32,
+        field_index: u32,
+        observed: u32,
+    },
+    FieldCountMismatch {
+        record_index: u32,
+        expected: u32,
+        observed: u32,
+    },
+    TemplateDataTrailingBytes {
+        record_index: u32,
+        trailing: u32,
+    },
+    TemplateDigestMismatch {
+        record_index: u32,
+    },
+    InvalidEventDigestField {
+        record_index: u32,
+    },
+    UnsupportedEventDigestAlgorithm {
+        record_index: u32,
+        algorithm: String,
+    },
+    InvalidEventNameField {
+        record_index: u32,
+    },
+    MissingRequiredMeasurement {
+        measurement_id: String,
+    },
+    PcrMismatch,
+}
+
+impl ImaReplayIssue {
+    fn is_invalid(&self) -> bool {
+        matches!(
+            self,
+            Self::InvalidPolicy
+                | Self::EmptyMeasurementList
+                | Self::MeasurementListTooLarge { .. }
+                | Self::RecordLimitExceeded
+                | Self::TruncatedRecord { .. }
+                | Self::TemplateNameTooLarge { .. }
+                | Self::InvalidTemplateName { .. }
+                | Self::UnsupportedTemplate { .. }
+                | Self::TemplateDataTooLarge { .. }
+                | Self::FieldTooLarge { .. }
+                | Self::FieldCountMismatch { .. }
+                | Self::TemplateDataTrailingBytes { .. }
+                | Self::TemplateDigestMismatch { .. }
+                | Self::InvalidEventDigestField { .. }
+                | Self::InvalidEventNameField { .. }
+        )
+    }
+
+    fn code(&self) -> String {
+        match self {
+            Self::InvalidPolicy => "invalid-policy".into(),
+            Self::EmptyMeasurementList => "empty-measurement-list".into(),
+            Self::MeasurementListTooLarge { observed, maximum } => {
+                format!("measurement-list-too-large:{observed}:{maximum}")
+            }
+            Self::RecordLimitExceeded => "record-limit-exceeded".into(),
+            Self::TruncatedRecord {
+                record_index,
+                stage,
+            } => {
+                format!("truncated:{record_index}:{stage}")
+            }
+            Self::TemplateNameTooLarge {
+                record_index,
+                observed,
+            } => {
+                format!("template-name-too-large:{record_index}:{observed}")
+            }
+            Self::InvalidTemplateName { record_index } => {
+                format!("invalid-template-name:{record_index}")
+            }
+            Self::UnsupportedTemplate {
+                record_index,
+                template_name,
+            } => {
+                format!("unsupported-template:{record_index}:{template_name}")
+            }
+            Self::TemplateDataTooLarge {
+                record_index,
+                observed,
+            } => {
+                format!("template-data-too-large:{record_index}:{observed}")
+            }
+            Self::FieldTooLarge {
+                record_index,
+                field_index,
+                observed,
+            } => {
+                format!("field-too-large:{record_index}:{field_index}:{observed}")
+            }
+            Self::FieldCountMismatch {
+                record_index,
+                expected,
+                observed,
+            } => {
+                format!("field-count-mismatch:{record_index}:{expected}:{observed}")
+            }
+            Self::TemplateDataTrailingBytes {
+                record_index,
+                trailing,
+            } => {
+                format!("template-data-trailing:{record_index}:{trailing}")
+            }
+            Self::TemplateDigestMismatch { record_index } => {
+                format!("template-digest-mismatch:{record_index}")
+            }
+            Self::InvalidEventDigestField { record_index } => {
+                format!("invalid-event-digest:{record_index}")
+            }
+            Self::UnsupportedEventDigestAlgorithm {
+                record_index,
+                algorithm,
+            } => {
+                format!("unsupported-event-digest-algorithm:{record_index}:{algorithm}")
+            }
+            Self::InvalidEventNameField { record_index } => {
+                format!("invalid-event-name:{record_index}")
+            }
+            Self::MissingRequiredMeasurement { measurement_id } => {
+                format!("missing-required:{measurement_id}")
+            }
+            Self::PcrMismatch => "pcr-mismatch".into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImaReplayReport {
+    pub schema_version: String,
+    pub policy_id: String,
+    pub policy_digest: Option<String>,
+    pub measurement_list_digest: String,
+    pub expected_pcr: u32,
+    pub initial_pcr: [u8; SHA256_LEN],
+    pub replayed_pcr: [u8; SHA256_LEN],
+    pub expected_final_pcr: [u8; SHA256_LEN],
+    pub record_count: u32,
+    pub selected_pcr_record_count: u32,
+    pub 

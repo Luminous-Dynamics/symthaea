@@ -1,0 +1,130 @@
+tes, GOLDEN_FINAL_PCR, &policy());
+        assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| matches!(issue, ImaReplayIssue::TruncatedRecord { .. }))
+        );
+    }
+
+    #[test]
+    fn reordered_records_do_not_match_frozen_pcr() {
+        let bytes = decode_hex(GOLDEN_HEX);
+        let first_len = first_record_len(&bytes);
+        let mut reordered = bytes[first_len..].to_vec();
+        reordered.extend_from_slice(&bytes[..first_len]);
+        let report = assess_canonical_ima_sha256(&reordered, GOLDEN_FINAL_PCR, &policy());
+        assert_eq!(report.disposition, ImaReplayDisposition::Blocked);
+        assert!(report.issues.contains(&ImaReplayIssue::PcrMismatch));
+    }
+
+    #[test]
+    fn duplicate_insertion_changes_pcr_and_blocks() {
+        let bytes = decode_hex(GOLDEN_HEX);
+        let first_len = first_record_len(&bytes);
+        let mut duplicated = bytes[..first_len].to_vec();
+        duplicated.extend_from_slice(&bytes[..first_len]);
+        duplicated.extend_from_slice(&bytes[first_len..]);
+        let report = assess_canonical_ima_sha256(&duplicated, GOLDEN_FINAL_PCR, &policy());
+        assert_eq!(report.disposition, ImaReplayDisposition::Blocked);
+        assert!(report.issues.contains(&ImaReplayIssue::PcrMismatch));
+    }
+
+    #[test]
+    fn template_data_tamper_is_invalid_before_pcr_comparison() {
+        let mut bytes = decode_hex(GOLDEN_HEX);
+        let marker = b"symthaea-verifier";
+        let offset = bytes
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .unwrap();
+        bytes[offset] ^= 1;
+        let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy());
+        assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| matches!(issue, ImaReplayIssue::TemplateDigestMismatch { .. }))
+        );
+    }
+
+    #[test]
+    fn unsupported_template_fails_closed() {
+        let mut bytes = decode_hex(GOLDEN_HEX);
+        let offset = bytes
+            .windows(6)
+            .position(|window| window == b"ima-ng")
+            .unwrap();
+        bytes[offset..offset + 6].copy_from_slice(b"ima-xx");
+        let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy());
+        assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| matches!(issue, ImaReplayIssue::UnsupportedTemplate { .. }))
+        );
+    }
+
+    #[test]
+    fn missing_required_artifact_blocks_even_when_pcr_matches() {
+        let bytes = decode_hex(GOLDEN_HEX);
+        let mut policy = policy();
+        policy.required_measurements.push(RequiredImaMeasurement {
+            measurement_id: "missing-config".into(),
+            event_sha256: [7u8; 32],
+            event_name_sha256: None,
+        });
+        let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy);
+        assert_eq!(report.disposition, ImaReplayDisposition::Blocked);
+        assert!(report.issues.iter().any(|issue| {
+            matches!(
+                issue,
+                ImaReplayIssue::MissingRequiredMeasurement { measurement_id }
+                    if measurement_id == "missing-config"
+            )
+        }));
+    }
+
+    #[test]
+    fn event_name_binding_is_content_plus_name_not_path_alone() {
+        let bytes = decode_hex(GOLDEN_HEX);
+        let mut policy = policy();
+        policy.required_measurements[0].event_name_sha256 = Some([9u8; 32]);
+        let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy);
+        assert_eq!(report.disposition, ImaReplayDisposition::Blocked);
+        assert!(report.issues.iter().any(|issue| {
+            matches!(
+                issue,
+                ImaReplayIssue::MissingRequiredMeasurement { measurement_id }
+                    if measurement_id == "verifier-executable"
+            )
+        }));
+    }
+
+    #[test]
+    fn measurement_list_resource_cap_fails_before_unbounded_processing() {
+        let bytes = decode_hex(GOLDEN_HEX);
+        let mut policy = policy();
+        policy.max_measurement_list_bytes = (bytes.len() - 1) as u64;
+        let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy);
+        assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
+        assert!(matches!(
+            report.issues.as_slice(),
+            [ImaReplayIssue::MeasurementListTooLarge { .. }]
+        ));
+    }
+
+    fn first_record_len(bytes: &[u8]) -> usize {
+        let name_len = u32::from_le_bytes(bytes[36..40].try_into().unwrap()) as usize;
+        let data_len_offset = 40 + name_len;
+        let data_len = u32::from_le_bytes(
+            bytes[data_len_offset..data_len_offset + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        data_len_offset + 4 + data_len
+    }
+}

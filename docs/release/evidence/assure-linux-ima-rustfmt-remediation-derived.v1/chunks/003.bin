@@ -1,0 +1,183 @@
+                selected_count = selected_count.saturating_add(1);
+                }
+                observed_measurements.push(record.measurement);
+                record_count = record_count.saturating_add(1);
+            }
+            Err(issue) => {
+                issues.push(issue);
+                break;
+            }
+        }
+    }
+
+    let mut matched = BTreeSet::<String>::new();
+    if !issues.iter().any(ImaReplayIssue::is_invalid) {
+        for requirement in &policy.required_measurements {
+            if observed_measurements
+                .iter()
+                .any(|measurement| measurement.matches(requirement))
+            {
+                matched.insert(requirement.measurement_id.clone());
+            } else {
+                issues.push(ImaReplayIssue::MissingRequiredMeasurement {
+                    measurement_id: requirement.measurement_id.clone(),
+                });
+            }
+        }
+
+        if replayed_pcr != expected_final_pcr {
+            issues.push(ImaReplayIssue::PcrMismatch);
+        }
+    }
+
+    let disposition = if issues.iter().any(ImaReplayIssue::is_invalid) {
+        ImaReplayDisposition::Invalid
+    } else if issues.is_empty() {
+        ImaReplayDisposition::Qualified
+    } else {
+        ImaReplayDisposition::Blocked
+    };
+
+    ImaReplayReport {
+        schema_version: IMA_REPLAY_REPORT_SCHEMA_V1.into(),
+        policy_id: policy.policy_id.clone(),
+        policy_digest,
+        measurement_list_digest,
+        expected_pcr: policy.expected_pcr,
+        initial_pcr: policy.expected_initial_pcr,
+        replayed_pcr,
+        expected_final_pcr,
+        record_count,
+        selected_pcr_record_count: selected_count,
+        template_counts,
+        matched_required_measurements: matched.into_iter().collect(),
+        disposition,
+        issues,
+    }
+}
+
+pub fn verify_canonical_ima_sha256(
+    canonical_binary_measurements: &[u8],
+    expected_final_pcr: [u8; SHA256_LEN],
+    policy: &ImaReplayPolicy,
+) -> Result<ImaReplayQualification, ImaReplayReport> {
+    let report =
+        assess_canonical_ima_sha256(canonical_binary_measurements, expected_final_pcr, policy);
+    if report.disposition != ImaReplayDisposition::Qualified {
+        return Err(report);
+    }
+
+    let policy_digest = report
+        .policy_digest
+        .clone()
+        .expect("qualified report always has a policy digest");
+    let report_digest = report.canonical_digest();
+    let qualification_digest = qualification_digest(&report, &report_digest, &policy_digest);
+    let verified = VerifiedImaReplay {
+        qualification_digest,
+        report_digest,
+        policy_digest,
+        measurement_list_digest: report.measurement_list_digest.clone(),
+        expected_pcr: report.expected_pcr,
+        final_pcr: report.replayed_pcr,
+        record_count: report.record_count,
+        selected_pcr_record_count: report.selected_pcr_record_count,
+        matched_required_measurements: report.matched_required_measurements.clone(),
+    };
+    Ok(ImaReplayQualification { report, verified })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ObservedMeasurement {
+    event_sha256: [u8; SHA256_LEN],
+    event_name_sha256: [u8; SHA256_LEN],
+}
+
+impl ObservedMeasurement {
+    fn matches(&self, required: &RequiredImaMeasurement) -> bool {
+        self.event_sha256 == required.event_sha256
+            && required
+                .event_name_sha256
+                .is_none_or(|expected| expected == self.event_name_sha256)
+    }
+}
+
+struct ParsedRecord {
+    pcr: u32,
+    template: SupportedImaTemplate,
+    template_digest: [u8; SHA256_LEN],
+    measurement: ObservedMeasurement,
+}
+
+fn parse_record(
+    bytes: &[u8],
+    cursor: &mut usize,
+    record_index: u32,
+    policy: &ImaReplayPolicy,
+    allowed: &BTreeSet<SupportedImaTemplate>,
+) -> Result<ParsedRecord, ImaReplayIssue> {
+    if bytes.len().saturating_sub(*cursor) < HEADER_BYTES_BEFORE_NAME {
+        return Err(truncated(record_index, "record-header"));
+    }
+
+    let pcr = read_u32(bytes, cursor, record_index, "pcr")?;
+    let template_digest = read_array32(bytes, cursor, record_index, "template-digest")?;
+    let name_len = read_u32(bytes, cursor, record_index, "template-name-length")?;
+    if name_len > policy.max_template_name_bytes {
+        return Err(ImaReplayIssue::TemplateNameTooLarge {
+            record_index,
+            observed: name_len,
+        });
+    }
+
+    let name_bytes = read_bytes(
+        bytes,
+        cursor,
+        name_len as usize,
+        record_index,
+        "template-name",
+    )?;
+    let name = std::str::from_utf8(name_bytes)
+        .map_err(|_| ImaReplayIssue::InvalidTemplateName { record_index })?;
+    let template = match name {
+        "ima-ng" => SupportedImaTemplate::ImaNg,
+        "ima-sig" => SupportedImaTemplate::ImaSig,
+        other => {
+            return Err(ImaReplayIssue::UnsupportedTemplate {
+                record_index,
+                template_name: other.to_string(),
+            });
+        }
+    };
+    if !allowed.contains(&template) {
+        return Err(ImaReplayIssue::UnsupportedTemplate {
+            record_index,
+            template_name: name.to_string(),
+        });
+    }
+
+    let data_len = read_u32(bytes, cursor, record_index, "template-data-length")?;
+    if data_len > policy.max_template_data_bytes {
+        return Err(ImaReplayIssue::TemplateDataTooLarge {
+            record_index,
+            observed: data_len,
+        });
+    }
+    let data = read_bytes(
+        bytes,
+        cursor,
+        data_len as usize,
+        record_index,
+        "template-data",
+    )?;
+
+    // For non-legacy IMA templates, canonical binary template data is exactly
+    // the concatenation of u32_le(field_len) || field_bytes. The kernel hashes
+    // those exact bytes for the per-bank template digest.
+    if sha256_array(data) != template_digest {
+        return Err(ImaReplayIssue::TemplateDigestMismatch { record_index });
+    }
+
+    let fields = parse_fields(
+        data,
+       

@@ -1,0 +1,200 @@
+template_counts: BTreeMap<String, u32>,
+    pub matched_required_measurements: Vec<String>,
+    pub disposition: ImaReplayDisposition,
+    pub issues: Vec<ImaReplayIssue>,
+}
+
+impl ImaReplayReport {
+    pub fn canonical_digest(&self) -> String {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(REPORT_DIGEST_DOMAIN);
+        for value in [
+            self.schema_version.as_str(),
+            self.policy_id.as_str(),
+            self.policy_digest.as_deref().unwrap_or("-"),
+            self.measurement_list_digest.as_str(),
+        ] {
+            push_field(&mut hasher, value);
+        }
+        push_u32(&mut hasher, self.expected_pcr);
+        hasher.update(&self.initial_pcr);
+        hasher.update(&self.replayed_pcr);
+        hasher.update(&self.expected_final_pcr);
+        push_u32(&mut hasher, self.record_count);
+        push_u32(&mut hasher, self.selected_pcr_record_count);
+        for (name, count) in &self.template_counts {
+            push_field(&mut hasher, name);
+            push_u32(&mut hasher, *count);
+        }
+        for measurement_id in &self.matched_required_measurements {
+            push_field(&mut hasher, measurement_id);
+        }
+        push_field(
+            &mut hasher,
+            match self.disposition {
+                ImaReplayDisposition::Invalid => "invalid",
+                ImaReplayDisposition::Blocked => "blocked",
+                ImaReplayDisposition::Qualified => "qualified",
+            },
+        );
+        for issue in &self.issues {
+            push_field(&mut hasher, &issue.code());
+        }
+        format!("blake3:{}", hasher.finalize().to_hex())
+    }
+
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
+}
+
+/// Capability-bearing replay result. It is intentionally not serializable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedImaReplay {
+    qualification_digest: String,
+    report_digest: String,
+    policy_digest: String,
+    measurement_list_digest: String,
+    expected_pcr: u32,
+    final_pcr: [u8; SHA256_LEN],
+    record_count: u32,
+    selected_pcr_record_count: u32,
+    matched_required_measurements: Vec<String>,
+}
+
+impl VerifiedImaReplay {
+    pub fn qualification_digest(&self) -> &str {
+        &self.qualification_digest
+    }
+
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
+
+    pub fn measurement_list_digest(&self) -> &str {
+        &self.measurement_list_digest
+    }
+
+    pub const fn expected_pcr(&self) -> u32 {
+        self.expected_pcr
+    }
+
+    pub const fn final_pcr(&self) -> [u8; SHA256_LEN] {
+        self.final_pcr
+    }
+
+    pub const fn record_count(&self) -> u32 {
+        self.record_count
+    }
+
+    pub const fn selected_pcr_record_count(&self) -> u32 {
+        self.selected_pcr_record_count
+    }
+
+    pub fn matched_required_measurements(&self) -> &[String] {
+        &self.matched_required_measurements
+    }
+
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImaReplayQualification {
+    pub report: ImaReplayReport,
+    verified: VerifiedImaReplay,
+}
+
+impl ImaReplayQualification {
+    pub fn verified(&self) -> &VerifiedImaReplay {
+        &self.verified
+    }
+
+    pub fn into_verified(self) -> VerifiedImaReplay {
+        self.verified
+    }
+
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
+}
+
+pub fn assess_canonical_ima_sha256(
+    canonical_binary_measurements: &[u8],
+    expected_final_pcr: [u8; SHA256_LEN],
+    policy: &ImaReplayPolicy,
+) -> ImaReplayReport {
+    let policy_digest = policy.canonical_digest();
+    if policy_digest.is_none() {
+        return terminal_report(
+            policy,
+            policy_digest,
+            bounded_list_digest(canonical_binary_measurements),
+            expected_final_pcr,
+            ImaReplayIssue::InvalidPolicy,
+        );
+    }
+
+    if canonical_binary_measurements.len() as u64 > policy.max_measurement_list_bytes {
+        return terminal_report(
+            policy,
+            policy_digest,
+            "unavailable:measurement-list-too-large".into(),
+            expected_final_pcr,
+            ImaReplayIssue::MeasurementListTooLarge {
+                observed: canonical_binary_measurements.len() as u64,
+                maximum: policy.max_measurement_list_bytes,
+            },
+        );
+    }
+
+    let measurement_list_digest = digest_list(canonical_binary_measurements);
+    if canonical_binary_measurements.is_empty() {
+        return terminal_report(
+            policy,
+            policy_digest,
+            measurement_list_digest,
+            expected_final_pcr,
+            ImaReplayIssue::EmptyMeasurementList,
+        );
+    }
+
+    let allowed = policy
+        .allowed_templates
+        .iter()
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut cursor = 0usize;
+    let mut record_count = 0u32;
+    let mut selected_count = 0u32;
+    let mut replayed_pcr = policy.expected_initial_pcr;
+    let mut template_counts = BTreeMap::<String, u32>::new();
+    let mut observed_measurements = Vec::<ObservedMeasurement>::new();
+    let mut issues = Vec::<ImaReplayIssue>::new();
+
+    while cursor < canonical_binary_measurements.len() {
+        if record_count >= policy.max_records {
+            issues.push(ImaReplayIssue::RecordLimitExceeded);
+            break;
+        }
+
+        let record_index = record_count;
+        match parse_record(
+            canonical_binary_measurements,
+            &mut cursor,
+            record_index,
+            policy,
+            &allowed,
+        ) {
+            Ok(record) => {
+                *template_counts
+                    .entry(record.template.as_str().to_string())
+                    .or_default() += 1;
+                if record.pcr == policy.expected_pcr {
+                    replayed_pcr = extend_sha256(replayed_pcr, record.template_digest);
+    

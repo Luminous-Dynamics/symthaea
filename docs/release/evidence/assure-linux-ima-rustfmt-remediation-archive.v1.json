@@ -1,0 +1,79 @@
+{
+  "schema": "symthaea.assurance.rustfmt-remediation-archive.v1",
+  "archive_id": "sha256:22764eb4b2e505e0e0b58c26047de0cdb9d97af5d7d2f903e7bb991236b7f6c6",
+  "payload": {
+    "authority": "DurableEvidenceOnly",
+    "qualification_result": "NOT_ESTABLISHED",
+    "derivation_id": "sha256:c63a2b5331d4c0b442b56e12c942706929c98bb60cf902a8c9979a4d5741c596",
+    "remediation_artifact": {
+      "artifact_id": 10461577017,
+      "digest": "sha256:0b5f570b39d4e3a06d638baf47ace3e46b03d66c389f6f42b29430b11eed6b95",
+      "retention_expires": "2026-12-15T17:04:10Z"
+    },
+    "source_path": "crates/domains/symthaea-linux-ima-replay/src/lib.rs",
+    "archive_format": "ordered-raw-chunks-v1",
+    "chunk_size": 6000,
+    "chunks": [
+      {
+        "index": 0,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/000.bin",
+        "bytes": 6000,
+        "sha256": "90b0bc4532e21a70326e37d756b5684f1a3f0de862c2692925570e298095f585",
+        "git_blob_sha1": "dbfa4dffcc55a7f80c732b32904c19c7794be6ac"
+      },
+      {
+        "index": 1,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/001.bin",
+        "bytes": 6000,
+        "sha256": "74e54fdb0f91a6c3bbcc4f7ed456c4fb976817727964fe5ecbdc9e4f7f3d25fb",
+        "git_blob_sha1": "d6585d206bca59294aab182f11a547685a2abef0"
+      },
+      {
+        "index": 2,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/002.bin",
+        "bytes": 6000,
+        "sha256": "0716450d67f00490daca9eeaf6fecd0f4fd37f4a09f67bd84147fb3696799522",
+        "git_blob_sha1": "9e5fa9b90bade19ce18ac42914c13e215a10f9f1"
+      },
+      {
+        "index": 3,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/003.bin",
+        "bytes": 6000,
+        "sha256": "b4d55389ae5822b439494e9029c25fe07a9bc309778e1a3af5474e7ffd8c26ea",
+        "git_blob_sha1": "d42ba64f3658c7939d4b73a8be95d9fea01ddfac"
+      },
+      {
+        "index": 4,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/004.bin",
+        "bytes": 6000,
+        "sha256": "3e88b04da983819b5def2c962cd373a8c87d4be025074892671825aed96d9231",
+        "git_blob_sha1": "029c8e845c7d852ff95e60f8b5c101739f56bc1b"
+      },
+      {
+        "index": 5,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/005.bin",
+        "bytes": 6000,
+        "sha256": "1fc1001e19d95844c3220121f8727255203cb97d69b4f67818970990e8329c20",
+        "git_blob_sha1": "863b5172c009497d5e952f0739511b90517ce502"
+      },
+      {
+        "index": 6,
+        "path": "docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1/chunks/006.bin",
+        "bytes": 5095,
+        "sha256": "5d509037cdc72fc344ed4b80424782f029d6273f3b3f8d5f7d96f6abf326b42e",
+        "git_blob_sha1": "0535de5e455152a193bc3008ba46cfd40232f7a7"
+      }
+    ],
+    "reconstructed": {
+      "bytes": 41095,
+      "sha256": "030ded9703fbd0e6dd9e93eb8bc39736bf84ea4cc4e5b39d140b9399d7dd6ae7",
+      "git_blob_sha1": "2ee7b299599570180fe2a0ca506399fdbbded4a7"
+    },
+    "nonclaims": [
+      "FormatterDerivedProduct",
+      "QualifiedExactHead",
+      "merge_authority",
+      "downstream_unblock_authority"
+    ]
+  }
+}

@@ -1,0 +1,195 @@
+ record_index,
+        template.expected_fields(),
+        policy.max_field_bytes,
+    )?;
+    let event_sha256 = parse_event_digest(fields[0], record_index)?;
+    let event_name = parse_event_name(fields[1], record_index)?;
+    let event_name_sha256 = sha256_array(event_name);
+
+    Ok(ParsedRecord {
+        pcr,
+        template,
+        template_digest,
+        measurement: ObservedMeasurement {
+            event_sha256,
+            event_name_sha256,
+        },
+    })
+}
+
+fn parse_fields<'a>(
+    data: &'a [u8],
+    record_index: u32,
+    expected_fields: usize,
+    max_field_bytes: u32,
+) -> Result<Vec<&'a [u8]>, ImaReplayIssue> {
+    let mut cursor = 0usize;
+    let mut fields = Vec::with_capacity(expected_fields);
+
+    while cursor < data.len() && fields.len() < expected_fields {
+        if data.len().saturating_sub(cursor) < 4 {
+            return Err(truncated(record_index, "field-length"));
+        }
+        let len = u32::from_le_bytes(
+            data[cursor..cursor + 4]
+                .try_into()
+                .expect("four bytes are present"),
+        );
+        cursor += 4;
+        if len > max_field_bytes {
+            return Err(ImaReplayIssue::FieldTooLarge {
+                record_index,
+                field_index: fields.len() as u32,
+                observed: len,
+            });
+        }
+        if data.len().saturating_sub(cursor) < len as usize {
+            return Err(truncated(record_index, "field-data"));
+        }
+        fields.push(&data[cursor..cursor + len as usize]);
+        cursor += len as usize;
+    }
+
+    if fields.len() != expected_fields {
+        return Err(ImaReplayIssue::FieldCountMismatch {
+            record_index,
+            expected: expected_fields as u32,
+            observed: fields.len() as u32,
+        });
+    }
+    if cursor != data.len() {
+        return Err(ImaReplayIssue::TemplateDataTrailingBytes {
+            record_index,
+            trailing: (data.len() - cursor) as u32,
+        });
+    }
+    Ok(fields)
+}
+
+/// `d-ng` is encoded as `<hash-algo> ':' '\0' <raw digest>`.
+fn parse_event_digest(field: &[u8], record_index: u32) -> Result<[u8; SHA256_LEN], ImaReplayIssue> {
+    let Some(colon) = field.iter().position(|byte| *byte == b':') else {
+        return Err(ImaReplayIssue::InvalidEventDigestField { record_index });
+    };
+    if colon == 0 || field.get(colon + 1) != Some(&0) {
+        return Err(ImaReplayIssue::InvalidEventDigestField { record_index });
+    }
+
+    let algorithm = std::str::from_utf8(&field[..colon])
+        .map_err(|_| ImaReplayIssue::InvalidEventDigestField { record_index })?;
+    if algorithm != "sha256" {
+        return Err(ImaReplayIssue::UnsupportedEventDigestAlgorithm {
+            record_index,
+            algorithm: algorithm.to_string(),
+        });
+    }
+
+    let digest = &field[colon + 2..];
+    if digest.len() != SHA256_LEN {
+        return Err(ImaReplayIssue::InvalidEventDigestField { record_index });
+    }
+    Ok(digest
+        .try_into()
+        .expect("digest length was checked to be SHA-256"))
+}
+
+fn parse_event_name<'a>(field: &'a [u8], record_index: u32) -> Result<&'a [u8], ImaReplayIssue> {
+    if field.is_empty() || field.last() != Some(&0) || field[..field.len() - 1].contains(&0) {
+        return Err(ImaReplayIssue::InvalidEventNameField { record_index });
+    }
+    Ok(&field[..field.len() - 1])
+}
+
+fn terminal_report(
+    policy: &ImaReplayPolicy,
+    policy_digest: Option<String>,
+    measurement_list_digest: String,
+    expected_final_pcr: [u8; SHA256_LEN],
+    issue: ImaReplayIssue,
+) -> ImaReplayReport {
+    ImaReplayReport {
+        schema_version: IMA_REPLAY_REPORT_SCHEMA_V1.into(),
+        policy_id: policy.policy_id.clone(),
+        policy_digest,
+        measurement_list_digest,
+        expected_pcr: policy.expected_pcr,
+        initial_pcr: policy.expected_initial_pcr,
+        replayed_pcr: policy.expected_initial_pcr,
+        expected_final_pcr,
+        record_count: 0,
+        selected_pcr_record_count: 0,
+        template_counts: BTreeMap::new(),
+        matched_required_measurements: Vec::new(),
+        disposition: ImaReplayDisposition::Invalid,
+        issues: vec![issue],
+    }
+}
+
+fn read_u32(
+    bytes: &[u8],
+    cursor: &mut usize,
+    record_index: u32,
+    stage: &str,
+) -> Result<u32, ImaReplayIssue> {
+    let raw = read_bytes(bytes, cursor, 4, record_index, stage)?;
+    Ok(u32::from_le_bytes(
+        raw.try_into().expect("four bytes are present"),
+    ))
+}
+
+fn read_array32(
+    bytes: &[u8],
+    cursor: &mut usize,
+    record_index: u32,
+    stage: &str,
+) -> Result<[u8; SHA256_LEN], ImaReplayIssue> {
+    let raw = read_bytes(bytes, cursor, SHA256_LEN, record_index, stage)?;
+    Ok(raw.try_into().expect("32 bytes are present"))
+}
+
+fn read_bytes<'a>(
+    bytes: &'a [u8],
+    cursor: &mut usize,
+    len: usize,
+    record_index: u32,
+    stage: &str,
+) -> Result<&'a [u8], ImaReplayIssue> {
+    if bytes.len().saturating_sub(*cursor) < len {
+        return Err(truncated(record_index, stage));
+    }
+    let start = *cursor;
+    *cursor += len;
+    Ok(&bytes[start..start + len])
+}
+
+fn truncated(record_index: u32, stage: &str) -> ImaReplayIssue {
+    ImaReplayIssue::TruncatedRecord {
+        record_index,
+        stage: stage.to_string(),
+    }
+}
+
+fn sha256_array(bytes: &[u8]) -> [u8; SHA256_LEN] {
+    Sha256::digest(bytes).into()
+}
+
+fn extend_sha256(previous: [u8; SHA256_LEN], event: [u8; SHA256_LEN]) -> [u8; SHA256_LEN] {
+    let mut hasher = Sha256::new();
+    hasher.update(previous);
+    hasher.update(event);
+    hasher.finalize().into()
+}
+
+fn bounded_list_digest(bytes: &[u8]) -> String {
+    if bytes.len() as u64 > ABSOLUTE_MAX_MEASUREMENT_LIST_BYTES {
+        "unavailable:absolute-measurement-list-limit".into()
+    } else {
+        digest_list(bytes)
+    }
+}
+
+fn digest_list(bytes: &[u8]) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(LIST_DIGEST_DOMAIN);
+    hasher.update(&(bytes.len() as u64).to_le_bytes());
+    hasher.update(bytes);

@@ -1,0 +1,164 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Canonical Linux IMA SHA-256 measurement-list replay.
+//!
+//! This is deliberately a narrow first provider theorem for ASSURE-RUNTIME-002:
+//! canonical little-endian `binary_runtime_measurements_sha256`, SHA-256 template
+//! digests/PCR extends, and reviewed `ima-ng` / `ima-sig` templates only.
+
+#![deny(unsafe_code)]
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
+
+pub const IMA_REPLAY_POLICY_SCHEMA_V1: &str = "symthaea.assurance.linux-ima-replay-policy.v1";
+pub const IMA_REPLAY_REPORT_SCHEMA_V1: &str = "symthaea.assurance.linux-ima-replay-report.v1";
+
+const POLICY_DIGEST_DOMAIN: &[u8] = b"symthaea.assurance.linux-ima-replay-policy.digest.v1\0";
+const LIST_DIGEST_DOMAIN: &[u8] = b"symthaea.assurance.linux-ima-canonical-list.digest.v1\0";
+const REPORT_DIGEST_DOMAIN: &[u8] = b"symthaea.assurance.linux-ima-replay-report.digest.v1\0";
+const QUALIFICATION_DIGEST_DOMAIN: &[u8] =
+    b"symthaea.assurance.linux-ima-replay-qualification.digest.v1\0";
+
+const SHA256_LEN: usize = 32;
+const HEADER_BYTES_BEFORE_NAME: usize = 4 + SHA256_LEN + 4;
+const MAX_TEXT_BYTES: usize = 512;
+const MAX_EVIDENCE_REFS: usize = 128;
+const MAX_REQUIRED_MEASUREMENTS: usize = 4096;
+const ABSOLUTE_MAX_MEASUREMENT_LIST_BYTES: u64 = 256 * 1024 * 1024;
+const ABSOLUTE_MAX_RECORDS: u32 = 1_000_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum SupportedImaTemplate {
+    ImaNg,
+    ImaSig,
+}
+
+impl SupportedImaTemplate {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ImaNg => "ima-ng",
+            Self::ImaSig => "ima-sig",
+        }
+    }
+
+    const fn expected_fields(self) -> usize {
+        match self {
+            Self::ImaNg => 2,
+            Self::ImaSig => 3,
+        }
+    }
+}
+
+/// One required measured artifact. A name digest is optional and is never
+/// accepted without the content digest.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequiredImaMeasurement {
+    pub measurement_id: String,
+    pub event_sha256: [u8; SHA256_LEN],
+    pub event_name_sha256: Option<[u8; SHA256_LEN]>,
+}
+
+impl RequiredImaMeasurement {
+    fn validate(&self) -> bool {
+        canonical_text(&self.measurement_id)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImaReplayPolicy {
+    pub schema_version: String,
+    pub policy_id: String,
+    /// PCR whose ordered extends are being independently replayed.
+    pub expected_pcr: u32,
+    /// Starting value for this replay lineage. A full hard-boot list normally
+    /// uses all-zero bytes; non-zero seeds require their own external lineage proof.
+    pub expected_initial_pcr: [u8; SHA256_LEN],
+    pub allowed_templates: Vec<SupportedImaTemplate>,
+    pub required_measurements: Vec<RequiredImaMeasurement>,
+    pub max_measurement_list_bytes: u64,
+    pub max_records: u32,
+    pub max_template_name_bytes: u32,
+    pub max_template_data_bytes: u32,
+    pub max_field_bytes: u32,
+    pub evidence_refs: Vec<String>,
+}
+
+impl ImaReplayPolicy {
+    pub fn validate(&self) -> bool {
+        if self.schema_version != IMA_REPLAY_POLICY_SCHEMA_V1
+            || !canonical_text(&self.policy_id)
+            || self.expected_pcr > 31
+            || self.allowed_templates.is_empty()
+            || self.required_measurements.len() > MAX_REQUIRED_MEASUREMENTS
+            || self.max_measurement_list_bytes == 0
+            || self.max_measurement_list_bytes > ABSOLUTE_MAX_MEASUREMENT_LIST_BYTES
+            || self.max_records == 0
+            || self.max_records > ABSOLUTE_MAX_RECORDS
+            || self.max_template_name_bytes == 0
+            || self.max_template_name_bytes > 1024
+            || self.max_template_data_bytes == 0
+            || self.max_template_data_bytes > 16 * 1024 * 1024
+            || self.max_field_bytes == 0
+            || self.max_field_bytes > self.max_template_data_bytes
+            || !valid_refs(&self.evidence_refs)
+        {
+            return false;
+        }
+
+        let templates = self
+            .allowed_templates
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>();
+        if templates.len() != self.allowed_templates.len() {
+            return false;
+        }
+
+        let mut ids = BTreeSet::new();
+        for requirement in &self.required_measurements {
+            if !requirement.validate() || !ids.insert(requirement.measurement_id.as_str()) {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn canonical_digest(&self) -> Option<String> {
+        if !self.validate() {
+            return None;
+        }
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(POLICY_DIGEST_DOMAIN);
+        push_field(&mut hasher, &self.schema_version);
+        push_field(&mut hasher, &self.policy_id);
+        push_u32(&mut hasher, self.expected_pcr);
+        hasher.update(&self.expected_initial_pcr);
+
+        let mut templates = self.allowed_templates.clone();
+        templates.sort();
+        for template in templates {
+            push_field(&mut hasher, template.as_str());
+        }
+
+        let mut requirements = self.required_measurements.clone();
+        requirements.sort_by(|left, right| left.measurement_id.cmp(&right.measurement_id));
+        for requirement in requirements {
+            push_field(&mut hasher, &requirement.measurement_id);
+            hasher.update(&requirement.event_sha256);
+            match requirement.event_name_sha256 {
+                Some(value) => {
+                    hasher.update(&[1]);
+                    hasher.update(&value);
+                }
+                None => {
+                    hasher.update(&[0]);
+                }
+            }
+        }
+
+        push_u64(&mut hasher, self.max_measurement_list_bytes);
+        for value in [
+            self.max_records,
+        
