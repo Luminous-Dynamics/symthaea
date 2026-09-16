@@ -1,0 +1,161 @@
+name: EUREKA V2 Qualification Evidence Conformance
+
+on:
+  pull_request:
+    paths:
+      - ".github/eureka/eureka-v2-qualification-stage-runner.py"
+      - ".github/eureka/eureka-v2-qualification-stage-runner-selftest.py"
+      - ".github/eureka/eureka-v2-qualification-forensic-manifest.py"
+      - ".github/workflows/eureka-v2-qualification-evidence-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  EUREKA_EVIDENCE_CONFORMANCE_REVISION: "EUREKA.002.V2.QUALIFICATION_EVIDENCE_CONFORMANCE.v1"
+  EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+
+jobs:
+  evidence-conformance:
+    name: Qualify EUREKA evidence tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Capture exact conformance subject
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout is dirty before evidence conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+
+          subject_head="$(git rev-parse HEAD)"
+          [[ "$subject_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
+            echo "Checked-out HEAD is not the intended conformance subject" >&2
+            exit 1
+          }
+
+          if [[ ! "$EUREKA_GITHUB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "github.workflow_sha is not a canonical commit identity" >&2
+            exit 1
+          fi
+          if ! git cat-file -e "${EUREKA_GITHUB_WORKFLOW_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$EUREKA_GITHUB_WORKFLOW_SHA"
+          fi
+
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
+          workflow_path=".github/workflows/eureka-v2-qualification-evidence-conformance.yml"
+          runner_path=".github/eureka/eureka-v2-qualification-stage-runner.py"
+          selftest_path=".github/eureka/eureka-v2-qualification-stage-runner-selftest.py"
+          manifest_path=".github/eureka/eureka-v2-qualification-forensic-manifest.py"
+          workflow_sha256="$(sha256sum "$workflow_path" | awk '{print $1}')"
+          interpreted_workflow_sha256="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
+          runner_sha256="$(sha256sum "$runner_path" | awk '{print $1}')"
+          selftest_sha256="$(sha256sum "$selftest_path" | awk '{print $1}')"
+          manifest_sha256="$(sha256sum "$manifest_path" | awk '{print $1}')"
+          python_version="$(python3 --version)"
+          receipt="${RUNNER_TEMP}/eureka-v2-evidence-conformance.env"
+
+          [[ "$workflow_sha256" == "$interpreted_workflow_sha256" ]] || {
+            echo "Checked-out conformance workflow differs from GitHub-interpreted bytes" >&2
+            exit 1
+          }
+
+          echo "EUREKA_CONFORMANCE_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_CARGO_LOCK_SHA256=$cargo_lock_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_WORKFLOW_SHA256=$workflow_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_RUNNER_SHA256=$runner_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_SELFTEST_SHA256=$selftest_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_MANIFEST_SHA256=$manifest_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_PYTHON_VERSION=$python_version" >> "$GITHUB_ENV"
+          echo "EUREKA_CONFORMANCE_RECEIPT=$receipt" >> "$GITHUB_ENV"
+
+          {
+            printf 'conformance_revision=%s\n' "$EUREKA_EVIDENCE_CONFORMANCE_REVISION"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'github_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'subject_head=%s\n' "$subject_head"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'cargo_lock_sha256=%s\n' "$cargo_lock_sha256"
+            printf 'workflow_sha256=%s\n' "$workflow_sha256"
+            printf 'stage_runner_sha256=%s\n' "$runner_sha256"
+            printf 'stage_selftest_sha256=%s\n' "$selftest_sha256"
+            printf 'forensic_manifest_tool_sha256=%s\n' "$manifest_sha256"
+            printf 'python_version=%s\n' "$python_version"
+            printf 'execution_authority_granted=false\n'
+          } > "$receipt"
+
+      - name: Run adversarial evidence-tool conformance suite
+        run: |
+          set -euo pipefail
+          python3 \
+            .github/eureka/eureka-v2-qualification-stage-runner-selftest.py \
+            .github/eureka/eureka-v2-qualification-stage-runner.py \
+            .github/eureka/eureka-v2-qualification-forensic-manifest.py
+
+      - name: Verify postflight and seal conformance PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_head="$(git rev-parse HEAD)"
+          current_tree="$(git rev-parse 'HEAD^{tree}')"
+          current_lock="$(sha256sum Cargo.lock | awk '{print $1}')"
+          current_workflow="$(sha256sum .github/workflows/eureka-v2-qualification-evidence-conformance.yml | awk '{print $1}')"
+          current_runner="$(sha256sum .github/eureka/eureka-v2-qualification-stage-runner.py | awk '{print $1}')"
+          current_selftest="$(sha256sum .github/eureka/eureka-v2-qualification-stage-runner-selftest.py | awk '{print $1}')"
+          current_manifest="$(sha256sum .github/eureka/eureka-v2-qualification-forensic-manifest.py | awk '{print $1}')"
+          current_python="$(python3 --version)"
+
+          [[ "$current_head" == "$EUREKA_CONFORMANCE_SUBJECT_HEAD" ]]
+          [[ "$current_tree" == "$EUREKA_CONFORMANCE_SUBJECT_TREE" ]]
+          [[ "$current_lock" == "$EUREKA_CONFORMANCE_CARGO_LOCK_SHA256" ]]
+          [[ "$current_workflow" == "$EUREKA_CONFORMANCE_WORKFLOW_SHA256" ]]
+          [[ "$current_runner" == "$EUREKA_CONFORMANCE_RUNNER_SHA256" ]]
+          [[ "$current_selftest" == "$EUREKA_CONFORMANCE_SELFTEST_SHA256" ]]
+          [[ "$current_manifest" == "$EUREKA_CONFORMANCE_MANIFEST_SHA256" ]]
+          [[ "$current_python" == "$EUREKA_CONFORMANCE_PYTHON_VERSION" ]]
+
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout mutated during evidence conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+
+          printf 'checkout_clean_after=true\n' >> "$EUREKA_CONFORMANCE_RECEIPT"
+          printf 'conformance_result=PASS\n' >> "$EUREKA_CONFORMANCE_RECEIPT"
+
+      - name: Upload exact conformance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eureka-v2-qualification-evidence-conformance-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/eureka-v2-evidence-conformance.env
+            .github/workflows/eureka-v2-qualification-evidence-conformance.yml
+            .github/eureka/eureka-v2-qualification-stage-runner.py
+            .github/eureka/eureka-v2-qualification-stage-runner-selftest.py
+            .github/eureka/eureka-v2-qualification-forensic-manifest.py
+          if-no-files-found: error
+          retention-days: 90
