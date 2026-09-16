@@ -1,0 +1,119 @@
+name: ASSURE Linux IMA Artifact-Derived Product Materialization
+
+on:
+  push:
+    branches:
+      - evidence/ima-rustfmt-product-materializer-v1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assure-linux-ima-artifact-materializer-v1
+  cancel-in-progress: false
+
+env:
+  MATERIALIZER_PARENT: c4854e22ecb4f9d03b821fcc44447549491ac8c6
+  PRODUCT_BASE: 29eb017a2e5b3fda7731ec946439c3096b51cceb
+  PRODUCT_PATH: crates/domains/symthaea-linux-ima-replay/src/lib.rs
+  EXPECTED_BLOB: 2ee7b299599570180fe2a0ca506399fdbbded4a7
+  EXPECTED_SHA256: 030ded9703fbd0e6dd9e93eb8bc39736bf84ea4cc4e5b39d140b9399d7dd6ae7
+  TARGET_BRANCH: fix/assure-linux-ima-replay-rust196-formatted-product
+
+jobs:
+  materialize:
+    name: Exact artifact-derived formatter product materialization
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact materializer head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove materializer control-plane topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$MATERIALIZER_PARENT"
+          test "$(git rev-list --count "$MATERIALIZER_PARENT"..HEAD)" = "1"
+          test "$(git diff --name-status "$MATERIALIZER_PARENT" HEAD)" = $'A\t.github/workflows/ima-rustfmt-product-materialize.yml'
+
+      - name: Reconstruct and verify exact retained formatter bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/formatted-lib.rs"
+          python3 scripts/verify-rustfmt-remediation-archive.py \
+            --archive-manifest docs/release/evidence/assure-linux-ima-rustfmt-remediation-archive.v1.json \
+            --repository-root "$GITHUB_WORKSPACE" \
+            --derivation-manifest docs/release/evidence/assure-linux-ima-rustfmt-remediation-derived.v1.json \
+            --output "$out" \
+            | tee "$RUNNER_TEMP/archive-verification.json"
+          test "$(sha256sum "$out" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(git hash-object "$out")" = "$EXPECTED_BLOB"
+
+      - name: Construct exact one-file product over frozen base
+        id: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/formatted-lib.rs"
+          product="$RUNNER_TEMP/product"
+          git worktree add --detach "$product" "$PRODUCT_BASE"
+          cp "$out" "$product/$PRODUCT_PATH"
+          cd "$product"
+          test "$(sha256sum "$PRODUCT_PATH" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(git hash-object "$PRODUCT_PATH")" = "$EXPECTED_BLOB"
+          git add -- "$PRODUCT_PATH"
+          test "$(git diff --cached --name-status)" = $'M\tcrates/domains/symthaea-linux-ima-replay/src/lib.rs'
+          git config user.name 'Luminous Dynamics Evidence Materializer'
+          git config user.email 'evidence-materializer@users.noreply.github.com'
+          git commit -m 'fix(assurance): apply artifact-derived Rustfmt bytes'
+          commit="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_BASE"
+          test "$(git rev-list --count "$PRODUCT_BASE"..HEAD)" = "1"
+          test "$(git diff --name-status "$PRODUCT_BASE" HEAD)" = $'M\tcrates/domains/symthaea-linux-ima-replay/src/lib.rs'
+          test "$(git rev-parse "HEAD:$PRODUCT_PATH")" = "$EXPECTED_BLOB"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse target overwrite and publish exact product branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(git ls-remote --heads origin "refs/heads/$TARGET_BRANCH")"
+          test -z "$existing"
+          git -C "$RUNNER_TEMP/product" push origin "${{ steps.product.outputs.commit }}:refs/heads/$TARGET_BRANCH"
+
+      - name: Write materialization receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/materialization-receipt.txt" <<EOF
+          authority=MaterializationOnly
+          qualification_result=NOT_ESTABLISHED
+          materializer_head=${GITHUB_SHA}
+          archive_id=sha256:22764eb4b2e505e0e0b58c26047de0cdb9d97af5d7d2f903e7bb991236b7f6c6
+          derivation_id=sha256:c63a2b5331d4c0b442b56e12c942706929c98bb60cf902a8c9979a4d5741c596
+          product_base=$PRODUCT_BASE
+          product_commit=${{ steps.product.outputs.commit }}
+          product_tree=${{ steps.product.outputs.tree }}
+          product_path=$PRODUCT_PATH
+          product_blob=$EXPECTED_BLOB
+          product_sha256=$EXPECTED_SHA256
+          changed_paths=1
+          EOF
+          cat "$RUNNER_TEMP/materialization-receipt.txt"
+
+      - name: Upload materialization evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-linux-ima-artifact-product-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/archive-verification.json
+            ${{ runner.temp }}/materialization-receipt.txt
+          if-no-files-found: error
+          retention-days: 90
