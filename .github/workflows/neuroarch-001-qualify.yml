@@ -34,11 +34,11 @@ jobs:
         run: |
           set -euo pipefail
           cargo check -p symthaea-neuroarch-types
-          git diff -- Cargo.lock | tee /tmp/neuroarch-cargo-lock.patch
-          test -s /tmp/neuroarch-cargo-lock.patch
-          grep -q '^+name = "symthaea-neuroarch-types"' /tmp/neuroarch-cargo-lock.patch
-          grep -q '^+name = "symthaea-neuroarch-adapters"' /tmp/neuroarch-cargo-lock.patch
-          if grep -E '^-[^\-]' /tmp/neuroarch-cargo-lock.patch; then
+          git diff -- Cargo.lock | tee neuroarch-cargo-lock.patch
+          test -s neuroarch-cargo-lock.patch
+          grep -q '^+name = "symthaea-neuroarch-types"' neuroarch-cargo-lock.patch
+          grep -q '^+name = "symthaea-neuroarch-adapters"' neuroarch-cargo-lock.patch
+          if grep -E '^-[^\-]' neuroarch-cargo-lock.patch; then
             echo 'Cargo.lock materialization removed existing content; refusing broad lock churn.' >&2
             exit 1
           fi
@@ -62,7 +62,7 @@ jobs:
           name: neuroarch-001-generated-lock
           path: |
             Cargo.lock
-            /tmp/neuroarch-cargo-lock.patch
+            neuroarch-cargo-lock.patch
           if-no-files-found: error
           retention-days: 14
 
