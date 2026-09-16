@@ -1,0 +1,60 @@
+{
+  "payload": {
+    "authority": "QualificationRecipeOnly",
+    "authority_boundary": {
+      "authoritative_cargo_network": "OFFLINE",
+      "network_permitted_phases": [
+        "capsule_lock_reconciliation_non_authoritative",
+        "locked_dependency_fetch"
+      ],
+      "pass_after": [
+        "offline_check",
+        "offline_golden_replay",
+        "offline_full_tests",
+        "offline_strict_clippy_all_targets"
+      ]
+    },
+    "nonclaims": [
+      "QualifiedExactHead",
+      "merge_authority",
+      "downstream_unblock_authority",
+      "qualification_execution",
+      "provider_independent_environment"
+    ],
+    "phase_order": [
+      "product_identity",
+      "git_object_capsule",
+      "rustfmt",
+      "capsule_lock_reconciliation_non_authoritative",
+      "locked_dependency_fetch",
+      "offline_metadata",
+      "offline_check",
+      "offline_test_census",
+      "offline_golden_replay",
+      "offline_full_tests",
+      "offline_strict_clippy_all_targets",
+      "qualification_receipt"
+    ],
+    "product_contract": {
+      "archive_id": "sha256:22764eb4b2e505e0e0b58c26047de0cdb9d97af5d7d2f903e7bb991236b7f6c6",
+      "derivation_id": "sha256:c63a2b5331d4c0b442b56e12c942706929c98bb60cf902a8c9979a4d5741c596",
+      "git_blob_sha1": "2ee7b299599570180fe2a0ca506399fdbbded4a7",
+      "parent": "29eb017a2e5b3fda7731ec946439c3096b51cceb",
+      "path": "crates/domains/symthaea-linux-ima-replay/src/lib.rs",
+      "sha256": "030ded9703fbd0e6dd9e93eb8bc39736bf84ea4cc4e5b39d140b9399d7dd6ae7"
+    },
+    "qualification_result": "NOT_ESTABLISHED",
+    "recipe_files": {
+      "regression_test": {
+        "git_blob_sha1": "de2880c203719ed3617102386654404823090ff8",
+        "path": "tests/python/test_assure_linux_ima_qualification_v3_recipe.py"
+      },
+      "script": {
+        "git_blob_sha1": "68bd2668e407b7753ea29c01ec6142a71a068944",
+        "path": "scripts/qualify-assure-linux-ima-rust196-v3.sh"
+      }
+    }
+  },
+  "recipe_id": "sha256:8d998fb0967e6192507ec72598d84c1d17856d7f64ff6a3886c477b94f06b3d0",
+  "schema": "symthaea.assurance.linux-ima-rust196-qualification-recipe.v3"
+}
