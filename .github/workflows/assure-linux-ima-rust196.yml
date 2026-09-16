@@ -1,0 +1,144 @@
+name: ASSURE Linux IMA Rustfmt Remediation Evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/qualification/assure-linux-ima-rust196-qualify.sh'
+      - '.github/workflows/assure-linux-ima-rust196.yml'
+      - 'crates/domains/symthaea-linux-ima-replay/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-linux-ima-rust196-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: c8f27155e43572476140e321282081d3414fd555
+  PRODUCT_PARENT: 29eb017a2e5b3fda7731ec946439c3096b51cceb
+
+jobs:
+  remediate:
+    name: Exact-head Rustfmt remediation evidence (expected red)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Prove exact red-evidence topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          expected_base='${{ github.event.pull_request.base.sha }}'
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          test "$expected_base" = "$PRODUCT_PARENT"
+          test "$(git rev-parse "$PRODUCT_HEAD^")" = "$PRODUCT_PARENT"
+          test "$(git rev-list --count "$PRODUCT_PARENT".."$PRODUCT_HEAD")" = "1"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_HEAD"
+          test "$(git rev-list --count "$PRODUCT_HEAD"..HEAD)" = "1"
+
+          git diff --name-status "$PRODUCT_PARENT" "$PRODUCT_HEAD" > "$RUNNER_TEMP/product-delta.txt"
+          test "$(cat "$RUNNER_TEMP/product-delta.txt")" = $'M\tcrates/domains/symthaea-linux-ima-replay/src/lib.rs'
+          git diff --name-status "$PRODUCT_HEAD" HEAD > "$RUNNER_TEMP/qualification-delta.txt"
+          python3 - "$RUNNER_TEMP/qualification-delta.txt" <<'PY'
+          import pathlib
+          import sys
+          expected = {
+              ('A', '.github/qualification/assure-linux-ima-rust196-qualify.sh'),
+              ('A', '.github/workflows/assure-linux-ima-rust196.yml'),
+          }
+          actual = {
+              tuple(line.split('\t'))
+              for line in pathlib.Path(sys.argv[1]).read_text().splitlines()
+          }
+          if actual != expected:
+              raise SystemExit(f"qualification delta mismatch: {actual!r}")
+          print('remediation_delta=PASS files=2')
+          PY
+
+          git diff --unified=3 "$PRODUCT_PARENT" "$PRODUCT_HEAD" -- \
+            crates/domains/symthaea-linux-ima-replay/src/lib.rs > "$RUNNER_TEMP/product.patch"
+          python3 - "$RUNNER_TEMP/product.patch" <<'PY'
+          import pathlib
+          import sys
+          body = [
+              line for line in pathlib.Path(sys.argv[1]).read_text().splitlines()
+              if line.startswith(('+', '-')) and not line.startswith(('+++', '---'))
+          ]
+          expected = [
+              '-                None => hasher.update(&[0]),',
+              '+                None => {',
+              '+                    hasher.update(&[0]);',
+              '+                }',
+          ]
+          if body != expected:
+              raise SystemExit(f"unexpected product patch: {body!r}")
+          print('ima_product_patch=PASS explicit_unit_none_arm')
+          PY
+
+          {
+            echo 'evidence_revision=assure-linux-ima-rust196-rustfmt-remediation-v1'
+            echo 'authority=RemediationOnly'
+            echo 'qualification_result=NOT_ESTABLISHED'
+            echo "subject_sha=$actual"
+            echo "subject_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "product_head=$PRODUCT_HEAD"
+            echo "product_source_blob=$(git rev-parse "$PRODUCT_HEAD:crates/domains/symthaea-linux-ima-replay/src/lib.rs")"
+            echo 'rustfmt=1.96.0'
+          } > "$RUNNER_TEMP/assure-linux-ima-rust196-remediation-receipt.txt"
+          git rev-parse HEAD > "$RUNNER_TEMP/pre-head"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/pre-tree"
+          sha256sum Cargo.lock | awk '{print $1}' > "$RUNNER_TEMP/pre-lock"
+
+      - name: Generate exact formatter remediation (expected red)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/qualification/assure-linux-ima-rust196-qualify.sh \
+            2>&1 | tee "$RUNNER_TEMP/assure-linux-ima-rust196-remediation-contract.log"
+
+      - name: Prove checkout and source lock unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/pre-head")"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat "$RUNNER_TEMP/pre-tree")"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-lock")"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo 'postflight_immutable=PASS' >> "$RUNNER_TEMP/assure-linux-ima-rust196-remediation-receipt.txt"
+
+      - name: Upload exact-head remediation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-linux-ima-rust196-remediation-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/assure-linux-ima-rust196-remediation-receipt.txt
+            ${{ runner.temp }}/product-delta.txt
+            ${{ runner.temp }}/product.patch
+            ${{ runner.temp }}/qualification-delta.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-remediation-contract.log
+            ${{ runner.temp }}/assure-linux-ima-rust196-remediation/source-census.tsv
+            ${{ runner.temp }}/assure-linux-ima-rust196-remediation/rustfmt-remediation/
+            .github/workflows/assure-linux-ima-rust196.yml
+            .github/qualification/assure-linux-ima-rust196-qualify.sh
+          if-no-files-found: ignore
+          retention-days: 90
