@@ -1,0 +1,187 @@
+{
+  "schema_version": "PARADOX-A0-NATIVE-REGISTRY-V2",
+  "authority": "DevelopmentOnly / Behavioral MeasurementOnly",
+  "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+  "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+  "confirmatory_execution_allowed": false,
+  "response_classes": [
+    "Commit",
+    "CommitConditionally",
+    "AbstainPreservePlurality",
+    "ReflexiveUpdate",
+    "RequestRepresentationRevision"
+  ],
+  "evidence_tiers": {
+    "A0-D": "direct live production signal with semantically complete response meaning",
+    "A0-L": "existing library-native primitive not yet proven reachable on the production cognitive path",
+    "A0-R": "frozen condition-blind readout of pre-existing production representation"
+  },
+  "capability_atoms": [
+    "select_supported_polarity",
+    "emit_commit_control",
+    "bind_visible_context",
+    "select_context_conditioned_polarity",
+    "emit_conditional_commit_control",
+    "preserve_opposed_evidence",
+    "recognize_independent_provenance",
+    "emit_plurality_abstention",
+    "detect_self_causal_relation",
+    "invoke_reflexive_update",
+    "detect_representation_inadequacy",
+    "request_representation_revision",
+    "request_external_information",
+    "detect_conflict",
+    "typed_abstention",
+    "generic_exploration",
+    "self_model_update_available",
+    "confidence_state"
+  ],
+  "response_requirements": {
+    "Commit": ["select_supported_polarity", "emit_commit_control"],
+    "CommitConditionally": ["detect_conflict", "bind_visible_context", "select_context_conditioned_polarity", "emit_conditional_commit_control"],
+    "AbstainPreservePlurality": ["detect_conflict", "preserve_opposed_evidence", "recognize_independent_provenance", "emit_plurality_abstention"],
+    "ReflexiveUpdate": ["detect_conflict", "detect_self_causal_relation", "invoke_reflexive_update"],
+    "RequestRepresentationRevision": ["detect_conflict", "detect_representation_inadequacy", "request_representation_revision"]
+  },
+  "candidates": [
+    {
+      "id": "cycle_action_hint",
+      "tier": "A0-D",
+      "source_path": "src/cognitive_loop/types/output.rs",
+      "source_blob_sha": "c206f5974595aa400ece1d12c8a02fef1f411dd9",
+      "native_type": "ActionHint",
+      "native_variants": ["Continue", "SlowDown", "SpeedUp", "Stabilize", "Explore", "SeekInput", "Inhibit"],
+      "observed_semantics": "adaptive cycle control; SeekInput means seeking clarification and Explore means exploring possibilities",
+      "supported_atoms": ["request_external_information", "generic_exploration"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "SeekInput": ["AbstainPreservePlurality"],
+        "Explore": ["RequestRepresentationRevision"],
+        "Inhibit": ["AbstainPreservePlurality"]
+      },
+      "reason_not_admitted": "no native variant carries proposition polarity, conditional context, evidence-plurality preservation, reflexive epistemic update, or model-representation revision semantics"
+    },
+    {
+      "id": "cycle_epistemic_conflict_telemetry",
+      "tier": "A0-D",
+      "source_path": "src/cognitive_loop/types/telemetry.rs",
+      "source_blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+      "native_type": "CycleMetadata conflict/control fields",
+      "native_variants": ["epistemic_conflict_count", "feedback_conflict_ratio", "epistemic_reasoning_accelerated", "metacognitive_anomaly"],
+      "observed_semantics": "live cycle exports conflict-sensitive telemetry and whether epistemic conflicts accelerated adaptive reasoning",
+      "supported_atoms": ["detect_conflict"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "epistemic_conflict_count>0": ["AbstainPreservePlurality", "ReflexiveUpdate", "RequestRepresentationRevision"],
+        "epistemic_reasoning_accelerated": ["RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "live conflict sensitivity is an upstream prerequisite, not evidence of provenance-preserving abstention, self-causal detection, contextual commitment, or representation revision"
+    },
+    {
+      "id": "core_metacognitive_recommendation",
+      "tier": "A0-L",
+      "source_path": "crates/core/symthaea-core/src/hdc/metacognitive_monitor.rs",
+      "source_blob_sha": "a2bd655332ef2f07a470d21901218a29393873c6",
+      "native_type": "CognitiveEvent + MetacognitiveRecommendation",
+      "native_variants": ["ErrorType::Conflict", "IncreaseIntegration", "ReduceLoad", "FocusAttention", "ConsolidateMemory", "ResetProcessing", "RequestClarification", "NoAction"],
+      "observed_semantics": "metacognitive conflict/error observation and recommendations over integration, load, attention, memory, reset and clarification",
+      "supported_atoms": ["detect_conflict", "request_external_information"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "RequestClarification": ["AbstainPreservePlurality", "RequestRepresentationRevision"],
+        "ResetProcessing": ["ReflexiveUpdate", "RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "recommendation emission is not yet equivalent to a complete epistemic response and downstream consumption is separately unqualified"
+    },
+    {
+      "id": "full_stack_understanding_recommendation",
+      "tier": "A0-L",
+      "source_path": "crates/core/symthaea-core/src/hdc/full_stack_consciousness.rs",
+      "source_blob_sha": "df42db41763b90624fba22ccf9d0ed04f3fa4909",
+      "native_type": "UnderstandingErrorType + MetacognitiveRecommendation",
+      "native_variants": ["ContradictoryInfo", "MissingContext", "Proceed", "ProceedWithCaution", "SeekClarification", "RequestMoreInfo"],
+      "observed_semantics": "understanding-level contradiction/missing-context signals plus confidence/uncertainty recommendations",
+      "supported_atoms": ["detect_conflict", "request_external_information"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "Proceed": ["Commit"],
+        "ProceedWithCaution": ["CommitConditionally"],
+        "SeekClarification": ["AbstainPreservePlurality"],
+        "RequestMoreInfo": ["RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "the recommendation does not itself select proposition content, preserve opposed evidence, identify self-reference, or diagnose representation-class inadequacy"
+    },
+    {
+      "id": "structured_thought_epistemic_status",
+      "tier": "A0-R",
+      "source_path": "src/mind/structured_thought.rs",
+      "source_blob_sha": "7f4035616b88000664392e3b47563ee4a9ab5a88",
+      "native_type": "EpistemicStatus",
+      "native_variants": ["Certain", "Probable", "Uncertain", "Unknown", "OutOfDomain"],
+      "observed_semantics": "translation-facing confidence/status readout; not an action policy",
+      "supported_atoms": ["confidence_state"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "Uncertain": ["AbstainPreservePlurality"],
+        "Unknown": ["AbstainPreservePlurality", "RequestRepresentationRevision"],
+        "OutOfDomain": ["RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "confidence/status alone does not determine the epistemically appropriate action and current derivation includes theory-inspired consciousness metrics subject to the PARADOX metric firewall"
+    },
+    {
+      "id": "predictive_self_action_recommendation",
+      "tier": "A0-L",
+      "source_path": "src/consciousness/dynamics/predictive_self.rs",
+      "source_blob_sha": "2dde0732b59245a896a723065bebcf164b1b5b34",
+      "native_type": "PredictiveSelfModel + ActionRecommendation",
+      "native_variants": ["prediction-error update", "Proceed", "ProceedWithCaution", "Reconsider"],
+      "observed_semantics": "self-model prediction/error learning and action-safety recommendation produced from predicted self-state and coherence impact",
+      "supported_atoms": ["self_model_update_available"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "Reconsider": ["ReflexiveUpdate", "RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "self-model update machinery exists, but it does not establish detection of the C5 self-causal relation or a decision to invoke reflexive update because of that relation"
+    },
+    {
+      "id": "broca_factcheck_verdict",
+      "tier": "A0-L",
+      "source_path": "src/cognitive_loop/broca_factcheck.rs",
+      "source_blob_sha": "ca4c2bc21691df1e15151cda3b22d0bbdffea11b",
+      "native_type": "FactCheckVerdict",
+      "native_variants": ["True", "False", "Mixed", "Unknown"],
+      "observed_semantics": "claim-verification verdict; Mixed explicitly conflates mixed and insufficient evidence",
+      "supported_atoms": [],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "Mixed": ["AbstainPreservePlurality"],
+        "Unknown": ["RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "does not preserve independent evidence polarity/provenance and Mixed is not specific to genuine opposed support"
+    },
+    {
+      "id": "futures_typed_abstention",
+      "tier": "A0-L",
+      "source_path": "crates/domains/symthaea-futures-core/src/lib.rs",
+      "source_blob_sha": "a28df60f59d6adf4d0b58f30f220f87182ed3e78",
+      "native_type": "ForecastOutput::Abstain(AbstentionReason)",
+      "native_variants": ["InsufficientObservationHistory", "OutOfDistributionScenario", "ModelDisagreementTooHigh", "HorizonBeyondValidatedRange", "UnresolvedOutcomeSpace", "ObservationPolicyTooLossy"],
+      "observed_semantics": "first-class typed refusal in a neutral forecasting boundary; includes model disagreement and unresolved outcome-space reasons",
+      "supported_atoms": ["typed_abstention"],
+      "admitted_response_classes": [],
+      "forbidden_aliases": {
+        "ModelDisagreementTooHigh": ["AbstainPreservePlurality"],
+        "UnresolvedOutcomeSpace": ["RequestRepresentationRevision"]
+      },
+      "reason_not_admitted": "semantically promising library primitive, but not shown to be reachable from the frozen production cognitive path; code search found no current emission of ModelDisagreementTooHigh"
+    }
+  ],
+  "class_admission": {
+    "Commit": {"A0-D": "not_admitted_v1", "A0-R": "not_admitted_v1"},
+    "CommitConditionally": {"A0-D": "not_admitted_v1", "A0-R": "not_admitted_v1"},
+    "AbstainPreservePlurality": {"A0-D": "not_admitted_v1", "A0-R": "not_admitted_v1"},
+    "ReflexiveUpdate": {"A0-D": "not_admitted_v1", "A0-R": "not_admitted_v1"},
+    "RequestRepresentationRevision": {"A0-D": "not_admitted_v1", "A0-R": "not_admitted_v1"}
+  },
+  "promotion_rule": "A response mapping may be admitted only before confirmatory execution, after development-only evidence shows all required capability atoms, semantic completeness, condition blindness, source-SHA binding, state-scope declaration, metamorphic validity, and for A0-D live runtime reachability or for A0-R a frozen readout that does not reimplement the PARADOX theorem."
+}
