@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   qualify:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     env:
       SUBJECT: 74c0d06ac75d21b0ae7bdab49f053be226031c85
       XCA_A_PARENT: 175c3629613f35f43accb99c4030ec70b50dd003
@@ -51,6 +51,11 @@ jobs:
           set +e
           (
             set -euo pipefail
+            if ! command -v rustup >/dev/null 2>&1; then
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+              export PATH="$HOME/.cargo/bin:$PATH"
+              printf '%s\n' "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            fi
             rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
             rustup override set 1.96.0
             rustc --version --verbose
@@ -61,11 +66,7 @@ jobs:
           rc=$?
           set -e
           printf '%s\n' "$rc" > "$EVIDENCE_DIR/toolchain-exit-code.txt"
-          if [ "$rc" -eq 0 ]; then
-            echo 'ok=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'ok=false' >> "$GITHUB_OUTPUT"
-          fi
+          if [ "$rc" -eq 0 ]; then echo 'ok=true' >> "$GITHUB_OUTPUT"; else echo 'ok=false' >> "$GITHUB_OUTPUT"; fi
           exit 0
 
       - name: Prove exact subject and finite B surface
@@ -90,11 +91,7 @@ jobs:
           rc=$?
           set -e
           printf '%s\n' "$rc" > "$EVIDENCE_DIR/provenance-exit-code.txt"
-          if [ "$rc" -eq 0 ]; then
-            echo 'ok=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'ok=false' >> "$GITHUB_OUTPUT"
-          fi
+          if [ "$rc" -eq 0 ]; then echo 'ok=true' >> "$GITHUB_OUTPUT"; else echo 'ok=false' >> "$GITHUB_OUTPUT"; fi
           exit 0
 
       - name: Rust 1.96 HAL-scoped format
@@ -102,77 +99,48 @@ jobs:
         shell: bash
         run: |
           set +e
-          cargo fmt --manifest-path crates/domains/symthaea-hal/Cargo.toml -- --check \
-            > "$EVIDENCE_DIR/format.stdout.txt" 2> "$EVIDENCE_DIR/format.stderr.txt"
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > "$EVIDENCE_DIR/format-exit-code.txt"
-          exit 0
+          cargo fmt --manifest-path crates/domains/symthaea-hal/Cargo.toml -- --check > "$EVIDENCE_DIR/format.stdout.txt" 2> "$EVIDENCE_DIR/format.stderr.txt"
+          rc=$?; set -e; printf '%s\n' "$rc" > "$EVIDENCE_DIR/format-exit-code.txt"; exit 0
 
       - name: Check HAL all targets
         if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
         shell: bash
         run: |
           set +e
-          cargo check --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets \
-            > "$EVIDENCE_DIR/check.stdout.txt" 2> "$EVIDENCE_DIR/check.stderr.txt"
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > "$EVIDENCE_DIR/check-exit-code.txt"
-          exit 0
+          cargo check --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets > "$EVIDENCE_DIR/check.stdout.txt" 2> "$EVIDENCE_DIR/check.stderr.txt"
+          rc=$?; set -e; printf '%s\n' "$rc" > "$EVIDENCE_DIR/check-exit-code.txt"; exit 0
 
       - name: Run HAL tests
         if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
         shell: bash
         run: |
           set +e
-          cargo test --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml \
-            > "$EVIDENCE_DIR/tests.stdout.txt" 2> "$EVIDENCE_DIR/tests.stderr.txt"
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tests-exit-code.txt"
-          exit 0
+          cargo test --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml > "$EVIDENCE_DIR/tests.stdout.txt" 2> "$EVIDENCE_DIR/tests.stderr.txt"
+          rc=$?; set -e; printf '%s\n' "$rc" > "$EVIDENCE_DIR/tests-exit-code.txt"; exit 0
 
       - name: Strict HAL Clippy
         if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
         shell: bash
         run: |
           set +e
-          cargo clippy --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets -- -D warnings \
-            > "$EVIDENCE_DIR/clippy.stdout.txt" 2> "$EVIDENCE_DIR/clippy.stderr.txt"
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > "$EVIDENCE_DIR/clippy-exit-code.txt"
-          exit 0
+          cargo clippy --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets -- -D warnings > "$EVIDENCE_DIR/clippy.stdout.txt" 2> "$EVIDENCE_DIR/clippy.stderr.txt"
+          rc=$?; set -e; printf '%s\n' "$rc" > "$EVIDENCE_DIR/clippy-exit-code.txt"; exit 0
 
       - name: Require committed lock parity
         if: steps.provenance.outputs.ok == 'true'
         shell: bash
         run: |
           set +e
-          git diff --exit-code -- Cargo.lock \
-            > "$EVIDENCE_DIR/lock.stdout.txt" 2> "$EVIDENCE_DIR/lock.stderr.txt"
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > "$EVIDENCE_DIR/lock-exit-code.txt"
-          exit 0
+          git diff --exit-code -- Cargo.lock > "$EVIDENCE_DIR/lock.stdout.txt" 2> "$EVIDENCE_DIR/lock.stderr.txt"
+          rc=$?; set -e; printf '%s\n' "$rc" > "$EVIDENCE_DIR/lock-exit-code.txt"; exit 0
 
       - name: Prove postflight tracked checkout immutability
         if: always()
         shell: bash
         run: |
           set +e
-          (
-            set -euo pipefail
-            test "$(git rev-parse HEAD)" = "$SUBJECT"
-            git diff --exit-code
-            git diff --cached --exit-code
-            test -z "$(git status --porcelain --untracked-files=no)"
-          ) > "$EVIDENCE_DIR/postflight.stdout.txt" 2> "$EVIDENCE_DIR/postflight.stderr.txt"
-          rc=$?
-          set -e
-          printf '%s\n' "$rc" > "$EVIDENCE_DIR/postflight-exit-code.txt"
-          exit 0
+          ( set -euo pipefail; test "$(git rev-parse HEAD)" = "$SUBJECT"; git diff --exit-code; git diff --cached --exit-code; test -z "$(git status --porcelain --untracked-files=no)" ) > "$EVIDENCE_DIR/postflight.stdout.txt" 2> "$EVIDENCE_DIR/postflight.stderr.txt"
+          rc=$?; set -e; printf '%s\n' "$rc" > "$EVIDENCE_DIR/postflight-exit-code.txt"; exit 0
 
       - name: Compute qualification verdict without short-circuiting evidence
         if: always()
@@ -183,16 +151,8 @@ jobs:
           : > "$EVIDENCE_DIR/gate-summary.txt"
           for gate in toolchain provenance format check tests clippy lock postflight; do
             file="$EVIDENCE_DIR/${gate}-exit-code.txt"
-            if [ ! -f "$file" ]; then
-              printf '%s=MISSING\n' "$gate" | tee -a "$EVIDENCE_DIR/gate-summary.txt"
-              verdict=FAIL
-              continue
-            fi
-            rc="$(cat "$file")"
-            printf '%s=%s\n' "$gate" "$rc" | tee -a "$EVIDENCE_DIR/gate-summary.txt"
-            if [ "$rc" != 0 ]; then
-              verdict=FAIL
-            fi
+            if [ ! -f "$file" ]; then printf '%s=MISSING\n' "$gate" | tee -a "$EVIDENCE_DIR/gate-summary.txt"; verdict=FAIL; continue; fi
+            rc="$(cat "$file")"; printf '%s=%s\n' "$gate" "$rc" | tee -a "$EVIDENCE_DIR/gate-summary.txt"; if [ "$rc" != 0 ]; then verdict=FAIL; fi
           done
           printf '%s\n' "$verdict" > "$EVIDENCE_DIR/VERDICT.txt"
 
@@ -210,12 +170,7 @@ jobs:
             printf 'lib_sha256=%s\n' "$(sha256sum crates/domains/symthaea-hal/src/lib.rs | cut -d' ' -f1)"
             printf 'verdict=%s\n' "$(cat "$EVIDENCE_DIR/VERDICT.txt" 2>/dev/null || printf MISSING)"
           } > "$EVIDENCE_DIR/MANIFEST.txt"
-          (
-            cd "$EVIDENCE_DIR"
-            find . -type f ! -name SHA256SUMS.txt -print0 \
-              | LC_ALL=C sort -z \
-              | xargs -0 sha256sum > SHA256SUMS.txt
-          )
+          ( cd "$EVIDENCE_DIR"; find . -type f ! -name SHA256SUMS.txt -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS.txt )
 
       - name: Upload qualification evidence
         if: always()
