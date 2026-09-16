@@ -111,7 +111,11 @@ impl PredicateObservationV1 {
         field(&mut out, "plan", self.plan_digest.as_str());
         field(&mut out, "evidence", self.evidence_digest.as_str());
         field(&mut out, "role", self.role.canonical_name());
-        field(&mut out, "semantic-id", self.semantic.semantic_id().as_str());
+        field(
+            &mut out,
+            "semantic-id",
+            self.semantic.semantic_id().as_str(),
+        );
         field(
             &mut out,
             "semantic-commitment",
@@ -192,11 +196,7 @@ impl AdmissionBindingV1 {
 
     fn recomputed_evidence_root(&self) -> DigestSha256 {
         let mut out = String::from("symthaea-assurance-evidence-root-step-v1\n");
-        field(
-            &mut out,
-            "previous",
-            self.previous_evidence_root.as_str(),
-        );
+        field(&mut out, "previous", self.previous_evidence_root.as_str());
         field(&mut out, "ordinal", &self.ordinal.to_string());
         field(&mut out, "evidence", self.evidence_digest.as_str());
         field(
@@ -374,9 +374,8 @@ pub fn resolve_v1(
         return make_result(ResolutionOutcomeV1::Conflicted);
     }
 
-    let contradiction_state = |predicate: &DeclaredPredicate| {
-        state_for(&states, predicate.role, &predicate.commitment)
-    };
+    let contradiction_state =
+        |predicate: &DeclaredPredicate| state_for(&states, predicate.role, &predicate.commitment);
 
     if declared
         .iter()
@@ -638,9 +637,7 @@ fn parse_semantic_set(
     let count_label = format!("{prefix}-count");
     let id_label = format!("{prefix}-id");
     let commitment_label = format!("{prefix}-commitment");
-    let count_index = fields
-        .iter()
-        .position(|(label, _)| label == &count_label)?;
+    let count_index = fields.iter().position(|(label, _)| label == &count_label)?;
     let count: usize = fields.get(count_index)?.1.parse().ok()?;
     let mut cursor = count_index + 1;
     let mut out = Vec::with_capacity(count);
