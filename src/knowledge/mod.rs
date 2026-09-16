@@ -48,6 +48,7 @@ pub mod graph;
 pub mod hdc_retrieval;
 pub mod ignorance_frontier;
 pub mod inquiry_contract;
+pub mod inquiry_preregistration;
 pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
@@ -92,6 +93,10 @@ pub use ignorance_frontier::{
 pub use inquiry_contract::{
     EvidenceTarget, InquiryAuthority, InquiryContract, InquiryContractBuilder, InquiryContractError,
     InquiryContractId, InquiryPlan, InquiryRequest, ReviewRequirement,
+};
+pub use inquiry_preregistration::{
+    DecisionInterpretation, InquiryPreregistration, PreregisteredDecisionRule,
+    PreregistrationError,
 };
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
