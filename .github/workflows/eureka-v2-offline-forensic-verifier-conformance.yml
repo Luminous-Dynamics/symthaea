@@ -1,0 +1,186 @@
+name: EUREKA V2 Offline Forensic Verifier Conformance
+
+on:
+  pull_request:
+    paths:
+      - ".github/eureka/eureka-v2-qualification-forensic-verifier.py"
+      - ".github/eureka/eureka-v2-qualification-forensic-verifier-selftest.py"
+      - ".github/eureka/eureka-v2-qualification-forensic-manifest.py"
+      - ".github/eureka/eureka-v2-qualification-stage-runner.py"
+      - ".github/eureka/eureka-v2-qualification-stage-runner-selftest.py"
+      - ".github/eureka/eureka-v2-backend-qualification-contract.sh"
+      - ".github/workflows/eureka-v2-offline-forensic-verifier-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  EUREKA_OFFLINE_FORENSIC_VERIFIER_CONFORMANCE_REVISION: "EUREKA.002.V2.OFFLINE_FORENSIC_VERIFIER_CONFORMANCE.v1"
+  EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+
+jobs:
+  verify-offline-forensic-verifier:
+    name: Qualify EUREKA offline forensic verifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Capture exact verifier-conformance subject
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout is dirty before offline-verifier conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+
+          subject_head="$(git rev-parse HEAD)"
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          [[ "$subject_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
+            echo "Checked-out HEAD is not the intended verifier-conformance subject" >&2
+            exit 1
+          }
+          [[ "$EUREKA_GITHUB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "github.workflow_sha is not a canonical commit identity" >&2
+            exit 1
+          }
+          if ! git cat-file -e "${EUREKA_GITHUB_WORKFLOW_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$EUREKA_GITHUB_WORKFLOW_SHA"
+          fi
+
+          workflow=".github/workflows/eureka-v2-offline-forensic-verifier-conformance.yml"
+          verifier=".github/eureka/eureka-v2-qualification-forensic-verifier.py"
+          verifier_selftest=".github/eureka/eureka-v2-qualification-forensic-verifier-selftest.py"
+          producer=".github/eureka/eureka-v2-qualification-forensic-manifest.py"
+          runner=".github/eureka/eureka-v2-qualification-stage-runner.py"
+          stage_selftest=".github/eureka/eureka-v2-qualification-stage-runner-selftest.py"
+          contract=".github/eureka/eureka-v2-backend-qualification-contract.sh"
+
+          workflow_sha="$(sha256sum "$workflow" | awk '{print $1}')"
+          interpreted_workflow_sha="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow}" | sha256sum | awk '{print $1}')"
+          verifier_sha="$(sha256sum "$verifier" | awk '{print $1}')"
+          verifier_selftest_sha="$(sha256sum "$verifier_selftest" | awk '{print $1}')"
+          producer_sha="$(sha256sum "$producer" | awk '{print $1}')"
+          runner_sha="$(sha256sum "$runner" | awk '{print $1}')"
+          stage_selftest_sha="$(sha256sum "$stage_selftest" | awk '{print $1}')"
+          contract_sha="$(sha256sum "$contract" | awk '{print $1}')"
+          python_version="$(python3 --version)"
+          receipt="${RUNNER_TEMP}/eureka-v2-offline-forensic-verifier-conformance.env"
+
+          [[ "$workflow_sha" == "$interpreted_workflow_sha" ]] || {
+            echo "Checked-out verifier workflow differs from GitHub-interpreted bytes" >&2
+            exit 1
+          }
+
+          echo "EUREKA_VERIFIER_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
+          echo "EUREKA_VERIFIER_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
+          echo "EUREKA_VERIFIER_WORKFLOW_SHA256=$workflow_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_VERIFIER_SHA256=$verifier_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_VERIFIER_SELFTEST_SHA256=$verifier_selftest_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_MANIFEST_PRODUCER_SHA256=$producer_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_STAGE_RUNNER_SHA256=$runner_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_STAGE_SELFTEST_SHA256=$stage_selftest_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_COMMAND_CONTRACT_SHA256=$contract_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_VERIFIER_PYTHON_VERSION=$python_version" >> "$GITHUB_ENV"
+          echo "EUREKA_VERIFIER_CONFORMANCE_RECEIPT=$receipt" >> "$GITHUB_ENV"
+
+          {
+            printf 'conformance_revision=%s\n' "$EUREKA_OFFLINE_FORENSIC_VERIFIER_CONFORMANCE_REVISION"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'github_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'subject_head=%s\n' "$subject_head"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'workflow_sha256=%s\n' "$workflow_sha"
+            printf 'verifier_sha256=%s\n' "$verifier_sha"
+            printf 'verifier_selftest_sha256=%s\n' "$verifier_selftest_sha"
+            printf 'manifest_producer_sha256=%s\n' "$producer_sha"
+            printf 'stage_runner_sha256=%s\n' "$runner_sha"
+            printf 'stage_selftest_sha256=%s\n' "$stage_selftest_sha"
+            printf 'command_contract_sha256=%s\n' "$contract_sha"
+            printf 'python_version=%s\n' "$python_version"
+            printf 'producer_imported_by_verifier=false\n'
+            printf 'execution_authority_granted=false\n'
+          } > "$receipt"
+
+      - name: Run adversarial offline-verifier conformance suite
+        run: |
+          set -euo pipefail
+          python3 \
+            .github/eureka/eureka-v2-qualification-forensic-verifier-selftest.py \
+            .github/eureka/eureka-v2-qualification-forensic-verifier.py \
+            .github/eureka/eureka-v2-qualification-forensic-manifest.py \
+            .github/eureka/eureka-v2-backend-qualification-contract.sh \
+            .github/eureka/eureka-v2-qualification-stage-runner.py \
+            .github/eureka/eureka-v2-qualification-stage-runner-selftest.py \
+            .github/workflows/eureka-v2-offline-forensic-verifier-conformance.yml
+
+      - name: Verify exact postflight and seal PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_head="$(git rev-parse HEAD)"
+          current_tree="$(git rev-parse 'HEAD^{tree}')"
+          current_workflow="$(sha256sum .github/workflows/eureka-v2-offline-forensic-verifier-conformance.yml | awk '{print $1}')"
+          current_verifier="$(sha256sum .github/eureka/eureka-v2-qualification-forensic-verifier.py | awk '{print $1}')"
+          current_verifier_selftest="$(sha256sum .github/eureka/eureka-v2-qualification-forensic-verifier-selftest.py | awk '{print $1}')"
+          current_producer="$(sha256sum .github/eureka/eureka-v2-qualification-forensic-manifest.py | awk '{print $1}')"
+          current_runner="$(sha256sum .github/eureka/eureka-v2-qualification-stage-runner.py | awk '{print $1}')"
+          current_stage_selftest="$(sha256sum .github/eureka/eureka-v2-qualification-stage-runner-selftest.py | awk '{print $1}')"
+          current_contract="$(sha256sum .github/eureka/eureka-v2-backend-qualification-contract.sh | awk '{print $1}')"
+          current_python="$(python3 --version)"
+
+          [[ "$current_head" == "$EUREKA_VERIFIER_SUBJECT_HEAD" ]]
+          [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]]
+          [[ "$current_tree" == "$EUREKA_VERIFIER_SUBJECT_TREE" ]]
+          [[ "$current_workflow" == "$EUREKA_VERIFIER_WORKFLOW_SHA256" ]]
+          [[ "$current_verifier" == "$EUREKA_VERIFIER_SHA256" ]]
+          [[ "$current_verifier_selftest" == "$EUREKA_VERIFIER_SELFTEST_SHA256" ]]
+          [[ "$current_producer" == "$EUREKA_MANIFEST_PRODUCER_SHA256" ]]
+          [[ "$current_runner" == "$EUREKA_STAGE_RUNNER_SHA256" ]]
+          [[ "$current_stage_selftest" == "$EUREKA_STAGE_SELFTEST_SHA256" ]]
+          [[ "$current_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]]
+          [[ "$current_python" == "$EUREKA_VERIFIER_PYTHON_VERSION" ]]
+
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout mutated during offline-verifier conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+
+          printf 'checkout_clean_after=true\n' >> "$EUREKA_VERIFIER_CONFORMANCE_RECEIPT"
+          printf 'conformance_result=PASS\n' >> "$EUREKA_VERIFIER_CONFORMANCE_RECEIPT"
+
+      - name: Upload exact verifier-conformance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eureka-v2-offline-forensic-verifier-conformance-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/eureka-v2-offline-forensic-verifier-conformance.env
+            .github/workflows/eureka-v2-offline-forensic-verifier-conformance.yml
+            .github/eureka/eureka-v2-qualification-forensic-verifier.py
+            .github/eureka/eureka-v2-qualification-forensic-verifier-selftest.py
+            .github/eureka/eureka-v2-qualification-forensic-manifest.py
+            .github/eureka/eureka-v2-qualification-stage-runner.py
+            .github/eureka/eureka-v2-qualification-stage-runner-selftest.py
+            .github/eureka/eureka-v2-backend-qualification-contract.sh
+          if-no-files-found: error
+          retention-days: 90
