@@ -12,9 +12,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: assure-003-r1-exact-subject-v1
+  cancel-in-progress: true
+
 jobs:
   qualify:
     runs-on: ubuntu-slim
+    timeout-minutes: 35
     env:
       SUBJECT: 167c623089544af8857629832e989f298ce67c6a
       QUALIFIED_INPUT: 8ff27afded5ca9751129926dacfdc0ebac33bb9b
@@ -40,6 +45,9 @@ jobs:
             printf 'workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
             printf 'run_id=%s\n' "$GITHUB_RUN_ID"
             printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'runner_name=%s\n' "$RUNNER_NAME"
+            printf 'runner_os=%s\n' "$RUNNER_OS"
+            printf 'runner_arch=%s\n' "$RUNNER_ARCH"
           } > "$EVIDENCE_DIR/run.txt"
 
       - name: Install pinned Rust 1.96 qualification toolchain
@@ -49,12 +57,18 @@ jobs:
           set +e
           (
             set -euo pipefail
+            command -v timeout
+            timeout --version | head -n 1
             if ! command -v rustup >/dev/null 2>&1; then
-              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain none
+              curl --proto '=https' --tlsv1.2 --fail --show-error --silent \
+                --connect-timeout 15 --max-time 120 --retry 3 --retry-delay 2 \
+                https://sh.rustup.rs -o /tmp/rustup-init.sh
+              timeout --foreground 180s sh /tmp/rustup-init.sh -y --profile minimal --default-toolchain none
               export PATH="$HOME/.cargo/bin:$PATH"
               printf '%s\n' "$HOME/.cargo/bin" >> "$GITHUB_PATH"
             fi
-            rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+            timeout --foreground 360s rustup toolchain install 1.96.0 \
+              --profile minimal --component rustfmt --component clippy --no-self-update
             rustup override set 1.96.0
             rustc --version --verbose
             cargo --version
