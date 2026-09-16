@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-physical-cognition"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Neutral physical-computation backend contracts for Symthaea research"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
