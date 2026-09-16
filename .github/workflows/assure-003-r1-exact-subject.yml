@@ -1,0 +1,250 @@
+# Qualification-plane workflow only; ASSURE-003-R1 subject bytes remain frozen.
+name: ASSURE-003-R1 Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - 'qual/assure-003-r1-exact-subject-v1'
+    paths:
+      - '.github/workflows/assure-003-r1-exact-subject.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    env:
+      SUBJECT: 167c623089544af8857629832e989f298ce67c6a
+      QUALIFIED_INPUT: 8ff27afded5ca9751129926dacfdc0ebac33bb9b
+      EVIDENCE_DIR: /tmp/assure-003-r1-qualification
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 167c623089544af8857629832e989f298ce67c6a
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Initialize evidence capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$EVIDENCE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          printf '%s\n' "$SUBJECT" > "$EVIDENCE_DIR/subject.txt"
+          printf '%s\n' "$QUALIFIED_INPUT" > "$EVIDENCE_DIR/qualified-input.txt"
+          {
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+            printf 'workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+          } > "$EVIDENCE_DIR/run.txt"
+
+      - name: Install pinned Rust 1.96 qualification toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          set +e
+          (
+            set -euo pipefail
+            rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+            rustup override set 1.96.0
+            rustc --version --verbose
+            cargo --version
+            cargo fmt --version
+            cargo clippy --version
+          ) > "$EVIDENCE_DIR/toolchain.stdout.txt" 2> "$EVIDENCE_DIR/toolchain.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/toolchain-exit-code.txt"
+          if [ "$rc" -eq 0 ]; then
+            echo 'ok=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ok=false' >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Prove exact subject, ancestry, and finite ASSURE-003 surface
+        id: provenance
+        shell: bash
+        run: |
+          set +e
+          (
+            set -euo pipefail
+            test "$(git rev-parse HEAD)" = "$SUBJECT"
+            git merge-base --is-ancestor "$QUALIFIED_INPUT" "$SUBJECT"
+            test "$(git rev-list --count "$QUALIFIED_INPUT".."$SUBJECT")" = 1
+            git diff --name-only "$QUALIFIED_INPUT".."$SUBJECT" | tee "$EVIDENCE_DIR/changed-paths.txt"
+            test "$(wc -l < "$EVIDENCE_DIR/changed-paths.txt")" = 4
+            grep -Fxq '.github/workflows/assure-003.yml' "$EVIDENCE_DIR/changed-paths.txt"
+            grep -Fxq 'crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs' "$EVIDENCE_DIR/changed-paths.txt"
+            grep -Fxq 'crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs' "$EVIDENCE_DIR/changed-paths.txt"
+            grep -Fxq 'crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs' "$EVIDENCE_DIR/changed-paths.txt"
+            git diff --exit-code
+            git diff --cached --exit-code
+            test -z "$(git status --porcelain --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/provenance.stdout.txt" 2> "$EVIDENCE_DIR/provenance.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/provenance-exit-code.txt"
+          if [ "$rc" -eq 0 ]; then
+            echo 'ok=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ok=false' >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Rust 1.96 package format
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml -- --check \
+            > "$EVIDENCE_DIR/format.stdout.txt" 2> "$EVIDENCE_DIR/format.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/format-exit-code.txt"
+          exit 0
+
+      - name: Check reference resolver
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo check --locked --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --bin assure003_resolver \
+            > "$EVIDENCE_DIR/check.stdout.txt" 2> "$EVIDENCE_DIR/check.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/check-exit-code.txt"
+          exit 0
+
+      - name: Resolver adversarial tests
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --bin assure003_resolver \
+            > "$EVIDENCE_DIR/resolver-tests.stdout.txt" 2> "$EVIDENCE_DIR/resolver-tests.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/resolver-tests-exit-code.txt"
+          exit 0
+
+      - name: Preserve ASSURE-002 campaign regressions
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml \
+            > "$EVIDENCE_DIR/campaign-tests.stdout.txt" 2> "$EVIDENCE_DIR/campaign-tests.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/campaign-tests-exit-code.txt"
+          exit 0
+
+      - name: Strict ASSURE-003 Clippy
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo clippy --locked --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --all-targets -- -D warnings \
+            > "$EVIDENCE_DIR/clippy.stdout.txt" 2> "$EVIDENCE_DIR/clippy.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/clippy-exit-code.txt"
+          exit 0
+
+      - name: Require committed lock parity
+        if: steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          git diff --exit-code -- Cargo.lock \
+            > "$EVIDENCE_DIR/lock.stdout.txt" 2> "$EVIDENCE_DIR/lock.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/lock-exit-code.txt"
+          exit 0
+
+      - name: Prove postflight tracked checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          (
+            set -euo pipefail
+            test "$(git rev-parse HEAD)" = "$SUBJECT"
+            git diff --exit-code
+            git diff --cached --exit-code
+            test -z "$(git status --porcelain --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/postflight.stdout.txt" 2> "$EVIDENCE_DIR/postflight.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/postflight-exit-code.txt"
+          exit 0
+
+      - name: Compute qualification verdict without short-circuiting evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          verdict=PASS
+          : > "$EVIDENCE_DIR/gate-summary.txt"
+          for gate in toolchain provenance format check resolver-tests campaign-tests clippy lock postflight; do
+            file="$EVIDENCE_DIR/${gate}-exit-code.txt"
+            if [ ! -f "$file" ]; then
+              printf '%s=MISSING\n' "$gate" | tee -a "$EVIDENCE_DIR/gate-summary.txt"
+              verdict=FAIL
+              continue
+            fi
+            rc="$(cat "$file")"
+            printf '%s=%s\n' "$gate" "$rc" | tee -a "$EVIDENCE_DIR/gate-summary.txt"
+            if [ "$rc" != 0 ]; then
+              verdict=FAIL
+            fi
+          done
+          printf '%s\n' "$verdict" > "$EVIDENCE_DIR/VERDICT.txt"
+
+      - name: Capture qualification manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            printf 'subject=%s\n' "$SUBJECT"
+            printf 'subject_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'qualified_input=%s\n' "$QUALIFIED_INPUT"
+            printf 'embedded_workflow_blob=%s\n' "$(git hash-object .github/workflows/assure-003.yml)"
+            printf 'resolver_main_blob=%s\n' "$(git hash-object crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs)"
+            printf 'resolver_core_blob=%s\n' "$(git hash-object crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs)"
+            printf 'resolver_tests_blob=%s\n' "$(git hash-object crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs)"
+            printf 'resolver_main_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs | cut -d' ' -f1)"
+            printf 'resolver_core_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs | cut -d' ' -f1)"
+            printf 'resolver_tests_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs | cut -d' ' -f1)"
+            printf 'verdict=%s\n' "$(cat "$EVIDENCE_DIR/VERDICT.txt" 2>/dev/null || printf MISSING)"
+          } > "$EVIDENCE_DIR/MANIFEST.txt"
+          (
+            cd "$EVIDENCE_DIR"
+            find . -type f ! -name SHA256SUMS.txt -print0 \
+              | LC_ALL=C sort -z \
+              | xargs -0 sha256sum > SHA256SUMS.txt
+          )
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-003-r1-${{ env.SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce qualification verdict after evidence upload
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$EVIDENCE_DIR/VERDICT.txt"
+          test "$(cat "$EVIDENCE_DIR/VERDICT.txt")" = PASS
