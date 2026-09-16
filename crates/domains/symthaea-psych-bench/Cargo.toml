@@ -25,6 +25,7 @@ symthaea = { path = "../../..", optional = true }
 symthaea-core = { path = "../../core/symthaea-core" }
 symthaea-evidence-plane = { path = "../../core/symthaea-evidence-plane" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
+symthaea-arc3-protocol = { path = "../symthaea-arc3-protocol" }
 symthaea-ssm = { path = "../symthaea-ssm" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea-neuroevolution = { path = "../symthaea-neuroevolution", optional = true }
