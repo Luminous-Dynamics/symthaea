@@ -1,0 +1,23 @@
+[package]
+name = "symthaea-assurance-post-release-checkpoint-two-observation"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Tracee-side post-release ticket consumption before checkpoint-two live mapped observation"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "linux", "runtime", "attestation"]
+categories = ["development-tools", "cryptography"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+nix = { version = "=0.26.4", default-features = false, features = ["fs"] }
+symthaea-assurance-post-release-runtime-handoff = { path = "../symthaea-assurance-post-release-runtime-handoff" }
+symthaea-assurance-fresh-mapped-runtime-continuity = { path = "../symthaea-assurance-fresh-mapped-runtime-continuity" }
+symthaea-assurance-nix-bound-in-process-runtime = { path = "../symthaea-assurance-nix-bound-in-process-runtime" }
+symthaea-assurance-nix-runtime-closure = { path = "../symthaea-assurance-nix-runtime-closure" }
+symthaea-assurance-observed-mapped-nix-executable-runtime = { path = "../symthaea-assurance-observed-mapped-nix-executable-runtime" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
