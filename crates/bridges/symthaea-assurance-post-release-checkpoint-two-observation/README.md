@@ -1,0 +1,9 @@
+# Post-release checkpoint-two observation
+
+Consumes one canonical post-release re-entry ticket in the released tracee before constructing checkpoint 2 and before observing live executable mappings.
+
+This bridge deliberately bypasses the circular part of the older generic fresh-observation API. It does **not** require an already-completed `ContinuousVerifierExecution` in order to create the live observation that checkpoint 2 will later sign. Instead it consumes the structured #3561 wire from the reviewed inherited read end, requires the current Linux PID and static runtime identity to match the ticket, requires the ticket's predecessor alias to equal the exact checkpoint-one digest carried by that same ticket, chooses a strictly advancing checkpoint-two monotonic counter, constructs the existing #3403 `MappedRuntimeCheckpointChallenge`, and only then invokes #3365's live `/proc/self/maps` + `/proc/self/mem` observer directly.
+
+The resulting opaque capability commits the exact ticket bytes/digest, release/retention identities carried by the ticket, current PID, checkpoint-two challenge digest/coordinates, exact raw #3365 observation qualification and mapped-object-set digest, Nix/runtime identity and observation-time field.
+
+This tranche proves **consumption-before-observation and non-circular live construction**, not supervisor authenticity. The ticket is not authority merely because it parses. A later composition must bind its exact ticket/bytes digest to #3561's opaque `IssuedPostReleaseRuntimeChallenge`; another later theorem must prove that a signed checkpoint 2 commits this exact live observation. Checkpoint-one live provenance, exclusive pipe peer authority, mapping continuity between checkpoints, trusted time, global replay resistance and physical authority remain explicit non-claims.
