@@ -8,5 +8,3 @@ description = "Read-only adapters from active Symthaea engines into neutral neur
 [dependencies]
 symthaea-core = { path = "../symthaea-core", default-features = false }
 symthaea-neuroarch-types = { path = "../symthaea-neuroarch-types" }
-
-[dev-dependencies]
