@@ -31,6 +31,7 @@
 pub mod adaptive_ontology;
 #[cfg(feature = "epistemic")]
 pub mod adversarial_epistemics;
+pub mod causal_admission;
 pub mod causal_bridge;
 pub mod causal_hypothesis;
 pub mod causal_reasoning_bridge;
@@ -53,6 +54,9 @@ pub mod reasoning_context;
 pub mod self_schema;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
+pub use causal_admission::{
+    CausalAdmissionDecision, CausalAdmissionFailure, CausalAdmissionGate, CausalAdmissionPolicy,
+};
 pub use causal_bridge::CausalKnowledgeBridge;
 pub use causal_hypothesis::{
     CausalEvidenceProfile, CausalHypothesis, CausalHypothesisError, CausalHypothesisId,
