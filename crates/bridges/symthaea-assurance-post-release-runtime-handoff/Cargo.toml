@@ -1,0 +1,24 @@
+[package]
+name = "symthaea-assurance-post-release-runtime-handoff"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Release-bound retained supervisor-to-runtime re-entry challenge handoff"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "linux", "runtime", "continuity"]
+categories = ["development-tools", "cryptography"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+getrandom = { workspace = true }
+nix = { version = "=0.26.4", default-features = false, features = ["fs"] }
+symthaea-assurance-continuity-qualified-bootstrap-release = { path = "../symthaea-assurance-continuity-qualified-bootstrap-release" }
+symthaea-assurance-bootstrap-syscall-confinement = { path = "../symthaea-assurance-bootstrap-syscall-confinement" }
+symthaea-assurance-bootstrap-executable-mapping-continuity = { path = "../symthaea-assurance-bootstrap-executable-mapping-continuity" }
+symthaea-assurance-bootstrap-ready-checkpoint = { path = "../symthaea-assurance-bootstrap-ready-checkpoint" }
+symthaea-assurance-launch-runtime-handoff-channel = { path = "../symthaea-assurance-launch-runtime-handoff-channel" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
