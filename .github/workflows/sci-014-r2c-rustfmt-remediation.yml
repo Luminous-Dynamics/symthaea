@@ -20,7 +20,7 @@ env:
 jobs:
   remediate:
     name: Rebuild exact R2C format-only successor
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     timeout-minutes: 30
     steps:
       - name: Checkout exact helper head
