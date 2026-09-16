@@ -46,6 +46,7 @@ pub mod extraction;
 pub mod graph;
 #[cfg(feature = "epistemic")]
 pub mod hdc_retrieval;
+pub mod ignorance_frontier;
 pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
@@ -83,6 +84,10 @@ pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
 };
 pub use graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactId, TemporalFact};
+pub use ignorance_frontier::{
+    ClaimIgnoranceProfile, IgnoranceFrontier, IgnoranceFrontierError, IgnoranceFrontierReport,
+    KnowledgeGap,
+};
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
     CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
