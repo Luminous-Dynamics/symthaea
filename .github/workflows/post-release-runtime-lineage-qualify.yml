@@ -1,0 +1,392 @@
+name: Post-release Runtime Lineage Qualification
+
+on:
+  push:
+    branches:
+      - 'qualify/post-release-runtime-lineage'
+    paths:
+      - '.github/workflows/post-release-runtime-lineage-qualify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-release-runtime-lineage-qualify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: 897cb2c638dcaa14618d4e7eb205a3ecd368d8a6
+  TERMINAL_PACKAGE: symthaea-assurance-post-release-continuous-runtime-lineage
+  CARGO_TERM_COLOR: always
+
+jobs:
+  qualify:
+    name: Exact-head focused Rust 1.96 qualification
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Checkout qualification helper
+        uses: actions/checkout@v4
+        with:
+          path: qualifier
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Prove qualification-only topology
+        id: topology
+        working-directory: qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SUBJECT_SHA"
+          test "$(git rev-list --count "$SUBJECT_SHA"..HEAD)" = 1
+          mapfile -t changed < <(git diff --name-only "$SUBJECT_SHA" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/post-release-runtime-lineage-qualify.yml"
+          git diff --check "$SUBJECT_SHA" HEAD
+          printf 'qualifier_head=%s\nsubject=%s\nscope=workflow-only\n' \
+            "$(git rev-parse HEAD)" "$SUBJECT_SHA" > "$RUNNER_TEMP/topology.txt"
+
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Bind exact subject and declared terminal package
+        id: subject
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -f "crates/bridges/$TERMINAL_PACKAGE/Cargo.toml"
+          grep -Fqx "name = \"$TERMINAL_PACKAGE\"" \
+            "crates/bridges/$TERMINAL_PACKAGE/Cargo.toml"
+          git diff --check HEAD
+          sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.subject.sha256"
+          printf 'subject_head=%s\nsubject_tree=%s\nterminal_package=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$TERMINAL_PACKAGE" \
+            > "$RUNNER_TEMP/subject.txt"
+
+      - name: Install pinned Rust 1.96
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Bind Rust and Cargo versions
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose | tee "$RUNNER_TEMP/rustc-version.txt"
+          cargo --version --verbose | tee "$RUNNER_TEMP/cargo-version.txt"
+          rustc --version | grep -Eq '^rustc 1\.96\.0([[:space:]]|$)'
+          cargo --version | grep -Eq '^cargo 1\.96\.0([[:space:]]|$)'
+
+      - name: Require full committed lock closure
+        id: lock
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.before.sha256"
+
+          set +e
+          cargo metadata --locked --format-version 1 \
+            > "$RUNNER_TEMP/metadata.locked.json" \
+            2> "$RUNNER_TEMP/metadata.locked.stderr"
+          locked_status=$?
+          set -e
+          printf '%s\n' "$locked_status" > "$RUNNER_TEMP/metadata.locked.status"
+
+          if [ "$locked_status" -ne 0 ]; then
+            if ! git diff --quiet -- Cargo.lock; then
+              echo 'cargo metadata --locked unexpectedly mutated Cargo.lock' >&2
+              git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.locked-probe.patch"
+              git checkout -- Cargo.lock
+              echo 'LOCKED_PROBE_MUTATED_PRODUCT' > "$RUNNER_TEMP/lock-classification.txt"
+              exit 1
+            fi
+
+            set +e
+            cargo metadata --format-version 1 \
+              > "$RUNNER_TEMP/metadata.reconciled.json" \
+              2> "$RUNNER_TEMP/metadata.reconciled.stderr"
+            reconcile_status=$?
+            set -e
+            printf '%s\n' "$reconcile_status" > "$RUNNER_TEMP/metadata.reconciled.status"
+
+            git status --porcelain=v1 --untracked-files=all \
+              > "$RUNNER_TEMP/reconciled-git-status.txt"
+
+            if [ "$reconcile_status" -ne 0 ]; then
+              git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.reconcile-failed.patch" || true
+              git checkout -- Cargo.lock
+              echo 'LOCK_RECONCILIATION_FAILED' > "$RUNNER_TEMP/lock-classification.txt"
+              exit 1
+            fi
+
+            python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          lines = subprocess.check_output(
+              ['git', 'status', '--porcelain=v1', '--untracked-files=all'],
+              text=True,
+          ).splitlines()
+          paths = []
+          for line in lines:
+              if len(line) < 4:
+                  print(f'malformed git status line: {line!r}', file=sys.stderr)
+                  sys.exit(1)
+              paths.append(line[3:])
+          unexpected = sorted({path for path in paths if path != 'Cargo.lock'})
+          if unexpected:
+              print('Cargo reconciliation changed paths other than Cargo.lock:', file=sys.stderr)
+              print('\n'.join(unexpected), file=sys.stderr)
+              sys.exit(1)
+          PY
+
+            cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+            sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.generated.sha256"
+            git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.generated.patch"
+            test -s "$RUNNER_TEMP/Cargo.lock.generated.patch"
+
+            set +e
+            cargo metadata --locked --format-version 1 \
+              > "$RUNNER_TEMP/metadata.generated-locked.json" \
+              2> "$RUNNER_TEMP/metadata.generated-locked.stderr"
+            generated_locked_status=$?
+            set -e
+            printf '%s\n' "$generated_locked_status" \
+              > "$RUNNER_TEMP/metadata.generated-locked.status"
+
+            git checkout -- Cargo.lock
+            test "$(sha256sum Cargo.lock | awk '{print $1}')" = \
+              "$(awk '{print $1}' "$RUNNER_TEMP/Cargo.lock.before.sha256")"
+
+            if [ "$generated_locked_status" -ne 0 ]; then
+              echo 'GENERATED_LOCK_NOT_SELF_CONSISTENT' > "$RUNNER_TEMP/lock-classification.txt"
+              exit 1
+            fi
+
+            echo 'FAIL_LOCK_DRIFT' > "$RUNNER_TEMP/lock-classification.txt"
+            echo 'Committed Cargo.lock does not represent the exact subject workspace.' >&2
+            echo 'Cargo-generated bytes were retained as remediation evidence only.' >&2
+            exit 1
+          fi
+
+          echo 'PASS_LOCKED_METADATA' > "$RUNNER_TEMP/lock-classification.txt"
+          git diff --exit-code -- Cargo.lock
+
+      - name: Derive exact local semantic package closure
+        id: closure
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = json.loads((Path(os.environ['RUNNER_TEMP']) / 'metadata.locked.json').read_text())
+          packages = {pkg['id']: pkg for pkg in metadata['packages']}
+          nodes = {node['id']: node for node in metadata['resolve']['nodes']}
+          terminal_name = os.environ['TERMINAL_PACKAGE']
+          roots = [pkg for pkg in metadata['packages'] if pkg['name'] == terminal_name]
+          if len(roots) != 1:
+              raise SystemExit(f'expected exactly one terminal package {terminal_name!r}, got {len(roots)}')
+
+          stack = [roots[0]['id']]
+          seen = set()
+          while stack:
+              package_id = stack.pop()
+              if package_id in seen:
+                  continue
+              seen.add(package_id)
+              node = nodes.get(package_id)
+              if node is not None:
+                  stack.extend(dep['pkg'] for dep in node['deps'])
+
+          workspace_root = Path(metadata['workspace_root']).resolve()
+          local = []
+          for package_id in seen:
+              pkg = packages[package_id]
+              manifest = Path(pkg['manifest_path']).resolve()
+              try:
+                  manifest.relative_to(workspace_root)
+              except ValueError:
+                  continue
+              if pkg['source'] is None:
+                  local.append(pkg['name'])
+
+          local = sorted(set(local))
+          if terminal_name not in local:
+              raise SystemExit('terminal package missing from derived local closure')
+          out = Path(os.environ['RUNNER_TEMP']) / 'local-semantic-closure.txt'
+          out.write_text(''.join(f'{name}\n' for name in local))
+          print(f'local semantic closure: {len(local)} packages')
+          print(out.read_text(), end='')
+          PY
+
+      - name: Rustfmt exact local semantic closure
+        id: fmt
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r package; do
+            args+=( -p "$package" )
+          done < "$RUNNER_TEMP/local-semantic-closure.txt"
+          cargo fmt "${args[@]}" -- --check \
+            2>&1 | tee "$RUNNER_TEMP/rustfmt.txt"
+
+      - name: Cargo check exact terminal closure
+        id: check
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p "$TERMINAL_PACKAGE" --all-targets \
+            2>&1 | tee "$RUNNER_TEMP/cargo-check.txt"
+
+      - name: Test every local package in semantic closure
+        id: tests
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/cargo-test.txt"
+          while IFS= read -r package; do
+            printf '\n===== cargo test -p %s =====\n' "$package" \
+              | tee -a "$RUNNER_TEMP/cargo-test.txt"
+            cargo test --locked -p "$package" \
+              2>&1 | tee -a "$RUNNER_TEMP/cargo-test.txt"
+          done < "$RUNNER_TEMP/local-semantic-closure.txt"
+
+      - name: Strict Clippy every local package in semantic closure
+        id: clippy
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > "$RUNNER_TEMP/clippy.txt"
+          while IFS= read -r package; do
+            printf '\n===== cargo clippy -p %s =====\n' "$package" \
+              | tee -a "$RUNNER_TEMP/clippy.txt"
+            cargo clippy --locked -p "$package" --all-targets -- -D warnings \
+              2>&1 | tee -a "$RUNNER_TEMP/clippy.txt"
+          done < "$RUNNER_TEMP/local-semantic-closure.txt"
+
+      - name: Prove exact subject postflight immutability
+        id: postflight
+        if: always()
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          printf 'postflight_immutable=PASS\nhead=%s\ntree=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" \
+            > "$RUNNER_TEMP/postflight.txt"
+
+      - name: Write qualification receipt
+        if: always()
+        shell: bash
+        env:
+          TOPOLOGY_OUTCOME: ${{ steps.topology.outcome }}
+          SUBJECT_OUTCOME: ${{ steps.subject.outcome }}
+          TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
+          LOCK_OUTCOME: ${{ steps.lock.outcome }}
+          CLOSURE_OUTCOME: ${{ steps.closure.outcome }}
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+          CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+        run: |
+          set -euo pipefail
+          classification=NOT_ESTABLISHED
+          if [ "$TOPOLOGY_OUTCOME" = success ] \
+            && [ "$SUBJECT_OUTCOME" = success ] \
+            && [ "$TOOLCHAIN_OUTCOME" = success ] \
+            && [ "$LOCK_OUTCOME" = success ] \
+            && [ "$CLOSURE_OUTCOME" = success ] \
+            && [ "$FMT_OUTCOME" = success ] \
+            && [ "$CHECK_OUTCOME" = success ] \
+            && [ "$TEST_OUTCOME" = success ] \
+            && [ "$CLIPPY_OUTCOME" = success ] \
+            && [ "$POSTFLIGHT_OUTCOME" = success ]; then
+            classification=QUALIFIED_EXACT_HEAD
+          elif [ -f "$RUNNER_TEMP/lock-classification.txt" ]; then
+            classification="$(cat "$RUNNER_TEMP/lock-classification.txt")"
+          fi
+
+          cat > "$RUNNER_TEMP/qualification-receipt.txt" <<EOF
+          schema=symthaea.assurance.post-release-runtime-lineage-qualification.v1
+          qualifier_sha=${GITHUB_SHA}
+          subject_sha=${SUBJECT_SHA}
+          terminal_package=${TERMINAL_PACKAGE}
+          topology=${TOPOLOGY_OUTCOME}
+          subject_binding=${SUBJECT_OUTCOME}
+          toolchain=${TOOLCHAIN_OUTCOME}
+          lock=${LOCK_OUTCOME}
+          closure=${CLOSURE_OUTCOME}
+          rustfmt=${FMT_OUTCOME}
+          check=${CHECK_OUTCOME}
+          tests=${TEST_OUTCOME}
+          clippy=${CLIPPY_OUTCOME}
+          postflight=${POSTFLIGHT_OUTCOME}
+          qualification_result=${classification}
+          EOF
+          cat "$RUNNER_TEMP/qualification-receipt.txt"
+
+      - name: Retain focused qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-release-runtime-lineage-${{ env.SUBJECT_SHA }}
+          path: |
+            ${{ runner.temp }}/qualification-receipt.txt
+            ${{ runner.temp }}/topology.txt
+            ${{ runner.temp }}/subject.txt
+            ${{ runner.temp }}/rustc-version.txt
+            ${{ runner.temp }}/cargo-version.txt
+            ${{ runner.temp }}/Cargo.lock.subject.sha256
+            ${{ runner.temp }}/Cargo.lock.before
+            ${{ runner.temp }}/Cargo.lock.before.sha256
+            ${{ runner.temp }}/Cargo.lock.generated
+            ${{ runner.temp }}/Cargo.lock.generated.sha256
+            ${{ runner.temp }}/Cargo.lock.generated.patch
+            ${{ runner.temp }}/Cargo.lock.locked-probe.patch
+            ${{ runner.temp }}/Cargo.lock.reconcile-failed.patch
+            ${{ runner.temp }}/metadata.locked.json
+            ${{ runner.temp }}/metadata.locked.stderr
+            ${{ runner.temp }}/metadata.locked.status
+            ${{ runner.temp }}/metadata.reconciled.json
+            ${{ runner.temp }}/metadata.reconciled.stderr
+            ${{ runner.temp }}/metadata.reconciled.status
+            ${{ runner.temp }}/metadata.generated-locked.json
+            ${{ runner.temp }}/metadata.generated-locked.stderr
+            ${{ runner.temp }}/metadata.generated-locked.status
+            ${{ runner.temp }}/reconciled-git-status.txt
+            ${{ runner.temp }}/lock-classification.txt
+            ${{ runner.temp }}/local-semantic-closure.txt
+            ${{ runner.temp }}/rustfmt.txt
+            ${{ runner.temp }}/cargo-check.txt
+            ${{ runner.temp }}/cargo-test.txt
+            ${{ runner.temp }}/clippy.txt
+            ${{ runner.temp }}/postflight.txt
+          if-no-files-found: warn
+          retention-days: 14
