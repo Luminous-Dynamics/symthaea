@@ -3,16 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Diagnostic ignorance frontier for explicit knowledge gaps.
 //!
-//! The frontier describes missing, conflicting, or stale epistemic support for
-//! an explicitly supplied claim set. It does not browse, run experiments, rank
-//! research priorities, change confidence, or trigger autonomous learning.
+//! The frontier describes missing, conflicting, stale, or provenance-concentrated
+//! epistemic support for an explicitly supplied claim set. It does not browse,
+//! run experiments, rank research priorities, change confidence, or trigger
+//! autonomous learning.
 
-use super::claim_evidence::{
-    ClaimId, ClaimKind, EpistemicLedger, EvidencePolarity,
-};
-use super::epistemic_vector::{
-    ClaimUncertaintyAssessment, UncertaintyDimension,
-};
+use super::claim_evidence::{ClaimId, ClaimKind, EpistemicLedger, EvidencePolarity};
+use super::epistemic_vector::{ClaimUncertaintyAssessment, UncertaintyDimension};
+use super::evidence_independence::EvidenceIndependenceAnalyzer;
 use std::collections::{BTreeMap, HashSet};
 use std::error::Error;
 use std::fmt;
@@ -31,6 +29,15 @@ pub enum KnowledgeGap {
     NoEvidence,
     /// Evidence exists, but none of it is marked as supporting the claim.
     NoSupportingEvidence,
+    /// Supporting records share declared ultimate provenance roots.
+    ///
+    /// This indicates source concentration only; distinct roots would still not
+    /// prove statistical or institutional independence.
+    SharedSupportingProvenanceAncestry {
+        shared_pair_count: usize,
+        supporting_evidence_count: usize,
+        distinct_root_count: usize,
+    },
     /// Contradicting evidence exists and remains unresolved in the ledger.
     ContradictoryEvidence { count: usize },
     /// A causal claim has no supporting Intervention/Replication record.
@@ -54,6 +61,7 @@ pub struct ClaimIgnoranceProfile {
     pub claim_id: ClaimId,
     pub evidence_count: usize,
     pub supporting_evidence_count: usize,
+    pub supporting_distinct_provenance_root_count: usize,
     pub contradicting_evidence_count: usize,
     pub interventional_support_count: usize,
     pub assessed_uncertainty_dimension_count: usize,
@@ -159,12 +167,25 @@ impl IgnoranceFrontier {
                 .filter(|record| record.polarity == EvidencePolarity::Contradicts)
                 .count();
             let interventional_support_count = ledger.interventional_support_count(claim_id);
+            let supporting_provenance = EvidenceIndependenceAnalyzer::analyze(
+                ledger,
+                claim_id,
+                EvidencePolarity::Supports,
+            );
+            let supporting_distinct_provenance_root_count = supporting_provenance.distinct_root_count;
 
             let mut gaps = Vec::new();
             if evidence_count == 0 {
                 gaps.push(KnowledgeGap::NoEvidence);
             } else if supporting_evidence_count == 0 {
                 gaps.push(KnowledgeGap::NoSupportingEvidence);
+            }
+            if supporting_provenance.has_shared_ancestry() {
+                gaps.push(KnowledgeGap::SharedSupportingProvenanceAncestry {
+                    shared_pair_count: supporting_provenance.shared_ancestry.len(),
+                    supporting_evidence_count,
+                    distinct_root_count: supporting_provenance.distinct_root_count,
+                });
             }
             if contradicting_evidence_count > 0 {
                 gaps.push(KnowledgeGap::ContradictoryEvidence {
@@ -207,6 +228,7 @@ impl IgnoranceFrontier {
                 claim_id,
                 evidence_count,
                 supporting_evidence_count,
+                supporting_distinct_provenance_root_count,
                 contradicting_evidence_count,
                 interventional_support_count,
                 assessed_uncertainty_dimension_count,
@@ -225,9 +247,7 @@ impl IgnoranceFrontier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knowledge::{
-        EpistemicVector, EvidenceKind, UncertaintyDimension,
-    };
+    use crate::knowledge::{EpistemicVector, EvidenceKind, UncertaintyDimension};
 
     fn source(ledger: &mut EpistemicLedger, label: &str) -> crate::knowledge::ProvenanceId {
         ledger
@@ -250,6 +270,7 @@ mod tests {
             .gaps
             .contains(&KnowledgeGap::NoUncertaintyAssessment));
         assert_eq!(profile.interventional_support_count, 0);
+        assert_eq!(profile.supporting_distinct_provenance_root_count, 0);
     }
 
     #[test]
@@ -275,6 +296,74 @@ mod tests {
         assert!(profile
             .gaps
             .contains(&KnowledgeGap::NoInterventionalSupport));
+        assert_eq!(profile.supporting_distinct_provenance_root_count, 1);
+    }
+
+    #[test]
+    fn copied_supporting_reports_surface_provenance_concentration() {
+        let mut ledger = EpistemicLedger::new();
+        let original = source(&mut ledger, "original");
+        let copy_a = ledger
+            .add_provenance("copy-a", None, None, 2, vec![original])
+            .unwrap();
+        let copy_b = ledger
+            .add_provenance("copy-b", None, None, 2, vec![original])
+            .unwrap();
+        let claim = ledger.add_claim("X exists", ClaimKind::Descriptive, None, None, 1);
+        for provenance in [copy_a, copy_b] {
+            ledger
+                .add_evidence(
+                    claim,
+                    EvidenceKind::Report,
+                    EvidencePolarity::Supports,
+                    provenance,
+                    3,
+                    None,
+                    None,
+                )
+                .unwrap();
+        }
+
+        let report = IgnoranceFrontier::inspect(&ledger, &[claim], &[]).unwrap();
+        let profile = &report.profiles[0];
+        assert_eq!(profile.supporting_evidence_count, 2);
+        assert_eq!(profile.supporting_distinct_provenance_root_count, 1);
+        assert!(profile.gaps.contains(
+            &KnowledgeGap::SharedSupportingProvenanceAncestry {
+                shared_pair_count: 1,
+                supporting_evidence_count: 2,
+                distinct_root_count: 1,
+            }
+        ));
+    }
+
+    #[test]
+    fn separately_rooted_support_is_not_called_independent_or_a_gap() {
+        let mut ledger = EpistemicLedger::new();
+        let a = source(&mut ledger, "a");
+        let b = source(&mut ledger, "b");
+        let claim = ledger.add_claim("X exists", ClaimKind::Descriptive, None, None, 1);
+        for provenance in [a, b] {
+            ledger
+                .add_evidence(
+                    claim,
+                    EvidenceKind::Report,
+                    EvidencePolarity::Supports,
+                    provenance,
+                    2,
+                    None,
+                    None,
+                )
+                .unwrap();
+        }
+
+        let report = IgnoranceFrontier::inspect(&ledger, &[claim], &[]).unwrap();
+        let profile = &report.profiles[0];
+        assert_eq!(profile.supporting_distinct_provenance_root_count, 2);
+        assert!(!profile.gaps.iter().any(|gap| matches!(
+            gap,
+            KnowledgeGap::SharedSupportingProvenanceAncestry { .. }
+        )));
     }
 
     #[test]
