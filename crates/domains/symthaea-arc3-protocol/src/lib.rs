@@ -259,8 +259,8 @@ impl TryFrom<WireObservation> for Arc3Envelope {
 fn parse_action(input: &WireActionInput) -> Result<Arc3Action, Arc3ProtocolError> {
     let kind = parse_action_kind(&input.id)?;
     for (key, value) in &input.data {
-        let allowed = key == "game_id"
-            || (kind == Arc3ActionKind::Action6 && (key == "x" || key == "y"));
+        let allowed =
+            key == "game_id" || (kind == Arc3ActionKind::Action6 && (key == "x" || key == "y"));
         if !allowed {
             return Err(Arc3ProtocolError::UnexpectedActionField(key.clone()));
         }
