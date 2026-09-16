@@ -191,6 +191,11 @@ fn rejects_invalid_schema_shape_and_timescale() {
 
 #[test]
 fn every_v1_circuit_identity_field_is_commitment_bound() {
+    let mut renumbered = topology();
+    renumbered.circuits[0].id = CircuitId(4);
+    renumbered.edges[0].source = CircuitId(4);
+    assert_commitment_changes(renumbered);
+
     let mut mutated = topology();
     mutated.circuits[0].role = "different".to_string();
     assert_commitment_changes(mutated);
@@ -222,6 +227,10 @@ fn every_v1_circuit_identity_field_is_commitment_bound() {
 
 #[test]
 fn every_v1_edge_identity_field_is_commitment_bound() {
+    let mut mutated = topology();
+    mutated.edges[0].id = EdgeId(42);
+    assert_commitment_changes(mutated);
+
     let mut mutated = topology();
     mutated.edges[0].source = CircuitId(3);
     assert_commitment_changes(mutated);
