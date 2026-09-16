@@ -33,6 +33,10 @@ pub enum TimescaleClass {
 }
 
 impl TimescaleClass {
+    /// Convert an exact model time constant into the V1 structural declaration.
+    ///
+    /// V1 structural topology records time at nanosecond resolution. Exact
+    /// floating-point model configuration belongs in subject/config identity.
     pub fn from_seconds(seconds: f32) -> Result<Self, TopologyError> {
         if !seconds.is_finite() || seconds <= 0.0 {
             return Err(TopologyError::InvalidTimescale);
@@ -53,10 +57,14 @@ impl TimescaleClass {
     }
 }
 
+/// Static implementation identity for a circuit.
+///
+/// `ExternalInput` is the only schema-level special case. Computational
+/// implementations use a bounded canonical token so this neutral crate never
+/// needs a variant for each concrete engine lineage.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum CircuitImplementation {
     ExternalInput,
-    IncumbentHdcLtcLayer,
     Named(String),
 }
 
@@ -73,11 +81,25 @@ pub struct CircuitDescriptor {
     /// Descriptive metadata only; this is not evidence of actual function.
     pub role: String,
     pub timescale_class: TimescaleClass,
+    /// Logical state dimensions per implementation unit.
     pub state_dimension: u64,
+    /// Number of implementation units represented by this circuit.
     pub unit_count: u64,
     pub implementation: CircuitImplementation,
     pub input_merge_policy: InputMergePolicy,
     pub modulation_profile: Option<String>,
+}
+
+impl CircuitDescriptor {
+    /// Checked logical-state total for resource accounting.
+    ///
+    /// Receipts should preserve both raw factors and derive the total exactly
+    /// once through this operation.
+    pub fn total_state_dimensions(&self) -> Result<u64, TopologyError> {
+        self.state_dimension
+            .checked_mul(self.unit_count)
+            .ok_or(TopologyError::DimensionOverflow)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -102,6 +124,8 @@ pub enum RecurrenceKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum BudgetClass {
+    /// No bounded route budget is declared by the adapted legacy interface.
+    /// This is not a claim of infinite physical capacity.
     LegacyUnbounded,
     Local,
     Global,
@@ -139,6 +163,10 @@ pub struct TopologyCommitment(pub [u8; 32]);
 
 impl TopologyCommitment {
     pub const ALGORITHM: &'static str = "blake3";
+
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
 }
 
 impl fmt::Display for TopologyCommitment {
@@ -209,6 +237,7 @@ impl TopologyDescriptor {
             if circuit.unit_count == 0 {
                 return Err(TopologyError::InvalidUnitCount(circuit.id));
             }
+            circuit.total_state_dimensions()?;
             circuit.timescale_class.validate()?;
             validate_impl(&circuit.implementation)?;
             if let Some(profile) = &circuit.modulation_profile {
@@ -250,10 +279,10 @@ impl TopologyDescriptor {
             let (source, target) = canonical_endpoints(edge);
             let direction = direction_tag(edge.direction);
             let pair = (direction, source, target);
-            if !self.allow_parallel_channels && !endpoint_pairs.insert(pair) {
+            let first_for_pair = endpoint_pairs.insert(pair);
+            if !self.allow_parallel_channels && !first_for_pair {
                 return Err(TopologyError::DuplicateStructuralEdge { source, target });
             }
-            endpoint_pairs.insert(pair);
 
             let channel_key = (direction, source, target, edge.channel.clone());
             if !channel_edges.insert(channel_key) {
@@ -265,6 +294,7 @@ impl TopologyDescriptor {
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, TopologyError> {
         self.validate()?;
+
         let mut out = Vec::new();
         out.extend_from_slice(TOPOLOGY_DOMAIN);
         out.extend_from_slice(&self.schema_version.to_le_bytes());
@@ -309,9 +339,6 @@ fn validate_symbolic_token(value: &str) -> Result<(), TopologyError> {
 }
 
 fn validate_named(value: &str) -> Result<(), TopologyError> {
-    if value.is_empty() {
-        return Err(TopologyError::EmptyNamedField);
-    }
     validate_symbolic_token(value)
 }
 
@@ -405,9 +432,8 @@ fn encode_timescale(out: &mut Vec<u8>, value: &TimescaleClass) {
 fn encode_impl(out: &mut Vec<u8>, value: &CircuitImplementation) -> Result<(), TopologyError> {
     match value {
         CircuitImplementation::ExternalInput => out.push(0),
-        CircuitImplementation::IncumbentHdcLtcLayer => out.push(1),
         CircuitImplementation::Named(name) => {
-            out.push(2);
+            out.push(1);
             push_str(out, name)?;
         }
     }
@@ -489,7 +515,7 @@ mod tests {
             role: role.to_string(),
             timescale_class: TimescaleClass::Medium,
             state_dimension: 64,
-            unit_count: 1,
+            unit_count: 2,
             implementation: CircuitImplementation::Named("test".to_string()),
             input_merge_policy: InputMergePolicy::Single,
             modulation_profile: None,
@@ -550,6 +576,20 @@ mod tests {
         bad = topology();
         bad.circuits[0].role = "visuál".to_string();
         assert_eq!(bad.validate(), Err(TopologyError::InvalidSymbolicToken));
+    }
+
+    #[test]
+    fn state_total_is_checked() {
+        let circuit = circuit(1, "a");
+        assert_eq!(circuit.total_state_dimensions().unwrap(), 128);
+
+        let mut overflow = circuit;
+        overflow.state_dimension = u64::MAX;
+        overflow.unit_count = 2;
+        assert_eq!(
+            overflow.total_state_dimensions(),
+            Err(TopologyError::DimensionOverflow)
+        );
     }
 
     #[test]
