@@ -1,0 +1,29 @@
+{
+  "schema": "symthaea.rel.sealed-evidence-source.v1",
+  "authority": "EvidenceArchive",
+  "source_run_id": 35083005616,
+  "source_head": "08cf8462c05a7f05660034462c15f4985bfe7e05",
+  "source_base": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "execution_artifact": {
+    "id": 10444169056,
+    "name": "rel-005a-execution-08cf8462c05a7f05660034462c15f4985bfe7e05",
+    "sha256": "aa5ece89ef98f0c45687b55875bdaade9d1b28243c5c499185576666ab0286b6"
+  },
+  "observation_seal_artifact": {
+    "id": 10444099340,
+    "name": "rel-005a-observation-seal-08cf8462c05a7f05660034462c15f4985bfe7e05",
+    "sha256": "2112b30159328c91802f774a42416db83c00dec746d0dc1d0016455a4be9929e"
+  },
+  "judge_static_run_id": 35089653602,
+  "judge_head": "534e1b64ad485a89f95d73617ef51af65cf2eead",
+  "judge_contract_artifact": {
+    "id": 10444746076,
+    "name": "rel-005a-comparison-only-contract-534e1b64ad485a89f95d73617ef51af65cf2eead",
+    "sha256": "9a6c240c735a2979f555661d7950d62af1ceaa54f3f66560f49fbd8f43803419"
+  },
+  "claims": {
+    "artifact_bytes_preserved": true,
+    "adjudication_performed_by_this_metadata": false,
+    "rel_005a_qualified": false
+  }
+}

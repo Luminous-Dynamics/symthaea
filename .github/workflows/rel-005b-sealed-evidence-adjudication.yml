@@ -1,0 +1,218 @@
+name: REL-005B Sealed Evidence Adjudication
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rel-005b-sealed-evidence-adjudication.yml"
+      - "docs/research/evidence/rel-005a/35083005616/**"
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+  EXPECTED_PARENT: 534e1b64ad485a89f95d73617ef51af65cf2eead
+  SOURCE_RUN_ID: "35083005616"
+  SOURCE_HEAD: 08cf8462c05a7f05660034462c15f4985bfe7e05
+  FROZEN_SCIENTIFIC_BASE: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  EXECUTION_ARTIFACT_SHA256: aa5ece89ef98f0c45687b55875bdaade9d1b28243c5c499185576666ab0286b6
+  SEAL_ARTIFACT_SHA256: 2112b30159328c91802f774a42416db83c00dec746d0dc1d0016455a4be9929e
+  CONTRACT_ARTIFACT_SHA256: 9a6c240c735a2979f555661d7950d62af1ceaa54f3f66560f49fbd8f43803419
+  ORACLE_GIT_BLOB: 5ed47e4fc7548061782d28f03f55a99b577ac856
+
+jobs:
+  adjudicate:
+    name: Adjudicate frozen sealed observation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact archive subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind one-commit archive lineage and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-independent-oracle.py)" = "${ORACLE_GIT_BLOB}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/workflows/rel-005b-sealed-evidence-adjudication.yml"
+            "docs/research/evidence/rel-005a/35083005616/comparison-only-contract-artifact.zip"
+            "docs/research/evidence/rel-005a/35083005616/execution-artifact.zip"
+            "docs/research/evidence/rel-005a/35083005616/observation-seal-artifact.zip"
+            "docs/research/evidence/rel-005a/35083005616/source-artifacts.json"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify archived Actions bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="docs/research/evidence/rel-005a/35083005616"
+          printf '%s  %s\n' "${EXECUTION_ARTIFACT_SHA256}" "${root}/execution-artifact.zip" | sha256sum -c -
+          printf '%s  %s\n' "${SEAL_ARTIFACT_SHA256}" "${root}/observation-seal-artifact.zip" | sha256sum -c -
+          printf '%s  %s\n' "${CONTRACT_ARTIFACT_SHA256}" "${root}/comparison-only-contract-artifact.zip" | sha256sum -c -
+          mkdir -p "${RUNNER_TEMP}/execution" "${RUNNER_TEMP}/seal" "${RUNNER_TEMP}/contract"
+          unzip -q "${root}/execution-artifact.zip" -d "${RUNNER_TEMP}/execution"
+          unzip -q "${root}/observation-seal-artifact.zip" -d "${RUNNER_TEMP}/seal"
+          unzip -q "${root}/comparison-only-contract-artifact.zip" -d "${RUNNER_TEMP}/contract"
+
+      - name: Validate source and judge archive metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path("docs/research/evidence/rel-005a/35083005616")
+          meta = json.loads((root / "source-artifacts.json").read_text())
+          assert meta["schema"] == "symthaea.rel.sealed-evidence-source.v1"
+          assert meta["authority"] == "EvidenceArchive"
+          assert str(meta["source_run_id"]) == os.environ["SOURCE_RUN_ID"]
+          assert meta["source_head"] == os.environ["SOURCE_HEAD"]
+          assert meta["source_base"] == os.environ["FROZEN_SCIENTIFIC_BASE"]
+          assert meta["execution_artifact"]["sha256"] == os.environ["EXECUTION_ARTIFACT_SHA256"]
+          assert meta["observation_seal_artifact"]["sha256"] == os.environ["SEAL_ARTIFACT_SHA256"]
+          assert meta["judge_head"] == os.environ["EXPECTED_PARENT"]
+          assert meta["judge_contract_artifact"]["sha256"] == os.environ["CONTRACT_ARTIFACT_SHA256"]
+
+          contract = json.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "contract/comparison-only-contract.json").read_text())
+          assert contract["schema"] == "symthaea.rel.comparison-only-contract.v2"
+          assert contract["authority"] == "ComparisonOnly"
+          assert contract["judge_head"] == os.environ["EXPECTED_PARENT"]
+          assert contract["frozen_diagnostic_head"] == os.environ["SOURCE_HEAD"]
+          assert contract["frozen_scientific_base"] == os.environ["FROZEN_SCIENTIFIC_BASE"]
+          assert contract["oracle_git_blob"] == os.environ["ORACLE_GIT_BLOB"]
+          assert contract["claims"]["adjudication_performed"] is False
+          assert contract["claims"]["rel_005a_qualified"] is False
+          PY
+
+      - name: Generate frozen PredictionOnly oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-independent-oracle.py \
+            --output "${RUNNER_TEMP}/oracle.json" \
+            > "${RUNNER_TEMP}/oracle.stdout"
+          python3 -m json.tool "${RUNNER_TEMP}/oracle.json" >/dev/null
+
+      - name: Run qualified ComparisonOnly adjudicator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-corrupted-anchor-comparison.py \
+            --observation "${RUNNER_TEMP}/execution/observation.json" \
+            --seal "${RUNNER_TEMP}/seal/observation-seal.json" \
+            --oracle "${RUNNER_TEMP}/oracle.json" \
+            --execution-receipt "${RUNNER_TEMP}/execution/execution-receipt.json" \
+            --manifest "${RUNNER_TEMP}/execution/capsule-manifest.json" \
+            --context "${RUNNER_TEMP}/execution/workflow-context.json" \
+            --expected-observation-head "${SOURCE_HEAD}" \
+            --source-run-id "${SOURCE_RUN_ID}" \
+            --output "${RUNNER_TEMP}/comparison-receipt.json"
+
+      - name: Enforce narrow resolution and nonclaims
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          receipt = json.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "comparison-receipt.json").read_text())
+          assert receipt["schema"] == "symthaea.rel.corrupted-anchor-comparison.v1"
+          assert receipt["authority"] == "ComparisonOnly"
+          assert receipt["comparison_status"] == "completed"
+          assert receipt["source_run_id"] == os.environ["SOURCE_RUN_ID"]
+          assert receipt["expected_observation_head"] == os.environ["SOURCE_HEAD"]
+          assert receipt["historical_predicate_outcome"] == "pass"
+          assert receipt["oracle_agreement"] is True
+          assert receipt["resolution"] == "RESOLVED_ORACLE_AND_HISTORICAL_PREDICATE_AGREE"
+          held = receipt["comparisons"]["corrupted_anchor_held_out_max"]
+          dispersion = receipt["comparisons"]["corrupted_mask_dispersion_max"]
+          assert held["observed"] == 0.515625
+          assert held["oracle"] == 0.515625
+          assert held["absolute_delta"] == 0.0
+          assert dispersion["observed"] == 2.8125
+          assert dispersion["oracle"] == 2.8125
+          assert dispersion["absolute_delta"] == 0.0
+          claims = receipt["claims"]
+          assert claims["dispute_resolved"] is True
+          assert claims["rel_005a_qualified"] is False
+          assert claims["full_rel_005a_scientific_pass"] is False
+          assert claims["full_rel_005a_scientific_fail"] is False
+          assert claims["production_executed_by_comparison"] is False
+          PY
+
+      - name: Build durable REL-005B receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          tmp = pathlib.Path(os.environ["RUNNER_TEMP"])
+          root = pathlib.Path("docs/research/evidence/rel-005a/35083005616")
+          sha256 = lambda p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+          comparison = json.loads((tmp / "comparison-receipt.json").read_text())
+          observation = json.loads((tmp / "execution/observation.json").read_text())
+          seal = json.loads((tmp / "seal/observation-seal.json").read_text())
+          receipt = {
+              "schema": "symthaea.rel.sealed-evidence-adjudication.v1",
+              "authority": "ComparisonOnly",
+              "archive_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "archive_parent": os.environ["EXPECTED_PARENT"],
+              "source_run_id": os.environ["SOURCE_RUN_ID"],
+              "source_head": os.environ["SOURCE_HEAD"],
+              "frozen_scientific_base": os.environ["FROZEN_SCIENTIFIC_BASE"],
+              "archived_artifact_sha256": {
+                  "execution": sha256(root / "execution-artifact.zip"),
+                  "observation_seal": sha256(root / "observation-seal-artifact.zip"),
+                  "judge_contract": sha256(root / "comparison-only-contract-artifact.zip"),
+              },
+              "observation_sha256": sha256(tmp / "execution/observation.json"),
+              "observation_seal_sha256": sha256(tmp / "seal/observation-seal.json"),
+              "oracle_sha256": sha256(tmp / "oracle.json"),
+              "comparison_receipt_sha256": sha256(tmp / "comparison-receipt.json"),
+              "seal_chain_sha256": seal["chain_sha256"],
+              "observed": {
+                  "corrupted_anchor_held_out_max": observation["corrupted_anchor_held_out_max"],
+                  "corrupted_mask_dispersion_max": observation["corrupted_mask_dispersion_max"],
+              },
+              "resolution": comparison["resolution"],
+              "claims": {
+                  "corrupted_anchor_dispute_resolved": True,
+                  "oracle_agreement": True,
+                  "historical_predicate_pass": True,
+                  "rel_005a_qualified": False,
+                  "full_rel_005a_scientific_pass": False,
+                  "full_rel_005a_scientific_fail": False,
+                  "production_behavior_changed": False,
+                  "qualification_threshold_changed": False,
+              },
+          }
+          path = tmp / "rel-005b-adjudication-receipt.json"
+          path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload REL-005B adjudication receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005b-sealed-evidence-adjudication-${{ env.SOURCE_HEAD }}
+          path: |
+            ${{ runner.temp }}/comparison-receipt.json
+            ${{ runner.temp }}/rel-005b-adjudication-receipt.json
+            ${{ runner.temp }}/oracle.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Check archive checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
