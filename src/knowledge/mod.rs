@@ -47,6 +47,7 @@ pub mod graph;
 #[cfg(feature = "epistemic")]
 pub mod hdc_retrieval;
 pub mod ignorance_frontier;
+pub mod inquiry_contract;
 pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
@@ -87,6 +88,10 @@ pub use graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactId, TemporalFact
 pub use ignorance_frontier::{
     ClaimIgnoranceProfile, IgnoranceFrontier, IgnoranceFrontierError, IgnoranceFrontierReport,
     KnowledgeGap,
+};
+pub use inquiry_contract::{
+    EvidenceTarget, InquiryAuthority, InquiryContract, InquiryContractBuilder, InquiryContractError,
+    InquiryContractId, InquiryPlan, InquiryRequest, ReviewRequirement,
 };
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
