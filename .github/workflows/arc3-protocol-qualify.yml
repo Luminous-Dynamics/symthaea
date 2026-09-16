@@ -72,18 +72,21 @@ jobs:
 
             if [ ! -s "$RUNNER_TEMP/arc3-cargo-lock.patch" ]; then
               echo "Offline reconciliation produced no Cargo.lock diff; refusing to guess" >&2
+              touch "$RUNNER_TEMP/lock-guard-rejected.txt"
               exit 1
             fi
 
             # A minimal reconciliation may only add/update the local protocol
             # package stanza. Registry package additions/removals or version,
             # source, checksum changes indicate dependency drift and are rejected.
+            set +e
             python3 - <<'PY'
             from pathlib import Path
+            import os
             import re
             import sys
 
-            patch = Path(__import__('os').environ['RUNNER_TEMP']) / 'arc3-cargo-lock.patch'
+            patch = Path(os.environ['RUNNER_TEMP']) / 'arc3-cargo-lock.patch'
             text = patch.read_text()
 
             forbidden = []
@@ -107,8 +110,17 @@ jobs:
                     print('\n'.join(forbidden), file=sys.stderr)
                 sys.exit(1)
             PY
+            guard_status=$?
+            set -e
+            printf '%s\n' "$guard_status" > "$RUNNER_TEMP/lock-guard-status.txt"
+
+            if [ "$guard_status" -ne 0 ]; then
+              touch "$RUNNER_TEMP/lock-guard-rejected.txt"
+              exit 1
+            fi
 
             cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
+            touch "$RUNNER_TEMP/lock-guard-accepted.txt"
 
             # Product lock is stale even when the disposable reconciliation is
             # minimal and successful. Preserve evidence and remain red until the
@@ -126,6 +138,9 @@ jobs:
             ${{ runner.temp }}/Cargo.lock.generated
             ${{ runner.temp }}/arc3-cargo-lock.patch
             ${{ runner.temp }}/offline-reconcile-status.txt
+            ${{ runner.temp }}/lock-guard-status.txt
+            ${{ runner.temp }}/lock-guard-accepted.txt
+            ${{ runner.temp }}/lock-guard-rejected.txt
           if-no-files-found: error
           retention-days: 14
 
