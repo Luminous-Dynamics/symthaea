@@ -1,0 +1,445 @@
+name: SCI-014 R2C Cargo.lock Projection Evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sci-014-r2c-lock-remediation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sci-014-r2c-lock-projection-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  OLD_PRODUCT_HEAD: c295b973e44cbd6eb6a2366b2004598d60fda9d9
+  PRODUCT_PARENT: d496b7e9c9df809f981740dea940dcdb01f9a6d2
+  OLD_LOCK_SHA256: d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f
+  EXPECTED_MANIFEST_BLOB: b32ef588b538c01f283dd5a6a7f9bc65de12ab5b
+  EXPECTED_LIB_BLOB: 574721499911234bf40b5231ce07d559ee8024da
+  EXPECTED_METADATA_TEST_BLOB: b95da10e3e24a445b93d8d142b8b5bb8be25a571
+  EXPECTED_SCHEMA_TEST_BLOB: bb40695beadf4ca5118f53e2b923129c685b83df
+  EXPECTED_STORE_TEST_BLOB: 37a43abf0aad5d11cd0389a7153cdc2aa88e1c94
+
+jobs:
+  project:
+    name: Produce exact read-only R2C lock projection
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact helper head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind exact helper identity, occurrence, and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+          mkdir -p "$evidence"
+
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          mapfile -t changed < <(git diff --name-only "$OLD_PRODUCT_HEAD" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/sci-014-r2c-lock-remediation.yml"
+
+          {
+            echo "helper_head=$(git rev-parse HEAD)"
+            echo "helper_tree=$(git rev-parse HEAD^{tree})"
+            echo "helper_parent=$(git rev-parse HEAD^)"
+            echo "helper_workflow_sha256=$(sha256sum .github/workflows/sci-014-r2c-lock-remediation.yml | awk '{print $1}')"
+            echo "authority=read_only_projection"
+          } > "$evidence/helper-subject.txt"
+
+          {
+            echo "github_run_id=${{ github.run_id }}"
+            echo "github_run_number=${{ github.run_number }}"
+            echo "github_run_attempt=${{ github.run_attempt }}"
+            echo "github_event_name=${{ github.event_name }}"
+            echo "github_repository=${{ github.repository }}"
+            echo "github_workflow_ref=${{ github.workflow_ref }}"
+            echo "github_workflow_sha=${{ github.workflow_sha }}"
+          } > "$evidence/run-occurrence.txt"
+
+          echo "HELPER_SCOPE_PROVEN" > "$evidence/classification.txt"
+
+      - name: Checkout exact historical R2C product
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.OLD_PRODUCT_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove historical product identity, scope, and source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+
+          test "$(git rev-parse HEAD)" = "$OLD_PRODUCT_HEAD"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$OLD_LOCK_SHA256"
+
+          mapfile -t changed < <(git diff --name-only "$PRODUCT_PARENT" "$OLD_PRODUCT_HEAD")
+          expected=(
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs
+          )
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${changed[@]}")
+
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml)" = "$EXPECTED_MANIFEST_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs)" = "$EXPECTED_LIB_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs)" = "$EXPECTED_METADATA_TEST_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs)" = "$EXPECTED_SCHEMA_TEST_BLOB"
+          test "$(git hash-object crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs)" = "$EXPECTED_STORE_TEST_BLOB"
+
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cp Cargo.lock "$evidence/Cargo.lock.before"
+          {
+            echo "old_product_head=$OLD_PRODUCT_HEAD"
+            echo "old_product_tree=$(git rev-parse HEAD^{tree})"
+            echo "product_parent=$PRODUCT_PARENT"
+            echo "parent_tree=$(git rev-parse "$PRODUCT_PARENT^{tree}")"
+            echo "old_lock_sha256=$OLD_LOCK_SHA256"
+            echo "changed_path_count=${#changed[@]}"
+          } > "$evidence/product-subject.txt"
+          printf '%s\n' "${changed[@]}" > "$evidence/product-path-census.txt"
+
+          echo "PRODUCT_SUBJECT_PROVEN" > "$evidence/classification.txt"
+
+      - name: Verify slim runtime prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+          python3 - <<'PY' | tee "$evidence/python-runtime.txt"
+          import sys
+          if sys.version_info < (3, 11):
+              raise SystemExit(f"Python >=3.11 required for tomllib, got {sys.version}")
+          import tomllib  # noqa: F401
+          print(sys.version)
+          PY
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Generate exact Cargo lock projection
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/sci014-r2c-lock-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/sci014-r2c-lock-target
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+
+          {
+            rustc -Vv
+            cargo -V
+          } > "$evidence/toolchain.txt"
+
+          set +e
+          cargo metadata --locked --format-version 1 \
+            > "$evidence/metadata-before.json" \
+            2> "$evidence/metadata-before.stderr"
+          locked_before=$?
+          set -e
+
+          if [ "$locked_before" -eq 0 ]; then
+            echo "UNEXPECTED_LOCK_ALREADY_CLOSED" > "$evidence/classification.txt"
+            exit 84
+          fi
+          echo "LOCKED_METADATA_REJECTED" > "$evidence/classification.txt"
+
+          cargo metadata --format-version 1 \
+            > "$evidence/metadata-projected.json" \
+            2> "$evidence/metadata-projected.stderr"
+
+          mapfile -t changed < <(git diff --name-only)
+          mapfile -t untracked < <(git ls-files --others --exclude-standard)
+          if [ "${#changed[@]}" -ne 1 ] || [ "${changed[0]}" != "Cargo.lock" ] || [ "${#untracked[@]}" -ne 0 ]; then
+            printf '%s\n' "${changed[@]}" > "$evidence/unexpected-projection-paths.txt"
+            printf '%s\n' "${untracked[@]}" > "$evidence/unexpected-projection-untracked.txt"
+            git diff > "$evidence/unexpected-projection.patch" || true
+            echo "FAIL_PROJECTION_SCOPE" > "$evidence/classification.txt"
+            exit 85
+          fi
+
+          cp Cargo.lock "$evidence/Cargo.lock.cargo-proposed"
+          git diff -- Cargo.lock > "$evidence/Cargo.lock.patch"
+          new_lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          test "$new_lock_sha" != "$OLD_LOCK_SHA256"
+
+          cargo metadata --locked --format-version 1 \
+            > "$evidence/metadata-projected-locked.json" \
+            2> "$evidence/metadata-projected-locked.stderr"
+
+          {
+            echo "old_lock_sha256=$OLD_LOCK_SHA256"
+            echo "new_lock_sha256=$new_lock_sha"
+            echo "locked_before_status=$locked_before"
+          } > "$evidence/remediation-subject.txt"
+
+          echo "LOCK_DRIFT_PROJECTION_GENERATED" > "$evidence/classification.txt"
+
+      - name: Prove exact R2-attributable Cargo.lock delta
+        id: lock_oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+
+          set +e
+          python3 - <<'PY' > "$evidence/lock-closure-oracle.txt" 2>&1
+          import json
+          import pathlib
+          import tomllib
+
+          temp = pathlib.Path("${{ runner.temp }}")
+          evidence = temp / "sci014-r2c-lock"
+          before = tomllib.loads((temp / "Cargo.lock.before").read_text())
+          after = tomllib.loads(pathlib.Path("Cargo.lock").read_text())
+          metadata = json.loads((evidence / "metadata-projected.json").read_text())
+
+          if {k: v for k, v in before.items() if k != "package"} != {k: v for k, v in after.items() if k != "package"}:
+              raise SystemExit("non-package Cargo.lock metadata changed")
+
+          def lock_key(pkg):
+              return (pkg["name"], pkg["version"], pkg.get("source"))
+
+          before_pkgs = {lock_key(pkg): pkg for pkg in before.get("package", [])}
+          after_pkgs = {lock_key(pkg): pkg for pkg in after.get("package", [])}
+          removed = set(before_pkgs) - set(after_pkgs)
+          actual_added = set(after_pkgs) - set(before_pkgs)
+          common = set(before_pkgs) & set(after_pkgs)
+          changed_existing = {key for key in common if before_pkgs[key] != after_pkgs[key]}
+
+          if removed:
+              raise SystemExit(f"existing packages removed: {sorted(removed)!r}")
+
+          packages_by_id = {pkg["id"]: pkg for pkg in metadata["packages"]}
+          nodes = {node["id"]: node for node in metadata["resolve"]["nodes"]}
+          metadata_ids_by_key = {
+              (pkg["name"], pkg["version"], pkg.get("source")): pkg["id"]
+              for pkg in metadata["packages"]
+          }
+
+          roots = [
+              pkg for pkg in metadata["packages"]
+              if pkg["name"] == "symthaea-scientific-view-control-plane-occurrence-sqlite"
+              and pkg["version"] == "0.1.0"
+              and pkg.get("source") is None
+          ]
+          if len(roots) != 1:
+              raise SystemExit(f"expected one exact R2C SQLite metadata root, got {len(roots)}")
+
+          root_id = roots[0]["id"]
+          reachable = set()
+          stack = [root_id]
+          while stack:
+              package_id = stack.pop()
+              if package_id in reachable:
+                  continue
+              reachable.add(package_id)
+              node = nodes.get(package_id)
+              if node is None:
+                  raise SystemExit(f"missing resolve node for reachable package {package_id}")
+              stack.extend(dep["pkg"] for dep in node.get("deps", []))
+
+          reachable_keys = {
+              (
+                  packages_by_id[package_id]["name"],
+                  packages_by_id[package_id]["version"],
+                  packages_by_id[package_id].get("source"),
+              )
+              for package_id in reachable
+          }
+          expected_added = reachable_keys - set(before_pkgs)
+          if actual_added != expected_added:
+              raise SystemExit(
+                  "lock additions differ from previously-unlocked projected R2 closure: "
+                  f"actual_only={sorted(actual_added - expected_added)!r} "
+                  f"missing={sorted(expected_added - actual_added)!r}"
+              )
+
+          required_local = {
+              ("symthaea-scientific-view-profile", "0.1.0", None),
+              ("symthaea-scientific-view-control-plane", "0.1.0", None),
+              ("symthaea-scientific-view-control-plane-occurrence", "0.1.0", None),
+              ("symthaea-scientific-view-control-plane-occurrence-sqlite", "0.1.0", None),
+          }
+          if not required_local <= actual_added:
+              raise SystemExit(
+                  f"required local R2 packages not all newly locked: {sorted(required_local - actual_added)!r}"
+              )
+
+          expected_changed = {
+              ("digest", "0.10.7", "registry+https://github.com/rust-lang/crates.io-index")
+          }
+          if changed_existing != expected_changed:
+              raise SystemExit(
+                  f"unexpected existing-package mutations: actual={sorted(changed_existing)!r} "
+                  f"expected={sorted(expected_changed)!r}"
+              )
+
+          digest_key = next(iter(expected_changed))
+          if digest_key not in reachable_keys:
+              raise SystemExit("digest 0.10.7 mutation is not in the R2 reachable closure")
+
+          before_digest = before_pkgs[digest_key]
+          after_digest = after_pkgs[digest_key]
+          before_without_deps = {k: v for k, v in before_digest.items() if k != "dependencies"}
+          after_without_deps = {k: v for k, v in after_digest.items() if k != "dependencies"}
+          if before_without_deps != after_without_deps:
+              raise SystemExit("digest identity/checksum/source fields changed")
+
+          before_deps = set(before_digest.get("dependencies", []))
+          after_deps = set(after_digest.get("dependencies", []))
+          if not before_deps <= after_deps:
+              raise SystemExit("digest dependency set removed an existing dependency")
+
+          digest_added_deps = after_deps - before_deps
+          if digest_added_deps != {"const-oid 0.9.6"}:
+              raise SystemExit(
+                  f"unexpected digest dependency activation: {sorted(digest_added_deps)!r}"
+              )
+
+          const_oid_key = (
+              "const-oid", "0.9.6", "registry+https://github.com/rust-lang/crates.io-index"
+          )
+          if const_oid_key not in reachable_keys:
+              raise SystemExit("const-oid 0.9.6 is not in the R2 reachable closure")
+
+          digest_id = metadata_ids_by_key.get(digest_key)
+          const_oid_id = metadata_ids_by_key.get(const_oid_key)
+          if digest_id is None or const_oid_id is None:
+              raise SystemExit("projected metadata missing digest/const-oid identity")
+
+          digest_edges = {dep["pkg"] for dep in nodes[digest_id].get("deps", [])}
+          if const_oid_id not in digest_edges:
+              raise SystemExit("projected R2 graph does not contain digest -> const-oid edge")
+
+          expected_local_deps = {
+              ("symthaea-scientific-view-profile", "0.1.0", None): {"sha2"},
+              ("symthaea-scientific-view-control-plane", "0.1.0", None): {
+                  "sha2", "symthaea-scientific-view-profile"
+              },
+              ("symthaea-scientific-view-control-plane-occurrence", "0.1.0", None): {
+                  "sha2", "thiserror", "symthaea-scientific-view-control-plane",
+                  "symthaea-scientific-view-profile"
+              },
+              ("symthaea-scientific-view-control-plane-occurrence-sqlite", "0.1.0", None): {
+                  "rusqlite", "thiserror", "symthaea-scientific-view-control-plane",
+                  "symthaea-scientific-view-control-plane-occurrence",
+                  "symthaea-scientific-view-profile"
+              },
+          }
+          for key, expected_names in expected_local_deps.items():
+              names = {dep.split(" ", 1)[0] for dep in after_pkgs[key].get("dependencies", [])}
+              if names != expected_names:
+                  raise SystemExit(
+                      f"unexpected direct lock dependencies for {key!r}: "
+                      f"actual={sorted(names)!r} expected={sorted(expected_names)!r}"
+                  )
+
+          print("lock_delta=exact_r2_attributable_projection")
+          print("added_count=", len(actual_added))
+          for key in sorted(actual_added):
+              print("added_package=", key)
+          print("changed_existing=", digest_key)
+          print("activated_dependency=digest@0.10.7 -> const-oid@0.9.6")
+          PY
+          oracle_status=$?
+          set -e
+
+          cat "$evidence/lock-closure-oracle.txt"
+          if [ "$oracle_status" -ne 0 ]; then
+            echo "FAIL_LOCK_PROJECTION_ORACLE" > "$evidence/classification.txt"
+            exit "$oracle_status"
+          fi
+
+          echo "ORACLE_PASSED_PENDING_POSTFLIGHT" > "$evidence/classification.txt"
+
+      - name: Restore and prove immutable historical checkout
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+          mkdir -p "$evidence"
+
+          prior_classification="$(cat "$evidence/classification.txt" 2>/dev/null || printf '%s' 'CLASSIFICATION_MISSING')"
+          prior_job_status="${{ job.status }}"
+          prior_oracle_outcome="${{ steps.lock_oracle.outcome }}"
+
+          git restore --source=HEAD -- Cargo.lock 2>/dev/null || true
+
+          current_head="$(git rev-parse HEAD 2>/dev/null || true)"
+          current_parent="$(git rev-parse HEAD^ 2>/dev/null || true)"
+          current_tree="$(git rev-parse HEAD^{tree} 2>/dev/null || true)"
+          current_lock_sha="$(sha256sum Cargo.lock 2>/dev/null | awk '{print $1}' || true)"
+          dirty="$(git status --porcelain=v1 --untracked-files=all 2>/dev/null || printf '%s' '__STATUS_READ_FAILED__')"
+
+          {
+            echo "postflight_product_head=$current_head"
+            echo "postflight_product_parent=$current_parent"
+            echo "postflight_product_tree=$current_tree"
+            echo "postflight_lock_sha256=$current_lock_sha"
+            echo "checkout_dirty_bytes=${#dirty}"
+            echo "prior_job_status=$prior_job_status"
+            echo "prior_oracle_outcome=$prior_oracle_outcome"
+            echo "prior_classification=$prior_classification"
+          } > "$evidence/postflight.txt"
+
+          postflight_ok=1
+          [ "$current_head" = "$OLD_PRODUCT_HEAD" ] || postflight_ok=0
+          [ "$current_parent" = "$PRODUCT_PARENT" ] || postflight_ok=0
+          [ "$current_lock_sha" = "$OLD_LOCK_SHA256" ] || postflight_ok=0
+          [ -z "$dirty" ] || postflight_ok=0
+
+          if [ "$postflight_ok" -ne 1 ]; then
+            echo "FAIL_POSTFLIGHT_IMMUTABILITY" > "$evidence/classification.txt"
+            exit 86
+          fi
+
+          if [ "$prior_job_status" = "success" ] \
+            && [ "$prior_oracle_outcome" = "success" ] \
+            && [ "$prior_classification" = "ORACLE_PASSED_PENDING_POSTFLIGHT" ]; then
+            echo "PASS_LOCK_PROJECTION_EVIDENCE" > "$evidence/classification.txt"
+          fi
+
+      - name: Finalize exact evidence census and hashes
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2c-lock"
+          mkdir -p "$evidence"
+          cd "$evidence"
+
+          find . -maxdepth 1 -type f \
+            ! -name 'artifact-file-census.txt' \
+            ! -name 'artifact-sha256.txt' \
+            -printf '%f\n' | LC_ALL=C sort > artifact-file-census.txt
+
+          : > artifact-sha256.txt
+          while IFS= read -r file; do
+            sha256sum "$file" >> artifact-sha256.txt
+          done < artifact-file-census.txt
+          sha256sum artifact-file-census.txt >> artifact-sha256.txt
+
+      - name: Retain read-only lock projection evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sci-014-r2c-lock-projection-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/sci014-r2c-lock/
+          if-no-files-found: error
+          retention-days: 30
