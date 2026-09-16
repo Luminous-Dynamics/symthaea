@@ -1,0 +1,95 @@
+{
+  "derivation_id": "sha256:c63a2b5331d4c0b442b56e12c942706929c98bb60cf902a8c9979a4d5741c596",
+  "payload": {
+    "accepted_transition": {
+      "changed_paths": [
+        "crates/domains/symthaea-linux-ima-replay/src/lib.rs"
+      ],
+      "from": "RemediationOnly",
+      "post_format_check": "PASS_REQUIRED",
+      "postflight_immutable": "PASS",
+      "pre_format_check": "FAIL_REQUIRED",
+      "to": "RemediationDerived"
+    },
+    "authority": "RemediationDerived",
+    "formatted": {
+      "bytes": 41095,
+      "git_blob_sha1": "2ee7b299599570180fe2a0ca506399fdbbded4a7",
+      "path": "crates/domains/symthaea-linux-ima-replay/src/lib.rs",
+      "sha256": "030ded9703fbd0e6dd9e93eb8bc39736bf84ea4cc4e5b39d140b9399d7dd6ae7"
+    },
+    "frozen_base": "29eb017a2e5b3fda7731ec946439c3096b51cceb",
+    "next_product_contract": {
+      "changed_paths_exact": [
+        "crates/domains/symthaea-linux-ima-replay/src/lib.rs"
+      ],
+      "parent": "29eb017a2e5b3fda7731ec946439c3096b51cceb",
+      "required_formatted_git_blob_sha1": "2ee7b299599570180fe2a0ca506399fdbbded4a7",
+      "required_formatted_sha256": "030ded9703fbd0e6dd9e93eb8bc39736bf84ea4cc4e5b39d140b9399d7dd6ae7",
+      "requires_fresh_full_qualification": true,
+      "state": "FormatterDerivedProductUnqualified"
+    },
+    "nonclaims": [
+      "QualifiedExactHead",
+      "merge_authority",
+      "downstream_unblock_authority",
+      "TPM-IMA-PCR-composition",
+      "deployment_readiness",
+      "physical_authority"
+    ],
+    "qualification_result": "NOT_ESTABLISHED",
+    "rejected_mutation": {
+      "expected_git_blob_sha1": "2ee7b299599570180fe2a0ca506399fdbbded4a7",
+      "reachable": false,
+      "reason": "connector_blob_identity_mismatch",
+      "rejected_git_blob_sha1": "1ad7d53e0d8ca554c2042b55041ae04ad7d1acfb"
+    },
+    "remediation_artifact": {
+      "artifact_id": 10461577017,
+      "digest": "sha256:0b5f570b39d4e3a06d638baf47ace3e46b03d66c389f6f42b29430b11eed6b95",
+      "retention_expires": "2026-12-15T17:04:10Z"
+    },
+    "remediation_subject": {
+      "commit": "9666dd732d802de20b798656e790a15761988ae0",
+      "job_id": 104894606483,
+      "run_id": 35125860813,
+      "tree": "c72c00bb6cd819e22d556f8e121bb71912077c64"
+    },
+    "semantic_product": "c8f27155e43572476140e321282081d3414fd555",
+    "source": {
+      "bytes": 40391,
+      "git_blob_sha1": "9a6ca0988ab6b38b9bcc1660d6f299936ce51e6f",
+      "path": "crates/domains/symthaea-linux-ima-replay/src/lib.rs",
+      "sha256": "a9230c9310ea4d2d9804b85cba5982e01a4ef6567ca25d1895a9b1073dcb4969"
+    },
+    "source_census": {
+      "duplicate_paths": 0,
+      "entries": [
+        {
+          "bytes": 607,
+          "git_blob_sha1": "dfcf84581ea0096d3c5902c5f50507723deb88ba",
+          "path": "crates/domains/symthaea-linux-ima-replay/Cargo.toml",
+          "sha256": "aa6005959f5b55cc0cdea193633ca69d3d494bc13d533ebb1db08196cba971da"
+        },
+        {
+          "bytes": 1305,
+          "git_blob_sha1": "5d9ab70f4173588bff56d27728d484783104ed56",
+          "path": "crates/domains/symthaea-linux-ima-replay/README.md",
+          "sha256": "355ffe95c5396816e8a88fef3e1c13ac2cbb1613c3dd9ebfb2f92edfe270bb0f"
+        },
+        {
+          "bytes": 40391,
+          "git_blob_sha1": "9a6ca0988ab6b38b9bcc1660d6f299936ce51e6f",
+          "path": "crates/domains/symthaea-linux-ima-replay/src/lib.rs",
+          "sha256": "a9230c9310ea4d2d9804b85cba5982e01a4ef6567ca25d1895a9b1073dcb4969"
+        }
+      ],
+      "files": 3,
+      "unique_paths": 3
+    },
+    "toolchain": {
+      "rustfmt": "1.96.0"
+    }
+  },
+  "schema": "symthaea.assurance.rustfmt-remediation-derivation.v1"
+}
