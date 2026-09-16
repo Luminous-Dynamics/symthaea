@@ -1,6 +1,6 @@
 # NEUROARCH-001 — Active HDC/LTC identity-field classification
 
-Status: preregistered classification draft; qualification pending  
+Status: preregistered classification draft; qualification pending
 Owner implementation: `symthaea-core::hdc::hdc_ltc_unified`
 
 This document prevents the active adapter from deciding after results which configuration fields count as topology, subject identity, learned parameters, or runtime state.
