@@ -48,12 +48,12 @@ jobs:
       - name: Install Rust 1.96
         uses: dtolnay/rust-toolchain@1.96.0
 
-      - name: Require locked workspace metadata
+      - name: Require locked protocol package resolution
         id: locked
         shell: bash
         run: |
           set -euo pipefail
-          if cargo metadata --locked --no-deps --format-version 1 >/dev/null; then
+          if cargo check --locked -p symthaea-arc3-protocol >/dev/null; then
             echo "lock_ok=true" >> "$GITHUB_OUTPUT"
           else
             echo "lock_ok=false" >> "$GITHUB_OUTPUT"
