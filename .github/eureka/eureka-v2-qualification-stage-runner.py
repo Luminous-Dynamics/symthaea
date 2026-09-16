@@ -122,6 +122,19 @@ def main() -> int:
     if actual_runner_sha != expected_runner_sha:
         fail("stage-runner digest changed before stage execution")
 
+    actual_python_version = (
+        f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    )
+    expected_python_version = os.environ.get("EUREKA_PYTHON_VERSION")
+    if expected_python_version is not None:
+        if not expected_python_version or "\n" in expected_python_version or "\r" in expected_python_version:
+            fail("EUREKA_PYTHON_VERSION is malformed")
+        if actual_python_version != expected_python_version:
+            fail(
+                "Python runtime identity changed before stage execution: "
+                f"expected {expected_python_version}, got {actual_python_version}"
+            )
+
     subject_head = required_env("EUREKA_SUBJECT_HEAD")
     subject_tree = required_env("EUREKA_SUBJECT_TREE")
     cargo_lock_sha = required_env("EUREKA_CARGO_LOCK_SHA256")
@@ -222,6 +235,7 @@ def main() -> int:
             ("workflow_sha256", workflow_sha),
             ("command_contract_sha256", actual_contract_sha),
             ("stage_runner_sha256", actual_runner_sha),
+            ("python_version", actual_python_version),
             ("log_limit_bytes", str(log_limit)),
             ("log_observed_bytes", str(observed_bytes)),
             ("log_retained_bytes", str(retained_bytes)),
