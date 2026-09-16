@@ -1,0 +1,355 @@
+name: SCI-014 R2 Occurrence Persistence Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sci-014-r2-occurrence-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sci-014-r2q-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: c295b973e44cbd6eb6a2366b2004598d60fda9d9
+  PRODUCT_TREE: e2dea6a163f8a9b742ffbbda1f6f78588efe5741
+  PRODUCT_PARENT: d496b7e9c9df809f981740dea940dcdb01f9a6d2
+  QUALIFIER_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify:
+    name: Qualify exact SCI-014 R2 occurrence persistence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact qualification head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.QUALIFIER_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind qualification workflow identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          mkdir -p "$evidence"
+          test "$(git rev-parse HEAD)" = "$QUALIFIER_HEAD"
+          workflow=.github/workflows/sci-014-r2-occurrence-qualification.yml
+          test -f "$workflow"
+          {
+            echo "qualification_head=$QUALIFIER_HEAD"
+            echo "qualification_tree=$(git rev-parse HEAD^{tree})"
+            echo "qualification_workflow_sha256=$(sha256sum "$workflow" | awk '{print $1}')"
+          } > "$evidence/qualification-subject.txt"
+
+      - name: Checkout exact R2C product head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.PRODUCT_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact product subject and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          test "$(git rev-parse HEAD)" = "$PRODUCT_HEAD"
+          test "$(git rev-parse HEAD^{tree})" = "$PRODUCT_TREE"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
+          mapfile -t changed < <(git diff --name-only "$PRODUCT_PARENT" "$PRODUCT_HEAD")
+          expected=(
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs
+          )
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${changed[@]}")
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          cp Cargo.lock "$evidence/Cargo.lock.committed"
+          {
+            echo "product_head=$PRODUCT_HEAD"
+            echo "product_tree=$PRODUCT_TREE"
+            echo "product_parent=$PRODUCT_PARENT"
+            echo "root_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "changed_path_count=${#changed[@]}"
+          } > "$evidence/product-subject.txt"
+          printf '%s\n' "${changed[@]}" > "$evidence/product-path-census.txt"
+
+      - name: Run independent canonical identity oracles
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          python3 crates/bridges/symthaea-scientific-view-profile/scripts/commitment_oracle.py \
+            | tee "$evidence/profile-commitment-oracle.txt"
+          python3 crates/bridges/symthaea-scientific-view-control-plane/scripts/commitment_oracle.py \
+            | tee "$evidence/control-plane-commitment-oracle.txt"
+          python3 crates/bridges/symthaea-scientific-view-control-plane-occurrence/scripts/commitment_oracle.py \
+            | tee "$evidence/occurrence-commitment-oracle.txt"
+          python3 crates/bridges/symthaea-scientific-view-control-plane-occurrence/scripts/wire_oracle.py \
+            | tee "$evidence/occurrence-wire-oracle.txt"
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+
+      - name: Record toolchain identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          {
+            rustc -Vv
+            cargo -V
+            rustfmt --version
+            cargo clippy -V
+          } | tee "$evidence/toolchain.txt"
+
+      - name: Prove full dependency lock closure or retain exact remediation
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/sci014-r2q-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/sci014-r2q-target
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          before_lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          metadata_tmp="$RUNNER_TEMP/metadata-full.json"
+
+          set +e
+          cargo metadata --locked --format-version 1 \
+            > "$metadata_tmp" 2> "$evidence/metadata-locked.stderr"
+          locked_status=$?
+          set -e
+
+          if [ "$locked_status" -eq 0 ]; then
+            sha256sum "$metadata_tmp" > "$evidence/metadata-locked.sha256"
+            rm -f "$metadata_tmp"
+            {
+              echo "locked_status=0"
+              echo "lock_before_sha256=$before_lock_sha"
+            } > "$evidence/lock-gate.txt"
+            echo "LOCK_CLEAN_PENDING_RUST" > "$evidence/classification.txt"
+            exit 0
+          fi
+
+          set +e
+          cargo metadata --format-version 1 \
+            > "$metadata_tmp" 2> "$evidence/metadata-projected.stderr"
+          projected_status=$?
+          set -e
+
+          if [ "$projected_status" -ne 0 ]; then
+            git diff -- Cargo.lock > "$evidence/lock-projection.patch" || true
+            git restore --source=HEAD -- Cargo.lock
+            rm -f "$metadata_tmp"
+            {
+              echo "locked_status=$locked_status"
+              echo "projected_status=$projected_status"
+            } > "$evidence/lock-gate.txt"
+            echo "FAIL_METADATA_OR_RESOLUTION" > "$evidence/classification.txt"
+            exit 87
+          fi
+
+          mapfile -t mutated < <(git diff --name-only)
+          mapfile -t untracked < <(git ls-files --others --exclude-standard)
+          if [ "${#mutated[@]}" -ne 1 ] || [ "${mutated[0]}" != "Cargo.lock" ] || [ "${#untracked[@]}" -ne 0 ]; then
+            printf '%s\n' "${mutated[@]}" > "$evidence/unexpected-projection-paths.txt"
+            printf '%s\n' "${untracked[@]}" > "$evidence/unexpected-projection-untracked.txt"
+            git diff > "$evidence/unexpected-projection.patch" || true
+            git restore --source=HEAD -- Cargo.lock
+            rm -f "$metadata_tmp"
+            echo "FAIL_PROJECTION_SCOPE" > "$evidence/classification.txt"
+            exit 88
+          fi
+
+          cp Cargo.lock "$evidence/Cargo.lock.cargo-proposed"
+          git diff -- Cargo.lock > "$evidence/lock-remediation.patch"
+          after_lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          sha256sum "$metadata_tmp" > "$evidence/metadata-projected.sha256"
+          rm -f "$metadata_tmp"
+
+          set +e
+          cargo metadata --locked --format-version 1 \
+            > "$RUNNER_TEMP/metadata-projected-locked.json" \
+            2> "$evidence/metadata-projected-locked.stderr"
+          projected_locked_status=$?
+          set -e
+          if [ "$projected_locked_status" -eq 0 ]; then
+            sha256sum "$RUNNER_TEMP/metadata-projected-locked.json" \
+              > "$evidence/metadata-projected-locked.sha256"
+          fi
+          rm -f "$RUNNER_TEMP/metadata-projected-locked.json"
+
+          git restore --source=HEAD -- Cargo.lock
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$before_lock_sha"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          {
+            echo "locked_status=$locked_status"
+            echo "projected_status=$projected_status"
+            echo "projected_locked_status=$projected_locked_status"
+            echo "lock_before_sha256=$before_lock_sha"
+            echo "cargo_proposed_lock_sha256=$after_lock_sha"
+          } > "$evidence/lock-gate.txt"
+
+          if [ "$projected_locked_status" -eq 0 ]; then
+            echo "FAIL_LOCK_DRIFT" > "$evidence/classification.txt"
+            exit 86
+          fi
+
+          echo "FAIL_METADATA_OR_RESOLUTION" > "$evidence/classification.txt"
+          exit 87
+
+      - name: Check exact R2C-owned formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          package=symthaea-scientific-view-control-plane-occurrence-sqlite
+          set +e
+          cargo fmt --check -p "$package" > "$evidence/rustfmt.txt" 2>&1
+          fmt_status=$?
+          set -e
+          if [ "$fmt_status" -ne 0 ]; then
+            echo "FAIL_PRODUCT_FORMAT_DRIFT" > "$evidence/classification.txt"
+            exit 85
+          fi
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo "FORMAT_CLEAN_PENDING_RUST" > "$evidence/classification.txt"
+
+      - name: Check focused R2 crates with committed lock
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/sci014-r2q-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/sci014-r2q-target
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          set +e
+          cargo check --locked --all-targets \
+            -p symthaea-scientific-view-control-plane-occurrence \
+            -p symthaea-scientific-view-control-plane-occurrence-sqlite \
+            2>&1 | tee "$evidence/cargo-check.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "FAIL_CARGO_CHECK" > "$evidence/classification.txt"
+            exit "$status"
+          fi
+          set +e
+          cargo tree --locked -p symthaea-scientific-view-control-plane-occurrence-sqlite \
+            > "$evidence/sqlite-dependency-tree.txt" 2> "$evidence/sqlite-dependency-tree.stderr"
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "FAIL_DEPENDENCY_TREE" > "$evidence/classification.txt"
+            exit "$status"
+          fi
+          echo "CHECK_CLEAN_PENDING_TESTS" > "$evidence/classification.txt"
+
+      - name: Run focused occurrence regressions
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/sci014-r2q-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/sci014-r2q-target
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          set +e
+          cargo test --locked -p symthaea-scientific-view-control-plane-occurrence \
+            2>&1 | tee "$evidence/occurrence-tests.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "FAIL_OCCURRENCE_TESTS" > "$evidence/classification.txt"
+            exit "$status"
+          fi
+          echo "OCCURRENCE_TESTS_CLEAN_PENDING_SQLITE_TESTS" > "$evidence/classification.txt"
+
+      - name: Run focused SQLite regressions
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/sci014-r2q-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/sci014-r2q-target
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          set +e
+          cargo test --locked -p symthaea-scientific-view-control-plane-occurrence-sqlite \
+            2>&1 | tee "$evidence/sqlite-tests.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "FAIL_SQLITE_TESTS" > "$evidence/classification.txt"
+            exit "$status"
+          fi
+          echo "TESTS_CLEAN_PENDING_CLIPPY" > "$evidence/classification.txt"
+
+      - name: Run strict focused Clippy
+        shell: bash
+        env:
+          CARGO_HOME: ${{ runner.temp }}/sci014-r2q-cargo-home
+          CARGO_TARGET_DIR: ${{ runner.temp }}/sci014-r2q-target
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          set +e
+          cargo clippy --locked --all-targets \
+            -p symthaea-scientific-view-control-plane-occurrence \
+            -p symthaea-scientific-view-control-plane-occurrence-sqlite \
+            -- -D warnings \
+            2>&1 | tee "$evidence/clippy.txt"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "FAIL_CLIPPY" > "$evidence/classification.txt"
+            exit "$status"
+          fi
+          echo "CLIPPY_CLEAN_PENDING_FINAL" > "$evidence/classification.txt"
+
+      - name: Record successful focused qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PASS_EXACT_PRODUCT_HEAD" > "$RUNNER_TEMP/sci014-r2q/classification.txt"
+
+      - name: Prove checkout and lock postflight
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2q"
+          mkdir -p "$evidence"
+          git restore --source=HEAD -- Cargo.lock 2>/dev/null || true
+          current_head="$(git rev-parse HEAD)"
+          current_tree="$(git rev-parse HEAD^{tree})"
+          lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          {
+            echo "postflight_product_head=$current_head"
+            echo "postflight_product_tree=$current_tree"
+            echo "postflight_root_lock_sha256=$lock_sha"
+            echo "prior_job_status=${{ job.status }}"
+            echo "checkout_dirty_bytes=${#dirty}"
+          } > "$evidence/postflight.txt"
+          test "$current_head" = "$PRODUCT_HEAD"
+          test "$current_tree" = "$PRODUCT_TREE"
+          test -z "$dirty"
+          committed_lock_sha="$(awk -F= '/^root_lock_sha256=/{print $2}' "$evidence/product-subject.txt")"
+          test "$lock_sha" = "$committed_lock_sha"
+
+      - name: Retain qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sci-014-r2q-${{ env.QUALIFIER_HEAD }}
+          path: ${{ runner.temp }}/sci014-r2q/
+          if-no-files-found: error
+          retention-days: 30
