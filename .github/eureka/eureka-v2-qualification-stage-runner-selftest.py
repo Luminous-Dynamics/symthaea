@@ -13,6 +13,7 @@ import sys
 import tempfile
 
 INFRASTRUCTURE_EXIT = 125
+STAGES = ("check", "test", "clippy")
 
 
 def sha256_file(path: Path) -> str:
@@ -186,6 +187,19 @@ def test_stage_runner(runner: Path, root: Path) -> None:
     assert int(large_receipt["log_observed_bytes"]) > 4096
     assert_log_bound(large_receipt, large_log)
 
+    mismatch_dir = root / "python-mismatch"
+    wrong_python = "Python 0.0.0"
+    mismatch = run_stage(
+        runner,
+        contract,
+        mismatch_dir,
+        "check",
+        "success",
+        extra_env={"EUREKA_PYTHON_VERSION": wrong_python},
+    )
+    assert mismatch.returncode != 0
+    assert not (mismatch_dir / "check.stage.env").exists()
+
 
 def manifest_env(
     runner: Path,
@@ -205,6 +219,61 @@ def manifest_env(
     return env
 
 
+def write_summary(
+    stage_dir: Path,
+    *,
+    check: str,
+    test: str,
+    clippy: str,
+    complete: bool,
+) -> None:
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    (stage_dir / "stage-evidence-summary.env").write_text(
+        f"check_disposition={check}\n"
+        f"test_disposition={test}\n"
+        f"clippy_disposition={clippy}\n"
+        f"diagnostic_evidence_complete={'true' if complete else 'false'}\n",
+        encoding="utf-8",
+    )
+
+
+def run_manifest(
+    manifest_tool: Path,
+    qualification_receipt: Path,
+    stage_dir: Path,
+    contract: Path,
+    runner: Path,
+    selftest: Path,
+    workflow: Path,
+    output: Path,
+    env: dict[str, str],
+) -> subprocess.CompletedProcess[bytes]:
+    return subprocess.run(
+        [
+            sys.executable,
+            str(manifest_tool),
+            str(qualification_receipt),
+            str(stage_dir),
+            str(contract),
+            str(runner),
+            str(selftest),
+            str(workflow),
+            str(output),
+        ],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+
+def clone_stage_dir(source: Path, destination: Path) -> None:
+    destination.mkdir(parents=True, exist_ok=True)
+    for path in source.iterdir():
+        if path.is_file():
+            (destination / path.name).write_bytes(path.read_bytes())
+
+
 def test_manifest_tool(runner: Path, selftest: Path, manifest_tool: Path, root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     contract = root / "manifest-contract.sh"
@@ -217,72 +286,312 @@ def test_manifest_tool(runner: Path, selftest: Path, manifest_tool: Path, root: 
         "receipt_schema_revision=synthetic-v1\nexecution_authority_granted=false\n",
         encoding="utf-8",
     )
-    stage_dir = root / "manifest-stages"
-    for stage in ("check", "test", "clippy"):
+    env = manifest_env(runner, selftest, manifest_tool, workflow, contract)
+
+    success_dir = root / "success-stages"
+    for stage in STAGES:
         result = run_stage(
             runner,
             contract,
-            stage_dir,
+            success_dir,
             stage,
             "success",
             extra_env={"EUREKA_WORKFLOW_SHA256": workflow_sha},
         )
         assert result.returncode == 0, result.stderr.decode(errors="replace")
-    (stage_dir / "stage-evidence-summary.env").write_text(
-        "check_disposition=Passed\n"
-        "test_disposition=Passed\n"
-        "clippy_disposition=Passed\n"
-        "diagnostic_evidence_complete=true\n",
-        encoding="utf-8",
+    write_summary(
+        success_dir,
+        check="Passed",
+        test="Passed",
+        clippy="Passed",
+        complete=True,
     )
 
-    env = manifest_env(runner, selftest, manifest_tool, workflow, contract)
-    args = [
-        sys.executable,
-        str(manifest_tool),
-        str(qualification_receipt),
-        str(stage_dir),
-        str(contract),
-        str(runner),
-        str(selftest),
-        str(workflow),
-    ]
     first = root / "manifest-1.env"
     second = root / "manifest-2.env"
-    result = subprocess.run(args + [str(first)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        success_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        first,
+        env,
+    )
     assert result.returncode == 0, result.stderr.decode(errors="replace")
-    result = subprocess.run(args + [str(second)], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        success_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        second,
+        env,
+    )
     assert result.returncode == 0, result.stderr.decode(errors="replace")
     assert first.read_bytes() == second.read_bytes()
     manifest = parse_env(first)
     assert manifest["diagnostic_evidence_complete"] == "true"
+    assert manifest["failure_chain_reconstructed"] == "true"
+    assert manifest["summary_consistency_verified"] == "true"
     assert manifest["execution_authority_granted"] == "false"
     assert manifest["check_disposition"] == "Passed"
-    assert manifest["check_log_sha256"] == sha256_file(stage_dir / "check.combined.log")
+    assert manifest["check_log_sha256"] == sha256_file(success_dir / "check.combined.log")
     assert len(manifest["manifest_commitment"]) == 64
 
-    check_log = stage_dir / "check.combined.log"
+    check_log = success_dir / "check.combined.log"
     original = check_log.read_bytes()
     check_log.write_bytes(original + b"tampered")
-    tampered = subprocess.run(
-        args + [str(root / "manifest-tampered.env")],
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+    tampered = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        success_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-tampered.env",
+        env,
     )
     assert tampered.returncode != 0
     check_log.write_bytes(original)
 
-    unexpected = stage_dir / "unexpected.bin"
+    unexpected = success_dir / "unexpected.bin"
     unexpected.write_bytes(b"unexpected")
-    extra = subprocess.run(
-        args + [str(root / "manifest-extra.env")],
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+    extra = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        success_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-extra.env",
+        env,
     )
     assert extra.returncode != 0
     unexpected.unlink()
+
+    failure_dir = root / "failure-stages"
+    result = run_stage(
+        runner,
+        contract,
+        failure_dir,
+        "check",
+        "fail",
+        extra_env={"EUREKA_WORKFLOW_SHA256": workflow_sha},
+    )
+    assert result.returncode == 23
+    write_summary(
+        failure_dir,
+        check="Failed",
+        test="NotRunDueToPredecessorFailure:check",
+        clippy="NotRunDueToPredecessorFailure:check",
+        complete=True,
+    )
+    failure_manifest = root / "manifest-failure.env"
+    result = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        failure_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        failure_manifest,
+        env,
+    )
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    failure_values = parse_env(failure_manifest)
+    assert failure_values["check_disposition"] == "Failed"
+    assert failure_values["test_disposition"] == "NotRunDueToPredecessorFailure:check"
+    assert failure_values["diagnostic_evidence_complete"] == "true"
+
+    forged_summary_dir = root / "forged-summary"
+    clone_stage_dir(failure_dir, forged_summary_dir)
+    write_summary(
+        forged_summary_dir,
+        check="Failed",
+        test="NotRunDueToPredecessorFailure:test",
+        clippy="NotRunDueToPredecessorFailure:test",
+        complete=True,
+    )
+    forged = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        forged_summary_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-forged-summary.env",
+        env,
+    )
+    assert forged.returncode != 0
+
+    late_execution_dir = root / "late-execution"
+    clone_stage_dir(failure_dir, late_execution_dir)
+    (late_execution_dir / "stage-evidence-summary.env").unlink()
+    result = run_stage(
+        runner,
+        contract,
+        late_execution_dir,
+        "test",
+        "success",
+        extra_env={"EUREKA_WORKFLOW_SHA256": workflow_sha},
+    )
+    assert result.returncode == 0
+    write_summary(
+        late_execution_dir,
+        check="Failed",
+        test="Passed",
+        clippy="NotRunDueToPredecessorFailure:check",
+        complete=True,
+    )
+    late = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        late_execution_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-late.env",
+        env,
+    )
+    assert late.returncode != 0
+
+    truncated_dir = root / "truncated-stages"
+    marker = root / "manifest-large-child-completed"
+    result = run_stage(
+        runner,
+        contract,
+        truncated_dir,
+        "check",
+        "large-success",
+        limit=4096,
+        marker=marker,
+        extra_env={"EUREKA_WORKFLOW_SHA256": workflow_sha},
+    )
+    assert result.returncode == INFRASTRUCTURE_EXIT
+    assert marker.exists()
+    write_summary(
+        truncated_dir,
+        check="EvidenceTruncated",
+        test="NotRunDueToPredecessorFailure:check",
+        clippy="NotRunDueToPredecessorFailure:check",
+        complete=False,
+    )
+    truncated_manifest = root / "manifest-truncated.env"
+    result = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        truncated_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        truncated_manifest,
+        env,
+    )
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    assert parse_env(truncated_manifest)["diagnostic_evidence_complete"] == "false"
+
+    forged_complete_dir = root / "forged-complete"
+    clone_stage_dir(truncated_dir, forged_complete_dir)
+    write_summary(
+        forged_complete_dir,
+        check="EvidenceTruncated",
+        test="NotRunDueToPredecessorFailure:check",
+        clippy="NotRunDueToPredecessorFailure:check",
+        complete=True,
+    )
+    forged_complete = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        forged_complete_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-forged-complete.env",
+        env,
+    )
+    assert forged_complete.returncode != 0
+
+    aborted_dir = root / "aborted-stages"
+    write_summary(
+        aborted_dir,
+        check="InfrastructureAborted",
+        test="NotRunDueToPredecessorFailure:check",
+        clippy="NotRunDueToPredecessorFailure:check",
+        complete=False,
+    )
+    aborted_manifest = root / "manifest-aborted.env"
+    result = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        aborted_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        aborted_manifest,
+        env,
+    )
+    assert result.returncode == 0, result.stderr.decode(errors="replace")
+    aborted_values = parse_env(aborted_manifest)
+    assert aborted_values["check_disposition"] == "InfrastructureAborted"
+    assert aborted_values["diagnostic_evidence_complete"] == "false"
+
+    half_artifact_dir = root / "half-artifact"
+    half_artifact_dir.mkdir(parents=True, exist_ok=True)
+    (half_artifact_dir / "check.stage.env").write_bytes(
+        (failure_dir / "check.stage.env").read_bytes()
+    )
+    write_summary(
+        half_artifact_dir,
+        check="Failed",
+        test="NotRunDueToPredecessorFailure:check",
+        clippy="NotRunDueToPredecessorFailure:check",
+        complete=True,
+    )
+    half = run_manifest(
+        manifest_tool,
+        qualification_receipt,
+        half_artifact_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-half.env",
+        env,
+    )
+    assert half.returncode != 0
+
+    false_pass_receipt = root / "qualification-false-pass.env"
+    false_pass_receipt.write_text(
+        "receipt_schema_revision=synthetic-v1\n"
+        "execution_authority_granted=false\n"
+        "qualification_result=PASS\n",
+        encoding="utf-8",
+    )
+    false_pass = run_manifest(
+        manifest_tool,
+        false_pass_receipt,
+        failure_dir,
+        contract,
+        runner,
+        selftest,
+        workflow,
+        root / "manifest-false-pass.env",
+        env,
+    )
+    assert false_pass.returncode != 0
 
 
 def main() -> int:
