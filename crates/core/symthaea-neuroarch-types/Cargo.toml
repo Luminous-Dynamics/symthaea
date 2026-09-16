@@ -8,6 +8,3 @@ description = "Neutral canonical topology and evidence-contract types for Symtha
 [dependencies]
 serde = { workspace = true }
 blake3 = { workspace = true }
-
-[dev-dependencies]
-serde_json = { workspace = true }
