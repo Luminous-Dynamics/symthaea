@@ -1,0 +1,126 @@
+name: ASSURE-003 Resolver Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs'
+      - 'crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/**'
+      - '.github/workflows/assure-003.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-003-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    env:
+      QUALIFIED_INPUT: 8ff27afded5ca9751129926dacfdc0ebac33bb9b
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Prove exact candidate and qualified ancestry
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          printf 'expected_head=%s\nactual_head=%s\nqualified_input=%s\n' "$EXPECTED_HEAD" "$ACTUAL_HEAD" "$QUALIFIED_INPUT"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          git merge-base --is-ancestor "$QUALIFIED_INPUT" HEAD
+          git diff --exit-code
+
+      - name: Enforce finite ASSURE-003 mutation surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only "$QUALIFIED_INPUT"..HEAD | tee /tmp/assure-003-paths.txt
+          while IFS= read -r path; do
+            case "$path" in
+              .github/workflows/assure-003.yml|\
+              crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs|\
+              crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs|\
+              crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs)
+                ;;
+              *)
+                printf 'ASSURE-003 out-of-scope mutation: %s\n' "$path" >&2
+                exit 1
+                ;;
+            esac
+          done < /tmp/assure-003-paths.txt
+
+      - name: Format
+        run: cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml -- --check
+
+      - name: Check reference resolver
+        run: cargo check --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --bin assure003_resolver
+
+      - name: Resolver adversarial tests
+        run: cargo test --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --bin assure003_resolver
+
+      - name: Preserve ASSURE-002 campaign regressions
+        run: cargo test --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml --all-targets -- -D warnings
+
+      - name: Require committed lock parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
+
+      - name: Capture qualification manifest
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p target/assure-003
+          {
+            printf 'candidate_head=%s\n' "$EXPECTED_HEAD"
+            printf 'qualified_input=%s\n' "$QUALIFIED_INPUT"
+            printf 'resolver_main_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs | cut -d' ' -f1)"
+            printf 'resolver_core_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs | cut -d' ' -f1)"
+            printf 'resolver_tests_sha256=%s\n' "$(sha256sum crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs | cut -d' ' -f1)"
+            rustc --version
+            cargo --version
+          } > target/assure-003/MANIFEST.txt
+          cat target/assure-003/MANIFEST.txt
+
+      - name: Upload qualification manifest
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-003-${{ github.event.pull_request.head.sha || github.sha }}
+          path: target/assure-003/MANIFEST.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Prove tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
