@@ -1,7 +1,7 @@
 # NEUROARCH-001A — Active HDC/LTC incumbent ownership gate
 
-Status: design/ownership gate; blocks NEUROARCH-001 qualification  
-Parent: #3316  
+Status: design/ownership gate; blocks NEUROARCH-001 qualification
+Parent: #3316
 Related: #3317, draft PR #3325
 
 ## Why this gate exists
