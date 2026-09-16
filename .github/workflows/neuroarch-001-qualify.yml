@@ -1,0 +1,88 @@
+name: NEUROARCH-001 Qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-neuroarch-types/**'
+      - 'crates/core/symthaea-neuroarch-adapters/**'
+      - 'docs/research/neuroarch/NEUROARCH_001*.md'
+      - '.github/workflows/neuroarch-001-qualify.yml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Neutral Contract + Lock Materialization
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Compile neutral contract and materialize minimal lock update
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-neuroarch-types
+          git diff -- Cargo.lock | tee neuroarch-cargo-lock.patch
+          test -s neuroarch-cargo-lock.patch
+          grep -q '^+name = "symthaea-neuroarch-types"' neuroarch-cargo-lock.patch
+          grep -q '^+name = "symthaea-neuroarch-adapters"' neuroarch-cargo-lock.patch
+          if grep -E '^-[^\-]' neuroarch-cargo-lock.patch; then
+            echo 'Cargo.lock materialization removed existing content; refusing broad lock churn.' >&2
+            exit 1
+          fi
+
+      - name: Check focused formatting
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/core/symthaea-neuroarch-types/src/lib.rs \
+            crates/core/symthaea-neuroarch-types/tests/contract_v1.rs \
+            crates/core/symthaea-neuroarch-adapters/src/lib.rs
+
+      - name: Test neutral topology contract
+        run: cargo test -p symthaea-neuroarch-types --locked
+
+      - name: Clippy neutral topology contract
+        run: cargo clippy -p symthaea-neuroarch-types --all-targets --locked -- -D warnings
+
+      - name: Upload generated lock evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: neuroarch-001-generated-lock
+          path: |
+            Cargo.lock
+            neuroarch-cargo-lock.patch
+          if-no-files-found: error
+          retention-days: 14
+
+  active-adapter:
+    name: Active-Core Adapter Parity + Purity
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Materialize minimal workspace lock update
+        run: cargo check -p symthaea-neuroarch-types
+
+      - name: Test active-core adapter
+        run: cargo test -p symthaea-neuroarch-adapters --lib --locked
+
+      - name: Clippy active-core adapter
+        run: cargo clippy -p symthaea-neuroarch-adapters --all-targets --locked -- -D warnings
