@@ -1,16 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Strong preferred release gate for the confined verifier bootstrap.
+//! Continuity-qualified release gate for the confined verifier bootstrap.
 //!
 //! This crate consumes both the exact syscall-confinement qualification and the
 //! matching file-backed executable-mapping continuity qualification. Immediately
 //! before release it proves that the tracee is still in a ptrace tracing stop
 //! owned by the current supervisor, then performs one safe `ptrace::detach`.
 //!
-//! The lower #3514 crate still contains a weaker public detach helper. Therefore
-//! this crate establishes a stronger preferred release theorem, not yet global
-//! absence of weaker release paths. That lower API must be removed before the
-//! complete stack is considered merge-ready.
+//! In this stacked lineage the lower confinement crate exposes no public detach
+//! helper. Therefore this is the only reviewed public safe-Rust release path for
+//! the confined bootstrap capability. That API-surface statement does not claim
+//! exclusion of privileged external mutation, arbitrary kernel/debugger action,
+//! post-release runtime continuity, trusted time, or physical authority.
 
 #![cfg(all(
     target_os = "linux",
@@ -243,7 +244,9 @@ impl ReleasedBootstrapVerifier {
     }
     pub const fn ptrace_detach_returned_success(&self) -> bool { true }
     pub const fn input_capabilities_consumed_by_release_constructor(&self) -> bool { true }
-    pub const fn all_weaker_release_paths_removed(&self) -> bool { false }
+    /// Within the reviewed stacked crates, no public safe-Rust release function
+    /// accepts only the weaker confinement-ready capability.
+    pub const fn all_weaker_release_paths_removed(&self) -> bool { true }
     pub const fn external_privileged_mutation_excluded(&self) -> bool { false }
     pub const fn trusted_time_established(&self) -> bool { false }
     pub const fn grants_physical_authority(&self) -> bool { false }

@@ -901,13 +901,6 @@ pub fn confine_bootstrap_until_ready(
     }
 }
 
-pub fn release_bootstrap_confined_tracee(
-    ready: &BootstrapSyscallConfinementReady,
-) -> Result<(), BootstrapSyscallConfinementIssue> {
-    ptrace::detach(ready.pid, None::<Signal>)
-        .map_err(|error| BootstrapSyscallConfinementIssue::DetachFailed(error.to_string()))
-}
-
 struct PendingSyscall {
     number: i64,
     args: [u64; 6],
