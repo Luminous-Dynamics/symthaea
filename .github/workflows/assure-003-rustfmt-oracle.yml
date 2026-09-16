@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       FAILED_CANDIDATE: b4266bd58eec509a3be0d9bd8a09e840316bd8d6
-      EVIDENCE_DIR: ${{ runner.temp }}/assure-003-rustfmt-oracle
+      EVIDENCE_DIR: /tmp/assure-003-rustfmt-oracle
     steps:
       - name: Initialize evidence capture
         shell: bash
@@ -161,7 +161,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: assure-003-rustfmt-196-${{ env.FAILED_CANDIDATE }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/assure-003-rustfmt-oracle
+          path: ${{ env.EVIDENCE_DIR }}
           if-no-files-found: error
           retention-days: 30
 
