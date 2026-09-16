@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-assurance-post-release-continuous-runtime-lineage"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bind launch, release, signed checkpoint two and full runtime continuity into one lineage"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "runtime", "continuity", "attestation"]
+categories = ["development-tools", "cryptography"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-launch-to-runtime-continuity = { path = "../symthaea-assurance-launch-to-runtime-continuity" }
+symthaea-assurance-authenticated-post-release-checkpoint-two = { path = "../symthaea-assurance-authenticated-post-release-checkpoint-two" }
+symthaea-assurance-signed-post-release-checkpoint-two = { path = "../symthaea-assurance-signed-post-release-checkpoint-two" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
