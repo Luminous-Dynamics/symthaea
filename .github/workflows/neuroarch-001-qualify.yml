@@ -30,10 +30,10 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Materialize minimal workspace lock update
+      - name: Compile neutral contract and materialize minimal lock update
         run: |
           set -euo pipefail
-          cargo metadata --format-version 1 --no-deps >/dev/null
+          cargo check -p symthaea-neuroarch-types
           git diff -- Cargo.lock | tee /tmp/neuroarch-cargo-lock.patch
           test -s /tmp/neuroarch-cargo-lock.patch
           grep -q '^+name = "symthaea-neuroarch-types"' /tmp/neuroarch-cargo-lock.patch
@@ -79,7 +79,7 @@ jobs:
           components: clippy
 
       - name: Materialize minimal workspace lock update
-        run: cargo metadata --format-version 1 --no-deps >/dev/null
+        run: cargo check -p symthaea-neuroarch-types
 
       - name: Test active-core adapter
         run: cargo test -p symthaea-neuroarch-adapters --lib --locked
