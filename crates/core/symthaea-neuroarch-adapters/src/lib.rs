@@ -15,6 +15,8 @@ use symthaea_neuroarch_types::{
     TimescaleClass, TOPOLOGY_SCHEMA_VERSION, TopologyDescriptor, TopologyError,
 };
 
+const ACTIVE_HDC_LTC_LAYER: &str = "active_core:hdc_ltc_layer";
+
 /// Read-only topology view of the HDC/LTC implementation actually exported by
 /// `symthaea-core` and consumed across active Symthaea domains.
 #[derive(Debug, Clone, Copy)]
@@ -64,12 +66,9 @@ impl NeuroTopology for ActiveCoreHdcLtcTopology<'_> {
                 id: CircuitId(id),
                 role: format!("layer:{idx}"),
                 timescale_class: timescale.clone(),
-                // V1 semantics: state_dimension is PER UNIT. `unit_count`
-                // carries multiplicity. Resource receipts must multiply these
-                // exactly once when computing total logical state dimensions.
                 state_dimension: dim,
                 unit_count,
-                implementation: CircuitImplementation::IncumbentHdcLtcLayer,
+                implementation: CircuitImplementation::Named(ACTIVE_HDC_LTC_LAYER.to_string()),
                 input_merge_policy: if idx > 0 && config.skip_connections {
                     InputMergePolicy::BundleAll
                 } else {
@@ -206,12 +205,10 @@ mod tests {
         let first_layer = &topology.circuits[1];
         assert_eq!(first_layer.state_dimension, 128);
         assert_eq!(first_layer.unit_count, 2);
+        assert_eq!(first_layer.total_state_dimensions().unwrap(), 256);
         assert_eq!(
-            first_layer
-                .state_dimension
-                .checked_mul(first_layer.unit_count)
-                .unwrap(),
-            256
+            first_layer.implementation,
+            CircuitImplementation::Named(ACTIVE_HDC_LTC_LAYER.to_string())
         );
     }
 
