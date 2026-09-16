@@ -1,0 +1,20 @@
+[package]
+name = "symthaea-assurance-signed-post-release-checkpoint-two"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Verify signed checkpoint two over authenticated post-release live runtime observation"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "runtime", "attestation", "continuity"]
+categories = ["development-tools", "cryptography"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-authenticated-post-release-checkpoint-two = { path = "../symthaea-assurance-authenticated-post-release-checkpoint-two" }
+symthaea-evidence-verifier-runtime-continuity = { path = "../../domains/symthaea-evidence-verifier-runtime-continuity" }
