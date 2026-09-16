@@ -68,10 +68,10 @@ jobs:
           grep -q '"name":"symthaea-neuroarch-types"' neuroarch-workspace-metadata.json
           grep -q '"name":"symthaea-neuroarch-adapters"' neuroarch-workspace-metadata.json
 
-      - name: Compile neutral contract and materialize minimal lock update
+      - name: Resolve workspace and materialize minimal lock update
         run: |
           set -euo pipefail
-          cargo check -p symthaea-neuroarch-types
+          cargo metadata --format-version 1 >/dev/null
           git diff -- Cargo.lock | tee neuroarch-cargo-lock.patch
           test -s neuroarch-cargo-lock.patch
 
@@ -97,6 +97,7 @@ jobs:
           test "${added_packages[0]}" = 'symthaea-neuroarch-adapters'
           test "${added_packages[1]}" = 'symthaea-neuroarch-types'
 
+          cargo check -p symthaea-neuroarch-types --locked
           cargo tree -p symthaea-neuroarch-types --depth 1 --locked > neuroarch-types-tree.txt
           cargo tree -p symthaea-neuroarch-adapters --depth 1 --locked > neuroarch-adapters-tree.txt
           grep -q 'blake3' neuroarch-types-tree.txt
