@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   format:
@@ -16,19 +16,43 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       FAILED_CANDIDATE: b4266bd58eec509a3be0d9bd8a09e840316bd8d6
+      EVIDENCE_DIR: ${{ runner.temp }}/assure-003-rustfmt-oracle
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
-          fetch-depth: 0
-          persist-credentials: true
-
-      - name: Prove diagnostic ancestry
+      - name: Initialize evidence capture
         shell: bash
         run: |
           set -euo pipefail
-          git merge-base --is-ancestor "$FAILED_CANDIDATE" HEAD
+          rm -rf "$EVIDENCE_DIR"
+          mkdir -p "$EVIDENCE_DIR/pre" "$EVIDENCE_DIR/post"
+          printf 'pending\n' > "$EVIDENCE_DIR/capture-status.txt"
+          printf '%s\n' 'cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml' > "$EVIDENCE_DIR/command.txt"
+          {
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+            printf 'workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'failed_candidate=%s\n' "$FAILED_CANDIDATE"
+          } > "$EVIDENCE_DIR/run.txt"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: b4266bd58eec509a3be0d9bd8a09e840316bd8d6
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact diagnostic subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          ACTUAL_TREE="$(git rev-parse 'HEAD^{tree}')"
+          printf '%s\n' "$ACTUAL_HEAD" > "$EVIDENCE_DIR/subject-sha.txt"
+          printf '%s\n' "$ACTUAL_TREE" > "$EVIDENCE_DIR/subject-tree.txt"
+          test "$ACTUAL_HEAD" = "$FAILED_CANDIDATE"
           git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
 
       - name: Install exact formatter
         shell: bash
@@ -36,51 +60,114 @@ jobs:
           set -euo pipefail
           rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
           rustup override set 1.96.0
-          rustc --version --verbose
-          cargo fmt --version
+          rustc --version --verbose | tee "$EVIDENCE_DIR/rustc-version.txt"
+          cargo --version | tee "$EVIDENCE_DIR/cargo-version.txt"
+          cargo fmt --version | tee "$EVIDENCE_DIR/rustfmt-version.txt"
 
-      - name: Apply Rust 1.96 formatter
+      - name: Capture exact input bytes
         shell: bash
         run: |
           set -euo pipefail
-          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
-          git diff -- \
+          for path in \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs
-          if git diff --quiet -- \
+          do
+            name="${path#crates/core/symthaea-assurance-campaign/src/bin/}"
+            mkdir -p "$EVIDENCE_DIR/pre/$(dirname "$name")"
+            cp -- "$path" "$EVIDENCE_DIR/pre/$name"
+          done
+          sha256sum \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
-            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs; then
-            echo 'formatter produced no delta; oracle cannot explain executed failure' >&2
-            exit 1
-          fi
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs \
+            > "$EVIDENCE_DIR/pre-sha256.txt"
 
-      - name: Commit exact formatter output on diagnostic branch
+      - name: Apply Rust 1.96 formatter without short-circuiting evidence
         shell: bash
-        env:
-          HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          set +e
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml \
+            > "$EVIDENCE_DIR/formatter.stdout.txt" \
+            2> "$EVIDENCE_DIR/formatter.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/formatter-exit-code.txt"
+
+      - name: Capture formatter result and enforce bounded mutation
+        if: always()
+        shell: bash
         run: |
           set -euo pipefail
-          git add -- \
+          git status --porcelain=v1 > "$EVIDENCE_DIR/git-status.txt"
+          git diff --binary -- \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
             crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
-            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs
-          git diff --cached --name-only > /tmp/oracle-paths.txt
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs \
+            > "$EVIDENCE_DIR/rustfmt.diff"
+          git diff --name-only > "$EVIDENCE_DIR/changed-paths.txt"
+
+          capture_ok=1
           while IFS= read -r path; do
             case "$path" in
               crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs|\
               crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs|\
               crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs)
                 ;;
+              '')
+                ;;
               *)
-                printf 'unexpected formatter mutation: %s\n' "$path" >&2
-                exit 1
+                printf 'unexpected formatter mutation: %s\n' "$path" | tee -a "$EVIDENCE_DIR/capture-errors.txt" >&2
+                capture_ok=0
                 ;;
             esac
-          done < /tmp/oracle-paths.txt
-          test -s /tmp/oracle-paths.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'chore(diag): capture Rust 1.96 ASSURE-003 rustfmt output'
-          git push origin "HEAD:${HEAD_REF}"
+          done < "$EVIDENCE_DIR/changed-paths.txt"
+
+          for path in \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs
+          do
+            name="${path#crates/core/symthaea-assurance-campaign/src/bin/}"
+            mkdir -p "$EVIDENCE_DIR/post/$(dirname "$name")"
+            cp -- "$path" "$EVIDENCE_DIR/post/$name"
+          done
+          sha256sum \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs \
+            > "$EVIDENCE_DIR/post-sha256.txt"
+
+          if [ "$capture_ok" -eq 1 ]; then
+            printf 'ok\n' > "$EVIDENCE_DIR/capture-status.txt"
+          else
+            printf 'bounded-mutation-failure\n' > "$EVIDENCE_DIR/capture-status.txt"
+          fi
+
+          (
+            cd "$EVIDENCE_DIR"
+            find . -type f ! -name SHA256SUMS.txt -print0 \
+              | LC_ALL=C sort -z \
+              | xargs -0 sha256sum > SHA256SUMS.txt
+          )
+
+      - name: Upload formatter derivation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-003-rustfmt-196-${{ env.FAILED_CANDIDATE }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/assure-003-rustfmt-oracle
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Resolve diagnostic outcome after evidence capture
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$EVIDENCE_DIR/capture-status.txt"
+          test "$(cat "$EVIDENCE_DIR/capture-status.txt")" = ok
+          test -f "$EVIDENCE_DIR/formatter-exit-code.txt"
+          test "$(cat "$EVIDENCE_DIR/formatter-exit-code.txt")" = 0
+          test -s "$EVIDENCE_DIR/changed-paths.txt"
+          test -s "$EVIDENCE_DIR/rustfmt.diff"
