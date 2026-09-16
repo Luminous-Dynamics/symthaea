@@ -1,0 +1,327 @@
+{
+  "schema_version": "PARADOX-A0R-MEASUREMENT-RECEIPT-CONTRACT-V1",
+  "authority": "DevelopmentOnly / Representational MeasurementOnly",
+  "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+  "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+  "latent_contract_schema": "PARADOX-A0R-LATENT-READOUT-CONTRACT-V2",
+  "statistics_contract_schema": "PARADOX-A0R-STATISTICS-V1",
+  "confirmatory_execution_allowed": false,
+  "production_cognition_mutation_allowed": false,
+  "purpose": [
+    "Bind each A0-R latent observation to an exact production subject, deterministic service configuration, fresh-state boundary, source-proved CfC transition semantics, and seal-before-label execution order.",
+    "Fail closed when a latent cannot be shown to come from the declared recurrent substrate under the frozen measurement configuration.",
+    "Prevent vector presence, all-zero fallbacks, hidden state reuse, masking drift, random initialization, or post-label retuning from being misreported as representational evidence."
+  ],
+  "claim_boundary": [
+    "V1 may establish decodability only for the frozen deterministic CfC model instance and frozen measurement configuration.",
+    "V1 does not establish architecture-wide decodability across independently initialized Symthaea instances; that requires a separately preregistered cross-genesis replication.",
+    "A valid recurrent vector does not establish that production policy causally uses the decoded relation.",
+    "A probe success does not establish a native behavioral response, metacognitive recruitment, ontology repair, consciousness, sentience, or phenomenology."
+  ],
+  "model_instance_scope": {
+    "scope": "single deterministic recurrent-basis instance family",
+    "genesis_phrase": "PARADOX-A0R-DEV-V1-GENESIS-2026-09-16",
+    "genesis_phrase_sha256": "0c481e5561fba5797438043e11b9c88b40eee2e8c6b1a4cacc9bbbf0e5eb19d4",
+    "same_genesis_for_all_base_fixtures": true,
+    "same_genesis_for_all_metamorphic_variants": true,
+    "target_conditioned_genesis_forbidden": true,
+    "cross_genesis_claim_authorized": false
+  },
+  "service_state_contract": {
+    "fresh_service_per_base_fixture": true,
+    "fresh_service_per_metamorphic_variant": true,
+    "fresh_service_per_technical_replicate": true,
+    "cross_fixture_service_reuse": "forbidden",
+    "cross_variant_service_reuse": "forbidden",
+    "within_fixture_temporal_state": "preserve only the declared evidence sequence for that fixture",
+    "service_instance_id_rule": "domain-separated deterministic receipt identifier; unique per run/base-fixture/transform/technical-replicate and never exposed as a probe feature",
+    "constructor_count_gate": "qualification must prove one CognitiveLoopService construction for every executed technical replicate and zero reuse across receipt instance IDs",
+    "receipt_id_rule": "receipt_id is a deterministic domain-separated identifier for run/base-fixture/transform/cycle/technical-replicate; it is receipt metadata only and forbidden as a probe feature"
+  },
+  "runner_config_v1": {
+    "constructor": "CognitiveLoopConfig::with_cfc() followed by the explicit overrides below",
+    "required_exact_values": {
+      "temporal_backend": "CfC",
+      "genesis_phrase": "PARADOX-A0R-DEV-V1-GENESIS-2026-09-16",
+      "cfc_config.num_neurons": 256,
+      "cfc_config.input_dim": 256,
+      "cfc_config.delta_t": 0.02,
+      "cfc_config.prediction_horizons": [
+        0.02,
+        0.1,
+        0.2
+      ],
+      "async_training": false,
+      "enable_online_learning": false,
+      "episodic_replay_training": false,
+      "memory_graduation": false,
+      "enable_recurrent_dim_masking": false,
+      "enable_spectral_entropy_masking": false,
+      "effective_dim_fraction_override": null,
+      "attention_budget_override_us": 60000000,
+      "timezone_offset_hours": 0.0
+    },
+    "full_config_binding": "runner_config_effective must contain the full canonical JSON projection used by the runner; canonical_config_sha256 is SHA-256 of RFC8259 JSON serialized with sorted keys and separators ',' ':' over that object",
+    "feature_binding": "enabled_features is a sorted unique array; enabled_feature_set_sha256 is SHA-256 of the UTF-8 newline-joined array values; target triple is receipt-bound separately",
+    "binary_binding": "exact executable SHA-256 must be receipt-bound",
+    "config_variation_by_target_or_label": "forbidden"
+  },
+  "source_theorem": {
+    "id": "A0R-CFC-INFALLIBLE-RESULT-PATH-V1",
+    "conclusion": "Under the exact frozen source and runner_config_v1 with TemporalBackend::CfC and a nonempty genesis-seeded CfC network, temporal_network.step() and temporal_network.read_state() cannot reach their Result error branches. The planning stale-state and zero-state fallback warnings are therefore unreachable for an eligible V1 receipt.",
+    "preconditions": [
+      "all source bindings below match exact Git blob SHA-1 values",
+      "temporal_backend is explicitly CfC; relying on TemporalBackend::default() is forbidden because the frozen default is HdcLtcUnified",
+      "genesis_phrase is Some(frozen phrase), selecting the deterministic CfCNetwork::from_genesis constructor path",
+      "CfCNetworkConfig retains the frozen default num_layers=2, so the recurrent cell vector is nonempty",
+      "no production source bytes in the bound source files differ from the production subject"
+    ],
+    "source_bindings": [
+      {
+        "path": "src/cognitive_loop/config/temporal.rs",
+        "blob_sha": "1fa3f1de884c0193533fb8bc1e4d64abe97b03ce",
+        "required_substrings": [
+          "#[default]\n    HdcLtcUnified",
+          "num_neurons: 256",
+          "input_dim: 256",
+          "delta_t: 0.02"
+        ],
+        "fact": "frozen default backend is HdcLtcUnified and frozen CfC dimensions/dt are declared here"
+      },
+      {
+        "path": "src/cognitive_loop/constructor.rs",
+        "blob_sha": "eb9bf757f94942efda84685127d37beb12c53e8d",
+        "required_substrings": [
+          "TemporalBackend::CfC =>",
+          "CfCNetwork::from_genesis(net_config, &genesis, \"cognitive_loop::cfc\")",
+          "TemporalNetwork::CfC(cfc)"
+        ],
+        "fact": "explicit CfC config constructs a genesis-seeded CfC network and wraps it in TemporalNetwork::CfC"
+      },
+      {
+        "path": "src/cognitive_loop/temporal_network.rs",
+        "blob_sha": "ef6f66bd35243b5c145c41502ca47001cc23b815",
+        "required_substrings": [
+          "Self::CfC(cfc) => cfc.step(input, dt)",
+          "Self::CfC(cfc) => cfc.read_state()"
+        ],
+        "fact": "TemporalNetwork delegates V1 step/read directly to CfCNetwork"
+      },
+      {
+        "path": "src/dynamics/cfc/network.rs",
+        "blob_sha": "ef29c34f55dc59acd8eb1fa4266c85abf7bf4d07",
+        "required_substrings": [
+          "num_layers: 2",
+          "pub fn from_genesis",
+          "let _ = self.forward(input, dt);\n        Ok(())",
+          "if let Some(cell) = self.cells.last() {\n            Ok(cell.state().clone())"
+        ],
+        "fact": "genesis-seeded CfC has two layers; step returns Ok after forward and read_state returns the last cell state"
+      },
+      {
+        "path": "src/cognitive_loop/cycle_phase_dynamics/planning.rs",
+        "blob_sha": "0c5587fdd0073119417d4c9041c8228fe6ee9bea",
+        "required_substrings": [
+          "CfC temporal step failed — continuing with stale state",
+          "CfC read_state failed in output read — using zero state",
+          "if self.config.enable_recurrent_dim_masking",
+          "if self.config.enable_spectral_entropy_masking"
+        ],
+        "fact": "generic warning/fallback paths and both recurrent masking controls exist; V1 makes them unreachable/disabled via the theorem and config gate"
+      },
+      {
+        "path": "src/cognitive_loop/config/mod.rs",
+        "blob_sha": "7a0acc36d0a433eff7413395fda8a6438b271dab",
+        "required_substrings": [
+          "pub fn with_cfc() -> Self",
+          "temporal_backend: TemporalBackend::CfC",
+          "enable_recurrent_dim_masking: false",
+          "enable_spectral_entropy_masking: false",
+          "effective_dim_fraction_override: None"
+        ],
+        "fact": "with_cfc explicitly selects CfC; frozen defaults disable recurrent and spectral masking"
+      }
+    ],
+    "nonfinite_caveat": "Result-path infallibility does not prove numerical finiteness. Every collected vector must independently pass the finite-value gate.",
+    "source_binding_digest_sha256": "ece28a3d5502a960fe6db7d417ac39251ee152bd5f73c1d7c9434f7d17cc5aed"
+  },
+  "technical_repeatability_gate": {
+    "replicates_per_measurement": 2,
+    "same_config_and_genesis": true,
+    "fresh_service_each_replicate": true,
+    "comparison": "bit-identical channel bytes across the two fresh-service replicates for cfc_recurrent_state, perception_hdv_binary, and perception_chunk32 at the preregistered measurement cycle",
+    "perceptual_controls_also_bound": true,
+    "mismatch_status": "INVALID_MEASUREMENT_NONDETERMINISTIC",
+    "replicates_increase_statistical_n": false,
+    "pairwise_exclusion": "if either technical replicate is invalid or the pair mismatches, the entire measurement group is excluded from probe fitting and the scientific denominator"
+  },
+  "measurement_cycle": {
+    "primary": "single preregistered final relational-state cycle from PARADOX-A0R-STATISTICS-V1",
+    "negative_control": "pre-relation or first-evidence cycle where the latent contract permits it",
+    "cycle_selection_after_label_access": "forbidden",
+    "multiple_cycle_search": "forbidden"
+  },
+  "required_receipt_fields": [
+    "receipt_schema_version",
+    "production_subject_sha",
+    "g2b_subject_sha",
+    "latent_contract_schema",
+    "statistics_contract_schema",
+    "runner_protocol_id",
+    "run_id",
+    "receipt_id",
+    "base_fixture_id",
+    "semantic_fixture_family_id",
+    "transform_id",
+    "technical_replicate_index",
+    "service_instance_id",
+    "genesis_phrase_sha256",
+    "runner_config_effective",
+    "canonical_config_sha256",
+    "enabled_features",
+    "enabled_feature_set_sha256",
+    "target_triple",
+    "executable_sha256",
+    "source_theorem_id",
+    "source_binding_digest",
+    "measurement_cycle_index",
+    "cfc_vector_length",
+    "cfc_vector_f32le_sha256",
+    "cfc_vector_nonfinite_count",
+    "cfc_vector_all_zero",
+    "perception_hdv_sha256",
+    "perception_chunk32_f32le_sha256",
+    "recurrent_masking_enabled",
+    "spectral_entropy_masking_enabled",
+    "effective_dim_fraction_override",
+    "observed_recurrent_mask_event_count",
+    "technical_repeatability_peer_receipt",
+    "technical_repeatability_match",
+    "probe_artifact_sha256",
+    "preprocessing_artifact_sha256",
+    "sealed_feature_bundle_sha256",
+    "sealed_prediction_sha256",
+    "seal_stage",
+    "label_join_stage",
+    "measurement_validity",
+    "invalidity_reasons"
+  ],
+  "vector_encoding": {
+    "cfc_recurrent_state": "exact f32 IEEE-754 little-endian bytes in feature order",
+    "perception_chunk32": "exact f32 IEEE-754 little-endian bytes in feature order",
+    "perception_hdv_binary": "canonical packed binary HDC bytes as exported by the frozen runner",
+    "hash": "SHA-256",
+    "raw_vector_retention": "allowed only in development evidence storage; receipt itself may contain digest plus summary fields"
+  },
+  "validity_rules": {
+    "eligible_status": "ELIGIBLE_A0R_MEASUREMENT",
+    "all_required": [
+      "exact production/g2b/contract bindings match",
+      "runner config matches every explicit V1 value and full-config digest is present",
+      "feature set, target triple, and executable are bound",
+      "source theorem preconditions and all source blob bindings pass",
+      "fresh service boundary passes",
+      "measurement cycle is prospectively selected",
+      "cfc vector length is exactly 256",
+      "cfc vector nonfinite count is zero",
+      "recurrent and spectral masking are disabled, effective_dim_fraction_override is null, and observed recurrent mask event count is zero",
+      "technical replicate pair is bit-identical",
+      "probe/preprocessing artifacts were frozen before held-out feature evaluation",
+      "prediction was sealed before held-out label/oracle join"
+    ],
+    "all_zero_vector_rule": "record but do not automatically invalidate; under the CfC source theorem a zero vector is not evidence of the generic read_state fallback, and a valid model state may in principle be zero",
+    "forbidden_inferences": [
+      "vector exists therefore transition succeeded",
+      "zero vector therefore fallback occurred",
+      "nonzero vector therefore semantic information exists",
+      "high probe accuracy therefore production policy uses the atom",
+      "single-genesis success therefore architecture-wide representation"
+    ],
+    "invalid_statuses": [
+      "INVALID_MEASUREMENT_SOURCE_BINDING",
+      "INVALID_MEASUREMENT_CONFIG_DRIFT",
+      "INVALID_MEASUREMENT_STATE_REUSE",
+      "INVALID_MEASUREMENT_DIMENSION",
+      "INVALID_MEASUREMENT_NONFINITE",
+      "INVALID_MEASUREMENT_MASKING",
+      "INVALID_MEASUREMENT_NONDETERMINISTIC",
+      "INVALID_MEASUREMENT_POSTHOC_CYCLE_SELECTION",
+      "INVALID_MEASUREMENT_SEAL_ORDER",
+      "INVALID_MEASUREMENT_PEER_INVALID",
+      "INVALID_MEASUREMENT_OTHER"
+    ],
+    "invalid_measurements_enter_probe_fit": false,
+    "invalid_measurements_enter_scientific_denominator": false,
+    "invalid_measurement_reporting": "report count and reason by target/channel; never silently discard"
+  },
+  "seal_order": [
+    "bind exact subject/source/config/feature/binary identities",
+    "construct fresh production service",
+    "execute one fixture in declared causal event order",
+    "collect primary and control channels at the frozen cycle",
+    "validate source/config/state/vector/repeatability gates",
+    "apply only preprocessing frozen from development-training data",
+    "emit probe prediction with frozen probe",
+    "seal feature and prediction digests",
+    "join held-out semantic label/oracle metadata",
+    "score and aggregate by independent base semantic fixture"
+  ],
+  "seal_rules": {
+    "seal_stage": "before_heldout_label_join",
+    "heldout_label_available_to_probe": false,
+    "heldout_condition_id_available_to_probe": false,
+    "heldout_oracle_available_to_probe": false,
+    "postseal_mutation_of_features_or_prediction": "forbidden",
+    "postseal_refit_or_threshold_change": "forbidden",
+    "label_join_is_analysis_only": true
+  },
+  "qualification_gates_before_any_a0r_result": [
+    "static receipt-contract audit PASS on exact subject",
+    "source blob/theorem audit PASS",
+    "runner config canonicalization golden test PASS",
+    "fresh-service construction-count and no-reuse test PASS",
+    "masking/config drift negative controls PASS",
+    "nonfinite/dimension negative controls PASS",
+    "seal-order negative control PASS",
+    "technical repeatability gate PASS",
+    "receipt-set uniqueness/pairing audit PASS",
+    "G2b independently verified before any confirmatory A0-R execution"
+  ],
+  "receipt_set_rules": {
+    "group_key": [
+      "run_id",
+      "base_fixture_id",
+      "transform_id",
+      "measurement_cycle_index"
+    ],
+    "replicate_indices_exactly": [
+      0,
+      1
+    ],
+    "receipt_id_unique_globally": true,
+    "service_instance_id_unique_globally": true,
+    "peer_binding_symmetric": true,
+    "same_within_pair": [
+      "production_subject_sha",
+      "g2b_subject_sha",
+      "semantic_fixture_family_id",
+      "genesis_phrase_sha256",
+      "canonical_config_sha256",
+      "enabled_feature_set_sha256",
+      "target_triple",
+      "executable_sha256",
+      "source_theorem_id",
+      "source_binding_digest",
+      "probe_artifact_sha256",
+      "preprocessing_artifact_sha256"
+    ],
+    "bit_identical_within_pair": [
+      "cfc_vector_f32le_sha256",
+      "perception_hdv_sha256",
+      "perception_chunk32_f32le_sha256"
+    ],
+    "pairwise_invalidity_rule": "if either member is not ELIGIBLE_A0R_MEASUREMENT, neither member may enter probe fitting or the scientific denominator",
+    "no_partial_pair_rule": "a missing technical replicate is INVALID_MEASUREMENT_NONDETERMINISTIC, not a one-replicate measurement",
+    "statistical_n_rule": "the pair still contributes at most one independent base semantic fixture"
+  }
+}

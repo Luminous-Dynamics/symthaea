@@ -1,0 +1,264 @@
+{
+  "schema_version": "PARADOX-A0R-LATENT-READOUT-CONTRACT-V2",
+  "authority": "DevelopmentOnly / Representational MeasurementOnly",
+  "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+  "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+  "confirmatory_execution_allowed": false,
+  "response_mapping_authorized": false,
+  "no_omnibus_score": true,
+  "claim_boundary": [
+    "Probe decodability means information is available in a frozen production representation under the frozen readout.",
+    "Probe decodability does not establish that production cognition uses that information causally.",
+    "Probe decodability does not establish a native PARADOX response, metacognitive recruitment, ontology repair, consciousness, or phenomenology.",
+    "A surface-control failure does not prove absence of representation; it only fails to establish abstraction under this contract."
+  ],
+  "state_scope": {
+    "unit": "one independent production-service instance per development fixture",
+    "cross_fixture_state": "forbidden",
+    "within_fixture_temporal_state": "preserved in declared evidence order",
+    "initialization": "same frozen production configuration and content-neutral initialization for original/metamorphic paired runs",
+    "paired_transform_rule": "rerun production from the same declared initial state; never transform a latent vector after production",
+    "receipt_requirement": "record state-scope identifier, cycle indices used, production subject SHA, channel ID, probe SHA, transform ID, and sealed prediction before any held-out label/scoring access"
+  },
+  "channels": {
+    "cfc_recurrent_state": {
+      "role": "primary_latent",
+      "receipt": "CycleResult.output",
+      "semantics": "post-step CfC recurrent hidden state copied from temporal_network.read_state()",
+      "source_bindings": [
+        {
+          "path": "src/cognitive_loop/phase_results.rs",
+          "blob_sha": "107e1984041f98f2bc8dcdfead1e24cc7bd601f3",
+          "fact": "DynCore.output is the core CfC dynamics output"
+        },
+        {
+          "path": "src/cognitive_loop/cycle_phase_dynamics/mod.rs",
+          "blob_sha": "f0884d86355e0e8fc02ed4c6ee9cbf284131c77b",
+          "fact": "CfcPlanningResult.output is documented as the CfC hidden-state output vector"
+        },
+        {
+          "path": "src/cognitive_loop/cycle_phase_dynamics/planning.rs",
+          "blob_sha": "0c5587fdd0073119417d4c9041c8228fe6ee9bea",
+          "fact": "after temporal_network.step(), output is obtained from temporal_network.read_state()"
+        },
+        {
+          "path": "src/cognitive_loop/cycle_phase_output/mod.rs",
+          "blob_sha": "aa5fbe66aed52bf1bc4f1e03b69055368d1fdab2",
+          "fact": "dynamics.core.output is moved unchanged into CycleResult.output"
+        }
+      ],
+      "eligible_for_abstraction_claim": true
+    },
+    "perception_hdv_binary": {
+      "role": "surface_control",
+      "receipt": "CycleResult.wisdom_hv",
+      "semantics": "cached binary perception HDC encoding; despite the legacy field name it is not a wisdom-policy representation on this frozen subject",
+      "source_bindings": [
+        {
+          "path": "src/cognitive_loop/cycle_phase_output/mod.rs",
+          "blob_sha": "aa5fbe66aed52bf1bc4f1e03b69055368d1fdab2",
+          "fact": "CycleResult.wisdom_hv is assigned perception.encoding.hv16_cached"
+        }
+      ],
+      "eligible_for_abstraction_claim": false
+    },
+    "perception_chunk32": {
+      "role": "surface_control",
+      "receipt": "CycleResult.thought_vector",
+      "semantics": "32-element chunk-average projection of the current perception HDV",
+      "source_bindings": [
+        {
+          "path": "src/cognitive_loop/cycle_phase_output/mod.rs",
+          "blob_sha": "aa5fbe66aed52bf1bc4f1e03b69055368d1fdab2",
+          "fact": "thought_vector averages consecutive chunks of perception.encoding.encoding_result.hdv into up to 32 values"
+        }
+      ],
+      "eligible_for_abstraction_claim": false
+    },
+    "typed_runtime_telemetry": {
+      "role": "structured_control",
+      "receipt": "CycleResult.metadata whitelist",
+      "semantics": "already-exported typed runtime diagnostics; never treated as a latent-vector representation",
+      "allowed_fields": [
+        "epistemic_conflict_count",
+        "feedback_conflict_ratio",
+        "epistemic_reasoning_accelerated",
+        "metacognitive_anomaly",
+        "predictive_self_safety",
+        "predictive_behavioral_error",
+        "self_model_accuracy"
+      ],
+      "source_bindings": [
+        {
+          "path": "src/cognitive_loop/types/telemetry.rs",
+          "blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+          "fact": "CycleMetadata exports the whitelisted conflict/self-model diagnostics"
+        }
+      ],
+      "eligible_for_abstraction_claim": false
+    }
+  },
+  "forbidden_probe_inputs": [
+    "raw_fixture_bytes",
+    "canonical_fixture_bytes",
+    "raw_input_text",
+    "input_byte_length",
+    "token_count",
+    "condition_id",
+    "condition_name",
+    "trial_index",
+    "confirmatory_seed",
+    "expected_response",
+    "oracle_output",
+    "score",
+    "fixture_hash_as_feature",
+    "source_file_path_as_feature"
+  ],
+  "label_authority": {
+    "source": "development-only semantic label manifest frozen independently of collected production states",
+    "feature_boundary": "labels and manifest metadata are never production inputs and never probe features",
+    "training_rule": "development-training labels may fit the probe; held-out-development labels remain unavailable to the fitted probe and are joined only after predictions are sealed",
+    "future_confirmatory_rule": "confirmatory labels/oracle outputs remain unavailable until exact frozen probe predictions and receipts are sealed",
+    "condition_identifier_rule": "condition identifiers may join evaluation records after sealing but are forbidden as probe features"
+  },
+  "targets": [
+    {
+      "id": "conflict_positive_control",
+      "capability_atom": "detect_conflict",
+      "role": "positive_control",
+      "label_contract": "positive when the semantic manifest contains qualified mutually incompatible evidence under the current representation; negative is matched evidence volume/difficulty without internal incompatibility",
+      "interpretation": "checks that the probe pipeline can recover a relation already known to have a live typed projection"
+    },
+    {
+      "id": "visible_context_binding",
+      "capability_atom": "bind_visible_context",
+      "role": "frontier",
+      "label_contract": "positive when a visible context variable is required to distinguish otherwise colliding evidence relations; negative contains matched context tokens whose identity is semantically inert",
+      "interpretation": "tests context binding separately from deciding which polarity to endorse"
+    },
+    {
+      "id": "context_conditioned_polarity",
+      "capability_atom": "select_context_conditioned_polarity",
+      "role": "frontier",
+      "label_contract": "binary directional label: positive when the active visible context supports proposition P and negative when the matched active context supports not-P; context names themselves are balanced and permuted",
+      "interpretation": "tests whether active-context polarity is geometrically available without granting conditional-commit policy"
+    },
+    {
+      "id": "opposed_evidence_retention",
+      "capability_atom": "preserve_opposed_evidence",
+      "role": "frontier",
+      "label_contract": "positive and negative pairs share the same final evidence item; positive history previously contained qualified opposite-polarity evidence while negative history contains matched-volume same-polarity evidence, so success requires information about earlier opposition to remain in final recurrent state",
+      "interpretation": "tests retention of opposed evidence beyond the current perceptual item"
+    },
+    {
+      "id": "independent_provenance",
+      "capability_atom": "recognize_independent_provenance",
+      "role": "frontier",
+      "label_contract": "positive uses genuinely independent evidence lineages; negative uses duplicate-source or shared-lineage pseudo-disagreement matched for content, reliability, timing, count, and surface source naming",
+      "interpretation": "tests source independence separately from conflict magnitude"
+    },
+    {
+      "id": "self_causal_relation",
+      "capability_atom": "detect_self_causal_relation",
+      "role": "frontier",
+      "label_contract": "positive has a declared causal edge from the system's prediction/action to subsequent evidence; negative is a matched sham with equivalent self-related language and outcome statistics but the causal edge is severed",
+      "interpretation": "tests reflexive causal representation without granting reflexive-update policy"
+    },
+    {
+      "id": "representation_inadequacy",
+      "capability_atom": "detect_representation_inadequacy",
+      "role": "frontier",
+      "label_contract": "positive fixtures are unsatisfied by the frozen context-free representation but become coherent under a held-out latent/context distinction; negative fixtures have matched uncertainty/surprise but remain resolvable within the frozen representation class",
+      "interpretation": "tests model-class inadequacy separately from generic uncertainty or need-for-more-information"
+    }
+  ],
+  "probe_family": {
+    "primary": "L2-regularized linear logistic readout, one binary probe per capability atom target",
+    "alternative": "nearest-centroid cosine readout as a nonparametric sensitivity analysis",
+    "parameter_authority": "development-only nested cross-validation; all parameters and normalization statistics freeze before any confirmatory receipt",
+    "forbidden": [
+      "decision trees over typed telemetry",
+      "hand-written theorem rules",
+      "condition-specific branches",
+      "fixture-ID lookup",
+      "LLM classification of fixture text",
+      "post-confirmatory retuning"
+    ]
+  },
+  "development_split": {
+    "grouping_keys": [
+      "semantic_fixture_family",
+      "proposition_identity",
+      "context_identity",
+      "source_identity"
+    ],
+    "rule": "no grouping key instance may appear in both training and held-out development partitions when it could leak target semantics",
+    "report": "per-atom held-out balanced accuracy, AUROC where defined, calibration, uncertainty interval, surface-control delta, and metamorphic outcomes"
+  },
+  "metamorphic_controls": [
+    {
+      "id": "paraphrase_invariance",
+      "kind": "invariance",
+      "applies_to": ["conflict_positive_control", "visible_context_binding", "context_conditioned_polarity", "opposed_evidence_retention", "independent_provenance", "self_causal_relation", "representation_inadequacy"],
+      "rule": "semantics-preserving lexical/paraphrase changes must preserve the decoded target"
+    },
+    {
+      "id": "evidence_order_invariance",
+      "kind": "invariance",
+      "applies_to": ["conflict_positive_control", "visible_context_binding", "context_conditioned_polarity", "opposed_evidence_retention", "independent_provenance", "representation_inadequacy"],
+      "rule": "permuting evidence presentation order, where the fixture semantics declare order irrelevant, must preserve the decoded target"
+    },
+    {
+      "id": "source_rename_invariance",
+      "kind": "invariance",
+      "applies_to": ["opposed_evidence_retention", "independent_provenance"],
+      "rule": "bijective renaming/permutation of source identifiers must preserve the target"
+    },
+    {
+      "id": "context_rename_invariance",
+      "kind": "invariance",
+      "applies_to": ["visible_context_binding", "context_conditioned_polarity", "representation_inadequacy"],
+      "rule": "bijective renaming of context labels must preserve the relational target"
+    },
+    {
+      "id": "polarity_swap_invariance",
+      "kind": "invariance",
+      "applies_to": ["conflict_positive_control", "visible_context_binding", "opposed_evidence_retention", "independent_provenance"],
+      "rule": "swapping proposition and negation symbols must preserve polarity-symmetric relational targets"
+    },
+    {
+      "id": "polarity_swap_equivariance",
+      "kind": "equivariance",
+      "applies_to": ["context_conditioned_polarity"],
+      "rule": "swapping proposition and negation roles must flip the directional polarity label while preserving context structure"
+    },
+    {
+      "id": "self_reference_sham_specificity",
+      "kind": "specificity",
+      "applies_to": ["self_causal_relation"],
+      "rule": "matched prediction text that cannot causally alter the target evidence must not decode as self-causal merely because self-related language is present"
+    },
+    {
+      "id": "uncertainty_vs_model_inadequacy_specificity",
+      "kind": "specificity",
+      "applies_to": ["representation_inadequacy"],
+      "rule": "matched high-uncertainty cases resolvable within the existing representation must remain distinguishable from representation-class inadequacy"
+    }
+  ],
+  "negative_controls": [
+    "perception_hdv_binary",
+    "perception_chunk32",
+    "label_permutation",
+    "pre_relation_or_first-evidence recurrent state when fixture semantics permit"
+  ],
+  "acceptance": {
+    "unit": "each capability atom independently",
+    "primary_channel": "cfc_recurrent_state",
+    "chance_requirement": "95% bootstrap confidence interval lower bound for held-out balanced accuracy must exceed 0.50",
+    "surface_abstraction_requirement": "for a frontier atom, the 95% bootstrap confidence interval lower bound of balanced-accuracy delta versus the better perceptual control must exceed 0.00",
+    "metamorphic_requirement": "at least 0.95 paired consistency on invariance controls and at least 0.90 correct transformation on applicable equivariance/specificity controls",
+    "label_permutation_requirement": "permuted-label control must not satisfy the chance requirement",
+    "failure_rule": "failure of any required gate yields NotEstablished for that atom; do not average atoms into a grouped or omnibus pass",
+    "promotion_rule": "an atom that passes may be added only as an A0-R representational atom after its exact probe and receipts are frozen; no behavioral response mapping is thereby admitted"
+  }
+}

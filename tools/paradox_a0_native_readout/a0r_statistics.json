@@ -1,0 +1,107 @@
+{
+  "schema_version": "PARADOX-A0R-STATISTICS-V1",
+  "authority": "DevelopmentOnly / Representational MeasurementOnly",
+  "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+  "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+  "latent_contract_schema": "PARADOX-A0R-LATENT-READOUT-CONTRACT-V2",
+  "confirmatory_execution_allowed": false,
+  "inferential_unit": {
+    "unit": "independent base semantic fixture",
+    "metamorphic_variants_count_as_independent": false,
+    "multiple_cycles_count_as_independent": false,
+    "primary_cycle": "single preregistered final relational-state cycle per base fixture",
+    "temporal_negative_control": "pre-relation or first-evidence cycle is paired to its base fixture and never increases n",
+    "cluster_rule": "all variants, cycles, channels, and paired controls derived from one base fixture remain in the same split/fold/bootstrap cluster"
+  },
+  "minimum_independent_groups": {
+    "frontier_atom_positive": 64,
+    "frontier_atom_negative": 64,
+    "positive_control_positive": 32,
+    "positive_control_negative": 32,
+    "shortfall_rule": "NotEstablished; do not relax thresholds or count metamorphic/cycle replicas as replacement groups"
+  },
+  "splitting": {
+    "outer_development_holdout_fraction": 0.25,
+    "nested_cv_folds": 5,
+    "group_keys": [
+      "base_fixture_id",
+      "semantic_fixture_family",
+      "proposition_identity",
+      "context_identity",
+      "source_identity"
+    ],
+    "same_partitions_for_all_channels": true,
+    "same_partitions_for_all_probe_families": true,
+    "stratify_binary_target_when_group_constraints_allow": true,
+    "leakage_rule": "an identity or lineage capable of leaking target semantics must not cross training/held-out boundaries"
+  },
+  "preprocessing": {
+    "primary_linear_probe": "training-fold z-score using training mean/std only; drop training-zero-variance coordinates",
+    "binary_hdc_surface_control": "same linear family and nested-CV protocol; no target-aware dimensionality reduction",
+    "chunk32_surface_control": "same linear family and nested-CV protocol",
+    "typed_telemetry": "structured sensitivity/control only; excluded from latent-abstraction superiority claim",
+    "learned_feature_reduction": "forbidden in V1",
+    "class_rebalancing": "training class weights allowed; no synthetic oversampling; held-out distribution is never resampled to balance classes"
+  },
+  "linear_probe": {
+    "family": "L2 logistic regression",
+    "regularization_grid": [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0, 10000.0],
+    "selection_metric": "mean grouped-inner-CV balanced accuracy",
+    "tie_break": "choose stronger regularization",
+    "fit_scope": "development training partition only",
+    "finalization": "refit once on full development-training partition at selected regularization; freeze coefficients, intercept, preprocessing statistics, feature order, and channel before held-out evaluation"
+  },
+  "resampling": {
+    "bootstrap_replicates": 10000,
+    "bootstrap_seed": 2026091601,
+    "bootstrap_unit": "base fixture cluster",
+    "bootstrap_pairing": "paired across recurrent and perceptual-control channels using identical resampled base fixture IDs",
+    "confidence_interval": "two-sided percentile 95% cluster bootstrap interval",
+    "chance_test": "one-sided grouped label-permutation test against balanced-accuracy 0.50",
+    "chance_permutations": 10000,
+    "chance_permutation_seed": 2026091602,
+    "surface_superiority_test": "one-sided paired cluster-bootstrap test of recurrent balanced-accuracy minus the better perceptual-control balanced-accuracy > 0",
+    "surface_control_selection": "better control is selected on development-training/nested-CV performance only, never held-out labels"
+  },
+  "multiplicity": {
+    "frontier_atom_count": 6,
+    "familywise_alpha": 0.05,
+    "method": "Holm step-down",
+    "families": [
+      "frontier above-chance permutation p-values",
+      "frontier recurrent-vs-best-perceptual-control superiority p-values"
+    ],
+    "positive_control_in_family": false,
+    "metamorphic_thresholds_in_family": false,
+    "rule": "a frontier atom must satisfy its raw interval gates and both applicable Holm-adjusted p-value gates"
+  },
+  "metrics": {
+    "primary": "balanced_accuracy",
+    "secondary": [
+      "AUROC when both classes are present",
+      "Brier score",
+      "expected calibration error",
+      "sensitivity",
+      "specificity"
+    ],
+    "no_omnibus": true,
+    "no_best_seed_reporting": true,
+    "report_all_atoms": true,
+    "report_all_channels": true,
+    "report_all_metamorphic_controls": true
+  },
+  "paired_surface_comparison": {
+    "controls": ["perception_hdv_binary", "perception_chunk32"],
+    "primary": "cfc_recurrent_state",
+    "same_base_fixtures": true,
+    "same_outer_holdout": true,
+    "same_label_manifest": true,
+    "claim_rule": "frontier abstraction beyond perception is NotEstablished unless recurrent state passes both above-chance and paired superiority gates"
+  },
+  "stopping": {
+    "adaptive_stopping": false,
+    "interim_peeking": false,
+    "post_hoc_sample_extension_after_seeing_target_results": false,
+    "allowed_extension": "only a prospectively timestamped amendment made before any held-out development labels are opened"
+  }
+}

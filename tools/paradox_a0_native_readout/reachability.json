@@ -1,0 +1,175 @@
+{
+  "schema_version": "PARADOX-A0-RUNTIME-REACHABILITY-V1",
+  "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+  "status_vocabulary": [
+    "live_service_public",
+    "live_subsystem_public",
+    "partial_live_projection",
+    "feature_gated_live_projection",
+    "internal_unproven",
+    "library_only"
+  ],
+  "candidates": {
+    "cycle_action_hint": {
+      "status": "live_service_public",
+      "live_exposed_atoms": ["request_external_information", "generic_exploration"],
+      "evidence": [
+        {
+          "path": "src/cognitive_loop/accessors/behavior.rs",
+          "blob_sha": "5242884fb7182b4454ea856558536c3291ad603c",
+          "fact": "CognitiveLoopService publicly exposes action_hint(), should_seek_input(), is_confident(), state_description(), and related adaptive-behavior accessors"
+        },
+        {
+          "path": "src/cognitive_loop/types/output.rs",
+          "blob_sha": "c206f5974595aa400ece1d12c8a02fef1f411dd9",
+          "fact": "ActionHint is a typed production enum; Uncertain adaptive state maps to SeekInput"
+        }
+      ],
+      "receiptable_without_production_mutation": true,
+      "limitation": "live reachability proves the control signal exists; it does not supply proposition/content/context or plurality/revision semantics"
+    },
+    "cycle_epistemic_conflict_telemetry": {
+      "status": "live_service_public",
+      "live_exposed_atoms": ["detect_conflict"],
+      "evidence": [
+        {
+          "path": "src/cognitive_loop/types/telemetry.rs",
+          "blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+          "fact": "CycleMetadata is returned in CycleResult and exports epistemic_conflict_count, feedback_conflict_ratio, epistemic_reasoning_accelerated and metacognitive_anomaly"
+        }
+      ],
+      "receiptable_without_production_mutation": true,
+      "limitation": "the fields establish live conflict sensitivity only; they do not identify independent provenance, preserve both evidence polarities, establish self-causal conflict, or diagnose representation inadequacy"
+    },
+    "core_metacognitive_recommendation": {
+      "status": "internal_unproven",
+      "live_exposed_atoms": [],
+      "evidence": [
+        {
+          "path": "crates/core/symthaea-core/src/hdc/metacognitive_monitor.rs",
+          "blob_sha": "a2bd655332ef2f07a470d21901218a29393873c6",
+          "fact": "typed conflict/error events and metacognitive recommendations exist"
+        },
+        {
+          "path": "src/cognitive_loop/types/telemetry.rs",
+          "blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+          "fact": "live CycleMetadata exposes a metacognitive_anomaly projection, but not the recommendation stream itself"
+        }
+      ],
+      "receiptable_without_production_mutation": false,
+      "limitation": "do not infer that the core recommendation enum is on the frozen live decision path merely because related metacognitive telemetry exists"
+    },
+    "full_stack_understanding_recommendation": {
+      "status": "internal_unproven",
+      "live_exposed_atoms": [],
+      "evidence": [
+        {
+          "path": "crates/core/symthaea-core/src/hdc/full_stack_consciousness.rs",
+          "blob_sha": "df42db41763b90624fba22ccf9d0ed04f3fa4909",
+          "fact": "understanding errors and Proceed/ProceedWithCaution/SeekClarification/RequestMoreInfo recommendations exist"
+        }
+      ],
+      "receiptable_without_production_mutation": false,
+      "limitation": "no exact frozen CycleResult/CognitiveLoopService receipt path for this recommendation has yet been demonstrated"
+    },
+    "structured_thought_epistemic_status": {
+      "status": "live_subsystem_public",
+      "live_exposed_atoms": ["confidence_state"],
+      "evidence": [
+        {
+          "path": "src/mind/epistemic.rs",
+          "blob_sha": "d53dfed42701e67c3fefb8ca2abb99aff7e67e0d",
+          "fact": "ContinuousMind publicly exposes extract_structured_thought(), which emits epistemic_status, meta_awareness, coherence and psi"
+        },
+        {
+          "path": "src/mind/structured_thought.rs",
+          "blob_sha": "7f4035616b88000664392e3b47563ee4a9ab5a88",
+          "fact": "StructuredThought is the pre-translation IR and carries typed EpistemicStatus"
+        }
+      ],
+      "receiptable_without_production_mutation": true,
+      "limitation": "this is a public ContinuousMind subsystem readout, not proof that CognitiveLoopService produces a complete PARADOX action; metric-semantic firewall applies"
+    },
+    "predictive_self_action_recommendation": {
+      "status": "partial_live_projection",
+      "live_exposed_atoms": ["self_model_update_available"],
+      "evidence": [
+        {
+          "path": "src/consciousness/dynamics/predictive_self.rs",
+          "blob_sha": "2dde0732b59245a896a723065bebcf164b1b5b34",
+          "fact": "predictive self-model updates prediction error and emits action-safety recommendations internally"
+        },
+        {
+          "path": "src/cognitive_loop/types/telemetry.rs",
+          "blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+          "fact": "CycleMetadata exports predictive_self_safety, predictive_behavioral_error and self_model_accuracy"
+        }
+      ],
+      "receiptable_without_production_mutation": true,
+      "limitation": "the live service exposes projections of predictive-self state, not the internal ActionRecommendation or a C5 self-causal epistemic decision"
+    },
+    "broca_factcheck_verdict": {
+      "status": "feature_gated_live_projection",
+      "live_exposed_atoms": [],
+      "evidence": [
+        {
+          "path": "src/cognitive_loop/broca_factcheck.rs",
+          "blob_sha": "ca4c2bc21691df1e15151cda3b22d0bbdffea11b",
+          "fact": "feature-gated cognitive-loop factcheck bridge processes typed FactCheckVerdict values"
+        },
+        {
+          "path": "src/cognitive_loop/types/telemetry.rs",
+          "blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+          "fact": "CycleMetadata can expose optional FactcheckTelemetry"
+        }
+      ],
+      "receiptable_without_production_mutation": true,
+      "limitation": "telemetry/modulation is reachable when enabled, but the typed verdict itself is not a complete plurality-preserving epistemic action"
+    },
+    "futures_typed_abstention": {
+      "status": "library_only",
+      "live_exposed_atoms": [],
+      "evidence": [
+        {
+          "path": "crates/domains/symthaea-futures-core/src/lib.rs",
+          "blob_sha": "a28df60f59d6adf4d0b58f30f220f87182ed3e78",
+          "fact": "neutral forecasting API defines first-class ForecastOutput::Abstain with typed reasons including ModelDisagreementTooHigh and UnresolvedOutcomeSpace"
+        }
+      ],
+      "receiptable_without_production_mutation": false,
+      "limitation": "code search found no frozen production emission of ModelDisagreementTooHigh; library semantics are not credited as live cognition"
+    }
+  },
+  "supplemental_live_surfaces": [
+    {
+      "path": "src/cognitive_loop/types/telemetry.rs",
+      "blob_sha": "117ac81f725dcc6dc5ab0bfa94bab40d00e9f414",
+      "facts": [
+        "CycleMetadata exports epistemic_conflict_count",
+        "CycleMetadata exports feedback_conflict_ratio",
+        "CycleMetadata exports metacognitive_anomaly",
+        "CycleMetadata exports epistemic_reasoning_accelerated",
+        "CycleMetadata exports predictive-self and self-model diagnostics"
+      ],
+      "interpretation": "the live loop has conflict-sensitive and self-model-sensitive observable/control projections, but these fields do not by themselves implement any full PARADOX response"
+    },
+    {
+      "path": "src/cognitive_loop/drives/self_reflection.rs",
+      "blob_sha": "31a34cc288cabd3b76fe2190df11b20c88b16fc8",
+      "facts": [
+        "SelfReflection performs live meta-learning over thresholds",
+        "Recommendation targets flow, boredom, trust, learning rate, exploration, reflection interval, coherence gate and surprise threshold"
+      ],
+      "interpretation": "live self-adjustment exists, but threshold calibration is not representation revision or C5 reflexive epistemic update"
+    },
+    {
+      "path": "src/cognitive_loop/accessors/behavior.rs",
+      "blob_sha": "5242884fb7182b4454ea856558536c3291ad603c",
+      "facts": [
+        "CognitiveLoopService publicly exposes self_assessment(), reflection_summary(), recommendations(), action_hint() and should_seek_input()"
+      ],
+      "interpretation": "A0 can receipt these native surfaces without changing production semantics"
+    }
+  ],
+  "authority_rule": "A0-D authority requires semantic completeness AND live reachability AND condition-blind receiptability. live_exposed_atoms are the only atoms a runtime/readout layer may credit from a candidate. A0-L never counts as current end-to-end behavior. A0-R additionally requires a frozen decoder that does not recreate the PARADOX oracle."
+}
