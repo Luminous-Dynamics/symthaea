@@ -1,9 +1,8 @@
 use super::*;
 use symthaea_assurance_campaign::{
-    CampaignEvidenceLedgerV1, EvidenceRequirementV1, OrderingReceiptV1,
-    PreregistrationReceiptV1, RegistrationStatementV1, ReproductionRequirementV1,
-    SupportCriterionV1, evidence_commitment_statement_digest,
-    resolve_terminal_registration_in_view,
+    CampaignEvidenceLedgerV1, EvidenceRequirementV1, OrderingReceiptV1, PreregistrationReceiptV1,
+    RegistrationStatementV1, ReproductionRequirementV1, SupportCriterionV1,
+    evidence_commitment_statement_digest, resolve_terminal_registration_in_view,
 };
 use symthaea_assurance_core::{EvidenceKind, EvidenceProvenance};
 use symthaea_assurance_semantics::{DefinitionSchemaV1, SemanticCommitmentV1};
@@ -93,11 +92,7 @@ fn plan(subject: &AiSubjectManifest) -> CampaignPlanV1 {
     .unwrap()
 }
 
-fn ordering(
-    sequence: u64,
-    statement: DigestSha256,
-    receipt_byte: char,
-) -> OrderingReceiptV1 {
+fn ordering(sequence: u64, statement: DigestSha256, receipt_byte: char) -> OrderingReceiptV1 {
     OrderingReceiptV1::new(
         id("transparency-log-a"),
         semantic("monotonic-ordering-profile-v1", 'f'),
@@ -164,12 +159,7 @@ impl Fixture {
             self.claim.digest(),
             kind,
             digest(artifact_byte),
-            EvidenceProvenance::new(
-                id("producer"),
-                id("executor"),
-                Some(id("verifier")),
-                None,
-            ),
+            EvidenceProvenance::new(id("producer"), id("executor"), Some(id("verifier")), None),
         );
         let commitment_statement = evidence_commitment_statement_digest(&self.current, &evidence);
         let commitment_ordering = ordering(self.next_sequence, commitment_statement, 'b');
@@ -370,10 +360,7 @@ fn opposite_observations_remain_conflicted() {
         PredicateDispositionV1::Satisfied,
         EvidenceKind::Observation,
     );
-    assert_eq!(
-        fixture.resolve().outcome(),
-        ResolutionOutcomeV1::Conflicted
-    );
+    assert_eq!(fixture.resolve().outcome(), ResolutionOutcomeV1::Conflicted);
 }
 
 #[test]
