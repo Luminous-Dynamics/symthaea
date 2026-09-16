@@ -3,7 +3,10 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Fluid reasoning benchmarks.
 
-pub mod arc3_protocol;
+/// Compatibility namespace for the dedicated minimal ARC-3 protocol crate.
+pub mod arc3_protocol {
+    pub use symthaea_arc3_protocol::*;
+}
 pub mod arc_abductive;
 pub mod arc_algebra;
 pub mod arc_analogy;
@@ -18,7 +21,7 @@ pub mod arc_scaling;
 pub mod arc_staircase;
 pub mod arc_strict;
 
-pub use arc3_protocol::{
+pub use symthaea_arc3_protocol::{
     Arc3Action, Arc3ActionKind, Arc3Coordinates, Arc3Envelope, Arc3GameState, Arc3Observation,
     Arc3ProtocolError, Arc3Provenance,
 };
