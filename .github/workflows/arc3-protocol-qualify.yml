@@ -33,6 +33,50 @@ jobs:
       - name: Run independent canonicalization oracle
         run: python3 scripts/arc3_protocol_oracle.py
 
+  lock-integrity:
+    name: Cargo lock integrity
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Require locked workspace metadata
+        id: locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo metadata --locked --no-deps --format-version 1 >/dev/null; then
+            echo "lock_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "lock_ok=false" >> "$GITHUB_OUTPUT"
+            cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+            cargo generate-lockfile
+            git diff -- Cargo.lock > "$RUNNER_TEMP/arc3-cargo-lock.patch"
+            cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+            cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
+            exit 1
+          fi
+
+      - name: Upload Cargo-generated lock evidence
+        if: failure() && steps.locked.outputs.lock_ok == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: arc3-cargo-lock-evidence-${{ env.SUBJECT_SHA }}
+          path: |
+            ${{ runner.temp }}/Cargo.lock.before
+            ${{ runner.temp }}/Cargo.lock.generated
+            ${{ runner.temp }}/arc3-cargo-lock.patch
+          if-no-files-found: error
+          retention-days: 14
+
   rust-protocol-crate:
     name: Rust protocol crate
     runs-on: ubuntu-slim
@@ -54,13 +98,13 @@ jobs:
         run: cargo fmt -p symthaea-arc3-protocol -- --check
 
       - name: Check protocol crate
-        run: cargo check -p symthaea-arc3-protocol
+        run: cargo check --locked -p symthaea-arc3-protocol
 
       - name: Test protocol crate
-        run: cargo test -p symthaea-arc3-protocol
+        run: cargo test --locked -p symthaea-arc3-protocol
 
       - name: Clippy protocol crate
-        run: cargo clippy -p symthaea-arc3-protocol --all-targets -- -D warnings
+        run: cargo clippy --locked -p symthaea-arc3-protocol --all-targets -- -D warnings
 
       - name: Cross-check independent oracle
         run: python3 scripts/arc3_protocol_oracle.py
@@ -86,10 +130,10 @@ jobs:
         run: cargo fmt -p symthaea-arc3-protocol -p symthaea-psych-bench -- --check
 
       - name: Check psych-bench integration
-        run: cargo check -p symthaea-psych-bench
+        run: cargo check --locked -p symthaea-psych-bench
 
       - name: Test protocol compatibility namespace
-        run: cargo test -p symthaea-psych-bench --lib
+        run: cargo test --locked -p symthaea-psych-bench --lib
 
       - name: Cross-check independent oracle
         run: python3 scripts/arc3_protocol_oracle.py
