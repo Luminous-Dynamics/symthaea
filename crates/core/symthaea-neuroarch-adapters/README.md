@@ -18,6 +18,12 @@ Adapters must not pre-multiply multiplicity into `state_dimension`, because NEUR
 
 The external-input descriptor is structural interface metadata, not evidence that its full HDC input is persistently stored. Persistent-state accounting must therefore distinguish computational circuit state from transient input/message buffers.
 
+## Timescale identity
+
+The active adapter maps `tau_base` into `TimescaleClass::CustomNanos`, rounded to the nearest nanosecond. That value is the V1 **structural timescale declaration**, not an exact model-parameter hash. At sufficiently small time constants, two distinct adjacent `f32` values can therefore share one topology timescale.
+
+The exact `tau_base` representation—and all other behaviorally relevant floating-point configuration—must be bound separately by the subject/config receipt. A shared `TopologyCommitment` never proves exact temporal-dynamics identity.
+
 ## Identity boundary
 
 Execution method, exact model parameters, build/toolchain identity, initialization seed, activation/learning configuration, Fourier configuration, and runtime state belong to subject/trial/checkpoint receipts rather than `TopologyCommitment` unless a future schema explicitly promotes a field into structural identity.
