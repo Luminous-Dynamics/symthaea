@@ -1,0 +1,147 @@
+name: EUREKA V2 Qualification Receipt Oracle Conformance
+
+on:
+  pull_request:
+    paths:
+      - ".github/eureka/eureka-v2-backend-qualification-receipt-oracle.py"
+      - ".github/eureka/eureka-v2-backend-qualification-receipt-oracle-selftest.py"
+      - ".github/workflows/eureka-v2-qualification-receipt-oracle-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  EUREKA_RECEIPT_ORACLE_CONFORMANCE_REVISION: "EUREKA.002.V2.QUALIFICATION_RECEIPT_ORACLE_CONFORMANCE.v1"
+  EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+
+jobs:
+  receipt-oracle-conformance:
+    name: Qualify EUREKA qualification receipt oracle
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Capture exact receipt-oracle subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout is dirty before receipt-oracle conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+
+          subject_head="$(git rev-parse HEAD)"
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          [[ "$subject_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
+            echo "Checked-out HEAD is not intended receipt-oracle subject" >&2
+            exit 1
+          }
+          [[ "$EUREKA_GITHUB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "github.workflow_sha is not canonical" >&2
+            exit 1
+          }
+          if ! git cat-file -e "${EUREKA_GITHUB_WORKFLOW_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$EUREKA_GITHUB_WORKFLOW_SHA"
+          fi
+
+          workflow=".github/workflows/eureka-v2-qualification-receipt-oracle-conformance.yml"
+          oracle=".github/eureka/eureka-v2-backend-qualification-receipt-oracle.py"
+          selftest=".github/eureka/eureka-v2-backend-qualification-receipt-oracle-selftest.py"
+          workflow_sha="$(sha256sum "$workflow" | awk '{print $1}')"
+          interpreted_workflow_sha="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow}" | sha256sum | awk '{print $1}')"
+          oracle_sha="$(sha256sum "$oracle" | awk '{print $1}')"
+          selftest_sha="$(sha256sum "$selftest" | awk '{print $1}')"
+          python_version="$(python3 --version)"
+          receipt="${RUNNER_TEMP}/eureka-v2-qualification-receipt-oracle-conformance.env"
+
+          [[ "$workflow_sha" == "$interpreted_workflow_sha" ]] || {
+            echo "Checked-out oracle workflow differs from GitHub-interpreted bytes" >&2
+            exit 1
+          }
+
+          echo "EUREKA_ORACLE_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
+          echo "EUREKA_ORACLE_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
+          echo "EUREKA_ORACLE_WORKFLOW_SHA256=$workflow_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_ORACLE_TOOL_SHA256=$oracle_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_ORACLE_SELFTEST_SHA256=$selftest_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_ORACLE_PYTHON_VERSION=$python_version" >> "$GITHUB_ENV"
+          echo "EUREKA_ORACLE_RECEIPT=$receipt" >> "$GITHUB_ENV"
+
+          {
+            printf 'conformance_revision=%s\n' "$EUREKA_RECEIPT_ORACLE_CONFORMANCE_REVISION"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'github_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'subject_head=%s\n' "$subject_head"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'workflow_sha256=%s\n' "$workflow_sha"
+            printf 'oracle_sha256=%s\n' "$oracle_sha"
+            printf 'oracle_selftest_sha256=%s\n' "$selftest_sha"
+            printf 'python_version=%s\n' "$python_version"
+            printf 'receipt_schema=EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2\n'
+            printf 'qualification_revision=EUREKA.002.V2.BACKEND_QUALIFICATION.v2\n'
+            printf 'command_contract_revision=EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2\n'
+            printf 'execution_authority_granted=false\n'
+          } > "$receipt"
+
+      - name: Run adversarial receipt-oracle conformance suite
+        run: |
+          set -euo pipefail
+          python3 \
+            .github/eureka/eureka-v2-backend-qualification-receipt-oracle-selftest.py \
+            .github/eureka/eureka-v2-backend-qualification-receipt-oracle.py
+
+      - name: Verify exact postflight and seal PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_head="$(git rev-parse HEAD)"
+          current_tree="$(git rev-parse 'HEAD^{tree}')"
+          current_workflow="$(sha256sum .github/workflows/eureka-v2-qualification-receipt-oracle-conformance.yml | awk '{print $1}')"
+          current_oracle="$(sha256sum .github/eureka/eureka-v2-backend-qualification-receipt-oracle.py | awk '{print $1}')"
+          current_selftest="$(sha256sum .github/eureka/eureka-v2-backend-qualification-receipt-oracle-selftest.py | awk '{print $1}')"
+          current_python="$(python3 --version)"
+
+          [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]]
+          [[ "$current_head" == "$EUREKA_ORACLE_SUBJECT_HEAD" ]]
+          [[ "$current_tree" == "$EUREKA_ORACLE_SUBJECT_TREE" ]]
+          [[ "$current_workflow" == "$EUREKA_ORACLE_WORKFLOW_SHA256" ]]
+          [[ "$current_oracle" == "$EUREKA_ORACLE_TOOL_SHA256" ]]
+          [[ "$current_selftest" == "$EUREKA_ORACLE_SELFTEST_SHA256" ]]
+          [[ "$current_python" == "$EUREKA_ORACLE_PYTHON_VERSION" ]]
+
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout mutated during receipt-oracle conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+          printf 'checkout_clean_after=true\n' >> "$EUREKA_ORACLE_RECEIPT"
+          printf 'conformance_result=PASS\n' >> "$EUREKA_ORACLE_RECEIPT"
+
+      - name: Upload exact receipt-oracle evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eureka-v2-qualification-receipt-oracle-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/eureka-v2-qualification-receipt-oracle-conformance.env
+            .github/workflows/eureka-v2-qualification-receipt-oracle-conformance.yml
+            .github/eureka/eureka-v2-backend-qualification-receipt-oracle.py
+            .github/eureka/eureka-v2-backend-qualification-receipt-oracle-selftest.py
+          if-no-files-found: error
+          retention-days: 90
