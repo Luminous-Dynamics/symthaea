@@ -1,0 +1,3 @@
+crates/domains/symthaea-muse/src/lib.rs
+crates/domains/symthaea-music-theory/src/lib.rs
+docs/muse-note.md
