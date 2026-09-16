@@ -43,7 +43,7 @@ jobs:
 
           git diff --check "$FROZEN_BASE_SHA" "$QUALIFY_SHA"
           git diff --name-only "$FROZEN_BASE_SHA" "$QUALIFY_SHA" | tee neuroarch-scope.txt
-          unexpected="$(grep -Ev '^(Cargo\.lock|\.github/workflows/neuroarch-001-qualify\.yml|crates/core/symthaea-neuroarch-(types|adapters)/|docs/research/neuroarch/NEUROARCH_001[^/]*\.md)$' neuroarch-scope.txt || true)"
+          unexpected="$(grep -Ev '^(Cargo\.lock|\.github/workflows/neuroarch-001-qualify\.yml|crates/core/symthaea-neuroarch-(types|adapters)/.*|docs/research/neuroarch/NEUROARCH_001[^/]*\.md)$' neuroarch-scope.txt || true)"
           test -z "$unexpected"
 
           printf 'qualification_sha=%s\n' "$actual_sha" > neuroarch-qualification-context.txt
