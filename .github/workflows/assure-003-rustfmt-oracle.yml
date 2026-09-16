@@ -2,6 +2,11 @@
 name: ASSURE-003 Rustfmt 1.96 Oracle
 
 on:
+  push:
+    branches:
+      - 'diag/assure-003-rustfmt-196-oracle'
+    paths:
+      - '.github/workflows/assure-003-rustfmt-oracle.yml'
   pull_request:
     paths:
       - '.github/workflows/assure-003-rustfmt-oracle.yml'
