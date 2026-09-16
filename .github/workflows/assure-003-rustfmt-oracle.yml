@@ -1,3 +1,4 @@
+# Disposable diagnostic workflow; not product or qualification lineage.
 name: ASSURE-003 Rustfmt 1.96 Oracle
 
 on:
