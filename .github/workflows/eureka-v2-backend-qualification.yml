@@ -26,6 +26,7 @@ env:
   EUREKA_V2_QUALIFICATION_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"
   EUREKA_V2_RECEIPT_SCHEMA_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"
   EUREKA_V2_COMMAND_CONTRACT_REVISION: "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"
+  EUREKA_STAGE_LOG_LIMIT_BYTES: "8388608"
   EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
   EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
 
@@ -97,10 +98,13 @@ jobs:
           cargo_lock_sha256="$(sha256sum Cargo.lock | awk '{print $1}')"
           workflow_path=".github/workflows/eureka-v2-backend-qualification.yml"
           contract_path=".github/eureka/eureka-v2-backend-qualification-contract.sh"
+          stage_runner_path=".github/eureka/eureka-v2-qualification-stage-runner.py"
           workflow_sha256="$(sha256sum "$workflow_path" | awk '{print $1}')"
           interpreted_workflow_sha256="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
           command_contract_sha256="$(sha256sum "$contract_path" | awk '{print $1}')"
+          stage_runner_sha256="$(sha256sum "$stage_runner_path" | awk '{print $1}')"
           receipt="${RUNNER_TEMP}/eureka-v2-backend-qualification.env"
+          stage_evidence_dir="${RUNNER_TEMP}/eureka-v2-stage-evidence"
           rustc_version="$(rustc --version)"
           cargo_version="$(cargo --version)"
 
@@ -117,8 +121,11 @@ jobs:
           echo "EUREKA_CARGO_LOCK_SHA256=$cargo_lock_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_WORKFLOW_SHA256=$workflow_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_COMMAND_CONTRACT_SHA256=$command_contract_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_STAGE_RUNNER_SHA256=$stage_runner_sha256" >> "$GITHUB_ENV"
           echo "EUREKA_QUALIFICATION_RECEIPT=$receipt" >> "$GITHUB_ENV"
           echo "EUREKA_QUALIFICATION_CONTRACT=$contract_path" >> "$GITHUB_ENV"
+          echo "EUREKA_STAGE_RUNNER=$stage_runner_path" >> "$GITHUB_ENV"
+          echo "EUREKA_STAGE_EVIDENCE_DIR=$stage_evidence_dir" >> "$GITHUB_ENV"
 
           {
             printf 'receipt_schema_revision=%s\n' "$EUREKA_V2_RECEIPT_SCHEMA_REVISION"
@@ -148,17 +155,120 @@ jobs:
       - name: Check backend-feature compilation
         run: |
           set -euo pipefail
-          bash "$EUREKA_QUALIFICATION_CONTRACT" check
+          python3 "$EUREKA_STAGE_RUNNER" check "$EUREKA_QUALIFICATION_CONTRACT" "$EUREKA_STAGE_EVIDENCE_DIR"
 
       - name: Run EUREKA backend unit tests
         run: |
           set -euo pipefail
-          bash "$EUREKA_QUALIFICATION_CONTRACT" test
+          python3 "$EUREKA_STAGE_RUNNER" test "$EUREKA_QUALIFICATION_CONTRACT" "$EUREKA_STAGE_EVIDENCE_DIR"
 
       - name: Strict Clippy for backend test surface
         run: |
           set -euo pipefail
-          bash "$EUREKA_QUALIFICATION_CONTRACT" clippy
+          python3 "$EUREKA_STAGE_RUNNER" clippy "$EUREKA_QUALIFICATION_CONTRACT" "$EUREKA_STAGE_EVIDENCE_DIR"
+
+      - name: Finalize qualification stage evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          stage_dir="${EUREKA_STAGE_EVIDENCE_DIR:-${RUNNER_TEMP}/eureka-v2-stage-evidence}"
+          mkdir -p "$stage_dir"
+          summary="$stage_dir/stage-evidence-summary.env"
+          : > "$summary"
+
+          read_one() {
+            local file="$1"
+            local key="$2"
+            local count
+            count="$(grep -c "^${key}=" "$file" || true)"
+            if [[ "$count" != "1" ]]; then
+              echo "Stage receipt key must occur exactly once: ${key} in ${file} (count=${count})" >&2
+              return 1
+            fi
+            sed -n "s/^${key}=//p" "$file"
+          }
+
+          blocker=""
+          diagnostic_complete="true"
+          stages=(check test clippy)
+          for stage in "${stages[@]}"; do
+            receipt="$stage_dir/${stage}.stage.env"
+            if [[ -f "$receipt" ]]; then
+              if [[ -n "$blocker" ]]; then
+                echo "Stage ${stage} produced execution evidence after failed predecessor ${blocker}" >&2
+                diagnostic_complete="false"
+              fi
+
+              recorded_stage="$(read_one "$receipt" stage)"
+              recorded_head="$(read_one "$receipt" subject_head)"
+              recorded_tree="$(read_one "$receipt" subject_tree)"
+              recorded_lock="$(read_one "$receipt" cargo_lock_sha256)"
+              recorded_workflow="$(read_one "$receipt" workflow_sha256)"
+              recorded_contract="$(read_one "$receipt" command_contract_sha256)"
+              recorded_runner="$(read_one "$receipt" stage_runner_sha256)"
+              recorded_retained="$(read_one "$receipt" log_retained_bytes)"
+              recorded_log_sha="$(read_one "$receipt" log_sha256)"
+              completeness="$(read_one "$receipt" log_completeness)"
+              disposition="$(read_one "$receipt" stage_disposition)"
+              authority="$(read_one "$receipt" execution_authority_granted)"
+
+              [[ "$recorded_stage" == "$stage" ]] || { echo "Stage receipt identity mismatch" >&2; exit 1; }
+              [[ "$recorded_head" == "$EUREKA_SUBJECT_HEAD" ]] || { echo "Stage subject HEAD mismatch" >&2; exit 1; }
+              [[ "$recorded_tree" == "$EUREKA_SUBJECT_TREE" ]] || { echo "Stage subject tree mismatch" >&2; exit 1; }
+              [[ "$recorded_lock" == "$EUREKA_CARGO_LOCK_SHA256" ]] || { echo "Stage Cargo.lock mismatch" >&2; exit 1; }
+              [[ "$recorded_workflow" == "$EUREKA_WORKFLOW_SHA256" ]] || { echo "Stage workflow mismatch" >&2; exit 1; }
+              [[ "$recorded_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]] || { echo "Stage command-contract mismatch" >&2; exit 1; }
+              [[ "$recorded_runner" == "$EUREKA_STAGE_RUNNER_SHA256" ]] || { echo "Stage runner mismatch" >&2; exit 1; }
+              [[ "$authority" == "false" ]] || { echo "Stage evidence escalated execution authority" >&2; exit 1; }
+
+              log="$stage_dir/${stage}.combined.log"
+              [[ -f "$log" ]] || { echo "Executed stage is missing retained log: ${stage}" >&2; exit 1; }
+              actual_retained="$(wc -c < "$log" | tr -d '[:space:]')"
+              actual_log_sha="$(sha256sum "$log" | awk '{print $1}')"
+              [[ "$actual_retained" == "$recorded_retained" ]] || { echo "Stage log length mismatch: ${stage}" >&2; exit 1; }
+              [[ "$actual_log_sha" == "$recorded_log_sha" ]] || { echo "Stage log digest mismatch: ${stage}" >&2; exit 1; }
+
+              case "$disposition" in
+                Passed)
+                  [[ "$completeness" == "Complete" ]] || diagnostic_complete="false"
+                  ;;
+                Failed|FailedBySignal)
+                  [[ "$completeness" == "Complete" ]] || diagnostic_complete="false"
+                  blocker="$stage"
+                  ;;
+                EvidenceCaptureFailed|EvidenceTruncated)
+                  diagnostic_complete="false"
+                  blocker="$stage"
+                  ;;
+                *)
+                  echo "Unknown stage disposition: ${disposition}" >&2
+                  exit 1
+                  ;;
+              esac
+              printf '%s_disposition=%s\n' "$stage" "$disposition" >> "$summary"
+            else
+              if [[ -n "$blocker" ]]; then
+                disposition="NotRunDueToPredecessorFailure:${blocker}"
+              else
+                disposition="InfrastructureAborted"
+                blocker="$stage"
+                diagnostic_complete="false"
+              fi
+              printf '%s_disposition=%s\n' "$stage" "$disposition" >> "$summary"
+            fi
+          done
+
+          printf 'diagnostic_evidence_complete=%s\n' "$diagnostic_complete" >> "$summary"
+          summary_sha256="$(sha256sum "$summary" | awk '{print $1}')"
+          printf 'summary_sha256=%s\n' "$summary_sha256" >> "$GITHUB_ENV"
+          echo "EUREKA_STAGE_EVIDENCE_SUMMARY=$summary" >> "$GITHUB_ENV"
+
+          if [[ "$diagnostic_complete" != "true" ]]; then
+            echo "Qualification stage evidence is incomplete" >&2
+            exit 1
+          fi
 
       - name: Verify exact-subject postflight and seal PASS receipt
         shell: bash
@@ -172,6 +282,7 @@ jobs:
           current_workflow="$(sha256sum "$workflow_path" | awk '{print $1}')"
           current_interpreted_workflow="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow_path}" | sha256sum | awk '{print $1}')"
           current_contract="$(sha256sum "$EUREKA_QUALIFICATION_CONTRACT" | awk '{print $1}')"
+          current_stage_runner="$(sha256sum "$EUREKA_STAGE_RUNNER" | awk '{print $1}')"
 
           [[ "$current_head" == "$EXPECTED_SUBJECT_SHA" ]] || {
             echo "HEAD no longer equals intended qualification subject" >&2
@@ -199,6 +310,25 @@ jobs:
           }
           [[ "$current_contract" == "$EUREKA_COMMAND_CONTRACT_SHA256" ]] || {
             echo "Qualification command contract changed during qualification" >&2
+            exit 1
+          }
+          [[ "$current_stage_runner" == "$EUREKA_STAGE_RUNNER_SHA256" ]] || {
+            echo "Qualification stage runner changed during qualification" >&2
+            exit 1
+          }
+
+          [[ -f "$EUREKA_STAGE_EVIDENCE_SUMMARY" ]] || {
+            echo "Stage-evidence summary is missing" >&2
+            exit 1
+          }
+          for stage in check test clippy; do
+            grep -qx "${stage}_disposition=Passed" "$EUREKA_STAGE_EVIDENCE_SUMMARY" || {
+              echo "Stage-evidence summary does not prove PASS for ${stage}" >&2
+              exit 1
+            }
+          done
+          grep -qx 'diagnostic_evidence_complete=true' "$EUREKA_STAGE_EVIDENCE_SUMMARY" || {
+            echo "Stage forensic evidence is incomplete" >&2
             exit 1
           }
 
@@ -263,13 +393,15 @@ jobs:
 
           printf 'qualification_result=PASS\n' >> "$EUREKA_QUALIFICATION_RECEIPT"
 
-      - name: Upload exact qualification receipt and contract
+      - name: Upload exact qualification receipt, contract, and stage evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: eureka-v2-backend-qualification-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/eureka-v2-backend-qualification.env
+            ${{ runner.temp }}/eureka-v2-stage-evidence/
             .github/eureka/eureka-v2-backend-qualification-contract.sh
+            .github/eureka/eureka-v2-qualification-stage-runner.py
           if-no-files-found: error
           retention-days: 90
