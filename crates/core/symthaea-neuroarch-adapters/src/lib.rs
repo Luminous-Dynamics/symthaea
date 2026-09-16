@@ -146,6 +146,7 @@ impl NeuroTopology for ActiveCoreHdcLtcTopology<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_core::genesis::GenesisSeed;
     use symthaea_core::hdc::hdc_ltc_unified::{
         NetworkStateSnapshot, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
     };
@@ -164,7 +165,10 @@ mod tests {
         }
     }
 
-    fn commitment(config: UnifiedNetworkConfig, seed: u64) -> symthaea_neuroarch_types::TopologyCommitment {
+    fn commitment(
+        config: UnifiedNetworkConfig,
+        seed: u64,
+    ) -> symthaea_neuroarch_types::TopologyCommitment {
         let network = HdcLtcUnifiedNetwork::new(config, seed);
         ActiveCoreHdcLtcTopology::new(&network)
             .topology_commitment()
@@ -174,6 +178,22 @@ mod tests {
     #[test]
     fn active_core_topology_is_seed_independent() {
         assert_eq!(commitment(config(), 1), commitment(config(), 999));
+    }
+
+    #[test]
+    fn active_core_topology_is_initialization_lineage_independent() {
+        let integer_seeded = HdcLtcUnifiedNetwork::new(config(), 42);
+        let genesis = GenesisSeed::from_phrase("neuroarch-v1-initialization-lineage");
+        let genesis_seeded = HdcLtcUnifiedNetwork::from_genesis(config(), &genesis);
+
+        assert_eq!(
+            ActiveCoreHdcLtcTopology::new(&integer_seeded)
+                .topology_commitment()
+                .unwrap(),
+            ActiveCoreHdcLtcTopology::new(&genesis_seeded)
+                .topology_commitment()
+                .unwrap()
+        );
     }
 
     #[test]
@@ -224,9 +244,20 @@ mod tests {
         activation.neuron_config.activation = UnifiedActivation::Sigmoid;
         assert_eq!(base_commit, commitment(activation, 1));
 
-        let mut learning_rate = config();
-        learning_rate.neuron_config.learning_rate = 0.123;
-        assert_eq!(base_commit, commitment(learning_rate, 1));
+        let mut backbone = config();
+        backbone.neuron_config.backbone_tau = 0.9;
+        assert_eq!(base_commit, commitment(backbone, 1));
+
+        let mut gating = config();
+        gating.neuron_config.gating_steepness = 2.0;
+        gating.neuron_config.interp_bias = 0.25;
+        assert_eq!(base_commit, commitment(gating, 1));
+
+        let mut learning = config();
+        learning.neuron_config.learning_rate = 0.123;
+        learning.neuron_config.momentum = 0.5;
+        learning.neuron_config.weight_decay = 0.002;
+        assert_eq!(base_commit, commitment(learning, 1));
 
         let mut fourier = config();
         fourier.neuron_config.fourier_frequencies = vec![1.0, 2.0, 5.0];
