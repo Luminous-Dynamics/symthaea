@@ -18,6 +18,7 @@ jobs:
     env:
       SUBJECT: 74c0d06ac75d21b0ae7bdab49f053be226031c85
       XCA_A_PARENT: 175c3629613f35f43accb99c4030ec70b50dd003
+      EXACT_COMMAND_BLOB: 40e079b8e466c176b894f0cb1172fbb6921f03c5
       EVIDENCE_DIR: /tmp/hal-xca-b-r1-qualification
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -26,58 +27,180 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Install exact qualification toolchain
+      - name: Initialize evidence capture
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
-          rustup override set 1.96.0
-          rustc --version --verbose
-          cargo --version
-          cargo fmt --version
-          cargo clippy --version
+          rm -rf "$EVIDENCE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          printf '%s\n' "$SUBJECT" > "$EVIDENCE_DIR/subject.txt"
+          printf '%s\n' "$XCA_A_PARENT" > "$EVIDENCE_DIR/xca-a-parent.txt"
+          printf '%s\n' "$EXACT_COMMAND_BLOB" > "$EVIDENCE_DIR/expected-exact-command-blob.txt"
+          {
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'workflow=%s\n' "$GITHUB_WORKFLOW"
+            printf 'workflow_ref=%s\n' "$GITHUB_WORKFLOW_REF"
+            printf 'run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+          } > "$EVIDENCE_DIR/run.txt"
+
+      - name: Install exact qualification toolchain
+        id: toolchain
+        shell: bash
+        run: |
+          set +e
+          (
+            set -euo pipefail
+            rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+            rustup override set 1.96.0
+            rustc --version --verbose
+            cargo --version
+            cargo fmt --version
+            cargo clippy --version
+          ) > "$EVIDENCE_DIR/toolchain.stdout.txt" 2> "$EVIDENCE_DIR/toolchain.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/toolchain-exit-code.txt"
+          if [ "$rc" -eq 0 ]; then
+            echo 'ok=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ok=false' >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
 
       - name: Prove exact subject and finite B surface
+        id: provenance
         shell: bash
         run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$SUBJECT"
-          git merge-base --is-ancestor "$XCA_A_PARENT" "$SUBJECT"
-          test "$(git rev-list --count "$XCA_A_PARENT".."$SUBJECT")" = 1
-          git diff --name-only "$XCA_A_PARENT".."$SUBJECT" | tee /tmp/hal-xca-b-r1-paths.txt
-          test "$(wc -l < /tmp/hal-xca-b-r1-paths.txt)" = 2
-          grep -Fxq 'crates/domains/symthaea-hal/src/exact_command.rs' /tmp/hal-xca-b-r1-paths.txt
-          grep -Fxq 'crates/domains/symthaea-hal/src/lib.rs' /tmp/hal-xca-b-r1-paths.txt
-          test "$(git hash-object crates/domains/symthaea-hal/src/exact_command.rs)" = 40e079b8e466c176b894f0cb1172fbb6921f03c5
-          git diff --exit-code
-          git diff --cached --exit-code
-          test -z "$(git status --porcelain --untracked-files=no)"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git rev-parse HEAD)" = "$SUBJECT"
+            git merge-base --is-ancestor "$XCA_A_PARENT" "$SUBJECT"
+            test "$(git rev-list --count "$XCA_A_PARENT".."$SUBJECT")" = 1
+            git diff --name-only "$XCA_A_PARENT".."$SUBJECT" | tee "$EVIDENCE_DIR/changed-paths.txt"
+            test "$(wc -l < "$EVIDENCE_DIR/changed-paths.txt")" = 2
+            grep -Fxq 'crates/domains/symthaea-hal/src/exact_command.rs' "$EVIDENCE_DIR/changed-paths.txt"
+            grep -Fxq 'crates/domains/symthaea-hal/src/lib.rs' "$EVIDENCE_DIR/changed-paths.txt"
+            test "$(git hash-object crates/domains/symthaea-hal/src/exact_command.rs)" = "$EXACT_COMMAND_BLOB"
+            git diff --exit-code
+            git diff --cached --exit-code
+            test -z "$(git status --porcelain --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/provenance.stdout.txt" 2> "$EVIDENCE_DIR/provenance.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/provenance-exit-code.txt"
+          if [ "$rc" -eq 0 ]; then
+            echo 'ok=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ok=false' >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
 
       - name: Rust 1.96 HAL-scoped format
-        run: cargo fmt --manifest-path crates/domains/symthaea-hal/Cargo.toml -- --check
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo fmt --manifest-path crates/domains/symthaea-hal/Cargo.toml -- --check \
+            > "$EVIDENCE_DIR/format.stdout.txt" 2> "$EVIDENCE_DIR/format.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/format-exit-code.txt"
+          exit 0
 
       - name: Check HAL all targets
-        run: cargo check --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo check --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets \
+            > "$EVIDENCE_DIR/check.stdout.txt" 2> "$EVIDENCE_DIR/check.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/check-exit-code.txt"
+          exit 0
 
       - name: Run HAL tests
-        run: cargo test --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo test --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml \
+            > "$EVIDENCE_DIR/tests.stdout.txt" 2> "$EVIDENCE_DIR/tests.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tests-exit-code.txt"
+          exit 0
 
       - name: Strict HAL Clippy
-        run: cargo clippy --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets -- -D warnings
+        if: steps.toolchain.outputs.ok == 'true' && steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          cargo clippy --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets -- -D warnings \
+            > "$EVIDENCE_DIR/clippy.stdout.txt" 2> "$EVIDENCE_DIR/clippy.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/clippy-exit-code.txt"
+          exit 0
 
       - name: Require committed lock parity
+        if: steps.provenance.outputs.ok == 'true'
+        shell: bash
+        run: |
+          set +e
+          git diff --exit-code -- Cargo.lock \
+            > "$EVIDENCE_DIR/lock.stdout.txt" 2> "$EVIDENCE_DIR/lock.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/lock-exit-code.txt"
+          exit 0
+
+      - name: Prove postflight tracked checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          (
+            set -euo pipefail
+            test "$(git rev-parse HEAD)" = "$SUBJECT"
+            git diff --exit-code
+            git diff --cached --exit-code
+            test -z "$(git status --porcelain --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/postflight.stdout.txt" 2> "$EVIDENCE_DIR/postflight.stderr.txt"
+          rc=$?
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/postflight-exit-code.txt"
+          exit 0
+
+      - name: Compute qualification verdict without short-circuiting evidence
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
-          git diff --exit-code -- Cargo.lock
+          verdict=PASS
+          : > "$EVIDENCE_DIR/gate-summary.txt"
+          for gate in toolchain provenance format check tests clippy lock postflight; do
+            file="$EVIDENCE_DIR/${gate}-exit-code.txt"
+            if [ ! -f "$file" ]; then
+              printf '%s=MISSING\n' "$gate" | tee -a "$EVIDENCE_DIR/gate-summary.txt"
+              verdict=FAIL
+              continue
+            fi
+            rc="$(cat "$file")"
+            printf '%s=%s\n' "$gate" "$rc" | tee -a "$EVIDENCE_DIR/gate-summary.txt"
+            if [ "$rc" != 0 ]; then
+              verdict=FAIL
+            fi
+          done
+          printf '%s\n' "$verdict" > "$EVIDENCE_DIR/VERDICT.txt"
 
       - name: Capture qualification manifest
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf "$EVIDENCE_DIR"
-          mkdir -p "$EVIDENCE_DIR"
           {
             printf 'subject=%s\n' "$SUBJECT"
             printf 'subject_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
@@ -85,17 +208,13 @@ jobs:
             printf 'exact_command_blob=%s\n' "$(git hash-object crates/domains/symthaea-hal/src/exact_command.rs)"
             printf 'exact_command_sha256=%s\n' "$(sha256sum crates/domains/symthaea-hal/src/exact_command.rs | cut -d' ' -f1)"
             printf 'lib_sha256=%s\n' "$(sha256sum crates/domains/symthaea-hal/src/lib.rs | cut -d' ' -f1)"
-            rustc --version
-            cargo --version
-            cargo fmt --version
-            cargo clippy --version
+            printf 'verdict=%s\n' "$(cat "$EVIDENCE_DIR/VERDICT.txt" 2>/dev/null || printf MISSING)"
           } > "$EVIDENCE_DIR/MANIFEST.txt"
-          if [ -f /tmp/hal-xca-b-r1-paths.txt ]; then
-            cp /tmp/hal-xca-b-r1-paths.txt "$EVIDENCE_DIR/CHANGED_PATHS.txt"
-          fi
           (
             cd "$EVIDENCE_DIR"
-            find . -type f ! -name SHA256SUMS.txt -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+            find . -type f ! -name SHA256SUMS.txt -print0 \
+              | LC_ALL=C sort -z \
+              | xargs -0 sha256sum > SHA256SUMS.txt
           )
 
       - name: Upload qualification evidence
@@ -107,12 +226,10 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Prove postflight tracked checkout immutability
+      - name: Enforce qualification verdict after evidence upload
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$SUBJECT"
-          git diff --exit-code
-          git diff --cached --exit-code
-          test -z "$(git status --porcelain --untracked-files=no)"
+          test -f "$EVIDENCE_DIR/VERDICT.txt"
+          test "$(cat "$EVIDENCE_DIR/VERDICT.txt")" = PASS
