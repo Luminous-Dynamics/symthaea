@@ -58,10 +58,27 @@ jobs:
           else
             echo "lock_ok=false" >> "$GITHUB_OUTPUT"
             cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
-            cargo generate-lockfile
+
+            # Reconcile only the requested package against the existing lock and
+            # already-cached registry state. Do not regenerate the whole workspace
+            # lockfile or allow network-driven dependency upgrades.
+            set +e
+            cargo check --offline -p symthaea-arc3-protocol
+            reconcile_status=$?
+            set -e
+
+            printf '%s\n' "$reconcile_status" > "$RUNNER_TEMP/offline-reconcile-status.txt"
             git diff -- Cargo.lock > "$RUNNER_TEMP/arc3-cargo-lock.patch"
             cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
-            cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
+
+            if [ -s "$RUNNER_TEMP/arc3-cargo-lock.patch" ]; then
+              cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
+            else
+              echo "Offline package reconciliation produced no Cargo.lock diff" >&2
+            fi
+
+            # The committed product lock was stale, so this qualification lane
+            # remains red even if the disposable offline reconciliation compiled.
             exit 1
           fi
 
@@ -74,6 +91,7 @@ jobs:
             ${{ runner.temp }}/Cargo.lock.before
             ${{ runner.temp }}/Cargo.lock.generated
             ${{ runner.temp }}/arc3-cargo-lock.patch
+            ${{ runner.temp }}/offline-reconcile-status.txt
           if-no-files-found: error
           retention-days: 14
 
