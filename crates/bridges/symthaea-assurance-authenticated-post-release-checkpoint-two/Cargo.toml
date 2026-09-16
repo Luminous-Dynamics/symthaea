@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-assurance-authenticated-post-release-checkpoint-two"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Bind supervisor-issued post-release challenge to tracee checkpoint-two live observation"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "linux", "runtime", "attestation"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-post-release-runtime-handoff = { path = "../symthaea-assurance-post-release-runtime-handoff" }
+symthaea-assurance-post-release-checkpoint-two-observation = { path = "../symthaea-assurance-post-release-checkpoint-two-observation" }
