@@ -58,16 +58,16 @@ impl NeuroTopology for ActiveCoreHdcLtcTopology<'_> {
         for (idx, &layer_size) in config.layer_sizes.iter().enumerate() {
             let unit_count =
                 u64::try_from(layer_size).map_err(|_| TopologyError::DimensionOverflow)?;
-            let state_dimension = unit_count
-                .checked_mul(dim)
-                .ok_or(TopologyError::DimensionOverflow)?;
             let id = u32::try_from(idx + 1).map_err(|_| TopologyError::DimensionOverflow)?;
 
             circuits.push(CircuitDescriptor {
                 id: CircuitId(id),
                 role: format!("layer:{idx}"),
                 timescale_class: timescale.clone(),
-                state_dimension,
+                // V1 semantics: state_dimension is PER UNIT. `unit_count`
+                // carries multiplicity. Resource receipts must multiply these
+                // exactly once when computing total logical state dimensions.
+                state_dimension: dim,
                 unit_count,
                 implementation: CircuitImplementation::IncumbentHdcLtcLayer,
                 input_merge_policy: if idx > 0 && config.skip_connections {
@@ -147,7 +147,7 @@ impl NeuroTopology for ActiveCoreHdcLtcTopology<'_> {
 mod tests {
     use super::*;
     use symthaea_core::hdc::hdc_ltc_unified::{
-        NetworkStateSnapshot, UnifiedConfig, UnifiedNetworkConfig,
+        NetworkStateSnapshot, UnifiedActivation, UnifiedConfig, UnifiedNetworkConfig,
     };
     use symthaea_core::hdc::unified_hv::ContinuousHV;
 
@@ -164,46 +164,74 @@ mod tests {
         }
     }
 
+    fn commitment(config: UnifiedNetworkConfig, seed: u64) -> symthaea_neuroarch_types::TopologyCommitment {
+        let network = HdcLtcUnifiedNetwork::new(config, seed);
+        ActiveCoreHdcLtcTopology::new(&network)
+            .topology_commitment()
+            .unwrap()
+    }
+
     #[test]
     fn active_core_topology_is_seed_independent() {
-        let a = HdcLtcUnifiedNetwork::new(config(), 1);
-        let b = HdcLtcUnifiedNetwork::new(config(), 999);
+        assert_eq!(commitment(config(), 1), commitment(config(), 999));
+    }
+
+    #[test]
+    fn active_core_state_dimension_is_per_unit() {
+        let network = HdcLtcUnifiedNetwork::new(config(), 1);
+        let topology = ActiveCoreHdcLtcTopology::new(&network)
+            .topology_descriptor()
+            .unwrap();
+
+        let first_layer = &topology.circuits[1];
+        assert_eq!(first_layer.state_dimension, 128);
+        assert_eq!(first_layer.unit_count, 2);
         assert_eq!(
-            ActiveCoreHdcLtcTopology::new(&a)
-                .topology_commitment()
+            first_layer
+                .state_dimension
+                .checked_mul(first_layer.unit_count)
                 .unwrap(),
-            ActiveCoreHdcLtcTopology::new(&b)
-                .topology_commitment()
-                .unwrap()
+            256
         );
     }
 
     #[test]
     fn active_core_structural_changes_change_commitment() {
-        let base = HdcLtcUnifiedNetwork::new(config(), 1);
-        let base_commit = ActiveCoreHdcLtcTopology::new(&base)
-            .topology_commitment()
-            .unwrap();
+        let base_commit = commitment(config(), 1);
 
         let mut resized = config();
         resized.layer_sizes[1] += 1;
-        let resized = HdcLtcUnifiedNetwork::new(resized, 1);
-        assert_ne!(
-            base_commit,
-            ActiveCoreHdcLtcTopology::new(&resized)
-                .topology_commitment()
-                .unwrap()
-        );
+        assert_ne!(base_commit, commitment(resized, 1));
+
+        let mut tau = config();
+        tau.neuron_config.tau_base = 0.2;
+        assert_ne!(base_commit, commitment(tau, 1));
+
+        let mut unbound = config();
+        unbound.use_layer_binding = false;
+        assert_ne!(base_commit, commitment(unbound, 1));
 
         let mut skip = config();
         skip.skip_connections = true;
-        let skip = HdcLtcUnifiedNetwork::new(skip, 1);
-        assert_ne!(
-            base_commit,
-            ActiveCoreHdcLtcTopology::new(&skip)
-                .topology_commitment()
-                .unwrap()
-        );
+        assert_ne!(base_commit, commitment(skip, 1));
+    }
+
+    #[test]
+    fn active_core_non_topological_model_changes_do_not_change_commitment() {
+        let base_commit = commitment(config(), 1);
+
+        let mut activation = config();
+        activation.neuron_config.activation = UnifiedActivation::Sigmoid;
+        assert_eq!(base_commit, commitment(activation, 1));
+
+        let mut learning_rate = config();
+        learning_rate.neuron_config.learning_rate = 0.123;
+        assert_eq!(base_commit, commitment(learning_rate, 1));
+
+        let mut fourier = config();
+        fourier.neuron_config.fourier_frequencies = vec![1.0, 2.0, 5.0];
+        fourier.neuron_config.fourier_amplitude = 0.42;
+        assert_eq!(base_commit, commitment(fourier, 1));
     }
 
     #[test]
