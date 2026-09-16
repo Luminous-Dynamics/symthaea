@@ -1,0 +1,400 @@
+name: REL-005A Corrupted-Anchor ComparisonOnly
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-independent-oracle.py"
+      - ".github/rel/rel-005a-corrupted-anchor-comparison.py"
+      - ".github/workflows/rel-005a-corrupted-anchor-comparison.yml"
+  workflow_dispatch:
+    inputs:
+      observation_run_id:
+        description: "Workflow run containing the sealed REL-005A diagnostic"
+        required: true
+        type: string
+      observation_head:
+        description: "Exact diagnostic head SHA named by the source artifacts"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  EXPECTED_JUDGE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  FROZEN_DIAGNOSTIC_HEAD: 08cf8462c05a7f05660034462c15f4985bfe7e05
+  FROZEN_SCIENTIFIC_BASE: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  ORACLE_GIT_BLOB: 5ed47e4fc7548061782d28f03f55a99b577ac856
+
+jobs:
+  static-contract:
+    name: Freeze ComparisonOnly contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact judge subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_JUDGE_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact judge lineage and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_JUDGE_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${FROZEN_DIAGNOSTIC_HEAD}"
+          test "$(git rev-list --count "${FROZEN_DIAGNOSTIC_HEAD}"..HEAD)" = "1"
+          mapfile -t changed < <(git diff --name-only "${FROZEN_DIAGNOSTIC_HEAD}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-corrupted-anchor-comparison.py"
+            ".github/rel/rel-005a-independent-oracle.py"
+            ".github/workflows/rel-005a-corrupted-anchor-comparison.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-independent-oracle.py)" = "${ORACLE_GIT_BLOB}"
+
+      - name: Run frozen PredictionOnly oracle twice
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-independent-oracle.py \
+            --output "${RUNNER_TEMP}/oracle-a.json" \
+            > "${RUNNER_TEMP}/oracle-a.stdout"
+          python3 -I .github/rel/rel-005a-independent-oracle.py \
+            --output "${RUNNER_TEMP}/oracle-b.json" \
+            > "${RUNNER_TEMP}/oracle-b.stdout"
+          cmp "${RUNNER_TEMP}/oracle-a.json" "${RUNNER_TEMP}/oracle-b.json"
+          sha256sum "${RUNNER_TEMP}/oracle-a.json" "${RUNNER_TEMP}/oracle-b.json"
+
+      - name: Self-check ComparisonOnly adjudicator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-corrupted-anchor-comparison.py --self-check
+
+      - name: Prove oracle agreement implies historical predicate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          oracle = json.loads((pathlib.Path(os.environ["RUNNER_TEMP"]) / "oracle-a.json").read_text())
+          predicted = float(oracle["corrupted_anchor_held_out_max"])
+          tolerance = 5.0e-5
+          historical_threshold = 0.20
+          assert predicted - tolerance > historical_threshold
+          PY
+
+      - name: Check judge checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_JUDGE_HEAD}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Build static contract receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def sha256(path: str) -> str:
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          def cmd(*args: str) -> str:
+              return subprocess.check_output(args, text=True).strip()
+          receipt = {
+              "schema": "symthaea.rel.comparison-only-contract.v2",
+              "authority": "ComparisonOnly",
+              "judge_head": cmd("git", "rev-parse", "HEAD"),
+              "judge_tree": cmd("git", "rev-parse", "HEAD^{tree}"),
+              "frozen_diagnostic_head": os.environ["FROZEN_DIAGNOSTIC_HEAD"],
+              "frozen_scientific_base": os.environ["FROZEN_SCIENTIFIC_BASE"],
+              "oracle_git_blob": cmd("git", "rev-parse", "HEAD:.github/rel/rel-005a-independent-oracle.py"),
+              "source_sha256": {
+                  ".github/rel/rel-005a-independent-oracle.py": sha256(".github/rel/rel-005a-independent-oracle.py"),
+                  ".github/rel/rel-005a-corrupted-anchor-comparison.py": sha256(".github/rel/rel-005a-corrupted-anchor-comparison.py"),
+                  ".github/workflows/rel-005a-corrupted-anchor-comparison.yml": sha256(".github/workflows/rel-005a-corrupted-anchor-comparison.yml"),
+              },
+              "claims": {
+                  "production_executed": False,
+                  "observation_consumed": False,
+                  "adjudication_performed": False,
+                  "rel_005a_qualified": False,
+              },
+          }
+          path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "comparison-only-contract.json"
+          path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload static contract receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-comparison-only-contract-${{ env.EXPECTED_JUDGE_HEAD }}
+          path: ${{ runner.temp }}/comparison-only-contract.json
+          retention-days: 30
+          if-no-files-found: error
+
+  compare-sealed-observation:
+    name: Compare sealed corrupted-anchor observation
+    if: github.event_name == 'workflow_dispatch'
+    needs: static-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact judge subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_JUDGE_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind frozen judge lineage and oracle identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_JUDGE_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${FROZEN_DIAGNOSTIC_HEAD}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-independent-oracle.py)" = "${ORACLE_GIT_BLOB}"
+
+      - name: Download source execution capsule
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: rel-005a-execution-${{ inputs.observation_head }}
+          path: ${{ runner.temp }}/source-execution
+          github-token: ${{ github.token }}
+          repository: Luminous-Dynamics/symthaea
+          run-id: ${{ inputs.observation_run_id }}
+
+      - name: Download source observation seal
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: rel-005a-observation-seal-${{ inputs.observation_head }}
+          path: ${{ runner.temp }}/source-seal
+          github-token: ${{ github.token }}
+          repository: Luminous-Dynamics/symthaea
+          run-id: ${{ inputs.observation_run_id }}
+
+      - name: Independently replay full execution capsule
+        id: replay
+        continue-on-error: true
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ inputs.observation_run_id }}
+          OBSERVATION_HEAD: ${{ inputs.observation_head }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+
+          root = pathlib.Path(os.environ["RUNNER_TEMP"]) / "source-execution"
+          out = pathlib.Path(os.environ["RUNNER_TEMP"]) / "capsule-replay.json"
+          sha256 = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+
+          manifest_path = root / "capsule-manifest.json"
+          execution_path = root / "execution-receipt.json"
+          context_path = root / "workflow-context.json"
+          observation_path = root / "observation.json"
+
+          try:
+              manifest = json.loads(manifest_path.read_text())
+              execution = json.loads(execution_path.read_text())
+              context = json.loads(context_path.read_text())
+              expected_head = os.environ["OBSERVATION_HEAD"]
+              source_run_id = os.environ["SOURCE_RUN_ID"]
+              scientific_base = os.environ["FROZEN_SCIENTIFIC_BASE"]
+
+              assert manifest["schema"] == "symthaea.rel.execution-capsule-manifest.v1"
+              assert manifest["authority"] == "ExecutionOnly"
+              assert execution["schema"] == "symthaea.rel.execution-receipt.v2"
+              assert execution["authority"] == "ExecutionOnly"
+              assert context["schema"] == "symthaea.rel.execution-context.v1"
+              assert context["authority"] == "ExecutionOnly"
+              for obj in (manifest, execution, context):
+                  assert obj["expected_head"] == expected_head
+                  assert obj.get("expected_base", "") == scientific_base
+              assert str(context["run_id"]) == source_run_id
+              workflow_ref = str(context.get("workflow_ref", ""))
+              assert workflow_ref.startswith(
+                  "Luminous-Dynamics/symthaea/.github/workflows/rel-005a-red-diagnostic.yml@"
+              )
+              assert execution["capsule_manifest_sha256"] == sha256(manifest_path)
+
+              excluded = {"capsule-manifest.json", "execution-receipt.json"}
+              actual_files = {
+                  p.relative_to(root).as_posix()
+                  for p in root.rglob("*")
+                  if p.is_file() and p.relative_to(root).as_posix() not in excluded
+              }
+              declared = set(manifest["files"])
+              assert actual_files == declared
+              for rel, meta in manifest["files"].items():
+                  path = root / rel
+                  assert path.is_file()
+                  assert meta["sha256"] == sha256(path)
+                  assert meta["size_bytes"] == path.stat().st_size
+
+              assert execution["execution_status"] == "ok"
+              assert execution["reason_code"] == "OK"
+              assert execution["measurement_exit_code"] == 0
+              assert execution["raw_observation_present"] is True
+              assert observation_path.is_file()
+              assert execution["raw_observation_sha256"] == sha256(observation_path)
+              assert all(v == "success" for v in execution["phase_outcomes"].values())
+
+              receipt = {
+                  "schema": "symthaea.rel.capsule-replay.v1",
+                  "authority": "ComparisonOnly",
+                  "replay_status": "ok",
+                  "source_run_id": source_run_id,
+                  "expected_observation_head": expected_head,
+                  "execution_receipt_sha256": sha256(execution_path),
+                  "capsule_manifest_sha256": sha256(manifest_path),
+                  "workflow_context_sha256": sha256(context_path),
+                  "observation_sha256": sha256(observation_path),
+                  "verified_files": sorted(declared),
+              }
+          except Exception as exc:
+              receipt = {
+                  "schema": "symthaea.rel.capsule-replay.v1",
+                  "authority": "ComparisonOnly",
+                  "replay_status": "error",
+                  "source_run_id": os.environ["SOURCE_RUN_ID"],
+                  "expected_observation_head": os.environ["OBSERVATION_HEAD"],
+                  "reason": f"{type(exc).__name__}: {exc}",
+              }
+              out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+              print(json.dumps(receipt, indent=2, sort_keys=True))
+              raise
+
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Generate independent PredictionOnly artifact
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-independent-oracle.py \
+            --output "${RUNNER_TEMP}/oracle.json" \
+            > "${RUNNER_TEMP}/oracle.stdout"
+          python3 -m json.tool "${RUNNER_TEMP}/oracle.json" >/dev/null
+
+      - name: Run ComparisonOnly adjudication
+        id: comparison
+        if: steps.replay.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-corrupted-anchor-comparison.py \
+            --observation "${RUNNER_TEMP}/source-execution/observation.json" \
+            --seal "${RUNNER_TEMP}/source-seal/observation-seal.json" \
+            --oracle "${RUNNER_TEMP}/oracle.json" \
+            --execution-receipt "${RUNNER_TEMP}/source-execution/execution-receipt.json" \
+            --manifest "${RUNNER_TEMP}/source-execution/capsule-manifest.json" \
+            --context "${RUNNER_TEMP}/source-execution/workflow-context.json" \
+            --expected-observation-head "${{ inputs.observation_head }}" \
+            --source-run-id "${{ inputs.observation_run_id }}" \
+            --output "${RUNNER_TEMP}/comparison-receipt.json"
+
+      - name: Build ComparisonOnly evidence envelope
+        if: always()
+        shell: bash
+        env:
+          REPLAY_OUTCOME: ${{ steps.replay.outcome }}
+          COMPARISON_OUTCOME: ${{ steps.comparison.outcome }}
+          SOURCE_RUN_ID: ${{ inputs.observation_run_id }}
+          OBSERVATION_HEAD: ${{ inputs.observation_head }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path(os.environ["RUNNER_TEMP"])
+          sha256 = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+          def digest(name):
+              path = root / name
+              return sha256(path) if path.is_file() else None
+          replay_path = root / "capsule-replay.json"
+          comparison_path = root / "comparison-receipt.json"
+          replay = json.loads(replay_path.read_text()) if replay_path.is_file() else None
+          comparison = json.loads(comparison_path.read_text()) if comparison_path.is_file() else None
+          evidence_status = "complete" if (
+              isinstance(replay, dict)
+              and replay.get("replay_status") == "ok"
+              and isinstance(comparison, dict)
+              and comparison.get("comparison_status") == "completed"
+          ) else "incomplete"
+          envelope = {
+              "schema": "symthaea.rel.comparison-evidence-envelope.v1",
+              "authority": "ComparisonOnly",
+              "judge_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "frozen_diagnostic_head": os.environ["FROZEN_DIAGNOSTIC_HEAD"],
+              "source_run_id": os.environ["SOURCE_RUN_ID"],
+              "expected_observation_head": os.environ["OBSERVATION_HEAD"],
+              "replay_step_outcome": os.environ["REPLAY_OUTCOME"],
+              "comparison_step_outcome": os.environ.get("COMPARISON_OUTCOME", "skipped"),
+              "evidence_status": evidence_status,
+              "capsule_replay_sha256": digest("capsule-replay.json"),
+              "comparison_receipt_sha256": digest("comparison-receipt.json"),
+              "oracle_artifact_sha256": digest("oracle.json"),
+              "observation_seal_sha256": digest("source-seal/observation-seal.json"),
+              "claims": {
+                  "production_executed_by_comparison": False,
+                  "rel_005a_qualified": False,
+                  "scientific_verdict_encoded_by_ci_status": False,
+              },
+          }
+          path = root / "comparison-envelope.json"
+          path.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(envelope, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload self-contained ComparisonOnly evidence bundle
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-corrupted-anchor-comparison-${{ inputs.observation_head }}
+          path: |
+            ${{ runner.temp }}/comparison-envelope.json
+            ${{ runner.temp }}/comparison-receipt.json
+            ${{ runner.temp }}/capsule-replay.json
+            ${{ runner.temp }}/oracle.json
+            ${{ runner.temp }}/source-execution/
+            ${{ runner.temp }}/source-seal/observation-seal.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Enforce ComparisonOnly outcome
+        if: always()
+        shell: bash
+        env:
+          REPLAY_OUTCOME: ${{ steps.replay.outcome }}
+          COMPARISON_OUTCOME: ${{ steps.comparison.outcome }}
+        run: |
+          set -euo pipefail
+          test "${REPLAY_OUTCOME}" = "success"
+          test "${COMPARISON_OUTCOME}" = "success"
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ["RUNNER_TEMP"])
+          replay = json.loads((root / "capsule-replay.json").read_text())
+          comparison = json.loads((root / "comparison-receipt.json").read_text())
+          envelope = json.loads((root / "comparison-envelope.json").read_text())
+          assert replay["schema"] == "symthaea.rel.capsule-replay.v1"
+          assert replay["authority"] == "ComparisonOnly"
+          assert replay["replay_status"] == "ok"
+          assert comparison["schema"] == "symthaea.rel.corrupted-anchor-comparison.v1"
+          assert comparison["authority"] == "ComparisonOnly"
+          assert comparison["comparison_status"] == "completed"
+          assert comparison["claims"]["dispute_resolved"] is True
+          assert comparison["claims"]["rel_005a_qualified"] is False
+          assert envelope["schema"] == "symthaea.rel.comparison-evidence-envelope.v1"
+          assert envelope["evidence_status"] == "complete"
+          assert envelope["claims"]["rel_005a_qualified"] is False
+          PY
