@@ -15,6 +15,7 @@ permissions:
 
 env:
   QUALIFY_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  FROZEN_BASE_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
@@ -30,14 +31,23 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.QUALIFY_SHA }}
-          fetch-depth: 1
+          fetch-depth: 2
 
-      - name: Bind exact head
+      - name: Bind exact head, base, and scope
         run: |
           set -euo pipefail
           actual_sha="$(git rev-parse HEAD)"
           test "$actual_sha" = "$QUALIFY_SHA"
+          test "$(git rev-parse HEAD^)" = "$FROZEN_BASE_SHA"
+          test "$(git rev-list --count "$FROZEN_BASE_SHA..$QUALIFY_SHA")" -eq 1
+
+          git diff --check "$FROZEN_BASE_SHA" "$QUALIFY_SHA"
+          git diff --name-only "$FROZEN_BASE_SHA" "$QUALIFY_SHA" | tee neuroarch-scope.txt
+          unexpected="$(grep -Ev '^(Cargo\.lock|\.github/workflows/neuroarch-001-qualify\.yml|crates/core/symthaea-neuroarch-(types|adapters)/|docs/research/neuroarch/NEUROARCH_001[^/]*\.md)$' neuroarch-scope.txt || true)"
+          test -z "$unexpected"
+
           printf 'qualification_sha=%s\n' "$actual_sha" > neuroarch-qualification-context.txt
+          printf 'frozen_base_sha=%s\n' "$FROZEN_BASE_SHA" >> neuroarch-qualification-context.txt
           printf 'event_name=%s\n' "$GITHUB_EVENT_NAME" >> neuroarch-qualification-context.txt
           printf 'ref=%s\n' "$GITHUB_REF" >> neuroarch-qualification-context.txt
 
@@ -51,6 +61,9 @@ jobs:
           set -euo pipefail
           rustc -vV | tee -a neuroarch-qualification-context.txt
           cargo -V | tee -a neuroarch-qualification-context.txt
+          rustc -vV | grep -q '^release: 1\.96\.0$'
+          cargo -V | grep -q '^cargo 1\.96\.0 '
+
           cargo metadata --format-version 1 --no-deps > neuroarch-workspace-metadata.json
           grep -q '"name":"symthaea-neuroarch-types"' neuroarch-workspace-metadata.json
           grep -q '"name":"symthaea-neuroarch-adapters"' neuroarch-workspace-metadata.json
@@ -61,12 +74,28 @@ jobs:
           cargo check -p symthaea-neuroarch-types
           git diff -- Cargo.lock | tee neuroarch-cargo-lock.patch
           test -s neuroarch-cargo-lock.patch
-          grep -q '^+name = "symthaea-neuroarch-types"' neuroarch-cargo-lock.patch
-          grep -q '^+name = "symthaea-neuroarch-adapters"' neuroarch-cargo-lock.patch
+
           if grep -E '^-[^-]' neuroarch-cargo-lock.patch; then
             echo 'Cargo.lock materialization removed existing content; refusing broad lock churn.' >&2
             exit 1
           fi
+
+          test "$(grep -c '^+\[\[package\]\]$' neuroarch-cargo-lock.patch)" -eq 2
+          mapfile -t added_packages < <(
+            awk '
+              /^\+\[\[package\]\]$/ { want_name = 1; next }
+              want_name && /^\+name = "/ {
+                line = $0
+                sub(/^\+name = "/, "", line)
+                sub(/"$/, "", line)
+                print line
+                want_name = 0
+              }
+            ' neuroarch-cargo-lock.patch | sort
+          )
+          test "${#added_packages[@]}" -eq 2
+          test "${added_packages[0]}" = 'symthaea-neuroarch-adapters'
+          test "${added_packages[1]}" = 'symthaea-neuroarch-types'
 
           cargo tree -p symthaea-neuroarch-types --depth 1 --locked > neuroarch-types-tree.txt
           cargo tree -p symthaea-neuroarch-adapters --depth 1 --locked > neuroarch-adapters-tree.txt
@@ -74,6 +103,7 @@ jobs:
           grep -q 'serde' neuroarch-types-tree.txt
           grep -q 'symthaea-core' neuroarch-adapters-tree.txt
           grep -q 'symthaea-neuroarch-types' neuroarch-adapters-tree.txt
+          sha256sum Cargo.lock > neuroarch-cargo-lock.sha256
 
       - name: Check focused formatting
         run: |
@@ -95,7 +125,9 @@ jobs:
           path: |
             Cargo.lock
             neuroarch-cargo-lock.patch
+            neuroarch-cargo-lock.sha256
             neuroarch-qualification-context.txt
+            neuroarch-scope.txt
             neuroarch-workspace-metadata.json
             neuroarch-types-tree.txt
             neuroarch-adapters-tree.txt
@@ -112,13 +144,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ env.QUALIFY_SHA }}
-          fetch-depth: 1
+          fetch-depth: 2
 
-      - name: Bind exact head
+      - name: Bind exact head and base
         run: |
           set -euo pipefail
           actual_sha="$(git rev-parse HEAD)"
           test "$actual_sha" = "$QUALIFY_SHA"
+          test "$(git rev-parse HEAD^)" = "$FROZEN_BASE_SHA"
 
       - name: Install Rust 1.96 qualification toolchain
         uses: dtolnay/rust-toolchain@1.96.0
@@ -135,6 +168,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -q "^qualification_sha=$QUALIFY_SHA$" neuroarch-lock-evidence/neuroarch-qualification-context.txt
+          grep -q "^frozen_base_sha=$FROZEN_BASE_SHA$" neuroarch-lock-evidence/neuroarch-qualification-context.txt
+          (cd neuroarch-lock-evidence && sha256sum -c neuroarch-cargo-lock.sha256)
           cp neuroarch-lock-evidence/Cargo.lock Cargo.lock
           cargo metadata --format-version 1 --no-deps --locked >/dev/null
 
