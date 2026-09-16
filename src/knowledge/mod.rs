@@ -32,6 +32,7 @@ pub mod adaptive_ontology;
 #[cfg(feature = "epistemic")]
 pub mod adversarial_epistemics;
 pub mod causal_bridge;
+pub mod causal_hypothesis;
 pub mod causal_reasoning_bridge;
 pub mod claim_evidence;
 #[cfg(feature = "epistemic")]
@@ -53,6 +54,10 @@ pub mod self_schema;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use causal_bridge::CausalKnowledgeBridge;
+pub use causal_hypothesis::{
+    CausalEvidenceProfile, CausalHypothesis, CausalHypothesisError, CausalHypothesisId,
+    CausalHypothesisStore, CausalSign,
+};
 pub use causal_reasoning_bridge::CausalReasoningBridge;
 pub use claim_evidence::{
     ClaimId, ClaimKind, EpistemicLedger, EvidenceId, EvidenceKind, EvidencePolarity, EvidenceRecord,
