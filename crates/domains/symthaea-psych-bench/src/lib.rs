@@ -53,6 +53,8 @@
 
 pub mod adapter;
 pub mod benchmarks;
+#[path = "harness/external_execution_attestation.rs"]
+pub mod external_execution_attestation;
 #[path = "harness/external_qualification.rs"]
 pub mod external_qualification;
 pub mod harness;
