@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SUBJECT_SHA: ba5454fc821a90fe7a00c0d202e3eee02c7b81f0
+  SUBJECT_SHA: edaac7585c3a227b06d3c9ecb9b027485ac5fbd5
   CARGO_TERM_COLOR: always
 
 jobs:
@@ -33,8 +33,8 @@ jobs:
       - name: Run independent canonicalization oracle
         run: python3 scripts/arc3_protocol_oracle.py
 
-  rust-module-proof:
-    name: Rust protocol module proof
+  rust-protocol-crate:
+    name: Rust protocol crate
     runs-on: ubuntu-slim
     timeout-minutes: 15
     steps:
@@ -47,41 +47,26 @@ jobs:
 
       - name: Install Rust 1.96
         uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
 
-      - name: Build minimal exact-source proof crate
-        shell: bash
-        run: |
-          set -euo pipefail
-          proof_dir="$RUNNER_TEMP/arc3-protocol-proof"
-          mkdir -p "$proof_dir/src"
-          cp crates/domains/symthaea-psych-bench/src/benchmarks/reasoning/arc3_protocol.rs \
-            "$proof_dir/src/lib.rs"
-          cat > "$proof_dir/Cargo.toml" <<'EOF'
-          [package]
-          name = "arc3-protocol-exact-source-proof"
-          version = "0.0.0"
-          edition = "2024"
-          rust-version = "1.94"
-          publish = false
+      - name: Format protocol crate
+        run: cargo fmt -p symthaea-arc3-protocol -- --check
 
-          [dependencies]
-          serde = { version = "1.0", features = ["derive"] }
-          serde_json = "1.0"
-          blake3 = "1.5"
-          EOF
-          cd "$proof_dir"
-          cargo test --lib --locked 2>/dev/null || {
-            # No lock exists on first execution. Generate it from the declared
-            # dependency families, then require the actual test execution.
-            cargo generate-lockfile
-            cargo test --lib --locked
-          }
+      - name: Check protocol crate
+        run: cargo check -p symthaea-arc3-protocol
+
+      - name: Test protocol crate
+        run: cargo test -p symthaea-arc3-protocol
+
+      - name: Clippy protocol crate
+        run: cargo clippy -p symthaea-arc3-protocol --all-targets -- -D warnings
 
       - name: Cross-check independent oracle
         run: python3 scripts/arc3_protocol_oracle.py
 
-  rust-contract:
-    name: Rust protocol contract
+  psych-bench-integration:
+    name: Psych-bench ARC3 integration
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -97,14 +82,14 @@ jobs:
         with:
           components: rustfmt
 
-      - name: Format affected crate
-        run: cargo fmt -p symthaea-psych-bench -- --check
+      - name: Format affected crates
+        run: cargo fmt -p symthaea-arc3-protocol -p symthaea-psych-bench -- --check
 
-      - name: Check affected crate
+      - name: Check psych-bench integration
         run: cargo check -p symthaea-psych-bench
 
-      - name: Test ARC3 protocol contract
-        run: cargo test -p symthaea-psych-bench arc3_protocol --lib
+      - name: Test protocol compatibility namespace
+        run: cargo test -p symthaea-psych-bench --lib
 
       - name: Cross-check independent oracle
         run: python3 scripts/arc3_protocol_oracle.py
