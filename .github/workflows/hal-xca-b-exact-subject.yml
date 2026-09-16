@@ -1,0 +1,113 @@
+# Qualification-plane workflow only; the HAL-XCA-B subject remains frozen.
+name: HAL-XCA-B Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - 'qual/hal-xca-b-exact-subject-v1'
+    paths:
+      - '.github/workflows/hal-xca-b-exact-subject.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    env:
+      SUBJECT: e77668fd8b69dd83c8fe7075a3fba9cd1567eff5
+      QUALIFIED_PARENT: 175c3629613f35f43accb99c4030ec70b50dd003
+      MANIFEST_DIR: /tmp/hal-xca-b-qualification
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: e77668fd8b69dd83c8fe7075a3fba9cd1567eff5
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust qualification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          cargo fmt --version
+          cargo clippy --version
+
+      - name: Prove exact subject and finite XCA-B surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT"
+          git merge-base --is-ancestor "$QUALIFIED_PARENT" "$SUBJECT"
+          test "$(git rev-list --count "$QUALIFIED_PARENT".."$SUBJECT")" = 1
+          git diff --name-only "$QUALIFIED_PARENT".."$SUBJECT" | tee /tmp/hal-xca-b-paths.txt
+          test "$(wc -l < /tmp/hal-xca-b-paths.txt)" = 2
+          grep -Fxq 'crates/domains/symthaea-hal/src/exact_command.rs' /tmp/hal-xca-b-paths.txt
+          grep -Fxq 'crates/domains/symthaea-hal/src/lib.rs' /tmp/hal-xca-b-paths.txt
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Rust 1.96 format
+        run: cargo fmt --manifest-path crates/domains/symthaea-hal/Cargo.toml -- --check
+
+      - name: Check HAL targets
+        run: cargo check --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets
+
+      - name: Run HAL tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml
+
+      - name: Strict HAL Clippy
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-hal/Cargo.toml --all-targets -- -D warnings
+
+      - name: Require committed lock parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff -- Cargo.lock
+          git diff --exit-code -- Cargo.lock
+
+      - name: Capture exact-subject qualification manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "$MANIFEST_DIR"
+          mkdir -p "$MANIFEST_DIR"
+          {
+            printf 'subject=%s\n' "$SUBJECT"
+            printf 'subject_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')"
+            printf 'qualified_parent=%s\n' "$QUALIFIED_PARENT"
+            printf 'exact_command_sha256=%s\n' "$(sha256sum crates/domains/symthaea-hal/src/exact_command.rs | cut -d' ' -f1)"
+            printf 'lib_sha256=%s\n' "$(sha256sum crates/domains/symthaea-hal/src/lib.rs | cut -d' ' -f1)"
+            rustc --version
+            cargo --version
+            cargo fmt --version
+            cargo clippy --version
+          } > "$MANIFEST_DIR/MANIFEST.txt"
+          cp /tmp/hal-xca-b-paths.txt "$MANIFEST_DIR/CHANGED_PATHS.txt"
+          (
+            cd "$MANIFEST_DIR"
+            sha256sum CHANGED_PATHS.txt MANIFEST.txt > SHA256SUMS.txt
+          )
+          cat "$MANIFEST_DIR/MANIFEST.txt"
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hal-xca-b-${{ env.SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.MANIFEST_DIR }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Prove postflight tracked checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
