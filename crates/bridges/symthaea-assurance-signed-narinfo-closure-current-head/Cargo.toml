@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-signed-narinfo-closure-current-head"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Challenge-current authority head for signed narinfo-backed Nix runtime closures"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "nix", "narinfo", "currentness", "supply-chain"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+base64 = "0.22"
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-signed-narinfo-runtime-closure = { path = "../symthaea-assurance-signed-narinfo-runtime-closure" }
