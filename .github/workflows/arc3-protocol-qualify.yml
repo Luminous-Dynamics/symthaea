@@ -59,9 +59,8 @@ jobs:
             echo "lock_ok=false" >> "$GITHUB_OUTPUT"
             cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
 
-            # Reconcile only the requested package against the existing lock and
-            # already-cached registry state. Do not regenerate the whole workspace
-            # lockfile or allow network-driven dependency upgrades.
+            # Reconcile only this package against the existing lock and cached
+            # registry state. Never regenerate the workspace lock wholesale.
             set +e
             cargo check --offline -p symthaea-arc3-protocol
             reconcile_status=$?
@@ -71,14 +70,49 @@ jobs:
             git diff -- Cargo.lock > "$RUNNER_TEMP/arc3-cargo-lock.patch"
             cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
 
-            if [ -s "$RUNNER_TEMP/arc3-cargo-lock.patch" ]; then
-              cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
-            else
-              echo "Offline package reconciliation produced no Cargo.lock diff" >&2
+            if [ ! -s "$RUNNER_TEMP/arc3-cargo-lock.patch" ]; then
+              echo "Offline reconciliation produced no Cargo.lock diff; refusing to guess" >&2
+              exit 1
             fi
 
-            # The committed product lock was stale, so this qualification lane
-            # remains red even if the disposable offline reconciliation compiled.
+            # A minimal reconciliation may only add/update the local protocol
+            # package stanza. Registry package additions/removals or version,
+            # source, checksum changes indicate dependency drift and are rejected.
+            python3 - <<'PY'
+            from pathlib import Path
+            import re
+            import sys
+
+            patch = Path(__import__('os').environ['RUNNER_TEMP']) / 'arc3-cargo-lock.patch'
+            text = patch.read_text()
+
+            forbidden = []
+            for line in text.splitlines():
+                if not line or line.startswith(('+++', '---', '@@')):
+                    continue
+                if line[0] not in '+-':
+                    continue
+                body = line[1:].strip()
+                if body.startswith(('version =', 'source =', 'checksum =')):
+                    forbidden.append(line)
+
+            names = re.findall(r'^[+-]name = "([^"]+)"$', text, re.MULTILINE)
+            foreign_names = sorted({n for n in names if n != 'symthaea-arc3-protocol'})
+            if forbidden or foreign_names:
+                print('Lock reconciliation is broader than the local ARC3 protocol package.', file=sys.stderr)
+                if foreign_names:
+                    print('Foreign package names:', ', '.join(foreign_names), file=sys.stderr)
+                if forbidden:
+                    print('Version/source/checksum drift:', file=sys.stderr)
+                    print('\n'.join(forbidden), file=sys.stderr)
+                sys.exit(1)
+            PY
+
+            cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
+
+            # Product lock is stale even when the disposable reconciliation is
+            # minimal and successful. Preserve evidence and remain red until the
+            # exact Cargo-produced lock bytes are committed to the product head.
             exit 1
           fi
 
