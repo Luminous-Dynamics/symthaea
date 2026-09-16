@@ -47,6 +47,31 @@ fn assert_commitment_changes(mutated: TopologyDescriptor) {
     assert_ne!(base.commitment().unwrap(), mutated.commitment().unwrap());
 }
 
+fn decode_hex(input: &str) -> Vec<u8> {
+    assert_eq!(input.len() % 2, 0);
+    input
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let pair = std::str::from_utf8(pair).unwrap();
+            u8::from_str_radix(pair, 16).unwrap()
+        })
+        .collect()
+}
+
+#[test]
+fn canonical_v1_bytes_match_golden() {
+    let expected = decode_hex(concat!(
+        "73796d74686165612d6e6575726f617263682d746f706f6c6f67792d763100010000030000000100",
+        "00000100000061028000000000000000020000000000000002070000006669787475726501000200",
+        "00000100000062028000000000000000020000000000000002070000006669787475726501000300",
+        "00000100000063028000000000000000020000000000000002070000006669787475726501000200",
+        "00000a000000000000000100000002000000030100000078000001000b0000000000000002000000",
+        "0300000003010000007900000100",
+    ));
+    assert_eq!(topology().canonical_bytes().unwrap(), expected);
+}
+
 #[test]
 fn rejects_duplicate_and_dangling_identity() {
     let mut duplicate_circuit = topology();
