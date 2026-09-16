@@ -37,6 +37,7 @@ pub mod claim_evidence;
 #[cfg(feature = "epistemic")]
 pub mod claim_priority;
 pub mod encoding;
+pub mod entity_event;
 pub mod epistemic_vector;
 pub mod evidence_independence;
 pub mod extraction;
@@ -58,6 +59,10 @@ pub use claim_evidence::{
     KnowledgeClaim, LedgerError, ProvenanceId, ProvenanceRecord,
 };
 pub use encoding::{FactEncoding, KnowledgeEncoder};
+pub use entity_event::{
+    EntityEventError, EntityEventStore, EntityId, EntityRelation, EventId, PersistentEntity,
+    PersistentEvent, RelationId,
+};
 pub use epistemic_vector::{
     ClaimUncertaintyAssessment, EpistemicVector, UncertaintyDimension, UncertaintyError,
     UncertaintyValue,
