@@ -1,0 +1,85 @@
+name: ASSURE-003 Rustfmt 1.96 Oracle
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/assure-003-rustfmt-oracle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    env:
+      FAILED_CANDIDATE: b4266bd58eec509a3be0d9bd8a09e840316bd8d6
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove diagnostic ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$FAILED_CANDIDATE" HEAD
+          git diff --exit-code
+
+      - name: Install exact formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo fmt --version
+
+      - name: Apply Rust 1.96 formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path crates/core/symthaea-assurance-campaign/Cargo.toml
+          git diff -- \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs
+          if git diff --quiet -- \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs; then
+            echo 'formatter produced no delta; oracle cannot explain executed failure' >&2
+            exit 1
+          fi
+
+      - name: Commit exact formatter output on diagnostic branch
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          git add -- \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs \
+            crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs
+          git diff --cached --name-only > /tmp/oracle-paths.txt
+          while IFS= read -r path; do
+            case "$path" in
+              crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver.rs|\
+              crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003.rs|\
+              crates/core/symthaea-assurance-campaign/src/bin/assure003_resolver/assure003/tests.rs)
+                ;;
+              *)
+                printf 'unexpected formatter mutation: %s\n' "$path" >&2
+                exit 1
+                ;;
+            esac
+          done < /tmp/oracle-paths.txt
+          test -s /tmp/oracle-paths.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore(diag): capture Rust 1.96 ASSURE-003 rustfmt output'
+          git push origin "HEAD:${HEAD_REF}"
