@@ -12,17 +12,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const IMA_REPLAY_POLICY_SCHEMA_V1: &str =
-    "symthaea.assurance.linux-ima-replay-policy.v1";
-pub const IMA_REPLAY_REPORT_SCHEMA_V1: &str =
-    "symthaea.assurance.linux-ima-replay-report.v1";
+pub const IMA_REPLAY_POLICY_SCHEMA_V1: &str = "symthaea.assurance.linux-ima-replay-policy.v1";
+pub const IMA_REPLAY_REPORT_SCHEMA_V1: &str = "symthaea.assurance.linux-ima-replay-report.v1";
 
-const POLICY_DIGEST_DOMAIN: &[u8] =
-    b"symthaea.assurance.linux-ima-replay-policy.digest.v1\0";
-const LIST_DIGEST_DOMAIN: &[u8] =
-    b"symthaea.assurance.linux-ima-canonical-list.digest.v1\0";
-const REPORT_DIGEST_DOMAIN: &[u8] =
-    b"symthaea.assurance.linux-ima-replay-report.digest.v1\0";
+const POLICY_DIGEST_DOMAIN: &[u8] = b"symthaea.assurance.linux-ima-replay-policy.digest.v1\0";
+const LIST_DIGEST_DOMAIN: &[u8] = b"symthaea.assurance.linux-ima-canonical-list.digest.v1\0";
+const REPORT_DIGEST_DOMAIN: &[u8] = b"symthaea.assurance.linux-ima-replay-report.digest.v1\0";
 const QUALIFICATION_DIGEST_DOMAIN: &[u8] =
     b"symthaea.assurance.linux-ima-replay-qualification.digest.v1\0";
 
@@ -157,7 +152,9 @@ impl ImaReplayPolicy {
                     hasher.update(&[1]);
                     hasher.update(&value);
                 }
-                None => hasher.update(&[0]),
+                None => {
+                    hasher.update(&[0]);
+                }
             }
         }
 
@@ -186,21 +183,60 @@ pub enum ImaReplayDisposition {
 pub enum ImaReplayIssue {
     InvalidPolicy,
     EmptyMeasurementList,
-    MeasurementListTooLarge { observed: u64, maximum: u64 },
+    MeasurementListTooLarge {
+        observed: u64,
+        maximum: u64,
+    },
     RecordLimitExceeded,
-    TruncatedRecord { record_index: u32, stage: String },
-    TemplateNameTooLarge { record_index: u32, observed: u32 },
-    InvalidTemplateName { record_index: u32 },
-    UnsupportedTemplate { record_index: u32, template_name: String },
-    TemplateDataTooLarge { record_index: u32, observed: u32 },
-    FieldTooLarge { record_index: u32, field_index: u32, observed: u32 },
-    FieldCountMismatch { record_index: u32, expected: u32, observed: u32 },
-    TemplateDataTrailingBytes { record_index: u32, trailing: u32 },
-    TemplateDigestMismatch { record_index: u32 },
-    InvalidEventDigestField { record_index: u32 },
-    UnsupportedEventDigestAlgorithm { record_index: u32, algorithm: String },
-    InvalidEventNameField { record_index: u32 },
-    MissingRequiredMeasurement { measurement_id: String },
+    TruncatedRecord {
+        record_index: u32,
+        stage: String,
+    },
+    TemplateNameTooLarge {
+        record_index: u32,
+        observed: u32,
+    },
+    InvalidTemplateName {
+        record_index: u32,
+    },
+    UnsupportedTemplate {
+        record_index: u32,
+        template_name: String,
+    },
+    TemplateDataTooLarge {
+        record_index: u32,
+        observed: u32,
+    },
+    FieldTooLarge {
+        record_index: u32,
+        field_index: u32,
+        observed: u32,
+    },
+    FieldCountMismatch {
+        record_index: u32,
+        expected: u32,
+        observed: u32,
+    },
+    TemplateDataTrailingBytes {
+        record_index: u32,
+        trailing: u32,
+    },
+    TemplateDigestMismatch {
+        record_index: u32,
+    },
+    InvalidEventDigestField {
+        record_index: u32,
+    },
+    UnsupportedEventDigestAlgorithm {
+        record_index: u32,
+        algorithm: String,
+    },
+    InvalidEventNameField {
+        record_index: u32,
+    },
+    MissingRequiredMeasurement {
+        measurement_id: String,
+    },
     PcrMismatch,
 }
 
@@ -234,28 +270,51 @@ impl ImaReplayIssue {
                 format!("measurement-list-too-large:{observed}:{maximum}")
             }
             Self::RecordLimitExceeded => "record-limit-exceeded".into(),
-            Self::TruncatedRecord { record_index, stage } => {
+            Self::TruncatedRecord {
+                record_index,
+                stage,
+            } => {
                 format!("truncated:{record_index}:{stage}")
             }
-            Self::TemplateNameTooLarge { record_index, observed } => {
+            Self::TemplateNameTooLarge {
+                record_index,
+                observed,
+            } => {
                 format!("template-name-too-large:{record_index}:{observed}")
             }
             Self::InvalidTemplateName { record_index } => {
                 format!("invalid-template-name:{record_index}")
             }
-            Self::UnsupportedTemplate { record_index, template_name } => {
+            Self::UnsupportedTemplate {
+                record_index,
+                template_name,
+            } => {
                 format!("unsupported-template:{record_index}:{template_name}")
             }
-            Self::TemplateDataTooLarge { record_index, observed } => {
+            Self::TemplateDataTooLarge {
+                record_index,
+                observed,
+            } => {
                 format!("template-data-too-large:{record_index}:{observed}")
             }
-            Self::FieldTooLarge { record_index, field_index, observed } => {
+            Self::FieldTooLarge {
+                record_index,
+                field_index,
+                observed,
+            } => {
                 format!("field-too-large:{record_index}:{field_index}:{observed}")
             }
-            Self::FieldCountMismatch { record_index, expected, observed } => {
+            Self::FieldCountMismatch {
+                record_index,
+                expected,
+                observed,
+            } => {
                 format!("field-count-mismatch:{record_index}:{expected}:{observed}")
             }
-            Self::TemplateDataTrailingBytes { record_index, trailing } => {
+            Self::TemplateDataTrailingBytes {
+                record_index,
+                trailing,
+            } => {
                 format!("template-data-trailing:{record_index}:{trailing}")
             }
             Self::TemplateDigestMismatch { record_index } => {
@@ -264,7 +323,10 @@ impl ImaReplayIssue {
             Self::InvalidEventDigestField { record_index } => {
                 format!("invalid-event-digest:{record_index}")
             }
-            Self::UnsupportedEventDigestAlgorithm { record_index, algorithm } => {
+            Self::UnsupportedEventDigestAlgorithm {
+                record_index,
+                algorithm,
+            } => {
                 format!("unsupported-event-digest-algorithm:{record_index}:{algorithm}")
             }
             Self::InvalidEventNameField { record_index } => {
@@ -552,11 +614,8 @@ pub fn verify_canonical_ima_sha256(
     expected_final_pcr: [u8; SHA256_LEN],
     policy: &ImaReplayPolicy,
 ) -> Result<ImaReplayQualification, ImaReplayReport> {
-    let report = assess_canonical_ima_sha256(
-        canonical_binary_measurements,
-        expected_final_pcr,
-        policy,
-    );
+    let report =
+        assess_canonical_ima_sha256(canonical_binary_measurements, expected_final_pcr, policy);
     if report.disposition != ImaReplayDisposition::Qualified {
         return Err(report);
     }
@@ -743,10 +802,7 @@ fn parse_fields<'a>(
 }
 
 /// `d-ng` is encoded as `<hash-algo> ':' '\0' <raw digest>`.
-fn parse_event_digest(
-    field: &[u8],
-    record_index: u32,
-) -> Result<[u8; SHA256_LEN], ImaReplayIssue> {
+fn parse_event_digest(field: &[u8], record_index: u32) -> Result<[u8; SHA256_LEN], ImaReplayIssue> {
     let Some(colon) = field.iter().position(|byte| *byte == b':') else {
         return Err(ImaReplayIssue::InvalidEventDigestField { record_index });
     };
@@ -772,14 +828,8 @@ fn parse_event_digest(
         .expect("digest length was checked to be SHA-256"))
 }
 
-fn parse_event_name<'a>(
-    field: &'a [u8],
-    record_index: u32,
-) -> Result<&'a [u8], ImaReplayIssue> {
-    if field.is_empty()
-        || field.last() != Some(&0)
-        || field[..field.len() - 1].contains(&0)
-    {
+fn parse_event_name<'a>(field: &'a [u8], record_index: u32) -> Result<&'a [u8], ImaReplayIssue> {
+    if field.is_empty() || field.last() != Some(&0) || field[..field.len() - 1].contains(&0) {
         return Err(ImaReplayIssue::InvalidEventNameField { record_index });
     }
     Ok(&field[..field.len() - 1])
@@ -858,10 +908,7 @@ fn sha256_array(bytes: &[u8]) -> [u8; SHA256_LEN] {
     Sha256::digest(bytes).into()
 }
 
-fn extend_sha256(
-    previous: [u8; SHA256_LEN],
-    event: [u8; SHA256_LEN],
-) -> [u8; SHA256_LEN] {
+fn extend_sha256(previous: [u8; SHA256_LEN], event: [u8; SHA256_LEN]) -> [u8; SHA256_LEN] {
     let mut hasher = Sha256::new();
     hasher.update(previous);
     hasher.update(event);
@@ -976,9 +1023,7 @@ mod tests {
         let bytes = value.as_bytes();
         assert_eq!(bytes.len() % 2, 0);
         (0..bytes.len() / 2)
-            .map(|index| {
-                (nibble(bytes[index * 2]) << 4) | nibble(bytes[index * 2 + 1])
-            })
+            .map(|index| (nibble(bytes[index * 2]) << 4) | nibble(bytes[index * 2 + 1]))
             .collect()
     }
 
@@ -1013,15 +1058,20 @@ mod tests {
     #[test]
     fn checked_in_golden_vector_replays_to_frozen_sha256_pcr() {
         let bytes = decode_hex(GOLDEN_HEX);
-        let qualified =
-            verify_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy()).unwrap();
+        let qualified = verify_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy()).unwrap();
         assert_eq!(qualified.report.record_count, 2);
         assert_eq!(qualified.report.selected_pcr_record_count, 2);
         assert_eq!(qualified.report.replayed_pcr, GOLDEN_FINAL_PCR);
-        assert_eq!(qualified.report.disposition, ImaReplayDisposition::Qualified);
+        assert_eq!(
+            qualified.report.disposition,
+            ImaReplayDisposition::Qualified
+        );
         assert_eq!(
             qualified.verified().matched_required_measurements(),
-            &["proof-dependency".to_string(), "verifier-executable".to_string()]
+            &[
+                "proof-dependency".to_string(),
+                "verifier-executable".to_string()
+            ]
         );
         assert!(!qualified.grants_physical_authority());
         assert!(!qualified.verified().grants_physical_authority());
@@ -1033,10 +1083,12 @@ mod tests {
         bytes.pop();
         let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy());
         assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| matches!(issue, ImaReplayIssue::TruncatedRecord { .. })));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| matches!(issue, ImaReplayIssue::TruncatedRecord { .. }))
+        );
     }
 
     #[test]
@@ -1073,10 +1125,12 @@ mod tests {
         bytes[offset] ^= 1;
         let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy());
         assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| matches!(issue, ImaReplayIssue::TemplateDigestMismatch { .. })));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| matches!(issue, ImaReplayIssue::TemplateDigestMismatch { .. }))
+        );
     }
 
     #[test]
@@ -1089,10 +1143,12 @@ mod tests {
         bytes[offset..offset + 6].copy_from_slice(b"ima-xx");
         let report = assess_canonical_ima_sha256(&bytes, GOLDEN_FINAL_PCR, &policy());
         assert_eq!(report.disposition, ImaReplayDisposition::Invalid);
-        assert!(report
-            .issues
-            .iter()
-            .any(|issue| matches!(issue, ImaReplayIssue::UnsupportedTemplate { .. })));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|issue| matches!(issue, ImaReplayIssue::UnsupportedTemplate { .. }))
+        );
     }
 
     #[test]
