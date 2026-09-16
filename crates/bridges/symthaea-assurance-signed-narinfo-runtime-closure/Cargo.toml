@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-assurance-signed-narinfo-runtime-closure"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Cross-check a qualified Nix runtime closure against an independently verified signed narinfo graph"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["assurance", "nix", "narinfo", "ed25519", "supply-chain"]
+categories = ["development-tools", "cryptography"]
+
+[dependencies]
+base64 = "0.22"
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+serde = { workspace = true }
+symthaea-assurance-nix-runtime-closure = { path = "../symthaea-assurance-nix-runtime-closure" }
