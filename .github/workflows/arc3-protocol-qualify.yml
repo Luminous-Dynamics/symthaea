@@ -76,39 +76,96 @@ jobs:
               exit 1
             fi
 
-            # A minimal reconciliation may only add/update the local protocol
-            # package stanza. Registry package additions/removals or version,
-            # source, checksum changes indicate dependency drift and are rejected.
+            # Compare the TOML structures, not diff text. The only authorized
+            # reconciliation is:
+            #   1. add the local symthaea-arc3-protocol package stanza exactly;
+            #   2. add that one dependency to the existing psych-bench stanza.
+            # Every registry coordinate and every other package must remain byte-
+            # semantically identical at the TOML object level.
             set +e
             python3 - <<'PY'
             from pathlib import Path
             import os
-            import re
             import sys
+            import tomllib
 
-            patch = Path(os.environ['RUNNER_TEMP']) / 'arc3-cargo-lock.patch'
-            text = patch.read_text()
+            temp = Path(os.environ['RUNNER_TEMP'])
+            before = tomllib.loads((temp / 'Cargo.lock.before').read_text())
+            after = tomllib.loads((temp / 'Cargo.lock.generated').read_text())
 
-            forbidden = []
-            for line in text.splitlines():
-                if not line or line.startswith(('+++', '---', '@@')):
+            def keyed(doc):
+                result = {}
+                for pkg in doc.get('package', []):
+                    key = (pkg['name'], pkg.get('version'), pkg.get('source'))
+                    if key in result:
+                        raise SystemExit(f'duplicate package identity in lock: {key!r}')
+                    result[key] = pkg
+                return result
+
+            before_pkgs = keyed(before)
+            after_pkgs = keyed(after)
+
+            protocol_key = ('symthaea-arc3-protocol', '0.1.0', None)
+            psych_key = ('symthaea-psych-bench', '0.1.0', None)
+
+            expected_protocol = {
+                'name': 'symthaea-arc3-protocol',
+                'version': '0.1.0',
+                'dependencies': ['blake3', 'serde', 'serde_json'],
+            }
+
+            errors = []
+
+            if protocol_key in before_pkgs:
+                errors.append('protocol package unexpectedly already present in committed lock')
+            if after_pkgs.get(protocol_key) != expected_protocol:
+                errors.append(
+                    'generated protocol package stanza differs from exact expected local package'
+                )
+
+            before_psych = before_pkgs.get(psych_key)
+            after_psych = after_pkgs.get(psych_key)
+            if before_psych is None or after_psych is None:
+                errors.append('psych-bench workspace package missing from before/after lock')
+            else:
+                expected_psych = dict(before_psych)
+                expected_deps = list(before_psych.get('dependencies', []))
+                if 'symthaea-arc3-protocol' in expected_deps:
+                    errors.append('psych-bench already referenced protocol in committed lock')
+                else:
+                    expected_deps.append('symthaea-arc3-protocol')
+                    expected_deps.sort()
+                    expected_psych['dependencies'] = expected_deps
+                    actual_psych = dict(after_psych)
+                    actual_psych['dependencies'] = sorted(actual_psych.get('dependencies', []))
+                    if actual_psych != expected_psych:
+                        errors.append(
+                            'psych-bench lock stanza changed beyond adding symthaea-arc3-protocol'
+                        )
+
+            allowed = {protocol_key, psych_key}
+            all_keys = set(before_pkgs) | set(after_pkgs)
+            for key in sorted(all_keys, key=repr):
+                if key in allowed:
                     continue
-                if line[0] not in '+-':
-                    continue
-                body = line[1:].strip()
-                if body.startswith(('version =', 'source =', 'checksum =')):
-                    forbidden.append(line)
+                if before_pkgs.get(key) != after_pkgs.get(key):
+                    errors.append(f'unauthorized lock package change: {key!r}')
 
-            names = re.findall(r'^[+-]name = "([^"]+)"$', text, re.MULTILINE)
-            foreign_names = sorted({n for n in names if n != 'symthaea-arc3-protocol'})
-            if forbidden or foreign_names:
-                print('Lock reconciliation is broader than the local ARC3 protocol package.', file=sys.stderr)
-                if foreign_names:
-                    print('Foreign package names:', ', '.join(foreign_names), file=sys.stderr)
-                if forbidden:
-                    print('Version/source/checksum drift:', file=sys.stderr)
-                    print('\n'.join(forbidden), file=sys.stderr)
+            if before.get('version') != after.get('version'):
+                errors.append('Cargo.lock format version changed')
+
+            before_top = {k: v for k, v in before.items() if k != 'package'}
+            after_top = {k: v for k, v in after.items() if k != 'package'}
+            if before_top != after_top:
+                errors.append('non-package Cargo.lock metadata changed')
+
+            if errors:
+                print('Lock reconciliation rejected:', file=sys.stderr)
+                for error in errors:
+                    print(f'  - {error}', file=sys.stderr)
                 sys.exit(1)
+
+            print('Lock reconciliation structurally limited to protocol + psych-bench linkage.')
             PY
             guard_status=$?
             set -e
