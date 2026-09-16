@@ -1,6 +1,6 @@
 # NEUROARCH-001 — Experimental topology contract
 
-Status: executable draft; qualification pending for issue #3317 and ownership gate #3519  
+Status: executable draft; qualification pending for issue #3317 and ownership gate #3519
 Parent program: #3316
 
 ## Purpose
