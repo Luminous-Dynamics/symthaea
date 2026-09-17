@@ -40,6 +40,7 @@ mod belief_mutation_verifier;
 pub mod belief_revision_gate;
 pub mod belief_revision_persistence;
 pub mod belief_revision_receipt;
+pub mod belief_revision_schema_history;
 pub mod belief_revision_snapshot;
 pub mod causal_admission;
 pub mod causal_bridge;
@@ -123,6 +124,10 @@ pub use belief_revision_persistence::{
 pub use belief_revision_receipt::{
     BeliefRevisionHistory, BeliefRevisionReceipt, BeliefRevisionReceiptError,
     BeliefRevisionReceiptId, RevisionEvidenceReference, RevisionEvidenceSnapshot,
+};
+pub use belief_revision_schema_history::{
+    BeliefRevisionSchemaHistoryError, BeliefRevisionSchemaHistoryV1,
+    SchemaBoundBeliefRevisionRecordV1,
 };
 pub use belief_revision_snapshot::{
     BeliefRevisionDecisionSnapshotV1, BeliefRevisionFailureSnapshotV1,
