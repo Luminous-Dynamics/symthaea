@@ -6,6 +6,8 @@
 //! canonical bytes + domain-separated BLAKE3. The crate-level `config_hash`
 //! remains a non-cryptographic diagnostic fingerprint and is never used here.
 
+pub mod witness;
+
 use crate::{EvidenceCounters, Expectation, RunEvidence, RunId};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
