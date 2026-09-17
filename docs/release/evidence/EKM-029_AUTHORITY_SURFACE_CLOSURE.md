@@ -42,9 +42,21 @@ The raw mutation-capable symbols are no longer publicly re-exported:
 - `BeliefMutationTransactionCoordinator`
 - `BeliefMutationDecisionGuard`
 
-They retain crate-private aliases so internal EKM tests and future internal integration can use them without reopening the external authority surface.
+Only a `#[cfg(test)]` crate-private alias for `BeliefMutationFirewall` remains because the pre-existing EKM-027 verifier tests exercise the raw writer directly. That alias is absent from production builds.
 
 Read-only/audit types and the separately supplied authorization/state types remain public where useful.
+
+## Replay authorization identity
+
+The lower-level EKM-026 firewall can acknowledge an already-applied revision under another authorization ID. That behavior is useful internally for idempotent plumbing, but it would create consumed authorization state that is not represented by the single mutation receipt.
+
+The public EKM-029 facade therefore imposes a stronger rule:
+
+- once a revision receipt has produced a mutation receipt, any idempotent replay must reuse that mutation receipt's original authorization ID;
+- an alternate authorization ID fails before reaching the raw firewall;
+- rebuilding `BeliefMutationAuthority` cannot turn a new authorization identity into hidden replay state while the support store/history survives.
+
+This makes public-path authorization consumption reconstructable from mutation history and prepares the state model for restart persistence.
 
 ## Invariants
 
@@ -54,6 +66,7 @@ Read-only/audit types and the separately supplied authorization/state types rema
 - Preparation always uses same-call decision + full evidence/provenance sealing.
 - Application always uses the sealed transaction path and independent post-mutation verifier.
 - Authorization remains separate from preparation and is bound to the exact decision and exact pre-state.
+- A revision receipt has one public-path authorization identity after successful mutation.
 - Rebuilding the facade does not make a previously applied decision apply twice while the support store/history survives.
 
 ## Non-claims
