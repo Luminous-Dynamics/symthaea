@@ -9,9 +9,7 @@
 //! The held-out corpus is never passed to the training-only selector.
 
 use super::sym_rsi_experiment::{EvaluationSplit, SymRsiExperimentManifest};
-use super::sym_rsi_fixtures::{
-    canonical_sym_rsi_001_fixture_manifest, FixtureDomainKind,
-};
+use super::sym_rsi_fixtures::{canonical_sym_rsi_001_fixture_manifest, FixtureDomainKind};
 use super::sym_rsi_replay_corpus::{merge_observed_traces, ReplayCorpusError, ReplayFixtureWorld};
 use super::sym_rsi_replay_selection::FixedHashCandidateSpec;
 use super::sym_rsi_runner::{run_fixture_policy, FixtureRunnerError};
@@ -221,12 +219,13 @@ fn replay_corpus_evidence_digest(
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi-001.replay-corpus-acquisition.v1\0");
+    let family_digest = canonical_candidate_family_digest();
     for value in [
         manifest.experiment_id.as_str(),
         manifest.preregistration_digest.as_str(),
         manifest.subject_digest.as_str(),
         manifest.environment_digest.as_str(),
-        canonical_candidate_family_digest().as_str(),
+        family_digest.as_str(),
     ] {
         hasher.update(&(value.len() as u64).to_le_bytes());
         hasher.update(value.as_bytes());
@@ -334,27 +333,27 @@ mod tests {
     #[test]
     fn fresh_and_ood_splits_cannot_be_preconsumed_as_replay_corpora() {
         let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
-        assert_eq!(
+        assert!(matches!(
             acquire_canonical_replay_corpus(&manifest, EvaluationSplit::FreshExecution),
             Err(ReplayAcquisitionError::ForbiddenAcquisitionSplit(
                 EvaluationSplit::FreshExecution
             ))
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             acquire_canonical_replay_corpus(&manifest, EvaluationSplit::OutOfDistribution),
             Err(ReplayAcquisitionError::ForbiddenAcquisitionSplit(
                 EvaluationSplit::OutOfDistribution
             ))
-        );
+        ));
     }
 
     #[test]
     fn modified_manifest_starts_a_different_lineage_instead_of_reusing_corpus_api() {
         let mut manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
         manifest.beta_cost = 0.051;
-        assert_eq!(
+        assert!(matches!(
             acquire_canonical_replay_corpus(&manifest, EvaluationSplit::TrainingReplay),
             Err(ReplayAcquisitionError::ManifestNotCanonical)
-        );
+        ));
     }
 }
