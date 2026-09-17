@@ -70,6 +70,7 @@ pub mod exact_replay;
 pub mod experience_tree;
 pub mod replay_policy;
 pub mod sym_rsi_experiment;
+pub mod sym_rsi_fixtures;
 
 // Re-export key types from core infrastructure
 pub use types::{
@@ -165,6 +166,10 @@ pub use sym_rsi_experiment::{
     ArmRunMetrics, DomainSeedPlan, EvaluationSplit, ExperimentArm, ExperimentDomainSpec,
     ExperimentHarnessError, PrimaryContrastKind, PrimaryContrastReceipt,
     SymRsiExperimentManifest, SymRsiRunReceipt, build_primary_contrast,
+};
+pub use sym_rsi_fixtures::{
+    FixtureDomainError, FixtureDomainKind, FixtureState, FixtureTransition,
+    SYM_RSI_001_FIXTURE_ADAPTER_VERSION, canonical_sym_rsi_001_fixture_manifest,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
