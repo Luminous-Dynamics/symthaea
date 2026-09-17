@@ -12,7 +12,7 @@
 //! dream actions fail the gate rather than being simulated into empirical evidence.
 
 use super::sym_rsi_candidate_family::{
-    canonical_candidate_family_digest, canonical_fixed_hash_candidate_family,
+    canonical_candidate_family_digest, canonical_fixed_hash_candidate_family, FrozenReplayCorpus,
 };
 use super::sym_rsi_dream_protocol::{
     validate_canonical_sym_rsi_001d_manifest, DreamProtocolError,
@@ -20,15 +20,12 @@ use super::sym_rsi_dream_protocol::{
 };
 use super::sym_rsi_experiment::{EvaluationSplit, SymRsiExperimentManifest};
 use super::sym_rsi_fixtures::FixtureDomainKind;
-use super::sym_rsi_grounded_dream::{
-    build_grounded_dream_policy, GroundedDreamError, GroundedDreamPolicy,
-};
+use super::sym_rsi_grounded_dream::{build_grounded_dream_policy, GroundedDreamError};
 use super::sym_rsi_replay_corpus::{
     merge_observed_traces, ReplayCorpusError, ReplayFixtureWorld, ReplayWorldEvaluation,
 };
 use super::sym_rsi_replay_selection::ReplaySelectionReceipt;
 use super::sym_rsi_runner::{run_fixture_policy, FixtureRunnerError};
-use super::FrozenReplayCorpus;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -287,8 +284,8 @@ pub fn validate_grounded_dream_on_verification(
             d_supported_steps += d_eval.supported_steps;
             c_attempted_steps += c_eval.attempted_steps;
             d_attempted_steps += d_eval.attempted_steps;
-            c_terminal_worlds += usize::from(c_eval.reached_terminal);
-            d_terminal_worlds += usize::from(d_eval.reached_terminal);
+            c_terminal_worlds += if c_eval.reached_terminal { 1 } else { 0 };
+            d_terminal_worlds += if d_eval.reached_terminal { 1 } else { 0 };
 
             let overrides = d_policy
                 .decision_log()
@@ -519,12 +516,13 @@ fn verification_corpus_evidence_digest(
 ) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi-001d.verification-corpus.v1\0");
+    let family_digest = canonical_candidate_family_digest();
     for value in [
         manifest.experiment_id.as_str(),
         manifest.preregistration_digest.as_str(),
         manifest.subject_digest.as_str(),
         manifest.environment_digest.as_str(),
-        canonical_candidate_family_digest().as_str(),
+        family_digest.as_str(),
     ] {
         hasher.update(&(value.len() as u64).to_le_bytes());
         hasher.update(value.as_bytes());
