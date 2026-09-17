@@ -1,0 +1,276 @@
+name: Post-release Runtime Lineage Remediation Qualification R3
+
+on:
+  push:
+    branches:
+      - 'qualify/post-release-runtime-lineage-remediation-r3'
+    paths:
+      - '.github/workflows/post-release-runtime-lineage-remediation-r3.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-release-runtime-lineage-remediation-r3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify-remediation-boundary:
+    name: Exact-parent manifest and lock boundary
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout qualification helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: qualifier
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Prove one-file qualification topology
+        id: topology
+        working-directory: qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          subject_sha="$(git rev-parse HEAD^)"
+          expected_subject="7f34d64d8be07fe70eb160ed9cc57d487b8e6b07"
+          test "$subject_sha" = "$expected_subject"
+          test "$(git rev-list --count "$subject_sha"..HEAD)" = 1
+          mapfile -t changed < <(git diff --name-only "$subject_sha" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/post-release-runtime-lineage-remediation-r3.yml"
+          git diff --check "$subject_sha" HEAD
+          echo "subject_sha=$subject_sha" >> "$GITHUB_OUTPUT"
+          printf 'qualifier_head=%s\nsubject_sha=%s\nscope=workflow-only\n' \
+            "$(git rev-parse HEAD)" "$subject_sha" > "$RUNNER_TEMP/topology.txt"
+
+      - name: Checkout exact remediation subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.topology.outputs.subject_sha }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Bind exact manifest repairs
+        id: subject
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.topology.outputs.subject_sha }}"
+          for manifest in \
+            crates/domains/symthaea-assurance-tpm-reference-crucible/Cargo.toml \
+            crates/bridges/symthaea-tpm-reference-evidence/Cargo.toml
+          do
+            test -f "$manifest"
+            grep -Fqx 'version = "0.1.0"' "$manifest"
+            grep -Fqx 'authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]' "$manifest"
+            if grep -Eq '^(version|authors)\.workspace[[:space:]]*=[[:space:]]*true$' "$manifest"; then
+              echo "invalid workspace package metadata inheritance remains in $manifest" >&2
+              exit 1
+            fi
+          done
+          grep -Fqx 'name = "symthaea-assurance-tpm-reference-crucible"' \
+            crates/domains/symthaea-assurance-tpm-reference-crucible/Cargo.toml
+          grep -Fqx 'name = "symthaea-tpm-reference-evidence"' \
+            crates/bridges/symthaea-tpm-reference-evidence/Cargo.toml
+          git diff --check HEAD
+          sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.subject.sha256"
+          printf 'subject_head=%s\nsubject_tree=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" \
+            > "$RUNNER_TEMP/subject.txt"
+
+      - name: Install pinned Rust 1.96
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Bind Rust and Cargo versions
+        id: versions
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose | tee "$RUNNER_TEMP/rustc-version.txt"
+          cargo --version --verbose | tee "$RUNNER_TEMP/cargo-version.txt"
+          rustc --version | grep -Eq '^rustc 1\.96\.0([[:space:]]|$)'
+          cargo --version | grep -Eq '^cargo 1\.96\.0([[:space:]]|$)'
+
+      - name: Classify exact manifest and lock boundary
+        id: metadata
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.before.sha256"
+          trap 'git checkout -- Cargo.lock >/dev/null 2>&1 || true' EXIT
+
+          set +e
+          cargo metadata --locked --format-version 1 \
+            > "$RUNNER_TEMP/metadata.locked.json" \
+            2> "$RUNNER_TEMP/metadata.locked.stderr"
+          locked_status=$?
+          set -e
+          printf '%s\n' "$locked_status" > "$RUNNER_TEMP/metadata.locked.status"
+
+          if [ "$locked_status" -eq 0 ]; then
+            echo 'PASS_LOCKED_METADATA' | tee "$RUNNER_TEMP/metadata-classification.txt"
+            git diff --exit-code -- Cargo.lock
+            exit 0
+          fi
+
+          if ! git diff --quiet -- Cargo.lock; then
+            git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.locked-probe.patch"
+            echo 'LOCKED_PROBE_MUTATED_PRODUCT' | tee "$RUNNER_TEMP/metadata-classification.txt"
+            exit 1
+          fi
+
+          set +e
+          cargo metadata --format-version 1 \
+            > "$RUNNER_TEMP/metadata.reconciled.json" \
+            2> "$RUNNER_TEMP/metadata.reconciled.stderr"
+          reconciled_status=$?
+          set -e
+          printf '%s\n' "$reconciled_status" > "$RUNNER_TEMP/metadata.reconciled.status"
+          git status --porcelain=v1 --untracked-files=all > "$RUNNER_TEMP/reconciled-git-status.txt"
+
+          if [ "$reconciled_status" -ne 0 ]; then
+            git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.reconcile-failed.patch" || true
+            echo 'RESOLUTION_FAILED_AFTER_MANIFEST_REPAIRS' \
+              | tee "$RUNNER_TEMP/metadata-classification.txt"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import subprocess
+          import sys
+
+          lines = subprocess.check_output(
+              ['git', 'status', '--porcelain=v1', '--untracked-files=all'],
+              text=True,
+          ).splitlines()
+          paths = []
+          for line in lines:
+              if len(line) < 4:
+                  print(f'malformed git status line: {line!r}', file=sys.stderr)
+                  sys.exit(1)
+              paths.append(line[3:])
+          unexpected = sorted({path for path in paths if path != 'Cargo.lock'})
+          if unexpected:
+              print('Cargo reconciliation changed paths other than Cargo.lock:', file=sys.stderr)
+              print('\n'.join(unexpected), file=sys.stderr)
+              sys.exit(1)
+          PY
+
+          if git diff --quiet -- Cargo.lock; then
+            echo 'LOCKED_METADATA_FAILED_WITHOUT_LOCK_DRIFT' \
+              | tee "$RUNNER_TEMP/metadata-classification.txt"
+            exit 1
+          fi
+
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.generated.sha256"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.generated.patch"
+          test -s "$RUNNER_TEMP/Cargo.lock.generated.patch"
+
+          set +e
+          cargo metadata --locked --format-version 1 \
+            > "$RUNNER_TEMP/metadata.generated-locked.json" \
+            2> "$RUNNER_TEMP/metadata.generated-locked.stderr"
+          generated_locked_status=$?
+          set -e
+          printf '%s\n' "$generated_locked_status" \
+            > "$RUNNER_TEMP/metadata.generated-locked.status"
+
+          if [ "$generated_locked_status" -ne 0 ]; then
+            echo 'GENERATED_LOCK_NOT_SELF_CONSISTENT' \
+              | tee "$RUNNER_TEMP/metadata-classification.txt"
+            exit 1
+          fi
+
+          echo 'FAIL_LOCK_DRIFT' | tee "$RUNNER_TEMP/metadata-classification.txt"
+          exit 1
+
+      - name: Prove exact subject postflight immutability
+        id: postflight
+        if: always()
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.topology.outputs.subject_sha }}"
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          printf 'postflight_immutable=PASS\nhead=%s\ntree=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" \
+            > "$RUNNER_TEMP/postflight.txt"
+
+      - name: Write remediation qualification receipt
+        if: always()
+        shell: bash
+        env:
+          TOPOLOGY_OUTCOME: ${{ steps.topology.outcome }}
+          SUBJECT_OUTCOME: ${{ steps.subject.outcome }}
+          TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
+          VERSIONS_OUTCOME: ${{ steps.versions.outcome }}
+          METADATA_OUTCOME: ${{ steps.metadata.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+          SUBJECT_SHA: ${{ steps.topology.outputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          classification=NOT_ESTABLISHED
+          if [ -f "$RUNNER_TEMP/metadata-classification.txt" ]; then
+            classification="$(cat "$RUNNER_TEMP/metadata-classification.txt")"
+          fi
+          cat > "$RUNNER_TEMP/qualification-receipt.txt" <<EOF
+          schema=symthaea.assurance.post-release-runtime-lineage-remediation-qualification.v2
+          qualifier_sha=${GITHUB_SHA}
+          subject_sha=${SUBJECT_SHA}
+          topology=${TOPOLOGY_OUTCOME}
+          subject_binding=${SUBJECT_OUTCOME}
+          toolchain=${TOOLCHAIN_OUTCOME}
+          versions=${VERSIONS_OUTCOME}
+          metadata=${METADATA_OUTCOME}
+          postflight=${POSTFLIGHT_OUTCOME}
+          qualification_result=${classification}
+          EOF
+          cat "$RUNNER_TEMP/qualification-receipt.txt"
+
+      - name: Retain remediation qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: post-release-runtime-lineage-remediation-${{ steps.topology.outputs.subject_sha }}
+          path: |
+            ${{ runner.temp }}/qualification-receipt.txt
+            ${{ runner.temp }}/topology.txt
+            ${{ runner.temp }}/subject.txt
+            ${{ runner.temp }}/rustc-version.txt
+            ${{ runner.temp }}/cargo-version.txt
+            ${{ runner.temp }}/Cargo.lock.subject.sha256
+            ${{ runner.temp }}/Cargo.lock.before
+            ${{ runner.temp }}/Cargo.lock.before.sha256
+            ${{ runner.temp }}/Cargo.lock.generated
+            ${{ runner.temp }}/Cargo.lock.generated.sha256
+            ${{ runner.temp }}/Cargo.lock.generated.patch
+            ${{ runner.temp }}/Cargo.lock.locked-probe.patch
+            ${{ runner.temp }}/Cargo.lock.reconcile-failed.patch
+            ${{ runner.temp }}/metadata.locked.json
+            ${{ runner.temp }}/metadata.locked.stderr
+            ${{ runner.temp }}/metadata.locked.status
+            ${{ runner.temp }}/metadata.reconciled.json
+            ${{ runner.temp }}/metadata.reconciled.stderr
+            ${{ runner.temp }}/metadata.reconciled.status
+            ${{ runner.temp }}/metadata.generated-locked.json
+            ${{ runner.temp }}/metadata.generated-locked.stderr
+            ${{ runner.temp }}/metadata.generated-locked.status
+            ${{ runner.temp }}/reconciled-git-status.txt
+            ${{ runner.temp }}/metadata-classification.txt
+            ${{ runner.temp }}/postflight.txt
+          if-no-files-found: warn
+          retention-days: 14
