@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #
-# Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v2
+# Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v3
 # and smoke.v1 evidence objects before any trusted recovery workload is eligible.
 
 set -euo pipefail
