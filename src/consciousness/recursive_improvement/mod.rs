@@ -74,6 +74,7 @@ pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
 pub mod sym_rsi_fresh_evaluation;
 pub mod sym_rsi_grounded_dream;
+pub mod sym_rsi_dream_protocol;
 pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
@@ -194,6 +195,14 @@ pub use sym_rsi_grounded_dream::{
     GroundedDreamModel, GroundedDreamPolicy, DREAM_OVERRIDE_MARGIN, DREAM_RISK_PENALTY,
     DREAM_STATE_DIM, SYM_RSI_001_GROUNDED_DREAM_POLICY_ID, SYM_RSI_001_GROUNDED_DREAM_SCHEMA,
     build_grounded_dream_policy, train_grounded_dream_model,
+};
+pub use sym_rsi_dream_protocol::{
+    DreamExtensionProtocolBinding, DreamProtocolError, DREAM_FRESH_SEEDS,
+    DREAM_OOD_SEEDS, DREAM_VERIFICATION_SEEDS, INHERITED_TRAINING_SEEDS,
+    SYM_RSI_001D_ANALYSIS_RULE, SYM_RSI_001D_EXPERIMENT_ID,
+    SYM_RSI_001D_PROTOCOL_SCHEMA, SYM_RSI_001D_QUALITY_TOLERANCE,
+    canonical_sym_rsi_001d_manifest, validate_canonical_sym_rsi_001d_manifest,
+    validate_dream_extension_seed_independence,
 };
 pub use sym_rsi_holdout_gate::{
     HeldOutReplayGateReceipt, HoldoutGateDecision, HoldoutGateError,
