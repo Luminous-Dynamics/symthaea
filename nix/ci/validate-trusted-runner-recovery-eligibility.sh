@@ -70,13 +70,15 @@ authorized_recovery_head="$(manifest_value "$PROMOTION_MANIFEST_PATH" authorized
 promoted_main_head="$(manifest_value "$PROMOTION_MANIFEST_PATH" promoted_main_head)"
 promoted_main_tree="$(manifest_value "$PROMOTION_MANIFEST_PATH" promoted_main_tree)"
 promotion_smoke_workflow_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" smoke_workflow_blob)"
+promotion_arc3_qualifier_workflow_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" arc3_protocol_qualifier_workflow_blob)"
+promotion_ci_rust_shell_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" ci_rust_shell_blob)"
 promotion_runner_module_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" runner_module_blob)"
 promotion_routing_policy_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" routing_policy_blob)"
 recovery_eligibility_verifier_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" recovery_eligibility_verifier_blob)"
 
-[[ "$promotion_schema" == 'symthaea.trusted-runner.promotion.v2' ]]
+[[ "$promotion_schema" == 'symthaea.trusted-runner.promotion.v3' ]]
 [[ "$promotion_result" == 'PASS' ]]
-for value in "$authorized_recovery_head" "$promoted_main_head" "$promoted_main_tree" "$promotion_smoke_workflow_blob" "$promotion_runner_module_blob" "$promotion_routing_policy_blob" "$recovery_eligibility_verifier_blob"; do
+for value in "$authorized_recovery_head" "$promoted_main_head" "$promoted_main_tree" "$promotion_smoke_workflow_blob" "$promotion_arc3_qualifier_workflow_blob" "$promotion_ci_rust_shell_blob" "$promotion_runner_module_blob" "$promotion_routing_policy_blob" "$recovery_eligibility_verifier_blob"; do
   [[ "$value" =~ ^[0-9a-f]{40}$ ]]
 done
 for pass_key in promotion_ancestry_checked promotion_tree_identity_checked promotion_diff_surface_checked promotion_artifact_blobs_checked promotion_local_checkout_checked promotion_refs_stable; do
@@ -150,6 +152,8 @@ local_tree="$(git rev-parse HEAD^{tree})"
 local_verifier_blob="$(git rev-parse HEAD:nix/ci/validate-trusted-runner-recovery-eligibility.sh)"
 [[ "$local_verifier_blob" == "$recovery_eligibility_verifier_blob" ]]
 [[ "$(git rev-parse HEAD:.github/workflows/self-hosted-runner-smoke.yml)" == "$smoke_workflow_blob" ]]
+[[ "$(git rev-parse HEAD:.github/workflows/arc3-protocol-trusted-cpu-qualify.yml)" == "$promotion_arc3_qualifier_workflow_blob" ]]
+[[ "$(git rev-parse HEAD:nix/ci-rust-shell.nix)" == "$promotion_ci_rust_shell_blob" ]]
 [[ "$(git rev-parse HEAD:nix/modules/github-actions-runner.nix)" == "$smoke_runner_module_blob" ]]
 [[ "$(git rev-parse HEAD:nix/tests/eval-trusted-runner-routing.nix)" == "$smoke_routing_policy_blob" ]]
 
@@ -159,9 +163,9 @@ git -c protocol.version=2 fetch --no-tags origin \
 [[ "$(git rev-parse refs/remotes/origin/main)" == "$public_main" ]]
 [[ "$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")" == "$public_recovery" ]]
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-recovery-eligibility-v1.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-recovery-eligibility-v2.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.recovery-eligibility.v1
+schema=symthaea.trusted-runner.recovery-eligibility.v2
 result=PASS
 promotion_manifest_sha256=$PROMOTION_MANIFEST_SHA256
 smoke_manifest_sha256=$SMOKE_MANIFEST_SHA256
@@ -173,11 +177,14 @@ smoke_run_attempt=$smoke_run_attempt
 runner_name=$runner_name
 runner_os=$runner_os
 runner_arch=$runner_arch
+arc3_protocol_qualifier_workflow_blob=$promotion_arc3_qualifier_workflow_blob
+ci_rust_shell_blob=$promotion_ci_rust_shell_blob
 recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
 promotion_smoke_join_checked=PASS
 current_main_identity_checked=PASS
 current_recovery_identity_checked=PASS
 local_verifier_identity_checked=PASS
+arc3_recovery_artifacts_checked=PASS
 refs_stable=PASS
 evidence_scope=trusted-cpu-recovery-eligibility-only
 EOF
