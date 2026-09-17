@@ -117,7 +117,8 @@ The trusted smoke uses `nix/ci-rust-shell.nix`, a purpose-built validation shell
 - CA certificates;
 - GCC/compiler support;
 - OpenSSL + headers;
-- pkg-config.
+- pkg-config;
+- Python 3 for independent qualification oracles.
 
 The current repository pin is Rust `1.96.0`. Future toolchain updates should flow through `rust-toolchain.toml`, not a runner-specific version string.
 
@@ -184,6 +185,27 @@ The workflow:
 The workflow declares `permissions: {}` and uses no third-party Actions.
 
 Do not add a pull-request trigger. Any future PR fallback needs a separate threat-model review and must not execute untrusted fork or branch code on this host.
+
+## ARC3 protocol correctness recovery
+
+`.github/workflows/arc3-protocol-trusted-cpu-qualify.yml` is a separately reviewed, main-owned recovery workflow for exact ARC3-001 protocol subject:
+
+`6ea96737aff361920c181891a71f80a9f481ddef`
+
+It is deliberately narrower than a generic PR executor:
+
+- `workflow_dispatch` only and `refs/heads/main` only;
+- `permissions: {}`;
+- no `uses:` Actions;
+- no caller-supplied SHA/ref/command input;
+- exact product branch + commit binding before code execution;
+- one `symthaea-trusted-cpu-v1` assignment performs independent oracle, affected-crate formatting, locked protocol check/tests, strict Clippy, locked psych-bench check/tests, and oracle recheck;
+- subject and recipe tracked-tree immutability are checked;
+- success emits a correctness-only `CANDIDATE_PASS` provenance manifest.
+
+This workflow may run only after the normal bootstrap → promotion → smoke → recovery-eligibility chain passes for the exact main generation containing it. Its success does **not** itself grant ARC3-QUAL-001 trusted-recipe admission and does not support performance claims.
+
+Changing its exact subject SHA, qualification commands, routing label, trigger, token policy, or action usage changes the reviewed recovery recipe and requires a new Stage-A authorization generation.
 
 ## Host verification
 
