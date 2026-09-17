@@ -469,7 +469,7 @@ pub fn train_grounded_dream_model(
         environment_digest: manifest.environment_digest.clone(),
         candidate_family_digest: canonical_candidate_family_digest(),
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
-        model_version: "symthaea-dream-transition-memory-v2-support-gated".into(),
+        model_version: "symthaea-dream-transition-memory-v3-local-support".into(),
         action_fingerprint_semantics: DREAM_ACTION_FINGERPRINT_SEMANTICS.into(),
         observation_count,
         action_support,
