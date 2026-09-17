@@ -1,0 +1,94 @@
+name: REL-005A ObservationSeal Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-observation-seal-contract.json"
+      - ".github/rel/verify-rel-005a-observation-seal-contract.py"
+      - ".github/workflows/rel-005a-observation-seal-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-observation-seal-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: 02563ef9196bba2a5a8e41f4e3a77aa60afe3321
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  seal-contract:
+    name: Verify preregistered ObservationSeal contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact seal-contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-observation-seal-contract.json"
+            ".github/rel/verify-rel-005a-observation-seal-contract.py"
+            ".github/workflows/rel-005a-observation-seal-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify ObservationSealContractOnly
+        shell: bash
+        env:
+          REL005A_SEAL_CONTRACT_RECEIPT_PATH: ${{ runner.temp }}/observation-seal-contract-receipt.json
+        run: |
+          set -euo pipefail
+          python3 .github/rel/verify-rel-005a-observation-seal-contract.py
+          python3 -m json.tool "${RUNNER_TEMP}/observation-seal-contract-receipt.json" >/dev/null
+
+      - name: Upload static seal-contract receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-observation-seal-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/rel-005a-observation-seal-contract.json
+            ${{ runner.temp }}/observation-seal-contract-receipt.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Enforce static seal-contract boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          receipt = json.loads(
+              pathlib.Path(os.environ["RUNNER_TEMP"], "observation-seal-contract-receipt.json").read_text()
+          )
+          assert receipt["authority"] == "ObservationSealContractOnly"
+          assert receipt["required_upstream_file_count"] == 10
+          assert receipt["identity_binding_count"] == 5
+          assert receipt["static_contract_valid"] is True
+          assert not any(receipt["claims"].values())
+          PY
