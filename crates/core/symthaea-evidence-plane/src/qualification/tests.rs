@@ -352,3 +352,21 @@ fn malformed_sha_is_rejected_before_evaluation() {
         Err(QualificationError::InvalidSha)
     ));
 }
+
+#[test]
+fn unexpected_job_fails_qualifier() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let observation = observation(vec![
+        job(1, "oracle", JobDisposition::Passed),
+        job(2, "rust", JobDisposition::Passed),
+        job(3, "surprise", JobDisposition::Passed),
+    ]);
+
+    let evaluation = profile.evaluate(SUBJECT, &observation).unwrap();
+    assert_eq!(
+        evaluation.classification,
+        QualificationClassification::FailQualifier
+    );
+    assert!(!evaluation.mechanical_integrity.satisfied);
+    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
+}
