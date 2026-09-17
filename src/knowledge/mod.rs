@@ -61,6 +61,7 @@ pub mod epistemic_restart_capsule_v2;
     reason = "EKM-032 V1 reserves typed canonical-hash helpers pending canonical restore schema"
 )]
 pub mod epistemic_restart_manifest;
+pub mod epistemic_restart_validation_receipt;
 #[allow(
     unused_imports,
     reason = "EKM-034 imports the support store only for its cfg(test) cold-restart fixture"
@@ -185,6 +186,11 @@ pub use epistemic_restart_manifest::{
     EpistemicLedgerInventoryV1, EpistemicLedgerLineageV1, EpistemicRestartDigest,
     EpistemicRestartEncoding, EpistemicRestartManifestError, EpistemicRestartManifestV1,
     EpistemicRestartManifestVersion,
+};
+pub use epistemic_restart_validation_receipt::{
+    EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptError,
+    EpistemicRestartValidationReceiptV1, EpistemicRestartValidationReceiptVersion,
+    LegacyManifestAssuranceV1, RestartValidationAuthorityV1,
 };
 pub use epistemic_restart_wire::{
     EpistemicRestartWireEncoding, EpistemicRestartWireError, EpistemicRestartWireSnapshotV1,
