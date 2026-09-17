@@ -18,6 +18,8 @@ DOMAIN = b"EUREKA.002.V2.BACKEND_QUALIFICATION_FORENSIC_MANIFEST_COMMITMENT.v3\x
 HEAD = "11" * 20
 TREE = "22" * 20
 LOCK = "33" * 32
+RUSTC = "rustc 1.96.0 (deadbeef 2026-08-20)"
+CARGO = "cargo 1.96.0 (cafebabe 2026-08-20)"
 STAGES = ("check", "test", "clippy")
 
 
@@ -74,19 +76,19 @@ def qualification_receipt(workflow_sha: str, contract_sha: str, *, passed: bool)
         ("receipt_schema_revision", "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"),
         ("qualification_revision", "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"),
         ("command_contract_revision", "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"),
-        ("repository", "synthetic/eureka"),
-        ("event", "selftest"),
+        ("repository", "Luminous-Dynamics/symthaea"),
+        ("event", "pull_request"),
         ("github_run_id", "1"),
         ("github_run_attempt", "1"),
-        ("github_workflow_ref", "synthetic@selftest"),
+        ("github_workflow_ref", "Luminous-Dynamics/symthaea/.github/workflows/eureka-v2-backend-qualification.yml@refs/pull/1/merge"),
         ("expected_subject_head", HEAD),
         ("subject_head", HEAD),
         ("subject_tree", TREE),
         ("cargo_lock_sha256", LOCK),
         ("workflow_sha256", workflow_sha),
         ("command_contract_sha256", contract_sha),
-        ("rustc_version", "rustc 1.96.0 synthetic"),
-        ("cargo_version", "cargo 1.96.0 synthetic"),
+        ("rustc_version", RUSTC),
+        ("cargo_version", CARGO),
         ("checkout_clean_before", "true"),
         ("claim_scope", "backend-build-test-lint-only"),
         ("execution_authority_granted", "false"),
@@ -195,9 +197,7 @@ def make_bundle(
             assert result.returncode == 0, result.stderr.decode(errors="replace")
         write_summary(stage_dir, "Passed", "Passed", "Passed", True)
         write(qualification, qualification_receipt(env["EUREKA_WORKFLOW_SHA256"], env["EUREKA_COMMAND_CONTRACT_SHA256"], passed=True))
-    result = run_producer(
-        producer, qualification, stage_dir, contract, runner, stage_selftest, workflow, manifest, env
-    )
+    result = run_producer(producer, qualification, stage_dir, contract, runner, stage_selftest, workflow, manifest, env)
     assert result.returncode == 0, result.stderr.decode(errors="replace")
     return manifest, qualification, stage_dir, contract, env
 
@@ -295,9 +295,7 @@ def main() -> int:
         manifest, qualification, stage_dir, contract, _ = make_bundle(
             root / "pass", producer, runner, stage_selftest, workflow, failing=False
         )
-        verify_args = args(
-            verifier, manifest, qualification, stage_dir, contract, runner, stage_selftest, producer, workflow
-        )
+        verify_args = args(verifier, manifest, qualification, stage_dir, contract, runner, stage_selftest, producer, workflow)
         result = run_verify(verify_args)
         assert result.returncode == 0, result.stderr.decode(errors="replace")
         assert b"classification=QUALIFICATION_PASS_EVIDENCE" in result.stdout
@@ -324,9 +322,19 @@ def main() -> int:
         forged = root / "forged-disposition.env"
         shutil.copyfile(manifest, forged)
         recommit(forged, {"check_disposition": "Failed"})
-        assert run_verify(
-            args(verifier, forged, qualification, stage_dir, contract, runner, stage_selftest, producer, workflow)
-        ).returncode != 0
+        assert run_verify(args(verifier, forged, qualification, stage_dir, contract, runner, stage_selftest, producer, workflow)).returncode != 0
+
+        # Recommitting the manifest around a receipt with an unknown field must
+        # still fail at the independent receipt grammar boundary.
+        unknown_receipt = root / "unknown-receipt.env"
+        unknown_receipt.write_text(
+            qualification.read_text(encoding="utf-8").replace("checkout_clean_before=true\n", "shadow_field=true\ncheckout_clean_before=true\n"),
+            encoding="utf-8",
+        )
+        unknown_manifest = root / "unknown-manifest.env"
+        shutil.copyfile(manifest, unknown_manifest)
+        rebind_qualification(unknown_manifest, unknown_receipt)
+        assert run_verify(args(verifier, unknown_manifest, unknown_receipt, stage_dir, contract, runner, stage_selftest, producer, workflow)).returncode != 0
 
         original_qualification = qualification.read_text(encoding="utf-8")
         qualification.write_text(
@@ -354,15 +362,9 @@ def main() -> int:
         assert result.returncode == 0, result.stderr.decode(errors="replace")
         assert b"classification=FORENSICALLY_VALID_FAILURE" in result.stdout
 
-        # Isolated logical/file-identity mutant: the failure receipt remains a
-        # valid failure. Only the packaged producer file and its v3 file identity
-        # are changed; the logical trusted producer identity remains unchanged.
         producer_copy = root / "producer-mutated.py"
         shutil.copyfile(producer, producer_copy)
-        producer_copy.write_text(
-            producer_copy.read_text(encoding="utf-8") + "\n# alternate producer\n",
-            encoding="utf-8",
-        )
+        producer_copy.write_text(producer_copy.read_text(encoding="utf-8") + "\n# alternate producer\n", encoding="utf-8")
         split_manifest = root / "split-producer.env"
         shutil.copyfile(fail_manifest, split_manifest)
         recommit(
@@ -385,15 +387,13 @@ def main() -> int:
         )
         assert run_verify(split_args).returncode != 0
 
-        # Separate false-PASS mutant: rebind the manifest to the changed receipt,
-        # leaving all stage and producer identities untouched. Rejection must be
-        # due to qualification semantics rather than the split-identity control.
         false_pass_manifest = root / "false-pass.env"
         shutil.copyfile(fail_manifest, false_pass_manifest)
         false_pass_qualification = root / "false-pass-qualification.env"
-        shutil.copyfile(fail_qualification, false_pass_qualification)
-        with false_pass_qualification.open("a", encoding="utf-8") as handle:
-            handle.write("qualification_result=PASS\n")
+        false_pass_qualification.write_text(
+            qualification_receipt(sha(workflow), sha(fail_contract), passed=True),
+            encoding="utf-8",
+        )
         rebind_qualification(false_pass_manifest, false_pass_qualification)
         false_pass_args = args(
             verifier,

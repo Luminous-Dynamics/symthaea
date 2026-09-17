@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Canonical v3 forensic manifest producer for EUREKA V2 qualification evidence.
 
-v3 replaces the failed v2 candidate's colliding identity keys with distinct
-logical identities and transport/file identities. It reconstructs stage legality
-from raw evidence, treats workflow summary text only as a cross-check, and
-fails closed on duplicate manifest fields before writing any output.
+The producer reconstructs stage legality from raw evidence, treats workflow
+summary text only as a cross-check, independently validates the exact backend
+qualification-receipt grammar, and publishes the final manifest with
+fail-if-exists semantics.
 """
 
 from __future__ import annotations
@@ -21,9 +21,53 @@ from typing import Final
 SCHEMA: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_FORENSIC_MANIFEST.v3"
 DOMAIN: Final = b"EUREKA.002.V2.BACKEND_QUALIFICATION_FORENSIC_MANIFEST_COMMITMENT.v3\x00"
 STAGE_SCHEMA: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_STAGE_RECEIPT.v1"
+QUAL_SCHEMA: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"
+QUAL_REVISION: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"
+CONTRACT_REVISION: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"
+REPOSITORY: Final = "Luminous-Dynamics/symthaea"
+CLAIM_SCOPE: Final = "backend-build-test-lint-only"
+EVENTS: Final = {"pull_request", "workflow_dispatch"}
 STAGES: Final = ("check", "test", "clippy")
 CHUNK: Final = 64 * 1024
 SIGNAL: Final = re.compile(r"^signal-([1-9][0-9]*)$")
+HEX40: Final = re.compile(r"^[0-9a-f]{40}$")
+HEX64: Final = re.compile(r"^[0-9a-f]{64}$")
+RUSTC: Final = re.compile(r"^rustc 1\.96\.0 \([0-9a-f]+(?: \d{4}-\d{2}-\d{2})?\)$")
+CARGO: Final = re.compile(r"^cargo 1\.96\.0 \([0-9a-f]+(?: \d{4}-\d{2}-\d{2})?\)$")
+
+QUAL_PREFLIGHT: Final = (
+    "receipt_schema_revision",
+    "qualification_revision",
+    "command_contract_revision",
+    "repository",
+    "event",
+    "github_run_id",
+    "github_run_attempt",
+    "github_workflow_ref",
+    "expected_subject_head",
+    "subject_head",
+    "subject_tree",
+    "cargo_lock_sha256",
+    "workflow_sha256",
+    "command_contract_sha256",
+    "rustc_version",
+    "cargo_version",
+    "checkout_clean_before",
+    "claim_scope",
+    "execution_authority_granted",
+    "real_canary_executed",
+    "heldout_executed",
+    "confirmatory_evidence_minted",
+)
+QUAL_POSTFLIGHT: Final = (
+    "postflight_head",
+    "postflight_tree",
+    "postflight_cargo_lock_sha256",
+    "postflight_workflow_sha256",
+    "postflight_command_contract_sha256",
+    "checkout_clean_after",
+    "qualification_result",
+)
 
 STAGE_KEYS: Final = {
     "stage_receipt_schema_revision",
@@ -87,23 +131,43 @@ def canonical_u64(text: str, label: str) -> int:
     return value
 
 
-def parse_env(path: Path, label: str) -> dict[str, str]:
+def canonical_positive(text: str, label: str) -> int:
+    value = canonical_u64(text, label)
+    if value == 0 or value > (1 << 63) - 1:
+        raise ManifestError(f"{label} is outside canonical positive-integer form")
+    return value
+
+
+def require_hex(value: str, pattern: re.Pattern[str], label: str) -> None:
+    if pattern.fullmatch(value) is None:
+        raise ManifestError(f"{label} is not canonical lowercase hex")
+
+
+def parse_env_ordered(path: Path, label: str) -> tuple[list[str], dict[str, str]]:
     regular(path, label)
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         raise ManifestError(f"cannot read {label}: {exc}") from exc
-    if not text.endswith("\n"):
-        raise ManifestError(f"{label} lacks trailing newline")
+    if not text.endswith("\n") or text.endswith("\n\n"):
+        raise ManifestError(f"{label} lacks one canonical terminal newline")
+    keys: list[str] = []
     values: dict[str, str] = {}
     for line in text[:-1].split("\n"):
         if not line or "=" not in line:
             raise ManifestError(f"malformed canonical env line in {label}")
         key, value = line.split("=", 1)
-        if not key or not value or key in values or "\r" in value or "\n" in value:
+        if not key or not value or key in values:
             raise ManifestError(f"invalid or duplicate field in {label}: {key!r}")
+        if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in key + value):
+            raise ManifestError(f"control character in {label}: {key!r}")
+        keys.append(key)
         values[key] = value
-    return values
+    return keys, values
+
+
+def parse_env(path: Path, label: str) -> dict[str, str]:
+    return parse_env_ordered(path, label)[1]
 
 
 def require_digest(path: Path, expected: str, label: str) -> None:
@@ -111,6 +175,91 @@ def require_digest(path: Path, expected: str, label: str) -> None:
     actual = sha256(path)
     if actual != expected:
         raise ManifestError(f"{label} digest mismatch: expected {expected}, got {actual}")
+
+
+def validate_qualification(
+    keys: list[str],
+    receipt: dict[str, str],
+    *,
+    subject_head: str,
+    subject_tree: str,
+    cargo_lock_sha: str,
+    workflow_sha: str,
+    contract_sha: str,
+) -> str:
+    if tuple(keys) == QUAL_PREFLIGHT:
+        sealed = False
+    elif tuple(keys) == QUAL_PREFLIGHT + QUAL_POSTFLIGHT:
+        sealed = True
+    else:
+        raise ManifestError("qualification receipt field order/set is not exact v2 grammar")
+
+    exact = {
+        "receipt_schema_revision": QUAL_SCHEMA,
+        "qualification_revision": QUAL_REVISION,
+        "command_contract_revision": CONTRACT_REVISION,
+        "repository": REPOSITORY,
+        "claim_scope": CLAIM_SCOPE,
+        "checkout_clean_before": "true",
+        "execution_authority_granted": "false",
+        "real_canary_executed": "false",
+        "heldout_executed": "false",
+        "confirmatory_evidence_minted": "false",
+    }
+    for key, expected in exact.items():
+        if receipt[key] != expected:
+            raise ManifestError(f"qualification receipt {key} violates frozen profile")
+    if receipt["event"] not in EVENTS:
+        raise ManifestError("qualification receipt event is not admitted")
+    canonical_positive(receipt["github_run_id"], "github_run_id")
+    canonical_positive(receipt["github_run_attempt"], "github_run_attempt")
+    workflow_ref = receipt["github_workflow_ref"]
+    if not workflow_ref.strip() or workflow_ref != workflow_ref.strip():
+        raise ManifestError("qualification github_workflow_ref is empty/noncanonical")
+
+    for key in ("expected_subject_head", "subject_head", "subject_tree"):
+        require_hex(receipt[key], HEX40, key)
+    for key in ("cargo_lock_sha256", "workflow_sha256", "command_contract_sha256"):
+        require_hex(receipt[key], HEX64, key)
+    if receipt["expected_subject_head"] != subject_head or receipt["subject_head"] != subject_head:
+        raise ManifestError("qualification receipt subject HEAD disagrees with producer subject")
+    if receipt["subject_tree"] != subject_tree:
+        raise ManifestError("qualification receipt tree disagrees with producer subject")
+    if receipt["cargo_lock_sha256"] != cargo_lock_sha:
+        raise ManifestError("qualification receipt Cargo.lock digest disagrees with producer subject")
+    if receipt["workflow_sha256"] != workflow_sha:
+        raise ManifestError("qualification receipt workflow digest disagrees with producer subject")
+    if receipt["command_contract_sha256"] != contract_sha:
+        raise ManifestError("qualification receipt contract digest disagrees with producer subject")
+    if RUSTC.fullmatch(receipt["rustc_version"]) is None:
+        raise ManifestError("qualification receipt rustc version is not frozen Rust 1.96.0 profile")
+    if CARGO.fullmatch(receipt["cargo_version"]) is None:
+        raise ManifestError("qualification receipt cargo version is not frozen Cargo 1.96.0 profile")
+
+    if not sealed:
+        return "VALID_UNSEALED_RECEIPT"
+
+    require_hex(receipt["postflight_head"], HEX40, "postflight_head")
+    require_hex(receipt["postflight_tree"], HEX40, "postflight_tree")
+    for key in (
+        "postflight_cargo_lock_sha256",
+        "postflight_workflow_sha256",
+        "postflight_command_contract_sha256",
+    ):
+        require_hex(receipt[key], HEX64, key)
+    expected_post = {
+        "postflight_head": subject_head,
+        "postflight_tree": subject_tree,
+        "postflight_cargo_lock_sha256": cargo_lock_sha,
+        "postflight_workflow_sha256": workflow_sha,
+        "postflight_command_contract_sha256": contract_sha,
+        "checkout_clean_after": "true",
+        "qualification_result": "PASS",
+    }
+    for key, expected in expected_post.items():
+        if receipt[key] != expected:
+            raise ManifestError(f"qualification PASS postflight mismatch: {key}")
+    return "VALID_PASS_RECEIPT"
 
 
 def validate_stage(receipt: dict[str, str], stage: str, log: Path) -> tuple[str, bool]:
@@ -212,7 +361,6 @@ def reconstruct(
         log_exists = log_path.is_file() and not log_path.is_symlink()
         if receipt_exists != log_exists:
             raise ManifestError(f"{stage} has only one of receipt/log")
-
         if receipt_exists:
             if blocker is not None:
                 raise ManifestError(f"{stage} executed after predecessor blocker {blocker}")
@@ -268,8 +416,11 @@ class Encoder:
         return "".join(self._lines).encode("utf-8")
 
 
-def atomic_write(path: Path, payload: bytes) -> None:
+def publish_new(path: Path, payload: bytes) -> None:
+    """Publish a complete evidence object atomically and refuse replacement."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise ManifestError("manifest output path may not be a symlink")
     temp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
@@ -277,7 +428,20 @@ def atomic_write(path: Path, payload: bytes) -> None:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temp, path)
+        try:
+            os.link(temp, path)
+        except FileExistsError as exc:
+            raise ManifestError("canonical manifest output already exists") from exc
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except OSError:
+            # The evidence theorem is fail-if-exists/content identity, not a
+            # crash-durable authority store. Directory fsync is best-effort here.
+            pass
     finally:
         try:
             temp.unlink()
@@ -304,6 +468,18 @@ def produce(
     producer_sha = required_env("EUREKA_FORENSIC_MANIFEST_TOOL_SHA256")
     python_version = required_env("EUREKA_PYTHON_VERSION")
 
+    require_hex(subject_head, HEX40, "subject HEAD")
+    require_hex(subject_tree, HEX40, "subject tree")
+    for value, label in (
+        (cargo_lock_sha, "Cargo.lock digest"),
+        (workflow_sha, "workflow digest"),
+        (contract_sha, "command-contract digest"),
+        (runner_sha, "stage-runner digest"),
+        (selftest_sha, "stage-selftest digest"),
+        (producer_sha, "manifest-producer digest"),
+    ):
+        require_hex(value, HEX64, label)
+
     actual_python = f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     if python_version != actual_python:
         raise ManifestError("Python runtime identity changed")
@@ -313,9 +489,17 @@ def produce(
     require_digest(stage_selftest, selftest_sha, "stage self-test")
     require_digest(Path(__file__), producer_sha, "manifest producer")
 
-    qualification = parse_env(qualification_receipt, "qualification receipt")
-    if qualification.get("execution_authority_granted") != "false":
-        raise ManifestError("qualification receipt escalates execution authority")
+    qualification_keys, qualification = parse_env_ordered(qualification_receipt, "qualification receipt")
+    qualification_class = validate_qualification(
+        qualification_keys,
+        qualification,
+        subject_head=subject_head,
+        subject_tree=subject_tree,
+        cargo_lock_sha=cargo_lock_sha,
+        workflow_sha=workflow_sha,
+        contract_sha=contract_sha,
+    )
+
     summary_path = stage_dir / "stage-evidence-summary.env"
     summary = parse_env(summary_path, "stage summary")
     if set(summary) != SUMMARY_KEYS or summary["diagnostic_evidence_complete"] not in {"true", "false"}:
@@ -337,7 +521,7 @@ def produce(
     complete_text = "true" if diagnostic_complete else "false"
     if summary["diagnostic_evidence_complete"] != complete_text:
         raise ManifestError("summary diagnostic completeness disagrees with raw evidence")
-    if qualification.get("qualification_result") == "PASS":
+    if qualification_class == "VALID_PASS_RECEIPT":
         if not diagnostic_complete or not all(derived[stage] == "Passed" for stage in STAGES):
             raise ManifestError("qualification PASS lacks complete all-stage PASS evidence")
 
@@ -372,7 +556,7 @@ def produce(
 
     body = enc.body()
     commitment = hashlib.sha256(DOMAIN + body).hexdigest()
-    atomic_write(output, body + f"manifest_commitment={commitment}\n".encode("ascii"))
+    publish_new(output, body + f"manifest_commitment={commitment}\n".encode("ascii"))
 
 
 def main() -> int:

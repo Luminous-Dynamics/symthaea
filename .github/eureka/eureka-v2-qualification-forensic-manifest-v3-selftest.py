@@ -17,6 +17,8 @@ STAGES = ("check", "test", "clippy")
 HEAD = "11" * 20
 TREE = "22" * 20
 LOCK = "33" * 32
+RUSTC = "rustc 1.96.0 (deadbeef 2026-08-20)"
+CARGO = "cargo 1.96.0 (cafebabe 2026-08-20)"
 
 
 def sha(path: Path) -> str:
@@ -38,6 +40,46 @@ def parse(path: Path) -> tuple[list[str], dict[str, str]]:
         keys.append(key)
         values[key] = value
     return keys, values
+
+
+def qualification_receipt(workflow_sha: str, contract_sha: str, *, passed: bool) -> str:
+    fields = [
+        ("receipt_schema_revision", "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"),
+        ("qualification_revision", "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"),
+        ("command_contract_revision", "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"),
+        ("repository", "Luminous-Dynamics/symthaea"),
+        ("event", "pull_request"),
+        ("github_run_id", "1"),
+        ("github_run_attempt", "1"),
+        ("github_workflow_ref", "Luminous-Dynamics/symthaea/.github/workflows/eureka-v2-backend-qualification.yml@refs/pull/1/merge"),
+        ("expected_subject_head", HEAD),
+        ("subject_head", HEAD),
+        ("subject_tree", TREE),
+        ("cargo_lock_sha256", LOCK),
+        ("workflow_sha256", workflow_sha),
+        ("command_contract_sha256", contract_sha),
+        ("rustc_version", RUSTC),
+        ("cargo_version", CARGO),
+        ("checkout_clean_before", "true"),
+        ("claim_scope", "backend-build-test-lint-only"),
+        ("execution_authority_granted", "false"),
+        ("real_canary_executed", "false"),
+        ("heldout_executed", "false"),
+        ("confirmatory_evidence_minted", "false"),
+    ]
+    if passed:
+        fields.extend(
+            [
+                ("postflight_head", HEAD),
+                ("postflight_tree", TREE),
+                ("postflight_cargo_lock_sha256", LOCK),
+                ("postflight_workflow_sha256", workflow_sha),
+                ("postflight_command_contract_sha256", contract_sha),
+                ("checkout_clean_after", "true"),
+                ("qualification_result", "PASS"),
+            ]
+        )
+    return "".join(f"{key}={value}\n" for key, value in fields)
 
 
 def write_contract(path: Path) -> None:
@@ -75,14 +117,7 @@ def env_for(producer: Path, runner: Path, stage_selftest: Path, workflow: Path, 
     return env
 
 
-def run_stage(
-    runner: Path,
-    contract: Path,
-    stage_dir: Path,
-    stage: str,
-    scenario: str,
-    env: dict[str, str],
-) -> subprocess.CompletedProcess[bytes]:
+def run_stage(runner: Path, contract: Path, stage_dir: Path, stage: str, scenario: str, env: dict[str, str]) -> subprocess.CompletedProcess[bytes]:
     child_env = env.copy()
     child_env["V3_SCENARIO"] = scenario
     return subprocess.run(
@@ -172,7 +207,7 @@ def main() -> int:
         env = env_for(producer, runner, stage_selftest, workflow, contract)
         qualification = root / "qualification.env"
         qualification.write_text(
-            "receipt_schema_revision=synthetic-v3\nexecution_authority_granted=false\nqualification_result=PASS\n",
+            qualification_receipt(env["EUREKA_WORKFLOW_SHA256"], env["EUREKA_COMMAND_CONTRACT_SHA256"], passed=True),
             encoding="utf-8",
         )
 
@@ -184,41 +219,36 @@ def main() -> int:
         first = root / "manifest-first.env"
         second = root / "manifest-second.env"
         for output in (first, second):
-            result = run_producer(
-                producer, qualification, success, contract, runner, stage_selftest, workflow, output, env
-            )
+            result = run_producer(producer, qualification, success, contract, runner, stage_selftest, workflow, output, env)
             assert result.returncode == 0, result.stderr.decode(errors="replace")
         assert first.read_bytes() == second.read_bytes()
+        first_bytes = first.read_bytes()
+        assert run_producer(producer, qualification, success, contract, runner, stage_selftest, workflow, first, env).returncode != 0
+        assert first.read_bytes() == first_bytes
+
         keys, values = parse(first)
         assert len(keys) == len(set(keys))
         assert values["forensic_manifest_schema_revision"] == "EUREKA.002.V2.BACKEND_QUALIFICATION_FORENSIC_MANIFEST.v3"
-        assert values["workflow_sha256"] == sha(workflow)
-        assert values["workflow_file_sha256"] == sha(workflow)
-        assert values["command_contract_sha256"] == sha(contract)
-        assert values["command_contract_file_sha256"] == sha(contract)
-        assert values["stage_runner_sha256"] == sha(runner)
-        assert values["stage_runner_file_sha256"] == sha(runner)
-        assert values["stage_selftest_sha256"] == sha(stage_selftest)
-        assert values["stage_selftest_file_sha256"] == sha(stage_selftest)
-        assert values["forensic_manifest_tool_sha256"] == sha(producer)
-        assert values["manifest_producer_file_sha256"] == sha(producer)
+        assert values["workflow_sha256"] == sha(workflow) == values["workflow_file_sha256"]
+        assert values["command_contract_sha256"] == sha(contract) == values["command_contract_file_sha256"]
+        assert values["stage_runner_sha256"] == sha(runner) == values["stage_runner_file_sha256"]
+        assert values["stage_selftest_sha256"] == sha(stage_selftest) == values["stage_selftest_file_sha256"]
+        assert values["forensic_manifest_tool_sha256"] == sha(producer) == values["manifest_producer_file_sha256"]
         assert values["execution_authority_granted"] == "false"
         verify_commitment(first)
 
         unexpected = success / "unexpected.bin"
         unexpected.write_bytes(b"unexpected")
-        assert run_producer(
-            producer,
-            qualification,
-            success,
-            contract,
-            runner,
-            stage_selftest,
-            workflow,
-            root / "unexpected.env",
-            env,
-        ).returncode != 0
+        assert run_producer(producer, qualification, success, contract, runner, stage_selftest, workflow, root / "unexpected.env", env).returncode != 0
         unexpected.unlink()
+
+        # Unknown receipt fields must be rejected by the producer itself.
+        malformed = root / "malformed-qualification.env"
+        malformed.write_text(
+            qualification.read_text(encoding="utf-8").replace("checkout_clean_before=true\n", "shadow_field=true\ncheckout_clean_before=true\n"),
+            encoding="utf-8",
+        )
+        assert run_producer(producer, malformed, success, contract, runner, stage_selftest, workflow, root / "malformed.env", env).returncode != 0
 
         failure = root / "failure"
         result = run_stage(runner, contract, failure, "check", "fail", env)
@@ -231,21 +261,11 @@ def main() -> int:
             True,
         )
         qualification.write_text(
-            "receipt_schema_revision=synthetic-v3\nexecution_authority_granted=false\n",
+            qualification_receipt(env["EUREKA_WORKFLOW_SHA256"], env["EUREKA_COMMAND_CONTRACT_SHA256"], passed=False),
             encoding="utf-8",
         )
         failure_manifest = root / "failure.env"
-        result = run_producer(
-            producer,
-            qualification,
-            failure,
-            contract,
-            runner,
-            stage_selftest,
-            workflow,
-            failure_manifest,
-            env,
-        )
+        result = run_producer(producer, qualification, failure, contract, runner, stage_selftest, workflow, failure_manifest, env)
         assert result.returncode == 0, result.stderr.decode(errors="replace")
         _, failure_values = parse(failure_manifest)
         assert failure_values["check_disposition"] == "Failed"
@@ -261,17 +281,7 @@ def main() -> int:
             "NotRunDueToPredecessorFailure:test",
             True,
         )
-        assert run_producer(
-            producer,
-            qualification,
-            forged,
-            contract,
-            runner,
-            stage_selftest,
-            workflow,
-            root / "forged.env",
-            env,
-        ).returncode != 0
+        assert run_producer(producer, qualification, forged, contract, runner, stage_selftest, workflow, root / "forged.env", env).returncode != 0
 
         late = root / "late"
         clone_stage_dir(failure, late)
@@ -279,33 +289,13 @@ def main() -> int:
         result = run_stage(runner, contract, late, "test", "pass", env)
         assert result.returncode == 0
         write_summary(late, "Failed", "Passed", "NotRunDueToPredecessorFailure:check", True)
-        assert run_producer(
-            producer,
-            qualification,
-            late,
-            contract,
-            runner,
-            stage_selftest,
-            workflow,
-            root / "late.env",
-            env,
-        ).returncode != 0
+        assert run_producer(producer, qualification, late, contract, runner, stage_selftest, workflow, root / "late.env", env).returncode != 0
 
         qualification.write_text(
-            "receipt_schema_revision=synthetic-v3\nexecution_authority_granted=false\nqualification_result=PASS\n",
+            qualification_receipt(env["EUREKA_WORKFLOW_SHA256"], env["EUREKA_COMMAND_CONTRACT_SHA256"], passed=True),
             encoding="utf-8",
         )
-        assert run_producer(
-            producer,
-            qualification,
-            failure,
-            contract,
-            runner,
-            stage_selftest,
-            workflow,
-            root / "false-pass.env",
-            env,
-        ).returncode != 0
+        assert run_producer(producer, qualification, failure, contract, runner, stage_selftest, workflow, root / "false-pass.env", env).returncode != 0
 
     print("EUREKA V2 forensic manifest v3 conformance: PASS")
     return 0
