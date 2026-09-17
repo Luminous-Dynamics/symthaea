@@ -1,0 +1,177 @@
+name: ASSURE Linux IMA Rust 1.96 Qualification V3
+
+on:
+  pull_request:
+    paths:
+      - '.github/qualification/assure-linux-ima-rust196-qualify.sh'
+      - '.github/workflows/assure-linux-ima-rust196.yml'
+      - 'crates/domains/symthaea-linux-ima-replay/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-linux-ima-rust196-v3-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: 9155351a868a91317ccc528568a4954382ea4511
+  PRODUCT_PARENT: 29eb017a2e5b3fda7731ec946439c3096b51cceb
+  EXPECTED_PRODUCT_BLOB: 2ee7b299599570180fe2a0ca506399fdbbded4a7
+  EXPECTED_PRODUCT_SHA256: 030ded9703fbd0e6dd9e93eb8bc39736bf84ea4cc4e5b39d140b9399d7dd6ae7
+  EXPECTED_PRODUCT_BYTES: '41095'
+  DERIVATION_ID: sha256:c63a2b5331d4c0b442b56e12c942706929c98bb60cf902a8c9979a4d5741c596
+  ARCHIVE_ID: sha256:22764eb4b2e505e0e0b58c26047de0cdb9d97af5d7d2f903e7bb991236b7f6c6
+  RECIPE_ID: sha256:8d998fb0967e6192507ec72598d84c1d17856d7f64ff6a3886c477b94f06b3d0
+  RECIPE_SCRIPT_BLOB: 68bd2668e407b7753ea29c01ec6142a71a068944
+
+jobs:
+  qualify:
+    name: Exact-head artifact-derived Linux IMA replay repair
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Prove exact subject, product, recipe, and two-layer topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='${{ github.event.pull_request.head.sha }}'
+          expected_base='${{ github.event.pull_request.base.sha }}'
+          actual="$(git rev-parse HEAD)"
+          target='crates/domains/symthaea-linux-ima-replay/src/lib.rs'
+          receipt="$RUNNER_TEMP/assure-linux-ima-rust196-v3-outer-receipt.txt"
+
+          test "$actual" = "$expected"
+          test "$expected_base" = "$PRODUCT_PARENT"
+
+          test "$(git rev-parse "$PRODUCT_HEAD^")" = "$PRODUCT_PARENT"
+          test "$(git rev-list --count "$PRODUCT_PARENT".."$PRODUCT_HEAD")" = '1'
+          test "$(git rev-list --parents -n 1 "$PRODUCT_HEAD" | awk '{print NF}')" = '2'
+          test "$(git diff --name-status "$PRODUCT_PARENT" "$PRODUCT_HEAD")" = $'M\tcrates/domains/symthaea-linux-ima-replay/src/lib.rs'
+          test "$(git rev-parse "$PRODUCT_HEAD:$target")" = "$EXPECTED_PRODUCT_BLOB"
+          test "$(git cat-file -s "$PRODUCT_HEAD:$target")" = "$EXPECTED_PRODUCT_BYTES"
+          test "$(git show "$PRODUCT_HEAD:$target" | sha256sum | awk '{print $1}')" = "$EXPECTED_PRODUCT_SHA256"
+
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_HEAD"
+          test "$(git rev-list --count "$PRODUCT_HEAD"..HEAD)" = '1'
+          test "$(git rev-list --parents -n 1 HEAD | awk '{print NF}')" = '2'
+
+          git diff --name-status "$PRODUCT_HEAD" HEAD > "$RUNNER_TEMP/qualification-delta.txt"
+          python3 - "$RUNNER_TEMP/qualification-delta.txt" <<'PY'
+          import pathlib, sys
+          expected = {
+              ('A', '.github/qualification/assure-linux-ima-rust196-qualify.sh'),
+              ('A', '.github/workflows/assure-linux-ima-rust196.yml'),
+          }
+          actual = set()
+          for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
+              status, path = line.split('\t')
+              actual.add((status, path))
+          if actual != expected:
+              raise SystemExit(f'qualification delta mismatch: {actual!r}')
+          print('qualification_delta=PASS files=2')
+          PY
+
+          test "$(git rev-parse HEAD:.github/qualification/assure-linux-ima-rust196-qualify.sh)" = "$RECIPE_SCRIPT_BLOB"
+
+          cat > "$receipt" <<EOF
+          schema=symthaea.assurance.linux-ima-rust196-exact-head-qualification.v3
+          authority=QualificationPending
+          qualification_state_before_execution=NOT_ESTABLISHED
+          repository=$GITHUB_REPOSITORY
+          pull_request=${{ github.event.pull_request.number }}
+          subject_sha=$actual
+          subject_tree=$(git rev-parse 'HEAD^{tree}')
+          product_head=$PRODUCT_HEAD
+          product_tree=$(git rev-parse "$PRODUCT_HEAD^{tree}")
+          product_parent=$PRODUCT_PARENT
+          product_blob=$EXPECTED_PRODUCT_BLOB
+          product_sha256=$EXPECTED_PRODUCT_SHA256
+          product_bytes=$EXPECTED_PRODUCT_BYTES
+          derivation_id=$DERIVATION_ID
+          archive_id=$ARCHIVE_ID
+          recipe_id=$RECIPE_ID
+          recipe_script_blob=$RECIPE_SCRIPT_BLOB
+          authoritative_cargo_network=OFFLINE
+          checkout_action=11d5960a326750d5838078e36cf38b85af677262
+          upload_artifact_action=ea165f8d65b6e75b540449e92b4886f43607fa02
+          runner_image=ubuntu-24.04
+          rustc=$(rustc --version)
+          cargo=$(cargo --version)
+          workflow_sha256=$(sha256sum .github/workflows/assure-linux-ima-rust196.yml | awk '{print $1}')
+          contract_sha256=$(sha256sum .github/qualification/assure-linux-ima-rust196-qualify.sh | awk '{print $1}')
+          source_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')
+          EOF
+
+          git rev-parse HEAD > "$RUNNER_TEMP/pre-head"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/pre-tree"
+          sha256sum Cargo.lock | awk '{print $1}' > "$RUNNER_TEMP/pre-lock"
+
+      - name: Execute content-addressed v3 qualification contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash .github/qualification/assure-linux-ima-rust196-qualify.sh \
+            2>&1 | tee "$RUNNER_TEMP/assure-linux-ima-rust196-v3-contract.log"
+
+      - name: Prove checkout and source lock unchanged
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/pre-head")"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat "$RUNNER_TEMP/pre-tree")"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-lock")"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          echo 'postflight_immutable=PASS' >> "$RUNNER_TEMP/assure-linux-ima-rust196-v3-outer-receipt.txt"
+
+      - name: Finalize exact-head PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$RUNNER_TEMP/assure-linux-ima-rust196-v3/qualification-receipt.txt"
+          grep -Fx 'qualification_result=PASS' "$RUNNER_TEMP/assure-linux-ima-rust196-v3/qualification-receipt.txt"
+          grep -Fx 'authoritative_cargo_network=OFFLINE' "$RUNNER_TEMP/assure-linux-ima-rust196-v3/qualification-receipt.txt"
+          grep -Fx 'postflight_immutable=PASS' "$RUNNER_TEMP/assure-linux-ima-rust196-v3-outer-receipt.txt"
+          echo 'qualification_result=PASS' >> "$RUNNER_TEMP/assure-linux-ima-rust196-v3-outer-receipt.txt"
+          echo 'authority=QualifiedExactHead' >> "$RUNNER_TEMP/assure-linux-ima-rust196-v3-outer-receipt.txt"
+
+      - name: Upload exact-head qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-linux-ima-rust196-v3-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3-outer-receipt.txt
+            ${{ runner.temp }}/qualification-delta.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3-contract.log
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/qualification-receipt.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/source-census.tsv
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/Cargo.lock.source
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/Cargo.lock.capsule
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/lock-audit.json
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/cargo-metadata.offline.json
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/test-list.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/golden-replay-test.log
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/full-test.log
+            ${{ runner.temp }}/assure-linux-ima-rust196-v3/clippy-all-targets.log
+            .github/workflows/assure-linux-ima-rust196.yml
+            .github/qualification/assure-linux-ima-rust196-qualify.sh
+          if-no-files-found: ignore
+          retention-days: 90
