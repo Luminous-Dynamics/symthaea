@@ -38,6 +38,7 @@ mod belief_mutation_persistence;
 mod belief_mutation_transaction;
 mod belief_mutation_verifier;
 pub mod belief_revision_gate;
+pub mod belief_revision_persistence;
 pub mod belief_revision_receipt;
 pub mod causal_admission;
 pub mod causal_bridge;
@@ -101,6 +102,10 @@ pub use belief_mutation_verifier::{
 pub use belief_revision_gate::{
     BeliefRevisionDecision, BeliefRevisionFailure, BeliefRevisionGate, BeliefRevisionPolicy,
     BeliefRevisionPolicyError, CalibrationSnapshot, EpistemicRevisionProposal,
+};
+pub use belief_revision_persistence::{
+    BeliefRevisionHistoryCapsuleV1, BeliefRevisionPersistenceError,
+    BeliefRevisionPersistenceVersion,
 };
 pub use belief_revision_receipt::{
     BeliefRevisionHistory, BeliefRevisionReceipt, BeliefRevisionReceiptError,
