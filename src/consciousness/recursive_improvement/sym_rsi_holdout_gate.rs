@@ -9,17 +9,21 @@
 
 use super::sym_rsi_candidate_family::{
     canonical_candidate_family_digest, canonical_fixed_hash_candidate_family, FrozenReplayCorpus,
-    ReplayCorpusAcquisitionReceipt, SYM_RSI_001_INCUMBENT_POLICY_ID,
+    ReplayCorpusAcquisitionReceipt, SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA,
+    SYM_RSI_001_INCUMBENT_POLICY_ID, SYM_RSI_001_REPLAY_CORPUS_SCHEMA,
 };
-use super::sym_rsi_experiment::{EvaluationSplit, SymRsiExperimentManifest};
+use super::sym_rsi_experiment::{
+    EvaluationSplit, ExperimentHarnessError, SymRsiExperimentManifest,
+};
 use super::sym_rsi_replay_corpus::{
     score_policy_on_replay_worlds, ReplayCorpusError, ReplayCorpusEvaluation,
 };
 use super::sym_rsi_replay_selection::{
-    select_fixed_hash_policy_from_replay, FixedHashCandidateSpec, ReplaySelectionError,
-    ReplaySelectionReceipt, SYM_RSI_001_REPLAY_SELECTION_SCHEMA,
+    select_fixed_hash_policy_from_replay, ReplaySelectionError, ReplaySelectionReceipt,
+    SYM_RSI_001_REPLAY_SELECTION_SCHEMA,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 pub const SYM_RSI_001_HOLDOUT_GATE_SCHEMA: &str =
     "symthaea.sym-rsi-001.held-out-replay-gate.v1";
@@ -30,6 +34,9 @@ pub fn select_canonical_training_candidate(
     manifest: &SymRsiExperimentManifest,
     training_corpus: &FrozenReplayCorpus,
 ) -> Result<ReplaySelectionReceipt, HoldoutGateError> {
+    manifest
+        .validate()
+        .map_err(HoldoutGateError::ManifestInvalid)?;
     validate_corpus_binding(manifest, training_corpus, EvaluationSplit::TrainingReplay)?;
     let candidates = canonical_fixed_hash_candidate_family();
     let receipt = select_fixed_hash_policy_from_replay(
@@ -89,6 +96,9 @@ pub fn validate_selected_candidate_on_holdout(
     training_selection: &ReplaySelectionReceipt,
     held_out_corpus: &FrozenReplayCorpus,
 ) -> Result<HeldOutReplayGateReceipt, HoldoutGateError> {
+    manifest
+        .validate()
+        .map_err(HoldoutGateError::ManifestInvalid)?;
     validate_canonical_selection_receipt(manifest, training_selection)?;
     validate_corpus_binding(manifest, held_out_corpus, EvaluationSplit::HeldOutReplay)?;
 
@@ -99,9 +109,11 @@ pub fn validate_selected_candidate_on_holdout(
     let selected_spec = canonical_fixed_hash_candidate_family()
         .into_iter()
         .find(|spec| spec.policy_id == training_selection.selected_policy_id)
-        .ok_or_else(|| HoldoutGateError::SelectedPolicyNotCanonical(
-            training_selection.selected_policy_id.clone(),
-        ))?;
+        .ok_or_else(|| {
+            HoldoutGateError::SelectedPolicyNotCanonical(
+                training_selection.selected_policy_id.clone(),
+            )
+        })?;
 
     let incumbent = score_policy_on_replay_worlds(
         &incumbent_spec.policy(),
@@ -121,10 +133,10 @@ pub fn validate_selected_candidate_on_holdout(
     let evaluator_call_delta =
         selected.attempted_steps as i128 - incumbent.attempted_steps as i128;
 
-    let decision = if selected_spec.policy_id == incumbent_spec.policy_id {
-        HoldoutGateDecision::NoChange
-    } else if !incumbent_full_support || !selected_full_support {
+    let decision = if !incumbent_full_support || !selected_full_support {
         HoldoutGateDecision::RejectedReplaySupport
+    } else if selected_spec.policy_id == incumbent_spec.policy_id {
+        HoldoutGateDecision::NoChange
     } else if selected.mean_best_solution_quality + manifest.held_out_quality_tolerance
         < incumbent.mean_best_solution_quality
     {
@@ -178,6 +190,11 @@ fn validate_corpus_binding(
     required_split: EvaluationSplit,
 ) -> Result<(), HoldoutGateError> {
     let receipt = &corpus.receipt;
+    if receipt.schema != SYM_RSI_001_REPLAY_CORPUS_SCHEMA
+        || receipt.candidate_family_schema != SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA
+    {
+        return Err(HoldoutGateError::CorpusReceiptShapeMismatch);
+    }
     if receipt.split != required_split
         || corpus
             .worlds
@@ -208,6 +225,51 @@ fn validate_corpus_binding(
     }
     if receipt.evidence_digest.trim().is_empty() {
         return Err(HoldoutGateError::MissingCorpusEvidenceDigest);
+    }
+
+    let mut expected_worlds = BTreeSet::new();
+    let mut expected_seed_count_per_domain = None;
+    for domain in &manifest.domains {
+        let seeds = match required_split {
+            EvaluationSplit::TrainingReplay => &domain.seeds.training_replay,
+            EvaluationSplit::HeldOutReplay => &domain.seeds.held_out_replay,
+            _ => return Err(HoldoutGateError::UnsupportedCorpusValidationSplit(required_split)),
+        };
+        match expected_seed_count_per_domain {
+            None => expected_seed_count_per_domain = Some(seeds.len()),
+            Some(expected) if expected != seeds.len() => {
+                return Err(HoldoutGateError::CorpusReceiptShapeMismatch);
+            }
+            Some(_) => {}
+        }
+        for &seed in seeds {
+            expected_worlds.insert((domain.domain_id.clone(), seed));
+        }
+    }
+
+    let mut observed_worlds = BTreeSet::new();
+    for world in &corpus.worlds {
+        let key = (world.domain.id().to_owned(), world.seed);
+        if !observed_worlds.insert(key.clone()) {
+            return Err(HoldoutGateError::DuplicateCorpusWorld {
+                domain_id: key.0,
+                seed: key.1,
+            });
+        }
+    }
+    if observed_worlds != expected_worlds {
+        return Err(HoldoutGateError::CorpusWorldSetMismatch);
+    }
+
+    let expected_seed_count_per_domain = expected_seed_count_per_domain.unwrap_or(0);
+    let expected_trajectory_count = expected_worlds.len() * canonical_ids.len();
+    if receipt.domain_count != manifest.domains.len()
+        || receipt.seed_count_per_domain != expected_seed_count_per_domain
+        || receipt.world_count != corpus.worlds.len()
+        || receipt.world_count != expected_worlds.len()
+        || receipt.trajectory_count != expected_trajectory_count
+    {
+        return Err(HoldoutGateError::CorpusReceiptShapeMismatch);
     }
     Ok(())
 }
@@ -250,13 +312,35 @@ fn validate_canonical_selection_receipt(
         if assessment.spec.salt != expected.salt {
             return Err(HoldoutGateError::CandidateSetMismatch);
         }
+        if !assessment.eligible || !full_support(&assessment.evaluation) {
+            return Err(HoldoutGateError::CandidateNotFullySupported(
+                assessment.spec.policy_id.clone(),
+            ));
+        }
     }
-    if !receipt
+
+    let incumbent = receipt
         .assessments
         .iter()
-        .any(|assessment| assessment.spec.policy_id == receipt.selected_policy_id && assessment.eligible)
-    {
+        .find(|assessment| assessment.spec.policy_id == receipt.incumbent_policy_id)
+        .ok_or(HoldoutGateError::CandidateSetMismatch)?;
+    let selected = receipt
+        .assessments
+        .iter()
+        .find(|assessment| assessment.spec.policy_id == receipt.selected_policy_id)
+        .ok_or_else(|| HoldoutGateError::SelectedPolicyNotCanonical(receipt.selected_policy_id.clone()))?;
+    if !selected.eligible {
         return Err(HoldoutGateError::SelectedPolicyNotEligible);
+    }
+    if receipt.incumbent_objective != incumbent.objective
+        || receipt.selected_objective != selected.objective
+        || receipt.strict_replay_improvement
+            != (receipt.selected_policy_id != receipt.incumbent_policy_id)
+        || receipt.selected_objective < receipt.incumbent_objective
+        || (receipt.strict_replay_improvement
+            && receipt.selected_objective <= receipt.incumbent_objective)
+    {
+        return Err(HoldoutGateError::SelectionReceiptShapeMismatch);
     }
     Ok(())
 }
@@ -308,19 +392,28 @@ fn decision_tag(decision: HoldoutGateDecision) -> u8 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HoldoutGateError {
+    ManifestInvalid(ExperimentHarnessError),
     ReplaySelection(ReplaySelectionError),
     ReplayCorpus(ReplayCorpusError),
     WrongCorpusSplit {
         required: EvaluationSplit,
         observed: EvaluationSplit,
     },
+    UnsupportedCorpusValidationSplit(EvaluationSplit),
     CorpusLineageMismatch,
+    CorpusReceiptShapeMismatch,
+    CorpusWorldSetMismatch,
+    DuplicateCorpusWorld {
+        domain_id: String,
+        seed: u64,
+    },
     CandidateFamilyMismatch,
     CollectorSetMismatch,
     MissingCorpusEvidenceDigest,
     SelectionReceiptShapeMismatch,
     SelectionLineageMismatch,
     CandidateSetMismatch,
+    CandidateNotFullySupported(String),
     SelectedPolicyNotCanonical(String),
     SelectedPolicyNotEligible,
 }
@@ -371,6 +464,22 @@ mod tests {
                 required: EvaluationSplit::HeldOutReplay,
                 observed: EvaluationSplit::TrainingReplay,
             })
+        ));
+    }
+
+    #[test]
+    fn missing_held_out_world_is_detected_even_if_receipt_metadata_is_unchanged() {
+        let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
+        let training = acquire_canonical_replay_corpus(&manifest, EvaluationSplit::TrainingReplay)
+            .unwrap();
+        let mut held_out = acquire_canonical_replay_corpus(&manifest, EvaluationSplit::HeldOutReplay)
+            .unwrap();
+        let selection = select_canonical_training_candidate(&manifest, &training).unwrap();
+        held_out.worlds.pop();
+        assert!(matches!(
+            validate_selected_candidate_on_holdout(&manifest, &selection, &held_out),
+            Err(HoldoutGateError::CorpusWorldSetMismatch)
+                | Err(HoldoutGateError::CorpusReceiptShapeMismatch)
         ));
     }
 }
