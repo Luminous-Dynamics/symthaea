@@ -33,6 +33,12 @@ The 301-304, 401-404, and 1201-1204 partitions are disjoint from every SYM-RSI-0
 
 **D — replay plus grounded dreaming.** Arm C wrapped by the frozen grounded dream model. The dream model may alter action choice only through predictions produced from learned transition memory.
 
+D's frozen v2 action-scoring rule is:
+
+`mean predicted task quality across 5 deterministic action perturbations - 0.10 × predicted failure probability`
+
+D overrides the base C action only when that score exceeds C's score by more than `0.01`. Predicted task quality is read from the task-quality channels of the model-generated outcome representation; the older generic Φ/magnitude proxy is retained only as a diagnostic and is not D's optimization target.
+
 D is forbidden from:
 - calling the true fixture transition function during action selection,
 - training on verification, fresh, or OOD outcomes,
