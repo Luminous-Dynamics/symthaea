@@ -1,0 +1,344 @@
+name: REL-005A ObservationSeal V3
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-observation-seal-source.json"
+      - ".github/workflows/rel-005a-observation-seal-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rel-005a-observation-seal-v3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: eeaa3f70ecca482de77d0f7f1dd69fa92852af6f
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  EXECUTION_HEAD: 6931639e53060809f9d459196a329c4fe983be7b
+  EXECUTION_TEST_BLOB: 680821c53c09f6ea894039f07367d7fdcddee6cd
+  EXECUTION_WORKFLOW_BLOB: 97ad6abe497e2bbb5bc1f1d8d14b4330996b3a95
+  PREDICATE_CONTRACT_HEAD: 43bf1d588447f602ce0f1549986bb558a839762c
+  PREDICATE_CONTRACT_BLOB: 3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a
+  FROZEN_SCIENTIFIC_SUBJECT: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  FROZEN_TEST_BLOB: 787ea051ae0bf8e5667b6925481afd46c15d0bc4
+  SOURCE_RUN_ID: "35284116872"
+  SOURCE_JOB_ID: "105412520071"
+  SOURCE_ARTIFACT_ID: "10523783298"
+  SOURCE_ARTIFACT_NAME: rel-005a-execution-v3-6931639e53060809f9d459196a329c4fe983be7b
+  SOURCE_ARTIFACT_DIGEST: sha256:a2d6e8421eee59fd0569a0fc7e996276248040ad8075911472ad0491044ff57b
+  SOURCE_OBSERVATION_SHA256: e271a5c2e6b51fda15cd6c3209e52859296f44ecd790b9c5e72f769d4aec1c4d
+  SOURCE_STATIC_AUDIT_SHA256: 166214a141374d4dfe971bfa7d696106ee24bf393e77dbe368a3d2a0194eae20
+
+jobs:
+  seal:
+    name: Seal exact ExecutionOnly v3 observation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact ObservationSeal subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent, inherited authorities, and two-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs)" = "${EXECUTION_TEST_BLOB}"
+          test "$(git rev-parse HEAD:.github/workflows/rel-005a-execution-v3.yml)" = "${EXECUTION_WORKFLOW_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-full-predicate-contract.json)" = "${PREDICATE_CONTRACT_BLOB}"
+          test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-observation-seal-source.json"
+            ".github/workflows/rel-005a-observation-seal-v3.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Validate committed source binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          meta = json.loads(pathlib.Path(".github/rel/rel-005a-observation-seal-source.json").read_text())
+          assert meta["schema"] == "symthaea.rel.execution-artifact-source.v1"
+          assert meta["authority"] == "EvidenceSourceBinding"
+          assert str(meta["source_run_id"]) == os.environ["SOURCE_RUN_ID"]
+          assert str(meta["source_job_id"]) == os.environ["SOURCE_JOB_ID"]
+          assert meta["source_head"] == os.environ["EXECUTION_HEAD"]
+          assert str(meta["source_artifact"]["id"]) == os.environ["SOURCE_ARTIFACT_ID"]
+          assert meta["source_artifact"]["name"] == os.environ["SOURCE_ARTIFACT_NAME"]
+          assert meta["source_artifact"]["digest"] == os.environ["SOURCE_ARTIFACT_DIGEST"]
+          assert meta["observation_sha256"] == os.environ["SOURCE_OBSERVATION_SHA256"]
+          assert meta["static_audit_sha256"] == os.environ["SOURCE_STATIC_AUDIT_SHA256"]
+          assert meta["predicate_contract_head"] == os.environ["PREDICATE_CONTRACT_HEAD"]
+          assert meta["predicate_contract_blob"] == os.environ["PREDICATE_CONTRACT_BLOB"]
+          assert meta["frozen_scientific_subject"] == os.environ["FROZEN_SCIENTIFIC_SUBJECT"]
+          assert meta["frozen_test_blob"] == os.environ["FROZEN_TEST_BLOB"]
+          PY
+
+      - name: Verify immutable GitHub run and artifact metadata
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SOURCE_RUN_ID}" > "${RUNNER_TEMP}/source-run.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SOURCE_RUN_ID}/jobs?per_page=100" > "${RUNNER_TEMP}/source-jobs.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/artifacts/${SOURCE_ARTIFACT_ID}" > "${RUNNER_TEMP}/source-artifact.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          tmp = pathlib.Path(os.environ["RUNNER_TEMP"])
+          run = json.loads((tmp / "source-run.json").read_text())
+          jobs = json.loads((tmp / "source-jobs.json").read_text())
+          artifact = json.loads((tmp / "source-artifact.json").read_text())
+          assert str(run["id"]) == os.environ["SOURCE_RUN_ID"]
+          assert run["head_sha"] == os.environ["EXECUTION_HEAD"]
+          assert run["status"] == "completed"
+          assert run["conclusion"] == "success"
+          assert str(artifact["id"]) == os.environ["SOURCE_ARTIFACT_ID"]
+          assert artifact["name"] == os.environ["SOURCE_ARTIFACT_NAME"]
+          assert artifact["digest"] == os.environ["SOURCE_ARTIFACT_DIGEST"]
+          assert artifact["expired"] is False
+          assert str(artifact["workflow_run"]["id"]) == os.environ["SOURCE_RUN_ID"]
+          assert artifact["workflow_run"]["head_sha"] == os.environ["EXECUTION_HEAD"]
+          selected = [j for j in jobs["jobs"] if str(j["id"]) == os.environ["SOURCE_JOB_ID"]]
+          assert len(selected) == 1
+          assert selected[0]["name"] == "Execute full REL-005A observation surface"
+          assert selected[0]["conclusion"] == "success"
+          PY
+
+      - name: Download exact ExecutionOnly artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ env.SOURCE_ARTIFACT_ID }}
+          path: ${{ runner.temp }}/execution-artifact
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+
+      - name: Validate complete ExecutionOnly capsule and build ObservationSeal
+        shell: bash
+        env:
+          DOWNLOAD_ROOT: ${{ runner.temp }}/execution-artifact
+          MANIFEST_PATH: ${{ runner.temp }}/execution-artifact-manifest.json
+          SEAL_PATH: ${{ runner.temp }}/observation-seal-v3.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path(os.environ["DOWNLOAD_ROOT"])
+          manifest_path = pathlib.Path(os.environ["MANIFEST_PATH"])
+          seal_path = pathlib.Path(os.environ["SEAL_PATH"])
+
+          expected = {
+              "execution-v3-static-audit.json",
+              "rustc-version.txt",
+              "cargo-version.txt",
+              "rustfmt-version.txt",
+              "clippy-version.txt",
+              "execution.stdout.log",
+              "execution.stderr.log",
+              "execution-exit-code.txt",
+              "rel-005a-execution-v3-observation.json",
+              "execution-v3-receipt.json",
+          }
+
+          paths = [p for p in root.rglob("*") if p.is_file()]
+          by_name = {}
+          for path in paths:
+              if path.name in by_name:
+                  raise SystemExit(f"duplicate artifact basename: {path.name}")
+              by_name[path.name] = path
+          if set(by_name) != expected:
+              raise SystemExit(
+                  f"artifact file census mismatch: got={sorted(by_name)} expected={sorted(expected)}"
+              )
+
+          def sha(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          def canonical(value):
+              return json.dumps(
+                  value, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+              ).encode()
+
+          source = json.loads(
+              pathlib.Path(".github/rel/rel-005a-observation-seal-source.json").read_text()
+          )
+          receipt = json.loads(by_name["execution-v3-receipt.json"].read_text())
+          observation = json.loads(
+              by_name["rel-005a-execution-v3-observation.json"].read_text()
+          )
+          audit = json.loads(by_name["execution-v3-static-audit.json"].read_text())
+
+          assert receipt["schema"] == "symthaea.rel.execution-only-receipt.v3"
+          assert receipt["authority"] == "ExecutionOnly"
+          assert receipt["subject_head"] == os.environ["EXECUTION_HEAD"]
+          assert receipt["predicate_contract_parent"] == os.environ["PREDICATE_CONTRACT_HEAD"]
+          assert receipt["predicate_contract_blob"] == os.environ["PREDICATE_CONTRACT_BLOB"]
+          assert receipt["frozen_scientific_subject"] == os.environ["FROZEN_SCIENTIFIC_SUBJECT"]
+          assert receipt["frozen_test_blob"] == os.environ["FROZEN_TEST_BLOB"]
+          assert receipt["static_audit_status"] == "success"
+          assert receipt["format_status"] == "success"
+          assert receipt["measurement_step_status"] == "success"
+          assert str(receipt["measurement_exit_code"]) == "0"
+          assert receipt["observation_present"] is True
+          assert receipt["clippy_status"] == "success"
+          assert receipt["result"] == "EXECUTION_OK"
+          assert not any(receipt["claims"].values())
+
+          assert observation["schema"] == "symthaea.rel.graft-frame-execution-observation.v3"
+          assert observation["authority"] == "ExecutionOnly"
+          assert observation["frozen_scientific_subject"] == os.environ["FROZEN_SCIENTIFIC_SUBJECT"]
+          assert observation["frozen_test_blob"] == os.environ["FROZEN_TEST_BLOB"]
+          assert observation["predicate_contract_head"] == os.environ["PREDICATE_CONTRACT_HEAD"]
+          assert not any(observation["claims"].values())
+
+          observation_sha = sha(by_name["rel-005a-execution-v3-observation.json"])
+          assert observation_sha == os.environ["SOURCE_OBSERVATION_SHA256"]
+          assert observation_sha == receipt["observation_sha256"]
+          assert sha(by_name["execution-v3-static-audit.json"]) == os.environ["SOURCE_STATIC_AUDIT_SHA256"]
+          assert by_name["execution-exit-code.txt"].read_text().strip() == "0"
+
+          assert audit["schema"] == "symthaea.rel.execution-v3-static-audit.v1"
+          assert audit["authority"] == "ExecutionInfrastructureOnly"
+          assert audit["frozen_test_blob"] == os.environ["FROZEN_TEST_BLOB"]
+          assert audit["predicate_contract_blob"] == os.environ["PREDICATE_CONTRACT_BLOB"]
+          assert audit["hv_literal_count"] == 13
+          assert audit["transform_call_site_count"] == 13
+          assert audit["translation_call_site_count"] == 18
+          assert audit["scientific_threshold_tokens_present"] is False
+          assert audit["scientific_assertion_macros_present"] is False
+          assert audit["fixture_literals_match_frozen_source"] is True
+          assert audit["predicate_contract_count"] == 41
+          assert audit["valid"] is True
+
+          predicate_contract = json.loads(
+              pathlib.Path(".github/rel/rel-005a-full-predicate-contract.json").read_text()
+          )
+          for predicate in predicate_contract["predicates"]:
+              key = predicate["observation"]
+              assert key in observation
+              assert observation[key] is not None
+
+          files = [
+              {
+                  "basename": name,
+                  "byte_length": by_name[name].stat().st_size,
+                  "sha256": sha(by_name[name]),
+              }
+              for name in sorted(by_name)
+          ]
+          manifest = {
+              "schema": "symthaea.rel.execution-artifact-manifest.v1",
+              "authority": "ObservationSeal",
+              "source_run_id": int(os.environ["SOURCE_RUN_ID"]),
+              "source_artifact_id": int(os.environ["SOURCE_ARTIFACT_ID"]),
+              "source_artifact_digest": os.environ["SOURCE_ARTIFACT_DIGEST"],
+              "execution_subject_head": os.environ["EXECUTION_HEAD"],
+              "files": files,
+          }
+          manifest_bytes = canonical(manifest)
+          manifest_path.write_bytes(manifest_bytes)
+          manifest_sha = hashlib.sha256(manifest_bytes).hexdigest()
+
+          execution_receipt_sha = sha(by_name["execution-v3-receipt.json"])
+          chain_payload = {
+              "artifact_manifest_sha256": manifest_sha,
+              "execution_receipt_sha256": execution_receipt_sha,
+              "execution_subject_head": os.environ["EXECUTION_HEAD"],
+              "observation_sha256": observation_sha,
+          }
+          chain_sha = hashlib.sha256(canonical(chain_payload)).hexdigest()
+
+          seal = {
+              "schema": "symthaea.rel.observation-seal.v3",
+              "authority": "ObservationSeal",
+              "observation_status": "sealed",
+              "adjudication": "not_run",
+              "scientific_result": "not_run",
+              "source_run_id": int(os.environ["SOURCE_RUN_ID"]),
+              "source_job_id": int(os.environ["SOURCE_JOB_ID"]),
+              "source_artifact_id": int(os.environ["SOURCE_ARTIFACT_ID"]),
+              "source_artifact_name": os.environ["SOURCE_ARTIFACT_NAME"],
+              "source_artifact_digest": os.environ["SOURCE_ARTIFACT_DIGEST"],
+              "execution_subject_head": os.environ["EXECUTION_HEAD"],
+              "predicate_contract_head": os.environ["PREDICATE_CONTRACT_HEAD"],
+              "frozen_scientific_subject": os.environ["FROZEN_SCIENTIFIC_SUBJECT"],
+              "frozen_test_blob": os.environ["FROZEN_TEST_BLOB"],
+              "execution_receipt_sha256": execution_receipt_sha,
+              "observation_sha256": observation_sha,
+              "artifact_manifest_sha256": manifest_sha,
+              "chain_commitment_sha256": chain_sha,
+              "claims": {
+                  "observation_sealed": True,
+                  "comparison_only_adjudicated": False,
+                  "rel_005a_qualified": False,
+                  "scientific_pass": False,
+                  "scientific_fail": False,
+              },
+          }
+          seal_path.write_text(json.dumps(seal, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(seal, indent=2, sort_keys=True))
+          PY
+
+      - name: Enforce ObservationSeal non-adjudication boundary
+        shell: bash
+        env:
+          SEAL_PATH: ${{ runner.temp }}/observation-seal-v3.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          seal = json.loads(pathlib.Path(os.environ["SEAL_PATH"]).read_text())
+          assert seal["authority"] == "ObservationSeal"
+          assert seal["observation_status"] == "sealed"
+          assert seal["adjudication"] == "not_run"
+          assert seal["scientific_result"] == "not_run"
+          assert seal["claims"]["observation_sealed"] is True
+          assert seal["claims"]["comparison_only_adjudicated"] is False
+          assert seal["claims"]["rel_005a_qualified"] is False
+          assert seal["claims"]["scientific_pass"] is False
+          assert seal["claims"]["scientific_fail"] is False
+          PY
+
+      - name: Upload sealed evidence capsule
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-observation-seal-v3-${{ env.EXECUTION_HEAD }}
+          path: |
+            ${{ runner.temp }}/execution-artifact/**
+            ${{ runner.temp }}/source-run.json
+            ${{ runner.temp }}/source-jobs.json
+            ${{ runner.temp }}/source-artifact.json
+            ${{ runner.temp }}/execution-artifact-manifest.json
+            ${{ runner.temp }}/observation-seal-v3.json
+            .github/rel/rel-005a-observation-seal-source.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
