@@ -1,4 +1,4 @@
-name: REL-005A Frozen Predicate Replay
+name: REL-005A Frozen Predicate Replay R2
 
 on:
   pull_request:
@@ -11,11 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: rel-005a-frozen-predicate-replay-${{ github.event.pull_request.number || github.ref }}
+  group: rel-005a-frozen-predicate-replay-r2-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 env:
-  FROZEN_PARENT: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  FROZEN_SCIENTIFIC_PARENT: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  REPLAY_PARENT: db4a76843b7a1538259a91443c07fbebfa9f3e3e
   FROZEN_TEST_BLOB: 787ea051ae0bf8e5667b6925481afd46c15d0bc4
   EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
   RUSTC_WRAPPER: ""
@@ -23,45 +24,30 @@ env:
 
 jobs:
   replay:
-    name: Replay frozen REL-005A predicates
+    name: Replay frozen REL-005A predicates R2
     runs-on: ubuntu-24.04
     timeout-minutes: 35
 
     steps:
-      - name: Checkout exact replay subject
+      - name: Checkout exact replay-repair subject
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ env.EXPECTED_HEAD }}
           fetch-depth: 0
 
-      - name: Bind lineage and two-file scope
+      - name: Bind repair lineage and one-file scope
         shell: bash
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
-          test "$(git rev-parse HEAD^)" = "${FROZEN_PARENT}"
+          test "$(git rev-parse HEAD^)" = "${REPLAY_PARENT}"
+          test "$(git rev-parse ${FROZEN_SCIENTIFIC_PARENT}:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
           test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
-          mapfile -t changed < <(git diff --name-only "${FROZEN_PARENT}" HEAD | sort)
-          expected=(
-            ".github/rel/rel-005a-serialization-repair.py"
-            ".github/workflows/rel-005a-frozen-predicate-replay.yml"
-          )
-          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
-          test "${changed[*]}" = "${expected_sorted[*]}"
-          printf 'head=%s\nparent=%s\ntree=%s\nfrozen_test_blob=%s\n' \
-            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^)" "$(git rev-parse HEAD^{tree})" \
+          mapfile -t changed < <(git diff --name-only "${REPLAY_PARENT}" HEAD | sort)
+          test "${changed[*]}" = ".github/workflows/rel-005a-frozen-predicate-replay.yml"
+          printf 'head=%s\nrepair_parent=%s\nscientific_parent=%s\nfrozen_test_blob=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^)" "${FROZEN_SCIENTIFIC_PARENT}" \
             "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)"
-
-      - name: Install frozen Rust toolchain
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
-          rustup override set 1.96.0
-          rustc -Vv
-          cargo -V
-          rustfmt -V
-          cargo clippy -V
 
       - name: Bind committed source identities
         shell: bash
@@ -76,6 +62,31 @@ jobs:
             HEAD:.github/rel/rel-005a-serialization-repair.py \
             HEAD:.github/workflows/rel-005a-frozen-predicate-replay.yml
 
+      - name: Stage immutable source evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp crates/core/symthaea-fep/tests/rel_graft_frame.rs "${RUNNER_TEMP}/frozen-rel_graft_frame.rs"
+          sha256sum "${RUNNER_TEMP}/frozen-rel_graft_frame.rs" > "${RUNNER_TEMP}/frozen-source.sha256"
+
+      - name: Install frozen Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc -Vv | tee "${RUNNER_TEMP}/rustc-version.txt"
+          cargo -V | tee "${RUNNER_TEMP}/cargo-version.txt"
+          rustfmt -V | tee "${RUNNER_TEMP}/rustfmt-version.txt"
+          cargo clippy -V | tee "${RUNNER_TEMP}/clippy-version.txt"
+
+      - name: Verify immutable frozen source formatting
+        id: frozenfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/rel_graft_frame.rs
+
       - name: Derive serialization-only executable source
         id: derive
         shell: bash
@@ -83,14 +94,12 @@ jobs:
           REL005A_REPAIR_METADATA_PATH: ${{ runner.temp }}/repair-metadata.json
         run: |
           set -euo pipefail
-          cp crates/core/symthaea-fep/tests/rel_graft_frame.rs "${RUNNER_TEMP}/frozen-rel_graft_frame.rs"
           python3 .github/rel/rel-005a-serialization-repair.py
           git diff -- crates/core/symthaea-fep/tests/rel_graft_frame.rs > "${RUNNER_TEMP}/serialization-repair.diff"
           test -s "${RUNNER_TEMP}/serialization-repair.diff"
           mapfile -t dirty < <(git diff --name-only | sort)
           test "${dirty[*]}" = "crates/core/symthaea-fep/tests/rel_graft_frame.rs"
           sha256sum crates/core/symthaea-fep/tests/rel_graft_frame.rs | tee "${RUNNER_TEMP}/derived-source.sha256"
-          rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/rel_graft_frame.rs
 
       - name: Execute frozen predicates and capture all process evidence
         id: measure
@@ -117,13 +126,22 @@ jobs:
           cat "${RUNNER_TEMP}/measurement.stdout.log"
           cat "${RUNNER_TEMP}/measurement.stderr.log" >&2
 
+      - name: Warnings-denied Clippy on derived source
+        id: clippy
+        if: steps.measure.outputs.exit_code == '0' && steps.measure.outputs.metrics_present == 'true'
+        shell: bash
+        run: cargo clippy --locked -p symthaea-fep --test rel_graft_frame -- -D warnings
+
       - name: Build ReplayOnly receipt
-        if: always() && steps.derive.conclusion == 'success'
+        if: always()
         shell: bash
         env:
           REPAIR_METADATA_PATH: ${{ runner.temp }}/repair-metadata.json
           METRICS_PATH: ${{ runner.temp }}/rel-005a-metrics.json
           RECEIPT_PATH: ${{ runner.temp }}/replay-receipt.json
+          DERIVE_STATUS: ${{ steps.derive.conclusion }}
+          MEASURE_STATUS: ${{ steps.measure.conclusion }}
+          CLIPPY_STATUS: ${{ steps.clippy.conclusion }}
           EXIT_CODE: ${{ steps.measure.outputs.exit_code || 'not-run' }}
           METRICS_PRESENT: ${{ steps.measure.outputs.metrics_present || 'false' }}
         run: |
@@ -136,28 +154,45 @@ jobs:
           import subprocess
 
           def sha(path):
-              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+              path = pathlib.Path(path)
+              return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
 
-          repair = json.loads(pathlib.Path(os.environ["REPAIR_METADATA_PATH"]).read_text())
+          repair_path = pathlib.Path(os.environ["REPAIR_METADATA_PATH"])
+          repair = json.loads(repair_path.read_text()) if repair_path.is_file() else None
           metrics_path = pathlib.Path(os.environ["METRICS_PATH"])
           metrics_present = os.environ["METRICS_PRESENT"] == "true" and metrics_path.is_file()
+          derive_status = os.environ.get("DERIVE_STATUS") or "not-run"
+          measure_status = os.environ.get("MEASURE_STATUS") or "not-run"
+          clippy_status = os.environ.get("CLIPPY_STATUS") or "not-run"
           exit_code = os.environ["EXIT_CODE"]
-          result = (
-              "ALL_FROZEN_PREDICATES_EXECUTED_AND_PASSED"
-              if exit_code == "0" and metrics_present
-              else "EXECUTION_OR_PREDICATE_RED"
-          )
+
+          if derive_status != "success":
+              result = "REPAIR_CONTRACT_RED"
+          elif measure_status != "success":
+              result = "DIAGNOSTIC_INFRASTRUCTURE_RED"
+          elif exit_code == "0" and metrics_present:
+              result = "ALL_FROZEN_PREDICATES_EXECUTED_AND_PASSED"
+          elif exit_code == "0" and not metrics_present:
+              result = "DIAGNOSTIC_INFRASTRUCTURE_RED"
+          else:
+              result = "EXECUTION_OR_PREDICATE_RED"
+
           receipt = {
-              "schema": "symthaea.rel.frozen-predicate-replay.v1",
+              "schema": "symthaea.rel.frozen-predicate-replay.v2",
               "authority": "LegacyPredicateReplayOnly",
               "subject_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
-              "frozen_parent": os.environ["FROZEN_PARENT"],
+              "repair_parent": os.environ["REPLAY_PARENT"],
+              "frozen_scientific_parent": os.environ["FROZEN_SCIENTIFIC_PARENT"],
               "frozen_test_blob": os.environ["FROZEN_TEST_BLOB"],
-              "repair_metadata_sha256": sha(os.environ["REPAIR_METADATA_PATH"]),
-              "derived_test_sha256": repair["derived_test_sha256"],
+              "repair_metadata_present": repair is not None,
+              "repair_metadata_sha256": sha(repair_path),
+              "derived_test_sha256": repair["derived_test_sha256"] if repair else None,
+              "derive_status": derive_status,
+              "measurement_step_status": measure_status,
               "measurement_exit_code": exit_code,
               "metrics_present": metrics_present,
               "metrics_sha256": sha(metrics_path) if metrics_present else None,
+              "clippy_status": clippy_status,
               "result": result,
               "claims": {
                   "serialization_repair_only": True,
@@ -179,12 +214,17 @@ jobs:
           PY
 
       - name: Upload replay capsule before enforcement
-        if: always() && steps.derive.conclusion == 'success'
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: rel-005a-frozen-predicate-replay-${{ env.EXPECTED_HEAD }}
+          name: rel-005a-frozen-predicate-replay-r2-${{ env.EXPECTED_HEAD }}
           path: |
             ${{ runner.temp }}/frozen-rel_graft_frame.rs
+            ${{ runner.temp }}/frozen-source.sha256
+            ${{ runner.temp }}/rustc-version.txt
+            ${{ runner.temp }}/cargo-version.txt
+            ${{ runner.temp }}/rustfmt-version.txt
+            ${{ runner.temp }}/clippy-version.txt
             ${{ runner.temp }}/repair-metadata.json
             ${{ runner.temp }}/serialization-repair.diff
             ${{ runner.temp }}/derived-source.sha256
@@ -196,13 +236,8 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Warnings-denied Clippy on derived source
-        if: steps.measure.outputs.exit_code == '0' && steps.measure.outputs.metrics_present == 'true'
-        shell: bash
-        run: cargo clippy --locked -p symthaea-fep --test rel_graft_frame -- -D warnings
-
-      - name: Restore frozen source
-        if: always() && steps.derive.conclusion == 'success'
+      - name: Restore frozen source unconditionally
+        if: always()
         shell: bash
         run: git checkout -- crates/core/symthaea-fep/tests/rel_graft_frame.rs
 
@@ -212,7 +247,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
-          test "$(git rev-parse HEAD^)" = "${FROZEN_PARENT}"
+          test "$(git rev-parse HEAD^)" = "${REPLAY_PARENT}"
           test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
           test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
@@ -220,9 +255,11 @@ jobs:
         if: always()
         shell: bash
         env:
+          DERIVE_STATUS: ${{ steps.derive.conclusion }}
           EXIT_CODE: ${{ steps.measure.outputs.exit_code || 'not-run' }}
           METRICS_PRESENT: ${{ steps.measure.outputs.metrics_present || 'false' }}
         run: |
           set -euo pipefail
+          test "${DERIVE_STATUS}" = "success"
           test "${EXIT_CODE}" = "0"
           test "${METRICS_PRESENT}" = "true"
