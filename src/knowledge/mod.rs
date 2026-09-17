@@ -55,6 +55,7 @@ pub mod ignorance_frontier;
 pub mod inquiry_contract;
 pub mod inquiry_preregistration;
 pub mod inquiry_result;
+pub mod legacy_confidence_characterization;
 pub mod llm_extraction;
 pub mod manager;
 pub mod persistence;
@@ -124,6 +125,9 @@ pub use inquiry_preregistration::{
     PreregistrationError,
 };
 pub use inquiry_result::{InquiryResultError, InquiryResultReceipt};
+pub use legacy_confidence_characterization::{
+    characterize_legacy_confidence_authority, LegacyConfidenceAuthorityProfile,
+};
 pub use manager::{KnowledgeManager, KnowledgeSignals, KnowledgeTelemetry};
 pub use reasoning_context::{
     CausalChain, EpistemicState, GroundedFact, KnowledgeQueryResult, ReasoningContext,
