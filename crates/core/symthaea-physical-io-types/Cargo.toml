@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-physical-io-types"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Canonical measurement-only physical I/O observation contracts for Symthaea FIELD"
+
+[dependencies]
+serde = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
