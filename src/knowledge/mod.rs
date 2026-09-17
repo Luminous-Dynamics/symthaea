@@ -62,6 +62,7 @@ pub mod epistemic_restart_continuity;
     reason = "EKM-032 V1 reserves typed canonical-hash helpers pending canonical restore schema"
 )]
 pub mod epistemic_restart_manifest;
+pub mod epistemic_restart_anchor;
 pub mod epistemic_restart_validation_receipt;
 #[allow(
     unused_imports,
@@ -186,6 +187,13 @@ pub use epistemic_restart_capsule_v2::{
 pub use epistemic_restart_continuity::{
     RestartContinuityDecisionV1, RestartContinuityDispositionV1, RestartContinuityGateV1,
     TrustedRestartValidationAnchorV1,
+};
+pub use epistemic_restart_anchor::{
+    RestartAnchorDigestV1, RestartAnchorEvidenceError, RestartAnchorEvidenceKindV1,
+    RestartAnchorEvidenceV1, RestartAnchorEvidenceVerifierV1, RestartAnchorStatementV1,
+    RestartAnchorTrackerV1, RestartAnchorTrackingError, VerifiedRestartAnchorEvidenceV1,
+    MAX_RESTART_ANCHOR_AUTHORITY_ID_BYTES, MAX_RESTART_ANCHOR_PROOF_BYTES,
+    digest_restart_anchor_statement, verify_restart_anchor_evidence,
 };
 pub use epistemic_restart_manifest::{
     EpistemicLedgerInventoryV1, EpistemicLedgerLineageV1, EpistemicRestartDigest,

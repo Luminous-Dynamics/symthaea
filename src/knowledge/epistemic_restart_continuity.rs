@@ -31,6 +31,18 @@ impl TrustedRestartValidationAnchorV1 {
         }
     }
 
+    /// Crate-internal bridge for EKM-046 after external anchor evidence has
+    /// already been verified. Public callers cannot use this to mint anchors.
+    pub(crate) fn from_verified_parts(
+        captured_at_cycle: u64,
+        receipt_digest: EpistemicRestartValidationReceiptDigest,
+    ) -> Self {
+        Self {
+            captured_at_cycle,
+            receipt_digest,
+        }
+    }
+
     pub fn captured_at_cycle(self) -> u64 {
         self.captured_at_cycle
     }
