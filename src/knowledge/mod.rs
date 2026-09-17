@@ -76,15 +76,14 @@ pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
 pub use belief_mutation_authority::{
     BeliefMutationAuthority, BeliefMutationAuthorityError, PreparedBeliefMutation,
 };
-pub(crate) use belief_mutation_decision_guard::BeliefMutationDecisionGuard;
 pub use belief_mutation_decision_guard::BeliefMutationDecisionGuardError;
+#[cfg(test)]
 pub(crate) use belief_mutation_firewall::BeliefMutationFirewall;
 pub use belief_mutation_firewall::{
     BeliefMutationAuthorization, BeliefMutationAuthorizationDecision, BeliefMutationError,
     BeliefMutationOutcome, BeliefMutationReceipt, BeliefMutationReceiptId,
     BeliefMutationRollbackPlan, EpistemicSupportState, EpistemicSupportStore,
 };
-pub(crate) use belief_mutation_transaction::BeliefMutationTransactionCoordinator;
 pub use belief_mutation_transaction::{
     BeliefMutationSealError, BeliefMutationTransactionError, BeliefMutationTransactionOutcome,
     BeliefRevisionEvidenceSeal, SealedClaimSnapshot,
