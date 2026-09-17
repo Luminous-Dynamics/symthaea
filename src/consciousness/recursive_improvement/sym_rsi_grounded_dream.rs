@@ -155,6 +155,7 @@ pub struct DreamActionPrediction {
     pub action: u8,
     pub training_support_count: usize,
     pub actionable: bool,
+    pub model_simulation_count: usize,
     pub score: f32,
     pub predicted_task_quality: f32,
     pub failure_probability: f32,
@@ -245,14 +246,23 @@ impl FixturePolicy for GroundedDreamPolicy {
             let dream_action = DreamFixtureAction::new(domain, action);
             let training_support_count = self.model.support_count(domain, action);
             let actionable = base_training_support_count > 0 && training_support_count > 0;
-            let task_prediction = task_prediction_summary(
-                &engine,
-                &encoded,
-                dream_action,
-                legal_actions,
-                &supported_actions,
-                state.quality as f32,
-            );
+            let task_prediction = if actionable {
+                task_prediction_summary(
+                    &engine,
+                    &encoded,
+                    dream_action,
+                    legal_actions,
+                    &supported_actions,
+                    state.quality as f32,
+                )
+            } else {
+                TaskPredictionSummary {
+                    mean_quality: state.quality.clamp(0.0, 1.0) as f32,
+                    failure_probability: 1.0,
+                    confidence: 0.0,
+                    simulations_run: 0,
+                }
+            };
             let predicted_task_quality = task_prediction.mean_quality;
             let score = predicted_task_quality
                 - DREAM_RISK_PENALTY * task_prediction.failure_probability;
@@ -268,11 +278,15 @@ impl FixturePolicy for GroundedDreamPolicy {
                 predicted_task_quality,
                 task_prediction.failure_probability,
                 task_prediction.confidence,
+                training_support_count,
+                actionable,
+                task_prediction.simulations_run,
             );
             predictions.push(DreamActionPrediction {
                 action,
                 training_support_count,
                 actionable,
+                model_simulation_count: task_prediction.simulations_run,
                 score,
                 predicted_task_quality,
                 failure_probability: task_prediction.failure_probability,
@@ -633,6 +647,10 @@ struct TaskPredictionSummary {
     mean_quality: f32,
     failure_probability: f32,
     confidence: f32,
+    training_support_count: usize,
+    actionable: bool,
+    model_simulation_count: usize,
+    simulations_run: usize,
 }
 
 fn task_prediction_summary(
@@ -670,6 +688,7 @@ fn task_prediction_summary(
         mean_quality: total_quality / simulations as f32,
         failure_probability,
         confidence: 1.0 - failure_probability,
+        simulations_run: simulations,
     }
 }
 
@@ -707,6 +726,9 @@ fn prediction_provenance_digest(
     hasher.update(&predicted_task_quality.to_bits().to_le_bytes());
     hasher.update(&failure_probability.to_bits().to_le_bytes());
     hasher.update(&confidence.to_bits().to_le_bytes());
+    hasher.update(&(training_support_count as u64).to_le_bytes());
+    hasher.update(&[u8::from(actionable)]);
+    hasher.update(&(model_simulation_count as u64).to_le_bytes());
     format!("blake3:{}", hasher.finalize().to_hex())
 }
 
@@ -821,7 +843,7 @@ mod tests {
             support.observation_count > 0
                 && FixtureDomainKind::ALL
                     .iter()
-                    .any(|domain| domain.id() == support.domain_id)
+                    .any(|domain| domain.id() == support.domain_id.as_str())
         }));
     }
 
@@ -843,8 +865,8 @@ mod tests {
         let split = EvaluationSplit::HeldOutReplay;
         let state = domain.reset(101, split);
         let legal = domain.legal_actions(&state, split);
-        let base_action = base_spec
-            .policy()
+        let mut base_policy = base_spec.policy();
+        let base_action = base_policy
             .choose_action(domain, 101, split, &state, &legal)
             .unwrap();
         let chosen = policy
@@ -855,7 +877,9 @@ mod tests {
         let decision = policy.decision_log().last().unwrap();
         assert_eq!(decision.base_training_support_count, 0);
         assert!(decision.predictions.iter().all(|prediction| {
-            prediction.training_support_count == 0 && !prediction.actionable
+            prediction.training_support_count == 0
+                && !prediction.actionable
+                && prediction.model_simulation_count == 0
         }));
     }
 
@@ -947,6 +971,7 @@ mod tests {
         assert!(summary.mean_quality.is_finite());
         assert!((0.0..=1.0).contains(&summary.failure_probability));
         assert!((0.0..=1.0).contains(&summary.confidence));
+        assert_eq!(summary.simulations_run, 5);
     }
 
     #[test]
