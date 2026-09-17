@@ -36,8 +36,10 @@ scan_manifest() {
   local extracted="$2"
   local status
 
-  extract_dependency_declarations "$manifest" > "$extracted"
-  if rg -n -i -- "$FORBIDDEN_RE" "$extracted"; then
+  if ! extract_dependency_declarations "$manifest" > "$extracted"; then
+    return 20
+  fi
+  if grep -n -i -E -- "$FORBIDDEN_RE" "$extracted"; then
     return 10
   else
     status=$?
@@ -102,6 +104,17 @@ EOF
     status=$?
     if [[ "$status" -ne 10 ]]; then
       echo "self-test failed: target-specific dependency returned unexpected status=$status" >&2
+      return 1
+    fi
+  fi
+
+  if scan_manifest "$tmpdir/missing.toml" "$tmpdir/missing.dependencies" >/dev/null 2>&1; then
+    echo 'self-test failed: missing manifest was accepted as clean' >&2
+    return 1
+  else
+    status=$?
+    if [[ "$status" -ne 20 ]]; then
+      echo "self-test failed: missing manifest returned unexpected status=$status" >&2
       return 1
     fi
   fi
