@@ -68,6 +68,7 @@ pub enum QualificationClassification {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QualificationJobRequirement {
     pub name: String,
     pub allow_skip: bool,
@@ -84,6 +85,7 @@ impl QualificationJobRequirement {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QualificationProfile {
     pub revision: u32,
     pub lane: QualificationLane,
@@ -166,6 +168,7 @@ impl QualificationProfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObservedQualificationStep {
     pub ordinal: u32,
     pub name: String,
@@ -173,6 +176,7 @@ pub struct ObservedQualificationStep {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ObservedQualificationJob {
     pub job_id: u64,
     pub name: String,
@@ -222,6 +226,7 @@ impl ObservedQualificationJob {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct QualificationRunObservation {
     pub repository: String,
     pub workflow_run_id: u64,
@@ -432,7 +437,52 @@ pub struct QualifiedHeadReceipt {
     mechanical_identity: QualificationDigest,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QualifiedHeadReceiptRecord {
+    pub revision: u32,
+    pub profile_identity: QualificationDigest,
+    pub expected_subject_sha: String,
+    pub observed_head_sha: String,
+    pub workflow_definition: ArtifactIdentity,
+    pub workflow_run_id: u64,
+    pub run_attempt: u32,
+    pub materializer_revision: u32,
+    pub job_set_identity: QualificationDigest,
+    pub mechanical_identity: QualificationDigest,
+}
+
+impl QualifiedHeadReceiptRecord {
+    pub fn verify(
+        &self,
+        profile: &QualificationProfile,
+        expected_subject_sha: &str,
+        observation: &QualificationRunObservation,
+    ) -> Result<QualifiedHeadReceipt, QualificationError> {
+        let trusted = QualifiedHeadReceipt::try_new(profile, expected_subject_sha, observation)?;
+        if *self != trusted.to_record() {
+            return Err(QualificationError::ReceiptRecordMismatch);
+        }
+        Ok(trusted)
+    }
+}
+
 impl QualifiedHeadReceipt {
+    pub fn to_record(&self) -> QualifiedHeadReceiptRecord {
+        QualifiedHeadReceiptRecord {
+            revision: self.revision,
+            profile_identity: self.profile_identity,
+            expected_subject_sha: self.expected_subject_sha.clone(),
+            observed_head_sha: self.observed_head_sha.clone(),
+            workflow_definition: self.workflow_definition,
+            workflow_run_id: self.workflow_run_id,
+            run_attempt: self.run_attempt,
+            materializer_revision: self.materializer_revision,
+            job_set_identity: self.job_set_identity,
+            mechanical_identity: self.mechanical_identity,
+        }
+    }
+
     pub fn try_new(
         profile: &QualificationProfile,
         expected_subject_sha: &str,
@@ -533,6 +583,7 @@ pub enum QualificationError {
     ReceiptRequiresFullExactHead,
     ReceiptRequiresPass,
     ReceiptSubjectMismatch,
+    ReceiptRecordMismatch,
 }
 
 impl fmt::Display for QualificationError {
