@@ -1,0 +1,111 @@
+name: Materialize post-release runtime lock remediation
+
+on:
+  push:
+    branches:
+      - qualify/materialize-post-release-lock-r1
+    paths:
+      - .github/workflows/materialize-post-release-runtime-lock.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-post-release-runtime-lock-r1
+  cancel-in-progress: false
+
+jobs:
+  materialize:
+    name: Materialize exact Cargo-generated lock
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact remediation target branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: assure/post-release-runtime-lineage-lock-refresh
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Bind exact pre-lock subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='7f34d64d8be07fe70eb160ed9cc57d487b8e6b07'
+          test "$(git rev-parse HEAD)" = "$expected"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          printf 'subject=%s\ntree=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" \
+            > "$RUNNER_TEMP/pre-lock-subject.txt"
+
+      - name: Install pinned Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Reproduce exact retained lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha='6803d27e50b9576fef59e869dd022153942947d8c935c7c0fdcede265c99dc0e'
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo metadata --format-version 1 > "$RUNNER_TEMP/metadata.reconciled.json"
+          actual_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          printf 'expected_sha256=%s\nactual_sha256=%s\n' "$expected_sha" "$actual_sha" \
+            | tee "$RUNNER_TEMP/lock-identity.txt"
+          test "$actual_sha" = "$expected_sha"
+          mapfile -t changed < <(git diff --name-only)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = Cargo.lock
+          git diff --check -- Cargo.lock
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.generated.patch"
+          test -s "$RUNNER_TEMP/Cargo.lock.generated.patch"
+
+      - name: Prove generated lock is self-consistent
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 \
+            > "$RUNNER_TEMP/metadata.generated-locked.json"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = \
+            '6803d27e50b9576fef59e869dd022153942947d8c935c7c0fdcede265c99dc0e'
+          mapfile -t changed < <(git diff --name-only)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = Cargo.lock
+
+      - name: Commit only retained Cargo-generated lock
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          test "$(git diff --cached --name-only)" = Cargo.lock
+          git commit -m 'chore(assurance): refresh post-release runtime lineage lock'
+          new_head="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = '7f34d64d8be07fe70eb160ed9cc57d487b8e6b07'
+          echo "new_head=$new_head" >> "$GITHUB_OUTPUT"
+          printf 'new_head=%s\nparent=%s\nlock_sha256=%s\n' \
+            "$new_head" "$(git rev-parse HEAD^)" \
+            "$(sha256sum Cargo.lock | awk '{print $1}')" \
+            > "$RUNNER_TEMP/materialized-commit.txt"
+
+      - name: Push exact lock-only remediation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:refs/heads/assure/post-release-runtime-lineage-lock-refresh
+
+      - name: Retain materialization evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: post-release-runtime-lock-materialization
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/pre-lock-subject.txt
+            ${{ runner.temp }}/lock-identity.txt
+            ${{ runner.temp }}/Cargo.lock.generated.patch
+            ${{ runner.temp }}/metadata.reconciled.json
+            ${{ runner.temp }}/metadata.generated-locked.json
+            ${{ runner.temp }}/materialized-commit.txt
