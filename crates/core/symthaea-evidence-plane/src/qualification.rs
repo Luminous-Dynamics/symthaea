@@ -418,7 +418,7 @@ impl QualificationProfile {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct QualifiedHeadReceipt {
     revision: u32,
     profile_identity: QualificationDigest,
