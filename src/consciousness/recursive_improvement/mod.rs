@@ -75,6 +75,7 @@ pub mod sym_rsi_fixtures;
 pub mod sym_rsi_fresh_evaluation;
 pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_dream_protocol;
+pub mod sym_rsi_dream_fresh_evaluation;
 pub mod sym_rsi_dream_verification;
 pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
@@ -204,6 +205,11 @@ pub use sym_rsi_dream_protocol::{
     SYM_RSI_001D_PROTOCOL_SCHEMA, SYM_RSI_001D_QUALITY_TOLERANCE,
     canonical_sym_rsi_001d_manifest, validate_canonical_sym_rsi_001d_manifest,
     validate_dream_extension_seed_independence,
+};
+pub use sym_rsi_dream_fresh_evaluation::{
+    DreamFreshDisposition, DreamFreshDomainSummary, DreamFreshEvaluationError,
+    DreamFreshEvaluationReceipt, DreamFreshPairReceipt,
+    SYM_RSI_001D_FRESH_EVALUATION_SCHEMA, run_fresh_d_vs_c,
 };
 pub use sym_rsi_dream_verification::{
     DreamVerificationCorpus, DreamVerificationCorpusReceipt, DreamVerificationDecision,
