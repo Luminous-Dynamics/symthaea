@@ -84,6 +84,7 @@ git merge-base --is-ancestor "$main_head_start" "$recovery_head_start" || {
 }
 
 expected_paths="$(cat <<'EOF'
+.github/workflows/arc3-protocol-trusted-cpu-qualify.yml
 .github/workflows/self-hosted-ai-assurance-foundation-recovery.yml
 .github/workflows/self-hosted-rca-canonical-lineage-recovery.yml
 .github/workflows/self-hosted-runner-smoke.yml
@@ -118,6 +119,8 @@ diff_paths_sha256="$(printf '%s\n' "$actual_paths" | sha256sum | awk '{print $1}
 runner_module_blob="$(git rev-parse "$recovery_head_start:nix/modules/github-actions-runner.nix")"
 routing_policy_blob="$(git rev-parse "$recovery_head_start:nix/tests/eval-trusted-runner-routing.nix")"
 smoke_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-runner-smoke.yml")"
+arc3_protocol_qualifier_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/arc3-protocol-trusted-cpu-qualify.yml")"
+ci_rust_shell_blob="$(git rev-parse "$recovery_head_start:nix/ci-rust-shell.nix")"
 bootstrap_validator_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-bootstrap.sh")"
 promotion_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-promotion.sh")"
 recovery_eligibility_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-recovery-eligibility.sh")"
@@ -143,6 +146,8 @@ printf 'bootstrap_rust_channel=%s\n' "$rust_channel"
 printf 'bootstrap_host_nix_system=%s\n' "$host_nix_system"
 printf 'bootstrap_host_nix_version=%s\n' "$host_nix_version"
 printf 'bootstrap_host_lifecycle_contract_blob=%s\n' "$host_lifecycle_contract_blob"
+printf 'bootstrap_arc3_protocol_qualifier_workflow_blob=%s\n' "$arc3_protocol_qualifier_workflow_blob"
+printf 'bootstrap_ci_rust_shell_blob=%s\n' "$ci_rust_shell_blob"
 printf 'bootstrap_promotion_verifier_blob=%s\n' "$promotion_verifier_blob"
 printf 'bootstrap_recovery_eligibility_verifier_blob=%s\n' "$recovery_eligibility_verifier_blob"
 
@@ -172,6 +177,7 @@ nix develop --no-write-lock-file \
     cargo --version
     rustfmt --version
     cargo clippy --version
+    python3 --version
     cargo metadata --locked --format-version 1 > /dev/null
     cargo check --locked -p symthaea-psych-bench --lib
   '
@@ -194,9 +200,9 @@ fi
 [[ "$initial_head" == "$recovery_head_end" ]]
 git merge-base --is-ancestor "$main_head_end" "$recovery_head_end"
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v6.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v7.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v6
+schema=symthaea.trusted-runner.bootstrap.v7
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
@@ -211,6 +217,8 @@ recovery_diff_paths_sha256=$diff_paths_sha256
 runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
 smoke_workflow_blob=$smoke_workflow_blob
+arc3_protocol_qualifier_workflow_blob=$arc3_protocol_qualifier_workflow_blob
+ci_rust_shell_blob=$ci_rust_shell_blob
 bootstrap_validator_blob=$bootstrap_validator_blob
 promotion_verifier_blob=$promotion_verifier_blob
 recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
