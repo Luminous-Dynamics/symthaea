@@ -1,0 +1,179 @@
+name: EUREKA V2 Qualification Receipt Symmetry Conformance
+
+on:
+  pull_request:
+    paths:
+      - ".github/eureka/eureka-v2-backend-qualification-receipt-oracle.py"
+      - ".github/eureka/eureka-v2-qualification-forensic-manifest-v3.py"
+      - ".github/eureka/eureka-v2-qualification-forensic-verifier-v3.py"
+      - ".github/eureka/eureka-v2-qualification-receipt-symmetry-selftest.py"
+      - ".github/eureka/eureka-v2-qualification-stage-runner.py"
+      - ".github/eureka/eureka-v2-qualification-stage-runner-selftest.py"
+      - ".github/workflows/eureka-v2-qualification-receipt-symmetry-conformance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  EUREKA_RECEIPT_SYMMETRY_REVISION: "EUREKA.002.V2.QUALIFICATION_RECEIPT_SYMMETRY_CONFORMANCE.v1"
+  EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+  EUREKA_GITHUB_WORKFLOW_SHA: ${{ github.workflow_sha }}
+
+jobs:
+  receipt-symmetry-conformance:
+    name: Qualify EUREKA receipt producer/verifier/oracle symmetry
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Capture exact receipt-symmetry subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout is dirty before receipt-symmetry conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+
+          subject_head="$(git rev-parse HEAD)"
+          subject_tree="$(git rev-parse 'HEAD^{tree}')"
+          [[ "$subject_head" == "$EXPECTED_SUBJECT_SHA" ]]
+          [[ "$EUREKA_GITHUB_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
+          if ! git cat-file -e "${EUREKA_GITHUB_WORKFLOW_SHA}^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$EUREKA_GITHUB_WORKFLOW_SHA"
+          fi
+
+          workflow=".github/workflows/eureka-v2-qualification-receipt-symmetry-conformance.yml"
+          oracle=".github/eureka/eureka-v2-backend-qualification-receipt-oracle.py"
+          producer=".github/eureka/eureka-v2-qualification-forensic-manifest-v3.py"
+          verifier=".github/eureka/eureka-v2-qualification-forensic-verifier-v3.py"
+          campaign=".github/eureka/eureka-v2-qualification-receipt-symmetry-selftest.py"
+          runner=".github/eureka/eureka-v2-qualification-stage-runner.py"
+          stage_selftest=".github/eureka/eureka-v2-qualification-stage-runner-selftest.py"
+
+          workflow_sha="$(sha256sum "$workflow" | awk '{print $1}')"
+          interpreted_workflow_sha="$(git show "${EUREKA_GITHUB_WORKFLOW_SHA}:${workflow}" | sha256sum | awk '{print $1}')"
+          [[ "$workflow_sha" == "$interpreted_workflow_sha" ]] || {
+            echo "Checked-out receipt-symmetry workflow differs from GitHub-interpreted bytes" >&2
+            exit 1
+          }
+
+          oracle_sha="$(sha256sum "$oracle" | awk '{print $1}')"
+          producer_sha="$(sha256sum "$producer" | awk '{print $1}')"
+          verifier_sha="$(sha256sum "$verifier" | awk '{print $1}')"
+          campaign_sha="$(sha256sum "$campaign" | awk '{print $1}')"
+          runner_sha="$(sha256sum "$runner" | awk '{print $1}')"
+          stage_selftest_sha="$(sha256sum "$stage_selftest" | awk '{print $1}')"
+          python_version="$(python3 --version)"
+          receipt="${RUNNER_TEMP}/eureka-v2-qualification-receipt-symmetry-conformance.env"
+          campaign_output="${RUNNER_TEMP}/eureka-v2-qualification-receipt-symmetry-campaign.env"
+
+          echo "EUREKA_RS_SUBJECT_HEAD=$subject_head" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_SUBJECT_TREE=$subject_tree" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_WORKFLOW_SHA256=$workflow_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_ORACLE_SHA256=$oracle_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_PRODUCER_SHA256=$producer_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_VERIFIER_SHA256=$verifier_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_CAMPAIGN_SHA256=$campaign_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_RUNNER_SHA256=$runner_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_STAGE_SELFTEST_SHA256=$stage_selftest_sha" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_PYTHON_VERSION=$python_version" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_RECEIPT=$receipt" >> "$GITHUB_ENV"
+          echo "EUREKA_RS_CAMPAIGN_OUTPUT=$campaign_output" >> "$GITHUB_ENV"
+
+          {
+            printf 'conformance_revision=%s\n' "$EUREKA_RECEIPT_SYMMETRY_REVISION"
+            printf 'repository=%s\n' "$GITHUB_REPOSITORY"
+            printf 'github_run_id=%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt=%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'subject_head=%s\n' "$subject_head"
+            printf 'subject_tree=%s\n' "$subject_tree"
+            printf 'workflow_sha256=%s\n' "$workflow_sha"
+            printf 'receipt_oracle_sha256=%s\n' "$oracle_sha"
+            printf 'manifest_producer_sha256=%s\n' "$producer_sha"
+            printf 'offline_verifier_sha256=%s\n' "$verifier_sha"
+            printf 'differential_campaign_sha256=%s\n' "$campaign_sha"
+            printf 'stage_runner_sha256=%s\n' "$runner_sha"
+            printf 'stage_selftest_sha256=%s\n' "$stage_selftest_sha"
+            printf 'python_version=%s\n' "$python_version"
+            printf 'shared_validation_imports=false\n'
+            printf 'execution_authority_granted=false\n'
+          } > "$receipt"
+
+      - name: Run producer-verifier-oracle differential campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 \
+            .github/eureka/eureka-v2-qualification-receipt-symmetry-selftest.py \
+            .github/eureka/eureka-v2-backend-qualification-receipt-oracle.py \
+            .github/eureka/eureka-v2-qualification-forensic-manifest-v3.py \
+            .github/eureka/eureka-v2-qualification-forensic-verifier-v3.py \
+            .github/eureka/eureka-v2-qualification-stage-runner.py \
+            .github/eureka/eureka-v2-qualification-stage-runner-selftest.py \
+            .github/workflows/eureka-v2-qualification-receipt-symmetry-conformance.yml \
+            "$EUREKA_RS_CAMPAIGN_OUTPUT"
+
+      - name: Verify exact postflight and seal PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_SUBJECT_SHA" ]]
+          [[ "$(git rev-parse HEAD)" == "$EUREKA_RS_SUBJECT_HEAD" ]]
+          [[ "$(git rev-parse 'HEAD^{tree}')" == "$EUREKA_RS_SUBJECT_TREE" ]]
+          [[ "$(sha256sum .github/workflows/eureka-v2-qualification-receipt-symmetry-conformance.yml | awk '{print $1}')" == "$EUREKA_RS_WORKFLOW_SHA256" ]]
+          [[ "$(sha256sum .github/eureka/eureka-v2-backend-qualification-receipt-oracle.py | awk '{print $1}')" == "$EUREKA_RS_ORACLE_SHA256" ]]
+          [[ "$(sha256sum .github/eureka/eureka-v2-qualification-forensic-manifest-v3.py | awk '{print $1}')" == "$EUREKA_RS_PRODUCER_SHA256" ]]
+          [[ "$(sha256sum .github/eureka/eureka-v2-qualification-forensic-verifier-v3.py | awk '{print $1}')" == "$EUREKA_RS_VERIFIER_SHA256" ]]
+          [[ "$(sha256sum .github/eureka/eureka-v2-qualification-receipt-symmetry-selftest.py | awk '{print $1}')" == "$EUREKA_RS_CAMPAIGN_SHA256" ]]
+          [[ "$(sha256sum .github/eureka/eureka-v2-qualification-stage-runner.py | awk '{print $1}')" == "$EUREKA_RS_RUNNER_SHA256" ]]
+          [[ "$(sha256sum .github/eureka/eureka-v2-qualification-stage-runner-selftest.py | awk '{print $1}')" == "$EUREKA_RS_STAGE_SELFTEST_SHA256" ]]
+          [[ "$(python3 --version)" == "$EUREKA_RS_PYTHON_VERSION" ]]
+          [[ -f "$EUREKA_RS_CAMPAIGN_OUTPUT" ]]
+          grep -Fxq 'valid_unsealed_agreement=PASS' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+          grep -Fxq 'valid_pass_agreement=PASS' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+          grep -Fxq 'all_mutants_rejected_by_oracle=true' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+          grep -Fxq 'all_mutants_rejected_by_producer=true' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+          grep -Fxq 'all_mutants_rejected_by_verifier=true' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+          grep -Fxq 'shared_validation_imports=false' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+          grep -Fxq 'execution_authority_granted=false' "$EUREKA_RS_CAMPAIGN_OUTPUT"
+
+          dirty="$(git status --porcelain=v1 --untracked-files=all)"
+          [[ -z "$dirty" ]] || {
+            echo "Checkout mutated during receipt-symmetry conformance" >&2
+            printf '%s\n' "$dirty" >&2
+            exit 1
+          }
+          printf 'checkout_clean_after=true\n' >> "$EUREKA_RS_RECEIPT"
+          printf 'conformance_result=PASS\n' >> "$EUREKA_RS_RECEIPT"
+
+      - name: Upload exact receipt-symmetry evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: eureka-v2-qualification-receipt-symmetry-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/eureka-v2-qualification-receipt-symmetry-conformance.env
+            ${{ runner.temp }}/eureka-v2-qualification-receipt-symmetry-campaign.env
+            .github/workflows/eureka-v2-qualification-receipt-symmetry-conformance.yml
+            .github/eureka/eureka-v2-backend-qualification-receipt-oracle.py
+            .github/eureka/eureka-v2-qualification-forensic-manifest-v3.py
+            .github/eureka/eureka-v2-qualification-forensic-verifier-v3.py
+            .github/eureka/eureka-v2-qualification-receipt-symmetry-selftest.py
+            .github/eureka/eureka-v2-qualification-stage-runner.py
+            .github/eureka/eureka-v2-qualification-stage-runner-selftest.py
+          if-no-files-found: error
+          retention-days: 90

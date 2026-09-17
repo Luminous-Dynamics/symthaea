@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 """Independent offline verifier for EUREKA V2 forensic manifest v3 evidence.
 
-No producer-side EUREKA module is imported. Given an externally supplied exact
-subject HEAD and retained evidence bytes, this verifier independently checks the
-v3 manifest commitment, logical/file identity agreement, qualification receipt,
-stage-chain legality, diagnostic completeness, and qualification-result ceiling.
+No producer-side EUREKA module or receipt oracle is imported. Given an
+externally supplied exact subject HEAD and retained evidence bytes, this
+verifier independently checks the v3 manifest commitment, logical/file
+identity agreement, exact qualification-receipt grammar, stage-chain legality,
+diagnostic completeness, and qualification-result ceiling.
 """
 
 from __future__ import annotations
@@ -23,9 +24,14 @@ STAGE_SCHEMA: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_STAGE_RECEIPT.v1"
 QUAL_SCHEMA: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_RECEIPT.v2"
 QUAL_REVISION: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION.v2"
 CONTRACT_REVISION: Final = "EUREKA.002.V2.BACKEND_QUALIFICATION_COMMANDS.v2"
+REPOSITORY: Final = "Luminous-Dynamics/symthaea"
+CLAIM_SCOPE: Final = "backend-build-test-lint-only"
+EVENTS: Final = {"pull_request", "workflow_dispatch"}
 STAGES: Final = ("check", "test", "clippy")
 HEX40: Final = re.compile(r"^[0-9a-f]{40}$")
 HEX64: Final = re.compile(r"^[0-9a-f]{64}$")
+RUSTC: Final = re.compile(r"^rustc 1\.96\.0 \([0-9a-f]+(?: \d{4}-\d{2}-\d{2})?\)$")
+CARGO: Final = re.compile(r"^cargo 1\.96\.0 \([0-9a-f]+(?: \d{4}-\d{2}-\d{2})?\)$")
 SIGNAL: Final = re.compile(r"^signal-([1-9][0-9]*)$")
 CHUNK: Final = 64 * 1024
 
@@ -56,10 +62,15 @@ SUMMARY_KEYS: Final = {
     "clippy_disposition",
     "diagnostic_evidence_complete",
 }
-QUAL_PREFLIGHT: Final = {
+QUAL_PREFLIGHT: Final = (
     "receipt_schema_revision",
     "qualification_revision",
     "command_contract_revision",
+    "repository",
+    "event",
+    "github_run_id",
+    "github_run_attempt",
+    "github_workflow_ref",
     "expected_subject_head",
     "subject_head",
     "subject_tree",
@@ -74,7 +85,16 @@ QUAL_PREFLIGHT: Final = {
     "real_canary_executed",
     "heldout_executed",
     "confirmatory_evidence_minted",
-}
+)
+QUAL_POSTFLIGHT: Final = (
+    "postflight_head",
+    "postflight_tree",
+    "postflight_cargo_lock_sha256",
+    "postflight_workflow_sha256",
+    "postflight_command_contract_sha256",
+    "checkout_clean_after",
+    "qualification_result",
+)
 
 
 class VerifyError(Exception):
@@ -103,21 +123,30 @@ def canonical_u64(text: str, label: str) -> int:
     return value
 
 
+def canonical_positive(text: str, label: str) -> int:
+    value = canonical_u64(text, label)
+    if value == 0 or value > (1 << 63) - 1:
+        raise VerifyError(f"{label} is outside canonical positive-integer form")
+    return value
+
+
 def parse_env_bytes(payload: bytes, label: str) -> tuple[list[str], dict[str, str]]:
     try:
         text = payload.decode("utf-8")
     except UnicodeError as exc:
         raise VerifyError(f"{label} is not UTF-8: {exc}") from exc
-    if not text.endswith("\n"):
-        raise VerifyError(f"{label} lacks trailing newline")
+    if not text.endswith("\n") or text.endswith("\n\n"):
+        raise VerifyError(f"{label} lacks one canonical terminal newline")
     keys: list[str] = []
     values: dict[str, str] = {}
     for line in text[:-1].split("\n"):
         if not line or "=" not in line:
             raise VerifyError(f"{label} has malformed canonical line")
         key, value = line.split("=", 1)
-        if not key or not value or key in values or "\r" in value or "\n" in value:
+        if not key or not value or key in values:
             raise VerifyError(f"{label} has invalid or duplicate field: {key!r}")
+        if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in key + value):
+            raise VerifyError(f"{label} has control character: {key!r}")
         keys.append(key)
         values[key] = value
     return keys, values
@@ -339,48 +368,77 @@ def reconstruct(stage_dir: Path, manifest: dict[str, str]) -> tuple[dict[str, st
     return derived, diagnostic_complete, first_blocker
 
 
-def validate_qualification(receipt: dict[str, str], manifest: dict[str, str]) -> str | None:
-    missing = sorted(QUAL_PREFLIGHT - set(receipt))
-    if missing:
-        raise VerifyError(f"qualification receipt lacks preflight fields: {','.join(missing)}")
-    if receipt["receipt_schema_revision"] != QUAL_SCHEMA:
-        raise VerifyError("qualification receipt schema mismatch")
-    if receipt["qualification_revision"] != QUAL_REVISION:
-        raise VerifyError("qualification revision mismatch")
-    if receipt["command_contract_revision"] != CONTRACT_REVISION:
-        raise VerifyError("qualification contract revision mismatch")
+def validate_qualification(keys: list[str], receipt: dict[str, str], manifest: dict[str, str]) -> str:
+    if tuple(keys) == QUAL_PREFLIGHT:
+        sealed = False
+    elif tuple(keys) == QUAL_PREFLIGHT + QUAL_POSTFLIGHT:
+        sealed = True
+    else:
+        raise VerifyError("qualification receipt field order/set is not exact v2 grammar")
+
+    exact = {
+        "receipt_schema_revision": QUAL_SCHEMA,
+        "qualification_revision": QUAL_REVISION,
+        "command_contract_revision": CONTRACT_REVISION,
+        "repository": REPOSITORY,
+        "claim_scope": CLAIM_SCOPE,
+        "checkout_clean_before": "true",
+        "execution_authority_granted": "false",
+        "real_canary_executed": "false",
+        "heldout_executed": "false",
+        "confirmatory_evidence_minted": "false",
+    }
+    for key, expected in exact.items():
+        if receipt[key] != expected:
+            raise VerifyError(f"qualification receipt {key} violates frozen profile")
+    if receipt["event"] not in EVENTS:
+        raise VerifyError("qualification receipt event is not admitted")
+    canonical_positive(receipt["github_run_id"], "github_run_id")
+    canonical_positive(receipt["github_run_attempt"], "github_run_attempt")
+    workflow_ref = receipt["github_workflow_ref"]
+    if not workflow_ref.strip() or workflow_ref != workflow_ref.strip():
+        raise VerifyError("qualification github_workflow_ref is empty/noncanonical")
+
     for key in ("expected_subject_head", "subject_head"):
+        require_hex(receipt[key], 40, key)
         if receipt[key] != manifest["subject_head"]:
             raise VerifyError(f"qualification receipt {key} disagrees with manifest")
-    for key in ("subject_tree", "cargo_lock_sha256", "workflow_sha256", "command_contract_sha256"):
+    require_hex(receipt["subject_tree"], 40, "subject_tree")
+    if receipt["subject_tree"] != manifest["subject_tree"]:
+        raise VerifyError("qualification receipt subject_tree disagrees with manifest")
+    for key in ("cargo_lock_sha256", "workflow_sha256", "command_contract_sha256"):
+        require_hex(receipt[key], 64, key)
         if receipt[key] != manifest[key]:
             raise VerifyError(f"qualification receipt {key} disagrees with manifest")
-    if receipt["checkout_clean_before"] != "true" or receipt["claim_scope"] != "backend-build-test-lint-only":
-        raise VerifyError("qualification preflight cleanliness/scope invalid")
+    if RUSTC.fullmatch(receipt["rustc_version"]) is None:
+        raise VerifyError("qualification receipt rustc version is not frozen Rust 1.96.0 profile")
+    if CARGO.fullmatch(receipt["cargo_version"]) is None:
+        raise VerifyError("qualification receipt cargo version is not frozen Cargo 1.96.0 profile")
+
+    if not sealed:
+        return "VALID_UNSEALED_RECEIPT"
+
+    expected_post = {
+        "postflight_head": manifest["subject_head"],
+        "postflight_tree": manifest["subject_tree"],
+        "postflight_cargo_lock_sha256": manifest["cargo_lock_sha256"],
+        "postflight_workflow_sha256": manifest["workflow_sha256"],
+        "postflight_command_contract_sha256": manifest["command_contract_sha256"],
+        "checkout_clean_after": "true",
+        "qualification_result": "PASS",
+    }
+    require_hex(receipt["postflight_head"], 40, "postflight_head")
+    require_hex(receipt["postflight_tree"], 40, "postflight_tree")
     for key in (
-        "execution_authority_granted",
-        "real_canary_executed",
-        "heldout_executed",
-        "confirmatory_evidence_minted",
+        "postflight_cargo_lock_sha256",
+        "postflight_workflow_sha256",
+        "postflight_command_contract_sha256",
     ):
-        if receipt[key] != "false":
-            raise VerifyError(f"qualification receipt escalates {key}")
-    result = receipt.get("qualification_result")
-    if result not in {None, "PASS"}:
-        raise VerifyError("unknown qualification_result value")
-    if result == "PASS":
-        post = {
-            "postflight_head": manifest["subject_head"],
-            "postflight_tree": manifest["subject_tree"],
-            "postflight_cargo_lock_sha256": manifest["cargo_lock_sha256"],
-            "postflight_workflow_sha256": manifest["workflow_sha256"],
-            "postflight_command_contract_sha256": manifest["command_contract_sha256"],
-            "checkout_clean_after": "true",
-        }
-        for key, expected in post.items():
-            if receipt.get(key) != expected:
-                raise VerifyError(f"qualification PASS lacks exact postflight field: {key}")
-    return result
+        require_hex(receipt[key], 64, key)
+    for key, expected in expected_post.items():
+        if receipt[key] != expected:
+            raise VerifyError(f"qualification PASS postflight mismatch: {key}")
+    return "VALID_PASS_RECEIPT"
 
 
 def verify(
@@ -447,10 +505,10 @@ def verify(
         if manifest[f"{stage}_disposition"] != derived[stage] or summary[f"{stage}_disposition"] != derived[stage]:
             raise VerifyError(f"{stage} disposition disagrees with raw evidence")
 
-    _, qualification = parse_env(qualification_receipt, "qualification receipt")
-    result = validate_qualification(qualification, manifest)
+    qualification_keys, qualification = parse_env(qualification_receipt, "qualification receipt")
+    receipt_class = validate_qualification(qualification_keys, qualification, manifest)
     all_passed = all(derived[stage] == "Passed" for stage in STAGES)
-    if result == "PASS":
+    if receipt_class == "VALID_PASS_RECEIPT":
         if not diagnostic_complete or not all_passed:
             raise VerifyError("qualification PASS lacks complete all-stage PASS evidence")
         return "QUALIFICATION_PASS_EVIDENCE"
