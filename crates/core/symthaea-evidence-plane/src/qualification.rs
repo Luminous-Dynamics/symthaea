@@ -29,6 +29,13 @@ impl fmt::Display for QualificationDigest {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ArtifactIdentity {
+    GitBlobSha1([u8; 20]),
+    Sha256([u8; 32]),
+    Blake3([u8; 32]),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QualificationLane {
     SourceSanity,
@@ -79,7 +86,7 @@ pub struct QualificationProfile {
     pub revision: u32,
     pub lane: QualificationLane,
     pub workflow_path: String,
-    pub workflow_definition: QualificationDigest,
+    pub workflow_definition: ArtifactIdentity,
     pub allowed_events: Vec<String>,
     pub required_jobs: Vec<QualificationJobRequirement>,
 }
@@ -89,7 +96,7 @@ impl QualificationProfile {
         revision: u32,
         lane: QualificationLane,
         workflow_path: impl Into<String>,
-        workflow_definition: QualificationDigest,
+        workflow_definition: ArtifactIdentity,
         mut allowed_events: Vec<String>,
         mut required_jobs: Vec<QualificationJobRequirement>,
     ) -> Result<Self, QualificationError> {
@@ -134,7 +141,7 @@ impl QualificationProfile {
         w.u32(self.revision);
         w.u8(lane_tag(self.lane));
         w.str(&self.workflow_path);
-        w.digest(self.workflow_definition);
+        w.artifact(self.workflow_definition);
         w.u32(self.allowed_events.len() as u32);
         for event in &self.allowed_events {
             w.str(event);
@@ -210,7 +217,7 @@ pub struct QualificationRunObservation {
     pub workflow_run_id: u64,
     pub workflow_id: u64,
     pub workflow_path: String,
-    pub workflow_definition: QualificationDigest,
+    pub workflow_definition: ArtifactIdentity,
     pub run_attempt: u32,
     pub event: String,
     pub exact_head_sha: String,
@@ -248,7 +255,7 @@ impl QualificationRunObservation {
         w.u64(self.workflow_run_id);
         w.u64(self.workflow_id);
         w.str(&self.workflow_path);
-        w.digest(self.workflow_definition);
+        w.artifact(self.workflow_definition);
         w.u32(self.run_attempt);
         w.str(&self.event);
         w.str(&self.exact_head_sha);
@@ -402,7 +409,7 @@ pub struct QualifiedHeadReceipt {
     pub profile_identity: QualificationDigest,
     pub expected_subject_sha: String,
     pub observed_head_sha: String,
-    pub workflow_definition: QualificationDigest,
+    pub workflow_definition: ArtifactIdentity,
     pub workflow_run_id: u64,
     pub run_attempt: u32,
     pub materializer_revision: u32,
@@ -455,7 +462,7 @@ impl QualifiedHeadReceipt {
         w.digest(self.profile_identity);
         w.str(&self.expected_subject_sha);
         w.str(&self.observed_head_sha);
-        w.digest(self.workflow_definition);
+        w.artifact(self.workflow_definition);
         w.u64(self.workflow_run_id);
         w.u32(self.run_attempt);
         w.u32(self.materializer_revision);
@@ -488,7 +495,7 @@ impl fmt::Display for QualificationError {
 impl std::error::Error for QualificationError {}
 
 fn validate_sha(sha: &str) -> Result<(), QualificationError> {
-    if sha.len() == 40
+    if matches!(sha.len(), 40 | 64)
         && sha.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
         Ok(())
@@ -583,6 +590,22 @@ impl Writer {
     }
     fn digest(&mut self, v: QualificationDigest) {
         self.buf.extend_from_slice(&v.0);
+    }
+    fn artifact(&mut self, v: ArtifactIdentity) {
+        match v {
+            ArtifactIdentity::GitBlobSha1(bytes) => {
+                self.u8(0);
+                self.bytes(&bytes);
+            }
+            ArtifactIdentity::Sha256(bytes) => {
+                self.u8(1);
+                self.bytes(&bytes);
+            }
+            ArtifactIdentity::Blake3(bytes) => {
+                self.u8(2);
+                self.bytes(&bytes);
+            }
+        }
     }
     fn bytes(&mut self, v: &[u8]) {
         self.u32(v.len() as u32);
