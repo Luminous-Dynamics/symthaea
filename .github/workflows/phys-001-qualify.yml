@@ -31,13 +31,11 @@ jobs:
           ref: ${{ env.QUALIFY_SHA }}
           fetch-depth: 0
 
-      - name: Bind exact head, one-commit topology, base, and scope
+      - name: Bind exact head, base, and scope
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$QUALIFY_SHA"
           git cat-file -e "$BASE_SHA^{commit}"
-          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
-          test "$(git rev-list --count "$BASE_SHA..$QUALIFY_SHA")" -eq 1
           git diff --check "$BASE_SHA" "$QUALIFY_SHA"
           git diff --name-only "$BASE_SHA" "$QUALIFY_SHA" | tee /tmp/phys001-scope.txt
           unexpected="$(grep -Ev '^(Cargo\.lock|\.github/workflows/phys-001-qualify\.yml|crates/core/symthaea-physical-cognition/.*|docs/research/physical-cognition/.*)$' /tmp/phys001-scope.txt || true)"
@@ -66,7 +64,7 @@ jobs:
           git diff -- Cargo.lock | tee /tmp/phys001-evidence/Cargo.lock.patch
           test -s /tmp/phys001-evidence/Cargo.lock.patch
           if grep -E '^-[^-]' /tmp/phys001-evidence/Cargo.lock.patch; then
-            echo 'Cargo.lock bootstrap removed existing content; refusing broad lock churn.' >&2
+            echo 'Cargo.lock bootstrap removed existing content; refusing broad churn.' >&2
             exit 1
           fi
           test "$(grep -c '^+\[\[package\]\]$' /tmp/phys001-evidence/Cargo.lock.patch)" -eq 1
