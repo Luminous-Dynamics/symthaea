@@ -613,11 +613,11 @@ pub fn verify_canonical_ima_sha256(
     canonical_binary_measurements: &[u8],
     expected_final_pcr: [u8; SHA256_LEN],
     policy: &ImaReplayPolicy,
-) -> Result<ImaReplayQualification, ImaReplayReport> {
+) -> Result<ImaReplayQualification, Box<ImaReplayReport>> {
     let report =
         assess_canonical_ima_sha256(canonical_binary_measurements, expected_final_pcr, policy);
     if report.disposition != ImaReplayDisposition::Qualified {
-        return Err(report);
+        return Err(Box::new(report));
     }
 
     let policy_digest = report
@@ -752,12 +752,12 @@ fn parse_record(
     })
 }
 
-fn parse_fields<'a>(
-    data: &'a [u8],
+fn parse_fields(
+    data: &[u8],
     record_index: u32,
     expected_fields: usize,
     max_field_bytes: u32,
-) -> Result<Vec<&'a [u8]>, ImaReplayIssue> {
+) -> Result<Vec<&[u8]>, ImaReplayIssue> {
     let mut cursor = 0usize;
     let mut fields = Vec::with_capacity(expected_fields);
 
@@ -828,7 +828,7 @@ fn parse_event_digest(field: &[u8], record_index: u32) -> Result<[u8; SHA256_LEN
         .expect("digest length was checked to be SHA-256"))
 }
 
-fn parse_event_name<'a>(field: &'a [u8], record_index: u32) -> Result<&'a [u8], ImaReplayIssue> {
+fn parse_event_name(field: &[u8], record_index: u32) -> Result<&[u8], ImaReplayIssue> {
     if field.is_empty() || field.last() != Some(&0) || field[..field.len() - 1].contains(&0) {
         return Err(ImaReplayIssue::InvalidEventNameField { record_index });
     }
