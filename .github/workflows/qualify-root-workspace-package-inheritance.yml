@@ -1,0 +1,194 @@
+name: Qualify root workspace package inheritance
+
+on:
+  push:
+    branches:
+      - qualify/root-workspace-package-inheritance-scan-r2
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan undefined root-workspace package inheritance
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout qualifier branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Bind exact remediation subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch_head="$(git rev-parse HEAD)"
+          subject="$(git rev-parse HEAD^)"
+          expected_subject="5ff5cd43923fc1059b238fab35bb1d38db7990de"
+          test "$subject" = "$expected_subject"
+          echo "branch_head=$branch_head" >> "$GITHUB_OUTPUT"
+          echo "subject=$subject" >> "$GITHUB_OUTPUT"
+          printf 'branch_head=%s\nsubject=%s\n' "$branch_head" "$subject" > "$RUNNER_TEMP/subject.txt"
+
+      - name: Resolve inheritance against the owning workspace
+        id: scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          export OUT_DIR="$RUNNER_TEMP"
+          python3 <<'PY'
+          from __future__ import annotations
+
+          import os
+          from pathlib import Path
+          import tomllib
+
+          repo = Path.cwd().resolve()
+          root_manifest = repo / "Cargo.toml"
+          out = Path(os.environ["OUT_DIR"])
+
+          root_members = out / "root-workspace-manifests.txt"
+          nested_roots = out / "nested-workspace-roots.txt"
+          offenders = out / "undefined-root-workspace-package-inheritance.txt"
+          parse_errors = out / "manifest-parse-errors.txt"
+          summary = out / "scan-summary.txt"
+
+          cache: dict[Path, dict] = {}
+          errors: list[str] = []
+
+          def load(path: Path) -> dict:
+              if path in cache:
+                  return cache[path]
+              try:
+                  with path.open("rb") as fh:
+                      data = tomllib.load(fh)
+              except Exception as exc:
+                  errors.append(f"{path.relative_to(repo)}:{type(exc).__name__}:{exc}")
+                  data = {}
+              cache[path] = data
+              return data
+
+          root_data = load(root_manifest)
+          workspace_package = root_data.get("workspace", {}).get("package", {})
+          root_keys = set(workspace_package.keys())
+
+          manifests = sorted(
+              p for p in repo.rglob("Cargo.toml")
+              if ".git" not in p.relative_to(repo).parts
+          )
+
+          def owning_workspace(manifest: Path, data: dict) -> Path | None:
+              package = data.get("package", {})
+              explicit = package.get("workspace")
+              if isinstance(explicit, str):
+                  candidate = (manifest.parent / explicit / "Cargo.toml").resolve()
+                  return candidate if candidate.exists() else None
+
+              current = manifest.parent
+              while True:
+                  candidate = current / "Cargo.toml"
+                  if candidate.exists() and "workspace" in load(candidate):
+                      return candidate.resolve()
+                  if current == repo or current.parent == current:
+                      break
+                  current = current.parent
+              return None
+
+          root_scoped: list[str] = []
+          nested: set[str] = set()
+          bad: list[str] = []
+
+          for manifest in manifests:
+              data = load(manifest)
+              package = data.get("package")
+              if not isinstance(package, dict):
+                  continue
+
+              owner = owning_workspace(manifest, data)
+              if owner != root_manifest:
+                  if owner is not None and owner.exists():
+                      nested.add(str(owner.relative_to(repo)))
+                  continue
+
+              rel = str(manifest.relative_to(repo))
+              root_scoped.append(rel)
+              for key, value in package.items():
+                  if isinstance(value, dict) and value.get("workspace") is True:
+                      if key not in root_keys:
+                          bad.append(f"{rel}:{key}")
+
+          root_scoped = sorted(set(root_scoped))
+          bad = sorted(set(bad))
+          errors = sorted(set(errors))
+
+          root_members.write_text("\n".join(root_scoped) + ("\n" if root_scoped else ""))
+          nested_roots.write_text("\n".join(sorted(nested)) + ("\n" if nested else ""))
+          offenders.write_text("\n".join(bad) + ("\n" if bad else ""))
+          parse_errors.write_text("\n".join(errors) + ("\n" if errors else ""))
+
+          lines = [
+              f"root_workspace={root_manifest.relative_to(repo)}",
+              f"root_workspace_package_keys={','.join(sorted(root_keys))}",
+              f"root_scoped_package_manifests={len(root_scoped)}",
+              f"nested_workspace_roots_excluded={len(nested)}",
+              f"undefined_root_inheritance_count={len(bad)}",
+              f"manifest_parse_error_count={len(errors)}",
+          ]
+          if nested:
+              lines.append("nested_workspace_roots:")
+              lines.extend(sorted(nested))
+          if bad:
+              lines.append("undefined_root_inheritance:")
+              lines.extend(bad)
+          if errors:
+              lines.append("manifest_parse_errors:")
+              lines.extend(errors)
+          summary.write_text("\n".join(lines) + "\n")
+          print(summary.read_text(), end="")
+
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a") as fh:
+              fh.write(f"count={len(bad)}\n")
+              fh.write(f"parse_errors={len(errors)}\n")
+          PY
+
+      - name: Upload retained inheritance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: root-workspace-package-inheritance-scan
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/subject.txt
+            ${{ runner.temp }}/root-workspace-manifests.txt
+            ${{ runner.temp }}/nested-workspace-roots.txt
+            ${{ runner.temp }}/undefined-root-workspace-package-inheritance.txt
+            ${{ runner.temp }}/manifest-parse-errors.txt
+            ${{ runner.temp }}/scan-summary.txt
+
+      - name: Require complete parse and no undefined root inheritance
+        shell: bash
+        run: |
+          set -euo pipefail
+          parse_errors='${{ steps.scan.outputs.parse_errors }}'
+          count='${{ steps.scan.outputs.count }}'
+          if [ "$parse_errors" -ne 0 ]; then
+            echo "Manifest census is incomplete: $parse_errors TOML parse errors." >&2
+            cat "$RUNNER_TEMP/manifest-parse-errors.txt" >&2
+            exit 1
+          fi
+          if [ "$count" -ne 0 ]; then
+            echo "Found $count package metadata inheritances undefined by the root [workspace.package]." >&2
+            cat "$RUNNER_TEMP/undefined-root-workspace-package-inheritance.txt" >&2
+            exit 1
+          fi
+
+      - name: Prove qualifier kept remediation subject immutable
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = '${{ steps.subject.outputs.subject }}'
+          git diff --exit-code
+          git diff --cached --exit-code
