@@ -80,7 +80,7 @@ fn exact_full_head_success_mints_receipt() {
     assert!(evaluation.mechanical_integrity.satisfied);
 
     let receipt =
-        QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).unwrap();
+        QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).unwrap();
     assert_eq!(receipt.expected_subject_sha, SUBJECT);
     assert_eq!(receipt.observed_head_sha, SUBJECT);
     assert_ne!(receipt.identity(), QualificationDigest([0; 32]));
@@ -99,7 +99,7 @@ fn queued_required_job_is_not_executed_and_cannot_mint() {
         evaluation.classification,
         QualificationClassification::NotExecuted
     );
-    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
+    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).is_err());
 }
 
 #[test]
@@ -181,7 +181,7 @@ fn green_source_sanity_lane_is_wrong_lane_for_authority() {
         evaluation.classification,
         QualificationClassification::WrongLane
     );
-    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
+    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).is_err());
 }
 
 #[test]
@@ -409,7 +409,7 @@ fn unexpected_job_fails_qualifier() {
         QualificationClassification::FailQualifier
     );
     assert!(!evaluation.mechanical_integrity.satisfied);
-    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
+    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).is_err());
 }
 
 #[test]
@@ -461,5 +461,20 @@ fn wrong_repository_fails_qualifier() {
         QualificationClassification::FailQualifier
     );
     assert!(!evaluation.mechanical_integrity.satisfied);
-    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
+    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).is_err());
+}
+
+#[test]
+fn receipt_mint_recomputes_failure_internally() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let observation = observation(vec![
+        job(1, "oracle", JobDisposition::Passed),
+        job(2, "rust", JobDisposition::FailSubject),
+    ]);
+
+    // No caller-supplied QualificationEvaluation enters the minting API.
+    assert!(matches!(
+        QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation),
+        Err(QualificationError::ReceiptRequiresPass)
+    ));
 }
