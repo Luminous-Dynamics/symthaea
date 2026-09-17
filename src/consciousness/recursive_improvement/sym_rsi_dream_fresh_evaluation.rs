@@ -8,7 +8,9 @@
 //! fresh execution. Unit tests exercise only the pure classification rule and never
 //! call the measurement entry point.
 
-use super::sym_rsi_candidate_family::canonical_fixed_hash_candidate_family;
+use super::sym_rsi_candidate_family::{
+    canonical_fixed_hash_candidate_family, FrozenReplayCorpus,
+};
 use super::sym_rsi_dream_protocol::{
     validate_canonical_sym_rsi_001d_manifest, SYM_RSI_001D_ANALYSIS_RULE,
     SYM_RSI_001D_EXPERIMENT_ID, SYM_RSI_001D_QUALITY_TOLERANCE,
@@ -29,7 +31,6 @@ use super::sym_rsi_replay_selection::ReplaySelectionReceipt;
 use super::sym_rsi_runner::{
     build_fixture_receipt, run_fixture_policy, FixtureRunnerError, ReceiptDiagnostics,
 };
-use super::FrozenReplayCorpus;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -523,7 +524,8 @@ fn validate_verification_gate_binding(
     }
 
     if gate.decision == DreamVerificationDecision::FreshDreamExecutionEligible
-        && (!gate.c_full_support
+        && (gate.domain_summaries.len() != FixtureDomainKind::ALL.len()
+            || !gate.c_full_support
             || !gate.d_full_support
             || gate.generated_evidence_promoted
             || gate.total_d_override_count == 0
