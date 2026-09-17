@@ -1,0 +1,98 @@
+name: PHYS-005 Bootstrap Qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-physical-binding/**'
+      - '.github/workflows/phys-005-qualify.yml'
+      - 'Cargo.lock'
+
+permissions:
+  contents: read
+
+env:
+  QUALIFY_SHA: ${{ github.event.pull_request.head.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact Head + Binding Capsule + Bootstrap Lock
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFY_SHA }}
+          fetch-depth: 0
+
+      - name: Bind exact head, one-commit topology, base, and scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFY_SHA"
+          git cat-file -e "$BASE_SHA^{commit}"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test "$(git rev-list --count "$BASE_SHA..$QUALIFY_SHA")" -eq 1
+          git diff --check "$BASE_SHA" "$QUALIFY_SHA"
+          git diff --name-only "$BASE_SHA" "$QUALIFY_SHA" | tee /tmp/phys005-scope.txt
+          unexpected="$(grep -Ev '^(Cargo\.lock|\.github/workflows/phys-005-qualify\.yml|crates/core/symthaea-physical-binding/.*)$' /tmp/phys005-scope.txt || true)"
+          test -z "$unexpected"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove toolchain
+        run: |
+          set -euo pipefail
+          rustc -vV | grep -q '^release: 1\.96\.0$'
+          cargo -V | grep -q '^cargo 1\.96\.0 '
+
+      - name: Materialize and audit cumulative bootstrap lock
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/phys005-evidence
+          cp Cargo.lock /tmp/phys005-evidence/Cargo.lock.before
+          cargo metadata --format-version 1 >/tmp/phys005-evidence/workspace-metadata.json
+          git diff -- Cargo.lock | tee /tmp/phys005-evidence/Cargo.lock.patch
+          test -s /tmp/phys005-evidence/Cargo.lock.patch
+          if grep -E '^-[^-]' /tmp/phys005-evidence/Cargo.lock.patch; then
+            echo 'Cargo.lock bootstrap removed existing content; refusing broad churn.' >&2
+            exit 1
+          fi
+          test "$(grep -c '^+\[\[package\]\]$' /tmp/phys005-evidence/Cargo.lock.patch)" -eq 5
+          for package in \
+            symthaea-physical-cognition \
+            symthaea-physical-experiment \
+            symthaea-physical-controls \
+            symthaea-physical-comparison \
+            symthaea-physical-binding; do
+            grep -q "^+name = \"$package\"$" /tmp/phys005-evidence/Cargo.lock.patch
+            grep -q "\"name\":\"$package\"" /tmp/phys005-evidence/workspace-metadata.json
+          done
+          cp Cargo.lock /tmp/phys005-evidence/Cargo.lock.generated
+          sha256sum Cargo.lock > /tmp/phys005-evidence/Cargo.lock.sha256
+
+      - name: Focused format, check, tests, and clippy
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check crates/core/symthaea-physical-binding/src/lib.rs
+          cargo check -p symthaea-physical-binding --locked
+          cargo test -p symthaea-physical-binding --locked
+          cargo clippy -p symthaea-physical-binding --all-targets --locked -- -D warnings
+
+      - name: Postflight source immutability
+        run: git diff --exit-code -- . ':(exclude)Cargo.lock'
+
+      - name: Upload bootstrap lock evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: phys-005-bootstrap-lock
+          path: /tmp/phys005-evidence
+          if-no-files-found: error
+          retention-days: 14
