@@ -38,7 +38,7 @@ pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
 pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
-    "mean-predicted-task-quality/5-legal-aware-perturbations-minus-0.10-task-regression-probability/0.01-override-margin/v2";
+    "domain-conditioned-action/mean-predicted-task-quality/5-legal-aware-perturbations-minus-0.10-task-regression-probability/0.01-override-margin/v3";
 
 const QUALITY_START: usize = 7;
 const QUALITY_COPIES: usize = 8;
@@ -50,14 +50,27 @@ const TERMINAL_INDEX: usize = 15;
 /// action; the remainder explore adjacent action IDs. The policy filters all
 /// final choices through the fixture's legal-action set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DreamFixtureAction(pub u8);
+pub struct DreamFixtureAction {
+    pub domain: FixtureDomainKind,
+    pub action: u8,
+}
+
+impl DreamFixtureAction {
+    pub fn new(domain: FixtureDomainKind, action: u8) -> Self {
+        Self { domain, action }
+    }
+}
 
 impl DreamableAction for DreamFixtureAction {
     fn perturb(&self, seed: u64) -> Self {
-        match seed % 5 {
-            0 | 1 | 2 => *self,
-            3 => Self(self.0.wrapping_add(1) % 4),
-            _ => Self(self.0.wrapping_add(3) % 4),
+        let action = match seed % 5 {
+            0 | 1 | 2 => self.action,
+            3 => self.action.wrapping_add(1) % 4,
+            _ => self.action.wrapping_add(3) % 4,
+        };
+        Self {
+            domain: self.domain,
+            action,
         }
     }
 
@@ -70,7 +83,7 @@ impl DreamableAction for DreamFixtureAction {
         // Generic, deliberately weak motion heuristic. This is not the fixture
         // transition function and contains no seed-specific environment knowledge.
         predicted[3] = (predicted[3] + 0.05).clamp(0.0, 1.0);
-        match self.0 % 4 {
+        match self.action % 4 {
             0 => predicted[4] = (predicted[4] - 0.10).clamp(-1.0, 1.0),
             1 => predicted[4] = (predicted[4] + 0.10).clamp(-1.0, 1.0),
             2 => predicted[5] = (predicted[5] - 0.10).clamp(-1.0, 1.0),
@@ -80,7 +93,7 @@ impl DreamableAction for DreamFixtureAction {
     }
 
     fn magnitude(&self) -> f32 {
-        (self.0 as f32 + 1.0) / 4.0
+        (self.action as f32 + 1.0) / 4.0
     }
 }
 
@@ -199,7 +212,7 @@ impl FixturePolicy for GroundedDreamPolicy {
 
         let mut predictions = Vec::with_capacity(legal_actions.len());
         for &action in legal_actions {
-            let dream_action = DreamFixtureAction(action);
+            let dream_action = DreamFixtureAction::new(domain, action);
             let distribution = engine.predict_outcome_distribution(&encoded, &dream_action);
             let task_prediction = task_prediction_summary(
                 &engine,
@@ -347,7 +360,7 @@ pub fn train_grounded_dream_model(
                 // extracted TransitionMemory or any SYM-RSI evidence digest.
                 engine.record(
                     &parent_vector,
-                    DreamFixtureAction(action),
+                    DreamFixtureAction::new(world.domain, action),
                     &outcome_vector,
                     1.0,
                 );
@@ -379,7 +392,7 @@ pub fn train_grounded_dream_model(
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
         model_version: "symthaea-dream-transition-memory-v1".into(),
         action_fingerprint_semantics:
-            "symthaea-dream/default-hasher(debug)/environment-bound-v1".into(),
+            "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2".into(),
         observation_count,
         transition_memory,
         config,
@@ -583,7 +596,9 @@ fn task_prediction_summary(
 
     for index in 0..simulations {
         let perturbed = action.perturb(index as u64);
-        let sampled_action = if legal_actions.contains(&perturbed.0) {
+        let sampled_action = if perturbed.domain == action.domain
+            && legal_actions.contains(&perturbed.action)
+        {
             perturbed
         } else {
             action
@@ -723,7 +738,7 @@ mod tests {
         );
         assert_eq!(
             model.action_fingerprint_semantics,
-            "symthaea-dream/default-hasher(debug)/environment-bound-v1"
+            "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2"
         );
         assert!(model.evidence_digest.starts_with("blake3:"));
     }
@@ -767,6 +782,26 @@ mod tests {
     }
 
     #[test]
+    fn dream_action_fingerprint_is_domain_conditioned() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        fn debug_fingerprint(action: DreamFixtureAction) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            format!("{action:?}").hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let search = DreamFixtureAction::new(FixtureDomainKind::BranchingSearch, 0);
+        let navigation = DreamFixtureAction::new(FixtureDomainKind::DelayedNavigation, 0);
+        let rugged = DreamFixtureAction::new(FixtureDomainKind::RuggedOptimization, 0);
+
+        assert_ne!(debug_fingerprint(search), debug_fingerprint(navigation));
+        assert_ne!(debug_fingerprint(search), debug_fingerprint(rugged));
+        assert_ne!(debug_fingerprint(navigation), debug_fingerprint(rugged));
+    }
+
+    #[test]
     fn task_prediction_summary_never_executes_illegal_perturbations() {
         let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
         let training =
@@ -788,7 +823,7 @@ mod tests {
         let summary = task_prediction_summary(
             &engine,
             &encoded,
-            DreamFixtureAction(1),
+            DreamFixtureAction::new(domain, 1),
             &legal,
             state.quality as f32,
         );
