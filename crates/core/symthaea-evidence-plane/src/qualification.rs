@@ -85,6 +85,7 @@ impl QualificationJobRequirement {
 pub struct QualificationProfile {
     pub revision: u32,
     pub lane: QualificationLane,
+    pub repository: String,
     pub workflow_path: String,
     pub workflow_definition: ArtifactIdentity,
     pub allowed_events: Vec<String>,
@@ -95,12 +96,17 @@ impl QualificationProfile {
     pub fn new(
         revision: u32,
         lane: QualificationLane,
+        repository: impl Into<String>,
         workflow_path: impl Into<String>,
         workflow_definition: ArtifactIdentity,
         mut allowed_events: Vec<String>,
         mut required_jobs: Vec<QualificationJobRequirement>,
     ) -> Result<Self, QualificationError> {
+        let repository = repository.into();
         let workflow_path = workflow_path.into();
+        if repository.is_empty() {
+            return Err(QualificationError::EmptyField("repository"));
+        }
         if workflow_path.is_empty() {
             return Err(QualificationError::EmptyField("workflow_path"));
         }
@@ -129,6 +135,7 @@ impl QualificationProfile {
         Ok(Self {
             revision,
             lane,
+            repository,
             workflow_path,
             workflow_definition,
             allowed_events,
@@ -140,6 +147,7 @@ impl QualificationProfile {
         let mut w = Writer::new(PROFILE_DOMAIN);
         w.u32(self.revision);
         w.u8(lane_tag(self.lane));
+        w.str(&self.repository);
         w.str(&self.workflow_path);
         w.artifact(self.workflow_definition);
         w.u32(self.allowed_events.len() as u32);
@@ -293,7 +301,7 @@ impl QualificationProfile {
         let mut counts: BTreeMap<&'static str, u64> = [
             "missing", "duplicate", "disallowed_skip", "cancelled",
             "subject_fail", "qualifier_fail", "infra", "not_executed",
-            "stale", "wrong_workflow", "wrong_event", "unexpected_job",
+            "stale", "wrong_repository", "wrong_workflow", "wrong_event", "unexpected_job",
         ]
         .into_iter()
         .map(|k| (k, 0))
@@ -335,6 +343,10 @@ impl QualificationProfile {
 
         counts.insert("stale", u64::from(observation.exact_head_sha != expected_subject_sha));
         counts.insert(
+            "wrong_repository",
+            u64::from(observation.repository != self.repository),
+        );
+        counts.insert(
             "wrong_workflow",
             u64::from(
                 observation.workflow_path != self.workflow_path
@@ -369,7 +381,8 @@ impl QualificationProfile {
             QualificationClassification::WrongLane
         } else if counts["stale"] > 0 {
             QualificationClassification::StaleSubject
-        } else if counts["wrong_workflow"] > 0
+        } else if counts["wrong_repository"] > 0
+            || counts["wrong_workflow"] > 0
             || counts["wrong_event"] > 0
             || counts["duplicate"] > 0
             || counts["unexpected_job"] > 0
