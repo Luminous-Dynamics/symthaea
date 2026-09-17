@@ -69,6 +69,7 @@ pub mod epistemic_world;
 pub mod exact_replay;
 pub mod experience_tree;
 pub mod replay_policy;
+pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
 pub mod sym_rsi_replay_corpus;
@@ -165,6 +166,12 @@ pub use experience_tree::{
     ExperienceNode, ExperienceNodeId, ExperienceProvenance, ExperienceTree, ExperienceTreeError,
 };
 pub use replay_policy::{PolicySelectionError, ReplayPolicyScore, select_replay_policy};
+pub use sym_rsi_candidate_family::{
+    FrozenReplayCorpus, ReplayAcquisitionError, ReplayCorpusAcquisitionReceipt,
+    SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA, SYM_RSI_001_INCUMBENT_POLICY_ID,
+    SYM_RSI_001_REPLAY_CORPUS_SCHEMA, acquire_canonical_replay_corpus,
+    canonical_candidate_family_digest, canonical_fixed_hash_candidate_family,
+};
 pub use sym_rsi_experiment::{
     ArmRunMetrics, DomainSeedPlan, EvaluationSplit, ExperimentArm, ExperimentDomainSpec,
     ExperimentHarnessError, PrimaryContrastKind, PrimaryContrastReceipt,
