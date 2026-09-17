@@ -1,0 +1,404 @@
+name: ARC3 Protocol Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arc3-protocol-qualify.yml'
+      - '.github/arc3/protocol-qualification-subject.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc3-protocol-qualify-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  subject:
+    name: Bind qualification subject
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      subject_sha: ${{ steps.bind.outputs.subject_sha }}
+      subject_binding_sha256: ${{ steps.bind.outputs.subject_binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Clean helper preflight
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+      - name: Validate subject binding
+        id: bind
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          import os
+          import re
+          import sys
+
+          path = Path('.github/arc3/protocol-qualification-subject.txt')
+          raw = path.read_bytes()
+          if re.fullmatch(rb'[0-9a-f]{40}\n?', raw) is None:
+              print('ARC3 protocol subject binding must be exactly 40 lowercase hex bytes plus at most one final LF', file=sys.stderr)
+              sys.exit(1)
+
+          subject = raw[:-1] if raw.endswith(b'\n') else raw
+          digest = sha256(raw).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'subject_sha={subject.decode()}\n')
+              out.write(f'subject_binding_sha256={digest}\n')
+          print(f'ARC3 protocol subject: {subject.decode()}')
+          print(f'ARC3 subject-binding SHA-256: {digest}')
+          PY
+
+      - name: Helper postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+  oracle:
+    name: Independent protocol oracle
+    needs: subject
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
+      - name: Run independent canonicalization oracle
+        run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Subject postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+  lock-integrity:
+    name: Cargo lock integrity
+    needs: subject
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Require locked protocol package resolution
+        id: locked
+        shell: bash
+        run: |
+          set -euo pipefail
+          if cargo check --locked -p symthaea-arc3-protocol >/dev/null; then
+            echo "lock_ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "lock_ok=false" >> "$GITHUB_OUTPUT"
+            cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+
+            # Reconcile only this package against the existing lock and cached
+            # registry state. Never regenerate the workspace lock wholesale.
+            set +e
+            cargo check --offline -p symthaea-arc3-protocol
+            reconcile_status=$?
+            set -e
+
+            printf '%s\n' "$reconcile_status" > "$RUNNER_TEMP/offline-reconcile-status.txt"
+            git diff -- Cargo.lock > "$RUNNER_TEMP/arc3-cargo-lock.patch"
+            cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+
+            if [ ! -s "$RUNNER_TEMP/arc3-cargo-lock.patch" ]; then
+              echo "Offline reconciliation produced no Cargo.lock diff; refusing to guess" >&2
+              touch "$RUNNER_TEMP/lock-guard-rejected.txt"
+              exit 1
+            fi
+
+            # Compare TOML structures, not diff text. Only two semantic changes
+            # are authorized: the local protocol package stanza and the one
+            # psych-bench dependency edge pointing at it.
+            set +e
+            python3 - <<'PY'
+          from pathlib import Path
+          import os
+          import sys
+          import tomllib
+
+          temp = Path(os.environ['RUNNER_TEMP'])
+          before = tomllib.loads((temp / 'Cargo.lock.before').read_text())
+          after = tomllib.loads((temp / 'Cargo.lock.generated').read_text())
+
+          def keyed(doc):
+              result = {}
+              for pkg in doc.get('package', []):
+                  key = (pkg['name'], pkg.get('version'), pkg.get('source'))
+                  if key in result:
+                      raise SystemExit(f'duplicate package identity in lock: {key!r}')
+                  result[key] = pkg
+              return result
+
+          before_pkgs = keyed(before)
+          after_pkgs = keyed(after)
+
+          protocol_key = ('symthaea-arc3-protocol', '0.1.0', None)
+          psych_key = ('symthaea-psych-bench', '0.1.0', None)
+
+          expected_protocol = {
+              'name': 'symthaea-arc3-protocol',
+              'version': '0.1.0',
+              'dependencies': ['blake3', 'serde', 'serde_json'],
+          }
+
+          errors = []
+
+          if protocol_key in before_pkgs:
+              errors.append('protocol package unexpectedly already present in committed lock')
+          if after_pkgs.get(protocol_key) != expected_protocol:
+              errors.append(
+                  'generated protocol package stanza differs from exact expected local package'
+              )
+
+          before_psych = before_pkgs.get(psych_key)
+          after_psych = after_pkgs.get(psych_key)
+          if before_psych is None or after_psych is None:
+              errors.append('psych-bench workspace package missing from before/after lock')
+          else:
+              expected_psych = dict(before_psych)
+              expected_deps = list(before_psych.get('dependencies', []))
+              if 'symthaea-arc3-protocol' in expected_deps:
+                  errors.append('psych-bench already referenced protocol in committed lock')
+              else:
+                  expected_deps.append('symthaea-arc3-protocol')
+                  expected_deps.sort()
+                  expected_psych['dependencies'] = expected_deps
+                  actual_psych = dict(after_psych)
+                  actual_psych['dependencies'] = sorted(actual_psych.get('dependencies', []))
+                  if actual_psych != expected_psych:
+                      errors.append(
+                          'psych-bench lock stanza changed beyond adding symthaea-arc3-protocol'
+                      )
+
+          allowed = {protocol_key, psych_key}
+          all_keys = set(before_pkgs) | set(after_pkgs)
+          for key in sorted(all_keys, key=repr):
+              if key in allowed:
+                  continue
+              if before_pkgs.get(key) != after_pkgs.get(key):
+                  errors.append(f'unauthorized lock package change: {key!r}')
+
+          if before.get('version') != after.get('version'):
+              errors.append('Cargo.lock format version changed')
+
+          before_top = {k: v for k, v in before.items() if k != 'package'}
+          after_top = {k: v for k, v in after.items() if k != 'package'}
+          if before_top != after_top:
+              errors.append('non-package Cargo.lock metadata changed')
+
+          if errors:
+              print('Lock reconciliation rejected:', file=sys.stderr)
+              for error in errors:
+                  print(f'  - {error}', file=sys.stderr)
+              sys.exit(1)
+
+          print('Lock reconciliation structurally limited to protocol + psych-bench linkage.')
+          PY
+            guard_status=$?
+            set -e
+            printf '%s\n' "$guard_status" > "$RUNNER_TEMP/lock-guard-status.txt"
+
+            if [ "$guard_status" -ne 0 ]; then
+              touch "$RUNNER_TEMP/lock-guard-rejected.txt"
+              exit 1
+            fi
+
+            cat "$RUNNER_TEMP/arc3-cargo-lock.patch"
+            touch "$RUNNER_TEMP/lock-guard-accepted.txt"
+
+            # Product lock is stale even when the disposable reconciliation is
+            # minimal and successful. Preserve evidence and remain red until the
+            # exact Cargo-produced lock bytes are committed to the product head.
+            exit 1
+          fi
+
+      - name: Upload Cargo-generated lock evidence
+        if: failure() && steps.locked.outputs.lock_ok == 'false'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arc3-cargo-lock-evidence-${{ env.SUBJECT_SHA }}
+          path: |
+            ${{ runner.temp }}/Cargo.lock.before
+            ${{ runner.temp }}/Cargo.lock.generated
+            ${{ runner.temp }}/arc3-cargo-lock.patch
+            ${{ runner.temp }}/offline-reconcile-status.txt
+            ${{ runner.temp }}/lock-guard-status.txt
+            ${{ runner.temp }}/lock-guard-accepted.txt
+            ${{ runner.temp }}/lock-guard-rejected.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Restore diagnostic mutation and verify postflight
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git restore --source=HEAD --staged --worktree -- Cargo.lock
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+  rust-protocol-crate:
+    name: Rust protocol crate
+    needs: subject
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Format protocol crate
+        run: cargo fmt -p symthaea-arc3-protocol -- --check
+
+      - name: Check protocol crate
+        run: cargo check --locked -p symthaea-arc3-protocol
+
+      - name: Test protocol crate
+        run: cargo test --locked -p symthaea-arc3-protocol
+
+      - name: Clippy protocol crate
+        run: cargo clippy --locked -p symthaea-arc3-protocol --all-targets -- -D warnings
+
+      - name: Cross-check independent oracle
+        run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Subject postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+  psych-bench-integration:
+    name: Psych-bench ARC3 integration
+    needs: subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+
+      - name: Bind exact subject
+        run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Format affected crates
+        run: cargo fmt -p symthaea-arc3-protocol -p symthaea-psych-bench -- --check
+
+      - name: Check psych-bench integration
+        run: cargo check --locked -p symthaea-psych-bench
+
+      - name: Test protocol compatibility namespace
+        run: cargo test --locked -p symthaea-psych-bench --lib
+
+      - name: Cross-check independent oracle
+        run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Subject postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
