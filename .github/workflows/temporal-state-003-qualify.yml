@@ -1,0 +1,105 @@
+name: TEMPORAL-STATE-003 Qualifier
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/temporal-state-003-qualify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QUALIFY_SHA: b66de824b2ce68af6a1cb3d0755a1d03cd1ff37a
+  FROZEN_BASE_SHA: 4bad8af72ff775e7c869b6df83faba718a339a36
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  observational-containment:
+    name: Exact-head observational containment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact product head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFY_SHA }}
+          fetch-depth: 2
+
+      - name: Bind exact head, parent, and product scope
+        run: |
+          set -euo pipefail
+          actual_sha="$(git rev-parse HEAD)"
+          test "$actual_sha" = "$QUALIFY_SHA"
+          test "$(git rev-parse HEAD^)" = "$FROZEN_BASE_SHA"
+          test "$(git rev-list --count "$FROZEN_BASE_SHA..$QUALIFY_SHA")" -eq 1
+          git diff --check "$FROZEN_BASE_SHA" "$QUALIFY_SHA"
+
+          mapfile -t changed < <(git diff --name-only "$FROZEN_BASE_SHA" "$QUALIFY_SHA" | sort)
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = 'src/dynamics/cfc/mod.rs'
+          test "${changed[1]}" = 'src/dynamics/cfc/observational.rs'
+
+          {
+            printf 'qualification_sha=%s\n' "$actual_sha"
+            printf 'frozen_base_sha=%s\n' "$FROZEN_BASE_SHA"
+            git diff --name-only "$FROZEN_BASE_SHA" "$QUALIFY_SHA"
+          } | tee temporal-state-003-context.txt
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Record toolchain and lock identity
+        run: |
+          set -euo pipefail
+          rustc -vV | tee -a temporal-state-003-context.txt
+          cargo -V | tee -a temporal-state-003-context.txt
+          rustc -vV | grep -q '^release: 1\.96\.0$'
+          cargo -V | grep -q '^cargo 1\.96\.0 '
+          cargo metadata --format-version 1 --no-deps --locked >/dev/null
+          sha256sum Cargo.lock \
+            src/dynamics/cfc/mod.rs \
+            src/dynamics/cfc/observational.rs \
+            | tee temporal-state-003-subject.sha256
+
+      - name: Install proven science-ai-core system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev \
+            protobuf-compiler \
+            libclang-dev \
+            libespeak-ng-dev \
+            cmake
+
+      - name: Prove observational prediction preserves every live layer state
+        run: |
+          set -euo pipefail
+          FEATURES='multi_agent,full_consciousness,full_language,magi_loop'
+          cargo test -p symthaea --lib --locked --features "$FEATURES" \
+            dynamics::cfc::observational::tests::observational_prediction_preserves_all_live_layer_states \
+            -- --exact --test-threads=1 2>&1 | tee temporal-state-003-test.log
+
+          grep -Fq \
+            'test dynamics::cfc::observational::tests::observational_prediction_preserves_all_live_layer_states ... ok' \
+            temporal-state-003-test.log
+          grep -Eq 'test result: ok\. 1 passed; 0 failed;' \
+            temporal-state-003-test.log
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporal-state-003-observational-containment
+          path: |
+            temporal-state-003-context.txt
+            temporal-state-003-subject.sha256
+            temporal-state-003-test.log
+          if-no-files-found: warn
+          retention-days: 14
