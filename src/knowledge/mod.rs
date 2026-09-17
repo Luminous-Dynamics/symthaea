@@ -40,6 +40,7 @@ mod belief_mutation_verifier;
 pub mod belief_revision_gate;
 pub mod belief_revision_persistence;
 pub mod belief_revision_receipt;
+pub mod belief_revision_snapshot;
 pub mod causal_admission;
 pub mod causal_bridge;
 pub mod causal_hypothesis;
@@ -122,6 +123,12 @@ pub use belief_revision_persistence::{
 pub use belief_revision_receipt::{
     BeliefRevisionHistory, BeliefRevisionReceipt, BeliefRevisionReceiptError,
     BeliefRevisionReceiptId, RevisionEvidenceReference, RevisionEvidenceSnapshot,
+};
+pub use belief_revision_snapshot::{
+    BeliefRevisionDecisionSnapshotV1, BeliefRevisionFailureSnapshotV1,
+    BeliefRevisionPolicySchemaV1, BeliefRevisionSnapshotVersion,
+    KnowledgeWeightRoutingFailureSnapshotV1, knowledge_weight_dimension_tag,
+    knowledge_weight_source_tag, uncertainty_dimension_tag,
 };
 pub use causal_admission::{
     CausalAdmissionDecision, CausalAdmissionFailure, CausalAdmissionGate, CausalAdmissionPolicy,
