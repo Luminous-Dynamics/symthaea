@@ -9,7 +9,6 @@
 //!
 //! No activation or writable hydration is introduced here.
 
-use super::belief_revision_gate::BeliefRevisionFailure;
 use super::belief_revision_schema_persistence::BeliefRevisionSchemaHistoryCapsuleV1;
 use super::belief_revision_snapshot::{
     knowledge_weight_dimension_tag, knowledge_weight_source_tag, uncertainty_dimension_tag,
@@ -21,6 +20,7 @@ use super::epistemic_restart_capsule::{
 };
 use std::error::Error;
 use std::fmt;
+use std::fmt::Write as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EpistemicRestartCapsuleV2Version {
@@ -36,7 +36,11 @@ impl EpistemicRestartV2Digest {
     }
 
     pub fn to_hex(self) -> String {
-        self.0.iter().map(|byte| format!("{byte:02x}")).collect()
+        let mut out = String::with_capacity(64);
+        for byte in self.0 {
+            write!(&mut out, "{byte:02x}").expect("writing to String cannot fail");
+        }
+        out
     }
 }
 
