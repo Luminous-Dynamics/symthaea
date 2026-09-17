@@ -60,6 +60,7 @@ pub mod epistemic_restart_manifest;
     reason = "EKM-034 imports the support store only for its cfg(test) cold-restart fixture"
 )]
 pub mod epistemic_restart_wire;
+pub mod epistemic_restart_wire_validation;
 pub mod epistemic_vector;
 pub mod evidence_binding_conformance;
 pub mod evidence_independence;
@@ -154,6 +155,10 @@ pub use epistemic_restart_wire::{
     EpistemicRestartWireV1, EpistemicRestartWireVersion, WireClaimV1, WireEvidenceV1,
     WireManifestSummaryV1, WireMutationV1, WireProvenanceV1, WireRevisionBasisV1,
     WireRevisionReceiptV1, WireSupportStateV1, WireUncertaintyAssessmentV1,
+};
+pub use epistemic_restart_wire_validation::{
+    EpistemicRestartWireValidationError, EpistemicRestartWireValidationReport,
+    EpistemicRestartWireValidator,
 };
 pub use epistemic_vector::{
     ClaimUncertaintyAssessment, EpistemicVector, UncertaintyDimension, UncertaintyError,
