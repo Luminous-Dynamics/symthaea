@@ -352,7 +352,10 @@ jobs:
   psych-bench-integration:
     name: Psych-bench ARC3 integration
     needs: subject
-    runs-on: ubuntu-latest
+    # Hosted fallback v2: preserve the exact qualification recipe while
+    # avoiding the currently starved ubuntu-latest pool. This branch is
+    # dormant until separately admitted; do not treat it as equivalent to v1.
+    runs-on: ubuntu-slim
     timeout-minutes: 20
     env:
       SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
