@@ -70,6 +70,17 @@ impl EpistemicSupportState {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct AuthorizationBinding {
+    receipt_id: BeliefRevisionReceiptId,
+    claim_id: ClaimId,
+    proposed_delta: f32,
+    expected_state_revision: u64,
+    expected_support: BoundedWeight,
+    approved_at_cycle: u64,
+    authority_label: String,
+}
+
 /// Immutable receipt for one applied epistemic-support mutation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BeliefMutationReceipt {
@@ -198,11 +209,18 @@ impl BeliefMutationRollbackPlan {
 }
 
 /// Isolated epistemic-support state plus append-only mutation history.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct EpistemicSupportStore {
     states: HashMap<ClaimId, EpistemicSupportState>,
     history: Vec<BeliefMutationReceipt>,
+    authorization_bindings: HashMap<String, AuthorizationBinding>,
     next_mutation_id: u64,
+}
+
+impl Default for EpistemicSupportStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EpistemicSupportStore {
@@ -210,6 +228,7 @@ impl EpistemicSupportStore {
         Self {
             states: HashMap::new(),
             history: Vec::new(),
+            authorization_bindings: HashMap::new(),
             next_mutation_id: 1,
         }
     }
@@ -268,13 +287,8 @@ impl EpistemicSupportStore {
             .find(|receipt| receipt.source_revision_receipt_id == receipt_id)
     }
 
-    pub fn mutation_for_authorization(
-        &self,
-        authorization_id: &str,
-    ) -> Option<&BeliefMutationReceipt> {
-        self.history
-            .iter()
-            .find(|receipt| receipt.authorization_id == authorization_id)
+    pub fn consumed_authorization_count(&self) -> usize {
+        self.authorization_bindings.len()
     }
 
     pub fn len(&self) -> usize {
@@ -285,9 +299,32 @@ impl EpistemicSupportStore {
         self.states.is_empty()
     }
 
-    fn apply(
+    fn authorization_binding(&self, authorization_id: &str) -> Option<&AuthorizationBinding> {
+        self.authorization_bindings.get(authorization_id)
+    }
+
+    fn record_authorization_binding(
+        &mut self,
+        authorization_id: &str,
+        binding: AuthorizationBinding,
+    ) -> Result<(), BeliefMutationError> {
+        if let Some(existing) = self.authorization_bindings.get(authorization_id) {
+            if existing != &binding {
+                return Err(BeliefMutationError::AuthorizationReplayMismatch {
+                    authorization_id: authorization_id.to_string(),
+                });
+            }
+            return Ok(());
+        }
+        self.authorization_bindings
+            .insert(authorization_id.to_string(), binding);
+        Ok(())
+    }
+
+    fn commit(
         &mut self,
         receipt: BeliefMutationReceipt,
+        binding: AuthorizationBinding,
     ) -> Result<(), BeliefMutationError> {
         let state = self
             .states
@@ -301,11 +338,21 @@ impl EpistemicSupportStore {
                 actual_revision: state.revision,
             });
         }
+        if let Some(existing) = self.authorization_bindings.get(&receipt.authorization_id) {
+            if existing != &binding {
+                return Err(BeliefMutationError::AuthorizationReplayMismatch {
+                    authorization_id: receipt.authorization_id.clone(),
+                });
+            }
+        }
+
         state.support = receipt.support_after;
         state.revision = receipt.state_revision_after;
         state.last_updated_cycle = receipt.applied_at_cycle;
         state.last_mutation_id = Some(receipt.id);
         self.next_mutation_id = self.next_mutation_id.max(receipt.id.0 + 1);
+        self.authorization_bindings
+            .insert(receipt.authorization_id.clone(), binding);
         self.history.push(receipt);
         Ok(())
     }
@@ -393,6 +440,18 @@ impl BeliefMutationAuthorization {
     pub fn approved_at_cycle(&self) -> u64 {
         self.approved_at_cycle
     }
+
+    fn binding(&self) -> AuthorizationBinding {
+        AuthorizationBinding {
+            receipt_id: self.source_revision_receipt_id,
+            claim_id: self.claim_id,
+            proposed_delta: self.proposed_delta,
+            expected_state_revision: self.expected_state_revision,
+            expected_support: self.expected_support,
+            approved_at_cycle: self.approved_at_cycle,
+            authority_label: self.authority_label.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -459,6 +518,10 @@ pub enum BeliefMutationError {
         evaluated_at_cycle: u64,
         state_last_updated_cycle: u64,
     },
+    EvidencePostdatesRevisionDecision {
+        latest_evidence_cycle: u64,
+        evaluated_at_cycle: u64,
+    },
     MissingBasisEvidence(EvidenceId),
     BasisEvidenceChanged(EvidenceId),
     RevisionDecisionChanged(Vec<BeliefRevisionFailure>),
@@ -476,30 +539,122 @@ pub enum BeliefMutationError {
 impl fmt::Display for BeliefMutationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EmptyAuthorizationId => write!(f, "belief mutation authorization id cannot be empty"),
+            Self::EmptyAuthorizationId => {
+                write!(f, "belief mutation authorization id cannot be empty")
+            }
             Self::EmptyAuthorityLabel => write!(f, "belief mutation authority label cannot be empty"),
             Self::UnknownClaim(id) => write!(f, "unknown claim {}", id.0),
-            Self::StateAlreadyRegistered(id) => write!(f, "epistemic support state already registered for claim {}", id.0),
-            Self::StateNotRegistered(id) => write!(f, "epistemic support state is not registered for claim {}", id.0),
-            Self::InitializationPredatesClaim { initialized_at_cycle, claim_created_at_cycle } => write!(f, "state initialization cycle {initialized_at_cycle} predates claim creation cycle {claim_created_at_cycle}"),
-            Self::RevisionReceiptRejected(id) => write!(f, "belief revision receipt {} was not eligible", id.0),
-            Self::RevisionReceiptHasDuplicateEvidence(ids) => write!(f, "belief revision receipt contains duplicate basis evidence attempts: {ids:?}"),
+            Self::StateAlreadyRegistered(id) => write!(
+                f,
+                "epistemic support state already registered for claim {}",
+                id.0
+            ),
+            Self::StateNotRegistered(id) => write!(
+                f,
+                "epistemic support state is not registered for claim {}",
+                id.0
+            ),
+            Self::InitializationPredatesClaim {
+                initialized_at_cycle,
+                claim_created_at_cycle,
+            } => write!(
+                f,
+                "state initialization cycle {initialized_at_cycle} predates claim creation cycle {claim_created_at_cycle}"
+            ),
+            Self::RevisionReceiptRejected(id) => {
+                write!(f, "belief revision receipt {} was not eligible", id.0)
+            }
+            Self::RevisionReceiptHasDuplicateEvidence(ids) => write!(
+                f,
+                "belief revision receipt contains duplicate basis evidence attempts: {ids:?}"
+            ),
             Self::AuthorizationDenied => write!(f, "belief mutation authorization was denied"),
-            Self::AuthorizationReceiptMismatch => write!(f, "belief mutation authorization is bound to a different revision receipt or delta"),
-            Self::AuthorizationStateClaimMismatch { state_claim, receipt_claim } => write!(f, "authorization state claim {} does not match receipt claim {}", state_claim.0, receipt_claim.0),
-            Self::AuthorizationPredatesRevisionDecision { approved_at_cycle, evaluated_at_cycle } => write!(f, "authorization cycle {approved_at_cycle} predates revision decision cycle {evaluated_at_cycle}"),
-            Self::MutationPredatesAuthorization { mutation_cycle, approved_at_cycle } => write!(f, "mutation cycle {mutation_cycle} predates authorization cycle {approved_at_cycle}"),
-            Self::MutationPredatesReceiptEvaluation { mutation_cycle, evaluated_at_cycle } => write!(f, "mutation cycle {mutation_cycle} predates revision evaluation cycle {evaluated_at_cycle}"),
-            Self::AuthorizationReplayMismatch { authorization_id } => write!(f, "authorization '{authorization_id}' was previously consumed for a different belief mutation"),
-            Self::StaleStateRevision { expected, actual } => write!(f, "authorized state revision {expected} is stale; current revision is {actual}"),
-            Self::StaleStateSupport { expected, actual } => write!(f, "authorized support {expected} is stale; current support is {actual}"),
-            Self::ReceiptPredatesCurrentState { evaluated_at_cycle, state_last_updated_cycle } => write!(f, "revision receipt evaluated at cycle {evaluated_at_cycle} predates current state update at cycle {state_last_updated_cycle}"),
-            Self::MissingBasisEvidence(id) => write!(f, "basis evidence {} no longer exists", id.0),
-            Self::BasisEvidenceChanged(id) => write!(f, "basis evidence {} no longer matches the revision receipt snapshot", id.0),
-            Self::RevisionDecisionChanged(failures) => write!(f, "belief revision is no longer eligible under its frozen policy: {failures:?}"),
+            Self::AuthorizationReceiptMismatch => write!(
+                f,
+                "belief mutation authorization is bound to a different revision receipt or delta"
+            ),
+            Self::AuthorizationStateClaimMismatch {
+                state_claim,
+                receipt_claim,
+            } => write!(
+                f,
+                "authorization state claim {} does not match receipt claim {}",
+                state_claim.0, receipt_claim.0
+            ),
+            Self::AuthorizationPredatesRevisionDecision {
+                approved_at_cycle,
+                evaluated_at_cycle,
+            } => write!(
+                f,
+                "authorization cycle {approved_at_cycle} predates revision decision cycle {evaluated_at_cycle}"
+            ),
+            Self::MutationPredatesAuthorization {
+                mutation_cycle,
+                approved_at_cycle,
+            } => write!(
+                f,
+                "mutation cycle {mutation_cycle} predates authorization cycle {approved_at_cycle}"
+            ),
+            Self::MutationPredatesReceiptEvaluation {
+                mutation_cycle,
+                evaluated_at_cycle,
+            } => write!(
+                f,
+                "mutation cycle {mutation_cycle} predates revision evaluation cycle {evaluated_at_cycle}"
+            ),
+            Self::AuthorizationReplayMismatch { authorization_id } => write!(
+                f,
+                "authorization '{authorization_id}' was previously consumed for a different belief mutation"
+            ),
+            Self::StaleStateRevision { expected, actual } => write!(
+                f,
+                "authorized state revision {expected} is stale; current revision is {actual}"
+            ),
+            Self::StaleStateSupport { expected, actual } => write!(
+                f,
+                "authorized support {expected} is stale; current support is {actual}"
+            ),
+            Self::ReceiptPredatesCurrentState {
+                evaluated_at_cycle,
+                state_last_updated_cycle,
+            } => write!(
+                f,
+                "revision receipt evaluated at cycle {evaluated_at_cycle} predates current state update at cycle {state_last_updated_cycle}"
+            ),
+            Self::EvidencePostdatesRevisionDecision {
+                latest_evidence_cycle,
+                evaluated_at_cycle,
+            } => write!(
+                f,
+                "claim evidence observed at cycle {latest_evidence_cycle} postdates revision decision cycle {evaluated_at_cycle}"
+            ),
+            Self::MissingBasisEvidence(id) => {
+                write!(f, "basis evidence {} no longer exists", id.0)
+            }
+            Self::BasisEvidenceChanged(id) => write!(
+                f,
+                "basis evidence {} no longer matches the revision receipt snapshot",
+                id.0
+            ),
+            Self::RevisionDecisionChanged(failures) => write!(
+                f,
+                "belief revision is no longer eligible under its frozen policy: {failures:?}"
+            ),
             Self::Weight(error) => write!(f, "belief weight update failed: {error:?}"),
-            Self::StateChangedBeforeCommit { expected_revision, actual_revision } => write!(f, "belief state changed before commit: expected revision {expected_revision}, actual {actual_revision}"),
-            Self::RollbackPlanPredatesMutation { generated_at_cycle, applied_at_cycle } => write!(f, "rollback plan cycle {generated_at_cycle} predates mutation cycle {applied_at_cycle}"),
+            Self::StateChangedBeforeCommit {
+                expected_revision,
+                actual_revision,
+            } => write!(
+                f,
+                "belief state changed before commit: expected revision {expected_revision}, actual {actual_revision}"
+            ),
+            Self::RollbackPlanPredatesMutation {
+                generated_at_cycle,
+                applied_at_cycle,
+            } => write!(
+                f,
+                "rollback plan cycle {generated_at_cycle} predates mutation cycle {applied_at_cycle}"
+            ),
         }
     }
 }
@@ -510,13 +665,6 @@ impl From<KnowledgeWeightError> for BeliefMutationError {
     fn from(value: KnowledgeWeightError) -> Self {
         Self::Weight(value)
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct AuthorizationBinding {
-    receipt_id: BeliefRevisionReceiptId,
-    claim_id: ClaimId,
-    proposed_delta: f32,
 }
 
 /// Replay-safe authorization firewall around the isolated epistemic-support store.
@@ -570,12 +718,7 @@ impl BeliefMutationFirewall {
             });
         }
 
-        let binding = AuthorizationBinding {
-            receipt_id: revision_receipt.id(),
-            claim_id: revision_receipt.claim_id(),
-            proposed_delta: revision_receipt.proposed_delta(),
-        };
-
+        let binding = authorization.binding();
         if let Some(previous) = self
             .consumed_authorizations
             .get(&authorization.authorization_id)
@@ -586,11 +729,8 @@ impl BeliefMutationFirewall {
                 });
             }
         }
-        if let Some(previous) = store.mutation_for_authorization(&authorization.authorization_id) {
-            if previous.source_revision_receipt_id != revision_receipt.id()
-                || previous.claim_id != revision_receipt.claim_id()
-                || previous.proposed_delta != revision_receipt.proposed_delta()
-            {
+        if let Some(previous) = store.authorization_binding(&authorization.authorization_id) {
+            if previous != &binding {
                 return Err(BeliefMutationError::AuthorizationReplayMismatch {
                     authorization_id: authorization.authorization_id.clone(),
                 });
@@ -600,10 +740,14 @@ impl BeliefMutationFirewall {
         // A revision receipt is single-use. Rebuilding the firewall cannot cause
         // a second application while the store/history is retained.
         if let Some(existing) = store.mutation_for_revision_receipt(revision_receipt.id()) {
+            let existing = existing.clone();
+            store.record_authorization_binding(
+                &authorization.authorization_id,
+                binding.clone(),
+            )?;
             self.consumed_authorizations
-                .entry(authorization.authorization_id.clone())
-                .or_insert(binding);
-            return Ok(BeliefMutationOutcome::AlreadyApplied(existing.clone()));
+                .insert(authorization.authorization_id.clone(), binding);
+            return Ok(BeliefMutationOutcome::AlreadyApplied(existing));
         }
 
         let state = store
@@ -632,17 +776,29 @@ impl BeliefMutationFirewall {
             });
         }
 
+        if let Some(latest_evidence_cycle) = ledger
+            .evidence_for_claim(revision_receipt.claim_id())
+            .into_iter()
+            .map(|record| record.observed_at_cycle)
+            .max()
+        {
+            if latest_evidence_cycle > revision_receipt.evaluated_at_cycle() {
+                return Err(BeliefMutationError::EvidencePostdatesRevisionDecision {
+                    latest_evidence_cycle,
+                    evaluated_at_cycle: revision_receipt.evaluated_at_cycle(),
+                });
+            }
+        }
+
         verify_basis_snapshots(ledger, revision_receipt)?;
         revalidate_revision_decision(ledger, revision_receipt)?;
 
         // Deliberately fail instead of silently clamping: the approved delta must
         // describe the exact state transition that is actually committed.
-        let support_after = BoundedWeight::new(
-            state.support.get() + revision_receipt.proposed_delta(),
-        )?;
-        let id = BeliefMutationReceiptId(store.next_mutation_id);
+        let support_after =
+            BoundedWeight::new(state.support.get() + revision_receipt.proposed_delta())?;
         let receipt = BeliefMutationReceipt {
-            id,
+            id: BeliefMutationReceiptId(store.next_mutation_id),
             source_revision_receipt_id: revision_receipt.id(),
             claim_id: revision_receipt.claim_id(),
             proposed_delta: revision_receipt.proposed_delta(),
@@ -656,7 +812,7 @@ impl BeliefMutationFirewall {
             applied_at_cycle: mutation_cycle,
         };
 
-        store.apply(receipt.clone())?;
+        store.commit(receipt.clone(), binding.clone())?;
         self.consumed_authorizations
             .insert(authorization.authorization_id.clone(), binding);
         Ok(BeliefMutationOutcome::Applied(receipt))
@@ -785,12 +941,13 @@ mod tests {
     }
 
     fn authorization(
+        id: &str,
         receipt: &BeliefRevisionReceipt,
         store: &EpistemicSupportStore,
     ) -> BeliefMutationAuthorization {
         let state = store.state(receipt.claim_id()).unwrap();
         BeliefMutationAuthorization::new(
-            "belief-auth-1",
+            id,
             "test-authority",
             BeliefMutationAuthorizationDecision::Approved,
             4,
@@ -801,18 +958,24 @@ mod tests {
     }
 
     #[test]
+    fn default_and_new_share_mutation_id_semantics() {
+        assert_eq!(EpistemicSupportStore::new().next_mutation_id, 1);
+        assert_eq!(EpistemicSupportStore::default().next_mutation_id, 1);
+    }
+
+    #[test]
     fn eligible_revision_applies_exact_bounded_delta_once() {
         let (ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
         assert!(receipt.eligible());
-        let authorization = authorization(&receipt, &store);
+        let authorization = authorization("belief-auth-1", &receipt, &store);
         let mut firewall = BeliefMutationFirewall::new();
 
         let first = firewall
             .apply(&ledger, &mut store, &receipt, &authorization, 5)
             .unwrap();
         assert!(first.applied_new_revision());
-        assert_eq!(first.receipt().support_before().get(), 0.50);
-        assert_eq!(first.receipt().support_after().get(), 0.60);
+        assert!((first.receipt().support_before().get() - 0.50).abs() < 1e-6);
+        assert!((first.receipt().support_after().get() - 0.60).abs() < 1e-6);
         assert_eq!(store.state(receipt.claim_id()).unwrap().revision(), 1);
 
         let replay = firewall
@@ -826,7 +989,7 @@ mod tests {
     #[test]
     fn rebuilt_firewall_does_not_reapply_consumed_revision_receipt() {
         let (ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
-        let authorization = authorization(&receipt, &store);
+        let authorization = authorization("belief-auth-1", &receipt, &store);
         let mut first = BeliefMutationFirewall::new();
         let applied = first
             .apply(&ledger, &mut store, &receipt, &authorization, 5)
@@ -839,12 +1002,49 @@ mod tests {
         assert!(!replay.applied_new_revision());
         assert_eq!(replay.receipt().id(), applied.receipt().id());
         assert_eq!(store.history().len(), 1);
+        assert_eq!(store.consumed_authorization_count(), 1);
+    }
+
+    #[test]
+    fn idempotent_ack_authorization_binding_survives_firewall_rebuild() {
+        let (ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
+        let first_auth = authorization("belief-auth-1", &receipt, &store);
+        let mut first = BeliefMutationFirewall::new();
+        first
+            .apply(&ledger, &mut store, &receipt, &first_auth, 5)
+            .unwrap();
+
+        // A second authorization ID may acknowledge the already-applied receipt;
+        // that ID is still consumed in the retained store.
+        let current_state = store.state(receipt.claim_id()).unwrap();
+        let ack_auth = BeliefMutationAuthorization::new(
+            "belief-auth-ack",
+            "test-authority",
+            BeliefMutationAuthorizationDecision::Approved,
+            6,
+            &receipt,
+            current_state,
+        )
+        .unwrap();
+        let mut second = BeliefMutationFirewall::new();
+        let replay = second
+            .apply(&ledger, &mut store, &receipt, &ack_auth, 6)
+            .unwrap();
+        assert!(!replay.applied_new_revision());
+        assert_eq!(store.consumed_authorization_count(), 2);
+
+        let mut third = BeliefMutationFirewall::new();
+        let replay_again = third
+            .apply(&ledger, &mut store, &receipt, &ack_auth, 7)
+            .unwrap();
+        assert!(!replay_again.applied_new_revision());
+        assert_eq!(store.history().len(), 1);
     }
 
     #[test]
     fn rejected_revision_receipt_never_mutates_state() {
-        let (mut ledger, _, mut store) = fixture(EvidencePolarity::Supports, 0.10);
-        let claim = store.states.keys().copied().next().unwrap();
+        let (ledger, eligible, mut store) = fixture(EvidencePolarity::Supports, 0.10);
+        let claim = eligible.claim_id();
         let support_evidence = ledger.claim(claim).unwrap().evidence_ids[0];
         let wrong_direction = EpistemicRevisionProposal::new(
             claim,
@@ -860,7 +1060,7 @@ mod tests {
             .unwrap();
         let rejected = history.get(id).unwrap().clone();
         assert!(!rejected.eligible());
-        let authorization = authorization(&rejected, &store);
+        let authorization = authorization("belief-auth-rejected", &rejected, &store);
         let before = store.state(claim).unwrap().clone();
         let mut firewall = BeliefMutationFirewall::new();
         assert!(matches!(
@@ -871,119 +1071,98 @@ mod tests {
     }
 
     #[test]
-    fn stale_authorized_state_version_fails_closed() {
-        let (ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
-        let stale_authorization = authorization(&receipt, &store);
-
-        // Apply once with a separately named authorization, moving the state to r1.
-        let state = store.state(receipt.claim_id()).unwrap();
-        let first_authorization = BeliefMutationAuthorization::new(
-            "belief-auth-first",
-            "test-authority",
-            BeliefMutationAuthorizationDecision::Approved,
-            4,
-            &receipt,
-            state,
+    fn duplicate_basis_receipt_is_not_mutation_eligible() {
+        let (ledger, base_receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
+        let claim = base_receipt.claim_id();
+        let support = ledger.claim(claim).unwrap().evidence_ids[0];
+        let proposal = EpistemicRevisionProposal::new(
+            claim,
+            0.10,
+            vec![support, support],
+            "duplicate evidence",
         )
         .unwrap();
-        let mut first = BeliefMutationFirewall::new();
-        first
-            .apply(&ledger, &mut store, &receipt, &first_authorization, 5)
-            .unwrap();
-
-        // Same source receipt is already consumed, so replay is idempotent rather
-        // than a second stale-state mutation.
-        let mut rebuilt = BeliefMutationFirewall::new();
-        let outcome = rebuilt
-            .apply(&ledger, &mut store, &receipt, &stale_authorization, 6)
-            .unwrap();
-        assert!(!outcome.applied_new_revision());
-        assert_eq!(store.history().len(), 1);
-    }
-
-    #[test]
-    fn newly_added_contradiction_can_invalidate_old_strengthen_decision() {
-        let (mut ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
-        let claim = receipt.claim_id();
-        // Rebuild a receipt under a policy that blocks strengthening when any
-        // contradictory evidence exists.
-        let support = ledger.claim(claim).unwrap().evidence_ids[0];
-        let proposal = EpistemicRevisionProposal::new(claim, 0.10, vec![support], "support")
-            .unwrap();
-        let policy = BeliefRevisionPolicy::new(0.20, 1, false, 0, 1.0)
-            .unwrap()
-            .block_strengthen_with_unresolved_contradictions(true);
+        let policy = BeliefRevisionPolicy::new(0.20, 1, false, 0, 1.0).unwrap();
         let mut history = BeliefRevisionHistory::new();
         let id = history
             .evaluate_and_record(&ledger, &proposal, &policy, None, None, 3)
             .unwrap();
-        let guarded_receipt = history.get(id).unwrap().clone();
-        assert!(guarded_receipt.eligible());
-        let authorization = authorization(&guarded_receipt, &store);
+        let receipt = history.get(id).unwrap().clone();
+        assert!(receipt.eligible());
+        assert_eq!(receipt.duplicate_basis_evidence_ids(), &[support]);
+        let auth = authorization("belief-auth-dup", &receipt, &store);
+        let mut firewall = BeliefMutationFirewall::new();
+        assert!(matches!(
+            firewall.apply(&ledger, &mut store, &receipt, &auth, 5),
+            Err(BeliefMutationError::RevisionReceiptHasDuplicateEvidence(_))
+        ));
+        assert!(store.history().is_empty());
+    }
 
+    #[test]
+    fn any_postdecision_evidence_makes_receipt_stale() {
+        let (mut ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
+        let claim = receipt.claim_id();
+        let auth = authorization("belief-auth-stale", &receipt, &store);
         let provenance = ledger
-            .add_provenance("later-test", None, None, 4, vec![])
+            .add_provenance("later-source", None, None, 4, vec![])
             .unwrap();
         ledger
             .add_evidence(
                 claim,
                 EvidenceKind::Measurement,
-                EvidencePolarity::Contradicts,
+                EvidencePolarity::Supports,
                 provenance,
                 4,
-                Some("later contradiction".into()),
+                Some("later result".into()),
                 Some("protocol-v2".into()),
             )
             .unwrap();
 
         let mut firewall = BeliefMutationFirewall::new();
-        assert!(matches!(
-            firewall.apply(
-                &ledger,
-                &mut store,
-                &guarded_receipt,
-                &authorization,
-                5,
-            ),
-            Err(BeliefMutationError::RevisionDecisionChanged(_))
-        ));
-        assert_eq!(store.state(claim).unwrap().support().get(), 0.50);
+        assert_eq!(
+            firewall
+                .apply(&ledger, &mut store, &receipt, &auth, 5)
+                .unwrap_err(),
+            BeliefMutationError::EvidencePostdatesRevisionDecision {
+                latest_evidence_cycle: 4,
+                evaluated_at_cycle: 3,
+            }
+        );
+        assert!((store.state(claim).unwrap().support().get() - 0.50).abs() < 1e-6);
     }
 
     #[test]
     fn out_of_range_transition_fails_instead_of_clamping() {
-        let (ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
+        let (ledger, receipt, _) = fixture(EvidencePolarity::Supports, 0.10);
         let claim = receipt.claim_id();
-        // Explicitly initialize a separate store near the upper boundary.
         let mut near_one = EpistemicSupportStore::new();
         near_one
             .register_claim(&ledger, claim, BoundedWeight::new(0.95).unwrap(), 3)
             .unwrap();
-        let auth = authorization(&receipt, &near_one);
+        let auth = authorization("belief-auth-boundary", &receipt, &near_one);
         let mut firewall = BeliefMutationFirewall::new();
         assert!(matches!(
             firewall.apply(&ledger, &mut near_one, &receipt, &auth, 5),
             Err(BeliefMutationError::Weight(_))
         ));
-        assert_eq!(near_one.state(claim).unwrap().support().get(), 0.95);
+        assert!((near_one.state(claim).unwrap().support().get() - 0.95).abs() < 1e-6);
         assert!(near_one.history().is_empty());
-        // Keep the original fixture used so this test also proves no shared state.
-        assert_eq!(store.state(claim).unwrap().support().get(), 0.50);
     }
 
     #[test]
     fn mutation_receipt_generates_exact_nonexecuting_rollback_plan() {
         let (ledger, receipt, mut store) = fixture(EvidencePolarity::Supports, 0.10);
-        let authorization = authorization(&receipt, &store);
+        let authorization = authorization("belief-auth-rollback", &receipt, &store);
         let mut firewall = BeliefMutationFirewall::new();
         let outcome = firewall
             .apply(&ledger, &mut store, &receipt, &authorization, 5)
             .unwrap();
         let plan = outcome.receipt().rollback_plan(6).unwrap();
         assert_eq!(plan.source_mutation_id(), outcome.receipt().id());
-        assert_eq!(plan.restore_support().get(), 0.50);
-        assert_eq!(plan.expected_current_support().get(), 0.60);
+        assert!((plan.restore_support().get() - 0.50).abs() < 1e-6);
+        assert!((plan.expected_current_support().get() - 0.60).abs() < 1e-6);
         assert_eq!(plan.expected_current_revision(), 1);
-        assert_eq!(store.state(receipt.claim_id()).unwrap().support().get(), 0.60);
+        assert!((store.state(receipt.claim_id()).unwrap().support().get() - 0.60).abs() < 1e-6);
     }
 }
