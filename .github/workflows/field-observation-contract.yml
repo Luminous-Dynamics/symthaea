@@ -60,21 +60,54 @@ jobs:
           cargo --version --verbose
 
       - name: Check FIELD contract formatting
-        run: cargo fmt --check -p symthaea-physical-io-types
-
-      - name: Check FIELD contract library
-        run: cargo check -p symthaea-physical-io-types --lib --locked
-
-      - name: Run FIELD contract tests
-        run: cargo test -p symthaea-physical-io-types --all-targets --locked
-
-      - name: Lint FIELD contract
-        run: cargo clippy -p symthaea-physical-io-types --all-targets --locked -- -D warnings
-
-      - name: Verify tracked checkout immutability
         shell: bash
         run: |
-          set -euo pipefail
-          git diff --exit-code
-          git diff --cached --exit-code
-          test -z "$(git status --porcelain --untracked-files=no)"
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/field-qualification-diagnostics"
+          cargo fmt --check -p symthaea-physical-io-types 2>&1 \
+            | tee "$RUNNER_TEMP/field-qualification-diagnostics/rustfmt.log"
+
+      - name: Check FIELD contract library
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/field-qualification-diagnostics"
+          cargo check -p symthaea-physical-io-types --lib --locked 2>&1 \
+            | tee "$RUNNER_TEMP/field-qualification-diagnostics/check.log"
+
+      - name: Run FIELD contract tests
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/field-qualification-diagnostics"
+          cargo test -p symthaea-physical-io-types --all-targets --locked 2>&1 \
+            | tee "$RUNNER_TEMP/field-qualification-diagnostics/test.log"
+
+      - name: Lint FIELD contract
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/field-qualification-diagnostics"
+          cargo clippy -p symthaea-physical-io-types --all-targets --locked -- -D warnings 2>&1 \
+            | tee "$RUNNER_TEMP/field-qualification-diagnostics/clippy.log"
+
+      - name: Verify tracked checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/field-qualification-diagnostics"
+          {
+            git diff --exit-code
+            git diff --cached --exit-code
+            test -z "$(git status --porcelain --untracked-files=no)"
+          } 2>&1 | tee "$RUNNER_TEMP/field-qualification-diagnostics/postflight-immutability.log"
+
+      - name: Preserve failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: field-001-qualification-diagnostics-${{ github.run_id }}
+          path: ${{ runner.temp }}/field-qualification-diagnostics
+          if-no-files-found: warn
+          retention-days: 7
