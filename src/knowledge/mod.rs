@@ -31,6 +31,7 @@
 pub mod adaptive_ontology;
 #[cfg(feature = "epistemic")]
 pub mod adversarial_epistemics;
+pub mod belief_mutation_firewall;
 pub mod belief_revision_gate;
 pub mod belief_revision_receipt;
 pub mod causal_admission;
@@ -68,6 +69,12 @@ pub mod receipt_admission;
 pub mod self_schema;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
+pub use belief_mutation_firewall::{
+    BeliefMutationAuthorization, BeliefMutationAuthorizationDecision, BeliefMutationError,
+    BeliefMutationFirewall, BeliefMutationOutcome, BeliefMutationReceipt,
+    BeliefMutationReceiptId, BeliefMutationRollbackPlan, EpistemicSupportState,
+    EpistemicSupportStore,
+};
 pub use belief_revision_gate::{
     BeliefRevisionDecision, BeliefRevisionFailure, BeliefRevisionGate, BeliefRevisionPolicy,
     BeliefRevisionPolicyError, CalibrationSnapshot, EpistemicRevisionProposal,
