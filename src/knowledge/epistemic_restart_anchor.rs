@@ -219,6 +219,7 @@ pub struct VerifiedRestartAnchorEvidenceV1 {
     statement: RestartAnchorStatementV1,
     statement_digest: RestartAnchorDigestV1,
     proof_digest: [u8; 32],
+    verified_at_cycle: u64,
     quarantine_construction_authorized: bool,
     activation_authorized: bool,
 }
@@ -234,6 +235,10 @@ impl VerifiedRestartAnchorEvidenceV1 {
 
     pub fn proof_digest(&self) -> [u8; 32] {
         self.proof_digest
+    }
+
+    pub fn verified_at_cycle(&self) -> u64 {
+        self.verified_at_cycle
     }
 
     /// Converts externally verified anchor evidence into EKM-045's narrow
@@ -299,6 +304,7 @@ pub fn verify_restart_anchor_evidence(
         statement: evidence.statement.clone(),
         statement_digest,
         proof_digest: *proof_hasher.finalize().as_bytes(),
+        verified_at_cycle: observed_at_cycle,
         quarantine_construction_authorized: false,
         activation_authorized: false,
     })
@@ -357,7 +363,23 @@ impl RestartAnchorTrackerV1 {
     pub fn accept(
         &mut self,
         verified: &VerifiedRestartAnchorEvidenceV1,
+        observed_at_cycle: u64,
     ) -> Result<(), RestartAnchorTrackingError> {
+        if observed_at_cycle < verified.verified_at_cycle
+            || observed_at_cycle < verified.statement.issued_at_cycle
+        {
+            return Err(RestartAnchorTrackingError::ObservationPredatesVerification {
+                observed_at_cycle,
+                verified_at_cycle: verified.verified_at_cycle,
+            });
+        }
+        if observed_at_cycle >= verified.statement.expires_at_cycle {
+            return Err(RestartAnchorTrackingError::Expired {
+                observed_at_cycle,
+                expires_at_cycle: verified.statement.expires_at_cycle,
+            });
+        }
+
         let sequence = verified.statement.sequence;
         let digest = verified.statement_digest;
 
@@ -450,6 +472,14 @@ pub enum RestartAnchorTrackingError {
     SequenceGap { expected: u64, actual: u64 },
     PreviousAnchorMismatch,
     SequenceOverflow,
+    ObservationPredatesVerification {
+        observed_at_cycle: u64,
+        verified_at_cycle: u64,
+    },
+    Expired {
+        observed_at_cycle: u64,
+        expires_at_cycle: u64,
+    },
 }
 
 impl fmt::Display for RestartAnchorTrackingError {
@@ -611,8 +641,8 @@ mod tests {
         .unwrap();
 
         let mut tracker = RestartAnchorTrackerV1::default();
-        tracker.accept(&first).unwrap();
-        tracker.accept(&second).unwrap();
+        tracker.accept(&first, 4).unwrap();
+        tracker.accept(&second, 5).unwrap();
         assert_eq!(tracker.latest_sequence(), Some(2));
     }
 
@@ -623,9 +653,9 @@ mod tests {
         let next_receipt = receipt(5, "X predicts Z");
 
         let mut tracker = RestartAnchorTrackerV1::default();
-        tracker.accept(&first).unwrap();
+        tracker.accept(&first, 4).unwrap();
         assert_eq!(
-            tracker.accept(&first).unwrap_err(),
+            tracker.accept(&first, 4).unwrap_err(),
             RestartAnchorTrackingError::Replay
         );
 
@@ -637,7 +667,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(
-            tracker.accept(&gap),
+            tracker.accept(&gap, 5),
             Err(RestartAnchorTrackingError::SequenceGap { .. })
         ));
     }
