@@ -37,6 +37,8 @@ pub const SYM_RSI_001_GROUNDED_DREAM_POLICY_ID: &str =
 pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
+pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
+    "mean-predicted-task-quality/5-perturbations-minus-0.10-failure-probability/0.01-override-margin/v1";
 
 const QUALITY_START: usize = 7;
 const QUALITY_COPIES: usize = 8;
@@ -233,6 +235,7 @@ impl FixturePolicy for GroundedDreamPolicy {
                     causal_assumptions: vec![
                         "nearest observed state/action transition memory".into(),
                         "heuristic fallback for unsupported action fingerprints".into(),
+                        SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE.into(),
                     ],
                     empirically_validated: false,
                 },
@@ -593,6 +596,7 @@ fn prediction_provenance_digest(
         model.evidence_digest.as_str(),
         state_digest,
         model.model_version.as_str(),
+        SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE,
     ] {
         hasher.update(&(value.len() as u64).to_le_bytes());
         hasher.update(value.as_bytes());
