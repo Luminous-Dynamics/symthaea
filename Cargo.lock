@@ -1373,6 +1373,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5ec2f1fc3ec205783a5da9a7e6c1509cc69dedf09a1949e412c1e18469326d00"
 dependencies = [
  "aws-lc-sys",
+ "untrusted 0.7.1",
  "zeroize",
 ]
 
@@ -6181,6 +6182,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
+ "const-oid 0.9.6",
  "crypto-common 0.1.7",
  "subtle",
 ]
@@ -6671,7 +6673,7 @@ dependencies = [
  "egui 0.33.3",
  "glow 0.16.0",
  "log",
- "memoffset",
+ "memoffset 0.9.1",
  "profiling",
  "wasm-bindgen",
  "web-sys",
@@ -11919,6 +11921,15 @@ checksum = "a64a92489e2744ce060c349162be1c5f33c6969234104dbd99ddb5feb08b8c15"
 
 [[package]]
 name = "memoffset"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "memoffset"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
@@ -12721,6 +12732,8 @@ dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
  "libc",
+ "memoffset 0.7.1",
+ "pin-utils",
 ]
 
 [[package]]
@@ -12756,7 +12769,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases 0.2.1",
  "libc",
- "memoffset",
+ "memoffset 0.9.1",
 ]
 
 [[package]]
@@ -14220,6 +14233,12 @@ name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
+
+[[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "piper"
@@ -15919,7 +15938,7 @@ dependencies = [
  "cfg-if",
  "getrandom 0.2.17",
  "libc",
- "untrusted",
+ "untrusted 0.9.0",
  "windows-sys 0.52.0",
 ]
 
@@ -16071,7 +16090,7 @@ checksum = "62f509095fc8cc0c8c8564016771d458079c11a8d857e65861f045145c0d3208"
 dependencies = [
  "countme",
  "hashbrown 0.14.5",
- "memoffset",
+ "memoffset 0.9.1",
  "rustc-hash 1.1.0",
  "text-size",
 ]
@@ -16321,7 +16340,7 @@ dependencies = [
  "aws-lc-rs",
  "ring",
  "rustls-pki-types",
- "untrusted",
+ "untrusted 0.9.0",
 ]
 
 [[package]]
@@ -18160,6 +18179,526 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-assurance-acceptance-ledger-head-currentness"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-assurance-tpm2-attestation-possession",
+]
+
+[[package]]
+name = "symthaea-assurance-authenticated-post-release-checkpoint-two"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-post-release-checkpoint-two-observation",
+ "symthaea-assurance-post-release-runtime-handoff",
+]
+
+[[package]]
+name = "symthaea-assurance-bootstrap-executable-mapping-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-bootstrap-syscall-confinement",
+ "symthaea-assurance-ptrace-static-exec-confirmation",
+]
+
+[[package]]
+name = "symthaea-assurance-bootstrap-ready-checkpoint"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-assurance-launch-bound-first-runtime-observation",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-bootstrap-syscall-confinement"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-bootstrap-ready-checkpoint",
+ "symthaea-assurance-critical-exec-preserved-authority",
+ "symthaea-assurance-launch-runtime-handoff-channel",
+ "symthaea-assurance-ptrace-static-exec-confirmation",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-closure-backed-continuous-verifier"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-nix-runtime-policy-binding",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-closure-backed-in-process-continuous"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-continuity-qualified-bootstrap-release"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-bootstrap-executable-mapping-continuity",
+ "symthaea-assurance-bootstrap-syscall-confinement",
+]
+
+[[package]]
+name = "symthaea-assurance-critical-exec-preserved-authority"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-ptrace-static-exec-confirmation",
+]
+
+[[package]]
+name = "symthaea-assurance-current-fd-pinned-linux-tpm-ima-anchor"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-linux-tpm-ima-current-anchor",
+ "symthaea-assurance-tpm2-fd-pinned-checkquote",
+]
+
+[[package]]
+name = "symthaea-assurance-current-in-process-linux-tpm-ima-anchor"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-linux-tpm-ima-current-anchor",
+ "symthaea-assurance-tpm2-in-process-ecdsa",
+]
+
+[[package]]
+name = "symthaea-assurance-fd-pinned-executable"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+]
+
+[[package]]
+name = "symthaea-assurance-fresh-mapped-runtime-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-closure-backed-in-process-continuous",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+ "symthaea-assurance-nix-runtime-closure",
+ "symthaea-assurance-observed-mapped-nix-executable-runtime",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-launch-bound-first-runtime-observation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-closure-backed-in-process-continuous",
+ "symthaea-assurance-fresh-mapped-runtime-continuity",
+ "symthaea-assurance-launch-runtime-handoff-channel",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+ "symthaea-assurance-nix-runtime-closure",
+ "symthaea-assurance-observed-mapped-nix-executable-runtime",
+]
+
+[[package]]
+name = "symthaea-assurance-launch-runtime-handoff-channel"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "getrandom 0.2.17",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-critical-exec-preserved-authority",
+ "symthaea-assurance-ptrace-static-exec-confirmation",
+]
+
+[[package]]
+name = "symthaea-assurance-launch-to-runtime-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-critical-exec-preserved-authority",
+ "symthaea-assurance-fresh-mapped-runtime-continuity",
+ "symthaea-assurance-launch-bound-first-runtime-observation",
+ "symthaea-assurance-launch-runtime-handoff-channel",
+ "symthaea-assurance-ptrace-static-exec-confirmation",
+]
+
+[[package]]
+name = "symthaea-assurance-linux-tpm-ima-current-anchor"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "sha2 0.10.9",
+ "symthaea-assurance-acceptance-ledger-head-currentness",
+ "symthaea-assurance-linux-tpm-ima-ledger-anchor",
+ "symthaea-assurance-tpm-ima-pcr-binding",
+ "symthaea-assurance-tpm2-attestation-possession",
+ "symthaea-assurance-tpm2-checkquote-adapter",
+ "symthaea-assurance-tpm2-platform-qualification",
+ "symthaea-assurance-tpm2-possession-policy-binding",
+ "symthaea-linux-ima-replay",
+]
+
+[[package]]
+name = "symthaea-assurance-linux-tpm-ima-ledger-anchor"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "sha2 0.10.9",
+ "symthaea-assurance-tpm-ima-pcr-binding",
+ "symthaea-assurance-tpm2-attestation-possession",
+ "symthaea-assurance-tpm2-checkquote-adapter",
+ "symthaea-assurance-tpm2-platform-qualification",
+ "symthaea-assurance-tpm2-possession-policy-binding",
+ "symthaea-linux-ima-replay",
+]
+
+[[package]]
+name = "symthaea-assurance-nix-bound-in-process-runtime"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-current-in-process-linux-tpm-ima-anchor",
+ "symthaea-assurance-nix-runtime-closure",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-nix-runtime-closure"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+ "symthaea-assurance-fd-pinned-executable",
+]
+
+[[package]]
+name = "symthaea-assurance-nix-runtime-policy-binding"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-current-fd-pinned-linux-tpm-ima-anchor",
+ "symthaea-assurance-nix-runtime-closure",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-observed-mapped-nix-executable-runtime"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+ "symthaea-assurance-nix-runtime-closure",
+]
+
+[[package]]
+name = "symthaea-assurance-policy-lineage"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-assurance-policy-manifest",
+]
+
+[[package]]
+name = "symthaea-assurance-policy-lineage-anchor"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-policy-lineage",
+]
+
+[[package]]
+name = "symthaea-assurance-policy-manifest"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-evidence-deployment-scope",
+ "symthaea-evidence-lifecycle",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-assurance-post-release-checkpoint-two-observation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-fresh-mapped-runtime-continuity",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+ "symthaea-assurance-nix-runtime-closure",
+ "symthaea-assurance-observed-mapped-nix-executable-runtime",
+ "symthaea-assurance-post-release-runtime-handoff",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-post-release-continuous-runtime-lineage"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-authenticated-post-release-checkpoint-two",
+ "symthaea-assurance-launch-to-runtime-continuity",
+ "symthaea-assurance-signed-post-release-checkpoint-two",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-post-release-runtime-handoff"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "getrandom 0.2.17",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-bootstrap-executable-mapping-continuity",
+ "symthaea-assurance-bootstrap-ready-checkpoint",
+ "symthaea-assurance-bootstrap-syscall-confinement",
+ "symthaea-assurance-continuity-qualified-bootstrap-release",
+ "symthaea-assurance-launch-runtime-handoff-channel",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-ptrace-static-exec-confirmation"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-static-fd-exec-launch",
+]
+
+[[package]]
+name = "symthaea-assurance-reference-integrity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm2-measured-boot-replay",
+]
+
+[[package]]
+name = "symthaea-assurance-reference-integrity-lineage"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-reference-integrity",
+]
+
+[[package]]
+name = "symthaea-assurance-requalification"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "symthaea-assurance-signed-mapped-runtime-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-closure-backed-in-process-continuous",
+ "symthaea-assurance-observed-mapped-nix-executable-runtime",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-signed-post-release-checkpoint-two"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-assurance-authenticated-post-release-checkpoint-two",
+ "symthaea-evidence-verifier-runtime-continuity",
+]
+
+[[package]]
+name = "symthaea-assurance-static-elf-launch-profile"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+]
+
+[[package]]
+name = "symthaea-assurance-static-fd-exec-launch"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "nix 0.26.4",
+ "serde",
+ "symthaea-assurance-nix-bound-in-process-runtime",
+ "symthaea-assurance-static-elf-launch-profile",
+]
+
+[[package]]
+name = "symthaea-assurance-statistics"
+version = "0.1.0"
+
+[[package]]
+name = "symthaea-assurance-tpm-ima-pcr-binding"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "sha2 0.10.9",
+ "symthaea-assurance-tpm2-attestation-possession",
+ "symthaea-assurance-tpm2-checkquote-adapter",
+ "symthaea-linux-ima-replay",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm-reference-crucible"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-reference-integrity",
+ "symthaea-assurance-reference-integrity-lineage",
+ "symthaea-assurance-tpm2-attestation-possession",
+ "symthaea-assurance-tpm2-measured-boot-replay",
+ "symthaea-assurance-tpm2-platform-qualification",
+ "symthaea-assurance-tpm2-tools-adapter",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-attestation-possession"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm2-platform-qualification",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-checkquote-adapter"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "sha2 0.10.9",
+ "symthaea-assurance-tpm2-attestation-possession",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-fd-pinned-checkquote"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm2-attestation-possession",
+ "symthaea-assurance-tpm2-checkquote-adapter",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-in-process-ecdsa"
+version = "0.1.0"
+dependencies = [
+ "aws-lc-rs",
+ "base64 0.22.1",
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm2-attestation-possession",
+ "symthaea-assurance-tpm2-checkquote-adapter",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-measured-boot-replay"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm2-attestation-possession",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-platform-qualification"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm2-tools-adapter",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-possession-policy-binding"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "symthaea-assurance-tpm2-attestation-possession",
+]
+
+[[package]]
+name = "symthaea-assurance-tpm2-tools-adapter"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-policy-lineage-anchor",
+ "symthaea-assurance-trust-store",
+]
+
+[[package]]
+name = "symthaea-assurance-trust-store"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-policy-lineage-anchor",
+]
+
+[[package]]
 name = "symthaea-astronomy"
 version = "0.1.0"
 
@@ -18375,6 +18914,13 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "symthaea-camera-geometry"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -18613,6 +19159,114 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-domain-awareness"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-formal-safety",
+ "uuid",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-camera-geometry"
+version = "0.1.0"
+dependencies = [
+ "symthaea-camera-geometry",
+ "symthaea-domain-awareness",
+ "symthaea-domain-awareness-vision",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-common-cause"
+version = "0.1.0"
+dependencies = [
+ "symthaea-domain-awareness-vision",
+ "symthaea-sensor-common-cause",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-evidence"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-assurance-requalification",
+ "symthaea-domain-awareness",
+ "symthaea-domain-awareness-common-cause",
+ "symthaea-domain-awareness-model-assurance",
+ "symthaea-formal-safety",
+ "symthaea-model-assurance",
+ "symthaea-perception-crucible",
+ "uuid",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-evidence-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-domain-awareness-evidence",
+ "symthaea-evidence-lifecycle",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-model-assurance"
+version = "0.1.0"
+dependencies = [
+ "symthaea-domain-awareness",
+ "symthaea-model-assurance",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-passive-rf"
+version = "0.1.0"
+dependencies = [
+ "symthaea-domain-awareness",
+ "uuid",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-requalification"
+version = "0.1.0"
+dependencies = [
+ "symthaea-assurance-requalification",
+ "symthaea-domain-awareness-common-cause",
+ "symthaea-domain-awareness-model-assurance",
+ "symthaea-domain-awareness-vision",
+ "symthaea-model-assurance",
+ "symthaea-sensor-common-cause",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-runtime-evidence"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-domain-awareness-evidence",
+ "symthaea-evidence-dependency",
+ "symthaea-evidence-runtime-crucible",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-selective-classification"
+version = "0.1.0"
+dependencies = [
+ "symthaea-domain-awareness",
+ "symthaea-selective-classification",
+ "uuid",
+]
+
+[[package]]
+name = "symthaea-domain-awareness-vision"
+version = "0.1.0"
+dependencies = [
+ "symthaea-domain-awareness",
+ "symthaea-vision-manifold",
+ "uuid",
+]
+
+[[package]]
 name = "symthaea-domotic"
 version = "0.1.0"
 dependencies = [
@@ -18759,11 +19413,166 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-evidence-active-independence"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-evidence-independence-completeness",
+ "symthaea-evidence-independence-graph",
+ "symthaea-evidence-independence-lifecycle",
+ "symthaea-evidence-independence-provenance",
+ "symthaea-evidence-verifier-diversity",
+]
+
+[[package]]
+name = "symthaea-evidence-current-independence"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-evidence-active-independence",
+ "symthaea-evidence-lifecycle-head-currentness",
+]
+
+[[package]]
+name = "symthaea-evidence-dependency"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "symthaea-evidence-deployment-scope"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-evidence-lifecycle",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-evidence-independence-completeness"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-evidence-independence-graph",
+ "symthaea-evidence-verifier-diversity",
+]
+
+[[package]]
+name = "symthaea-evidence-independence-graph"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-evidence-verifier-diversity",
+]
+
+[[package]]
+name = "symthaea-evidence-independence-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-evidence-independence-provenance",
+ "symthaea-evidence-verifier-diversity",
+]
+
+[[package]]
+name = "symthaea-evidence-independence-provenance"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-evidence-verifier-diversity",
+]
+
+[[package]]
+name = "symthaea-evidence-lifecycle"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-evidence-lifecycle-head-currentness"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-evidence-independence-lifecycle",
+ "symthaea-evidence-independence-provenance",
+ "symthaea-evidence-verifier-diversity",
+]
+
+[[package]]
 name = "symthaea-evidence-plane"
 version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-evidence-quarantine"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-evidence-deployment-scope",
+ "symthaea-evidence-lifecycle",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-evidence-runtime-crucible"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-evidence-deployment-scope",
+ "symthaea-evidence-lifecycle",
+ "symthaea-evidence-quarantine",
+ "symthaea-evidence-time-assurance",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-evidence-time-assurance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-evidence-deployment-scope",
+ "symthaea-evidence-lifecycle",
+ "symthaea-evidence-quarantine",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-evidence-verifier-diversity"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-evidence-verifier-runtime-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
 ]
 
 [[package]]
@@ -18860,6 +19669,7 @@ version = "0.1.0"
 name = "symthaea-formal-safety"
 version = "0.1.0"
 dependencies = [
+ "blake3",
  "chumsky",
  "no-panic",
  "serde",
@@ -19124,6 +19934,7 @@ dependencies = [
  "symthaea-core",
  "symthaea-fep",
  "symthaea-hal",
+ "symthaea-model-assurance",
 ]
 
 [[package]]
@@ -19213,6 +20024,15 @@ name = "symthaea-linalg"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-linux-ima-replay"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "symthaea-logparse"
 version = "0.1.0"
 dependencies = [
@@ -19289,6 +20109,14 @@ dependencies = [
 [[package]]
 name = "symthaea-modal"
 version = "0.1.0"
+
+[[package]]
+name = "symthaea-model-assurance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "symthaea-mujoco-bridge"
@@ -19539,6 +20367,23 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "symthaea-perception-crucible"
+version = "0.1.0"
+dependencies = [
+ "symthaea-selective-classification",
+ "symthaea-tracking-eval",
+]
+
+[[package]]
+name = "symthaea-perception-zero-event-assurance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-assurance-statistics",
+ "symthaea-perception-crucible",
 ]
 
 [[package]]
@@ -19850,6 +20695,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-selective-classification"
+version = "0.1.0"
+
+[[package]]
+name = "symthaea-sensor-common-cause"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-domain-awareness",
+ "symthaea-sensor-trust",
+ "uuid",
+]
+
+[[package]]
+name = "symthaea-sensor-trust"
+version = "0.1.0"
+dependencies = [
+ "symthaea-domain-awareness",
+ "uuid",
+]
+
+[[package]]
 name = "symthaea-sensors"
 version = "0.1.0"
 dependencies = [
@@ -20130,6 +20997,62 @@ name = "symthaea-thermofluids"
 version = "0.1.0"
 
 [[package]]
+name = "symthaea-tpm-reference-current-independence"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-domain-awareness-evidence",
+ "symthaea-evidence-active-independence",
+ "symthaea-evidence-current-independence",
+ "symthaea-formal-safety",
+ "symthaea-tpm-reference-evidence",
+]
+
+[[package]]
+name = "symthaea-tpm-reference-evidence"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-assurance-tpm-reference-crucible",
+ "symthaea-domain-awareness-evidence",
+ "symthaea-formal-safety",
+]
+
+[[package]]
+name = "symthaea-tpm-reference-runtime-continuity"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "symthaea-domain-awareness-evidence",
+ "symthaea-evidence-verifier-runtime-continuity",
+ "symthaea-formal-safety",
+ "symthaea-tpm-reference-current-independence",
+ "symthaea-tpm-reference-evidence",
+]
+
+[[package]]
+name = "symthaea-tpm-reference-runtime-event-binding"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "ed25519-dalek 2.1.0",
+ "hex",
+ "serde",
+ "symthaea-domain-awareness-evidence",
+ "symthaea-evidence-verifier-runtime-continuity",
+ "symthaea-formal-safety",
+ "symthaea-tpm-reference-current-independence",
+ "symthaea-tpm-reference-evidence",
+]
+
+[[package]]
+name = "symthaea-tracking-eval"
+version = "0.1.0"
+
+[[package]]
 name = "symthaea-types"
 version = "0.1.0"
 dependencies = [
@@ -20183,6 +21106,16 @@ dependencies = [
  "tracing",
  "uuid",
  "v4l",
+]
+
+[[package]]
+name = "symthaea-vision-tracking-eval"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "image 0.24.9",
+ "symthaea-tracking-eval",
+ "symthaea-vision-manifold",
 ]
 
 [[package]]
@@ -21691,7 +22624,7 @@ version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
- "memoffset",
+ "memoffset 0.9.1",
  "tempfile",
  "windows-sys 0.61.2",
 ]
@@ -21936,6 +22869,12 @@ name = "unsafe-libyaml"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
+
+[[package]]
+name = "untrusted"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
 name = "untrusted"
