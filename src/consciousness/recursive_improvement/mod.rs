@@ -7,6 +7,7 @@
 //! - MAGI Loop: Falsifiable AGI crossing criterion (predict → calibrate → act → observe → attribute → update)
 //! - Consciousness world modeling (latent state tracking)
 //! - Dream feedback (counterfactual learning)
+//! - Replay-grounded policy improvement with explicit epistemic boundaries
 //! - Active inference bridge (MAGI + PAC + signals)
 //!
 //! ## MAGI Loop (Minimum AGI Loop) Implementation
@@ -60,6 +61,14 @@ pub mod persistence;
 pub mod resolution;
 pub mod runtime;
 pub mod world_prediction;
+
+// Replay-grounded recursive improvement. These modules keep exact historical
+// replay distinct from model-generated counterfactuals and predictions.
+pub mod dream_confidence_gate;
+pub mod epistemic_world;
+pub mod exact_replay;
+pub mod experience_tree;
+pub mod replay_policy;
 
 // Re-export key types from core infrastructure
 pub use types::{
@@ -142,6 +151,15 @@ pub use dream_feedback::{
     ActionPrior, ConfidenceAdjustment, DreamFeedbackBridge, DreamFeedbackStats, DreamInsight,
     hash_context,
 };
+
+// Replay-grounded RSI exports
+pub use dream_confidence_gate::DreamConfidenceGate;
+pub use epistemic_world::{EpistemicWorldRecord, WorldEvidenceKind};
+pub use exact_replay::{ExactReplayWorld, ReplayError};
+pub use experience_tree::{
+    ExperienceNode, ExperienceNodeId, ExperienceProvenance, ExperienceTree, ExperienceTreeError,
+};
+pub use replay_policy::{PolicySelectionError, ReplayPolicyScore, select_replay_policy};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // World Model — gated behind full_consciousness feature flag
