@@ -7,6 +7,7 @@ description = "Shared evidence contract (declared mechanism vs. measured counter
 
 [dependencies]
 serde = { workspace = true }
+blake3 = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
