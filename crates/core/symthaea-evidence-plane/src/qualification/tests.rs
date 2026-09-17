@@ -478,3 +478,56 @@ fn receipt_mint_recomputes_failure_internally() {
         Err(QualificationError::ReceiptRequiresPass)
     ));
 }
+
+#[test]
+fn untrusted_receipt_record_must_reproduce_kernel_mint() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let observation = pass_observation();
+    let trusted = QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).unwrap();
+    let record = trusted.to_record();
+
+    let verified = record.verify(&profile, SUBJECT, &observation).unwrap();
+    assert_eq!(verified.identity(), trusted.identity());
+}
+
+#[test]
+fn tampered_receipt_record_is_rejected() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let observation = pass_observation();
+    let trusted = QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).unwrap();
+    let mut record = trusted.to_record();
+    record.run_attempt += 1;
+
+    assert!(matches!(
+        record.verify(&profile, SUBJECT, &observation),
+        Err(QualificationError::ReceiptRecordMismatch)
+    ));
+}
+
+#[test]
+fn receipt_record_rejects_unknown_fields() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let observation = pass_observation();
+    let trusted = QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).unwrap();
+    let mut value = serde_json::to_value(trusted.to_record()).unwrap();
+    value
+        .as_object_mut()
+        .unwrap()
+        .insert("future_authority".into(), serde_json::json!(true));
+
+    let parsed = serde_json::from_value::<QualifiedHeadReceiptRecord>(value);
+    assert!(parsed.is_err());
+}
+
+#[test]
+fn observation_rejects_unknown_fields() {
+    let observation = pass_observation();
+    let mut value = serde_json::to_value(observation).unwrap();
+    value
+        .as_object_mut()
+        .unwrap()
+        .insert("future_field".into(), serde_json::json!("must-not-disappear"));
+
+    let parsed = serde_json::from_value::<QualificationRunObservation>(value);
+    assert!(parsed.is_err());
+}
