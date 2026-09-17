@@ -35,9 +35,9 @@ The 301-304, 401-404, and 1201-1204 partitions are disjoint from every SYM-RSI-0
 
 D's frozen v2 action-scoring rule is:
 
-`mean predicted task quality across 5 deterministic action perturbations - 0.10 × predicted failure probability`
+`mean predicted task quality across 5 legality-aware deterministic action perturbations - 0.10 × predicted task-regression probability`
 
-D overrides the base C action only when that score exceeds C's score by more than `0.01`. Predicted task quality is read from the task-quality channels of the model-generated outcome representation; the older generic Φ/magnitude proxy is retained only as a diagnostic and is not D's optimization target.
+D overrides the base C action only when that score exceeds C's score by more than `0.01`. A perturbation that is illegal in the current state falls back to the original legal action rather than being simulated as if executable. Task-regression probability is the fraction of those five model predictions whose task quality is below the current state's quality. Predicted task quality is read from the task-quality channels of the model-generated outcome representation; the older generic Φ/magnitude proxy is retained only as a diagnostic and is not D's optimization target.
 
 D is forbidden from:
 - calling the true fixture transition function during action selection,
