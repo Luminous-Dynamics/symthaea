@@ -1,0 +1,273 @@
+name: Draft CI Governor
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  pull_request_target:
+    types: [ready_for_review]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Actually cancel eligible draft full-CI runs (false = dry run)"
+        required: true
+        default: false
+        type: boolean
+      max_cancellations:
+        description: "Maximum eligible full-CI runs to cancel in one reconciliation"
+        required: true
+        default: 100
+        type: number
+
+permissions: {}
+
+concurrency:
+  # Ready transitions are isolated per PR. Scheduled/manual reconciliations share
+  # one group so two cancellation batches cannot race each other.
+  group: draft-ci-governor-${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || 'reconcile' }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch-ready-full-ci:
+    name: Dispatch full matrix when draft becomes ready
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      actions: write
+      pull-requests: read
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch full CI for current ready branch
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const eventPr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const fullName = `${owner}/${repo}`;
+
+            if (eventPr.head.repo.full_name !== fullName) {
+              core.notice(`PR #${eventPr.number} is from a fork; normal pull-request CI remains authoritative.`);
+              return;
+            }
+
+            // Re-read immediately before the write-capable operation. The
+            // ready_for_review payload is evidence of the transition, not an
+            // immutable execution subject: workflow_dispatch accepts a branch
+            // or tag ref, not a commit SHA.
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: eventPr.number,
+            });
+            if (pr.state !== 'open' || pr.draft || pr.head.repo.full_name !== fullName) {
+              core.notice(`PR #${eventPr.number} is no longer an open same-repo ready PR; no full CI dispatch.`);
+              return;
+            }
+            if (eventPr.head.sha !== pr.head.sha) {
+              core.notice(`PR #${pr.number} moved after ready_for_review: event_head=${eventPr.head.sha}; current_head=${pr.head.sha}. Dispatch will target current branch ref ${pr.head.ref}.`);
+            }
+
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              branch: pr.head.ref,
+              per_page: 100,
+            });
+            const liveCurrentHead = runs.find(run =>
+              run.head_sha === pr.head.sha &&
+              ['queued', 'in_progress', 'waiting', 'pending', 'requested'].includes(run.status)
+            );
+            if (liveCurrentHead) {
+              core.notice(`Current-head full CI run ${liveCurrentHead.id} already exists for ${pr.head.sha}; not duplicating it.`);
+              return;
+            }
+
+            core.notice(`Dispatching full matrix for ready PR #${pr.number} using branch ref ${pr.head.ref}. Pre-dispatch head=${pr.head.sha}; the resulting CI run's own head_sha is authoritative.`);
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              ref: pr.head.ref,
+            });
+
+  reconcile-draft-ci-queue:
+    name: Reconcile draft CI queue
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    permissions:
+      actions: write
+      pull-requests: read
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - name: Reconcile only draft PR full-CI runs
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const fullName = `${owner}/${repo}`;
+            const scheduled = context.eventName === 'schedule';
+            const apply = scheduled || String(context.payload.inputs?.apply ?? 'false') === 'true';
+            const requestedMax = scheduled
+              ? 500
+              : Number(context.payload.inputs?.max_cancellations ?? 100);
+            if (!Number.isInteger(requestedMax) || requestedMax < 1 || requestedMax > 500) {
+              core.setFailed(`max_cancellations must be an integer in [1, 500], got ${requestedMax}`);
+              return;
+            }
+
+            // Cover every non-terminal Actions state. Prioritize work that has not
+            // been assigned useful runner time before touching in-progress runs.
+            const liveStatuses = ['queued', 'requested', 'waiting', 'pending', 'in_progress'];
+            const runsById = new Map();
+            for (const status of liveStatuses) {
+              const found = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner,
+                repo,
+                workflow_id: 'ci.yml',
+                event: 'pull_request',
+                status,
+                per_page: 100,
+              });
+              for (const run of found) {
+                runsById.set(run.id, run);
+              }
+            }
+            const runs = [...runsById.values()];
+
+            const openPrs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100,
+            });
+            const prByNumber = new Map(openPrs.map(pr => [pr.number, pr]));
+            const prByHeadSha = new Map(openPrs.map(pr => [pr.head.sha, pr]));
+            const prsBySameRepoBranch = new Map();
+            for (const pr of openPrs) {
+              if (pr.head.repo.full_name !== fullName) continue;
+              const candidates = prsBySameRepoBranch.get(pr.head.ref) ?? [];
+              candidates.push(pr);
+              prsBySameRepoBranch.set(pr.head.ref, candidates);
+            }
+
+            const eligibleRuns = [];
+            for (const run of runs) {
+              const referencedNumber = run.pull_requests?.[0]?.number;
+              let pr;
+
+              // If GitHub gives the run an associated PR identity, that identity is
+              // authoritative. Never fall through to SHA/branch heuristics merely
+              // because the associated PR is no longer open; doing so could bind an
+              // old run to a different PR that later reused the same branch name.
+              if (referencedNumber) {
+                pr = prByNumber.get(referencedNumber);
+                if (!pr) continue;
+              } else {
+                const branchCandidates = prsBySameRepoBranch.get(run.head_branch) ?? [];
+                const branchMatch = branchCandidates.length === 1 ? branchCandidates[0] : undefined;
+                pr = prByHeadSha.get(run.head_sha) || branchMatch;
+              }
+
+              if (!pr || !pr.draft || pr.head.repo.full_name !== fullName) {
+                continue;
+              }
+              eligibleRuns.push({ run, pr });
+            }
+
+            // Drain non-running backlog before destroying useful in-progress work;
+            // within each status, drain oldest-first so bounded batches converge on
+            // historical backlog instead of perpetually chasing new draft runs.
+            const statusPriority = new Map(liveStatuses.map((status, index) => [status, index]));
+            eligibleRuns.sort((a, b) => {
+              const statusDelta =
+                (statusPriority.get(a.run.status) ?? 99) -
+                (statusPriority.get(b.run.status) ?? 99);
+              if (statusDelta !== 0) return statusDelta;
+              const timeDelta = Date.parse(a.run.created_at) - Date.parse(b.run.created_at);
+              return timeDelta || a.run.id - b.run.id;
+            });
+
+            // GITHUB_TOKEN normally has a 1,000-request/hour repository budget.
+            // Each destructive iteration uses one PR re-read plus one cancellation.
+            // Keep a 200-request reserve for the rest of the repository and derive
+            // the actual cap from the live primary-rate budget rather than assuming
+            // the requested cap is safe. Discovery requests occurred before this
+            // read, so `remaining` already accounts for them.
+            const { data: rate } = await github.rest.rateLimit.get();
+            const remaining = rate.resources.core.remaining;
+            const resetAt = new Date(rate.resources.core.reset * 1000).toISOString();
+            const reserve = 200;
+            const rateSafeMax = Math.max(0, Math.floor((remaining - reserve) / 2));
+            const effectiveMax = Math.min(requestedMax, rateSafeMax);
+
+            core.notice(`Draft CI reconciliation examined ${runs.length} live pull-request CI runs across statuses: ${liveStatuses.join(', ')}.`);
+            core.notice(`Eligible same-repo draft full-CI runs: ${eligibleRuns.length}. apply=${apply}; requested_max=${requestedMax}; effective_max=${effectiveMax}; rate_remaining=${remaining}; reserve=${reserve}; rate_reset=${resetAt}; source=${scheduled ? 'schedule' : 'manual'}. order=status-priority-then-oldest.`);
+
+            if (!apply) {
+              for (const { run, pr } of eligibleRuns.slice(0, effectiveMax)) {
+                core.notice(`[dry-run] would cancel ${run.status} CI run ${run.id} for draft PR #${pr.number} at ${run.head_sha}; created_at=${run.created_at}`);
+              }
+              if (eligibleRuns.length > effectiveMax) {
+                core.notice(`[dry-run] ${eligibleRuns.length - effectiveMax} additional eligible runs omitted by effective cap.`);
+              }
+              return;
+            }
+
+            if (effectiveMax === 0) {
+              core.notice(`No primary-rate budget is safely available for cancellations before ${resetAt}; leaving all runs unchanged.`);
+              return;
+            }
+
+            let cancelled = 0;
+            let alreadyGone = 0;
+            let noLongerEligible = 0;
+            let rateLimited = false;
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            for (const { run, pr } of eligibleRuns.slice(0, effectiveMax)) {
+              // The initial open-PR census is only candidate discovery. Re-read
+              // immediately before the destructive action so a concurrent
+              // ready/close transition cannot be cancelled from a stale snapshot.
+              const { data: livePr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pr.number,
+              });
+              if (
+                livePr.state !== 'open' ||
+                !livePr.draft ||
+                livePr.head.repo.full_name !== fullName
+              ) {
+                noLongerEligible += 1;
+                core.notice(`Leaving CI run ${run.id} alone: PR #${pr.number} is no longer an open same-repo draft.`);
+                continue;
+              }
+
+              try {
+                core.notice(`Cancelling ${run.status} CI run ${run.id} for draft PR #${pr.number} at ${run.head_sha}; created_at=${run.created_at}.`);
+                await github.rest.actions.cancelWorkflowRun({
+                  owner,
+                  repo,
+                  run_id: run.id,
+                });
+                cancelled += 1;
+              } catch (error) {
+                if (error.status === 409) {
+                  alreadyGone += 1;
+                } else if (error.status === 403 || error.status === 429) {
+                  rateLimited = true;
+                  const retryAfter = error.response?.headers?.['retry-after'];
+                  core.warning(`Stopping reconciliation after rate-limit response ${error.status}; retry-after=${retryAfter ?? 'unspecified'}. No further cancellation requests will be sent in this run.`);
+                  break;
+                } else {
+                  throw error;
+                }
+              }
+
+              // GitHub REST best practice for many mutative requests is to pause
+              // between them. One second also keeps secondary-rate pressure well
+              // below the 900-point/minute REST ceiling for this serial loop.
+              await sleep(1000);
+            }
+
+            core.notice(`Cancellation accepted: ${cancelled}; no-longer-eligible: ${noLongerEligible}; already non-cancellable: ${alreadyGone}; rate_limited=${rateLimited}; requested_max=${requestedMax}; effective_max=${effectiveMax}.`);
