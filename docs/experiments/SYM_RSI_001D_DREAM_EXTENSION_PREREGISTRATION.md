@@ -33,6 +33,12 @@ The 301-304, 401-404, and 1201-1204 partitions are disjoint from every SYM-RSI-0
 
 **D — replay plus grounded dreaming.** Arm C wrapped by the frozen grounded dream model. The dream model may alter action choice only through predictions produced from learned transition memory.
 
+D's frozen v4 action-scoring rule is:
+
+`domain-conditioned action memory; exactly 5 legality-aware model simulations per legal candidate; mean predicted task quality - 0.10 × predicted task-regression probability`
+
+Dream action identity includes the fixture domain as well as the discrete action ID, so numerically identical actions from different domains cannot share one transition-memory fingerprint. D overrides the base C action only when that score exceeds C's score by more than `0.01`. A perturbation that is illegal in the current state falls back to the original legal action rather than being simulated as if executable. Task-regression probability is the fraction of those five model predictions whose task quality is below the current state's quality. Predicted task quality is read from the task-quality channels of the model-generated outcome representation. D-v4 does not invoke the generic Φ/magnitude distribution during action selection, so the recorded model-simulation count is the actual decision-path count rather than a partial accounting.
+
 D is forbidden from:
 - calling the true fixture transition function during action selection,
 - training on verification, fresh, or OOD outcomes,
