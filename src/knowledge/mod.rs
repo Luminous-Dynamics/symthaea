@@ -41,6 +41,7 @@ pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_vector;
+pub mod evidence_binding_conformance;
 pub mod evidence_independence;
 pub mod evidence_mutation_firewall;
 pub mod evidence_mutation_journal;
@@ -84,6 +85,10 @@ pub use entity_event::{
 pub use epistemic_vector::{
     ClaimUncertaintyAssessment, EpistemicVector, UncertaintyDimension, UncertaintyError,
     UncertaintyValue,
+};
+pub use evidence_binding_conformance::{
+    EvidenceBindingConformanceFailure, EvidenceBindingConformanceObserver,
+    EvidenceBindingConformanceReport,
 };
 pub use evidence_independence::{
     EvidenceIndependenceAnalyzer, EvidenceLineage, ProvenanceDiversityReport, SharedAncestry,
