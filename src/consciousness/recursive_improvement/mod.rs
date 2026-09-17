@@ -69,6 +69,7 @@ pub mod epistemic_world;
 pub mod exact_replay;
 pub mod experience_tree;
 pub mod replay_policy;
+pub mod sym_rsi_experiment;
 
 // Re-export key types from core infrastructure
 pub use types::{
@@ -160,6 +161,11 @@ pub use experience_tree::{
     ExperienceNode, ExperienceNodeId, ExperienceProvenance, ExperienceTree, ExperienceTreeError,
 };
 pub use replay_policy::{PolicySelectionError, ReplayPolicyScore, select_replay_policy};
+pub use sym_rsi_experiment::{
+    ArmRunMetrics, DomainSeedPlan, EvaluationSplit, ExperimentArm, ExperimentDomainSpec,
+    ExperimentHarnessError, PrimaryContrastKind, PrimaryContrastReceipt,
+    SymRsiExperimentManifest, SymRsiRunReceipt, build_primary_contrast,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // World Model — gated behind full_consciousness feature flag
