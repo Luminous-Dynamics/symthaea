@@ -34,6 +34,7 @@ pub mod adversarial_epistemics;
 mod belief_mutation_authority;
 mod belief_mutation_decision_guard;
 mod belief_mutation_firewall;
+mod belief_mutation_persistence;
 mod belief_mutation_transaction;
 mod belief_mutation_verifier;
 pub mod belief_revision_gate;
@@ -83,6 +84,11 @@ pub use belief_mutation_firewall::{
     BeliefMutationAuthorization, BeliefMutationAuthorizationDecision, BeliefMutationError,
     BeliefMutationOutcome, BeliefMutationReceipt, BeliefMutationReceiptId,
     BeliefMutationRollbackPlan, EpistemicSupportState, EpistemicSupportStore,
+};
+pub use belief_mutation_persistence::{
+    BeliefMutationPersistenceCapsuleV1, BeliefMutationPersistenceError,
+    BeliefMutationPersistenceVersion, PersistedBeliefMutationV1,
+    PersistedEpistemicSupportStateV1,
 };
 pub use belief_mutation_transaction::{
     BeliefMutationSealError, BeliefMutationTransactionError, BeliefMutationTransactionOutcome,
