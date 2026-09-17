@@ -1,0 +1,101 @@
+name: ARC3 Cargo.lock Remediation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arc3-lock-remediate.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: arc3-lock-remediate
+  cancel-in-progress: false
+
+jobs:
+  apply-generated-lock:
+    name: Apply accepted Cargo-generated lock
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'ci/arc3-lock-remediate'
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      TARGET_BRANCH: feat/arc3-protocol-contract
+      EXPECTED_TARGET_HEAD: 2305cc8cf7614d645fd6dd40334264ebb555f808
+      ARTIFACT_ID: '10473951185'
+      ARTIFACT_ZIP_SHA256: c28a7d58aa8c651fe77fe2853718fe92e5770bbf1079048dd77a71d907cd626d
+      LOCK_BEFORE_SHA256: d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f
+      LOCK_GENERATED_SHA256: b423cecb22955a11ac32bcde9f2264c8f27fb9db4fa3d2ae31793d15de562f3f
+      PATCH_SHA256: f2fa4be5533ca4fae8be09ce74aa2fc501a84952a7de43ab71affaaeb76d4487
+    steps:
+      - name: Download exact qualification artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/arc3-lock-artifact"
+          curl --fail-with-body --location \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header 'Accept: application/vnd.github+json' \
+            --header 'X-GitHub-Api-Version: 2022-11-28' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" \
+            --output "$RUNNER_TEMP/arc3-lock-artifact.zip"
+          printf '%s  %s\n' "$ARTIFACT_ZIP_SHA256" "$RUNNER_TEMP/arc3-lock-artifact.zip" | sha256sum --check --strict
+          unzip -q "$RUNNER_TEMP/arc3-lock-artifact.zip" -d "$RUNNER_TEMP/arc3-lock-artifact"
+
+      - name: Verify remediation evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$RUNNER_TEMP/arc3-lock-artifact"
+          test -f "$d/Cargo.lock.before"
+          test -f "$d/Cargo.lock.generated"
+          test -f "$d/arc3-cargo-lock.patch"
+          test -f "$d/lock-guard-accepted.txt"
+          test "$(cat "$d/lock-guard-status.txt")" = '0'
+          printf '%s  %s\n' "$LOCK_BEFORE_SHA256" "$d/Cargo.lock.before" | sha256sum --check --strict
+          printf '%s  %s\n' "$LOCK_GENERATED_SHA256" "$d/Cargo.lock.generated" | sha256sum --check --strict
+          printf '%s  %s\n' "$PATCH_SHA256" "$d/arc3-cargo-lock.patch" | sha256sum --check --strict
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 1
+          persist-credentials: true
+
+      - name: Bind exact product preimage
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_TARGET_HEAD"
+          printf '%s  Cargo.lock\n' "$LOCK_BEFORE_SHA256" | sha256sum --check --strict
+          cmp --silent Cargo.lock "$RUNNER_TEMP/arc3-lock-artifact/Cargo.lock.before"
+
+      - name: Apply exact generated lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/arc3-lock-artifact/Cargo.lock.generated" Cargo.lock
+          printf '%s  Cargo.lock\n' "$LOCK_GENERATED_SHA256" | sha256sum --check --strict
+          git diff -- Cargo.lock > "$RUNNER_TEMP/applied.patch"
+          printf '%s  %s\n' "$PATCH_SHA256" "$RUNNER_TEMP/applied.patch" | sha256sum --check --strict
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = 'Cargo.lock'
+
+      - name: Commit and push lock-only remediation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          test "$(git diff --cached --name-only | wc -l)" -eq 1
+          test "$(git diff --cached --name-only)" = 'Cargo.lock'
+          git commit -m 'chore(arc3): reconcile protocol Cargo.lock'
+          new_head="$(git rev-parse HEAD)"
+          git push origin "HEAD:$TARGET_BRANCH"
+          printf 'ARC3 product head after exact lock remediation: %s\n' "$new_head"
