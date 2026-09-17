@@ -247,7 +247,7 @@ impl FixturePolicy for GroundedDreamPolicy {
                     kind,
                     provenance_digest,
                     model_version: Some(self.model.model_version.clone()),
-                    confidence: Some(distribution.confidence as f64),
+                    confidence: Some(task_prediction.confidence as f64),
                     support_distance: None,
                     causal_assumptions: vec![
                         "nearest observed state/action transition memory".into(),
