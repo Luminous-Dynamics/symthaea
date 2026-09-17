@@ -1,0 +1,509 @@
+name: SCI-014 R2C Immutable Lock Promotion
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sci-014-r2c-lock-promotion.yml"
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: sci-014-r2c-lock-promotion-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+env:
+  HISTORICAL_PRODUCT_HEAD: c295b973e44cbd6eb6a2366b2004598d60fda9d9
+  HISTORICAL_PRODUCT_TREE: e2dea6a163f8a9b742ffbbda1f6f78588efe5741
+  PRODUCT_PARENT: d496b7e9c9df809f981740dea940dcdb01f9a6d2
+  PARENT_TREE: 6d2327ae72a5ceff2377a7c6e81ddcae5e7ef002
+  HELPER_HEAD: d52f4a2d37d9dc2dfa98a3e07b4ca276dfcfc162
+  PROJECTION_RUN_ID: "35139415483"
+  PROJECTION_RUN_ATTEMPT: "1"
+  PROJECTION_ARTIFACT_ID: "10471790570"
+  PROJECTION_ARTIFACT_NAME: sci-014-r2c-lock-projection-d52f4a2d37d9dc2dfa98a3e07b4ca276dfcfc162
+  PROJECTION_ARTIFACT_SHA256: 5dbb840667c63bedd2a423e01fe3e72cbcd1201f3415ce35b3288b276e9aca28
+  PROPOSED_LOCK_SHA256: 88c36da3603b086c7a9445c43d16e938e40a8fd12e727899979ba5224d645a6e
+  PROPOSED_LOCK_BLOB: f9bdf506a02f71d89b36c36aab380224ebf50a78
+  OLD_LOCK_SHA256: d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f
+  EXPECTED_MANIFEST_BLOB: b32ef588b538c01f283dd5a6a7f9bc65de12ab5b
+  EXPECTED_LIB_BLOB: 574721499911234bf40b5231ce07d559ee8024da
+  EXPECTED_METADATA_TEST_BLOB: b95da10e3e24a445b93d8d142b8b5bb8be25a571
+  EXPECTED_SCHEMA_TEST_BLOB: bb40695beadf4ca5118f53e2b923129c685b83df
+  EXPECTED_STORE_TEST_BLOB: 37a43abf0aad5d11cd0389a7153cdc2aa88e1c94
+  TARGET_BRANCH: feat/sci-014-control-plane-occurrence-sqlite-lock-closed-v1
+
+jobs:
+  promote:
+    name: Promote exact reviewed R2C lock projection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact promotion helper head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind promotion helper identity and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2-promotion"
+          mkdir -p "$evidence"
+          helper_head="$(git rev-parse HEAD)"
+          test "$helper_head" = "${{ github.event.pull_request.head.sha }}"
+          mapfile -t changed < <(git diff --name-only "$HISTORICAL_PRODUCT_HEAD" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/sci-014-r2c-lock-promotion.yml"
+          {
+            echo "promotion_helper_head=$helper_head"
+            echo "promotion_helper_tree=$(git rev-parse HEAD^{tree})"
+            echo "promotion_helper_parent=$(git rev-parse HEAD^)"
+            echo "promotion_workflow_sha256=$(sha256sum .github/workflows/sci-014-r2c-lock-promotion.yml | awk '{print $1}')"
+            echo "authority=conditional_new_branch_publication_only"
+          } > "$evidence/promotion-helper-subject.txt"
+          {
+            echo "github_run_id=${{ github.run_id }}"
+            echo "github_run_number=${{ github.run_number }}"
+            echo "github_run_attempt=${{ github.run_attempt }}"
+            echo "github_event_name=${{ github.event_name }}"
+            echo "github_repository=${{ github.repository }}"
+            echo "github_workflow_ref=${{ github.workflow_ref }}"
+            echo "github_workflow_sha=${{ github.workflow_sha }}"
+          } > "$evidence/promotion-run-occurrence.txt"
+
+      - name: Download and independently verify exact projection artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2-promotion"
+          artifact_dir="$RUNNER_TEMP/sci014-r2-projection-artifact"
+          mkdir -p "$artifact_dir"
+          export EVIDENCE_DIR="$evidence"
+          export ARTIFACT_DIR="$artifact_dir"
+          python3 - <<'PY'
+          import hashlib
+          import io
+          import json
+          import os
+          import pathlib
+          import urllib.request
+          import zipfile
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          token = os.environ["GH_TOKEN"]
+          artifact_id = int(os.environ["PROJECTION_ARTIFACT_ID"])
+          expected_name = os.environ["PROJECTION_ARTIFACT_NAME"]
+          expected_digest = "sha256:" + os.environ["PROJECTION_ARTIFACT_SHA256"]
+          helper_head = os.environ["HELPER_HEAD"]
+          run_id = int(os.environ["PROJECTION_RUN_ID"])
+          artifact_dir = pathlib.Path(os.environ["ARTIFACT_DIR"])
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          headers = {
+              "Authorization": f"Bearer {token}",
+              "Accept": "application/vnd.github+json",
+              "X-GitHub-Api-Version": "2022-11-28",
+              "User-Agent": "sci-014-r2-promotion",
+          }
+
+          def get(url):
+              return urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=60)
+
+          meta_url = f"https://api.github.com/repos/{repo}/actions/artifacts/{artifact_id}"
+          with get(meta_url) as response:
+              meta = json.load(response)
+          if meta["id"] != artifact_id:
+              raise SystemExit("artifact id mismatch")
+          if meta["name"] != expected_name:
+              raise SystemExit("artifact name mismatch")
+          if meta.get("expired"):
+              raise SystemExit("artifact is expired")
+          if meta.get("digest") != expected_digest:
+              raise SystemExit(f"artifact digest mismatch: {meta.get('digest')!r}")
+          wr = meta.get("workflow_run") or {}
+          if wr.get("id") != run_id or wr.get("head_sha") != helper_head:
+              raise SystemExit("artifact workflow-run occurrence mismatch")
+
+          zip_url = f"https://api.github.com/repos/{repo}/actions/artifacts/{artifact_id}/zip"
+          with get(zip_url) as response:
+              payload = response.read()
+          zip_sha = hashlib.sha256(payload).hexdigest()
+          if zip_sha != os.environ["PROJECTION_ARTIFACT_SHA256"]:
+              raise SystemExit("downloaded artifact ZIP sha256 mismatch")
+          (evidence / "projection-artifact.zip.sha256").write_text(zip_sha + "\n")
+          (evidence / "projection-artifact-metadata.json").write_text(
+              json.dumps(meta, sort_keys=True, indent=2) + "\n"
+          )
+
+          with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+              for member in archive.infolist():
+                  p = pathlib.PurePosixPath(member.filename)
+                  if p.is_absolute() or ".." in p.parts:
+                      raise SystemExit(f"unsafe artifact ZIP member {member.filename!r}")
+              archive.extractall(artifact_dir)
+
+          census_path = artifact_dir / "artifact-file-census.txt"
+          manifest_path = artifact_dir / "artifact-sha256.txt"
+          census = [line for line in census_path.read_text().splitlines() if line]
+          actual = sorted(
+              p.name for p in artifact_dir.iterdir()
+              if p.is_file() and p.name not in {"artifact-file-census.txt", "artifact-sha256.txt"}
+          )
+          if census != actual:
+              raise SystemExit(f"artifact census mismatch: expected={census!r} actual={actual!r}")
+
+          manifest = {}
+          for line in manifest_path.read_text().splitlines():
+              digest, filename = line.split(maxsplit=1)
+              filename = filename.lstrip("* ")
+              manifest[filename] = digest
+          expected_manifest_names = set(census) | {"artifact-file-census.txt"}
+          if set(manifest) != expected_manifest_names:
+              raise SystemExit("artifact sha256 manifest filename set mismatch")
+          for filename, digest in manifest.items():
+              actual_digest = hashlib.sha256((artifact_dir / filename).read_bytes()).hexdigest()
+              if actual_digest != digest:
+                  raise SystemExit(f"artifact internal sha256 mismatch for {filename}")
+
+          def kv(path):
+              out = {}
+              for line in path.read_text().splitlines():
+                  if "=" in line:
+                      key, value = line.split("=", 1)
+                      out[key] = value
+              return out
+
+          if (artifact_dir / "classification.txt").read_text().strip() != "PASS_LOCK_PROJECTION_EVIDENCE":
+              raise SystemExit("projection artifact is not terminal PASS")
+          run = kv(artifact_dir / "run-occurrence.txt")
+          if run.get("github_run_id") != os.environ["PROJECTION_RUN_ID"]:
+              raise SystemExit("internal projection run id mismatch")
+          if run.get("github_run_attempt") != os.environ["PROJECTION_RUN_ATTEMPT"]:
+              raise SystemExit("internal projection run attempt mismatch")
+          helper = kv(artifact_dir / "helper-subject.txt")
+          if helper.get("helper_head") != helper_head:
+              raise SystemExit("internal helper head mismatch")
+          product = kv(artifact_dir / "product-subject.txt")
+          if product.get("old_product_head") != os.environ["HISTORICAL_PRODUCT_HEAD"]:
+              raise SystemExit("internal historical product head mismatch")
+          if product.get("old_product_tree") != os.environ["HISTORICAL_PRODUCT_TREE"]:
+              raise SystemExit("internal historical product tree mismatch")
+          if product.get("product_parent") != os.environ["PRODUCT_PARENT"]:
+              raise SystemExit("internal product parent mismatch")
+          if product.get("parent_tree") != os.environ["PARENT_TREE"]:
+              raise SystemExit("internal parent tree mismatch")
+          rem = kv(artifact_dir / "remediation-subject.txt")
+          if rem.get("old_lock_sha256") != os.environ["OLD_LOCK_SHA256"]:
+              raise SystemExit("internal old-lock sha mismatch")
+          if rem.get("new_lock_sha256") != os.environ["PROPOSED_LOCK_SHA256"]:
+              raise SystemExit("internal proposed-lock sha mismatch")
+
+          lock = (artifact_dir / "Cargo.lock.cargo-proposed").read_bytes()
+          if hashlib.sha256(lock).hexdigest() != os.environ["PROPOSED_LOCK_SHA256"]:
+              raise SystemExit("proposed lock payload sha mismatch")
+          oracle = (artifact_dir / "lock-closure-oracle.txt").read_text()
+          required = [
+              "lock_delta=exact_r2_attributable_projection",
+              "added_count= 4",
+              "changed_existing= ('digest', '0.10.7', 'registry+https://github.com/rust-lang/crates.io-index')",
+              "activated_dependency=digest@0.10.7 -> const-oid@0.9.6",
+          ]
+          for line in required:
+              if line not in oracle:
+                  raise SystemExit(f"missing required oracle statement {line!r}")
+
+          postflight = kv(artifact_dir / "postflight.txt")
+          if postflight.get("postflight_product_head") != os.environ["HISTORICAL_PRODUCT_HEAD"]:
+              raise SystemExit("projection postflight head mismatch")
+          if postflight.get("postflight_product_parent") != os.environ["PRODUCT_PARENT"]:
+              raise SystemExit("projection postflight parent mismatch")
+          if postflight.get("postflight_product_tree") != os.environ["HISTORICAL_PRODUCT_TREE"]:
+              raise SystemExit("projection postflight tree mismatch")
+          if postflight.get("postflight_lock_sha256") != os.environ["OLD_LOCK_SHA256"]:
+              raise SystemExit("projection postflight lock mismatch")
+          if postflight.get("checkout_dirty_bytes") != "0":
+              raise SystemExit("projection postflight checkout was dirty")
+          if postflight.get("prior_job_status") != "success" or postflight.get("prior_oracle_outcome") != "success":
+              raise SystemExit("projection postflight did not follow successful job/oracle")
+
+          (evidence / "projection-internal-census.sha256").write_text(
+              hashlib.sha256(census_path.read_bytes()).hexdigest() + "\n"
+          )
+          (evidence / "projection-internal-manifest.sha256").write_text(
+              hashlib.sha256(manifest_path.read_bytes()).hexdigest() + "\n"
+          )
+          (evidence / "projection-review.txt").write_text(
+              "artifact_occurrence=verified\n"
+              "archive_digest=verified\n"
+              "internal_manifest=verified\n"
+              "terminal_classification=PASS_LOCK_PROJECTION_EVIDENCE\n"
+          )
+          PY
+
+      - name: Checkout exact historical product for composition
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.HISTORICAL_PRODUCT_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Construct and prove exact target tree two ways
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2-promotion"
+          artifact_dir="$RUNNER_TEMP/sci014-r2-projection-artifact"
+          test "$(git rev-parse HEAD)" = "$HISTORICAL_PRODUCT_HEAD"
+          test "$(git rev-parse HEAD^{tree})" = "$HISTORICAL_PRODUCT_TREE"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
+          test "$(git rev-parse "$PRODUCT_PARENT^{tree}")" = "$PARENT_TREE"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+          declare -A expected_blobs=(
+            [crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml]="$EXPECTED_MANIFEST_BLOB"
+            [crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs]="$EXPECTED_LIB_BLOB"
+            [crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs]="$EXPECTED_METADATA_TEST_BLOB"
+            [crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs]="$EXPECTED_SCHEMA_TEST_BLOB"
+            [crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs]="$EXPECTED_STORE_TEST_BLOB"
+          )
+          for path in "${!expected_blobs[@]}"; do
+            test "$(git hash-object "$path")" = "${expected_blobs[$path]}"
+          done
+
+          lock_blob="$(git hash-object -w "$artifact_dir/Cargo.lock.cargo-proposed")"
+          test "$lock_blob" = "$PROPOSED_LOCK_BLOB"
+
+          idx_a="$RUNNER_TEMP/sci014-tree-a.index"
+          rm -f "$idx_a"
+          GIT_INDEX_FILE="$idx_a" git read-tree "$PARENT_TREE"
+          for path in "${!expected_blobs[@]}"; do
+            GIT_INDEX_FILE="$idx_a" git update-index --add --cacheinfo "100644,${expected_blobs[$path]},$path"
+          done
+          GIT_INDEX_FILE="$idx_a" git update-index --cacheinfo "100644,$lock_blob,Cargo.lock"
+          tree_a="$(GIT_INDEX_FILE="$idx_a" git write-tree)"
+
+          idx_b="$RUNNER_TEMP/sci014-tree-b.index"
+          rm -f "$idx_b"
+          GIT_INDEX_FILE="$idx_b" git read-tree "$HISTORICAL_PRODUCT_TREE"
+          GIT_INDEX_FILE="$idx_b" git update-index --cacheinfo "100644,$lock_blob,Cargo.lock"
+          tree_b="$(GIT_INDEX_FILE="$idx_b" git write-tree)"
+          test "$tree_a" = "$tree_b"
+
+          {
+            echo "target_tree=$tree_a"
+            echo "tree_from_parent_plus_exact_blobs=$tree_a"
+            echo "tree_from_historical_product_plus_lock=$tree_b"
+            echo "proposed_lock_git_blob=$lock_blob"
+          } > "$evidence/tree-proof.txt"
+
+          census_digest="$(sha256sum "$artifact_dir/artifact-file-census.txt" | awk '{print $1}')"
+          manifest_digest="$(sha256sum "$artifact_dir/artifact-sha256.txt" | awk '{print $1}')"
+          cat > "$evidence/promotion-operation-preimage.txt" <<EOF
+          domain=symthaea.sci014.r2.lock-promotion.operation.v1
+          historical_product_head=$HISTORICAL_PRODUCT_HEAD
+          historical_product_tree=$HISTORICAL_PRODUCT_TREE
+          product_parent=$PRODUCT_PARENT
+          parent_tree=$PARENT_TREE
+          helper_head=$HELPER_HEAD
+          projection_run_id=$PROJECTION_RUN_ID
+          projection_run_attempt=$PROJECTION_RUN_ATTEMPT
+          projection_artifact_id=$PROJECTION_ARTIFACT_ID
+          projection_artifact_sha256=$PROJECTION_ARTIFACT_SHA256
+          artifact_census_sha256=$census_digest
+          artifact_hash_manifest_sha256=$manifest_digest
+          proposed_lock_sha256=$PROPOSED_LOCK_SHA256
+          manifest_blob=$EXPECTED_MANIFEST_BLOB
+          lib_blob=$EXPECTED_LIB_BLOB
+          metadata_test_blob=$EXPECTED_METADATA_TEST_BLOB
+          schema_test_blob=$EXPECTED_SCHEMA_TEST_BLOB
+          store_test_blob=$EXPECTED_STORE_TEST_BLOB
+          target_tree=$tree_a
+          target_branch=$TARGET_BRANCH
+          EOF
+          sed -i 's/^          //' "$evidence/promotion-operation-preimage.txt"
+          sha256sum "$evidence/promotion-operation-preimage.txt" | awk '{print $1}' > "$evidence/promotion-operation-id.txt"
+
+          export GIT_AUTHOR_NAME="SCI-014 R2 Promotion"
+          export GIT_AUTHOR_EMAIL="sci014-r2-promotion@users.noreply.github.com"
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          export GIT_AUTHOR_DATE="2026-09-16T22:12:16Z"
+          export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
+          prepared_commit="$(printf '%s\n' 'fix(science): close SCI-014 R2C workspace lock' | git commit-tree "$tree_a" -p "$PRODUCT_PARENT")"
+          test "$(git show -s --format=%T "$prepared_commit")" = "$tree_a"
+          test "$(git show -s --format=%P "$prepared_commit")" = "$PRODUCT_PARENT"
+          {
+            echo "prepared_commit=$prepared_commit"
+            echo "prepared_tree=$tree_a"
+            echo "prepared_parent=$PRODUCT_PARENT"
+            echo "prepared_object_authority=none_until_target_ref_publication"
+          } > "$evidence/prepared-product-object.txt"
+
+          mapfile -t product_paths < <(git diff-tree --no-commit-id --name-only -r "$PRODUCT_PARENT" "$prepared_commit")
+          expected_paths=(
+            Cargo.lock
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/Cargo.toml
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/src/lib.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/metadata_bootstrap_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/schema_contract_v1.rs
+            crates/bridges/symthaea-scientific-view-control-plane-occurrence-sqlite/tests/sqlite_occurrence_store_v1.rs
+          )
+          diff -u <(printf '%s\n' "${expected_paths[@]}") <(printf '%s\n' "${product_paths[@]}")
+          printf '%s\n' "${product_paths[@]}" > "$evidence/product-path-census.txt"
+
+      - name: Publish reserved product branch and reconcile exact outcome
+        id: publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2-promotion"
+          prepared_commit="$(awk -F= '/^prepared_commit=/{print $2}' "$evidence/prepared-product-object.txt")"
+          operation_id="$(cat "$evidence/promotion-operation-id.txt")"
+          auth_remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          pre_ref_status=0
+          pre_ref="$(git ls-remote "$auth_remote" "refs/heads/$TARGET_BRANCH" 2>"$evidence/prepublication-ref.stderr")" || pre_ref_status=$?
+          {
+            echo "operation_id=$operation_id"
+            echo "prepared_commit=$prepared_commit"
+            echo "prepublication_ref_status=$pre_ref_status"
+            echo "prepublication_ref=$pre_ref"
+          } > "$evidence/publication.txt"
+
+          if [ "$pre_ref_status" -ne 0 ]; then
+            echo "OUTCOME_UNKNOWN" > "$evidence/classification.txt"
+            exit 90
+          fi
+
+          if [ -n "$pre_ref" ]; then
+            observed="${pre_ref%%[[:space:]]*}"
+            if [ "$observed" = "$prepared_commit" ]; then
+              echo "COMMITTED_EXACT" > "$evidence/classification.txt"
+              echo "observed_ref_target=$observed" >> "$evidence/publication.txt"
+              exit 0
+            fi
+            echo "SUPERSEDED_OR_CONFLICT" > "$evidence/classification.txt"
+            echo "observed_ref_target=$observed" >> "$evidence/publication.txt"
+            exit 91
+          fi
+
+          push_status=0
+          git push --porcelain "$auth_remote" "$prepared_commit:refs/heads/$TARGET_BRANCH" \
+            > "$evidence/push.stdout" 2> "$evidence/push.stderr" || push_status=$?
+          echo "push_status=$push_status" >> "$evidence/publication.txt"
+
+          observed_status=0
+          observed_line="$(git ls-remote "$auth_remote" "refs/heads/$TARGET_BRANCH" 2>"$evidence/reconcile-ref.stderr")" || observed_status=$?
+          echo "reconcile_ref_status=$observed_status" >> "$evidence/publication.txt"
+          echo "reconcile_ref_line=$observed_line" >> "$evidence/publication.txt"
+
+          if [ "$observed_status" -ne 0 ]; then
+            echo "OUTCOME_UNKNOWN" > "$evidence/classification.txt"
+            exit 92
+          fi
+          if [ -z "$observed_line" ]; then
+            echo "PROVEN_NOT_COMMITTED" > "$evidence/classification.txt"
+            exit 93
+          fi
+          observed="${observed_line%%[[:space:]]*}"
+          echo "observed_ref_target=$observed" >> "$evidence/publication.txt"
+          if [ "$observed" = "$prepared_commit" ]; then
+            echo "COMMITTED_EXACT" > "$evidence/classification.txt"
+            exit 0
+          fi
+          echo "SUPERSEDED_OR_CONFLICT" > "$evidence/classification.txt"
+          exit 94
+
+      - name: Prove promotion postflight and exact published ref
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2-promotion"
+          prior="$(cat "$evidence/classification.txt" 2>/dev/null || printf '%s' 'CLASSIFICATION_MISSING')"
+          prepared_commit="$(awk -F= '/^prepared_commit=/{print $2}' "$evidence/prepared-product-object.txt" 2>/dev/null || true)"
+          auth_remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          ref_status=0
+          ref_line="$(git ls-remote "$auth_remote" "refs/heads/$TARGET_BRANCH" 2>"$evidence/postflight-ref.stderr")" || ref_status=$?
+          observed=""
+          if [ -n "$ref_line" ]; then observed="${ref_line%%[[:space:]]*}"; fi
+          head="$(git rev-parse HEAD 2>/dev/null || true)"
+          tree="$(git rev-parse HEAD^{tree} 2>/dev/null || true)"
+          dirty="$(git status --porcelain=v1 --untracked-files=all 2>/dev/null || printf '%s' '__STATUS_FAILED__')"
+          {
+            echo "prior_classification=$prior"
+            echo "historical_checkout_head=$head"
+            echo "historical_checkout_tree=$tree"
+            echo "checkout_dirty_bytes=${#dirty}"
+            echo "target_ref_status=$ref_status"
+            echo "target_ref_target=$observed"
+            echo "prepared_commit=$prepared_commit"
+          } > "$evidence/postflight.txt"
+
+          postflight_ok=1
+          [ "$head" = "$HISTORICAL_PRODUCT_HEAD" ] || postflight_ok=0
+          [ "$tree" = "$HISTORICAL_PRODUCT_TREE" ] || postflight_ok=0
+          [ -z "$dirty" ] || postflight_ok=0
+          if [ "$prior" = "COMMITTED_EXACT" ]; then
+            [ "$ref_status" -eq 0 ] || postflight_ok=0
+            [ "$observed" = "$prepared_commit" ] || postflight_ok=0
+          fi
+          if [ "$postflight_ok" -ne 1 ]; then
+            echo "FAIL_PROMOTION_POSTFLIGHT" > "$evidence/classification.txt"
+            exit 95
+          fi
+
+      - name: Finalize promotion receipt evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/sci014-r2-promotion"
+          classification="$(cat "$evidence/classification.txt" 2>/dev/null || printf '%s' 'CLASSIFICATION_MISSING')"
+          operation_id="$(cat "$evidence/promotion-operation-id.txt" 2>/dev/null || true)"
+          prepared_commit="$(awk -F= '/^prepared_commit=/{print $2}' "$evidence/prepared-product-object.txt" 2>/dev/null || true)"
+          target_tree="$(awk -F= '/^target_tree=/{print $2}' "$evidence/tree-proof.txt" 2>/dev/null || true)"
+          {
+            echo "classification=$classification"
+            echo "operation_id=$operation_id"
+            echo "projection_run_id=$PROJECTION_RUN_ID"
+            echo "projection_run_attempt=$PROJECTION_RUN_ATTEMPT"
+            echo "projection_artifact_id=$PROJECTION_ARTIFACT_ID"
+            echo "projection_artifact_sha256=$PROJECTION_ARTIFACT_SHA256"
+            echo "historical_product_head=$HISTORICAL_PRODUCT_HEAD"
+            echo "product_parent=$PRODUCT_PARENT"
+            echo "proposed_lock_sha256=$PROPOSED_LOCK_SHA256"
+            echo "proposed_lock_blob=$PROPOSED_LOCK_BLOB"
+            echo "product_commit=$prepared_commit"
+            echo "product_tree=$target_tree"
+            echo "branch=$TARGET_BRANCH"
+          } > "$evidence/promotion-receipt.txt"
+
+          cd "$evidence"
+          find . -maxdepth 1 -type f \
+            ! -name 'artifact-file-census.txt' \
+            ! -name 'artifact-sha256.txt' \
+            -printf '%f\n' | LC_ALL=C sort > artifact-file-census.txt
+          : > artifact-sha256.txt
+          while IFS= read -r file; do
+            sha256sum "$file" >> artifact-sha256.txt
+          done < artifact-file-census.txt
+          sha256sum artifact-file-census.txt >> artifact-sha256.txt
+
+      - name: Retain promotion evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sci-014-r2c-lock-promotion-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/sci014-r2-promotion/
+          if-no-files-found: error
+          retention-days: 30
