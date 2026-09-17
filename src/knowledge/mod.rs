@@ -55,6 +55,7 @@ pub mod ignorance_frontier;
 pub mod inquiry_contract;
 pub mod inquiry_preregistration;
 pub mod inquiry_result;
+pub mod knowledge_weight_routing;
 pub mod legacy_confidence_characterization;
 pub mod llm_extraction;
 pub mod manager;
@@ -125,6 +126,11 @@ pub use inquiry_preregistration::{
     PreregistrationError,
 };
 pub use inquiry_result::{InquiryResultError, InquiryResultReceipt};
+pub use knowledge_weight_routing::{
+    BoundedWeight, KnowledgeWeightAuthorityRouter, KnowledgeWeightDimension, KnowledgeWeightError,
+    KnowledgeWeightRoutingDecision, KnowledgeWeightRoutingFailure, KnowledgeWeightSource,
+    KnowledgeWeightUpdateProposal, KnowledgeWeightVector, SignedWeightDelta,
+};
 pub use legacy_confidence_characterization::{
     characterize_legacy_confidence_authority, LegacyConfidenceAuthorityProfile,
 };
