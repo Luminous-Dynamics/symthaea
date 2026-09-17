@@ -59,10 +59,12 @@ jobs:
       - name: Record toolchain and workspace membership
         run: |
           set -euo pipefail
-          rustc -vV | tee -a neuroarch-qualification-context.txt
-          cargo -V | tee -a neuroarch-qualification-context.txt
-          rustc -vV | grep -q '^release: 1\.96\.0$'
-          cargo -V | grep -q '^cargo 1\.96\.0 '
+          rustc_version="$(rustc -vV)"
+          cargo_version="$(cargo -V)"
+          printf '%s\n' "$rustc_version" | tee -a neuroarch-qualification-context.txt
+          printf '%s\n' "$cargo_version" | tee -a neuroarch-qualification-context.txt
+          grep -q '^release: 1\.96\.0$' <<< "$rustc_version"
+          grep -q '^cargo 1\.96\.0 ' <<< "$cargo_version"
 
           cargo metadata --format-version 1 --no-deps > neuroarch-workspace-metadata.json
           grep -q '"name":"symthaea-neuroarch-types"' neuroarch-workspace-metadata.json
