@@ -33,12 +33,14 @@ use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction, Transition
 pub const SYM_RSI_001_GROUNDED_DREAM_SCHEMA: &str =
     "symthaea.sym-rsi-001.grounded-dream-model.v1";
 pub const SYM_RSI_001_GROUNDED_DREAM_POLICY_ID: &str =
-    "sym-rsi-grounded-dream-policy-v2";
+    "sym-rsi-grounded-dream-policy-v3";
 pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
 pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
     "domain-conditioned-action/mean-predicted-task-quality/5-legal-aware-perturbations-minus-0.10-task-regression-probability/0.01-override-margin/v3";
+pub const DREAM_ACTION_FINGERPRINT_SEMANTICS: &str =
+    "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2";
 
 const QUALITY_START: usize = 7;
 const QUALITY_COPIES: usize = 8;
@@ -391,8 +393,7 @@ pub fn train_grounded_dream_model(
         candidate_family_digest: canonical_candidate_family_digest(),
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
         model_version: "symthaea-dream-transition-memory-v1".into(),
-        action_fingerprint_semantics:
-            "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2".into(),
+        action_fingerprint_semantics: DREAM_ACTION_FINGERPRINT_SEMANTICS.into(),
         observation_count,
         transition_memory,
         config,
@@ -673,6 +674,8 @@ fn dream_model_evidence_digest(
         manifest.environment_digest.as_str(),
         corpus.receipt.evidence_digest.as_str(),
         SYM_RSI_001_GROUNDED_DREAM_SCHEMA,
+        DREAM_ACTION_FINGERPRINT_SEMANTICS,
+        SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE,
     ] {
         hasher.update(&(value.len() as u64).to_le_bytes());
         hasher.update(value.as_bytes());
@@ -738,7 +741,7 @@ mod tests {
         );
         assert_eq!(
             model.action_fingerprint_semantics,
-            "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2"
+            DREAM_ACTION_FINGERPRINT_SEMANTICS
         );
         assert!(model.evidence_digest.starts_with("blake3:"));
     }
