@@ -24,23 +24,47 @@ jobs:
     timeout-minutes: 5
     outputs:
       subject_sha: ${{ steps.bind.outputs.subject_sha }}
+      subject_binding_sha256: ${{ steps.bind.outputs.subject_binding_sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Clean helper preflight
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
       - name: Validate subject binding
         id: bind
         shell: bash
         run: |
           set -euo pipefail
-          subject="$(tr -d '\r\n' < .github/arc3/protocol-qualification-subject.txt)"
-          if [ "${#subject}" -ne 40 ] || [[ ! "$subject" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Invalid ARC3 protocol subject SHA: '$subject'" >&2
-            exit 1
-          fi
-          printf 'subject_sha=%s\n' "$subject" >> "$GITHUB_OUTPUT"
-          printf 'ARC3 protocol subject: %s\n' "$subject"
+          python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          import os
+          import re
+          import sys
+
+          path = Path('.github/arc3/protocol-qualification-subject.txt')
+          raw = path.read_bytes()
+          if re.fullmatch(rb'[0-9a-f]{40}\n?', raw) is None:
+              print('ARC3 protocol subject binding must be exactly 40 lowercase hex bytes plus at most one final LF', file=sys.stderr)
+              sys.exit(1)
+
+          subject = raw[:-1] if raw.endswith(b'\n') else raw
+          digest = sha256(raw).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'subject_sha={subject.decode()}\n')
+              out.write(f'subject_binding_sha256={digest}\n')
+          print(f'ARC3 protocol subject: {subject.decode()}')
+          print(f'ARC3 subject-binding SHA-256: {digest}')
+          PY
+
+      - name: Helper postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
   oracle:
     name: Independent protocol oracle
@@ -49,6 +73,7 @@ jobs:
     timeout-minutes: 5
     env:
       SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -57,8 +82,21 @@ jobs:
       - name: Bind exact subject
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
       - name: Run independent canonicalization oracle
         run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Subject postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
 
   lock-integrity:
     name: Cargo lock integrity
@@ -67,6 +105,7 @@ jobs:
     timeout-minutes: 15
     env:
       SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -75,10 +114,25 @@ jobs:
       - name: Bind exact subject
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
       - name: Install Rust 1.96
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
         with:
           toolchain: 1.96.0
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
 
       - name: Require locked protocol package resolution
         id: locked
@@ -230,6 +284,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Restore diagnostic mutation and verify postflight
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git restore --source=HEAD --staged --worktree -- Cargo.lock
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
   rust-protocol-crate:
     name: Rust protocol crate
     needs: subject
@@ -237,6 +299,7 @@ jobs:
     timeout-minutes: 15
     env:
       SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -245,11 +308,26 @@ jobs:
       - name: Bind exact subject
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
       - name: Install Rust 1.96
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
         with:
           toolchain: 1.96.0
           components: rustfmt,clippy
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
 
       - name: Format protocol crate
         run: cargo fmt -p symthaea-arc3-protocol -- --check
@@ -266,6 +344,11 @@ jobs:
       - name: Cross-check independent oracle
         run: python3 scripts/arc3_protocol_oracle.py
 
+      - name: Subject postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
   psych-bench-integration:
     name: Psych-bench ARC3 integration
     needs: subject
@@ -273,6 +356,7 @@ jobs:
     timeout-minutes: 20
     env:
       SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+      SUBJECT_BINDING_SHA256: ${{ needs.subject.outputs.subject_binding_sha256 }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -281,11 +365,26 @@ jobs:
       - name: Bind exact subject
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
+      - name: Clean subject preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          sha256sum Cargo.lock
+          printf 'Subject-binding SHA-256: %s\n' "$SUBJECT_BINDING_SHA256"
+
       - name: Install Rust 1.96
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
         with:
           toolchain: 1.96.0
           components: rustfmt
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
 
       - name: Format affected crates
         run: cargo fmt -p symthaea-arc3-protocol -p symthaea-psych-bench -- --check
@@ -298,3 +397,8 @@ jobs:
 
       - name: Cross-check independent oracle
         run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Subject postflight immutable
+        if: always()
+        shell: bash
+        run: test -z "$(git status --porcelain=v1 --untracked-files=no)"
