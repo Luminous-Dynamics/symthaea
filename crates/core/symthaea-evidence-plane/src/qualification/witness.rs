@@ -277,8 +277,7 @@ mod tests {
             provider_conclusion: Some("success".into()),
         };
 
-        let evaluation = profile.evaluate(SUBJECT, &observation).unwrap();
-        QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).unwrap()
+        QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation).unwrap()
     }
 
     fn recipe(workflow_byte: u8) -> QualifierRecipe {
