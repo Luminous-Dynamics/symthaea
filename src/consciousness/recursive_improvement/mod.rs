@@ -71,6 +71,7 @@ pub mod experience_tree;
 pub mod replay_policy;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
+pub mod sym_rsi_runner;
 
 // Re-export key types from core infrastructure
 pub use types::{
@@ -170,6 +171,11 @@ pub use sym_rsi_experiment::{
 pub use sym_rsi_fixtures::{
     FixtureDomainError, FixtureDomainKind, FixtureState, FixtureTransition,
     SYM_RSI_001_FIXTURE_ADAPTER_VERSION, canonical_sym_rsi_001_fixture_manifest,
+};
+pub use sym_rsi_runner::{
+    FixedHashPolicy, FixtureObservedStep, FixturePolicy, FixtureRunTrace, FixtureRunnerError,
+    ReceiptDiagnostics, build_fixture_receipt, fixture_action_digest, fixture_state_digest,
+    run_fixture_policy,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
