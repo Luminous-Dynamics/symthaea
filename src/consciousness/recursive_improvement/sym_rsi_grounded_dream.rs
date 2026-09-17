@@ -33,7 +33,7 @@ use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction, Transition
 pub const SYM_RSI_001_GROUNDED_DREAM_SCHEMA: &str =
     "symthaea.sym-rsi-001.grounded-dream-model.v1";
 pub const SYM_RSI_001_GROUNDED_DREAM_POLICY_ID: &str =
-    "sym-rsi-grounded-dream-policy-v1";
+    "sym-rsi-grounded-dream-policy-v2";
 pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
@@ -114,6 +114,7 @@ pub struct DreamActionPrediction {
     pub action: u8,
     pub score: f32,
     pub expected_phi: f32,
+    pub predicted_task_quality: f32,
     pub failure_probability: f32,
     pub model_confidence: f32,
     pub epistemic: EpistemicWorldRecord,
@@ -196,9 +197,11 @@ impl FixturePolicy for GroundedDreamPolicy {
 
         let mut predictions = Vec::with_capacity(legal_actions.len());
         for &action in legal_actions {
-            let distribution =
-                engine.predict_outcome_distribution(&encoded, &DreamFixtureAction(action));
-            let score = distribution.expected_phi
+            let dream_action = DreamFixtureAction(action);
+            let distribution = engine.predict_outcome_distribution(&encoded, &dream_action);
+            let predicted_task_quality =
+                mean_predicted_task_quality(&engine, &encoded, dream_action);
+            let score = predicted_task_quality
                 - DREAM_RISK_PENALTY * distribution.failure_probability;
             let kind = if action == base_action {
                 WorldEvidenceKind::ModelPredicted
@@ -210,6 +213,7 @@ impl FixturePolicy for GroundedDreamPolicy {
                 &state_digest,
                 action,
                 distribution.expected_phi,
+                predicted_task_quality,
                 distribution.failure_probability,
                 distribution.confidence,
             );
@@ -217,6 +221,7 @@ impl FixturePolicy for GroundedDreamPolicy {
                 action,
                 score,
                 expected_phi: distribution.expected_phi,
+                predicted_task_quality,
                 failure_probability: distribution.failure_probability,
                 model_confidence: distribution.confidence,
                 epistemic: EpistemicWorldRecord {
@@ -547,16 +552,43 @@ fn signed_unit(value: i32) -> f32 {
     value / (1.0 + value.abs())
 }
 
+fn mean_predicted_task_quality(
+    engine: &DreamEngine<DreamFixtureAction>,
+    state: &[f32],
+    action: DreamFixtureAction,
+) -> f32 {
+    let simulations = engine.config().counterfactual_count.max(1);
+    let mut total = 0.0_f32;
+    for index in 0..simulations {
+        let perturbed = action.perturb(index as u64);
+        let outcome = engine.predict_counterfactual_outcome(state, &perturbed);
+        total += extract_predicted_task_quality(&outcome);
+    }
+    total / simulations as f32
+}
+
+fn extract_predicted_task_quality(outcome: &[f32]) -> f32 {
+    if outcome.len() < QUALITY_START + QUALITY_COPIES {
+        return 0.0;
+    }
+    let sum = outcome[QUALITY_START..QUALITY_START + QUALITY_COPIES]
+        .iter()
+        .copied()
+        .sum::<f32>();
+    (sum / QUALITY_COPIES as f32).clamp(0.0, 1.0)
+}
+
 fn prediction_provenance_digest(
     model: &GroundedDreamModel,
     state_digest: &str,
     action: u8,
     expected_phi: f32,
+    predicted_task_quality: f32,
     failure_probability: f32,
     confidence: f32,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v1\0");
+    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v2\0");
     for value in [
         model.evidence_digest.as_str(),
         state_digest,
@@ -567,6 +599,7 @@ fn prediction_provenance_digest(
     }
     hasher.update(&[action]);
     hasher.update(&expected_phi.to_bits().to_le_bytes());
+    hasher.update(&predicted_task_quality.to_bits().to_le_bytes());
     hasher.update(&failure_probability.to_bits().to_le_bytes());
     hasher.update(&confidence.to_bits().to_le_bytes());
     format!("blake3:{}", hasher.finalize().to_hex())
@@ -686,7 +719,9 @@ mod tests {
         let decision = policy.decision_log().last().unwrap();
         assert!(!decision.generated_evidence_promoted);
         assert!(decision.predictions.iter().all(|prediction| {
-            !prediction.epistemic.kind.is_empirical()
+            prediction.predicted_task_quality.is_finite()
+                && (0.0..=1.0).contains(&prediction.predicted_task_quality)
+                && !prediction.epistemic.kind.is_empirical()
                 && !prediction.epistemic.empirically_validated
                 && !prediction.epistemic.may_promote_confidence()
                 && prediction.epistemic.provenance_digest.starts_with("blake3:")
