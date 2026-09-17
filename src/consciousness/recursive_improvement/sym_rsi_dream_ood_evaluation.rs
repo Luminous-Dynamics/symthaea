@@ -348,8 +348,7 @@ fn validate_fresh_receipt(
         || receipt.evidence_digest.trim().is_empty()
         || matches!(
             receipt.disposition,
-            DreamFreshDisposition::NoCandidatePromotion
-                | DreamFreshDisposition::BlockedByHoldout
+            DreamFreshDisposition::BlockedByVerification
                 | DreamFreshDisposition::IntegrityFailure
         )
     {
