@@ -1,0 +1,35 @@
+{
+  "schema": "symthaea-ci-runner-fixture-v1",
+  "observed_at": "2026-09-16T20:25:00Z",
+  "run": {
+    "id": 35018703802,
+    "workflow_id": 243210908,
+    "workflow_name": "CI",
+    "run_attempt": 1,
+    "status": "in_progress",
+    "conclusion": null,
+    "head_sha": "8ff27afded5ca9751129926dacfdc0ebac33bb9b",
+    "created_at": "2026-09-15T20:17:36Z",
+    "run_started_at": "2026-09-15T20:17:36Z",
+    "updated_at": "2026-09-16T20:17:54Z"
+  },
+  "jobs": [
+    {
+      "id": 104548646452,
+      "name": "Test CI-safe (core-media)",
+      "required": true,
+      "runner_class": "ubuntu-latest",
+      "status": "in_progress",
+      "conclusion": null,
+      "started_at": "2026-09-15T20:17:36Z",
+      "timeout_minutes": 75,
+      "steps": [
+        {"name": "Set up job", "status": "completed", "conclusion": "success"},
+        {"name": "Run actions/checkout@v4", "status": "completed", "conclusion": "success"},
+        {"name": "Install Rust toolchain", "status": "completed", "conclusion": "success"},
+        {"name": "Run tests (core-media)", "status": "in_progress", "conclusion": null},
+        {"name": "Post Cache cargo registry and target", "status": "pending", "conclusion": null}
+      ]
+    }
+  ]
+}
