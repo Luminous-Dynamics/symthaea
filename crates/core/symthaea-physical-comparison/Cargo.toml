@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-physical-comparison"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Preregistered projection and budget-matching contracts for Symthaea physical-substrate comparisons"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-physical-cognition = { path = "../symthaea-physical-cognition" }
+symthaea-physical-experiment = { path = "../symthaea-physical-experiment" }
