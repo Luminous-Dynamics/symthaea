@@ -1,0 +1,103 @@
+name: AURUM-001 Bootstrap Qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-aurum/**'
+      - '.github/workflows/aurum-001-qualify.yml'
+      - 'Cargo.lock'
+
+permissions:
+  contents: read
+
+env:
+  QUALIFY_SHA: ${{ github.event.pull_request.head.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact Head + Gold Reservoir + Bootstrap Lock
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFY_SHA }}
+          fetch-depth: 0
+
+      - name: Bind exact head, base, and scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFY_SHA"
+          git cat-file -e "$BASE_SHA^{commit}"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test "$(git rev-list --count "$BASE_SHA..$QUALIFY_SHA")" -eq 1
+          git diff --check "$BASE_SHA" "$QUALIFY_SHA"
+          git diff --name-only "$BASE_SHA" "$QUALIFY_SHA" | tee /tmp/aurum001-scope.txt
+          unexpected="$(grep -Ev '^(Cargo\.lock|\.github/workflows/aurum-001-qualify\.yml|crates/domains/symthaea-aurum/.*)$' /tmp/aurum001-scope.txt || true)"
+          test -z "$unexpected"
+          printf 'qualification_sha=%s\nbase_sha=%s\n' "$QUALIFY_SHA" "$BASE_SHA" > /tmp/aurum001-context.txt
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Prove toolchain
+        run: |
+          set -euo pipefail
+          rustc -vV | tee -a /tmp/aurum001-context.txt
+          cargo -V | tee -a /tmp/aurum001-context.txt
+          rustc -vV | grep -q '^release: 1\.96\.0$'
+          cargo -V | grep -q '^cargo 1\.96\.0 '
+
+      - name: Materialize and audit cumulative bootstrap lock
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/aurum001-evidence
+          cp Cargo.lock /tmp/aurum001-evidence/Cargo.lock.before
+          cargo metadata --format-version 1 >/tmp/aurum001-evidence/workspace-metadata.json
+          git diff -- Cargo.lock | tee /tmp/aurum001-evidence/Cargo.lock.patch
+          test -s /tmp/aurum001-evidence/Cargo.lock.patch
+          if grep -E '^-[^-]' /tmp/aurum001-evidence/Cargo.lock.patch; then
+            echo 'Cargo.lock bootstrap removed existing content; refusing broad churn.' >&2
+            exit 1
+          fi
+          test "$(grep -c '^+\[\[package\]\]$' /tmp/aurum001-evidence/Cargo.lock.patch)" -eq 2
+          grep -q '^+name = "symthaea-physical-cognition"$' /tmp/aurum001-evidence/Cargo.lock.patch
+          grep -q '^+name = "symthaea-aurum"$' /tmp/aurum001-evidence/Cargo.lock.patch
+          grep -q '"name":"symthaea-physical-cognition"' /tmp/aurum001-evidence/workspace-metadata.json
+          grep -q '"name":"symthaea-aurum"' /tmp/aurum001-evidence/workspace-metadata.json
+          cp Cargo.lock /tmp/aurum001-evidence/Cargo.lock.generated
+          sha256sum Cargo.lock > /tmp/aurum001-evidence/Cargo.lock.sha256
+
+      - name: Focused format, check, tests, and clippy
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-aurum/src/lib.rs \
+            crates/domains/symthaea-aurum/src/model.rs \
+            crates/domains/symthaea-aurum/src/config_binding.rs
+          cargo check -p symthaea-aurum --locked
+          cargo test -p symthaea-aurum --locked
+          cargo clippy -p symthaea-aurum --all-targets --locked -- -D warnings
+
+      - name: Postflight source immutability
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- . ':(exclude)Cargo.lock'
+          cp /tmp/aurum001-context.txt /tmp/aurum001-evidence/context.txt
+          cp /tmp/aurum001-scope.txt /tmp/aurum001-evidence/scope.txt
+
+      - name: Upload bootstrap lock evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: aurum-001-bootstrap-lock
+          path: /tmp/aurum001-evidence
+          if-no-files-found: error
+          retention-days: 14

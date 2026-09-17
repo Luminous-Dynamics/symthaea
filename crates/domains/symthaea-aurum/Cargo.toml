@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-aurum"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Gold nanojunction physical-reservoir research models for Symthaea"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-physical-cognition = { path = "../../core/symthaea-physical-cognition" }
