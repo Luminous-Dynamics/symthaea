@@ -31,6 +31,7 @@
 pub mod adaptive_ontology;
 #[cfg(feature = "epistemic")]
 pub mod adversarial_epistemics;
+pub mod belief_revision_gate;
 pub mod causal_admission;
 pub mod causal_bridge;
 pub mod causal_hypothesis;
@@ -66,6 +67,10 @@ pub mod receipt_admission;
 pub mod self_schema;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
+pub use belief_revision_gate::{
+    BeliefRevisionDecision, BeliefRevisionFailure, BeliefRevisionGate, BeliefRevisionPolicy,
+    BeliefRevisionPolicyError, CalibrationSnapshot, EpistemicRevisionProposal,
+};
 pub use causal_admission::{
     CausalAdmissionDecision, CausalAdmissionFailure, CausalAdmissionGate, CausalAdmissionPolicy,
 };
