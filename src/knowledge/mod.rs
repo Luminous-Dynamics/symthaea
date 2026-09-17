@@ -42,6 +42,7 @@ pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_vector;
 pub mod evidence_independence;
+pub mod evidence_mutation_firewall;
 pub mod extraction;
 pub mod graph;
 #[cfg(feature = "epistemic")]
@@ -83,6 +84,11 @@ pub use epistemic_vector::{
 };
 pub use evidence_independence::{
     EvidenceIndependenceAnalyzer, EvidenceLineage, ProvenanceDiversityReport, SharedAncestry,
+};
+pub use evidence_mutation_firewall::{
+    EvidenceDraftIdentity, EvidenceIngestionOutcome, EvidenceIngestionReceipt,
+    EvidenceMutationAuthorization, EvidenceMutationError, EvidenceMutationFirewall,
+    MutationAuthorizationDecision,
 };
 pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
