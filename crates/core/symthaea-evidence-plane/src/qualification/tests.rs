@@ -26,7 +26,18 @@ fn job(id: u64, name: &str, disposition: JobDisposition) -> ObservedQualificatio
         job_id: id,
         name: name.into(),
         disposition,
-        step_summary: digest(id as u8),
+        steps: vec![
+            ObservedQualificationStep {
+                ordinal: 1,
+                name: "setup".into(),
+                disposition: JobDisposition::Passed,
+            },
+            ObservedQualificationStep {
+                ordinal: 2,
+                name: "run".into(),
+                disposition,
+            },
+        ],
         provider_status: Some("completed".into()),
         provider_conclusion: Some("success".into()),
     }
@@ -238,11 +249,35 @@ fn descriptive_provider_text_and_refs_do_not_change_authority_identity() {
 }
 
 #[test]
-fn changed_step_summary_changes_identity() {
+fn changed_step_outcome_changes_identity() {
     let a = pass_observation();
     let mut b = a.clone();
-    b.jobs[0].step_summary = digest(99);
+    b.jobs[0].steps[1].disposition = JobDisposition::FailQualifier;
     assert_ne!(a.identity().unwrap(), b.identity().unwrap());
+}
+
+#[test]
+fn step_order_does_not_change_identity() {
+    let a = pass_observation();
+    let mut b = a.clone();
+    b.jobs[0].steps.reverse();
+    assert_eq!(a.identity().unwrap(), b.identity().unwrap());
+}
+
+#[test]
+fn duplicate_normalized_step_fails_validation() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let mut observation = pass_observation();
+    observation.jobs[0].steps.push(ObservedQualificationStep {
+        ordinal: 1,
+        name: "setup".into(),
+        disposition: JobDisposition::Passed,
+    });
+
+    assert!(matches!(
+        profile.evaluate(SUBJECT, &observation),
+        Err(QualificationError::DuplicateObservedStep)
+    ));
 }
 
 #[test]
