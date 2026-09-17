@@ -55,6 +55,11 @@ pub mod epistemic_restart_capsule;
     reason = "EKM-032 V1 reserves typed canonical-hash helpers pending canonical restore schema"
 )]
 pub mod epistemic_restart_manifest;
+#[allow(
+    unused_imports,
+    reason = "EKM-034 imports the support store only for its cfg(test) cold-restart fixture"
+)]
+pub mod epistemic_restart_wire;
 pub mod epistemic_vector;
 pub mod evidence_binding_conformance;
 pub mod evidence_independence;
@@ -143,6 +148,12 @@ pub use epistemic_restart_manifest::{
     EpistemicLedgerInventoryV1, EpistemicLedgerLineageV1, EpistemicRestartDigest,
     EpistemicRestartEncoding, EpistemicRestartManifestError, EpistemicRestartManifestV1,
     EpistemicRestartManifestVersion,
+};
+pub use epistemic_restart_wire::{
+    EpistemicRestartWireEncoding, EpistemicRestartWireError, EpistemicRestartWireSnapshotV1,
+    EpistemicRestartWireV1, EpistemicRestartWireVersion, WireClaimV1, WireEvidenceV1,
+    WireManifestSummaryV1, WireMutationV1, WireProvenanceV1, WireRevisionBasisV1,
+    WireRevisionReceiptV1, WireSupportStateV1, WireUncertaintyAssessmentV1,
 };
 pub use epistemic_vector::{
     ClaimUncertaintyAssessment, EpistemicVector, UncertaintyDimension, UncertaintyError,
