@@ -422,6 +422,15 @@ impl<A: DreamableAction> DreamEngine<A> {
         self.memory.clear();
     }
 
+    /// Predict one counterfactual outcome from the learned dream world model.
+    ///
+    /// This is a model-generated hypothesis, not an observation and not empirical
+    /// evidence. Callers must preserve that epistemic distinction. The prediction
+    /// uses the same learned TransitionMemory + heuristic fallback as dream cycles.
+    pub fn predict_counterfactual_outcome(&self, state: &[f32], action: &A) -> Vec<f32> {
+        self.simulate_outcome(state, action)
+    }
+
     /// PRECOGNITION: Predict outcome distribution for an action
     ///
     /// Runs counterfactual simulations to estimate the likelihood of failure
@@ -434,7 +443,7 @@ impl<A: DreamableAction> DreamEngine<A> {
         for i in 0..self.config.counterfactual_count {
             // Generate a slightly perturbed action to account for environmental noise
             let perturbed = action.perturb(i as u64);
-            let outcome = self.simulate_outcome(state, &perturbed);
+            let outcome = self.predict_counterfactual_outcome(state, &perturbed);
             let phi = Self::estimate_phi(&outcome);
 
             total_phi += phi;
@@ -599,6 +608,20 @@ mod tests {
         engine.record(&state, action, &outcome, 0.5);
         assert_eq!(engine.memory_size(), 1);
         assert_eq!(engine.stats().events_recorded, 1);
+    }
+
+    #[test]
+    fn test_counterfactual_outcome_api_is_deterministic_and_model_based() {
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        let state = vec![0.2, 0.4, 0.6, 0.8];
+        let action = vec![0.1, 0.2];
+        let observed = vec![0.7, 0.6, 0.5, 0.4];
+        engine.record(&state, action.clone(), &observed, 0.8);
+
+        let first = engine.predict_counterfactual_outcome(&state, &action);
+        let second = engine.predict_counterfactual_outcome(&state, &action);
+        assert_eq!(first, second);
+        assert_eq!(first.len(), state.len());
     }
 
     #[test]
