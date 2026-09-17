@@ -10,6 +10,7 @@ fn profile(lane: QualificationLane) -> QualificationProfile {
     QualificationProfile::new(
         1,
         lane,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         artifact(7),
         vec!["workflow_dispatch".into()],
@@ -285,6 +286,7 @@ fn conditional_skip_must_be_explicitly_preregistered() {
     let profile = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         artifact(7),
         vec!["workflow_dispatch".into()],
@@ -320,6 +322,7 @@ fn profile_rejects_duplicate_job_names_and_events() {
     let duplicate_jobs = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         artifact(7),
         vec!["workflow_dispatch".into()],
@@ -336,6 +339,7 @@ fn profile_rejects_duplicate_job_names_and_events() {
     let duplicate_events = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         artifact(7),
         vec!["pull_request".into(), "pull_request".into()],
@@ -352,6 +356,7 @@ fn profile_identity_normalizes_declared_set_order() {
     let a = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         artifact(7),
         vec!["workflow_dispatch".into(), "pull_request".into()],
@@ -364,6 +369,7 @@ fn profile_identity_normalizes_declared_set_order() {
     let b = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         artifact(7),
         vec!["pull_request".into(), "workflow_dispatch".into()],
@@ -411,6 +417,7 @@ fn digest_algorithm_is_part_of_workflow_identity() {
     let git = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         ArtifactIdentity::GitBlobSha1([7; 20]),
         vec!["workflow_dispatch".into()],
@@ -420,6 +427,7 @@ fn digest_algorithm_is_part_of_workflow_identity() {
     let sha256 = QualificationProfile::new(
         1,
         QualificationLane::FullExactHead,
+        "Luminous-Dynamics/symthaea",
         ".github/workflows/qualify.yml",
         ArtifactIdentity::Sha256([7; 32]),
         vec!["workflow_dispatch".into()],
@@ -439,4 +447,19 @@ fn sha256_commit_identity_is_accepted() {
 
     let evaluation = profile.evaluate(&expected, &observation).unwrap();
     assert_eq!(evaluation.classification, QualificationClassification::Pass);
+}
+
+#[test]
+fn wrong_repository_fails_qualifier() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let mut observation = pass_observation();
+    observation.repository = "attacker/example".into();
+
+    let evaluation = profile.evaluate(SUBJECT, &observation).unwrap();
+    assert_eq!(
+        evaluation.classification,
+        QualificationClassification::FailQualifier
+    );
+    assert!(!evaluation.mechanical_integrity.satisfied);
+    assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
 }
