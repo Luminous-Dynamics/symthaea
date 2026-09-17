@@ -38,7 +38,7 @@ pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
 pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
-    "domain-conditioned-action/mean-predicted-task-quality/5-legal-aware-perturbations-minus-0.10-task-regression-probability/0.01-override-margin/v3";
+    "domain-conditioned-action/5-model-simulations-per-candidate/mean-predicted-task-quality-minus-0.10-task-regression-probability/0.01-override-margin/v4";
 pub const DREAM_ACTION_FINGERPRINT_SEMANTICS: &str =
     "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2";
 
@@ -130,7 +130,6 @@ impl GroundedDreamModel {
 pub struct DreamActionPrediction {
     pub action: u8,
     pub score: f32,
-    pub expected_phi: f32,
     pub predicted_task_quality: f32,
     pub failure_probability: f32,
     pub model_confidence: f32,
@@ -215,7 +214,6 @@ impl FixturePolicy for GroundedDreamPolicy {
         let mut predictions = Vec::with_capacity(legal_actions.len());
         for &action in legal_actions {
             let dream_action = DreamFixtureAction::new(domain, action);
-            let distribution = engine.predict_outcome_distribution(&encoded, &dream_action);
             let task_prediction = task_prediction_summary(
                 &engine,
                 &encoded,
@@ -235,7 +233,6 @@ impl FixturePolicy for GroundedDreamPolicy {
                 &self.model,
                 &state_digest,
                 action,
-                distribution.expected_phi,
                 predicted_task_quality,
                 task_prediction.failure_probability,
                 task_prediction.confidence,
@@ -243,7 +240,6 @@ impl FixturePolicy for GroundedDreamPolicy {
             predictions.push(DreamActionPrediction {
                 action,
                 score,
-                expected_phi: distribution.expected_phi,
                 predicted_task_quality,
                 failure_probability: task_prediction.failure_probability,
                 model_confidence: task_prediction.confidence,
@@ -635,7 +631,6 @@ fn prediction_provenance_digest(
     model: &GroundedDreamModel,
     state_digest: &str,
     action: u8,
-    expected_phi: f32,
     predicted_task_quality: f32,
     failure_probability: f32,
     confidence: f32,
@@ -652,7 +647,6 @@ fn prediction_provenance_digest(
         hasher.update(value.as_bytes());
     }
     hasher.update(&[action]);
-    hasher.update(&expected_phi.to_bits().to_le_bytes());
     hasher.update(&predicted_task_quality.to_bits().to_le_bytes());
     hasher.update(&failure_probability.to_bits().to_le_bytes());
     hasher.update(&confidence.to_bits().to_le_bytes());
