@@ -31,10 +31,11 @@
 pub mod adaptive_ontology;
 #[cfg(feature = "epistemic")]
 pub mod adversarial_epistemics;
-pub mod belief_mutation_decision_guard;
-pub mod belief_mutation_firewall;
-pub mod belief_mutation_transaction;
-pub mod belief_mutation_verifier;
+mod belief_mutation_authority;
+mod belief_mutation_decision_guard;
+mod belief_mutation_firewall;
+mod belief_mutation_transaction;
+mod belief_mutation_verifier;
 pub mod belief_revision_gate;
 pub mod belief_revision_receipt;
 pub mod causal_admission;
@@ -72,23 +73,24 @@ pub mod receipt_admission;
 pub mod self_schema;
 
 pub use adaptive_ontology::{AdaptiveOntology, PrimitiveUsage};
-pub use belief_mutation_decision_guard::{
-    BeliefMutationDecisionGuard, BeliefMutationDecisionGuardError,
+pub use belief_mutation_authority::{
+    BeliefMutationAuthority, BeliefMutationAuthorityError, PreparedBeliefMutation,
 };
+pub use belief_mutation_decision_guard::BeliefMutationDecisionGuardError;
+#[cfg(test)]
+pub(crate) use belief_mutation_firewall::BeliefMutationFirewall;
 pub use belief_mutation_firewall::{
     BeliefMutationAuthorization, BeliefMutationAuthorizationDecision, BeliefMutationError,
-    BeliefMutationFirewall, BeliefMutationOutcome, BeliefMutationReceipt,
-    BeliefMutationReceiptId, BeliefMutationRollbackPlan, EpistemicSupportState,
-    EpistemicSupportStore,
+    BeliefMutationOutcome, BeliefMutationReceipt, BeliefMutationReceiptId,
+    BeliefMutationRollbackPlan, EpistemicSupportState, EpistemicSupportStore,
 };
 pub use belief_mutation_transaction::{
-    BeliefMutationSealError, BeliefMutationTransactionCoordinator,
-    BeliefMutationTransactionError, BeliefMutationTransactionOutcome,
+    BeliefMutationSealError, BeliefMutationTransactionError, BeliefMutationTransactionOutcome,
     BeliefRevisionEvidenceSeal, SealedClaimSnapshot,
 };
 pub use belief_mutation_verifier::{
-    BeliefMutationInvariantFailure, BeliefMutationSnapshot,
-    BeliefMutationVerificationError, BeliefMutationVerificationReport, BeliefMutationVerifier,
+    BeliefMutationInvariantFailure, BeliefMutationSnapshot, BeliefMutationVerificationError,
+    BeliefMutationVerificationReport, BeliefMutationVerifier,
 };
 pub use belief_revision_gate::{
     BeliefRevisionDecision, BeliefRevisionFailure, BeliefRevisionGate, BeliefRevisionPolicy,
