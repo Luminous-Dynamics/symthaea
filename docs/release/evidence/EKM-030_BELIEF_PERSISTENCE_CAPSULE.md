@@ -26,7 +26,7 @@ EKM-030 defines the first deterministic export/validation contract for that stat
 - authorization/application cycles,
 - consumed authorization count.
 
-The baseline is reconstructed from the first mutation's `support_before`, or from current support for an unmutated state. This means the capsule contains the information a separately qualified restore layer would need to reconstruct the state chain without guessing its starting value.
+The baseline is reconstructed from the first mutation's `support_before`, or from current support for an unmutated state. This means the capsule contains the information a separately qualified restore layer would need to reconstruct the support-state chain without guessing its starting value.
 
 ## Capture validation
 
@@ -62,11 +62,20 @@ The tests deliberately exercise the crate-internal raw EKM-026 firewall to creat
 
 This demonstrates why the EKM-029 public replay restriction is required for deterministic persistence.
 
+## Revision-decision history boundary
+
+The mutation capsule stores the **source revision receipt IDs used by successful mutations**, but it does not yet persist the full EKM-025 `BeliefRevisionHistory`. That distinction matters because the revision history also contains rejected decisions and owns the monotonic receipt-ID sequence.
+
+A restart implementation must not infer that a support-state capsule alone is sufficient to reset `BeliefRevisionHistory` to receipt ID 1. Reusing an earlier decision ID would collapse distinct authority lineages.
+
+Therefore full restart recovery additionally requires a versioned revision-decision-history capsule (or an equivalent monotonic-ID persistence mechanism) before hydration can be considered safe.
+
 ## Non-claims
 
 EKM-030 does **not** establish:
 
 - hydration/restoration of `EpistemicSupportStore`,
+- persistence/restoration of full `BeliefRevisionHistory`, including rejected decisions and its next receipt ID,
 - SQLite/file persistence,
 - crash consistency,
 - atomic disk commits,
@@ -79,14 +88,15 @@ No method in this tranche writes support state or mutation history.
 
 ## Next boundary
 
-A future restore tranche should consume this versioned capsule and reconstruct an `EpistemicSupportStore` only after independently checking:
+A future restore program should first persist the complete EKM-025 revision-decision lineage, then consume this versioned support capsule and reconstruct an `EpistemicSupportStore` only after independently checking:
 
-1. capsule structural validity,
-2. ledger claim identity compatibility,
-3. exact revision-chain continuity,
-4. authorization-history closure,
-5. post-restore equivalence against the capsule,
-6. replay safety after authority reconstruction.
+1. revision-receipt ID continuity, including rejected decisions,
+2. capsule structural validity,
+3. ledger claim identity compatibility,
+4. exact support revision-chain continuity,
+5. authorization-history closure,
+6. post-restore equivalence against both capsules,
+7. replay safety after authority reconstruction.
 
 Restore should remain separate from ordinary belief revision authority.
 
