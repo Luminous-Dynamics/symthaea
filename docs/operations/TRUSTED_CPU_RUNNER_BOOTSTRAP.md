@@ -9,17 +9,17 @@ The complete v1 recovery sequence is:
 ```text
 explicit operator authorization
         ↓
-Stage A: bootstrap.v6 PASS
+Stage A: bootstrap.v7 PASS
         ↓
 Stage B: provision hardened persistent host / ephemeral runner process
         ↓
-Stage C: exact promotion + promotion.v2 PASS
+Stage C: exact promotion + promotion.v3 PASS
         ↓
 Stage D: main-only GitHub smoke + smoke.v1 PASS
         ↓
-Stage E: promotion/smoke join + recovery-eligibility.v1 PASS
+Stage E: promotion/smoke join + recovery-eligibility.v2 PASS
         ↓
-Stage F: one exact frozen correctness recovery target (#578 first)
+Stage F: one explicitly operator-authorized exact correctness recovery target
 ```
 
 Each arrow is a separate evidence transition. None may be inferred from the previous stage.
@@ -48,7 +48,7 @@ The validator independently requires:
 - authorized head = checked-out head = freshly fetched recovery head;
 - current public `main` is an ancestor of recovery;
 - exact reviewed recovery path allowlist;
-- exact runner/routing/smoke/bootstrap/promotion/recovery-eligibility/lifecycle artifact identities;
+- exact runner/routing/smoke/ARC3-qualifier/CI-shell/bootstrap/promotion/recovery-eligibility/lifecycle artifact identities;
 - runner-policy and routing-policy Nix evaluation;
 - pinned minimal Rust environment with locked Cargo metadata and compilation;
 - unchanged source commit/tree;
@@ -57,18 +57,18 @@ The validator independently requires:
 A successful run emits:
 
 ```text
-schema=symthaea.trusted-runner.bootstrap.v6
+schema=symthaea.trusted-runner.bootstrap.v7
 ```
 
 and a SHA-256 of the exact manifest bytes. Retain **both** the manifest and printed hash outside the repository.
 
-`bootstrap.v6` binds:
+`bootstrap.v7` binds:
 
 - operator-authorized recovery head and exact source tree;
 - exact pre-promotion `main` head/tree;
 - exact promoted-tree requirement and required recovery ancestor;
 - reviewed path-set SHA-256;
-- runner module, routing policy and smoke workflow blobs;
+- runner module, routing policy, smoke workflow, ARC3 protocol qualifier workflow and pinned CI-shell blobs;
 - bootstrap, promotion and recovery-eligibility verifier blobs;
 - host-lifecycle contract blob;
 - nixpkgs/Rust/lock/toolchain provenance;
@@ -79,7 +79,7 @@ If either public ref moves or any reviewed artifact changes, Stage A is stale. R
 
 ## Stage B — provision the host
 
-Only after `bootstrap.v6 PASS`:
+Only after `bootstrap.v7 PASS`:
 
 1. Read `TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md`.
 2. Treat v1 as a **persistent hardened host with an ephemeral runner registration/process**, not a fresh host per job.
@@ -95,12 +95,12 @@ An online runner is not a qualified runner. Do not dispatch correctness recovery
 
 The manual GitHub smoke is dispatchable only after its workflow exists on the default branch.
 
-Before landing, current public `main` must still equal the `main_head` recorded by Stage A. Promotion must preserve the operator-authorized recovery commit in ancestry. **Do not squash or cherry-pick.** The resulting `main` tree must be byte-identical to `promotion_expected_main_tree` from `bootstrap.v6`.
+Before landing, current public `main` must still equal the `main_head` recorded by Stage A. Promotion must preserve the operator-authorized recovery commit in ancestry. **Do not squash or cherry-pick.** The resulting `main` tree must be byte-identical to `promotion_expected_main_tree` from `bootstrap.v7`.
 
 After landing, detach a pristine checkout at current public `main` and verify promotion using the exact retained Stage-A evidence:
 
 ```bash
-export SYMTHAEA_TRUSTED_BOOTSTRAP_MANIFEST_PATH='/path/to/bootstrap.v6'
+export SYMTHAEA_TRUSTED_BOOTSTRAP_MANIFEST_PATH='/path/to/bootstrap.v7'
 export SYMTHAEA_TRUSTED_BOOTSTRAP_MANIFEST_SHA256='<recorded Stage-A SHA-256>'
 
 bash nix/ci/validate-trusted-runner-promotion.sh
@@ -121,12 +121,12 @@ The verifier first authenticates the exact bootstrap-manifest bytes. It then req
 Success emits:
 
 ```text
-schema=symthaea.trusted-runner.promotion.v2
+schema=symthaea.trusted-runner.promotion.v3
 ```
 
 plus its SHA-256. Retain both exact bytes and hash.
 
-`promotion.v2 PASS` means only **Stage-D smoke is eligible**. It does not qualify the runner.
+`promotion.v3 PASS` means only **Stage-D smoke is eligible**. It does not qualify the runner.
 
 ## Stage D — main-only GitHub smoke
 
@@ -161,7 +161,7 @@ If the smoke fails, do not route recovery workloads. Repair the observed substra
 Before any recovery workflow is dispatched, detach a pristine checkout at **current public `main`** and provide the exact retained promotion and smoke manifests plus their independently recorded hashes:
 
 ```bash
-export SYMTHAEA_TRUSTED_PROMOTION_MANIFEST_PATH='/path/to/promotion.v2'
+export SYMTHAEA_TRUSTED_PROMOTION_MANIFEST_PATH='/path/to/promotion.v3'
 export SYMTHAEA_TRUSTED_PROMOTION_MANIFEST_SHA256='<recorded promotion SHA-256>'
 export SYMTHAEA_TRUSTED_SMOKE_MANIFEST_PATH='/path/to/smoke.v1'
 export SYMTHAEA_TRUSTED_SMOKE_MANIFEST_SHA256='<recorded smoke SHA-256>'
@@ -172,9 +172,10 @@ bash nix/ci/validate-trusted-runner-recovery-eligibility.sh
 The Stage-E verifier requires:
 
 - exact SHA-256 match for both evidence files before parsing;
-- `promotion.v2 PASS` and `smoke.v1 PASS` schemas;
+- `promotion.v3 PASS` and `smoke.v1 PASS` schemas;
 - same promoted/smoked `main` head and tree;
 - same smoke-workflow, runner-module and routing-policy blobs;
+- Stage-A/Stage-C-bound ARC3 protocol qualifier workflow and CI-shell blobs still match current `main`;
 - current public `main` still equals the smoke-qualified head/tree;
 - recovery branch still equals the authorized recovery head;
 - pristine local checkout equals exact current public `main`;
@@ -184,7 +185,7 @@ The Stage-E verifier requires:
 Success emits:
 
 ```text
-schema=symthaea.trusted-runner.recovery-eligibility.v1
+schema=symthaea.trusted-runner.recovery-eligibility.v2
 ```
 
 and a SHA-256. Retain both.
@@ -192,12 +193,12 @@ and a SHA-256. Retain both.
 This creates the final bootstrap theorem:
 
 ```text
-bootstrap.v6 PASS
-    + promotion.v2 PASS
+bootstrap.v7 PASS
+    + promotion.v3 PASS
     + smoke.v1 PASS
     + exact promotion/smoke identity join
     + current main/recovery ref stability
-    = recovery-eligibility.v1 PASS
+    = recovery-eligibility.v2 PASS
 ```
 
 Even this is **not scientific evidence**. It only authorizes attempting a reviewed trusted-CPU correctness recovery workload.
@@ -206,7 +207,7 @@ Any movement of public `main` after the smoke invalidates v1 recovery eligibilit
 
 ## Stage F — one exact correctness recovery target
 
-Only after `recovery-eligibility.v1 PASS` may reviewed manual recovery workflows use `symthaea-trusted-cpu-v1`.
+Only after `recovery-eligibility.v2 PASS` may reviewed manual recovery workflows use `symthaea-trusted-cpu-v1`.
 
 Recovery harnesses must:
 
@@ -221,7 +222,7 @@ Recovery harnesses must:
 - verify source and harness immutability;
 - make no performance-equivalence claim.
 
-Proceed one prerequisite at a time. The first RCA recovery target remains exact PR #578 canonical-lineage generation. Do not prepare or dispatch #531/#555/#582/#585/#588 recovery in parallel.
+Proceed one prerequisite at a time. Recovery-target priority is an **operator authorization decision**, not something inferred from branch age or queue duration. The historical first RCA target remains exact PR #578 canonical-lineage generation; ARC3 protocol subject `6ea96737aff361920c181891a71f80a9f481ddef` is now also staged as a separately reviewed exact correctness target through `.github/workflows/arc3-protocol-trusted-cpu-qualify.yml`. Do not dispatch both merely because both are eligible; authorize one exact target at a time. Do not prepare or dispatch #531/#555/#582/#585/#588 recovery in parallel.
 
 ## Failure semantics
 
