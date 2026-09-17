@@ -1,0 +1,320 @@
+name: REL-005A ExecutionOnly V3
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs"
+      - ".github/workflows/rel-005a-execution-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-execution-v3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CONTRACT_PARENT: 43bf1d588447f602ce0f1549986bb558a839762c
+  PREDICATE_CONTRACT_BLOB: 3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a
+  FROZEN_SCIENTIFIC_SUBJECT: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  FROZEN_TEST_BLOB: 787ea051ae0bf8e5667b6925481afd46c15d0bc4
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  execution:
+    name: Execute full REL-005A observation surface
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout exact ExecutionOnly subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact lineage and two-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${CONTRACT_PARENT}"
+          test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-full-predicate-contract.json)" = "${PREDICATE_CONTRACT_BLOB}"
+          mapfile -t changed < <(git diff --name-only "${CONTRACT_PARENT}" HEAD | sort)
+          expected=(
+            ".github/workflows/rel-005a-execution-v3.yml"
+            "crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Audit frozen-fixture derivation and authority boundary
+        id: audit
+        shell: bash
+        env:
+          AUDIT_PATH: ${{ runner.temp }}/execution-v3-static-audit.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+
+          frozen_path = pathlib.Path("crates/core/symthaea-fep/tests/rel_graft_frame.rs")
+          execution_path = pathlib.Path("crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs")
+          contract_path = pathlib.Path(".github/rel/rel-005a-full-predicate-contract.json")
+          frozen = frozen_path.read_text()
+          execution = execution_path.read_text()
+          contract = json.loads(contract_path.read_text())
+
+          def sha(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          def hv_literals(source):
+              found = re.findall(r"hv\(&\[(.*?)\]\)", source, flags=re.S)
+              return [re.sub(r"\s+", "", item) for item in found]
+
+          frozen_hv = hv_literals(frozen)
+          execution_hv = hv_literals(execution)
+          if frozen_hv != execution_hv:
+              raise SystemExit("ExecutionOnly fixture literals diverge from frozen #3142 source")
+          if len(frozen_hv) != 13:
+              raise SystemExit(f"unexpected frozen hv literal count: {len(frozen_hv)}")
+
+          for symbol, expected in [
+              ("compute_xenobot_graft_transform", 13),
+              ("translate_foreign_hypervector", 18),
+          ]:
+              if frozen.count(symbol) != expected:
+                  raise SystemExit(f"unexpected frozen {symbol} count")
+              if execution.count(symbol) != expected:
+                  raise SystemExit(f"ExecutionOnly {symbol} count diverges")
+
+          shared_needles = [
+              "corrupted_targets[0].values[0] += 1.5;",
+              "if index < 2",
+              ".map(reverse_coordinates)",
+              "ContinuousHV::ones(8)",
+              "anchors_a[1].clone()",
+              "anchors_a[2].clone()",
+              "anchors_a[3].clone()",
+              "anchors_a[0].clone()",
+          ]
+          for needle in shared_needles:
+              if needle not in frozen or needle not in execution:
+                  raise SystemExit(f"missing shared frozen construction: {needle}")
+
+          forbidden = [
+              "POSITIVE_TOL",
+              "FIXED_HADAMARD_MIN_DEFECT",
+              "RAW_COSINE_MIN_DRIFT",
+              "NEGATIVE_HELD_OUT_MIN_ERROR",
+              "NEGATIVE_DISPERSION_MIN",
+              "assert!(",
+              "assert_eq!(",
+              "assert_ne!(",
+          ]
+          for token in forbidden:
+              if token in execution:
+                  raise SystemExit(f"ExecutionOnly contains forbidden adjudication token: {token}")
+
+          if 'const INVERSE_FLOOR: f32 = 1.0e-7;' not in execution:
+              raise SystemExit("frozen inverse-exposure measurement parameter missing")
+          if contract["authority"] != "PredicateContractOnly":
+              raise SystemExit("predicate contract authority mismatch")
+          if len(contract["predicates"]) != 41:
+              raise SystemExit("predicate contract census mismatch")
+
+          audit = {
+              "schema": "symthaea.rel.execution-v3-static-audit.v1",
+              "authority": "ExecutionInfrastructureOnly",
+              "frozen_test_blob": os.environ["FROZEN_TEST_BLOB"],
+              "predicate_contract_blob": os.environ["PREDICATE_CONTRACT_BLOB"],
+              "frozen_source_sha256": sha(frozen_path),
+              "execution_source_sha256": sha(execution_path),
+              "predicate_contract_sha256": sha(contract_path),
+              "hv_literal_count": len(execution_hv),
+              "transform_call_site_count": execution.count("compute_xenobot_graft_transform"),
+              "translation_call_site_count": execution.count("translate_foreign_hypervector"),
+              "scientific_threshold_tokens_present": False,
+              "scientific_assertion_macros_present": False,
+              "fixture_literals_match_frozen_source": True,
+              "predicate_contract_count": len(contract["predicates"]),
+              "valid": True,
+          }
+          pathlib.Path(os.environ["AUDIT_PATH"]).write_text(
+              json.dumps(audit, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(audit, indent=2, sort_keys=True))
+          PY
+
+      - name: Install frozen Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc -Vv | tee "${RUNNER_TEMP}/rustc-version.txt"
+          cargo -V | tee "${RUNNER_TEMP}/cargo-version.txt"
+          rustfmt -V | tee "${RUNNER_TEMP}/rustfmt-version.txt"
+          cargo clippy -V | tee "${RUNNER_TEMP}/clippy-version.txt"
+
+      - name: Verify ExecutionOnly source formatting
+        id: fmt
+        shell: bash
+        run: rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs
+
+      - name: Execute observation surface and capture process evidence
+        id: measure
+        shell: bash
+        env:
+          REL005A_EXECUTION_OBSERVATION_PATH: ${{ runner.temp }}/rel-005a-execution-v3-observation.json
+          RUST_BACKTRACE: "1"
+        run: |
+          set -euo pipefail
+          set +e
+          cargo test --locked -p symthaea-fep --test rel_graft_frame_execution_v3 -- --nocapture \
+            >"${RUNNER_TEMP}/execution.stdout.log" \
+            2>"${RUNNER_TEMP}/execution.stderr.log"
+          code=$?
+          set -e
+          printf '%s\n' "${code}" > "${RUNNER_TEMP}/execution-exit-code.txt"
+          echo "exit_code=${code}" >> "${GITHUB_OUTPUT}"
+          if [ -s "${REL005A_EXECUTION_OBSERVATION_PATH}" ]; then
+            python3 -m json.tool "${REL005A_EXECUTION_OBSERVATION_PATH}" >/dev/null
+            echo "observation_present=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "observation_present=false" >> "${GITHUB_OUTPUT}"
+          fi
+          cat "${RUNNER_TEMP}/execution.stdout.log"
+          cat "${RUNNER_TEMP}/execution.stderr.log" >&2
+
+      - name: Warnings-denied Clippy on ExecutionOnly test
+        id: clippy
+        if: steps.measure.outputs.exit_code == '0' && steps.measure.outputs.observation_present == 'true'
+        shell: bash
+        run: cargo clippy --locked -p symthaea-fep --test rel_graft_frame_execution_v3 -- -D warnings
+
+      - name: Build ExecutionOnly receipt
+        if: always()
+        shell: bash
+        env:
+          AUDIT_PATH: ${{ runner.temp }}/execution-v3-static-audit.json
+          OBSERVATION_PATH: ${{ runner.temp }}/rel-005a-execution-v3-observation.json
+          RECEIPT_PATH: ${{ runner.temp }}/execution-v3-receipt.json
+          AUDIT_STATUS: ${{ steps.audit.conclusion }}
+          FMT_STATUS: ${{ steps.fmt.conclusion }}
+          MEASURE_STATUS: ${{ steps.measure.conclusion }}
+          CLIPPY_STATUS: ${{ steps.clippy.conclusion }}
+          EXIT_CODE: ${{ steps.measure.outputs.exit_code || 'not-run' }}
+          OBSERVATION_PRESENT: ${{ steps.measure.outputs.observation_present || 'false' }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          def sha(path):
+              path = pathlib.Path(path)
+              return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+
+          observation_path = pathlib.Path(os.environ["OBSERVATION_PATH"])
+          observation_present = (
+              os.environ["OBSERVATION_PRESENT"] == "true"
+              and observation_path.is_file()
+          )
+          exit_code = os.environ["EXIT_CODE"]
+          audit_status = os.environ.get("AUDIT_STATUS") or "not-run"
+          fmt_status = os.environ.get("FMT_STATUS") or "not-run"
+          measure_status = os.environ.get("MEASURE_STATUS") or "not-run"
+          clippy_status = os.environ.get("CLIPPY_STATUS") or "not-run"
+
+          if audit_status != "success" or fmt_status != "success":
+              result = "EXECUTION_INFRASTRUCTURE_RED"
+          elif measure_status != "success":
+              result = "EXECUTION_INFRASTRUCTURE_RED"
+          elif exit_code == "0" and observation_present:
+              result = "EXECUTION_OK"
+          else:
+              result = "EXECUTION_RED"
+
+          receipt = {
+              "schema": "symthaea.rel.execution-only-receipt.v3",
+              "authority": "ExecutionOnly",
+              "subject_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "predicate_contract_parent": os.environ["CONTRACT_PARENT"],
+              "predicate_contract_blob": os.environ["PREDICATE_CONTRACT_BLOB"],
+              "frozen_scientific_subject": os.environ["FROZEN_SCIENTIFIC_SUBJECT"],
+              "frozen_test_blob": os.environ["FROZEN_TEST_BLOB"],
+              "static_audit_status": audit_status,
+              "format_status": fmt_status,
+              "measurement_step_status": measure_status,
+              "measurement_exit_code": exit_code,
+              "observation_present": observation_present,
+              "observation_sha256": sha(observation_path) if observation_present else None,
+              "static_audit_sha256": sha(os.environ["AUDIT_PATH"]),
+              "clippy_status": clippy_status,
+              "result": result,
+              "claims": {
+                  "observation_sealed": False,
+                  "comparison_only_adjudicated": False,
+                  "rel_005a_qualified": False,
+                  "scientific_pass": False,
+                  "scientific_fail": False,
+              },
+          }
+          pathlib.Path(os.environ["RECEIPT_PATH"]).write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload ExecutionOnly capsule before enforcement
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-execution-v3-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/execution-v3-static-audit.json
+            ${{ runner.temp }}/rustc-version.txt
+            ${{ runner.temp }}/cargo-version.txt
+            ${{ runner.temp }}/rustfmt-version.txt
+            ${{ runner.temp }}/clippy-version.txt
+            ${{ runner.temp }}/execution.stdout.log
+            ${{ runner.temp }}/execution.stderr.log
+            ${{ runner.temp }}/execution-exit-code.txt
+            ${{ runner.temp }}/rel-005a-execution-v3-observation.json
+            ${{ runner.temp }}/execution-v3-receipt.json
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${CONTRACT_PARENT}"
+          test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-full-predicate-contract.json)" = "${PREDICATE_CONTRACT_BLOB}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Enforce ExecutionOnly result
+        if: always()
+        shell: bash
+        env:
+          EXIT_CODE: ${{ steps.measure.outputs.exit_code || 'not-run' }}
+          OBSERVATION_PRESENT: ${{ steps.measure.outputs.observation_present || 'false' }}
+        run: |
+          set -euo pipefail
+          test "${EXIT_CODE}" = "0"
+          test "${OBSERVATION_PRESENT}" = "true"
