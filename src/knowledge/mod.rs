@@ -49,6 +49,7 @@ pub mod claim_evidence;
 pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
+pub mod epistemic_restart_capsule;
 #[allow(
     dead_code,
     reason = "EKM-032 V1 reserves typed canonical-hash helpers pending canonical restore schema"
@@ -133,6 +134,10 @@ pub use encoding::{FactEncoding, KnowledgeEncoder};
 pub use entity_event::{
     EntityEventError, EntityEventStore, EntityId, EntityRelation, EventId, PersistentEntity,
     PersistentEvent, RelationId,
+};
+pub use epistemic_restart_capsule::{
+    EpistemicRestartCapsuleError, EpistemicRestartCapsuleV1, EpistemicRestartCapsuleVersion,
+    PersistedEpistemicLedgerV1, QuarantinedEpistemicRestartV1,
 };
 pub use epistemic_restart_manifest::{
     EpistemicLedgerInventoryV1, EpistemicLedgerLineageV1, EpistemicRestartDigest,
