@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-neuroarch-adapters"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Read-only adapters from active Symthaea engines into neutral neuroarchitecture topology contracts"
+
+[dependencies]
+symthaea-core = { path = "../symthaea-core", default-features = false }
+symthaea-neuroarch-types = { path = "../symthaea-neuroarch-types" }
