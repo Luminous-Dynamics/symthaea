@@ -67,6 +67,7 @@ pub mod epistemic_restart_manifest;
 )]
 pub mod epistemic_restart_wire;
 pub mod epistemic_restart_wire_v2;
+pub mod epistemic_restart_wire_v2_validation;
 pub mod epistemic_restart_wire_validation;
 pub mod epistemic_vector;
 pub mod evidence_binding_conformance;
@@ -194,6 +195,10 @@ pub use epistemic_restart_wire::{
 pub use epistemic_restart_wire_v2::{
     EpistemicRestartWireSnapshotV2, EpistemicRestartWireV2, EpistemicRestartWireV2Encoding,
     EpistemicRestartWireV2Error, EpistemicRestartWireV2Version,
+};
+pub use epistemic_restart_wire_v2_validation::{
+    EpistemicRestartWireV2ValidationError, EpistemicRestartWireV2ValidationReport,
+    EpistemicRestartWireV2Validator,
 };
 pub use epistemic_restart_wire_validation::{
     EpistemicRestartWireValidationError, EpistemicRestartWireValidationReport,
