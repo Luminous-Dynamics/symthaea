@@ -8,5 +8,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+/// Exact delayed-recall definition and deterministic fixture generator.
+pub mod delayed_recall;
 /// Exact NARMA10 workload definition and deterministic fixture generator.
 pub mod narma10;
