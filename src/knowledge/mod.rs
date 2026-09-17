@@ -56,6 +56,7 @@ pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_restart_capsule;
 pub mod epistemic_restart_capsule_v2;
+pub mod epistemic_restart_continuity;
 #[allow(
     dead_code,
     reason = "EKM-032 V1 reserves typed canonical-hash helpers pending canonical restore schema"
@@ -181,6 +182,10 @@ pub use epistemic_restart_capsule_v2::{
     EpistemicRestartCapsuleV2, EpistemicRestartCapsuleV2Error,
     EpistemicRestartCapsuleV2Version, EpistemicRestartV2Digest,
     QuarantinedEpistemicRestartV2,
+};
+pub use epistemic_restart_continuity::{
+    RestartContinuityDecisionV1, RestartContinuityDispositionV1, RestartContinuityGateV1,
+    TrustedRestartValidationAnchorV1,
 };
 pub use epistemic_restart_manifest::{
     EpistemicLedgerInventoryV1, EpistemicLedgerLineageV1, EpistemicRestartDigest,
