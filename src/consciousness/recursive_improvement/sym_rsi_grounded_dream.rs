@@ -38,7 +38,7 @@ pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
 pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
-    "mean-predicted-task-quality/5-perturbations-minus-0.10-failure-probability/0.01-override-margin/v1";
+    "mean-predicted-task-quality/5-legal-aware-perturbations-minus-0.10-task-regression-probability/0.01-override-margin/v2";
 
 const QUALITY_START: usize = 7;
 const QUALITY_COPIES: usize = 8;
@@ -201,10 +201,16 @@ impl FixturePolicy for GroundedDreamPolicy {
         for &action in legal_actions {
             let dream_action = DreamFixtureAction(action);
             let distribution = engine.predict_outcome_distribution(&encoded, &dream_action);
-            let predicted_task_quality =
-                mean_predicted_task_quality(&engine, &encoded, dream_action);
+            let task_prediction = task_prediction_summary(
+                &engine,
+                &encoded,
+                dream_action,
+                legal_actions,
+                state.quality as f32,
+            );
+            let predicted_task_quality = task_prediction.mean_quality;
             let score = predicted_task_quality
-                - DREAM_RISK_PENALTY * distribution.failure_probability;
+                - DREAM_RISK_PENALTY * task_prediction.failure_probability;
             let kind = if action == base_action {
                 WorldEvidenceKind::ModelPredicted
             } else {
@@ -216,16 +222,16 @@ impl FixturePolicy for GroundedDreamPolicy {
                 action,
                 distribution.expected_phi,
                 predicted_task_quality,
-                distribution.failure_probability,
-                distribution.confidence,
+                task_prediction.failure_probability,
+                task_prediction.confidence,
             );
             predictions.push(DreamActionPrediction {
                 action,
                 score,
                 expected_phi: distribution.expected_phi,
                 predicted_task_quality,
-                failure_probability: distribution.failure_probability,
-                model_confidence: distribution.confidence,
+                failure_probability: task_prediction.failure_probability,
+                model_confidence: task_prediction.confidence,
                 epistemic: EpistemicWorldRecord {
                     kind,
                     provenance_digest,
@@ -235,6 +241,8 @@ impl FixturePolicy for GroundedDreamPolicy {
                     causal_assumptions: vec![
                         "nearest observed state/action transition memory".into(),
                         "heuristic fallback for unsupported action fingerprints".into(),
+                        "illegal perturbation samples fall back to the original legal action".into(),
+                        "task failure means predicted quality regression relative to the current state".into(),
                         SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE.into(),
                     ],
                     empirically_validated: false,
@@ -555,19 +563,45 @@ fn signed_unit(value: i32) -> f32 {
     value / (1.0 + value.abs())
 }
 
-fn mean_predicted_task_quality(
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct TaskPredictionSummary {
+    mean_quality: f32,
+    failure_probability: f32,
+    confidence: f32,
+}
+
+fn task_prediction_summary(
     engine: &DreamEngine<DreamFixtureAction>,
     state: &[f32],
     action: DreamFixtureAction,
-) -> f32 {
+    legal_actions: &[u8],
+    current_quality: f32,
+) -> TaskPredictionSummary {
     let simulations = engine.config().counterfactual_count.max(1);
-    let mut total = 0.0_f32;
+    let mut total_quality = 0.0_f32;
+    let mut regression_count = 0_usize;
+
     for index in 0..simulations {
         let perturbed = action.perturb(index as u64);
-        let outcome = engine.predict_counterfactual_outcome(state, &perturbed);
-        total += extract_predicted_task_quality(&outcome);
+        let sampled_action = if legal_actions.contains(&perturbed.0) {
+            perturbed
+        } else {
+            action
+        };
+        let outcome = engine.predict_counterfactual_outcome(state, &sampled_action);
+        let predicted_quality = extract_predicted_task_quality(&outcome);
+        total_quality += predicted_quality;
+        if predicted_quality + f32::EPSILON < current_quality {
+            regression_count += 1;
+        }
     }
-    total / simulations as f32
+
+    let failure_probability = regression_count as f32 / simulations as f32;
+    TaskPredictionSummary {
+        mean_quality: total_quality / simulations as f32,
+        failure_probability,
+        confidence: 1.0 - failure_probability,
+    }
 }
 
 fn extract_predicted_task_quality(outcome: &[f32]) -> f32 {
@@ -730,6 +764,37 @@ mod tests {
                 && !prediction.epistemic.may_promote_confidence()
                 && prediction.epistemic.provenance_digest.starts_with("blake3:")
         }));
+    }
+
+    #[test]
+    fn task_prediction_summary_never_executes_illegal_perturbations() {
+        let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
+        let training =
+            acquire_canonical_replay_corpus(&manifest, EvaluationSplit::TrainingReplay).unwrap();
+        let selection = select_canonical_training_candidate(&manifest, &training).unwrap();
+        let policy = build_grounded_dream_policy(&manifest, &training, &selection).unwrap();
+
+        let domain = FixtureDomainKind::DelayedNavigation;
+        let split = EvaluationSplit::HeldOutReplay;
+        let mut state = domain.reset(101, split);
+        state.a = 0;
+        state.b = 0;
+        let legal = domain.legal_actions(&state, split);
+        assert!(!legal.contains(&0));
+        assert!(!legal.contains(&3));
+
+        let encoded = encode_fixture_state(domain, split, &state);
+        let engine = policy.model().engine();
+        let summary = task_prediction_summary(
+            &engine,
+            &encoded,
+            DreamFixtureAction(1),
+            &legal,
+            state.quality as f32,
+        );
+        assert!(summary.mean_quality.is_finite());
+        assert!((0.0..=1.0).contains(&summary.failure_probability));
+        assert!((0.0..=1.0).contains(&summary.confidence));
     }
 
     #[test]
