@@ -1,9 +1,9 @@
 [package]
 name = "symthaea-tpm-reference-evidence"
-version.workspace = true
+version = "0.1.0"
 edition.workspace = true
 license.workspace = true
-authors.workspace = true
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Typed candidate evidence from TPM/reference qualification into formal safety obligations"
 
 [dependencies]
