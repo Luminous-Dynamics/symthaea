@@ -8,9 +8,15 @@
 //! takes across the frozen replay corpus is historically supported and reaches a
 //! recorded terminal state. Selection among eligible candidates uses the bounded
 //! replay objective and preserves the incumbent on exact ties.
+//!
+//! Policy selection is additionally restricted to the preregistered training-replay
+//! split. Held-out replay, fresh execution, and OOD worlds are evaluation evidence,
+//! never selection evidence.
 
 use super::replay_policy::{select_replay_policy, PolicySelectionError, ReplayPolicyScore};
-use super::sym_rsi_experiment::{ExperimentHarnessError, SymRsiExperimentManifest};
+use super::sym_rsi_experiment::{
+    EvaluationSplit, ExperimentHarnessError, SymRsiExperimentManifest,
+};
 use super::sym_rsi_replay_corpus::{
     score_policy_on_replay_worlds, ReplayCorpusError, ReplayCorpusEvaluation, ReplayFixtureWorld,
 };
@@ -61,6 +67,7 @@ pub struct ReplaySelectionReceipt {
     pub beta_cost: f64,
     pub beta_parallelism: f64,
     pub full_historical_support_required: bool,
+    pub selection_split: EvaluationSplit,
     pub incumbent_objective: f64,
     pub selected_objective: f64,
     pub strict_replay_improvement: bool,
@@ -112,6 +119,20 @@ pub fn select_fixed_hash_policy_from_replay(
         return Err(ReplaySelectionError::IncumbentMissing(
             incumbent_policy_id.to_owned(),
         ));
+    }
+
+    if worlds.is_empty() {
+        return Err(ReplaySelectionError::EmptyReplayWorlds);
+    }
+    if let Some(world) = worlds
+        .iter()
+        .find(|world| world.split != EvaluationSplit::TrainingReplay)
+    {
+        return Err(ReplaySelectionError::NonTrainingReplayWorld {
+            domain_id: world.domain.id().to_owned(),
+            split: world.split,
+            seed: world.seed,
+        });
     }
 
     let mut assessments = Vec::with_capacity(candidates.len());
@@ -194,6 +215,7 @@ pub fn select_fixed_hash_policy_from_replay(
         beta_cost: manifest.beta_cost,
         beta_parallelism: manifest.beta_parallelism,
         full_historical_support_required: true,
+        selection_split: EvaluationSplit::TrainingReplay,
         incumbent_objective: incumbent_assessment.objective,
         selected_objective: selected_assessment.objective,
         strict_replay_improvement,
@@ -223,6 +245,7 @@ fn selection_evidence_digest(
     }
     hasher.update(&manifest.beta_cost.to_bits().to_le_bytes());
     hasher.update(&manifest.beta_parallelism.to_bits().to_le_bytes());
+    hasher.update(&[0]); // EvaluationSplit::TrainingReplay domain tag.
     for assessment in assessments {
         hasher.update(&(assessment.spec.policy_id.len() as u64).to_le_bytes());
         hasher.update(assessment.spec.policy_id.as_bytes());
@@ -244,6 +267,12 @@ pub enum ReplaySelectionError {
     DuplicatePolicyId(String),
     DuplicateSalt(u64),
     IncumbentMissing(String),
+    EmptyReplayWorlds,
+    NonTrainingReplayWorld {
+        domain_id: String,
+        split: EvaluationSplit,
+        seed: u64,
+    },
     IncumbentNotFullySupported,
     NoEligibleCandidates,
     NonFiniteObjective(String),
@@ -288,9 +317,6 @@ mod tests {
         }
         let world = merge_observed_traces(&traces).unwrap();
 
-        // Search deterministically for a salt whose first action is not present in
-        // this small observed tree. Such a candidate must be excluded rather than
-        // benefiting from a one-step replay cost.
         let mut unseen = None;
         for salt in 100..10_000 {
             let spec = FixedHashCandidateSpec {
@@ -373,6 +399,7 @@ mod tests {
             selected.evaluation.terminal_worlds,
             selected.evaluation.world_count
         );
+        assert_eq!(receipt.selection_split, EvaluationSplit::TrainingReplay);
         assert!(receipt.evidence_digest.starts_with("blake3:"));
     }
 
@@ -392,6 +419,38 @@ mod tests {
         assert_eq!(
             select_fixed_hash_policy_from_replay(&manifest, "incumbent", &candidates, &[]),
             Err(ReplaySelectionError::DuplicateSalt(7))
+        );
+    }
+
+    #[test]
+    fn held_out_replay_is_rejected_as_selection_evidence() {
+        let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
+        let spec = FixedHashCandidateSpec {
+            policy_id: "incumbent".into(),
+            salt: 7,
+        };
+        let mut policy = spec.policy();
+        let trace = run_fixture_policy(
+            &manifest,
+            FixtureDomainKind::BranchingSearch,
+            EvaluationSplit::HeldOutReplay,
+            101,
+            &mut policy,
+        )
+        .unwrap();
+        let world = merge_observed_traces(&[trace]).unwrap();
+        assert_eq!(
+            select_fixed_hash_policy_from_replay(
+                &manifest,
+                "incumbent",
+                &[spec],
+                &[world],
+            ),
+            Err(ReplaySelectionError::NonTrainingReplayWorld {
+                domain_id: FixtureDomainKind::BranchingSearch.id().into(),
+                split: EvaluationSplit::HeldOutReplay,
+                seed: 101,
+            })
         );
     }
 }
