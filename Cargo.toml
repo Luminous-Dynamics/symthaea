@@ -1002,6 +1002,7 @@ default-mind = [
 [dev-dependencies]
 symthaea-cell-foundry = { path = "crates/domains/symthaea-cell-foundry" }
 symthaea-formal-safety = { path = "crates/domains/symthaea-formal-safety" }
+sha2 = { workspace = true }  # PARADOX A0-R F0 research-only transport worker
 
 criterion = "0.5"
 proptest = "1.4"
@@ -1020,6 +1021,11 @@ symthaea-mycelix-conductor = { path = "crates/bridges/symthaea-mycelix-conductor
 symthaea-epistemic-types = { path = "crates/domains/symthaea-epistemic-types" }
 tempfile = "3.8"  # For perception tests
 tower = { version = "0.5", features = ["util"] }  # Router oneshot helpers in integration tests
+
+# PARADOX A0-R F0 label-blind native-state transport (research-only).
+[[example]]
+name = "paradox_a0r_f0_worker"
+path = "examples/paradox_a0r_f0_worker.rs"
 
 # Binaries
 # Note: Some binaries require specific features or external crates

@@ -1,0 +1,201 @@
+{
+  "schema_version": "PARADOX-A0R-F0-TRANSPORT-CONTRACT-V1",
+  "authority": "DevelopmentOnly / Representational MeasurementOnly / TransportOnly",
+  "issue": 3733,
+  "ancestry": {
+    "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+    "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+    "a0_static_subject_sha": "8cc2651576f0068a1ccac3ef21c8a0a0eb3c2afb",
+    "m0_static_subject_sha": "306b0471a0854d2e77c1d50438fc493806fe1564",
+    "m0_qualification": {
+      "run_id": 35255409450,
+      "job_id": 105317704633,
+      "runner_sha": "36f3d8470926ad400bcef98b1ff93fcc854d8fec",
+      "contract_sha256": "4fa80c3860bdec1921b4a34ecb9583f93e12b9a715877a6af80d58088c056e79",
+      "audit_log_sha256": "05317222e0d2d1fa84225bd9b838cbb9e0c26683ddb4048f358ba2134d5749fe",
+      "status": "QUALIFIED_PASS"
+    }
+  },
+  "execution_authority": {
+    "production_cognition_mutation_allowed": false,
+    "semantic_label_access_allowed": false,
+    "split_logic_allowed": false,
+    "probe_fitting_allowed": false,
+    "heldout_scoring_allowed": false,
+    "behavioral_mapping_allowed": false,
+    "feature_dataset_campaign_allowed_by_this_subject": false,
+    "transport_qualification_allowed": true
+  },
+  "worker": {
+    "target": "example:paradox_a0r_f0_worker",
+    "request_schema": "PARADOX-A0R-F0-WORKER-REQUEST-V1",
+    "response_schema": "PARADOX-A0R-F0-WORKER-RESPONSE-V1",
+    "input_transport": "NDJSON over stdin only",
+    "sidecar_arguments": "forbidden",
+    "environment": "qualification launches under explicit allowlist",
+    "fresh_service_per_request": true,
+    "production_entrypoint": "CognitiveLoopService::cycle(&str)",
+    "forbidden_entrypoint": "CognitiveLoopService::cycle_with_hv",
+    "preencode_text_outside_production": false,
+    "public_channels_only": [
+      "CycleResult.output",
+      "CycleResult.thought_vector",
+      "CycleResult.wisdom_hv"
+    ]
+  },
+  "runner_config_projection": {
+    "canonical_json": "{\"async_training\":false,\"attention_budget_override_us\":60000000,\"cfc_config.delta_t\":0.02,\"cfc_config.input_dim\":256,\"cfc_config.num_neurons\":256,\"cfc_config.prediction_horizons\":[0.02,0.1,0.2],\"effective_dim_fraction_override\":null,\"enable_online_learning\":false,\"enable_recurrent_dim_masking\":false,\"enable_spectral_entropy_masking\":false,\"episodic_replay_training\":false,\"genesis_phrase\":\"PARADOX-A0R-DEV-V1-GENESIS-2026-09-16\",\"memory_graduation\":false,\"temporal_backend\":\"CfC\",\"timezone_offset_hours\":0.0}",
+    "sha256": "2cd99b06cf2cf11cfc0612c0db818355099b48b04bd687ca66a31a08680be1f9",
+    "note": "This is the frozen F0 projection of the A0 V1 fields that are causally relevant to transport. The qualifier separately binds executable bytes, features, target triple, source blobs and environment capsule; this hash is not represented as a hash of every CognitiveLoopConfig field."
+  },
+  "scientific_payload": {
+    "schema": "PARADOX-A0R-F0-SCIENTIFIC-PAYLOAD-V1",
+    "hash_domain": "PARADOX-A0R-F0-SCIENTIFIC-V1",
+    "canonicalization": "ordered binary length frames: u32le field-name length, UTF-8 field name, u64le value length, raw value bytes",
+    "fields": [
+      "measurement_cycle_index",
+      "recurrent_length",
+      "recurrent_f32le_sha256",
+      "recurrent_nonfinite_count",
+      "recurrent_all_zero",
+      "thought_vector_length",
+      "thought_vector_f32le_sha256",
+      "thought_vector_nonfinite_count",
+      "wisdom_hv_byte_length",
+      "wisdom_hv_sha256",
+      "sealed_feature_bundle_sha256",
+      "recurrent_masking_enabled",
+      "spectral_entropy_masking_enabled",
+      "effective_dim_fraction_override_is_none",
+      "measurement_validity",
+      "invalidity_reasons"
+    ],
+    "must_not_contain": [
+      "opaque_measurement_id",
+      "opaque_base_fixture_id",
+      "opaque_transform_id",
+      "technical_pair_id",
+      "technical_replicate_index",
+      "service_instance_id",
+      "subject_sha",
+      "executable_sha256",
+      "environment_capsule_sha256",
+      "target_label",
+      "condition_name",
+      "semantic_fixture_family_id",
+      "expected_response",
+      "oracle_output",
+      "capability_atom",
+      "split_membership",
+      "probe_artifact",
+      "prediction",
+      "score"
+    ]
+  },
+  "provenance_envelope": {
+    "schema": "PARADOX-A0R-F0-PROVENANCE-ENVELOPE-V1",
+    "hash_domain": "PARADOX-A0R-F0-RECEIPT-V1",
+    "binds": [
+      "production_subject_sha",
+      "g2b_subject_sha",
+      "a0_subject_sha",
+      "m0_subject_sha",
+      "f0_subject_sha",
+      "opaque_measurement_id",
+      "opaque_base_fixture_id",
+      "opaque_transform_id",
+      "technical_pair_id",
+      "technical_replicate_index",
+      "service_instance_id",
+      "runner_config_projection_sha256",
+      "executable_sha256",
+      "environment_capsule_sha256",
+      "source_binding_sha256",
+      "scientific_payload_sha256"
+    ],
+    "provenance_is_decoder_feature": false
+  },
+  "technical_pair_receipt": {
+    "schema": "PARADOX-A0R-F0-TECHNICAL-PAIR-RECEIPT-V1",
+    "construction_stage": "after both worker receipts are sealed",
+    "label_blind": true,
+    "replicate_indices_exactly": [0, 1],
+    "require_distinct_service_instance_ids": true,
+    "require_identical_scientific_payload_sha256": true,
+    "require_distinct_receipt_binding_sha256": true,
+    "missing_or_mismatch_status": "INVALID_MEASUREMENT_NONDETERMINISTIC",
+    "increases_statistical_n": false
+  },
+  "raw_feature_encoding": {
+    "recurrent": "exact f32 IEEE-754 little-endian bytes in vector order",
+    "thought_vector": "exact f32 IEEE-754 little-endian bytes in vector order",
+    "wisdom_hv": "exact public BinaryHV 2048 raw bytes",
+    "feature_bundle_hash_domain": "PARADOX-A0R-F0-FEATURE-BUNDLE-V1",
+    "receipt_contains_raw_features": true,
+    "raw_features_are_development_evidence_only": true
+  },
+  "validity": {
+    "eligible_status": "ELIGIBLE_F0_TRANSPORT",
+    "recurrent_length": 256,
+    "thought_vector_length": 32,
+    "wisdom_hv_byte_length": 2048,
+    "nonfinite_allowed": false,
+    "all_zero_recurrent": "record but do not automatically invalidate",
+    "recurrent_masking_enabled": false,
+    "spectral_entropy_masking_enabled": false,
+    "effective_dim_fraction_override": null,
+    "all_attempts_retained_by_qualifier": true,
+    "label_aware_retry": "forbidden"
+  },
+  "noninterference": {
+    "scientific_payload_must_be_invariant_under": [
+      "semantic sidecar replaced or absent",
+      "expected-response/oracle sidecar replaced or absent",
+      "capability-atom names permuted",
+      "split assignments permuted",
+      "opaque measurement/base/transform/pair IDs bijectively renamed",
+      "measurement-plan row order permuted with event stream preserved",
+      "semantic-looking unrelated environment variables injected and rejected before cognition",
+      "semantic sidecar filename/path changed",
+      "score/prediction sidecars inaccessible to worker"
+    ],
+    "id_rename_expected": {
+      "scientific_payload_sha256": "equal",
+      "receipt_binding_sha256": "different"
+    }
+  },
+  "source_bindings": [
+    {"path": "src/cognitive_loop/cycle.rs", "blob_sha": "4247c9d44c967da4cdf7b2b91a7440aa2209949d"},
+    {"path": "src/cognitive_loop/cycle_phase_output/mod.rs", "blob_sha": "aa5fbe66aed52bf1bc4f1e03b69055368d1fdab2"},
+    {"path": "src/cognitive_loop/types/output.rs", "blob_sha": "c206f5974595aa400ece1d12c8a02fef1f411dd9"},
+    {"path": "src/cognitive_loop/helpers/mod.rs", "blob_sha": "c16aeb1b840bae0a9f5caede8d2489540835c209"},
+    {"path": "src/cognitive_loop/config/mod.rs", "blob_sha": "7a0acc36d0a433eff7413395fda8a6438b271dab"},
+    {"path": "src/cognitive_loop/config/temporal.rs", "blob_sha": "1fa3f1de884c0193533fb8bc1e4d64abe97b03ce"},
+    {"path": "crates/core/symthaea-core/src/hdc/binary_hv.rs", "blob_sha": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056"},
+    {"path": "Cargo.lock", "blob_sha": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"}
+  ],
+  "qualification_required_before_feature_acquisition_qualified": [
+    "exact F0 subject and ancestry binding",
+    "exact source census and no production-cognition source changes",
+    "source blob/path audit",
+    "Cargo.lock unchanged from M0 parent",
+    "rustfmt check",
+    "locked offline cargo check for paradox_a0r_f0_worker",
+    "worker process launched with explicit environment allowlist and no sidecar arguments",
+    "two fresh-service technical replicates produce bit-identical scientific payloads and distinct provenance bindings",
+    "ID-renaming changes provenance binding but not scientific payload",
+    "plan-order permutation does not change per-row scientific payload",
+    "semantic fields rejected recursively",
+    "semantic sidecar argument rejected",
+    "semantic environment variable rejected before cognition",
+    "cycle_with_hv path mutation detected",
+    "external text pre-encoding mutation detected",
+    "dimension/nonfinite/config drift mutations fail closed",
+    "technical service reuse and byte mismatch fail closed",
+    "post-seal feature mutation detected",
+    "unretained failed attempt and label-aware retry rejected by qualification harness",
+    "postflight exact-subject immutability"
+  ],
+  "evidence_state_after_commit_only": "F0_IMPLEMENTED_UNQUALIFIED",
+  "claim_ceiling_after_qualification": "Under the frozen production subject and configuration, a label-blind research worker reproducibly transports the specified already-exported recurrent/perceptual channels through the normal text cycle path while satisfying the preregistered noninterference, state-isolation, identity-binding, validity and mutation controls. This does not establish latent decodability, behavioral competence, production-policy use, causal necessity, metacognitive recruitment, ontology repair, cross-genesis generality, consciousness, sentience or phenomenology."
+}
