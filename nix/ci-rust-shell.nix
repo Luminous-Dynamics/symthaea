@@ -32,6 +32,10 @@ pkgs.mkShell {
     openssl
     openssl.dev
     pkg-config
+    # Independent qualification oracles are intentionally separate from the
+    # Rust implementation under test. Keep Python explicit in the pinned
+    # correctness shell rather than relying on runner-image ambient packages.
+    python3
   ];
 
   CARGO_TERM_COLOR = "always";
