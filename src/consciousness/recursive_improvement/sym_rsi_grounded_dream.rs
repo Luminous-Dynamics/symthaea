@@ -16,6 +16,7 @@
 use super::epistemic_world::{EpistemicWorldRecord, WorldEvidenceKind};
 use super::sym_rsi_candidate_family::{
     canonical_candidate_family_digest, canonical_fixed_hash_candidate_family, FrozenReplayCorpus,
+    SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA, SYM_RSI_001_REPLAY_CORPUS_SCHEMA,
 };
 use super::sym_rsi_experiment::{EvaluationSplit, SymRsiExperimentManifest};
 use super::sym_rsi_fixtures::{
@@ -91,6 +92,9 @@ pub struct GroundedDreamModel {
     pub candidate_family_digest: String,
     pub training_corpus_evidence_digest: String,
     pub model_version: String,
+    /// The upstream dream crate currently fingerprints actions with DefaultHasher
+    /// over Debug output. That identity is therefore explicitly environment-bound.
+    pub action_fingerprint_semantics: String,
     pub observation_count: usize,
     pub transition_memory: TransitionMemory,
     pub config: DreamEngineConfig,
@@ -358,6 +362,8 @@ pub fn train_grounded_dream_model(
         candidate_family_digest: canonical_candidate_family_digest(),
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
         model_version: "symthaea-dream-transition-memory-v1".into(),
+        action_fingerprint_semantics:
+            "symthaea-dream/default-hasher(debug)/environment-bound-v1".into(),
         observation_count,
         transition_memory,
         config,
@@ -403,14 +409,51 @@ fn validate_training_corpus_binding(
     {
         return Err(GroundedDreamError::TrainingCorpusRequired);
     }
-    if corpus.receipt.experiment_id != manifest.experiment_id
+
+    let canonical_family = canonical_fixed_hash_candidate_family();
+    let canonical_ids = canonical_family
+        .iter()
+        .map(|candidate| candidate.policy_id.clone())
+        .collect::<Vec<_>>();
+    if corpus.receipt.schema != SYM_RSI_001_REPLAY_CORPUS_SCHEMA
+        || corpus.receipt.experiment_id != manifest.experiment_id
         || corpus.receipt.preregistration_digest != manifest.preregistration_digest
         || corpus.receipt.subject_digest != manifest.subject_digest
         || corpus.receipt.environment_digest != manifest.environment_digest
+        || corpus.receipt.candidate_family_schema != SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA
         || corpus.receipt.candidate_family_digest != canonical_candidate_family_digest()
+        || corpus.receipt.collector_policy_ids != canonical_ids
         || corpus.receipt.evidence_digest.trim().is_empty()
     {
         return Err(GroundedDreamError::TrainingCorpusBindingMismatch);
+    }
+
+    let mut expected = BTreeSet::new();
+    for domain in &manifest.domains {
+        for &seed in &domain.seeds.training_replay {
+            expected.insert((domain.domain_id.clone(), seed));
+        }
+    }
+    let mut observed = BTreeSet::new();
+    for world in corpus.worlds() {
+        let key = (world.domain.id().to_owned(), world.seed);
+        if !observed.insert(key) {
+            return Err(GroundedDreamError::DuplicateTrainingWorld);
+        }
+    }
+    let expected_seed_count = manifest
+        .domains
+        .first()
+        .map(|domain| domain.seeds.training_replay.len())
+        .unwrap_or(0);
+    if observed != expected
+        || corpus.receipt.domain_count != manifest.domains.len()
+        || corpus.receipt.seed_count_per_domain != expected_seed_count
+        || corpus.receipt.world_count != expected.len()
+        || corpus.receipt.world_count != corpus.worlds().len()
+        || corpus.receipt.trajectory_count != expected.len() * canonical_family.len()
+    {
+        return Err(GroundedDreamError::TrainingCorpusIncomplete);
     }
     Ok(())
 }
@@ -429,6 +472,21 @@ fn validate_replay_selection_binding(
     {
         return Err(GroundedDreamError::ReplaySelectionBindingMismatch);
     }
+    let canonical = canonical_fixed_hash_candidate_family();
+    if receipt.assessments.len() != canonical.len() {
+        return Err(GroundedDreamError::ReplaySelectionCandidateSetMismatch);
+    }
+    for expected in &canonical {
+        let assessment = receipt
+            .assessments
+            .iter()
+            .find(|assessment| assessment.spec.policy_id == expected.policy_id)
+            .ok_or(GroundedDreamError::ReplaySelectionCandidateSetMismatch)?;
+        if assessment.spec.salt != expected.salt {
+            return Err(GroundedDreamError::ReplaySelectionCandidateSetMismatch);
+        }
+    }
+
     let assessment = receipt
         .assessments
         .iter()
@@ -436,6 +494,9 @@ fn validate_replay_selection_binding(
         .ok_or(GroundedDreamError::ReplaySelectionBindingMismatch)?;
     if !assessment.eligible {
         return Err(GroundedDreamError::SelectedPolicyNotReplayEligible);
+    }
+    if assessment.objective != receipt.selected_objective {
+        return Err(GroundedDreamError::ReplaySelectionBindingMismatch);
     }
     Ok(())
 }
@@ -555,6 +616,9 @@ pub enum GroundedDreamError {
     ReplaySelectionBindingMismatch,
     SelectedPolicyNotCanonical(String),
     SelectedPolicyNotReplayEligible,
+    ReplaySelectionCandidateSetMismatch,
+    DuplicateTrainingWorld,
+    TrainingCorpusIncomplete,
     MissingRawState(u64),
     MissingReplayNode(u64),
     UnrecoverableObservedAction { node_id: u64 },
@@ -585,6 +649,10 @@ mod tests {
         assert_eq!(
             model.training_corpus_evidence_digest,
             training.receipt.evidence_digest
+        );
+        assert_eq!(
+            model.action_fingerprint_semantics,
+            "symthaea-dream/default-hasher(debug)/environment-bound-v1"
         );
         assert!(model.evidence_digest.starts_with("blake3:"));
     }
