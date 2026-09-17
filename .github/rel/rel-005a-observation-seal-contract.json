@@ -1,0 +1,67 @@
+{
+  "schema": "symthaea.rel.observation-seal-contract.v1",
+  "authority": "ObservationSealContractOnly",
+  "relation": "REL-005A",
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+  "expected_execution_observation_schema": "symthaea.rel.graft-frame-execution-observation.v3",
+  "expected_execution_receipt_schema": "symthaea.rel.execution-only-receipt.v3",
+  "expected_execution_authority": "ExecutionOnly",
+  "required_execution_result": "EXECUTION_OK",
+  "required_execution_exit_code": "0",
+  "required_upstream_files": [
+    "execution-v3-static-audit.json",
+    "rustc-version.txt",
+    "cargo-version.txt",
+    "rustfmt-version.txt",
+    "clippy-version.txt",
+    "execution.stdout.log",
+    "execution.stderr.log",
+    "execution-exit-code.txt",
+    "rel-005a-execution-v3-observation.json",
+    "execution-v3-receipt.json"
+  ],
+  "required_identity_bindings": [
+    "subject_head",
+    "predicate_contract_parent",
+    "predicate_contract_blob",
+    "frozen_scientific_subject",
+    "frozen_test_blob"
+  ],
+  "required_false_claims": [
+    "observation_sealed",
+    "comparison_only_adjudicated",
+    "rel_005a_qualified",
+    "scientific_pass",
+    "scientific_fail"
+  ],
+  "seal_manifest": {
+    "hash_algorithm": "sha256",
+    "sort_files_by": "basename_utf8_ascending",
+    "per_file_fields": ["basename", "byte_length", "sha256"],
+    "canonical_json": "UTF-8 JSON with sort_keys=true, separators=(',', ':'), ensure_ascii=true",
+    "chain_commitment_input_fields": [
+      "execution_subject_head",
+      "execution_receipt_sha256",
+      "observation_sha256",
+      "artifact_manifest_sha256"
+    ],
+    "chain_commitment_encoding": "canonical_json",
+    "chain_commitment_algorithm": "sha256"
+  },
+  "seal_output": {
+    "schema": "symthaea.rel.observation-seal.v3",
+    "authority": "ObservationSeal",
+    "observation_status": "sealed",
+    "adjudication": "not_run",
+    "scientific_result": "not_run"
+  },
+  "claims": {
+    "comparison_only_adjudicated": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
