@@ -33,7 +33,7 @@ use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction, Transition
 pub const SYM_RSI_001_GROUNDED_DREAM_SCHEMA: &str =
     "symthaea.sym-rsi-001.grounded-dream-model.v1";
 pub const SYM_RSI_001_GROUNDED_DREAM_POLICY_ID: &str =
-    "sym-rsi-grounded-dream-policy-v3";
+    "sym-rsi-grounded-dream-policy-v4";
 pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
