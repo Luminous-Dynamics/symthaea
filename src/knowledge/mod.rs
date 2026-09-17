@@ -44,6 +44,7 @@ pub mod epistemic_vector;
 pub mod evidence_independence;
 pub mod evidence_mutation_firewall;
 pub mod evidence_mutation_journal;
+pub mod evidence_mutation_verifier;
 pub mod extraction;
 pub mod graph;
 #[cfg(feature = "epistemic")]
@@ -94,6 +95,10 @@ pub use evidence_mutation_firewall::{
 pub use evidence_mutation_journal::{
     EvidenceMutationJournal, EvidenceMutationJournalError, EvidenceMutationJournalSnapshot,
     JournaledEvidenceMutationFirewall, MutationJournalEntry,
+};
+pub use evidence_mutation_verifier::{
+    EvidenceMutationInvariantFailure, EvidenceMutationSnapshot, EvidenceMutationVerificationError,
+    EvidenceMutationVerificationReport, EvidenceMutationVerifier,
 };
 pub use extraction::{
     EntityType, ExtractedEntity, ExtractedFact, ExtractedRelation, KnowledgeExtractor, SemanticRole,
