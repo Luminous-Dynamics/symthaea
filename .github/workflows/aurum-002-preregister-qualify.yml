@@ -1,0 +1,91 @@
+name: AURUM-002 Preregistration Qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'docs/research/physical-cognition/AURUM_002_PREREGISTRATION.md'
+      - '.github/workflows/aurum-002-preregister-qualify.yml'
+
+permissions:
+  contents: read
+
+env:
+  QUALIFY_SHA: ${{ github.event.pull_request.head.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  PHYS001_SHA: 5d90397cf04fafd5acf1835f0b16bb5941dc4f2b
+  PHYS002_SHA: 9ae4695ffaba9a94f9ad69a783724659036aa927
+  PHYS003_SHA: eff60b7f418b632e7602d19b7d7006b6b24bb2f0
+  PHYS004_SHA: 3126a0bb63672b0647d783397cfc6b15164642b8
+  PHYS005_SHA: 5db7f62ef711a7fb9798e2c3d0e3e886c77b913a
+  PHYS006_SHA: a4ccf536ab5df4f2c59775d355b25c3ee9805f42
+  WLOAD001_SHA: 65cd00d78e698b5e9189efdd5c3c91341b0fcfa4
+  WLOAD002_SHA: 65be4f5500df47287adf96264e30c7f49afd05c4
+  WLOAD003_SHA: b44d0119c6578b3723d776377bb13cdaab8d446b
+  AURUM001_SHA: 86617dd7aa564846701ddff3d1adc948e0eec4c0
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preregistration:
+    name: Exact Subject + Dependency Freeze + No Execution Code
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact preregistration head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.QUALIFY_SHA }}
+          fetch-depth: 0
+
+      - name: Bind exact one-commit preregistration subject
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$QUALIFY_SHA"
+          test "$BASE_SHA" = "$AURUM001_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          test "$(git rev-list --count "$BASE_SHA..$QUALIFY_SHA")" -eq 1
+          git diff --check "$BASE_SHA" "$QUALIFY_SHA"
+          git diff --name-only "$BASE_SHA" "$QUALIFY_SHA" | tee /tmp/aurum002-scope.txt
+          test "$(wc -l < /tmp/aurum002-scope.txt)" -eq 2
+          grep -qx '.github/workflows/aurum-002-preregister-qualify.yml' /tmp/aurum002-scope.txt
+          grep -qx 'docs/research/physical-cognition/AURUM_002_PREREGISTRATION.md' /tmp/aurum002-scope.txt
+
+      - name: Verify frozen dependency refs are still exact
+        run: |
+          set -euo pipefail
+          remote_sha() {
+            git ls-remote origin "refs/heads/$1" | awk '{print $1}'
+          }
+          test "$(remote_sha phys-001-physical-backend-contract)" = "$PHYS001_SHA"
+          test "$(remote_sha phys-002-experiment-receipts)" = "$PHYS002_SHA"
+          test "$(remote_sha phys-003-matched-controls)" = "$PHYS003_SHA"
+          test "$(remote_sha phys-004-comparison-protocol)" = "$PHYS004_SHA"
+          test "$(remote_sha phys-005-exact-binding)" = "$PHYS005_SHA"
+          test "$(remote_sha phys-006-workload-fixtures)" = "$PHYS006_SHA"
+          test "$(remote_sha wload-001-narma10-fixtures)" = "$WLOAD001_SHA"
+          test "$(remote_sha wload-002-delayed-recall-fixtures)" = "$WLOAD002_SHA"
+          test "$(remote_sha wload-003-change-point-fixtures)" = "$WLOAD003_SHA"
+          test "$(remote_sha aurum-001-gold-nanojunction-reservoir)" = "$AURUM001_SHA"
+
+      - name: Verify document binds every exact dependency and remains pre-execution
+        run: |
+          set -euo pipefail
+          doc='docs/research/physical-cognition/AURUM_002_PREREGISTRATION.md'
+          grep -Fq 'Status: **PRE-EXECUTION / NO RESULT**' "$doc"
+          for sha in \
+            "$PHYS001_SHA" "$PHYS002_SHA" "$PHYS003_SHA" "$PHYS004_SHA" "$PHYS005_SHA" \
+            "$PHYS006_SHA" "$WLOAD001_SHA" "$WLOAD002_SHA" "$WLOAD003_SHA" "$AURUM001_SHA"; do
+            grep -Fq "$sha" "$doc"
+          done
+          grep -Fq '9 independently committed subject/comparator experiments' "$doc"
+          grep -Fq 'implementation_digest = BLAKE3(canonical_capsule_bytes)' "$doc"
+          grep -Fq 'AurumConfig::configuration_digest()' "$doc"
+          grep -Fq 'verify_exact_binding()' "$doc"
+          grep -Fq 'positive always means the AURUM arm performed better' "$doc"
+          grep -Fq 'splitmix64-unbiased-rejection-v1' "$doc"
+          grep -Fq 'Do not implement or execute the result-producing AURUM-002 runner' "$doc"
+
+      - name: Postflight immutability
+        run: git diff --exit-code
