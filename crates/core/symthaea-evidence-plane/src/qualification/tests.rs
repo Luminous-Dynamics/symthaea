@@ -2,8 +2,8 @@ use super::*;
 
 const SUBJECT: &str = "0123456789abcdef0123456789abcdef01234567";
 
-fn digest(byte: u8) -> QualificationDigest {
-    QualificationDigest([byte; 32])
+fn artifact(byte: u8) -> ArtifactIdentity {
+    ArtifactIdentity::GitBlobSha1([byte; 20])
 }
 
 fn profile(lane: QualificationLane) -> QualificationProfile {
@@ -11,7 +11,7 @@ fn profile(lane: QualificationLane) -> QualificationProfile {
         1,
         lane,
         ".github/workflows/qualify.yml",
-        digest(7),
+        artifact(7),
         vec!["workflow_dispatch".into()],
         vec![
             QualificationJobRequirement::required("oracle"),
@@ -49,7 +49,7 @@ fn observation(jobs: Vec<ObservedQualificationJob>) -> QualificationRunObservati
         workflow_run_id: 42,
         workflow_id: 9,
         workflow_path: ".github/workflows/qualify.yml".into(),
-        workflow_definition: digest(7),
+        workflow_definition: artifact(7),
         run_attempt: 1,
         event: "workflow_dispatch".into(),
         exact_head_sha: SUBJECT.into(),
@@ -188,7 +188,7 @@ fn wrong_workflow_definition_or_event_fails_qualifier() {
     let profile = profile(QualificationLane::FullExactHead);
 
     let mut wrong_definition = pass_observation();
-    wrong_definition.workflow_definition = digest(8);
+    wrong_definition.workflow_definition = artifact(8);
     assert_eq!(
         profile
             .evaluate(SUBJECT, &wrong_definition)
@@ -286,7 +286,7 @@ fn conditional_skip_must_be_explicitly_preregistered() {
         1,
         QualificationLane::FullExactHead,
         ".github/workflows/qualify.yml",
-        digest(7),
+        artifact(7),
         vec!["workflow_dispatch".into()],
         vec![
             QualificationJobRequirement::required("oracle"),
@@ -321,7 +321,7 @@ fn profile_rejects_duplicate_job_names_and_events() {
         1,
         QualificationLane::FullExactHead,
         ".github/workflows/qualify.yml",
-        digest(7),
+        artifact(7),
         vec!["workflow_dispatch".into()],
         vec![
             QualificationJobRequirement::required("rust"),
@@ -337,7 +337,7 @@ fn profile_rejects_duplicate_job_names_and_events() {
         1,
         QualificationLane::FullExactHead,
         ".github/workflows/qualify.yml",
-        digest(7),
+        artifact(7),
         vec!["pull_request".into(), "pull_request".into()],
         vec![QualificationJobRequirement::required("rust")],
     );
@@ -353,7 +353,7 @@ fn profile_identity_normalizes_declared_set_order() {
         1,
         QualificationLane::FullExactHead,
         ".github/workflows/qualify.yml",
-        digest(7),
+        artifact(7),
         vec!["workflow_dispatch".into(), "pull_request".into()],
         vec![
             QualificationJobRequirement::required("rust"),
@@ -365,7 +365,7 @@ fn profile_identity_normalizes_declared_set_order() {
         1,
         QualificationLane::FullExactHead,
         ".github/workflows/qualify.yml",
-        digest(7),
+        artifact(7),
         vec!["pull_request".into(), "workflow_dispatch".into()],
         vec![
             QualificationJobRequirement::required("oracle"),
@@ -404,4 +404,39 @@ fn unexpected_job_fails_qualifier() {
     );
     assert!(!evaluation.mechanical_integrity.satisfied);
     assert!(QualifiedHeadReceipt::try_new(&profile, SUBJECT, &observation, &evaluation).is_err());
+}
+
+#[test]
+fn digest_algorithm_is_part_of_workflow_identity() {
+    let git = QualificationProfile::new(
+        1,
+        QualificationLane::FullExactHead,
+        ".github/workflows/qualify.yml",
+        ArtifactIdentity::GitBlobSha1([7; 20]),
+        vec!["workflow_dispatch".into()],
+        vec![QualificationJobRequirement::required("rust")],
+    )
+    .unwrap();
+    let sha256 = QualificationProfile::new(
+        1,
+        QualificationLane::FullExactHead,
+        ".github/workflows/qualify.yml",
+        ArtifactIdentity::Sha256([7; 32]),
+        vec!["workflow_dispatch".into()],
+        vec![QualificationJobRequirement::required("rust")],
+    )
+    .unwrap();
+
+    assert_ne!(git.identity(), sha256.identity());
+}
+
+#[test]
+fn sha256_commit_identity_is_accepted() {
+    let profile = profile(QualificationLane::FullExactHead);
+    let mut observation = pass_observation();
+    let expected = "ab".repeat(32);
+    observation.exact_head_sha = expected.clone();
+
+    let evaluation = profile.evaluate(&expected, &observation).unwrap();
+    assert_eq!(evaluation.classification, QualificationClassification::Pass);
 }
