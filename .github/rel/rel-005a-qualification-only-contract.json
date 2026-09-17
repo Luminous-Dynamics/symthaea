@@ -1,0 +1,45 @@
+{
+  "schema": "symthaea.rel.qualification-only-contract.v1",
+  "authority": "QualificationOnlyContractOnly",
+  "relation": "REL-005A",
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "observation_seal_contract_head": "eeaa3f70ecca482de77d0f7f1dd69fa92852af6f",
+  "comparison_contract_head": "1e445d072c269d189145c98118b60e8d174a5495",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+  "required_predicate_count": 41,
+  "allowed_comparison_results": [
+    "ALL_PREDICATES_PASS",
+    "PREDICATE_FAILURES"
+  ],
+  "qualification_mapping": {
+    "ALL_PREDICATES_PASS": {
+      "qualification_completed": true,
+      "rel_005a_qualified": true,
+      "scientific_pass": true,
+      "scientific_fail": false
+    },
+    "PREDICATE_FAILURES": {
+      "qualification_completed": true,
+      "rel_005a_qualified": false,
+      "scientific_pass": false,
+      "scientific_fail": true
+    }
+  },
+  "forbidden_direct_inputs": [
+    "raw observation JSON",
+    "production code",
+    "scientific thresholds",
+    "individual metric values"
+  ],
+  "required_chain_checks": [
+    "PredicateContractOnly receipt is valid and source-grounded",
+    "ExecutionOnly receipt is EXECUTION_OK with exit 0 and observation present",
+    "ObservationSeal is sealed and carries no adjudication/scientific result",
+    "ComparisonOnly is adjudicated over exactly 41 predicates",
+    "all subject/contract/frozen identities agree",
+    "observation and seal commitments agree across receipts",
+    "comparison counts are internally consistent"
+  ]
+}
