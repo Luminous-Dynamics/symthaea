@@ -422,6 +422,30 @@ impl<A: DreamableAction> DreamEngine<A> {
         self.memory.clear();
     }
 
+    /// Return the nearest recorded state support for an action.
+    ///
+    /// This exposes the same action fingerprint and cosine-similarity relation used
+    /// internally by the learned transition memory. `None` means that action class
+    /// has no recorded observation in the model. The value is descriptive model
+    /// support, not empirical confidence in a generated outcome.
+    pub fn nearest_observed_support_similarity(
+        &self,
+        state: &[f32],
+        action: &A,
+    ) -> Option<f32> {
+        let fingerprint = self.hash_action(action);
+        self.world_model
+            .observations
+            .iter()
+            .filter(|observation| observation.action_fingerprint == fingerprint)
+            .map(|observation| self.cosine_similarity(state, &observation.state_context))
+            .filter(|similarity| similarity.is_finite())
+            .max_by(|left, right| {
+                left.partial_cmp(right)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+    }
+
     /// Predict one counterfactual outcome from the learned dream world model.
     ///
     /// This is a model-generated hypothesis, not an observation and not empirical
@@ -608,6 +632,26 @@ mod tests {
         engine.record(&state, action, &outcome, 0.5);
         assert_eq!(engine.memory_size(), 1);
         assert_eq!(engine.stats().events_recorded, 1);
+    }
+
+    #[test]
+    fn test_nearest_observed_support_similarity_tracks_recorded_action_class() {
+        let mut engine = DreamEngine::<Vec<f32>>::with_defaults();
+        let state = vec![0.2, 0.4, 0.6, 0.8];
+        let supported_action = vec![0.1, 0.2];
+        let unsupported_action = vec![0.9, 0.8];
+        let outcome = vec![0.7, 0.6, 0.5, 0.4];
+        engine.record(&state, supported_action.clone(), &outcome, 0.8);
+
+        let exact = engine
+            .nearest_observed_support_similarity(&state, &supported_action)
+            .unwrap();
+        assert!((exact - 1.0).abs() < 1e-6);
+        assert!(
+            engine
+                .nearest_observed_support_similarity(&state, &unsupported_action)
+                .is_none()
+        );
     }
 
     #[test]
