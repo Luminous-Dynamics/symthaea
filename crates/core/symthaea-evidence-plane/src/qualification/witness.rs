@@ -22,7 +22,7 @@ pub struct RecipeArtifact {
     pub identity: ArtifactIdentity,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct QualifierRecipe {
     pub revision: u32,
     pub artifacts: Vec<RecipeArtifact>,
@@ -93,18 +93,18 @@ pub enum RecipeWitnessDisposition {
     RecipeChangedConformanceOnly,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct QualifierRecipeWitness {
-    pub revision: u32,
-    pub candidate_receipt_root: QualificationDigest,
-    pub candidate_recipe_root: QualificationDigest,
-    pub predecessor_recipe_root: Option<QualificationDigest>,
-    pub relation: RecipeRelation,
-    pub disposition: RecipeWitnessDisposition,
+    revision: u32,
+    candidate_receipt_root: QualificationDigest,
+    candidate_recipe_root: QualificationDigest,
+    predecessor_recipe_root: Option<QualificationDigest>,
+    relation: RecipeRelation,
+    disposition: RecipeWitnessDisposition,
     /// Immutable external admission/review record for first bootstrap only.
     /// Presence binds the record; this kernel does not claim the record itself
     /// is trustworthy.
-    pub bootstrap_admission_basis: Option<ArtifactIdentity>,
+    bootstrap_admission_basis: Option<ArtifactIdentity>,
 }
 
 impl QualifierRecipeWitness {
@@ -147,6 +147,31 @@ impl QualifierRecipeWitness {
             disposition,
             bootstrap_admission_basis,
         })
+    }
+
+
+    pub fn relation(&self) -> RecipeRelation {
+        self.relation
+    }
+
+    pub fn disposition(&self) -> RecipeWitnessDisposition {
+        self.disposition
+    }
+
+    pub fn candidate_receipt_root(&self) -> QualificationDigest {
+        self.candidate_receipt_root
+    }
+
+    pub fn candidate_recipe_root(&self) -> QualificationDigest {
+        self.candidate_recipe_root
+    }
+
+    pub fn predecessor_recipe_root(&self) -> Option<QualificationDigest> {
+        self.predecessor_recipe_root
+    }
+
+    pub fn bootstrap_admission_basis(&self) -> Option<ArtifactIdentity> {
+        self.bootstrap_admission_basis
     }
 
     /// True only for dispositions that can participate in trusted authority
