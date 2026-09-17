@@ -341,6 +341,7 @@ pub struct RestartAnchorTrackerV1 {
     latest_sequence: Option<u64>,
     latest_anchor_digest: Option<RestartAnchorDigestV1>,
     latest_receipt_digest: Option<EpistemicRestartValidationReceiptDigest>,
+    latest_captured_at_cycle: Option<u64>,
 }
 
 impl RestartAnchorTrackerV1 {
@@ -354,6 +355,10 @@ impl RestartAnchorTrackerV1 {
 
     pub fn latest_receipt_digest(&self) -> Option<EpistemicRestartValidationReceiptDigest> {
         self.latest_receipt_digest
+    }
+
+    pub fn latest_captured_at_cycle(&self) -> Option<u64> {
+        self.latest_captured_at_cycle
     }
 
     /// Accept a verified anchor into a strict contiguous predecessor chain.
@@ -383,13 +388,23 @@ impl RestartAnchorTrackerV1 {
         let sequence = verified.statement.sequence;
         let digest = verified.statement_digest;
 
-        match (self.latest_sequence, self.latest_anchor_digest) {
-            (None, None) => {
+        match (
+            self.latest_sequence,
+            self.latest_anchor_digest,
+            self.latest_receipt_digest,
+            self.latest_captured_at_cycle,
+        ) {
+            (None, None, None, None) => {
                 if sequence != 1 || verified.statement.previous_anchor_digest.is_some() {
                     return Err(RestartAnchorTrackingError::InvalidGenesis);
                 }
             }
-            (Some(latest_sequence), Some(latest_digest)) => {
+            (
+                Some(latest_sequence),
+                Some(latest_digest),
+                Some(latest_receipt),
+                Some(latest_capture_cycle),
+            ) => {
                 if sequence < latest_sequence {
                     return Err(RestartAnchorTrackingError::SequenceRollback {
                         latest: latest_sequence,
@@ -414,6 +429,18 @@ impl RestartAnchorTrackerV1 {
                 if verified.statement.previous_anchor_digest != Some(latest_digest) {
                     return Err(RestartAnchorTrackingError::PreviousAnchorMismatch);
                 }
+                if verified.statement.receipt_digest == latest_receipt {
+                    return Err(RestartAnchorTrackingError::ReceiptReplay);
+                }
+                if verified.statement.captured_at_cycle < latest_capture_cycle {
+                    return Err(RestartAnchorTrackingError::CaptureCycleRollback {
+                        latest: latest_capture_cycle,
+                        proposed: verified.statement.captured_at_cycle,
+                    });
+                }
+                if verified.statement.captured_at_cycle == latest_capture_cycle {
+                    return Err(RestartAnchorTrackingError::SameCaptureCycleSubstitution);
+                }
             }
             _ => return Err(RestartAnchorTrackingError::InvalidTrackerState),
         }
@@ -421,6 +448,7 @@ impl RestartAnchorTrackerV1 {
         self.latest_sequence = Some(sequence);
         self.latest_anchor_digest = Some(digest);
         self.latest_receipt_digest = Some(verified.statement.receipt_digest);
+        self.latest_captured_at_cycle = Some(verified.statement.captured_at_cycle);
         Ok(())
     }
 }
@@ -471,6 +499,9 @@ pub enum RestartAnchorTrackingError {
     Replay,
     SequenceGap { expected: u64, actual: u64 },
     PreviousAnchorMismatch,
+    ReceiptReplay,
+    CaptureCycleRollback { latest: u64, proposed: u64 },
+    SameCaptureCycleSubstitution,
     SequenceOverflow,
     ObservationPredatesVerification {
         observed_at_cycle: u64,
@@ -644,6 +675,7 @@ mod tests {
         tracker.accept(&first, 4).unwrap();
         tracker.accept(&second, 5).unwrap();
         assert_eq!(tracker.latest_sequence(), Some(2));
+        assert_eq!(tracker.latest_captured_at_cycle(), Some(5));
     }
 
     #[test]
@@ -670,6 +702,43 @@ mod tests {
             tracker.accept(&gap, 5),
             Err(RestartAnchorTrackingError::SequenceGap { .. })
         ));
+    }
+
+    #[test]
+    fn tracker_rejects_capture_cycle_rollback_and_same_cycle_substitution() {
+        let current_receipt = receipt(5, "X predicts Y");
+        let current = verified(&current_receipt, 1, None, b"valid").unwrap();
+        let mut tracker = RestartAnchorTrackerV1::default();
+        tracker.accept(&current, 5).unwrap();
+
+        let older_receipt = receipt(4, "X predicts older");
+        let older = verified(
+            &older_receipt,
+            2,
+            Some(current.statement_digest()),
+            b"valid",
+        )
+        .unwrap();
+        assert_eq!(
+            tracker.accept(&older, 5).unwrap_err(),
+            RestartAnchorTrackingError::CaptureCycleRollback {
+                latest: 5,
+                proposed: 4,
+            }
+        );
+
+        let same_cycle_receipt = receipt(5, "X predicts different");
+        let same_cycle = verified(
+            &same_cycle_receipt,
+            2,
+            Some(current.statement_digest()),
+            b"valid",
+        )
+        .unwrap();
+        assert_eq!(
+            tracker.accept(&same_cycle, 5).unwrap_err(),
+            RestartAnchorTrackingError::SameCaptureCycleSubstitution
+        );
     }
 
     #[test]
