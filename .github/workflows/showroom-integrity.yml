@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  workflow_dispatch:
 
 concurrency:
   # Showroom integrity is repo-wide, but only the latest commit for a branch/PR
@@ -16,7 +18,17 @@ jobs:
   validate-ring0:
     name: Ring 0 Buildability Audit
     runs-on: ubuntu-latest
-    if: github.repository == 'Luminous-Dynamics/symthaea'
+    # Draft PRs already carry focused/theorem-specific qualification plus the
+    # lightweight Showroom hygiene theorem in PR Governance. Do not spend a
+    # generic Rust runner on buildability until the PR becomes ready.
+    # ready_for_review is explicitly subscribed above, so the exact ready head is
+    # validated even if no new commit is pushed after leaving draft state.
+    # converted_to_draft is also subscribed so this workflow's concurrency group
+    # promptly supersedes any older in-flight ready-state validation; the new job
+    # itself skips before runner allocation because draft=true.
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     steps:
       - uses: actions/checkout@v4
 
@@ -30,9 +42,5 @@ jobs:
         run: cargo check -p symthaea-core --lib
 
       - name: Hygiene Scan
-        run: |
-          # Ensure no forbidden dependencies
-          ! rg -i 'mycelix|prism|holochain|swarm|robotics|symtropy-robotics|zero.?knowledge|zkp|pqc|private monorepo|internal only' .
-
-          # Check license
-          head -n 5 LICENSE | grep "GNU AFFERO GENERAL PUBLIC LICENSE"
+        shell: bash
+        run: bash .github/scripts/check-showroom-hygiene.sh
