@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-physical-controls"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Matched substrate-neutral controls for Symthaea physical-reservoir research"
+
+[dependencies]
+symthaea-physical-cognition = { path = "../symthaea-physical-cognition" }
