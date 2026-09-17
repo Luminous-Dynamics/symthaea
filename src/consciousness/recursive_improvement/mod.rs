@@ -72,6 +72,7 @@ pub mod replay_policy;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
+pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
 pub mod sym_rsi_runner;
@@ -180,6 +181,11 @@ pub use sym_rsi_experiment::{
 pub use sym_rsi_fixtures::{
     FixtureDomainError, FixtureDomainKind, FixtureState, FixtureTransition,
     SYM_RSI_001_FIXTURE_ADAPTER_VERSION, canonical_sym_rsi_001_fixture_manifest,
+};
+pub use sym_rsi_holdout_gate::{
+    HeldOutReplayGateReceipt, HoldoutGateDecision, HoldoutGateError,
+    SYM_RSI_001_HOLDOUT_GATE_SCHEMA, select_canonical_training_candidate,
+    validate_selected_candidate_on_holdout,
 };
 pub use sym_rsi_replay_corpus::{
     ReplayCorpusError, ReplayCorpusEvaluation, ReplayFixtureWorld, ReplayWorldEvaluation,
