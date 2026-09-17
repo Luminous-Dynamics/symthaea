@@ -73,6 +73,7 @@ pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
 pub mod sym_rsi_fresh_evaluation;
+pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
@@ -187,6 +188,12 @@ pub use sym_rsi_fresh_evaluation::{
     FreshCvsADisposition, FreshCvsAReceipt, FreshDomainSummary, FreshEvaluationError,
     FreshPairReceipt, SYM_RSI_001_C_VS_A_ANALYSIS_RULE, SYM_RSI_001_FRESH_EVALUATION_SCHEMA,
     run_fresh_c_vs_a,
+};
+pub use sym_rsi_grounded_dream::{
+    DreamActionPrediction, DreamDecisionRecord, DreamFixtureAction, GroundedDreamError,
+    GroundedDreamModel, GroundedDreamPolicy, DREAM_OVERRIDE_MARGIN, DREAM_RISK_PENALTY,
+    DREAM_STATE_DIM, SYM_RSI_001_GROUNDED_DREAM_POLICY_ID, SYM_RSI_001_GROUNDED_DREAM_SCHEMA,
+    build_grounded_dream_policy, train_grounded_dream_model,
 };
 pub use sym_rsi_holdout_gate::{
     HeldOutReplayGateReceipt, HoldoutGateDecision, HoldoutGateError,
