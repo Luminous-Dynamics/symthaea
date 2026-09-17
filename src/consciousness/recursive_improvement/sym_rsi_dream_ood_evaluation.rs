@@ -170,8 +170,12 @@ pub fn run_ood_d_vs_c(
                 .iter()
                 .map(|decision| decision.predictions.len())
                 .sum::<usize>();
-            let simulation_count =
-                prediction_count * d_policy.model().config.counterfactual_count;
+            let simulation_count = d_policy
+                .decision_log()
+                .iter()
+                .flat_map(|decision| decision.predictions.iter())
+                .map(|prediction| prediction.model_simulation_count)
+                .sum::<usize>();
             let promoted = d_policy.generated_evidence_promoted();
 
             let c_receipt = build_fixture_receipt(
