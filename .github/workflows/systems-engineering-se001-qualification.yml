@@ -1,0 +1,200 @@
+name: Systems Engineering SE-001 Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/systems-engineering-se001-qualification.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: se001-qualification-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SE001_BASE: 389ec313105c9ebcdf4774840b690560dea75615
+  SE001_SUBJECT: 47de7f2a306cffb66b5505786220590aa5f42e90
+
+jobs:
+  source-static:
+    name: Frozen subject static + identity oracle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen SE-001 subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SE001_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Bind exact subject and exact scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SE001_SUBJECT"
+          test -z "$(git status --porcelain)"
+
+          mapfile -t changed < <(git diff --name-only "$SE001_BASE" "$SE001_SUBJECT")
+          printf '%s\n' "${changed[@]}"
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = 'crates/domains/symthaea-se-model/Cargo.toml'
+          test "${changed[1]}" = 'crates/domains/symthaea-se-model/src/lib.rs'
+
+      - name: Install pinned Rust + rustfmt
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check focused formatting without Cargo workspace mutation
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs
+
+      - name: Independent stdlib identity oracle
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import struct
+
+          NODE_DOMAIN = b"symthaea.se.node-revision.v1"
+          GRAPH_DOMAIN = b"symthaea.se.graph-snapshot.v1"
+
+          def push(h, value):
+              h.update(struct.pack(">Q", len(value)))
+              h.update(value)
+
+          node = hashlib.sha256()
+          for field in (
+              NODE_DOMAIN,
+              b"requirement",
+              b"REQ-1",
+              b"shutdown",
+              b"Provide safe shutdown",
+              b"modeled",
+          ):
+              push(node, field)
+          node_digest = node.digest()
+          node_id = "sha256:" + node_digest.hex()
+          expected_node = "sha256:30181cffc416564994ffb6e51340273d1dd7013c47f1596b48b3372ecea828dc"
+          assert node_id == expected_node, (node_id, expected_node)
+
+          graph = hashlib.sha256()
+          push(graph, GRAPH_DOMAIN)
+          push(graph, b"nodes")
+          push(graph, struct.pack(">Q", 1))
+          push(graph, b"node")
+          push(graph, b"requirement:REQ-1")
+          push(graph, node_digest)
+          push(graph, b"relations")
+          push(graph, struct.pack(">Q", 0))
+          graph_id = "sha256:" + graph.hexdigest()
+          expected_graph = "sha256:94c024e10ac11cc82a5308139def332211d3e5bb98391bda0eada0f54297568c"
+          assert graph_id == expected_graph, (graph_id, expected_graph)
+
+          print("SE001_INDEPENDENT_IDENTITY_ORACLE=PASS")
+          print(f"node_revision={node_id}")
+          print(f"graph_snapshot={graph_id}")
+          PY
+
+      - name: Immutable postflight
+        run: test -z "$(git status --porcelain)"
+
+  locked-package:
+    name: Frozen subject locked package qualification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen SE-001 subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SE001_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust + Clippy
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Require current lock to resolve exact subject
+        run: cargo metadata --locked --no-deps --format-version 1 >/tmp/se001-metadata.json
+
+      - name: Focused all-target check
+        run: cargo check -p symthaea-se-model --locked --all-targets
+
+      - name: Focused tests
+        run: cargo test -p symthaea-se-model --locked
+
+      - name: Focused strict Clippy
+        run: cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
+
+      - name: Immutable postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SE001_SUBJECT"
+          test -z "$(git status --porcelain)"
+
+  lock-reconciliation-probe:
+    name: Cargo-generated lock reconciliation probe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen SE-001 subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SE001_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust + Clippy
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy
+
+      - name: Generate lock reconciliation from Cargo only
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qualification
+          cp Cargo.lock qualification/Cargo.lock.before
+
+          set +e
+          cargo metadata --locked --no-deps --format-version 1 \
+            >qualification/locked-metadata.json \
+            2>qualification/locked-metadata.stderr
+          locked_rc=$?
+          set -e
+          printf '%s\n' "$locked_rc" > qualification/locked-metadata.exit
+
+          cargo metadata --no-deps --format-version 1 >qualification/reconciled-metadata.json
+          cp Cargo.lock qualification/Cargo.lock.reconciled
+          git diff -- Cargo.lock > qualification/Cargo.lock.patch
+
+          mapfile -t tracked < <(git status --porcelain --untracked-files=no | awk '{print $2}')
+          if (( ${#tracked[@]} > 1 )); then
+            printf 'Unexpected tracked mutations:\n%s\n' "${tracked[*]}" >&2
+            exit 1
+          fi
+          if (( ${#tracked[@]} == 1 )) && [[ "${tracked[0]}" != 'Cargo.lock' ]]; then
+            printf 'Unexpected tracked mutation: %s\n' "${tracked[0]}" >&2
+            exit 1
+          fi
+
+          if cmp -s qualification/Cargo.lock.before qualification/Cargo.lock.reconciled; then
+            echo 'SE001_LOCK_RECONCILIATION=not_required' | tee qualification/result.txt
+          else
+            echo 'SE001_LOCK_RECONCILIATION=required' | tee qualification/result.txt
+          fi
+
+      - name: Validate package against Cargo-reconciled lock candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-se-model --locked --all-targets
+          cargo test -p symthaea-se-model --locked
+          cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
+
+      - name: Upload reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: se001-lock-reconciliation-${{ env.SE001_SUBJECT }}
+          path: qualification/
+          if-no-files-found: error
+          retention-days: 14
