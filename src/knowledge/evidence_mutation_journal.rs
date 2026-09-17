@@ -200,11 +200,18 @@ impl EvidenceMutationJournal {
         }
 
         if let Some(existing) = self.by_authorization.get(&entry.authorization_id) {
-            if existing != &entry {
+            let same_binding = existing.authority_label == entry.authority_label
+                && existing.draft_identity == entry.draft_identity
+                && existing.evidence_id == entry.evidence_id
+                && existing.authorized_at_cycle == entry.authorized_at_cycle;
+            if !same_binding {
                 return Err(EvidenceMutationJournalError::AuthorizationBindingConflict {
                     authorization_id: entry.authorization_id,
                 });
             }
+            // Replays may happen at a later call-time ingestion cycle. Preserve
+            // the original first-ingestion timestamp rather than treating that
+            // later replay timestamp as an inconsistent binding.
             return Ok(());
         }
 
@@ -443,6 +450,14 @@ mod tests {
         assert!(!replay.inserted_new_record());
         assert_eq!(replay.receipt().evidence_id(), inserted.receipt().evidence_id());
         assert_eq!(ledger.evidence_count(), count);
+        assert_eq!(
+            restored
+                .journal()
+                .authorization_entry("auth-1")
+                .unwrap()
+                .first_ingested_at_cycle(),
+            8
+        );
     }
 
     #[test]
