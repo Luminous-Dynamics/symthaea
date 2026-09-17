@@ -342,7 +342,13 @@ fn validate_support_and_mutations(
                 mutation.id,
             ));
         }
-        if mutation.state_revision_after != mutation.state_revision_before + 1 {
+        let expected_after_revision = mutation
+            .state_revision_before
+            .checked_add(1)
+            .ok_or(EpistemicRestartWireValidationError::MutationRevisionOverflow(
+                mutation.id,
+            ))?;
+        if mutation.state_revision_after != expected_after_revision {
             return Err(EpistemicRestartWireValidationError::MutationRevisionStepMismatch(
                 mutation.id,
             ));
@@ -387,8 +393,13 @@ fn validate_support_and_mutations(
         let mut expected_revision = 0u64;
         let mut expected_support = state.baseline_support;
         for mutation in &chain {
+            let next_revision = expected_revision
+                .checked_add(1)
+                .ok_or(EpistemicRestartWireValidationError::SupportRevisionOverflow(
+                    claim_id,
+                ))?;
             if mutation.state_revision_before != expected_revision
-                || mutation.state_revision_after != expected_revision + 1
+                || mutation.state_revision_after != next_revision
                 || mutation.support_before != expected_support
             {
                 return Err(EpistemicRestartWireValidationError::MutationChainBroken(
@@ -556,42 +567,31 @@ fn declared_roots_for_receipt(
     receipt: &WireRevisionReceiptV1,
     provenance: &HashMap<ProvenanceId, &super::epistemic_restart_wire::WireProvenanceV1>,
 ) -> BTreeSet<ProvenanceId> {
-    fn walk(
-        current: ProvenanceId,
-        provenance: &HashMap<ProvenanceId, &super::epistemic_restart_wire::WireProvenanceV1>,
-        visited: &mut HashSet<ProvenanceId>,
-        roots: &mut BTreeSet<ProvenanceId>,
-    ) {
-        if !visited.insert(current) {
-            return;
-        }
-        let Some(record) = provenance.get(&current) else {
-            return;
-        };
-        if record.parent_ids.is_empty() {
-            roots.insert(current);
-            return;
-        }
-        for parent in &record.parent_ids {
-            walk(*parent, provenance, visited, roots);
-        }
-    }
-
     let mut roots = BTreeSet::new();
     let mut visited = HashSet::new();
+    let mut stack = Vec::new();
+
     for basis in &receipt.basis {
         let Some(snapshot) = &basis.snapshot else {
             continue;
         };
-        if snapshot.claim_id != receipt.claim_id {
+        if snapshot.claim_id == receipt.claim_id {
+            stack.push(snapshot.provenance_id);
+        }
+    }
+
+    while let Some(current) = stack.pop() {
+        if !visited.insert(current) {
             continue;
         }
-        walk(
-            snapshot.provenance_id,
-            provenance,
-            &mut visited,
-            &mut roots,
-        );
+        let Some(record) = provenance.get(&current) else {
+            continue;
+        };
+        if record.parent_ids.is_empty() {
+            roots.insert(current);
+        } else {
+            stack.extend(record.parent_ids.iter().copied());
+        }
     }
     roots
 }
@@ -708,11 +708,13 @@ pub enum EpistemicRestartWireValidationError {
     DuplicateSourceRevisionReceipt(BeliefRevisionReceiptId),
     MutationIdsNotMonotonic,
     MutationTemporalMismatch(BeliefMutationReceiptId),
+    MutationRevisionOverflow(BeliefMutationReceiptId),
     MutationRevisionStepMismatch(BeliefMutationReceiptId),
     MutationDeltaMismatch(BeliefMutationReceiptId),
     MutationWithoutSupportState(ClaimId),
     UnmutatedSupportStateInvalid(ClaimId),
     MutationChainBaselineMismatch(ClaimId),
+    SupportRevisionOverflow(ClaimId),
     MutationChainBroken(ClaimId),
     SupportStateFinalMismatch(ClaimId),
     RevisionIdLineageGap {
@@ -786,13 +788,11 @@ impl Error for EpistemicRestartWireValidationError {}
 mod tests {
     use super::*;
     use crate::knowledge::{
-        ClaimKind, EvidenceKind, EvidencePolarity, EpistemicRestartWireEncoding,
-        EpistemicRestartWireSnapshotV1, EpistemicRestartWireVersion, WireClaimV1, WireEvidenceV1,
-        WireManifestSummaryV1, WireMutationV1, WireProvenanceV1, WireRevisionBasisV1,
-        WireRevisionReceiptV1, WireSupportStateV1,
+        BoundedWeight, ClaimKind, EpistemicRestartWireEncoding, EpistemicRestartWireSnapshotV1,
+        EpistemicRestartWireVersion, EvidenceKind, EvidencePolarity, RevisionEvidenceSnapshot,
+        WireClaimV1, WireEvidenceV1, WireManifestSummaryV1, WireMutationV1, WireProvenanceV1,
+        WireRevisionBasisV1, WireRevisionReceiptV1, WireSupportStateV1,
     };
-    use crate::knowledge::RevisionEvidenceSnapshot;
-    use crate::knowledge::BoundedWeight;
 
     fn snapshot() -> EpistemicRestartWireSnapshotV1 {
         let evidence_snapshot = RevisionEvidenceSnapshot {
@@ -944,6 +944,19 @@ mod tests {
         assert_eq!(
             EpistemicRestartWireValidator::validate(&snapshot).unwrap_err(),
             EpistemicRestartWireValidationError::AuthorizationPredatesDecision(
+                BeliefMutationReceiptId(1)
+            )
+        );
+    }
+
+    #[test]
+    fn max_revision_is_rejected_without_overflow() {
+        let mut snapshot = snapshot();
+        snapshot.mutations[0].state_revision_before = u64::MAX;
+        snapshot.mutations[0].state_revision_after = 0;
+        assert_eq!(
+            EpistemicRestartWireValidator::validate(&snapshot).unwrap_err(),
+            EpistemicRestartWireValidationError::MutationRevisionOverflow(
                 BeliefMutationReceiptId(1)
             )
         );
