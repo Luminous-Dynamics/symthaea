@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/arc3-protocol-qualify.yml'
+      - '.github/arc3/protocol-qualification-subject.txt'
   workflow_dispatch:
 
 permissions:
@@ -14,16 +15,42 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SUBJECT_SHA: 2305cc8cf7614d645fd6dd40334264ebb555f808
   CARGO_TERM_COLOR: always
 
 jobs:
-  oracle:
-    name: Independent protocol oracle
+  subject:
+    name: Bind qualification subject
     runs-on: ubuntu-slim
     timeout-minutes: 5
+    outputs:
+      subject_sha: ${{ steps.bind.outputs.subject_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Validate subject binding
+        id: bind
+        shell: bash
+        run: |
+          set -euo pipefail
+          subject="$(tr -d '\r\n' < .github/arc3/protocol-qualification-subject.txt)"
+          if [ "${#subject}" -ne 40 ] || [[ ! "$subject" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid ARC3 protocol subject SHA: '$subject'" >&2
+            exit 1
+          fi
+          printf 'subject_sha=%s\n' "$subject" >> "$GITHUB_OUTPUT"
+          printf 'ARC3 protocol subject: %s\n' "$subject"
+
+  oracle:
+    name: Independent protocol oracle
+    needs: subject
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.SUBJECT_SHA }}
 
@@ -35,10 +62,13 @@ jobs:
 
   lock-integrity:
     name: Cargo lock integrity
+    needs: subject
     runs-on: ubuntu-slim
     timeout-minutes: 15
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.SUBJECT_SHA }}
 
@@ -46,7 +76,9 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
       - name: Install Rust 1.96
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
 
       - name: Require locked protocol package resolution
         id: locked
@@ -184,7 +216,7 @@ jobs:
 
       - name: Upload Cargo-generated lock evidence
         if: failure() && steps.locked.outputs.lock_ok == 'false'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: arc3-cargo-lock-evidence-${{ env.SUBJECT_SHA }}
           path: |
@@ -200,10 +232,13 @@ jobs:
 
   rust-protocol-crate:
     name: Rust protocol crate
+    needs: subject
     runs-on: ubuntu-slim
     timeout-minutes: 15
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.SUBJECT_SHA }}
 
@@ -211,8 +246,9 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
       - name: Install Rust 1.96
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
         with:
+          toolchain: 1.96.0
           components: rustfmt,clippy
 
       - name: Format protocol crate
@@ -232,10 +268,13 @@ jobs:
 
   psych-bench-integration:
     name: Psych-bench ARC3 integration
+    needs: subject
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      SUBJECT_SHA: ${{ needs.subject.outputs.subject_sha }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.SUBJECT_SHA }}
 
@@ -243,8 +282,9 @@ jobs:
         run: test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
 
       - name: Install Rust 1.96
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
         with:
+          toolchain: 1.96.0
           components: rustfmt
 
       - name: Format affected crates
