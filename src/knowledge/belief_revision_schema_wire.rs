@@ -194,10 +194,29 @@ impl BeliefRevisionSchemaWireV1 {
     }
 }
 
+fn validate_policy_for_wire(
+    policy: &BeliefRevisionPolicySchemaV1,
+) -> Result<(), BeliefRevisionSchemaWireError> {
+    policy
+        .build_policy()
+        .map_err(|_| BeliefRevisionSchemaWireError::InvalidPolicy)?;
+    let mut previous_tag = 0u8;
+    for (dimension, maximum) in &policy.strengthen_uncertainty_caps {
+        let tag = uncertainty_tag(*dimension);
+        if tag <= previous_tag {
+            return Err(BeliefRevisionSchemaWireError::NonCanonicalUncertaintyCaps);
+        }
+        previous_tag = tag;
+        checked_unit_f64(*maximum)?;
+    }
+    Ok(())
+}
+
 fn encode_policy(
     writer: &mut Writer,
     policy: &BeliefRevisionPolicySchemaV1,
 ) -> Result<(), BeliefRevisionSchemaWireError> {
+    validate_policy_for_wire(policy)?;
     writer.f32(policy.max_abs_delta);
     writer.usize(policy.min_declared_provenance_roots)?;
     writer.bool(policy.require_calibration);
@@ -215,7 +234,9 @@ fn encode_policy(
     Ok(())
 }
 
-fn decode_policy(reader: &mut Reader<'_>) -> Result<BeliefRevisionPolicySchemaV1, BeliefRevisionSchemaWireError> {
+fn decode_policy(
+    reader: &mut Reader<'_>,
+) -> Result<BeliefRevisionPolicySchemaV1, BeliefRevisionSchemaWireError> {
     let max_abs_delta = reader.f32()?;
     let min_roots = reader.usize()?;
     let require_calibration = reader.bool()?;
@@ -268,7 +289,9 @@ fn encode_decision(
     Ok(())
 }
 
-fn decode_decision(reader: &mut Reader<'_>) -> Result<BeliefRevisionDecisionSnapshotV1, BeliefRevisionSchemaWireError> {
+fn decode_decision(
+    reader: &mut Reader<'_>,
+) -> Result<BeliefRevisionDecisionSnapshotV1, BeliefRevisionSchemaWireError> {
     let eligible = reader.bool()?;
     let declared_provenance_root_count = reader.usize()?;
     let failure_count = reader.count()?;
@@ -391,7 +414,9 @@ fn encode_failure(
     Ok(())
 }
 
-fn decode_failure(reader: &mut Reader<'_>) -> Result<BeliefRevisionFailureSnapshotV1, BeliefRevisionSchemaWireError> {
+fn decode_failure(
+    reader: &mut Reader<'_>,
+) -> Result<BeliefRevisionFailureSnapshotV1, BeliefRevisionSchemaWireError> {
     Ok(match reader.u8()? {
         1 => {
             let count = reader.count()?;
@@ -516,7 +541,9 @@ fn weight_dimension_tag(value: KnowledgeWeightDimension) -> u8 {
     }
 }
 
-fn parse_weight_dimension(tag: u8) -> Result<KnowledgeWeightDimension, BeliefRevisionSchemaWireError> {
+fn parse_weight_dimension(
+    tag: u8,
+) -> Result<KnowledgeWeightDimension, BeliefRevisionSchemaWireError> {
     match tag {
         1 => Ok(KnowledgeWeightDimension::EpistemicSupport),
         2 => Ok(KnowledgeWeightDimension::Accessibility),
@@ -752,11 +779,17 @@ mod tests {
         let bytes = BeliefRevisionSchemaWireV1::encode(&capsule).unwrap();
         let decoded = BeliefRevisionSchemaWireV1::decode(&bytes).unwrap();
         assert_eq!(decoded.captured_at_cycle, capsule.captured_at_cycle());
-        assert_eq!(decoded.linked_revision_count as usize, capsule.linked_revision_count());
+        assert_eq!(
+            decoded.linked_revision_count as usize,
+            capsule.linked_revision_count()
+        );
         assert_eq!(decoded.records.len(), 1);
         assert_eq!(decoded.records[0].receipt_id, capsule.records()[0].receipt_id);
         assert_eq!(decoded.records[0].policy_schema, capsule.records()[0].policy_schema);
-        assert_eq!(decoded.records[0].decision_snapshot, capsule.records()[0].decision_snapshot);
+        assert_eq!(
+            decoded.records[0].decision_snapshot,
+            capsule.records()[0].decision_snapshot
+        );
     }
 
     #[test]
@@ -780,6 +813,20 @@ mod tests {
         assert_eq!(
             BeliefRevisionSchemaWireV1::decode(&bytes).unwrap_err(),
             BeliefRevisionSchemaWireError::UnsupportedVersion(2)
+        );
+    }
+
+    #[test]
+    fn encoder_rejects_manually_noncanonical_uncertainty_caps() {
+        let capsule = capsule();
+        let mut policy = capsule.records()[0].policy_schema.clone();
+        policy.strengthen_uncertainty_caps = vec![
+            (UncertaintyDimension::DistributionShift, 0.3),
+            (UncertaintyDimension::Epistemic, 0.2),
+        ];
+        assert_eq!(
+            validate_policy_for_wire(&policy).unwrap_err(),
+            BeliefRevisionSchemaWireError::NonCanonicalUncertaintyCaps
         );
     }
 }
