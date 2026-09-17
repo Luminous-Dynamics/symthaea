@@ -1,0 +1,230 @@
+name: ARC3 Protocol Trusted CPU Qualification
+
+on:
+  workflow_dispatch:
+
+# The trusted CPU is a disposable correctness appliance. This workflow uses
+# public unauthenticated Git and must not receive repository write credentials.
+permissions: {}
+
+env:
+  NIX_CONFIG: experimental-features = nix-command flakes
+  GIT_TERMINAL_PROMPT: "0"
+  # Exact product subject authorized for this recovery profile. Changing this
+  # SHA changes the qualification recipe and requires review/admission again.
+  ARC3_SUBJECT_SHA: 6ea96737aff361920c181891a71f80a9f481ddef
+  ARC3_SUBJECT_BRANCH: feat/arc3-protocol-contract
+
+concurrency:
+  group: arc3-protocol-trusted-cpu-v1
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Qualify exact ARC3 protocol subject on trusted CPU
+    # The workflow recipe itself must come from trusted main. The product subject
+    # is separately hard-bound above and fetched into an isolated worktree.
+    if: >-
+      github.repository == 'Luminous-Dynamics/symthaea' &&
+      github.ref == 'refs/heads/main'
+    runs-on: [symthaea-trusted-cpu-v1]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout exact trusted recipe without an Action
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$GITHUB_REF" = 'refs/heads/main'
+
+          git init .
+          git remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Bind exact product subject
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Refuse to qualify a stale or detached historical branch head under
+          # this one-subject recovery recipe.
+          advertised="$(
+            git ls-remote https://github.com/Luminous-Dynamics/symthaea.git               "refs/heads/$ARC3_SUBJECT_BRANCH" | awk '{print $1}'
+          )"
+          test "$advertised" = "$ARC3_SUBJECT_SHA"
+
+          subject_dir="$RUNNER_TEMP/arc3-subject"
+          rm -rf "$subject_dir"
+          git init "$subject_dir"
+          git -C "$subject_dir" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
+          git -C "$subject_dir" -c protocol.version=2 fetch --no-tags --depth=1 origin "$ARC3_SUBJECT_SHA"
+          git -C "$subject_dir" checkout --detach FETCH_HEAD
+
+          test "$(git -C "$subject_dir" rev-parse HEAD)" = "$ARC3_SUBJECT_SHA"
+          test -z "$(git -C "$subject_dir" status --porcelain=v1 --untracked-files=no)"
+
+          printf 'recipe_commit=%s\n' "$(git rev-parse HEAD)"
+          printf 'recipe_tree=%s\n' "$(git rev-parse HEAD^{tree})"
+          printf 'subject_commit=%s\n' "$(git -C "$subject_dir" rev-parse HEAD)"
+          printf 'subject_tree=%s\n' "$(git -C "$subject_dir" rev-parse HEAD^{tree})"
+          printf 'subject_cargo_lock_sha256='
+          sha256sum "$subject_dir/Cargo.lock" | awk '{print $1}'
+
+      - name: Evaluate trusted runner policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix build --no-link --no-write-lock-file             --impure             --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-github-actions-runner.nix { inherit pkgs; }'
+          nix build --no-link --no-write-lock-file             --impure             --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
+
+      - name: Run exact ARC3 qualification profile
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          export SUBJECT_DIR="$RUNNER_TEMP/arc3-subject"
+          export CARGO_HOME="$RUNNER_TEMP/cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-target"
+          export CARGO_INCREMENTAL=0
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          nix develop --no-write-lock-file             --impure             --expr 'let f = builtins.getFlake (toString ./.); in import ./nix/ci-rust-shell.nix { nixpkgs = f.inputs.nixpkgs; rust-overlay = f.inputs.rust-overlay; system = builtins.currentSystem; }'             --command env SUBJECT_DIR="$SUBJECT_DIR"               CARGO_HOME="$CARGO_HOME"               CARGO_TARGET_DIR="$CARGO_TARGET_DIR"               CARGO_INCREMENTAL=0               bash -c '
+                set -euo pipefail
+                cd "$SUBJECT_DIR"
+
+                echo "::group::toolchain"
+                rustc --version --verbose
+                cargo --version --verbose
+                rustfmt --version
+                cargo clippy --version
+                python3 --version
+                echo "::endgroup::"
+
+                echo "::group::independent oracle"
+                python3 scripts/arc3_protocol_oracle.py
+                echo "::endgroup::"
+
+                echo "::group::format"
+                cargo fmt -p symthaea-arc3-protocol -p symthaea-psych-bench -- --check
+                echo "::endgroup::"
+
+                echo "::group::protocol locked check"
+                cargo check --locked -p symthaea-arc3-protocol
+                echo "::endgroup::"
+
+                echo "::group::protocol tests"
+                cargo test --locked -p symthaea-arc3-protocol
+                echo "::endgroup::"
+
+                echo "::group::protocol strict clippy"
+                cargo clippy --locked -p symthaea-arc3-protocol --all-targets -- -D warnings
+                echo "::endgroup::"
+
+                echo "::group::psych-bench locked check"
+                cargo check --locked -p symthaea-psych-bench
+                echo "::endgroup::"
+
+                echo "::group::psych-bench compatibility tests"
+                cargo test --locked -p symthaea-psych-bench --lib
+                echo "::endgroup::"
+
+                echo "::group::oracle recheck"
+                python3 scripts/arc3_protocol_oracle.py
+                echo "::endgroup::"
+              '
+
+      - name: Verify subject and recipe immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          subject_dir="$RUNNER_TEMP/arc3-subject"
+
+          test "$GITHUB_REF" = 'refs/heads/main'
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+
+          test "$(git -C "$subject_dir" rev-parse HEAD)" = "$ARC3_SUBJECT_SHA"
+          git -C "$subject_dir" diff --exit-code
+          git -C "$subject_dir" diff --cached --exit-code
+          test -z "$(git -C "$subject_dir" status --porcelain=v1 --untracked-files=no)"
+
+      - name: Emit qualification provenance
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          subject_dir="$RUNNER_TEMP/arc3-subject"
+          recipe_tree="$(git rev-parse HEAD^{tree})"
+          subject_tree="$(git -C "$subject_dir" rev-parse HEAD^{tree})"
+          workflow_blob="$(git rev-parse HEAD:.github/workflows/arc3-protocol-trusted-cpu-qualify.yml)"
+          runner_module_blob="$(git rev-parse HEAD:nix/modules/github-actions-runner.nix)"
+          runner_eval_blob="$(git rev-parse HEAD:nix/tests/eval-github-actions-runner.nix)"
+          routing_eval_blob="$(git rev-parse HEAD:nix/tests/eval-trusted-runner-routing.nix)"
+          ci_shell_blob="$(git rev-parse HEAD:nix/ci-rust-shell.nix)"
+          lock_sha256="$(sha256sum "$subject_dir/Cargo.lock" | awk '{print $1}')"
+          fixture_sha256="$(sha256sum "$subject_dir/docs/arc-agi-3/fixtures/protocol-v1-observation.json" | awk '{print $1}')"
+          vector_sha256="$(sha256sum "$subject_dir/docs/arc-agi-3/fixtures/protocol-v1-observation.hex" | awk '{print $1}')"
+          oracle_sha256="$(sha256sum "$subject_dir/scripts/arc3_protocol_oracle.py" | awk '{print $1}')"
+
+          manifest="$RUNNER_TEMP/arc3-protocol-trusted-cpu-qualification-v1.txt"
+          cat > "$manifest" <<EOF
+          schema=symthaea.arc3.protocol.trusted-cpu-qualification.v1
+          result=CANDIDATE_PASS
+          scope=correctness-only
+          github_run_id=$GITHUB_RUN_ID
+          github_run_attempt=$GITHUB_RUN_ATTEMPT
+          recipe_commit=$GITHUB_SHA
+          recipe_tree=$recipe_tree
+          workflow_blob=$workflow_blob
+          runner_module_blob=$runner_module_blob
+          runner_eval_blob=$runner_eval_blob
+          routing_eval_blob=$routing_eval_blob
+          ci_shell_blob=$ci_shell_blob
+          subject_commit=$ARC3_SUBJECT_SHA
+          subject_tree=$subject_tree
+          cargo_lock_sha256=$lock_sha256
+          fixture_sha256=$fixture_sha256
+          vector_sha256=$vector_sha256
+          oracle_sha256=$oracle_sha256
+          runner_name=${RUNNER_NAME:-unknown}
+          runner_os=${RUNNER_OS:-unknown}
+          runner_arch=${RUNNER_ARCH:-unknown}
+          subject_immutable=PASS
+          recipe_immutable=PASS
+          independent_oracle=PASS
+          rustfmt=PASS
+          protocol_locked_check=PASS
+          protocol_tests=PASS
+          protocol_strict_clippy=PASS
+          psych_bench_locked_check=PASS
+          psych_bench_compatibility_tests=PASS
+          EOF
+
+          manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
+          manifest_bytes="$(wc -c < "$manifest" | tr -d '[:space:]')"
+          manifest_base64="$(base64 < "$manifest" | tr -d '\n')"
+
+          cat "$manifest"
+          printf 'qualification_manifest_sha256=%s\n' "$manifest_sha256"
+          printf 'qualification_manifest_bytes=%s\n' "$manifest_bytes"
+          printf 'qualification_manifest_base64=%s\n' "$manifest_base64"
+
+          {
+            echo '## ARC3 trusted-CPU candidate qualification: PASS'
+            echo
+            echo "- Subject: \`$ARC3_SUBJECT_SHA\`"
+            echo "- Subject tree: \`$subject_tree\`"
+            echo "- Recipe: \`$GITHUB_SHA\`"
+            echo "- Recipe tree: \`$recipe_tree\`"
+            echo "- Manifest SHA-256: \`$manifest_sha256\`"
+            echo "- Manifest bytes: \`$manifest_bytes\`"
+            echo
+            echo 'Correctness qualification candidate only. This does not grant trusted recipe admission under ARC3-QUAL-001 and does not support performance claims.'
+          } >> "$GITHUB_STEP_SUMMARY"
