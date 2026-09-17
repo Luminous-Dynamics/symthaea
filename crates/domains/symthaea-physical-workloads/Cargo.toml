@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-physical-workloads"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Exact scientific workload definitions for Symthaea physical-computation research"
+
+[dependencies]
+symthaea-physical-experiment = { path = "../../core/symthaea-physical-experiment" }
+symthaea-physical-fixtures = { path = "../../core/symthaea-physical-fixtures" }
