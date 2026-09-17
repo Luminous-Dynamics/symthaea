@@ -456,7 +456,7 @@ pub fn train_grounded_dream_model(
         environment_digest: manifest.environment_digest.clone(),
         candidate_family_digest: canonical_candidate_family_digest(),
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
-        model_version: "symthaea-dream-transition-memory-v1".into(),
+        model_version: "symthaea-dream-transition-memory-v2-support-gated".into(),
         action_fingerprint_semantics: DREAM_ACTION_FINGERPRINT_SEMANTICS.into(),
         observation_count,
         action_support,
@@ -710,9 +710,12 @@ fn prediction_provenance_digest(
     predicted_task_quality: f32,
     failure_probability: f32,
     confidence: f32,
+    training_support_count: usize,
+    actionable: bool,
+    model_simulation_count: usize,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v2\0");
+    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v3\0");
     for value in [
         model.evidence_digest.as_str(),
         state_digest,
@@ -960,12 +963,18 @@ mod tests {
 
         let encoded = encode_fixture_state(domain, split, &state);
         let engine = policy.model().engine();
+        let supported = policy.model().supported_actions(domain);
+        let supported_legal_action = legal
+            .iter()
+            .copied()
+            .find(|action| supported.contains(action))
+            .expect("training corpus should support at least one legal navigation action");
         let summary = task_prediction_summary(
             &engine,
             &encoded,
-            DreamFixtureAction::new(domain, 1),
+            DreamFixtureAction::new(domain, supported_legal_action),
             &legal,
-            &policy.model().supported_actions(domain),
+            &supported,
             state.quality as f32,
         );
         assert!(summary.mean_quality.is_finite());
