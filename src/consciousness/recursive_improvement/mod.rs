@@ -194,8 +194,9 @@ pub use sym_rsi_fresh_evaluation::{
     run_fresh_c_vs_a,
 };
 pub use sym_rsi_grounded_dream::{
-    DreamActionPrediction, DreamDecisionRecord, DreamFixtureAction, GroundedDreamError,
-    GroundedDreamModel, GroundedDreamPolicy, DREAM_ACTION_FINGERPRINT_SEMANTICS,
+    DreamActionPrediction, DreamActionSupport, DreamDecisionRecord, DreamFixtureAction,
+    GroundedDreamError, GroundedDreamModel, GroundedDreamPolicy,
+    DREAM_ACTION_FINGERPRINT_SEMANTICS,
     DREAM_OVERRIDE_MARGIN, DREAM_RISK_PENALTY, DREAM_STATE_DIM,
     SYM_RSI_001_GROUNDED_DREAM_POLICY_ID, SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE,
     SYM_RSI_001_GROUNDED_DREAM_SCHEMA,

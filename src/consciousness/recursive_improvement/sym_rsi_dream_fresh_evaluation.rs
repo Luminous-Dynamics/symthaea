@@ -214,8 +214,12 @@ pub fn run_fresh_d_vs_c(
                 .iter()
                 .map(|decision| decision.predictions.len())
                 .sum::<usize>();
-            let d_model_simulation_count =
-                d_prediction_count * d_policy.model().config.counterfactual_count;
+            let d_model_simulation_count = d_policy
+                .decision_log()
+                .iter()
+                .flat_map(|decision| decision.predictions.iter())
+                .map(|prediction| prediction.model_simulation_count)
+                .sum::<usize>();
             let generated_evidence_promoted = d_policy.generated_evidence_promoted();
 
             let c_receipt = build_fixture_receipt(

@@ -27,18 +27,18 @@ use super::sym_rsi_runner::{
     fixture_action_digest, fixture_state_digest, FixedHashPolicy, FixturePolicy,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction, TransitionMemory};
 
 pub const SYM_RSI_001_GROUNDED_DREAM_SCHEMA: &str =
     "symthaea.sym-rsi-001.grounded-dream-model.v1";
 pub const SYM_RSI_001_GROUNDED_DREAM_POLICY_ID: &str =
-    "sym-rsi-grounded-dream-policy-v4";
+    "sym-rsi-grounded-dream-policy-v5";
 pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
 pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
-    "domain-conditioned-action/5-model-simulations-per-candidate/mean-predicted-task-quality-minus-0.10-task-regression-probability/0.01-override-margin/v4";
+    "domain-conditioned-action/observed-action-support-gate/5-model-simulations-per-candidate/mean-predicted-task-quality-minus-0.10-task-regression-probability/0.01-override-margin/v5";
 pub const DREAM_ACTION_FINGERPRINT_SEMANTICS: &str =
     "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2";
 
@@ -99,6 +99,13 @@ impl DreamableAction for DreamFixtureAction {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DreamActionSupport {
+    pub domain_id: String,
+    pub action: u8,
+    pub observation_count: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GroundedDreamModel {
     pub schema: String,
@@ -113,6 +120,7 @@ pub struct GroundedDreamModel {
     /// over Debug output. That identity is therefore explicitly environment-bound.
     pub action_fingerprint_semantics: String,
     pub observation_count: usize,
+    pub action_support: Vec<DreamActionSupport>,
     pub transition_memory: TransitionMemory,
     pub config: DreamEngineConfig,
     pub evidence_digest: String,
@@ -124,11 +132,30 @@ impl GroundedDreamModel {
         engine.world_model = self.transition_memory.clone();
         engine
     }
+
+    pub fn support_count(&self, domain: FixtureDomainKind, action: u8) -> usize {
+        self.action_support
+            .iter()
+            .find(|support| support.domain_id == domain.id() && support.action == action)
+            .map(|support| support.observation_count)
+            .unwrap_or(0)
+    }
+
+    fn supported_actions(&self, domain: FixtureDomainKind) -> BTreeSet<u8> {
+        self.action_support
+            .iter()
+            .filter(|support| support.domain_id == domain.id() && support.observation_count > 0)
+            .map(|support| support.action)
+            .collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DreamActionPrediction {
     pub action: u8,
+    pub training_support_count: usize,
+    pub actionable: bool,
+    pub model_simulation_count: usize,
     pub score: f32,
     pub predicted_task_quality: f32,
     pub failure_probability: f32,
@@ -144,6 +171,7 @@ pub struct DreamDecisionRecord {
     pub step: u32,
     pub state_digest: String,
     pub base_action: u8,
+    pub base_training_support_count: usize,
     pub chosen_action: u8,
     pub override_applied: bool,
     pub predictions: Vec<DreamActionPrediction>,
@@ -210,17 +238,31 @@ impl FixturePolicy for GroundedDreamPolicy {
         let encoded = encode_fixture_state(domain, split, state);
         let state_digest = fixture_state_digest(domain, seed, split, state);
         let engine = self.model.engine();
+        let supported_actions = self.model.supported_actions(domain);
+        let base_training_support_count = self.model.support_count(domain, base_action);
 
         let mut predictions = Vec::with_capacity(legal_actions.len());
         for &action in legal_actions {
             let dream_action = DreamFixtureAction::new(domain, action);
-            let task_prediction = task_prediction_summary(
-                &engine,
-                &encoded,
-                dream_action,
-                legal_actions,
-                state.quality as f32,
-            );
+            let training_support_count = self.model.support_count(domain, action);
+            let actionable = base_training_support_count > 0 && training_support_count > 0;
+            let task_prediction = if actionable {
+                task_prediction_summary(
+                    &engine,
+                    &encoded,
+                    dream_action,
+                    legal_actions,
+                    &supported_actions,
+                    state.quality as f32,
+                )
+            } else {
+                TaskPredictionSummary {
+                    mean_quality: state.quality.clamp(0.0, 1.0) as f32,
+                    failure_probability: 1.0,
+                    confidence: 0.0,
+                    simulations_run: 0,
+                }
+            };
             let predicted_task_quality = task_prediction.mean_quality;
             let score = predicted_task_quality
                 - DREAM_RISK_PENALTY * task_prediction.failure_probability;
@@ -236,9 +278,15 @@ impl FixturePolicy for GroundedDreamPolicy {
                 predicted_task_quality,
                 task_prediction.failure_probability,
                 task_prediction.confidence,
+                training_support_count,
+                actionable,
+                task_prediction.simulations_run,
             );
             predictions.push(DreamActionPrediction {
                 action,
+                training_support_count,
+                actionable,
+                model_simulation_count: task_prediction.simulations_run,
                 score,
                 predicted_task_quality,
                 failure_probability: task_prediction.failure_probability,
@@ -251,8 +299,8 @@ impl FixturePolicy for GroundedDreamPolicy {
                     support_distance: None,
                     causal_assumptions: vec![
                         "nearest observed state/action transition memory".into(),
-                        "heuristic fallback for unsupported action fingerprints".into(),
-                        "illegal perturbation samples fall back to the original legal action".into(),
+                        "candidate and base action classes require recorded training support".into(),
+                        "illegal or unsupported perturbation samples fall back to the original supported legal action".into(),
                         "task failure means predicted quality regression relative to the current state".into(),
                         SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE.into(),
                     ],
@@ -263,19 +311,25 @@ impl FixturePolicy for GroundedDreamPolicy {
 
         let base_score = predictions
             .iter()
-            .find(|prediction| prediction.action == base_action)
-            .map(|prediction| prediction.score)
-            .unwrap_or(f32::NEG_INFINITY);
-        let best = predictions.iter().max_by(|left, right| {
-            left.score
-                .partial_cmp(&right.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| right.action.cmp(&left.action))
-        });
-        let chosen_action = best
-            .filter(|prediction| prediction.score > base_score + self.override_margin)
-            .map(|prediction| prediction.action)
-            .unwrap_or(base_action);
+            .find(|prediction| prediction.action == base_action && prediction.actionable)
+            .map(|prediction| prediction.score);
+        let best = predictions
+            .iter()
+            .filter(|prediction| prediction.actionable)
+            .max_by(|left, right| {
+                left.score
+                    .partial_cmp(&right.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+                    .then_with(|| right.action.cmp(&left.action))
+            });
+        let chosen_action = match (base_score, best) {
+            (Some(base_score), Some(best))
+                if best.score > base_score + self.override_margin =>
+            {
+                best.action
+            }
+            _ => base_action,
+        };
 
         debug_assert!(predictions
             .iter()
@@ -288,6 +342,7 @@ impl FixturePolicy for GroundedDreamPolicy {
             step: state.step,
             state_digest,
             base_action,
+            base_training_support_count,
             chosen_action,
             override_applied: chosen_action != base_action,
             predictions,
@@ -319,6 +374,7 @@ pub fn train_grounded_dream_model(
     };
     let mut engine = DreamEngine::<DreamFixtureAction>::new(config.clone());
     let mut observation_count = 0_usize;
+    let mut action_support_counts: BTreeMap<(String, u8), usize> = BTreeMap::new();
 
     for world in training_corpus.worlds() {
         let mut stack = vec![world.root_node_id];
@@ -363,6 +419,9 @@ pub fn train_grounded_dream_model(
                     1.0,
                 );
                 observation_count += 1;
+                *action_support_counts
+                    .entry((world.domain.id().to_owned(), action))
+                    .or_insert(0) += 1;
                 stack.push(child_id);
             }
         }
@@ -373,10 +432,19 @@ pub fn train_grounded_dream_model(
     }
 
     let transition_memory = engine.world_model.clone();
+    let action_support = action_support_counts
+        .into_iter()
+        .map(|((domain_id, action), observation_count)| DreamActionSupport {
+            domain_id,
+            action,
+            observation_count,
+        })
+        .collect::<Vec<_>>();
     let evidence_digest = dream_model_evidence_digest(
         manifest,
         training_corpus,
         &transition_memory,
+        &action_support,
         observation_count,
     );
 
@@ -388,9 +456,10 @@ pub fn train_grounded_dream_model(
         environment_digest: manifest.environment_digest.clone(),
         candidate_family_digest: canonical_candidate_family_digest(),
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
-        model_version: "symthaea-dream-transition-memory-v1".into(),
+        model_version: "symthaea-dream-transition-memory-v2-support-gated".into(),
         action_fingerprint_semantics: DREAM_ACTION_FINGERPRINT_SEMANTICS.into(),
         observation_count,
+        action_support,
         transition_memory,
         config,
         evidence_digest,
@@ -578,6 +647,10 @@ struct TaskPredictionSummary {
     mean_quality: f32,
     failure_probability: f32,
     confidence: f32,
+    training_support_count: usize,
+    actionable: bool,
+    model_simulation_count: usize,
+    simulations_run: usize,
 }
 
 fn task_prediction_summary(
@@ -585,6 +658,7 @@ fn task_prediction_summary(
     state: &[f32],
     action: DreamFixtureAction,
     legal_actions: &[u8],
+    supported_actions: &BTreeSet<u8>,
     current_quality: f32,
 ) -> TaskPredictionSummary {
     let simulations = engine.config().counterfactual_count.max(1);
@@ -595,6 +669,7 @@ fn task_prediction_summary(
         let perturbed = action.perturb(index as u64);
         let sampled_action = if perturbed.domain == action.domain
             && legal_actions.contains(&perturbed.action)
+            && supported_actions.contains(&perturbed.action)
         {
             perturbed
         } else {
@@ -613,6 +688,7 @@ fn task_prediction_summary(
         mean_quality: total_quality / simulations as f32,
         failure_probability,
         confidence: 1.0 - failure_probability,
+        simulations_run: simulations,
     }
 }
 
@@ -634,9 +710,12 @@ fn prediction_provenance_digest(
     predicted_task_quality: f32,
     failure_probability: f32,
     confidence: f32,
+    training_support_count: usize,
+    actionable: bool,
+    model_simulation_count: usize,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v2\0");
+    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v3\0");
     for value in [
         model.evidence_digest.as_str(),
         state_digest,
@@ -650,6 +729,9 @@ fn prediction_provenance_digest(
     hasher.update(&predicted_task_quality.to_bits().to_le_bytes());
     hasher.update(&failure_probability.to_bits().to_le_bytes());
     hasher.update(&confidence.to_bits().to_le_bytes());
+    hasher.update(&(training_support_count as u64).to_le_bytes());
+    hasher.update(&[u8::from(actionable)]);
+    hasher.update(&(model_simulation_count as u64).to_le_bytes());
     format!("blake3:{}", hasher.finalize().to_hex())
 }
 
@@ -657,6 +739,7 @@ fn dream_model_evidence_digest(
     manifest: &SymRsiExperimentManifest,
     corpus: &FrozenReplayCorpus,
     memory: &TransitionMemory,
+    action_support: &[DreamActionSupport],
     observation_count: usize,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
@@ -675,6 +758,12 @@ fn dream_model_evidence_digest(
         hasher.update(value.as_bytes());
     }
     hasher.update(&(observation_count as u64).to_le_bytes());
+    for support in action_support {
+        hasher.update(&(support.domain_id.len() as u64).to_le_bytes());
+        hasher.update(support.domain_id.as_bytes());
+        hasher.update(&[support.action]);
+        hasher.update(&(support.observation_count as u64).to_le_bytes());
+    }
     for observation in &memory.observations {
         hasher.update(&observation.action_fingerprint.to_le_bytes());
         hasher.update(&observation.weight.to_bits().to_le_bytes());
@@ -738,6 +827,63 @@ mod tests {
             DREAM_ACTION_FINGERPRINT_SEMANTICS
         );
         assert!(model.evidence_digest.starts_with("blake3:"));
+    }
+
+    #[test]
+    fn action_support_census_is_complete_for_recorded_training_edges() {
+        let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
+        let training =
+            acquire_canonical_replay_corpus(&manifest, EvaluationSplit::TrainingReplay).unwrap();
+        let model = train_grounded_dream_model(&manifest, &training).unwrap();
+
+        let support_total = model
+            .action_support
+            .iter()
+            .map(|support| support.observation_count)
+            .sum::<usize>();
+        assert_eq!(support_total, model.observation_count);
+        assert!(model.action_support.iter().all(|support| {
+            support.observation_count > 0
+                && FixtureDomainKind::ALL
+                    .iter()
+                    .any(|domain| domain.id() == support.domain_id.as_str())
+        }));
+    }
+
+    #[test]
+    fn no_training_support_means_no_dream_override() {
+        let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
+        let training =
+            acquire_canonical_replay_corpus(&manifest, EvaluationSplit::TrainingReplay).unwrap();
+        let selection = select_canonical_training_candidate(&manifest, &training).unwrap();
+        let base_spec = canonical_fixed_hash_candidate_family()
+            .into_iter()
+            .find(|candidate| candidate.policy_id == selection.selected_policy_id)
+            .unwrap();
+        let mut model = train_grounded_dream_model(&manifest, &training).unwrap();
+        model.action_support.clear();
+        let mut policy = GroundedDreamPolicy::new(base_spec.policy(), model);
+
+        let domain = FixtureDomainKind::BranchingSearch;
+        let split = EvaluationSplit::HeldOutReplay;
+        let state = domain.reset(101, split);
+        let legal = domain.legal_actions(&state, split);
+        let mut base_policy = base_spec.policy();
+        let base_action = base_policy
+            .choose_action(domain, 101, split, &state, &legal)
+            .unwrap();
+        let chosen = policy
+            .choose_action(domain, 101, split, &state, &legal)
+            .unwrap();
+
+        assert_eq!(chosen, base_action);
+        let decision = policy.decision_log().last().unwrap();
+        assert_eq!(decision.base_training_support_count, 0);
+        assert!(decision.predictions.iter().all(|prediction| {
+            prediction.training_support_count == 0
+                && !prediction.actionable
+                && prediction.model_simulation_count == 0
+        }));
     }
 
     #[test]
@@ -817,16 +963,24 @@ mod tests {
 
         let encoded = encode_fixture_state(domain, split, &state);
         let engine = policy.model().engine();
+        let supported = policy.model().supported_actions(domain);
+        let supported_legal_action = legal
+            .iter()
+            .copied()
+            .find(|action| supported.contains(action))
+            .expect("training corpus should support at least one legal navigation action");
         let summary = task_prediction_summary(
             &engine,
             &encoded,
-            DreamFixtureAction::new(domain, 1),
+            DreamFixtureAction::new(domain, supported_legal_action),
             &legal,
+            &supported,
             state.quality as f32,
         );
         assert!(summary.mean_quality.is_finite());
         assert!((0.0..=1.0).contains(&summary.failure_probability));
         assert!((0.0..=1.0).contains(&summary.confidence));
+        assert_eq!(summary.simulations_run, 5);
     }
 
     #[test]

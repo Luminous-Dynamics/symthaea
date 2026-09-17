@@ -297,7 +297,12 @@ pub fn validate_grounded_dream_on_verification(
                 .iter()
                 .map(|decision| decision.predictions.len())
                 .sum::<usize>();
-            let simulations = predictions * d_policy.model().config.counterfactual_count;
+            let simulations = d_policy
+                .decision_log()
+                .iter()
+                .flat_map(|decision| decision.predictions.iter())
+                .map(|prediction| prediction.model_simulation_count)
+                .sum::<usize>();
             d_override_count += overrides;
             d_prediction_count += predictions;
             d_model_simulation_count += simulations;
