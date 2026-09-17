@@ -18151,6 +18151,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-arc3-protocol"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-art-eye"
 version = "0.1.0"
 dependencies = [
@@ -19712,6 +19721,7 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea",
+ "symthaea-arc3-protocol",
  "symthaea-core",
  "symthaea-evidence-plane",
  "symthaea-fep",
