@@ -1,0 +1,140 @@
+{
+  "schema_version": "PARADOX-A0R-F0-TRANSPORT-CONTRACT-V2",
+  "authority": "DevelopmentOnly / Representational MeasurementOnly / TransportOnly",
+  "issue": 3733,
+  "supersedes_unqualified_subject": "876ff2d308fd10ed0873f912079e2aa02a58c834",
+  "ancestry": {
+    "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+    "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+    "a0_static_subject_sha": "8cc2651576f0068a1ccac3ef21c8a0a0eb3c2afb",
+    "m0_static_subject_sha": "306b0471a0854d2e77c1d50438fc493806fe1564",
+    "m0_qualification_run": 35255409450,
+    "m0_qualification_job": 105317704633
+  },
+  "execution_authority": {
+    "production_cognition_mutation_allowed": false,
+    "semantic_label_access_allowed": false,
+    "split_logic_allowed": false,
+    "probe_fitting_allowed": false,
+    "heldout_scoring_allowed": false,
+    "behavioral_mapping_allowed": false,
+    "feature_dataset_campaign_allowed_by_this_subject": false,
+    "transport_qualification_allowed": true
+  },
+  "worker": {
+    "target": "example:paradox_a0r_f0_worker",
+    "request_schema": "PARADOX-A0R-F0-WORKER-REQUEST-V2",
+    "response_schema": "PARADOX-A0R-F0-WORKER-RESPONSE-V2",
+    "input_transport": "NDJSON stdin only",
+    "sidecar_arguments": "forbidden",
+    "environment_values_read_by_worker": false,
+    "qualification_launch_environment": "explicit env -i allowlist",
+    "fresh_service_per_request": true,
+    "production_entrypoint": "CognitiveLoopService::cycle(&str)",
+    "forbidden_entrypoint": "CognitiveLoopService::cycle_with_hv",
+    "opaque_id_format": "exactly 32 lowercase hexadecimal characters [0-9a-f]{32}",
+    "technical_replicate_indices": [0, 1],
+    "service_identity_generation": "after scientific_payload_sha256 is sealed",
+    "public_channels_only": [
+      "CycleResult.output",
+      "CycleResult.thought_vector",
+      "CycleResult.wisdom_hv"
+    ]
+  },
+  "runner_config_projection": {
+    "canonical_json": "{\"async_training\":false,\"attention_budget_override_us\":60000000,\"cfc_config.delta_t\":0.02,\"cfc_config.input_dim\":256,\"cfc_config.num_neurons\":256,\"cfc_config.prediction_horizons\":[0.02,0.1,0.2],\"effective_dim_fraction_override\":null,\"enable_online_learning\":false,\"enable_recurrent_dim_masking\":false,\"enable_spectral_entropy_masking\":false,\"episodic_replay_training\":false,\"genesis_phrase\":\"PARADOX-A0R-DEV-V1-GENESIS-2026-09-16\",\"memory_graduation\":false,\"temporal_backend\":\"CfC\",\"timezone_offset_hours\":0.0}",
+    "sha256": "2cd99b06cf2cf11cfc0612c0db818355099b48b04bd687ca66a31a08680be1f9"
+  },
+  "scientific_payload": {
+    "schema": "PARADOX-A0R-F0-SCIENTIFIC-PAYLOAD-V1",
+    "hash_domain": "PARADOX-A0R-F0-SCIENTIFIC-V1",
+    "canonicalization": "ordered binary length frames",
+    "provenance_fields_forbidden": true,
+    "raw_diagnostics_recomputed_independently": [
+      "recurrent_length",
+      "thought_vector_length",
+      "wisdom_hv_byte_length",
+      "recurrent_nonfinite_count",
+      "thought_vector_nonfinite_count",
+      "recurrent_all_zero_exact_positive_zero_bits",
+      "raw_channel_sha256",
+      "sealed_feature_bundle_sha256",
+      "invalidity_reasons",
+      "measurement_validity"
+    ],
+    "frozen_diagnostics": {
+      "recurrent_masking_enabled": false,
+      "spectral_entropy_masking_enabled": false,
+      "effective_dim_fraction_override_is_none": true
+    }
+  },
+  "provenance_envelope": {
+    "schema": "PARADOX-A0R-F0-PROVENANCE-ENVELOPE-V1",
+    "hash_domain": "PARADOX-A0R-F0-RECEIPT-V1",
+    "opaque_ids_are_decoder_features": false,
+    "service_identity_is_decoder_feature": false
+  },
+  "technical_pair_receipt": {
+    "schema": "PARADOX-A0R-F0-TECHNICAL-PAIR-RECEIPT-V1",
+    "label_blind": true,
+    "replicate_indices_exactly": [0, 1],
+    "require_distinct_service_instance_ids": true,
+    "require_identical_scientific_payload_sha256": true,
+    "require_distinct_receipt_binding_sha256": true,
+    "peer_invariant_provenance_fields": [
+      "production_subject_sha",
+      "g2b_subject_sha",
+      "a0_subject_sha",
+      "m0_subject_sha",
+      "f0_subject_sha",
+      "opaque_measurement_id",
+      "opaque_base_fixture_id",
+      "opaque_transform_id",
+      "technical_pair_id",
+      "runner_config_projection_sha256",
+      "executable_sha256",
+      "environment_capsule_sha256",
+      "source_binding_sha256",
+      "scientific_payload_sha256"
+    ],
+    "invalid_status": "INVALID_MEASUREMENT_NONDETERMINISTIC",
+    "statistical_n_increment": 0
+  },
+  "source_bindings": [
+    {"path":"src/cognitive_loop/cycle.rs","blob_sha":"4247c9d44c967da4cdf7b2b91a7440aa2209949d"},
+    {"path":"src/cognitive_loop/cycle_phase_output/mod.rs","blob_sha":"aa5fbe66aed52bf1bc4f1e03b69055368d1fdab2"},
+    {"path":"src/cognitive_loop/types/output.rs","blob_sha":"c206f5974595aa400ece1d12c8a02fef1f411dd9"},
+    {"path":"src/cognitive_loop/helpers/mod.rs","blob_sha":"c16aeb1b840bae0a9f5caede8d2489540835c209"},
+    {"path":"src/cognitive_loop/config/mod.rs","blob_sha":"7a0acc36d0a433eff7413395fda8a6438b271dab"},
+    {"path":"src/cognitive_loop/config/temporal.rs","blob_sha":"1fa3f1de884c0193533fb8bc1e4d64abe97b03ce"},
+    {"path":"crates/core/symthaea-core/src/hdc/binary_hv.rs","blob_sha":"22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056"},
+    {"path":"Cargo.lock","blob_sha":"1d5b6c3dffb474fabef0f8237c6741b4f252bc62"}
+  ],
+  "qualification_runtime_controls": [
+    "two fresh-service replicates",
+    "independent raw f32 diagnostic reconstruction",
+    "independent raw/science/provenance hash recomputation",
+    "strict pair-invariant provenance",
+    "opaque-id rename: science invariant / provenance variant",
+    "plan-order per-row invariance",
+    "semantic key rejection",
+    "sidecar argument rejection",
+    "explicit environment allowlist",
+    "replicate index outside {0,1} rejection",
+    "strict opaque-id syntax rejection",
+    "raw post-seal mutation rejection",
+    "coherently rehashed nonfinite diagnostic lie rejection",
+    "coherently rehashed all-zero diagnostic lie rejection",
+    "coherently rehashed mask diagnostic lie rejection",
+    "service identity reuse rejection",
+    "peer provenance drift rejection",
+    "cycle_with_hv source mutation rejection",
+    "opaque-id-to-config/source mutation rejection",
+    "unretained-attempt detection",
+    "label-aware retry surface rejection",
+    "postflight exact-subject immutability"
+  ],
+  "evidence_state_after_commit_only": "F0_IMPLEMENTED_UNQUALIFIED",
+  "evidence_state_after_exact_qualification": "FEATURE_ACQUISITION_QUALIFIED",
+  "claim_ceiling": "Qualification establishes only reproducible label-blind transport of specified already-exported channels under the frozen subject/configuration. It does not establish a collected PARADOX dataset, latent decodability, behavior, production-policy use, causal necessity, metacognition, ontology repair, cross-genesis generality, consciousness, sentience, phenomenology, or theory superiority."
+}
