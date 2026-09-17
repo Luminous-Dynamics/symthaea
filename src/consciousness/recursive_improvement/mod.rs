@@ -72,6 +72,7 @@ pub mod replay_policy;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
+pub mod sym_rsi_fresh_evaluation;
 pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
@@ -181,6 +182,11 @@ pub use sym_rsi_experiment::{
 pub use sym_rsi_fixtures::{
     FixtureDomainError, FixtureDomainKind, FixtureState, FixtureTransition,
     SYM_RSI_001_FIXTURE_ADAPTER_VERSION, canonical_sym_rsi_001_fixture_manifest,
+};
+pub use sym_rsi_fresh_evaluation::{
+    FreshCvsADisposition, FreshCvsAReceipt, FreshDomainSummary, FreshEvaluationError,
+    FreshPairReceipt, SYM_RSI_001_C_VS_A_ANALYSIS_RULE, SYM_RSI_001_FRESH_EVALUATION_SCHEMA,
+    run_fresh_c_vs_a,
 };
 pub use sym_rsi_holdout_gate::{
     HeldOutReplayGateReceipt, HoldoutGateDecision, HoldoutGateError,
