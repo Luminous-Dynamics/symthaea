@@ -72,6 +72,7 @@ pub mod replay_policy;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
 pub mod sym_rsi_replay_corpus;
+pub mod sym_rsi_replay_selection;
 pub mod sym_rsi_runner;
 
 // Re-export key types from core infrastructure
@@ -176,6 +177,11 @@ pub use sym_rsi_fixtures::{
 pub use sym_rsi_replay_corpus::{
     ReplayCorpusError, ReplayCorpusEvaluation, ReplayFixtureWorld, ReplayWorldEvaluation,
     merge_observed_traces, score_policy_on_replay_worlds,
+};
+pub use sym_rsi_replay_selection::{
+    FixedHashCandidateSpec, ReplayCandidateAssessment, ReplayIneligibility, ReplaySelectionError,
+    ReplaySelectionReceipt, SYM_RSI_001_REPLAY_SELECTION_SCHEMA,
+    select_fixed_hash_policy_from_replay,
 };
 pub use sym_rsi_runner::{
     FixedHashPolicy, FixtureObservedStep, FixturePolicy, FixtureRunTrace, FixtureRunnerError,
