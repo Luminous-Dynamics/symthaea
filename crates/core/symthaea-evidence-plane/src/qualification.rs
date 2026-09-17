@@ -420,16 +420,16 @@ impl QualificationProfile {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualifiedHeadReceipt {
-    pub revision: u32,
-    pub profile_identity: QualificationDigest,
-    pub expected_subject_sha: String,
-    pub observed_head_sha: String,
-    pub workflow_definition: ArtifactIdentity,
-    pub workflow_run_id: u64,
-    pub run_attempt: u32,
-    pub materializer_revision: u32,
-    pub job_set_identity: QualificationDigest,
-    pub mechanical_identity: QualificationDigest,
+    revision: u32,
+    profile_identity: QualificationDigest,
+    expected_subject_sha: String,
+    observed_head_sha: String,
+    workflow_definition: ArtifactIdentity,
+    workflow_run_id: u64,
+    run_attempt: u32,
+    materializer_revision: u32,
+    job_set_identity: QualificationDigest,
+    mechanical_identity: QualificationDigest,
 }
 
 impl QualifiedHeadReceipt {
@@ -437,12 +437,15 @@ impl QualifiedHeadReceipt {
         profile: &QualificationProfile,
         expected_subject_sha: &str,
         observation: &QualificationRunObservation,
-        evaluation: &QualificationEvaluation,
     ) -> Result<Self, QualificationError> {
         validate_sha(expected_subject_sha)?;
         if profile.lane != QualificationLane::FullExactHead {
             return Err(QualificationError::ReceiptRequiresFullExactHead);
         }
+
+        // Recompute classification and mechanical integrity inside the minting
+        // boundary. Never accept caller-supplied evaluation state as authority.
+        let evaluation = profile.evaluate(expected_subject_sha, observation)?;
         if evaluation.classification != QualificationClassification::Pass
             || !evaluation.mechanical_integrity.satisfied
         {
@@ -450,11 +453,6 @@ impl QualifiedHeadReceipt {
         }
         if observation.exact_head_sha != expected_subject_sha {
             return Err(QualificationError::ReceiptSubjectMismatch);
-        }
-        if evaluation.profile_identity != profile.identity()
-            || evaluation.observation_identity != observation.identity()?
-        {
-            return Err(QualificationError::ReceiptIdentityMismatch);
         }
 
         Ok(Self {
@@ -469,6 +467,42 @@ impl QualifiedHeadReceipt {
             job_set_identity: evaluation.job_set_identity,
             mechanical_identity: evaluation.mechanical_identity,
         })
+    }
+
+    pub fn profile_identity(&self) -> QualificationDigest {
+        self.profile_identity
+    }
+
+    pub fn expected_subject_sha(&self) -> &str {
+        &self.expected_subject_sha
+    }
+
+    pub fn observed_head_sha(&self) -> &str {
+        &self.observed_head_sha
+    }
+
+    pub fn workflow_definition(&self) -> ArtifactIdentity {
+        self.workflow_definition
+    }
+
+    pub fn workflow_run_id(&self) -> u64 {
+        self.workflow_run_id
+    }
+
+    pub fn run_attempt(&self) -> u32 {
+        self.run_attempt
+    }
+
+    pub fn materializer_revision(&self) -> u32 {
+        self.materializer_revision
+    }
+
+    pub fn job_set_identity(&self) -> QualificationDigest {
+        self.job_set_identity
+    }
+
+    pub fn mechanical_identity(&self) -> QualificationDigest {
+        self.mechanical_identity
     }
 
     pub fn identity(&self) -> QualificationDigest {
@@ -499,7 +533,6 @@ pub enum QualificationError {
     ReceiptRequiresFullExactHead,
     ReceiptRequiresPass,
     ReceiptSubjectMismatch,
-    ReceiptIdentityMismatch,
 }
 
 impl fmt::Display for QualificationError {
