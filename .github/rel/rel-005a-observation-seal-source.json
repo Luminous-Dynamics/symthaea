@@ -1,0 +1,21 @@
+{
+  "schema": "symthaea.rel.execution-artifact-source.v1",
+  "authority": "EvidenceSourceBinding",
+  "source_run_id": 35284116872,
+  "source_job_id": 105412520071,
+  "source_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "source_workflow": "REL-005A ExecutionOnly V3",
+  "source_result": "EXECUTION_OK",
+  "source_artifact": {
+    "id": 10523783298,
+    "name": "rel-005a-execution-v3-6931639e53060809f9d459196a329c4fe983be7b",
+    "size_in_bytes": 8459,
+    "digest": "sha256:a2d6e8421eee59fd0569a0fc7e996276248040ad8075911472ad0491044ff57b"
+  },
+  "observation_sha256": "e271a5c2e6b51fda15cd6c3209e52859296f44ecd790b9c5e72f769d4aec1c4d",
+  "static_audit_sha256": "166214a141374d4dfe971bfa7d696106ee24bf393e77dbe368a3d2a0194eae20",
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "predicate_contract_blob": "3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4"
+}
