@@ -1,0 +1,270 @@
+{
+  "schema_version": "PARADOX-A0R-M0-STATIC-CONTRACT-V1",
+  "authority": "DevelopmentOnly / Representational MeasurementOnly / ProtocolHardening",
+  "issue": 3612,
+  "ancestry": {
+    "a0_static_subject_sha": "8cc2651576f0068a1ccac3ef21c8a0a0eb3c2afb",
+    "g2b_subject_sha": "09d83a1d1fddbbbd30e4eba7cc95946c8eab871f",
+    "production_subject_sha": "eb73527d05a913e79d1f05135ad6b06c1da8e2ee",
+    "a0_static_status_required": "QUALIFIED_PASS",
+    "a0_static_qualification": {
+      "pull_request": 3652,
+      "run_id": 35151014357,
+      "job_id": 104979041434,
+      "runner_sha": "49384f96d4feca186deb5bdc254c88aa6343d31a",
+      "runner_base_sha": "4bad8af72ff775e7c869b6df83faba718a339a36"
+    }
+  },
+  "execution_authority": {
+    "production_cognition_mutation_allowed": false,
+    "feature_collection_allowed": false,
+    "semantic_label_join_allowed": false,
+    "probe_fitting_allowed": false,
+    "heldout_scoring_allowed": false,
+    "confirmatory_execution_allowed": false
+  },
+  "planes": {
+    "F": {
+      "name": "measurement_features",
+      "may_read": [
+        "opaque_measurement_plan",
+        "agent_visible_fixture_material",
+        "frozen_runner_configuration",
+        "production_execution_interface"
+      ],
+      "must_not_read": [
+        "condition_name",
+        "semantic_fixture_family_id",
+        "target_label",
+        "expected_response",
+        "oracle_output",
+        "capability_atom_label",
+        "score",
+        "split_membership",
+        "probe_parameters",
+        "probe_predictions"
+      ],
+      "may_emit": [
+        "opaque_measurement_id",
+        "opaque_base_fixture_id",
+        "opaque_transform_id",
+        "technical_replicate_index",
+        "service_instance_id",
+        "measurement_cycle_index",
+        "measurement_validity",
+        "invalidity_reasons",
+        "channel_digests",
+        "environment_capsule_sha256",
+        "runner_config_sha256",
+        "executable_sha256"
+      ]
+    },
+    "S": {
+      "name": "semantic_and_split",
+      "may_read": [
+        "fixture_manifest",
+        "semantic_label_manifest",
+        "transform_manifest",
+        "grouping_keys",
+        "preregistered_split_algorithm",
+        "preregistered_split_seed"
+      ],
+      "must_not_read": [
+        "raw_feature_bytes",
+        "feature_vector",
+        "feature_digest",
+        "channel_digest",
+        "probe_parameters",
+        "probe_predictions",
+        "probe_score"
+      ],
+      "may_emit": [
+        "fixture_manifest_sha256",
+        "label_manifest_sha256",
+        "transform_manifest_sha256",
+        "split_manifest_sha256",
+        "outer_holdout_membership",
+        "inner_fold_membership",
+        "grouping_commitments",
+        "partition_prevalence_metadata"
+      ]
+    },
+    "P": {
+      "name": "probe_fit_and_evaluation",
+      "activation_prerequisites": [
+        "FEATURE_DATASET_SEALED",
+        "SPLIT_AND_LABEL_MANIFESTS_FROZEN"
+      ],
+      "heldout_label_join_prerequisites": [
+        "PREPROCESSING_FROZEN",
+        "DEVELOPMENT_PROBE_FROZEN",
+        "HELDOUT_PREDICTIONS_SEALED"
+      ]
+    }
+  },
+  "canonicalization": {
+    "structured_object_encoding": "UTF-8 JSON; sorted keys; separators=(',', ':'); ensure_ascii=false; allow_nan=false",
+    "unicode_rule": "all strings MUST be Unicode NFC before canonical serialization",
+    "line_ending_rule": "structured JSON source formatting and line endings are non-semantic after parsing; byte-bearing artifacts are committed separately by exact SHA-256",
+    "integer_rule": "base-10 JSON integers only",
+    "float_rule": "scientific commitment manifests MUST NOT contain JSON floating-point numbers; raw f32 feature bytes are committed as binary digests",
+    "framing": "frame(x)=u64be(byte_length(x)) || x"
+  },
+  "commitments": {
+    "hash": "SHA-256",
+    "row": {
+      "domain": "SYMT-PARADOX-A0R-M0-ROW-V1",
+      "preimage": [
+        "frame(domain_utf8)",
+        "frame(canonical_row_metadata_utf8)",
+        "frame(raw_32_byte_feature_bundle_digest)"
+      ]
+    },
+    "dataset": {
+      "domain": "SYMT-PARADOX-A0R-M0-DATASET-V1",
+      "ordering": "explicit ordered row manifest; opaque_measurement_id values MUST be unique and manifest order is itself committed",
+      "preimage": [
+        "frame(domain_utf8)",
+        "frame(canonical_dataset_header_utf8)",
+        "frame(concatenated_raw_32_byte_row_commitments_in_manifest_order)"
+      ]
+    },
+    "manifest_domains": {
+      "fixture_manifest_sha256": "SYMT-PARADOX-A0R-M0-FIXTURE-MANIFEST-V1",
+      "label_manifest_sha256": "SYMT-PARADOX-A0R-M0-LABEL-MANIFEST-V1",
+      "transform_manifest_sha256": "SYMT-PARADOX-A0R-M0-TRANSFORM-MANIFEST-V1",
+      "split_manifest_sha256": "SYMT-PARADOX-A0R-M0-SPLIT-MANIFEST-V1",
+      "environment_capsule_sha256": "SYMT-PARADOX-A0R-M0-ENVIRONMENT-CAPSULE-V1",
+      "runner_config_sha256": "SYMT-PARADOX-A0R-M0-RUNNER-CONFIG-V1",
+      "feature_set_sha256": "SYMT-PARADOX-A0R-M0-FEATURE-SET-V1",
+      "prediction_bundle_sha256": "SYMT-PARADOX-A0R-M0-PREDICTION-BUNDLE-V1"
+    }
+  },
+  "commitment_derivation_registry": {
+    "required_fields": [
+      "field_name",
+      "domain",
+      "input_objects",
+      "canonicalization",
+      "ordering",
+      "normalization",
+      "hash_algorithm",
+      "reference_implementation"
+    ],
+    "independent_recomputation_required_where_practical": true,
+    "hardcoded_digest_only_comparison_forbidden_when_source_available": true
+  },
+  "feature_receipt": {
+    "required_fields": [
+      "receipt_schema_version",
+      "a0_static_subject_sha",
+      "g2b_subject_sha",
+      "production_subject_sha",
+      "opaque_measurement_id",
+      "opaque_base_fixture_id",
+      "opaque_transform_id",
+      "technical_replicate_index",
+      "service_instance_id",
+      "measurement_cycle_index",
+      "runner_config_sha256",
+      "feature_set_sha256",
+      "target_triple",
+      "executable_sha256",
+      "environment_capsule_sha256",
+      "cfc_vector_length",
+      "cfc_vector_f32le_sha256",
+      "cfc_vector_nonfinite_count",
+      "perception_hdv_sha256",
+      "perception_chunk32_f32le_sha256",
+      "measurement_validity",
+      "invalidity_reasons",
+      "technical_repeatability_peer_id",
+      "technical_repeatability_match",
+      "sealed_feature_bundle_sha256"
+    ],
+    "forbidden_fields": [
+      "condition_name",
+      "semantic_fixture_family_id",
+      "target_label",
+      "expected_response",
+      "oracle_output",
+      "capability_atom_label",
+      "score",
+      "outer_holdout_membership",
+      "inner_fold_membership",
+      "probe_artifact_sha256",
+      "preprocessing_artifact_sha256",
+      "sealed_prediction_sha256"
+    ],
+    "cfc_vector_length": 256,
+    "nonfinite_count_required": 0,
+    "technical_replicates_per_measurement": 2,
+    "technical_replicates_increase_n": false,
+    "raw_feature_bytes_in_receipt": false
+  },
+  "split_firewall": {
+    "split_frozen_before_feature_values_available": true,
+    "feature_values_can_affect_split": false,
+    "regeneration_after_feature_or_probe_inspection": "forbidden",
+    "algorithm_seed_and_tiebreaks_must_be_frozen": true,
+    "impossible_stratification_behavior_must_fail_closed": true
+  },
+  "invalidity_policy": {
+    "all_attempts_retained": true,
+    "label_aware_retry_allowed": false,
+    "retry_policy_frozen_before_labels": true,
+    "technical_replicates_increase_n": false,
+    "complete_case_silent_drop": "forbidden",
+    "differential_attrition_default": "zero unexplained class-differential attrition",
+    "affected_atom_on_material_differential_attrition": "NotEstablished",
+    "affected_atom_below_minimum_independent_group_threshold": "NotEstablished"
+  },
+  "environment_capsule_required": [
+    "runner_image_identifier",
+    "os_release",
+    "kernel_release",
+    "cpu_architecture",
+    "cpu_model_if_stable",
+    "rustc_version",
+    "rustc_commit",
+    "cargo_lock_sha256",
+    "relevant_environment_variables",
+    "executable_sha256"
+  ],
+  "state_ladder": [
+    "STATIC_CONTRACT_QUALIFIED",
+    "FEATURE_DATASET_SEALED",
+    "SPLIT_AND_LABEL_MANIFESTS_FROZEN",
+    "DEVELOPMENT_PROBE_FROZEN",
+    "HELDOUT_PREDICTIONS_SEALED",
+    "DEVELOPMENT_RESULT_SCORED"
+  ],
+  "mutation_controls": [
+    "SOURCE_CHANGED_DIGEST_STALE",
+    "DIGEST_CHANGED_SOURCE_STABLE",
+    "COMMITTED_ROW_ORDER_CHANGED",
+    "DUPLICATE_ROW_INSERTED",
+    "ROW_DELETED",
+    "MANIFEST_DATASET_CROSS_BINDING_SWAP",
+    "SPLIT_SEED_OR_TIEBREAK_CHANGED",
+    "CANONICALIZATION_ALTERNATIVE",
+    "LABEL_OR_TRANSFORM_SUBSTITUTION_AFTER_FEATURE_SEAL",
+    "PREDICTION_BUNDLE_MUTATED_AFTER_SEAL",
+    "FORBIDDEN_LABEL_FIELD_IN_FEATURE_RECEIPT",
+    "FEATURE_VALUE_PRESENT_IN_SPLIT_INPUT",
+    "DUPLICATE_OPAQUE_MEASUREMENT_ID",
+    "TECHNICAL_REPLICATE_MISMATCH"
+  ],
+  "failure_classes": {
+    "COMMITMENT_DERIVATION_MISMATCH": "subject/data-plane defect",
+    "BOUND_OBJECT_UNREACHABLE": "runner-plane defect",
+    "BOUND_SOURCE_BYTES_MISMATCH": "subject/source-plane defect",
+    "FIREWALL_VIOLATION": "information-flow defect",
+    "DATASET_SEAL_MISMATCH": "evidence-object defect"
+  },
+  "claim_boundary": [
+    "M0 static qualification establishes only that the frozen protocol and audits encode the declared information-flow, commitment, attrition, and mutation-control rules.",
+    "A later successful M0 measurement run may establish reproducible acquisition of the specified frozen Symthaea representation under the sealed protocol.",
+    "Neither establishes decodability, production-policy use, causal necessity, behavioral competence, metacognitive recruitment, ontology repair, architecture-wide cross-genesis representation, consciousness, sentience, or phenomenology."
+  ]
+}
