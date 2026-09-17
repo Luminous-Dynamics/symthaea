@@ -69,6 +69,10 @@ pub enum BeliefMutationAuthorityError {
     Preparation(BeliefMutationDecisionGuardError),
     PreparedReceiptMissing(BeliefRevisionReceiptId),
     PreparedPairMismatch,
+    ReplayAuthorizationMismatch {
+        expected: String,
+        actual: String,
+    },
     Transaction(BeliefMutationTransactionError),
 }
 
@@ -84,6 +88,10 @@ impl fmt::Display for BeliefMutationAuthorityError {
             Self::PreparedPairMismatch => write!(
                 f,
                 "prepared belief mutation receipt and evidence seal are not bound to the same decision"
+            ),
+            Self::ReplayAuthorizationMismatch { expected, actual } => write!(
+                f,
+                "belief mutation replay must reuse original authorization id '{expected}', got '{actual}'"
             ),
             Self::Transaction(error) => write!(f, "belief mutation transaction failed: {error}"),
         }
@@ -172,6 +180,20 @@ impl BeliefMutationAuthority {
         {
             return Err(BeliefMutationAuthorityError::PreparedPairMismatch);
         }
+
+        // A revision receipt has one authoritative authorization identity. The
+        // lower-level firewall can acknowledge alternate IDs on an idempotent
+        // replay, but the public facade forbids that so restart persistence can
+        // reconstruct every consumed public authorization from mutation history.
+        if let Some(existing) = store.mutation_for_revision_receipt(prepared.receipt.id()) {
+            if existing.authorization_id() != authorization.authorization_id() {
+                return Err(BeliefMutationAuthorityError::ReplayAuthorizationMismatch {
+                    expected: existing.authorization_id().to_string(),
+                    actual: authorization.authorization_id().to_string(),
+                });
+            }
+        }
+
         BeliefMutationTransactionCoordinator::apply(
             &prepared.seal,
             ledger,
@@ -310,5 +332,54 @@ mod tests {
         assert!(!replay.mutation().applied_new_revision());
         assert!(replay.verified(), "{:?}", replay.verification().failures());
         assert_eq!(store.history().len(), 1);
+    }
+
+    #[test]
+    fn replay_cannot_consume_a_second_authorization_identity() {
+        let (ledger, proposal, policy, claim) = fixture();
+        let mut history = BeliefRevisionHistory::new();
+        let authority = BeliefMutationAuthority::new();
+        let prepared = authority
+            .prepare(&ledger, &mut history, &proposal, &policy, None, None, 3)
+            .unwrap();
+        let mut store = EpistemicSupportStore::new();
+        store
+            .register_claim(&ledger, claim, BoundedWeight::new(0.50).unwrap(), 3)
+            .unwrap();
+        let original = BeliefMutationAuthorization::new(
+            "auth-original",
+            "test-authority",
+            BeliefMutationAuthorizationDecision::Approved,
+            4,
+            prepared.receipt(),
+            store.state(claim).unwrap(),
+        )
+        .unwrap();
+        let mut first = BeliefMutationAuthority::new();
+        first
+            .apply(&ledger, &mut store, &prepared, &original, 5)
+            .unwrap();
+
+        let alternate = BeliefMutationAuthorization::new(
+            "auth-alternate",
+            "test-authority",
+            BeliefMutationAuthorizationDecision::Approved,
+            6,
+            prepared.receipt(),
+            store.state(claim).unwrap(),
+        )
+        .unwrap();
+        let mut rebuilt = BeliefMutationAuthority::new();
+        assert_eq!(
+            rebuilt
+                .apply(&ledger, &mut store, &prepared, &alternate, 7)
+                .unwrap_err(),
+            BeliefMutationAuthorityError::ReplayAuthorizationMismatch {
+                expected: "auth-original".into(),
+                actual: "auth-alternate".into(),
+            }
+        );
+        assert_eq!(store.history().len(), 1);
+        assert_eq!(store.consumed_authorization_count(), 1);
     }
 }
