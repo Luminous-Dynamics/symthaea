@@ -1,0 +1,46 @@
+{
+  "schema": "symthaea.rel.comparison-only-contract.v1",
+  "authority": "ComparisonOnlyContractOnly",
+  "relation": "REL-005A",
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "predicate_contract_blob": "3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a",
+  "observation_seal_contract_head": "eeaa3f70ecca482de77d0f7f1dd69fa92852af6f",
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+  "expected_observation_schema": "symthaea.rel.graft-frame-execution-observation.v3",
+  "expected_observation_authority": "ExecutionOnly",
+  "expected_seal_schema": "symthaea.rel.observation-seal.v3",
+  "expected_seal_authority": "ObservationSeal",
+  "allowed_operators": ["eq", "le", "gt", "le_threshold", "gt_threshold"],
+  "comparison_semantics": {
+    "eq": "Python value equality with exact type discipline; booleans are not numeric",
+    "le": "finite numeric observed <= literal value",
+    "gt": "finite numeric observed > literal value",
+    "le_threshold": "finite numeric observed <= named preregistered threshold",
+    "gt_threshold": "finite numeric observed > named preregistered threshold"
+  },
+  "evidence_rules": {
+    "require_observation_sha256_matches_seal": true,
+    "require_exact_execution_subject": true,
+    "require_exact_predicate_contract": true,
+    "require_exact_frozen_subject": true,
+    "require_observation_upstream_claims_false": true,
+    "require_seal_adjudication_not_run": true,
+    "require_seal_scientific_result_not_run": true,
+    "require_all_predicate_observations_present": true,
+    "reject_null_predicate_observations": true,
+    "reject_nonfinite_predicate_numbers": true
+  },
+  "result_model": {
+    "valid_all_pass": "ALL_PREDICATES_PASS",
+    "valid_one_or_more_fail": "PREDICATE_FAILURES",
+    "invalid_or_tampered_evidence": "comparison process must fail without emitting a scientific adjudication"
+  },
+  "output_claims": {
+    "comparison_only_adjudicated": true,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
