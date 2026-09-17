@@ -364,7 +364,10 @@ impl BeliefRevisionGate {
             failures.push(BeliefRevisionFailure::CausalStrengthenLacksInterventionalBasis);
         }
 
-        if policy.require_uncertainty_assessment || !policy.strengthen_uncertainty_caps.is_empty() {
+        if policy.require_uncertainty_assessment
+            || policy.require_current_uncertainty
+            || !policy.strengthen_uncertainty_caps.is_empty()
+        {
             match uncertainty {
                 None => failures.push(BeliefRevisionFailure::UncertaintyAssessmentMissing),
                 Some(assessment) => {
@@ -699,6 +702,30 @@ mod tests {
                 latest_evidence_cycle: 7,
             }
         ));
+    }
+
+    #[test]
+    fn current_uncertainty_requirement_alone_requires_assessment() {
+        let mut ledger = EpistemicLedger::new();
+        let source = root(&mut ledger, "measurement");
+        let claim = ledger.add_claim("X exists", ClaimKind::Descriptive, None, None, 1);
+        let evidence = add_evidence(
+            &mut ledger,
+            claim,
+            source,
+            EvidenceKind::Measurement,
+            EvidencePolarity::Supports,
+            2,
+        );
+        let proposal = EpistemicRevisionProposal::new(claim, 0.10, vec![evidence], "measurement")
+            .unwrap();
+        let policy = BeliefRevisionPolicy::new(0.20, 1, false, 0, 1.0)
+            .unwrap()
+            .with_uncertainty_requirements(false, true);
+        let decision = BeliefRevisionGate::evaluate(&ledger, &proposal, &policy, None, None);
+        assert!(decision
+            .failures()
+            .contains(&BeliefRevisionFailure::UncertaintyAssessmentMissing));
     }
 
     #[test]
