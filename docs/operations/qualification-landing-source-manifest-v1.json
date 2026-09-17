@@ -1,0 +1,842 @@
+{
+  "schema": "symthaea.qualification-landing-source-manifest.v1",
+  "qualification_era_target": "QERA-001",
+  "normative_framing_role": "normative_framing",
+  "external_primitives": [
+    "ci-qual-001:#3649",
+    "cogsec-exact-state:#270",
+    "execution-lineage:symthaea-evidence-plane::ExecutionLineageV1",
+    "hak-evidence:#870/#896/#919/#961",
+    "phys-experiment:#3650"
+  ],
+  "entries": [
+    {
+      "logical_role": "attempt_history_v4",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_attempt_v4.py",
+      "source_blob_id": "6d28e61497fd7854386e1b2cc940fc5a2c904db8",
+      "semantic_schema_or_domain": "symthaea.qualification-attempt-observation/history.v4",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "qualification_admission_v3",
+        "qualification_attempt_v3",
+        "qualification_evidence_id",
+        "qualification_profile",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [
+        "ci-qual-001:#3649"
+      ],
+      "golden_vector_refs": [
+        "test_attempt_history_v4"
+      ],
+      "claim_ceiling": [
+        "attempt registration/terminal observation history only; provider-declared Passed is not trusted witness authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": [
+        "V4 preserves V3 registration identity and makes evidence content IDs explicit"
+      ]
+    },
+    {
+      "logical_role": "attempt_subject_migration",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_attempt_subject_migration_v1.py",
+      "source_blob_id": "e80c5c4374434ce58f8a93699376638d89995f3b",
+      "semantic_schema_or_domain": "symthaea.qualification-attempt-subject-migration.v1",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "attempt_history_v4",
+        "environment_realization",
+        "input_closure",
+        "integration_train_manifest",
+        "normative_framing",
+        "pass_selection_projection",
+        "qualification_attempt_subject",
+        "qualification_pass_selection_replay_v1"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_attempt_subject_migration_v1"
+      ],
+      "claim_ceiling": [
+        "migration witness only; no trusted PASS, provider authentication, chronology, scientific validity, admission, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#2469",
+      "notes": []
+    },
+    {
+      "logical_role": "environment_realization",
+      "source_branch": "tools/qualification-environment-realization-convergence-v1",
+      "source_commit_sha": "1e1652d879e4609a6b1a4464f832e2503838789a",
+      "source_path": "scripts/qualification_environment_realization_v1.py",
+      "source_blob_id": "70fd803ef49793c2f44365c0099d4ec80c1ea348",
+      "semantic_schema_or_domain": "symthaea.qualification-environment-realization.v1",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_environment_resolution_v1",
+        "qualification_environment_selection_verifier_v1",
+        "qualification_subject",
+        "qualification_tool_requirements_v1"
+      ],
+      "required_external_primitives": [
+        "execution-lineage:symthaea-evidence-plane::ExecutionLineageV1"
+      ],
+      "golden_vector_refs": [
+        "test_environment_realization_v1"
+      ],
+      "claim_ceiling": [
+        "verified captured environment commitments only; no provider authenticity, chronology, PASS, recipe execution, scientific validity, or action authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "input_closure",
+      "source_branch": "tools/qualification-input-closure-convergence-v1",
+      "source_commit_sha": "b474d182e1df8995f0a426ae7ab5e8e2bb3c87bf",
+      "source_path": "scripts/qualification_input_closure_v1.py",
+      "source_blob_id": "ff43d4b5dfc34deaabf46f3cb068fd5bc77f7cbd",
+      "semantic_schema_or_domain": "symthaea.qualification-input-closure.v1",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_input_closure_v1"
+      ],
+      "claim_ceiling": [
+        "input-closure identity only; no artifact availability, execution, or PASS authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "integration_train_catalog",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/integration_train_catalog.py",
+      "source_blob_id": "3fd412f9f7aaf462222a5d1c844319de0e9abc87",
+      "semantic_schema_or_domain": "historical-module:integration_train_catalog",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "integration_train_manifest",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/integration_train_manifest.py",
+      "source_blob_id": "25ec29db95e8b04d2aff607cd6fc96a8f4d6b942",
+      "semantic_schema_or_domain": "historical-module:integration_train_manifest",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "normative_framing",
+      "source_branch": "tools/qualification-semantic-convergence-v2",
+      "source_commit_sha": "5d951664ff2608d231da258b2a29db56d07e83f5",
+      "source_path": "scripts/qualification_framing_v1.py",
+      "source_blob_id": "ab5f50d9d2e68fadd42f171e66855eba60d03930",
+      "semantic_schema_or_domain": "symthaea.qualification-framing.v1",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_framing_v1"
+      ],
+      "claim_ceiling": [
+        "canonical identity framing only; no PASS, provider authenticity, or domain claim authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": [
+        "single normative generic qualification framing candidate under issue #2469"
+      ]
+    },
+    {
+      "logical_role": "pass_selection_projection",
+      "source_branch": "tools/qualification-pass-selection-semantic-projection-v2",
+      "source_commit_sha": "4471e64ad7fc7a4c7982173547eec721cd2d2e6c",
+      "source_path": "scripts/qualification_pass_selection_semantic_projection_v2.py",
+      "source_blob_id": "41042a52bc7fb99ed48ab7a84d1a445afe299b21",
+      "semantic_schema_or_domain": "symthaea.qualification-pass-selection-semantic-projection.v2",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "input_closure",
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_pass_selection_v2",
+        "qualification_subject",
+        "semantic_ids"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_pass_selection_projection_v2"
+      ],
+      "claim_ceiling": [
+        "projection verifies correspondence without rewriting historical PassSelectionV2 identity"
+      ],
+      "migration_or_equivalence_ref": "issue:#2469",
+      "notes": [
+        "historical source selection ID remains separately bound"
+      ]
+    },
+    {
+      "logical_role": "positive_receipt_core_v1_python",
+      "source_branch": "tools/qualification-receipt-core-v1",
+      "source_commit_sha": "54e6fc3a688b04cbd4ea4b32e9c1b91454093aee",
+      "source_path": "scripts/qualification_receipt_core_v1.py",
+      "source_blob_id": "4784ac1fd7fc6d0036d6d9f8baa607467e0ed1f2",
+      "semantic_schema_or_domain": "symthaea.qualification-receipt-core.v1",
+      "normative_status": "HistoricalOnly",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_receipt_core_v1_python"
+      ],
+      "claim_ceiling": [
+        "historical provider/retry-neutral positive receipt core only; no provider authenticity, trusted PASS by itself, scientific validity, current admission, claim interpretation, or merge/execution authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3748",
+      "notes": [
+        "custom little-endian length/count framing plus BLAKE3; not #2469 normative framing"
+      ]
+    },
+    {
+      "logical_role": "positive_receipt_core_v1_rust",
+      "source_branch": "tools/qualification-receipt-core-rust-v1",
+      "source_commit_sha": "765fdedefd72e5042f458f682c1e9a176ff5a7ff",
+      "source_path": "crates/core/symthaea-qualification-receipt-core/src/lib.rs",
+      "source_blob_id": "1010fe1146afd0b9169f4f3213f11ff896ea22d0",
+      "semantic_schema_or_domain": "symthaea.qualification-receipt-core.v1",
+      "normative_status": "HistoricalOnly",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_receipt_core_v1_python"
+      ],
+      "claim_ceiling": [
+        "historical cross-language receipt-core implementation; no normative-framing compliance or qualification authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3748",
+      "notes": [
+        "contains frozen V1 golden frame/ID and independently matches Python reference"
+      ]
+    },
+    {
+      "logical_role": "qualification_admission_v3",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_admission_v3.py",
+      "source_blob_id": "9ab30af5d4bfa52fc43bba14326b520fe1f9db5a",
+      "semantic_schema_or_domain": "historical-module:qualification_admission_v3",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_catalog",
+        "integration_train_manifest",
+        "qualification_profile",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_attempt_subject",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_attempt_subject.py",
+      "source_blob_id": "d5d1ca1901de9b33e41dab62571d410c3f35551f",
+      "semantic_schema_or_domain": "historical-module:qualification_attempt_subject",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "qualification_attempt_v3"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_attempt_v3",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_attempt_v3.py",
+      "source_blob_id": "27ad6f6d1c8df11c4a4603f9aa86a24045df265b",
+      "semantic_schema_or_domain": "historical-module:qualification_attempt_v3",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "qualification_admission_v3",
+        "qualification_profile",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_environment_resolution_v1",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_environment_resolution_v1.py",
+      "source_blob_id": "d849d6fb7d53dad89c4b9f917cb68310030ae1b5",
+      "semantic_schema_or_domain": "historical-module:qualification_environment_resolution_v1",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "input_closure",
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_environment_selection_v1",
+        "qualification_environment_selection_verifier_v1",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_environment_selection_v1",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_environment_selection_v1.py",
+      "source_blob_id": "e4bc298f32204a17b4aaf0628aa934df89d9e776",
+      "semantic_schema_or_domain": "historical-module:qualification_environment_selection_v1",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "input_closure",
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_environment_selection_verifier_v1",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_environment_selection_verifier_v1.py",
+      "source_blob_id": "b176afd730024eb3d0d83c1993b7ceeebbc4a561",
+      "semantic_schema_or_domain": "historical-module:qualification_environment_selection_verifier_v1",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "input_closure",
+        "integration_train_manifest",
+        "qualification_environment_selection_v1",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_evidence_binding",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_evidence_binding.py",
+      "source_blob_id": "3dfed01c080d29adf055adcafbe253e5d4efb2ef",
+      "semantic_schema_or_domain": "historical-module:qualification_evidence_binding",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "qualification_evidence_id"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_evidence_id",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_evidence_id.py",
+      "source_blob_id": "eee345e54a7849f68902ea59cc65c9d5dfe4af94",
+      "semantic_schema_or_domain": "historical-module:qualification_evidence_id",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_pass_selection_replay_v1",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_pass_selection_replay_v1.py",
+      "source_blob_id": "c463366260b1e11c282c809fb5a383a2351e39c5",
+      "semantic_schema_or_domain": "historical-module:qualification_pass_selection_replay_v1",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_pass_selection_v2"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_pass_selection_v2",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_pass_selection_v2.py",
+      "source_blob_id": "c7d779011bfe5c4b10e6f6def2efa5bd63c775ea",
+      "semantic_schema_or_domain": "historical-module:qualification_pass_selection_v2",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "attempt_history_v4",
+        "integration_train_manifest",
+        "qualification_admission_v3",
+        "qualification_attempt_subject",
+        "qualification_evidence_id",
+        "qualification_profile",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_profile",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_profile.py",
+      "source_blob_id": "d9691348d7f2bd8faa0f5aa9c53ef1407952ab70",
+      "semantic_schema_or_domain": "historical-module:qualification_profile",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_subject",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_subject.py",
+      "source_blob_id": "280482ce1f659d3c5bc536794bac24ff8168d2ec",
+      "semantic_schema_or_domain": "historical-module:qualification_subject",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "qualification_tool_requirements_v1",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "scripts/qualification_tool_requirements_v1.py",
+      "source_blob_id": "9a946b0eb9f5ab7f28a555ced5e3bbc42aba5b79",
+      "semantic_schema_or_domain": "historical-module:qualification_tool_requirements_v1",
+      "normative_status": "CompatibilityAdapter",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_subject",
+        "recipe_identity",
+        "semantic_ids"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical transitive source dependency only; not QERA-001 normative identity, receipt, claim, or action authority"
+      ],
+      "migration_or_equivalence_ref": "issue:#3770",
+      "notes": [
+        "represented to close historical local import provenance; broad import is explicitly blocked"
+      ]
+    },
+    {
+      "logical_role": "receipt_candidate_gate",
+      "source_branch": "tools/qualification-receipt-candidate-gate-v1",
+      "source_commit_sha": "2654d2590ed9eb6701abd82d147ec9938ea7e7f4",
+      "source_path": "scripts/qualification_receipt_candidate_gate.py",
+      "source_blob_id": "e42921f47e421752bbf8685d491f744ea9b75703",
+      "semantic_schema_or_domain": "symthaea.qualification-receipt-candidate-gate.v1",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "qualification_profile",
+        "support_closure"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_receipt_candidate_gate_v1"
+      ],
+      "claim_ceiling": [
+        "receipt candidacy only; no trusted PASS, provider authenticity, current admission, claim interpretation, or merge/execution authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "recipe_identity",
+      "source_branch": "tools/qualification-semantic-convergence-v2",
+      "source_commit_sha": "5d951664ff2608d231da258b2a29db56d07e83f5",
+      "source_path": "scripts/qualification_recipe_v1.py",
+      "source_blob_id": "c550d5a42a182d18455f7fcc481365d230b06582",
+      "semantic_schema_or_domain": "symthaea.qualification-recipe.v1",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_profile",
+        "qualification_subject"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_recipe_v1"
+      ],
+      "claim_ceiling": [
+        "recipe semantic identity only; no proof that recipe executed"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": [
+        "script bytes referenced by a recipe remain input-closure material"
+      ]
+    },
+    {
+      "logical_role": "semantic_ids",
+      "source_branch": "tools/qualification-semantic-convergence-v2",
+      "source_commit_sha": "5d951664ff2608d231da258b2a29db56d07e83f5",
+      "source_path": "scripts/qualification_semantic_ids_v2.py",
+      "source_blob_id": "850e995b960847f77dc248ca2e92ce200028621c",
+      "semantic_schema_or_domain": "symthaea.qualification-semantic-ids.v2",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "normative_framing",
+        "qualification_profile",
+        "qualification_subject",
+        "recipe_identity"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_semantic_ids_v2"
+      ],
+      "claim_ceiling": [
+        "subject/profile semantic IDs only; historical prototype IDs are not reinterpreted"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "support_closure",
+      "source_branch": "tools/qualification-support-closure-v1",
+      "source_commit_sha": "7a1975522821a6f07d7611fb7b937b7b91155228",
+      "source_path": "scripts/qualification_support_closure.py",
+      "source_blob_id": "d38ba8124897953af7db5f4220d1e124b02a2e51",
+      "semantic_schema_or_domain": "symthaea.qualification-support-closure.v1",
+      "normative_status": "NormativeCandidate",
+      "required_entry_roles": [
+        "integration_train_manifest",
+        "qualification_evidence_binding",
+        "qualification_pass_selection_v2"
+      ],
+      "required_external_primitives": [],
+      "golden_vector_refs": [
+        "test_support_closure_v1"
+      ],
+      "claim_ceiling": [
+        "byte closure only; no trusted terminal disposition, semantic-rule satisfaction, provider provenance/authenticity, evidence correctness/sufficiency, claim interpretation, current admission, or merge authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_attempt_history_v4",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "tests/python/test_qualification_attempt_v4.py",
+      "source_blob_id": "d1026d7545f87057c1297299115f3c2c316db491",
+      "semantic_schema_or_domain": "qualification-attempt-v4-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_attempt_subject_migration_v1",
+      "source_branch": "tools/qualification-attempt-subject-migration-v1",
+      "source_commit_sha": "b65060237ed8eabd43765589d4d3e09e5a4eccb8",
+      "source_path": "tests/python/test_qualification_attempt_subject_migration_v1.py",
+      "source_blob_id": "aaf60935fd66aa3eaf142a6580c4a2f9fd328f23",
+      "semantic_schema_or_domain": "qualification-attempt-subject-migration-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_environment_realization_v1",
+      "source_branch": "tools/qualification-environment-realization-convergence-v1",
+      "source_commit_sha": "1e1652d879e4609a6b1a4464f832e2503838789a",
+      "source_path": "tests/python/test_qualification_environment_realization_v1.py",
+      "source_blob_id": "377f0ae1e5e1ade8f0f133b287377851d917b1fc",
+      "semantic_schema_or_domain": "qualification-environment-realization-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_framing_v1",
+      "source_branch": "tools/qualification-semantic-convergence-v2",
+      "source_commit_sha": "5d951664ff2608d231da258b2a29db56d07e83f5",
+      "source_path": "tests/python/test_qualification_framing_v1.py",
+      "source_blob_id": "aa72bb86211cedb93110ff6cdf11123bc587258b",
+      "semantic_schema_or_domain": "qualification-framing-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_input_closure_v1",
+      "source_branch": "tools/qualification-input-closure-convergence-v1",
+      "source_commit_sha": "b474d182e1df8995f0a426ae7ab5e8e2bb3c87bf",
+      "source_path": "tests/python/test_qualification_input_closure_v1.py",
+      "source_blob_id": "d76ec411d9ab3541ec7fff18cfc8ccbe3b067bfb",
+      "semantic_schema_or_domain": "qualification-input-closure-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_pass_selection_projection_v2",
+      "source_branch": "tools/qualification-pass-selection-semantic-projection-v2",
+      "source_commit_sha": "4471e64ad7fc7a4c7982173547eec721cd2d2e6c",
+      "source_path": "tests/python/test_qualification_pass_selection_semantic_projection_v2.py",
+      "source_blob_id": "6e2d054c208fe087fbd3fc8b44d5d73bf91ed23b",
+      "semantic_schema_or_domain": "qualification-pass-selection-semantic-projection-v2-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_receipt_candidate_gate_v1",
+      "source_branch": "tools/qualification-receipt-candidate-gate-v1",
+      "source_commit_sha": "2654d2590ed9eb6701abd82d147ec9938ea7e7f4",
+      "source_path": "tests/python/test_qualification_receipt_candidate_gate.py",
+      "source_blob_id": "b85a6a89ff750daecc3c14c2ab8a9afb2c9c01d2",
+      "semantic_schema_or_domain": "qualification-receipt-candidate-gate-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_receipt_core_v1_python",
+      "source_branch": "tools/qualification-receipt-core-v1",
+      "source_commit_sha": "54e6fc3a688b04cbd4ea4b32e9c1b91454093aee",
+      "source_path": "tests/python/test_qualification_receipt_core_v1.py",
+      "source_blob_id": "7c8c97e5c9b79444844ed35589955d17ab66710c",
+      "semantic_schema_or_domain": "qualification-receipt-core-v1-python-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "historical V1 compatibility vectors only"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_recipe_v1",
+      "source_branch": "tools/qualification-semantic-convergence-v2",
+      "source_commit_sha": "5d951664ff2608d231da258b2a29db56d07e83f5",
+      "source_path": "tests/python/test_qualification_recipe_v1.py",
+      "source_blob_id": "1b5f9334065992b6176d32e48f29907496c9c74b",
+      "semantic_schema_or_domain": "qualification-recipe-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_semantic_ids_v2",
+      "source_branch": "tools/qualification-semantic-convergence-v2",
+      "source_commit_sha": "5d951664ff2608d231da258b2a29db56d07e83f5",
+      "source_path": "tests/python/test_qualification_semantic_ids_v2.py",
+      "source_blob_id": "ce83f49afcda34269b6ea2ed7c444a8af41f82cb",
+      "semantic_schema_or_domain": "qualification-semantic-ids-v2-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    },
+    {
+      "logical_role": "test_support_closure_v1",
+      "source_branch": "tools/qualification-support-closure-v1",
+      "source_commit_sha": "7a1975522821a6f07d7611fb7b937b7b91155228",
+      "source_path": "tests/python/test_qualification_support_closure.py",
+      "source_blob_id": "827a302f0dc9030bb69dfd512826e892e07c2938",
+      "semantic_schema_or_domain": "qualification-support-closure-v1-tests",
+      "normative_status": "TestVector",
+      "required_entry_roles": [],
+      "required_external_primitives": [],
+      "golden_vector_refs": [],
+      "claim_ceiling": [
+        "test vectors only; no qualification authority"
+      ],
+      "migration_or_equivalence_ref": null,
+      "notes": []
+    }
+  ]
+}
