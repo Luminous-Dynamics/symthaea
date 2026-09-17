@@ -149,12 +149,18 @@ impl QualificationProfile {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObservedQualificationStep {
+    pub ordinal: u32,
+    pub name: String,
+    pub disposition: JobDisposition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservedQualificationJob {
     pub job_id: u64,
     pub name: String,
     pub disposition: JobDisposition,
-    /// Canonical digest of normalized step names/conclusions, if materialized.
-    pub step_summary: QualificationDigest,
+    pub steps: Vec<ObservedQualificationStep>,
     /// Descriptive only; excluded from authority identity.
     pub provider_status: Option<String>,
     /// Descriptive only; excluded from authority identity.
@@ -162,12 +168,38 @@ pub struct ObservedQualificationJob {
 }
 
 impl ObservedQualificationJob {
+    fn validate(&self) -> Result<(), QualificationError> {
+        if self.name.is_empty() {
+            return Err(QualificationError::EmptyField("job_name"));
+        }
+        if self.steps.iter().any(|step| step.name.is_empty()) {
+            return Err(QualificationError::EmptyField("step_name"));
+        }
+
+        let mut seen = std::collections::BTreeSet::new();
+        for step in &self.steps {
+            if !seen.insert((step.ordinal, step.name.as_str())) {
+                return Err(QualificationError::DuplicateObservedStep);
+            }
+        }
+        Ok(())
+    }
+
     fn canonical_bytes(&self) -> Vec<u8> {
         let mut w = Writer::empty();
         w.u64(self.job_id);
         w.str(&self.name);
         w.u8(job_tag(self.disposition));
-        w.digest(self.step_summary);
+
+        let mut steps: Vec<_> = self.steps.iter().collect();
+        steps.sort_by(|a, b| (a.ordinal, a.name.as_str()).cmp(&(b.ordinal, b.name.as_str())));
+        w.u32(steps.len() as u32);
+        for step in steps {
+            w.u32(step.ordinal);
+            w.str(&step.name);
+            w.u8(job_tag(step.disposition));
+        }
+
         w.into_bytes()
     }
 }
@@ -202,7 +234,11 @@ impl QualificationRunObservation {
         if self.event.is_empty() {
             return Err(QualificationError::EmptyField("event"));
         }
-        validate_sha(&self.exact_head_sha)
+        validate_sha(&self.exact_head_sha)?;
+        for job in &self.jobs {
+            job.validate()?;
+        }
+        Ok(())
     }
 
     pub fn identity(&self) -> Result<QualificationDigest, QualificationError> {
@@ -436,6 +472,7 @@ pub enum QualificationError {
     EmptyRequiredJobs,
     DuplicateAllowedEvent,
     DuplicateRequiredJob,
+    DuplicateObservedStep,
     InvalidSha,
     ReceiptRequiresFullExactHead,
     ReceiptRequiresPass,
