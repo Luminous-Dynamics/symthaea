@@ -1,0 +1,312 @@
+name: Post-release Runtime Lineage Qualification R2
+
+on:
+  push:
+    branches:
+      - 'qualify/post-release-runtime-lineage-r2'
+    paths:
+      - '.github/workflows/post-release-runtime-lineage-qualify-r2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-release-runtime-lineage-qualify-r2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: 3c9ca0e3eaa477baad0bd49c0887f2181bff2812
+  LOCK_SHA256: 6803d27e50b9576fef59e869dd022153942947d8c935c7c0fdcede265c99dc0e
+  TERMINAL_PACKAGE: symthaea-assurance-post-release-continuous-runtime-lineage
+  CARGO_TERM_COLOR: always
+
+jobs:
+  qualify:
+    name: Exact-head Rust 1.96 terminal-lineage qualification
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Checkout qualification helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          path: qualifier
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Prove qualification-only topology
+        id: topology
+        working-directory: qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SUBJECT_SHA"
+          test "$(git rev-list --count "$SUBJECT_SHA"..HEAD)" = 1
+          mapfile -t changed < <(git diff --name-only "$SUBJECT_SHA" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/post-release-runtime-lineage-qualify-r2.yml"
+          git diff --check "$SUBJECT_SHA" HEAD
+          printf 'qualifier_head=%s\nsubject=%s\nscope=workflow-only\n'             "$(git rev-parse HEAD)" "$SUBJECT_SHA" > "$RUNNER_TEMP/topology.txt"
+
+      - name: Checkout exact lock-repaired subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Bind exact subject and generated lock identity
+        id: subject
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -f "crates/bridges/$TERMINAL_PACKAGE/Cargo.toml"
+          grep -Fqx "name = \"$TERMINAL_PACKAGE\""             "crates/bridges/$TERMINAL_PACKAGE/Cargo.toml"
+          actual_lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          test "$actual_lock_sha" = "$LOCK_SHA256"
+          git diff --check HEAD
+          printf 'subject_head=%s\nsubject_tree=%s\nterminal_package=%s\nlock_sha256=%s\n'             "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})"             "$TERMINAL_PACKAGE" "$actual_lock_sha" > "$RUNNER_TEMP/subject.txt"
+
+      - name: Install pinned Rust 1.96
+        id: toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Bind Rust and Cargo versions
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose | tee "$RUNNER_TEMP/rustc-version.txt"
+          cargo --version --verbose | tee "$RUNNER_TEMP/cargo-version.txt"
+          rustc --version | grep -Eq '^rustc 1\.96\.0([[:space:]]|$)'
+          cargo --version | grep -Eq '^cargo 1\.96\.0([[:space:]]|$)'
+
+      - name: Prove committed lock resolves exactly
+        id: metadata
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1             > "$RUNNER_TEMP/metadata.locked.json"             2> "$RUNNER_TEMP/metadata.locked.stderr"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$LOCK_SHA256"
+          git diff --exit-code -- Cargo.lock
+
+      - name: Derive exact reachable workspace closure
+        id: closure
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          temp = Path(os.environ['RUNNER_TEMP'])
+          metadata = json.loads((temp / 'metadata.locked.json').read_text())
+          packages = {pkg['id']: pkg for pkg in metadata['packages']}
+          nodes = {node['id']: node for node in metadata['resolve']['nodes']}
+          workspace_members = set(metadata['workspace_members'])
+          terminal = os.environ['TERMINAL_PACKAGE']
+
+          roots = [pkg['id'] for pkg in metadata['packages']
+                   if pkg['name'] == terminal and pkg['id'] in workspace_members]
+          if len(roots) != 1:
+              raise SystemExit(f'expected one workspace terminal package {terminal!r}, got {len(roots)}')
+
+          seen = set()
+          stack = roots[:]
+          while stack:
+              package_id = stack.pop()
+              if package_id in seen:
+                  continue
+              seen.add(package_id)
+              node = nodes.get(package_id)
+              if node:
+                  stack.extend(dep['pkg'] for dep in node['deps'])
+
+          workspace_ids = sorted(seen & workspace_members)
+          workspace_names = sorted(packages[p]['name'] for p in workspace_ids)
+          workspace_root = Path(metadata['workspace_root']).resolve()
+
+          patched_local = []
+          for package_id in sorted(seen - workspace_members):
+              pkg = packages[package_id]
+              if pkg['source'] is not None:
+                  continue
+              manifest = Path(pkg['manifest_path']).resolve()
+              try:
+                  manifest.relative_to(workspace_root)
+              except ValueError:
+                  continue
+              patched_local.append(pkg['name'])
+          patched_local = sorted(set(patched_local))
+
+          fast = [
+              'symthaea-assurance-post-release-runtime-handoff',
+              'symthaea-assurance-post-release-checkpoint-two-observation',
+              'symthaea-assurance-authenticated-post-release-checkpoint-two',
+              'symthaea-assurance-signed-post-release-checkpoint-two',
+              'symthaea-assurance-post-release-continuous-runtime-lineage',
+          ]
+          missing_fast = sorted(set(fast) - set(workspace_names))
+          if missing_fast:
+              raise SystemExit(f'fast-gate packages missing from reachable workspace closure: {missing_fast}')
+          if len(workspace_names) != 43:
+              raise SystemExit(f'expected 43 reachable workspace members, got {len(workspace_names)}')
+          if patched_local != ['curve25519-dalek-derive']:
+              raise SystemExit(f'unexpected reachable non-workspace local patches: {patched_local!r}')
+
+          (temp / 'reachable-workspace-packages.txt').write_text(
+              ''.join(f'{name}\n' for name in workspace_names)
+          )
+          (temp / 'reachable-local-patches.txt').write_text(
+              ''.join(f'{name}\n' for name in patched_local)
+          )
+          (temp / 'fast-packages.txt').write_text(
+              ''.join(f'{name}\n' for name in fast)
+          )
+          print(f'reachable workspace members={len(workspace_names)}')
+          print(f'reachable local patches={patched_local}')
+          PY
+
+      - name: Fetch exact locked dependencies once
+        id: fetch
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fetch --locked 2>&1 | tee "$RUNNER_TEMP/cargo-fetch.txt"
+          cargo metadata --locked --offline --format-version 1             > "$RUNNER_TEMP/metadata.offline-locked.json"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$LOCK_SHA256"
+          git diff --exit-code -- Cargo.lock
+
+      - name: Rustfmt exact reachable workspace closure
+        id: fmt
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r package; do
+            args+=( -p "$package" )
+          done < "$RUNNER_TEMP/reachable-workspace-packages.txt"
+          cargo fmt "${args[@]}" -- --check             2>&1 | tee "$RUNNER_TEMP/rustfmt.txt"
+
+      - name: Cargo check exact terminal package offline
+        id: check
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked --offline -p "$TERMINAL_PACKAGE" --all-targets             2>&1 | tee "$RUNNER_TEMP/cargo-check.txt"
+
+      - name: Test five post-release lineage packages offline
+        id: tests
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r package; do
+            args+=( -p "$package" )
+          done < "$RUNNER_TEMP/fast-packages.txt"
+          cargo test --locked --offline "${args[@]}"             2>&1 | tee "$RUNNER_TEMP/cargo-test.txt"
+
+      - name: Strict Clippy five post-release lineage packages offline
+        id: clippy
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r package; do
+            args+=( -p "$package" )
+          done < "$RUNNER_TEMP/fast-packages.txt"
+          cargo clippy --locked --offline "${args[@]}" --all-targets -- -D warnings             2>&1 | tee "$RUNNER_TEMP/clippy.txt"
+
+      - name: Prove exact subject postflight immutability
+        id: postflight
+        if: always()
+        working-directory: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$LOCK_SHA256"
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          printf 'postflight_immutable=PASS\nhead=%s\ntree=%s\n'             "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})"             > "$RUNNER_TEMP/postflight.txt"
+
+      - name: Write qualification receipt
+        if: always()
+        shell: bash
+        env:
+          TOPOLOGY_OUTCOME: ${{ steps.topology.outcome }}
+          SUBJECT_OUTCOME: ${{ steps.subject.outcome }}
+          TOOLCHAIN_OUTCOME: ${{ steps.toolchain.outcome }}
+          METADATA_OUTCOME: ${{ steps.metadata.outcome }}
+          CLOSURE_OUTCOME: ${{ steps.closure.outcome }}
+          FETCH_OUTCOME: ${{ steps.fetch.outcome }}
+          FMT_OUTCOME: ${{ steps.fmt.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          TEST_OUTCOME: ${{ steps.tests.outcome }}
+          CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+        run: |
+          set -euo pipefail
+          classification=NOT_ESTABLISHED
+          if [ "$TOPOLOGY_OUTCOME" = success ]             && [ "$SUBJECT_OUTCOME" = success ]             && [ "$TOOLCHAIN_OUTCOME" = success ]             && [ "$METADATA_OUTCOME" = success ]             && [ "$CLOSURE_OUTCOME" = success ]             && [ "$FETCH_OUTCOME" = success ]             && [ "$FMT_OUTCOME" = success ]             && [ "$CHECK_OUTCOME" = success ]             && [ "$TEST_OUTCOME" = success ]             && [ "$CLIPPY_OUTCOME" = success ]             && [ "$POSTFLIGHT_OUTCOME" = success ]; then
+            classification=QUALIFIED_TERMINAL_LINEAGE_R2
+          fi
+          cat > "$RUNNER_TEMP/qualification-receipt.txt" <<EOF
+          schema=symthaea.assurance.post-release-runtime-lineage-qualification.v2
+          qualifier_sha=${GITHUB_SHA}
+          subject_sha=${SUBJECT_SHA}
+          lock_sha256=${LOCK_SHA256}
+          terminal_package=${TERMINAL_PACKAGE}
+          topology=${TOPOLOGY_OUTCOME}
+          subject_binding=${SUBJECT_OUTCOME}
+          toolchain=${TOOLCHAIN_OUTCOME}
+          locked_metadata=${METADATA_OUTCOME}
+          closure=${CLOSURE_OUTCOME}
+          fetch_and_offline_metadata=${FETCH_OUTCOME}
+          rustfmt=${FMT_OUTCOME}
+          check=${CHECK_OUTCOME}
+          tests=${TEST_OUTCOME}
+          clippy=${CLIPPY_OUTCOME}
+          postflight=${POSTFLIGHT_OUTCOME}
+          qualification_result=${classification}
+          EOF
+          cat "$RUNNER_TEMP/qualification-receipt.txt"
+
+      - name: Retain R2 qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: post-release-runtime-lineage-r2-${{ env.SUBJECT_SHA }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/qualification-receipt.txt
+            ${{ runner.temp }}/topology.txt
+            ${{ runner.temp }}/subject.txt
+            ${{ runner.temp }}/rustc-version.txt
+            ${{ runner.temp }}/cargo-version.txt
+            ${{ runner.temp }}/metadata.locked.json
+            ${{ runner.temp }}/metadata.locked.stderr
+            ${{ runner.temp }}/metadata.offline-locked.json
+            ${{ runner.temp }}/reachable-workspace-packages.txt
+            ${{ runner.temp }}/reachable-local-patches.txt
+            ${{ runner.temp }}/fast-packages.txt
+            ${{ runner.temp }}/cargo-fetch.txt
+            ${{ runner.temp }}/rustfmt.txt
+            ${{ runner.temp }}/cargo-check.txt
+            ${{ runner.temp }}/cargo-test.txt
+            ${{ runner.temp }}/clippy.txt
+            ${{ runner.temp }}/postflight.txt
