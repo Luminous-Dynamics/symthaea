@@ -49,6 +49,10 @@ pub mod claim_evidence;
 pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
+#[allow(
+    dead_code,
+    reason = "EKM-032 V1 reserves typed canonical-hash helpers pending canonical restore schema"
+)]
 pub mod epistemic_restart_manifest;
 pub mod epistemic_vector;
 pub mod evidence_binding_conformance;
