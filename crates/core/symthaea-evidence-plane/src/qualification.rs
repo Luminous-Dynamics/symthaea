@@ -250,7 +250,7 @@ impl QualificationProfile {
         let mut counts: BTreeMap<&'static str, u64> = [
             "missing", "duplicate", "disallowed_skip", "cancelled",
             "subject_fail", "qualifier_fail", "infra", "not_executed",
-            "stale", "wrong_workflow", "wrong_event",
+            "stale", "wrong_workflow", "wrong_event", "unexpected_job",
         ]
         .into_iter()
         .map(|k| (k, 0))
@@ -260,6 +260,17 @@ impl QualificationProfile {
         for job in &observation.jobs {
             observed_by_name.entry(&job.name).or_default().push(job);
         }
+
+        let required_names: std::collections::BTreeSet<&str> =
+            self.required_jobs.iter().map(|job| job.name.as_str()).collect();
+        counts.insert(
+            "unexpected_job",
+            observation
+                .jobs
+                .iter()
+                .filter(|job| !required_names.contains(job.name.as_str()))
+                .count() as u64,
+        );
 
         for requirement in &self.required_jobs {
             let jobs = observed_by_name.get(requirement.name.as_str());
@@ -318,6 +329,7 @@ impl QualificationProfile {
         } else if counts["wrong_workflow"] > 0
             || counts["wrong_event"] > 0
             || counts["duplicate"] > 0
+            || counts["unexpected_job"] > 0
         {
             QualificationClassification::FailQualifier
         } else if counts["missing"] > 0 || counts["disallowed_skip"] > 0 {
@@ -519,6 +531,9 @@ impl Writer {
     }
     fn u8(&mut self, v: u8) {
         self.buf.push(v);
+    }
+    fn bool(&mut self, v: bool) {
+        self.u8(u8::from(v));
     }
     fn u32(&mut self, v: u32) {
         self.buf.extend_from_slice(&v.to_le_bytes());
