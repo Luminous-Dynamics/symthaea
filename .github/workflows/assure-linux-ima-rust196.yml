@@ -1,0 +1,103 @@
+name: ASSURE Linux IMA Rust 1.96 Qualification V6
+
+on:
+  pull_request:
+    paths:
+      - '.github/qualification/assure-linux-ima-rust196-*'
+      - '.github/workflows/assure-linux-ima-rust196.yml'
+      - 'crates/domains/symthaea-linux-ima-replay/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-linux-ima-rust196-v6-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  FROZEN_BASE: 29eb017a2e5b3fda7731ec946439c3096b51cceb
+  FORMATTER_PRODUCT_HEAD: 9155351a868a91317ccc528568a4954382ea4511
+  EXPECTED_FORMATTER_BLOB: 2ee7b299599570180fe2a0ca506399fdbbded4a7
+  PRODUCT_HEAD: 6de8ddb67b491c30e2147728d2db52f39e7bdf9b
+  PRODUCT_PARENT: 9155351a868a91317ccc528568a4954382ea4511
+  EXPECTED_PRODUCT_BLOB: 6fddffc3eb1fac7ae5101a96db5283255cab8fb2
+  EXPECTED_PRODUCT_SHA256: b772638d9e6a3c152ce3906a09216a3c25e2f2c5a4d9554f8da6b64b1decd4c6
+  EXPECTED_PRODUCT_BYTES: '41090'
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  DERIVATION_ID: sha256:c63a2b5331d4c0b442b56e12c942706929c98bb60cf902a8c9979a4d5741c596
+  ARCHIVE_ID: sha256:22764eb4b2e505e0e0b58c26047de0cdb9d97af5d7d2f903e7bb991236b7f6c6
+  RECIPE_ID: sha256:75fd20bf7337219cfa2e67259ac53927500ec6962af8159b74d9c49316f34bbd
+  RECIPE_SCRIPT_BLOB: fe817d3a9d1e619001f14d2c95763624a135ca0e
+  RECIPE_SCRIPT_SHA256: fc9f64c9122c85fe462958736a60e81f3f66cc9ac70913eb45e94aac92ad73e6
+  LOCK_AUDIT_BLOB: 8b213ff236da0070f4ef0784d088c1f17fc28d3a
+  LOCK_AUDIT_SHA256: fa829944fc61eeec5119620c05270ee640fab6f3d5489f210451358978951d56
+  METADATA_AUDIT_BLOB: 52dde197204d063b5f31eab33c9af3fe6ed2d448
+  METADATA_AUDIT_SHA256: c9f9cb13962bdff0abd57ecb2b773aa1c4a14a92ca89f5b1297e1ad40c836206
+  RUNNER_SCRIPT_BLOB: 5c3da049801131a619ab055d2d96d619d922e186
+  RUNNER_SCRIPT_SHA256: ec94f01a03a11ed9bf40152018905b7b0f6ce512e41c28810a659c639351d527
+
+jobs:
+  qualify:
+    name: Exact-head Linux IMA Rust 1.96 Clippy repair
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Execute exact-head v6 subject with frozen v5 recipe
+        shell: bash
+        run: bash .github/qualification/assure-linux-ima-rust196-runner.sh execute
+
+      - name: Prove immutable postflight
+        if: always()
+        shell: bash
+        run: bash .github/qualification/assure-linux-ima-rust196-runner.sh postflight
+
+      - name: Finalize exact-head PASS
+        shell: bash
+        run: bash .github/qualification/assure-linux-ima-rust196-runner.sh finalize
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-linux-ima-rust196-v6-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/assure-linux-ima-rust196-v6-outer-receipt.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v6-contract.log
+            ${{ runner.temp }}/qualification-delta.txt
+            ${{ runner.temp }}/pre-head
+            ${{ runner.temp }}/pre-tree
+            ${{ runner.temp }}/pre-lock
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5-recipe-payload.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/qualification-receipt.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/contract-outcome.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/current-stage.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/source-census.tsv
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/Cargo.lock.source
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/Cargo.lock.capsule
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/lock-audit.json
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/cargo-metadata.offline.json
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/metadata-audit.json
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/test-list.txt
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/golden-replay-test.log
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/full-test.log
+            ${{ runner.temp }}/assure-linux-ima-rust196-v5/clippy-all-targets.log
+            .github/workflows/assure-linux-ima-rust196.yml
+            .github/qualification/assure-linux-ima-rust196-*
+          if-no-files-found: ignore
+          retention-days: 90
