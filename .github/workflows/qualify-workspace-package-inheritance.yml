@@ -1,0 +1,131 @@
+name: Qualify workspace package inheritance
+
+on:
+  push:
+    branches:
+      - qualify/workspace-package-inheritance-scan-r1
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Scan undefined workspace.package inheritance
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Checkout qualifier branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Bind exact remediation subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch_head="$(git rev-parse HEAD)"
+          subject="$(git rev-parse HEAD^)"
+          expected_subject="5ff5cd43923fc1059b238fab35bb1d38db7990de"
+          test "$subject" = "$expected_subject"
+          echo "branch_head=$branch_head" >> "$GITHUB_OUTPUT"
+          echo "subject=$subject" >> "$GITHUB_OUTPUT"
+          printf 'branch_head=%s\nsubject=%s\n' "$branch_head" "$subject" > "$RUNNER_TEMP/subject.txt"
+
+      - name: Scan package metadata inheritance against workspace.package
+        id: scan
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          keys="$RUNNER_TEMP/workspace-package-keys.txt"
+          offenders="$RUNNER_TEMP/undefined-workspace-package-inheritance.txt"
+          summary="$RUNNER_TEMP/scan-summary.txt"
+
+          awk '
+            /^[[:space:]]*\[workspace\.package\][[:space:]]*$/ { inside = 1; next }
+            inside && /^[[:space:]]*\[/ { exit }
+            inside {
+              line = $0
+              sub(/#.*/, "", line)
+              if (line ~ /^[[:space:]]*[A-Za-z0-9_-]+[[:space:]]*=/) {
+                sub(/^[[:space:]]*/, "", line)
+                key = line
+                sub(/[[:space:]]*=.*$/, "", key)
+                print key
+              }
+            }
+          ' Cargo.toml | LC_ALL=C sort -u > "$keys"
+
+          : > "$offenders"
+          while IFS= read -r -d '' manifest; do
+            while IFS= read -r key; do
+              [ -n "$key" ] || continue
+              if ! grep -Fxq -- "$key" "$keys"; then
+                printf '%s:%s\n' "${manifest#./}" "$key" >> "$offenders"
+              fi
+            done < <(
+              awk '
+                /^[[:space:]]*\[package\][[:space:]]*$/ { inside = 1; next }
+                inside && /^[[:space:]]*\[/ { exit }
+                inside {
+                  line = $0
+                  sub(/#.*/, "", line)
+                  if (line ~ /^[[:space:]]*[A-Za-z0-9_-]+\.workspace[[:space:]]*=[[:space:]]*true[[:space:]]*$/) {
+                    sub(/^[[:space:]]*/, "", line)
+                    key = line
+                    sub(/\.workspace[[:space:]]*=.*$/, "", key)
+                    print key
+                  }
+                }
+              ' "$manifest"
+            )
+          done < <(find . -path './.git' -prune -o -type f -name Cargo.toml -print0)
+
+          LC_ALL=C sort -u -o "$offenders" "$offenders"
+          count="$(awk 'END { print NR + 0 }' "$offenders")"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+
+          {
+            printf 'subject=%s\n' '${{ steps.subject.outputs.subject }}'
+            printf 'workspace_package_keys='; paste -sd, "$keys"; printf '\n'
+            printf 'undefined_inheritance_count=%s\n' "$count"
+            if [ "$count" -gt 0 ]; then
+              printf '%s\n' 'undefined_inheritance:'
+              cat "$offenders"
+            fi
+          } > "$summary"
+
+          cat "$summary"
+
+      - name: Upload retained inheritance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-package-inheritance-scan
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/subject.txt
+            ${{ runner.temp }}/workspace-package-keys.txt
+            ${{ runner.temp }}/undefined-workspace-package-inheritance.txt
+            ${{ runner.temp }}/scan-summary.txt
+
+      - name: Require no undefined workspace.package inheritance
+        shell: bash
+        run: |
+          set -euo pipefail
+          count='${{ steps.scan.outputs.count }}'
+          if [ "$count" -ne 0 ]; then
+            echo "Found $count package metadata inheritances whose keys are undefined in [workspace.package]." >&2
+            cat "$RUNNER_TEMP/undefined-workspace-package-inheritance.txt" >&2
+            exit 1
+          fi
+
+      - name: Prove qualifier kept remediation subject immutable
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = '${{ steps.subject.outputs.subject }}'
+          git diff --exit-code
+          git diff --cached --exit-code
