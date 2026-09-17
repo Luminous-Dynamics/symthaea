@@ -42,6 +42,7 @@ pub mod belief_revision_persistence;
 pub mod belief_revision_receipt;
 pub mod belief_revision_schema_history;
 pub mod belief_revision_schema_persistence;
+pub mod belief_revision_schema_wire;
 pub mod belief_revision_snapshot;
 pub mod causal_admission;
 pub mod causal_bridge;
@@ -134,6 +135,11 @@ pub use belief_revision_schema_history::{
 pub use belief_revision_schema_persistence::{
     BeliefRevisionSchemaHistoryCapsuleV1, BeliefRevisionSchemaPersistenceError,
     BeliefRevisionSchemaPersistenceVersion,
+};
+pub use belief_revision_schema_wire::{
+    BeliefRevisionSchemaWireEncoding, BeliefRevisionSchemaWireError,
+    BeliefRevisionSchemaWireRecordV1, BeliefRevisionSchemaWireSnapshotV1,
+    BeliefRevisionSchemaWireV1, BeliefRevisionSchemaWireVersion,
 };
 pub use belief_revision_snapshot::{
     BeliefRevisionDecisionSnapshotV1, BeliefRevisionFailureSnapshotV1,
