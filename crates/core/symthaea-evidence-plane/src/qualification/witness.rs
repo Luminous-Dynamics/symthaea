@@ -24,8 +24,8 @@ pub struct RecipeArtifact {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct QualifierRecipe {
-    pub revision: u32,
-    pub artifacts: Vec<RecipeArtifact>,
+    revision: u32,
+    artifacts: Vec<RecipeArtifact>,
 }
 
 impl QualifierRecipe {
@@ -49,6 +49,14 @@ impl QualifierRecipe {
         }
 
         Ok(Self { revision, artifacts })
+    }
+
+    pub fn revision(&self) -> u32 {
+        self.revision
+    }
+
+    pub fn artifacts(&self) -> &[RecipeArtifact] {
+        &self.artifacts
     }
 
     pub fn identity(&self) -> QualificationDigest {
