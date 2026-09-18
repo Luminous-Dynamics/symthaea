@@ -28,13 +28,14 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: helper
+          persist-credentials: false
 
       - name: Validate helper and exact subject binding
         id: bind
         shell: bash
         run: |
           set -euo pipefail
-          test -z "$(git -C helper status --porcelain=v1 --untracked-files=no)"
+          test -z "$(git -C helper status --porcelain=v1 --untracked-files=normal)"
 
           python3 - <<'PY'
           from hashlib import sha256
@@ -63,6 +64,7 @@ jobs:
         with:
           ref: ${{ steps.bind.outputs.subject_sha }}
           path: subject
+          persist-credentials: false
 
       - name: Bind exact product and record preflight identity
         shell: bash
@@ -72,7 +74,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
-          test -z "$(git -C subject status --porcelain=v1 --untracked-files=no)"
+          test -z "$(git -C subject status --porcelain=v1 --untracked-files=normal)"
           printf 'subject_sha=%s\n' "$SUBJECT_SHA"
           printf 'subject_tree=%s\n' "$(git -C subject rev-parse HEAD^{tree})"
           printf 'subject_binding_sha256=%s\n' "$SUBJECT_BINDING_SHA256"
@@ -134,9 +136,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C helper rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
-          test -z "$(git -C helper status --porcelain=v1 --untracked-files=no)"
+          test -z "$(git -C helper status --porcelain=v1 --untracked-files=normal)"
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
-          test -z "$(git -C subject status --porcelain=v1 --untracked-files=no)"
+          test -z "$(git -C subject status --porcelain=v1 --untracked-files=normal)"
 
       - name: Emit candidate qualification receipt
         id: receipt
