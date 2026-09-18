@@ -1,0 +1,136 @@
+name: DE-001A Cosmology Nix Closure
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-cosmology-research/nix/**"
+      - "crates/domains/symthaea-cosmology-research/references/de001a_execution_closure_v2.json"
+      - "crates/domains/symthaea-cosmology-research/tests/de001a_execution_closure_v2.rs"
+      - "docs/research/DE_001A_NIX_CLOSURE_IMPLEMENTATION_2026-09-18.md"
+      - ".github/workflows/de001a-cosmology-nix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: de001a-cosmology-nix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  closure:
+    name: DE-001A Nix environment qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FLAKE_PATH: ./crates/domains/symthaea-cosmology-research/nix
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
+
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind execution subject
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          actual_tree="$(git rev-parse HEAD^{tree})"
+          test "$actual_head" = "$EXPECTED_HEAD"
+          echo "head=$actual_head" >> "$GITHUB_OUTPUT"
+          echo "tree=$actual_tree" >> "$GITHUB_OUTPUT"
+          echo "Subject HEAD: $actual_head"
+          echo "Subject TREE: $actual_tree"
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3
+        with:
+          enable_kvm: false
+          extra_nix_config: |
+            sandbox = true
+            experimental-features = nix-command flakes
+
+      - name: Verify flake lock is immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="$(sha256sum "$FLAKE_PATH/flake.lock" | awk '{print $1}')"
+          nix flake metadata "$FLAKE_PATH" --no-update-lock-file --json > de001a-flake-metadata.json
+          after="$(sha256sum "$FLAKE_PATH/flake.lock" | awk '{print $1}')"
+          test "$before" = "$after"
+          echo "flake_lock_sha256=$before" >> "$GITHUB_ENV"
+
+      - name: Qualify environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix flake check "$FLAKE_PATH" --no-update-lock-file --print-build-logs
+          nix build "$FLAKE_PATH#checks.x86_64-linux.environment" \
+            --no-update-lock-file --print-build-logs --no-link
+
+      - name: Realize environment identity
+        id: environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_path="$(nix build "$FLAKE_PATH#environment" \
+            --no-update-lock-file --print-out-paths --no-link)"
+          test -n "$env_path"
+          nar_hash="$(nix hash path "$env_path")"
+          closure_size="$(nix path-info -S "$env_path" | awk '{print $2}')"
+          nix path-info --json "$env_path" > de001a-environment-path-info.json
+          printf '%s\n' "$env_path" > de001a-environment-store-path.txt
+          echo "store_path=$env_path" >> "$GITHUB_OUTPUT"
+          echo "nar_hash=$nar_hash" >> "$GITHUB_OUTPUT"
+          echo "closure_size=$closure_size" >> "$GITHUB_OUTPUT"
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+
+      - name: Write environment qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          metadata_sha256="$(sha256sum de001a-flake-metadata.json 2>/dev/null | awk '{print $1}' || true)"
+          {
+            echo "protocol=DE-001A-closure-v2"
+            echo "head=$(git rev-parse HEAD)"
+            echo "tree=$(git rev-parse HEAD^{tree})"
+            echo "base=${EXPECTED_BASE}"
+            echo "flake_lock_sha256=${flake_lock_sha256:-UNAVAILABLE}"
+            echo "flake_metadata_sha256=${metadata_sha256:-UNAVAILABLE}"
+            echo "nix_version=$(nix --version 2>/dev/null || echo UNAVAILABLE)"
+            echo "environment_store_path=${{ steps.environment.outputs.store_path }}"
+            echo "environment_nar_hash=${{ steps.environment.outputs.nar_hash }}"
+            echo "environment_closure_size=${{ steps.environment.outputs.closure_size }}"
+            echo "workflow_run_id=${GITHUB_RUN_ID}"
+            echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "job_status=${{ job.status }}"
+            echo "authority=environment-qualification-only"
+            echo "scientific_claim=NONE"
+          } > de001a-environment-receipt.txt
+          cat de001a-environment-receipt.txt
+
+      - name: Upload environment qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-environment-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            de001a-environment-receipt.txt
+            de001a-flake-metadata.json
+            de001a-environment-path-info.json
+            de001a-environment-store-path.txt
+          if-no-files-found: warn
+          retention-days: 30
