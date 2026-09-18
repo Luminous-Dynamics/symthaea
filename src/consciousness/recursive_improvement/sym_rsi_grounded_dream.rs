@@ -33,12 +33,12 @@ use symthaea_dream::{DreamEngine, DreamEngineConfig, DreamableAction, Transition
 pub const SYM_RSI_001_GROUNDED_DREAM_SCHEMA: &str =
     "symthaea.sym-rsi-001.grounded-dream-model.v1";
 pub const SYM_RSI_001_GROUNDED_DREAM_POLICY_ID: &str =
-    "sym-rsi-grounded-dream-policy-v5";
+    "sym-rsi-grounded-dream-policy-v6";
 pub const DREAM_STATE_DIM: usize = 16;
 pub const DREAM_RISK_PENALTY: f32 = 0.10;
 pub const DREAM_OVERRIDE_MARGIN: f32 = 0.01;
 pub const SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE: &str =
-    "domain-conditioned-action/observed-action-support-gate/5-model-simulations-per-candidate/mean-predicted-task-quality-minus-0.10-task-regression-probability/0.01-override-margin/v5";
+    "domain-conditioned-action/observed-action-support-gate/local-state-support-shrinkage/5-model-simulations-per-candidate/support-adjusted-task-quality-minus-0.10-task-regression-probability/0.01-override-margin/v6";
 pub const DREAM_ACTION_FINGERPRINT_SEMANTICS: &str =
     "symthaea-dream/default-hasher(debug-domain-conditioned-action)/environment-bound-v2";
 
@@ -158,6 +158,8 @@ pub struct DreamActionPrediction {
     pub model_simulation_count: usize,
     pub score: f32,
     pub predicted_task_quality: f32,
+    pub support_adjusted_task_quality: f32,
+    pub mean_support_similarity: f32,
     pub failure_probability: f32,
     pub model_confidence: f32,
     pub epistemic: EpistemicWorldRecord,
@@ -258,13 +260,16 @@ impl FixturePolicy for GroundedDreamPolicy {
             } else {
                 TaskPredictionSummary {
                     mean_quality: state.quality.clamp(0.0, 1.0) as f32,
+                    support_adjusted_mean_quality: state.quality.clamp(0.0, 1.0) as f32,
+                    mean_support_similarity: 0.0,
                     failure_probability: 1.0,
                     confidence: 0.0,
                     simulations_run: 0,
                 }
             };
             let predicted_task_quality = task_prediction.mean_quality;
-            let score = predicted_task_quality
+            let support_adjusted_task_quality = task_prediction.support_adjusted_mean_quality;
+            let score = support_adjusted_task_quality
                 - DREAM_RISK_PENALTY * task_prediction.failure_probability;
             let kind = if action == base_action {
                 WorldEvidenceKind::ModelPredicted
@@ -276,6 +281,8 @@ impl FixturePolicy for GroundedDreamPolicy {
                 &state_digest,
                 action,
                 predicted_task_quality,
+                support_adjusted_task_quality,
+                task_prediction.mean_support_similarity,
                 task_prediction.failure_probability,
                 task_prediction.confidence,
                 training_support_count,
@@ -289,6 +296,8 @@ impl FixturePolicy for GroundedDreamPolicy {
                 model_simulation_count: task_prediction.simulations_run,
                 score,
                 predicted_task_quality,
+                support_adjusted_task_quality,
+                mean_support_similarity: task_prediction.mean_support_similarity,
                 failure_probability: task_prediction.failure_probability,
                 model_confidence: task_prediction.confidence,
                 epistemic: EpistemicWorldRecord {
@@ -296,12 +305,16 @@ impl FixturePolicy for GroundedDreamPolicy {
                     provenance_digest,
                     model_version: Some(self.model.model_version.clone()),
                     confidence: Some(task_prediction.confidence as f64),
-                    support_distance: None,
+                    support_distance: Some(
+                        (1.0 - task_prediction.mean_support_similarity.clamp(0.0, 1.0))
+                            as f64,
+                    ),
                     causal_assumptions: vec![
                         "nearest observed state/action transition memory".into(),
                         "candidate and base action classes require recorded training support".into(),
                         "illegal or unsupported perturbation samples fall back to the original supported legal action".into(),
-                        "task failure means predicted quality regression relative to the current state".into(),
+                        "predicted quality change is shrunk toward current observed quality by nearest training-state cosine support".into(),
+                        "task failure means support-adjusted predicted quality regression relative to the current state".into(),
                         SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE.into(),
                     ],
                     empirically_validated: false,
@@ -456,7 +469,7 @@ pub fn train_grounded_dream_model(
         environment_digest: manifest.environment_digest.clone(),
         candidate_family_digest: canonical_candidate_family_digest(),
         training_corpus_evidence_digest: training_corpus.receipt.evidence_digest.clone(),
-        model_version: "symthaea-dream-transition-memory-v2-support-gated".into(),
+        model_version: "symthaea-dream-transition-memory-v3-local-support".into(),
         action_fingerprint_semantics: DREAM_ACTION_FINGERPRINT_SEMANTICS.into(),
         observation_count,
         action_support,
@@ -663,6 +676,8 @@ fn task_prediction_summary(
 ) -> TaskPredictionSummary {
     let simulations = engine.config().counterfactual_count.max(1);
     let mut total_quality = 0.0_f32;
+    let mut total_support_adjusted_quality = 0.0_f32;
+    let mut total_support_similarity = 0.0_f32;
     let mut regression_count = 0_usize;
 
     for index in 0..simulations {
@@ -675,21 +690,44 @@ fn task_prediction_summary(
         } else {
             action
         };
+        let support_similarity = engine
+            .nearest_observed_support_similarity(state, &sampled_action)
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0);
         let outcome = engine.predict_counterfactual_outcome(state, &sampled_action);
         let predicted_quality = extract_predicted_task_quality(&outcome);
+        let support_adjusted_quality = support_adjusted_quality(
+            current_quality,
+            predicted_quality,
+            support_similarity,
+        );
         total_quality += predicted_quality;
-        if predicted_quality + f32::EPSILON < current_quality {
+        total_support_adjusted_quality += support_adjusted_quality;
+        total_support_similarity += support_similarity;
+        if support_adjusted_quality + f32::EPSILON < current_quality {
             regression_count += 1;
         }
     }
 
     let failure_probability = regression_count as f32 / simulations as f32;
+    let mean_support_similarity = total_support_similarity / simulations as f32;
     TaskPredictionSummary {
         mean_quality: total_quality / simulations as f32,
+        support_adjusted_mean_quality: total_support_adjusted_quality / simulations as f32,
+        mean_support_similarity,
         failure_probability,
-        confidence: 1.0 - failure_probability,
+        confidence: (1.0 - failure_probability) * mean_support_similarity,
         simulations_run: simulations,
     }
+}
+
+fn support_adjusted_quality(
+    current_quality: f32,
+    predicted_quality: f32,
+    support_similarity: f32,
+) -> f32 {
+    let support = support_similarity.clamp(0.0, 1.0);
+    (current_quality + support * (predicted_quality - current_quality)).clamp(0.0, 1.0)
 }
 
 fn extract_predicted_task_quality(outcome: &[f32]) -> f32 {
@@ -708,6 +746,8 @@ fn prediction_provenance_digest(
     state_digest: &str,
     action: u8,
     predicted_task_quality: f32,
+    support_adjusted_task_quality: f32,
+    mean_support_similarity: f32,
     failure_probability: f32,
     confidence: f32,
     training_support_count: usize,
@@ -715,7 +755,7 @@ fn prediction_provenance_digest(
     model_simulation_count: usize,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v3\0");
+    hasher.update(b"symthaea.sym-rsi-001.dream-prediction.v4\0");
     for value in [
         model.evidence_digest.as_str(),
         state_digest,
@@ -727,6 +767,8 @@ fn prediction_provenance_digest(
     }
     hasher.update(&[action]);
     hasher.update(&predicted_task_quality.to_bits().to_le_bytes());
+    hasher.update(&support_adjusted_task_quality.to_bits().to_le_bytes());
+    hasher.update(&mean_support_similarity.to_bits().to_le_bytes());
     hasher.update(&failure_probability.to_bits().to_le_bytes());
     hasher.update(&confidence.to_bits().to_le_bytes());
     hasher.update(&(training_support_count as u64).to_le_bytes());
@@ -830,6 +872,15 @@ mod tests {
     }
 
     #[test]
+    fn local_support_shrinkage_is_conservative_and_bounded() {
+        assert_eq!(support_adjusted_quality(0.4, 0.9, 0.0), 0.4);
+        assert!((support_adjusted_quality(0.4, 0.9, 0.5) - 0.65).abs() < 1e-6);
+        assert_eq!(support_adjusted_quality(0.4, 0.9, 1.0), 0.9);
+        assert_eq!(support_adjusted_quality(0.8, 0.2, 0.0), 0.8);
+        assert_eq!(support_adjusted_quality(0.8, 0.2, 1.0), 0.2);
+    }
+
+    #[test]
     fn action_support_census_is_complete_for_recorded_training_edges() {
         let manifest = canonical_sym_rsi_001_fixture_manifest("pre", "subject", "env");
         let training =
@@ -916,7 +967,10 @@ mod tests {
         assert!(!decision.generated_evidence_promoted);
         assert!(decision.predictions.iter().all(|prediction| {
             prediction.predicted_task_quality.is_finite()
+                && prediction.support_adjusted_task_quality.is_finite()
                 && (0.0..=1.0).contains(&prediction.predicted_task_quality)
+                && (0.0..=1.0).contains(&prediction.support_adjusted_task_quality)
+                && (0.0..=1.0).contains(&prediction.mean_support_similarity)
                 && !prediction.epistemic.kind.is_empirical()
                 && !prediction.epistemic.empirically_validated
                 && !prediction.epistemic.may_promote_confidence()
@@ -978,6 +1032,8 @@ mod tests {
             state.quality as f32,
         );
         assert!(summary.mean_quality.is_finite());
+        assert!(summary.support_adjusted_mean_quality.is_finite());
+        assert!((0.0..=1.0).contains(&summary.mean_support_similarity));
         assert!((0.0..=1.0).contains(&summary.failure_probability));
         assert!((0.0..=1.0).contains(&summary.confidence));
         assert_eq!(summary.simulations_run, 5);
