@@ -16,8 +16,8 @@ use super::belief_mutation_firewall::BeliefMutationReceiptId;
 use super::belief_mutation_seal_wire::{
     BeliefMutationSealWireSnapshotV1, WireBeliefMutationEvidenceSealV1,
 };
-use super::belief_revision_receipt::{BeliefRevisionReceiptId, RevisionEvidenceSnapshot};
 use super::belief_mutation_transaction::SealedClaimSnapshot;
+use super::belief_revision_receipt::{BeliefRevisionReceiptId, RevisionEvidenceSnapshot};
 use super::claim_evidence::{ClaimId, ClaimKind, EvidenceId, EvidenceKind, EvidencePolarity};
 use super::epistemic_restart_historical_replay_eligibility::{
     HistoricalReplayEligibilityError, HistoricalReplayEligibilityReceiptV1,
@@ -292,6 +292,37 @@ impl HistoricalEvidenceProjectionV1 {
     pub fn projection_digest(&self) -> HistoricalEvidenceProjectionDigestV1 {
         self.projection_digest
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify_against(
+        &self,
+        restart: &EpistemicRestartWireSnapshotV2,
+        seals: &BeliefMutationSealWireSnapshotV1,
+        restart_receipt: &EpistemicRestartValidationReceiptV1,
+        checkpoint: &VerifiedRestartMutationSealCheckpointV1,
+        admission: &ProtectedMutationSealAdmissionV1,
+        currentness: &VerifiedRestartMutationSealCurrentnessV1,
+        eligibility: &HistoricalReplayEligibilityReceiptV1,
+        projected_at_cycle: u64,
+    ) -> Result<(), HistoricalEvidenceProjectionError> {
+        let live = Self::project(
+            restart,
+            seals,
+            restart_receipt,
+            checkpoint,
+            admission,
+            currentness,
+            eligibility,
+            projected_at_cycle,
+        )?;
+        if &live != self {
+            return Err(HistoricalEvidenceProjectionError::ProjectionMismatch);
+        }
+        if digest_projection(self)? != self.projection_digest {
+            return Err(HistoricalEvidenceProjectionError::ProjectionDigestMismatch);
+        }
+        Ok(())
+    }
 }
 
 fn project_record(
@@ -433,7 +464,9 @@ fn digest_projection(
         &mut hasher,
         projection.total_excluded_with_observation_not_after_seal,
     )?;
-    hasher.update(&[u8::from(projection.membership_derived_from_protected_census)]);
+    hasher.update(&[u8::from(
+        projection.membership_derived_from_protected_census,
+    )]);
     hasher.update(&[u8::from(projection.observation_cycle_used_as_membership)]);
     hasher.update(&[u8::from(projection.ledger_constructed)]);
     hasher.update(&[u8::from(projection.historical_replay_authorized)]);
@@ -560,8 +593,14 @@ pub enum HistoricalEvidenceProjectionError {
         projected_at_cycle: u64,
         expires_at_cycle: u64,
     },
-    TooManyProjectionRecords { actual: usize, maximum: usize },
-    TooManyProjectedEvidenceRecords { actual: usize, maximum: usize },
+    TooManyProjectionRecords {
+        actual: usize,
+        maximum: usize,
+    },
+    TooManyProjectedEvidenceRecords {
+        actual: usize,
+        maximum: usize,
+    },
     FinalClaimMissing(ClaimId),
     FinalClaimChanged(ClaimId),
     DuplicateSealedEvidence(BeliefMutationReceiptId),
@@ -573,6 +612,8 @@ pub enum HistoricalEvidenceProjectionError {
         expected_claim: ClaimId,
         actual_claim: ClaimId,
     },
+    ProjectionMismatch,
+    ProjectionDigestMismatch,
     LengthOverflow,
 }
 
