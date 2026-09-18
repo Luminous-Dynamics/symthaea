@@ -4,21 +4,26 @@
 
 Draft authority contract for provider-independent mathematical build evidence.
 
-This tranche changes no Cargo dependency and no `Cargo.lock` bytes. The normative semantic validator is:
+This tranche changes no Cargo dependency and no `Cargo.lock` bytes. The normative single-receipt semantic validator is:
 
 `.github/scripts/validate-math-build-receipt.py`
+
+Cross-receipt predecessor continuity is enforced by:
+
+`.github/scripts/validate-math-build-receipt-chain.py`
 
 The JSON interchange description is:
 
 `.github/schemas/math-build-receipt-v1.schema.json`
 
-The JSON Schema is structural. The validator is authoritative for role transitions, receipt hashing, sorted collections, required build gates, and claim ceilings.
+The JSON Schema is structural. The validators are authoritative for role transitions, receipt hashing, sorted collections, required build gates, predecessor continuity, and claim ceilings.
 
 ## Core rule
 
 ```text
 valid receipt
     != successful receipt
+    != valid promotion chain
     != artifact contained in source
     != exact-head build qualification
     != formal authority
@@ -26,6 +31,8 @@ valid receipt
 ```
 
 A receipt may be structurally valid while recording a failed execution. Failure evidence is still evidence and must not be discarded merely because it cannot promote authority.
+
+An individually valid receipt may also be invalid as a member of a promotion chain if it names or describes a different predecessor than the one actually supplied for review.
 
 ## Roles
 
@@ -88,6 +95,57 @@ Canonicalization is:
 
 The v1 schema forbids floats specifically to avoid cross-runtime numeric serialization ambiguity. A future schema requiring non-integer numerical evidence must define its canonical numeric encoding explicitly rather than silently relaxing this rule.
 
+## Cross-receipt continuity
+
+A predecessor digest is necessary but not sufficient for authority promotion. The supplied predecessor content must agree with the successor's semantic claims.
+
+For a generation → replay promotion, the chain validator requires:
+
+```text
+replay.generation_receipt_sha256
+    == generation.receipt_sha256
+
+replay.old_subject
+    == generation.source_subject
+
+replay.generated_artifact_sha256
+    == generation.lock_candidate_sha256
+
+replay.old_subject
+    != replay.repaired_subject
+```
+
+Both generation and replay receipts must independently validate and have `outcome=pass`.
+
+For replay → exact-head qualification, it additionally requires:
+
+```text
+exact.replay_receipt_sha256
+    == replay.receipt_sha256
+
+exact.subject
+    == replay.repaired_subject
+
+exact.contained_lock_sha256
+    == replay.replayed_artifact_sha256
+```
+
+The exact-head receipt must independently validate and have `outcome=pass`.
+
+This closes a substitution class where each receipt can be internally valid while a successor is presented beside a different predecessor with the same role but different subject/artifact content.
+
+The chain validator's embedded adversarial fixtures cover at least:
+
+- replay pointing at a different generation digest;
+- replay substituting a different old subject;
+- replay substituting different but internally byte-equal generated/replayed artifacts;
+- exact-head pointing at a different replay digest;
+- exact-head substituting a different repaired subject;
+- exact-head substituting a different contained lock;
+- failed generation evidence being used as if it were a promotion predecessor.
+
+Source presence of those fixtures is not execution authority. They remain pending until executed in a qualified environment.
+
 ## Authority-bearing vs provenance-only fields
 
 Subject identities, artifact digests, recipe semantics, dependency identities, gate identities/results, and predecessor receipt digests are authority-bearing.
@@ -98,7 +156,7 @@ Authentication of an envelope or signature proves who/what attested to bytes; it
 
 ## Provider independence
 
-The validator is Python-stdlib-only by design. It must remain runnable without Cargo dependency resolution so it cannot create or repair the dependency graph it is judging.
+Both validators are Python-stdlib-only by design. They must remain runnable without Cargo dependency resolution so receipt validation cannot create or repair the dependency graph it is judging.
 
 Future producers may be:
 
@@ -132,9 +190,9 @@ Neither wrapping nor signing may promote a failing or weaker receipt role into a
 FrozenSourceSubject
         ↓ generation PASS
 GeneratedArtifactCandidate
-        ↓ exact-byte replay PASS
+        ↓ generation/replay continuity + exact-byte replay PASS
 RepairedContainedSubject
-        ↓ exact-head build PASS
+        ↓ replay/exact-head continuity + exact-head build PASS
 PackageScopedBuildQualified
 ```
 
@@ -143,6 +201,7 @@ Forbidden shortcuts:
 ```text
 ArtifactGenerationReceipt -X-> PackageScopedBuildQualified
 ArtifactReplayReceipt     -X-> PackageScopedBuildQualified
+Digest-only predecessor   -X-> ValidPromotionChain
 Any build receipt         -X-> FormalAuthority
 Any build receipt         -X-> MathematicalAuthority
 ```
@@ -155,10 +214,18 @@ For MATH-BUILD-001 / #3828:
 2. the evidence artifact must be inspected before replay;
 3. exact accepted lock bytes are replayed into the repaired #3792 subject;
 4. the replay produces an `artifact_replay` receipt;
-5. the repaired #3792 exact head runs package-scoped qualification and may produce `exact_head_build_qualification`;
-6. only then may downstream mathematical branches be re-frozen onto that build-qualified subject.
+5. generation/replay chain continuity must validate;
+6. the repaired #3792 exact head runs package-scoped qualification and may produce `exact_head_build_qualification`;
+7. full three-receipt chain continuity must validate;
+8. only then may downstream mathematical branches be re-frozen onto that build-qualified subject.
 
 The later Lean-bridge dependency transition is a distinct lock transition and requires its own generation/replay/exact-head receipt lineage.
+
+## Execution state
+
+As of this tranche, the source and embedded self-tests exist, but no hosted or otherwise qualified execution receipt for the validators is claimed.
+
+A local independent execution attempt from this ChatGPT environment could not resolve the public GitHub host, so no local PASS is inferred from that attempt either.
 
 ## Nonclaims
 
