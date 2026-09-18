@@ -11,10 +11,13 @@
 //!
 //! ```text
 //! CognitiveLoop
-//!   → HumanoidCommand (21 torques, ±1)
-//!   → SafetyInterlock::filter_command()   ← watchdog, e-stop, bounds
+//!   → normalized-torque policy intent
+//!   → humanoid ActuationAdapter
+//!   → PhysicalActuationCommand(NormalizedPosition)
+//!   → PCA9685 position-profile admission
+//!   → legacy HAL safety/runtime compatibility path
 //!   → ServoOutput::apply()                ← calibration, slew-rate limit
-//!   → Pca9685 boards (I2C → PWM → servos)
+//!   → Pca9685 boards (I2C → PWM → position servos)
 //!
 //! IMU sensor (I2C)
 //!   → EmbeddedSensor<I2C, Mpu6050Decoder>
@@ -22,6 +25,10 @@
 //!   → SensorInput bridge (in main crate)
 //!   → CognitiveLoop perception
 //! ```
+//!
+//! The typed PCA9685 boundary is explicitly position-actuated. The existing
+//! `HumanoidCommand` runtime path remains a compatibility carrier during the
+//! migration and must not be interpreted as evidence of physical torque control.
 //!
 //! ## Board Layout
 //!
@@ -51,7 +58,8 @@
 //! servo.init(50.0).unwrap();
 //! servo.enable().unwrap();
 //!
-//! // Safety interlock filters commands
+//! // Legacy compatibility path. New physical integrations should bind an
+//! // explicit position-mode PhysicalActuationCommand before this carrier.
 //! let mut safety = SafetyInterlock::new();
 //! let cmd = HumanoidCommand::zero();
 //! let safe_cmd = safety.filter_command(&cmd).unwrap();
@@ -69,6 +77,7 @@ pub mod interlock;
 pub mod mock;
 pub mod motor_safety;
 pub mod pca9685;
+pub mod position_actuation;
 pub mod recording;
 pub mod runtime;
 pub mod sensor;
@@ -84,6 +93,9 @@ pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
 pub use motor_safety::MotorSafetyLevel;
 pub use pca9685::Pca9685;
+pub use position_actuation::{
+    PCA9685_POSITION_PROFILE_ID, Pca9685PositionCapabilities, lower_pca9685_position_command,
+};
 pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
 pub use runtime::{
     AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, HealthStatus, RuntimeTelemetry,
