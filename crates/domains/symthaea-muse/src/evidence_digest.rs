@@ -4,6 +4,8 @@
 
 #[path = "intervention_effect_evidence.rs"]
 pub mod intervention_effect_evidence;
+#[path = "intervention_effect_panel.rs"]
+pub mod intervention_effect_panel;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
