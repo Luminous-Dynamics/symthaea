@@ -315,7 +315,9 @@ fn push_optional(hasher: &mut blake3::Hasher, value: Option<&str>) {
             hasher.update(b"some\0");
             push_field(hasher, value);
         }
-        None => hasher.update(b"none\0"),
+        None => {
+            hasher.update(b"none\0");
+        }
     }
 }
 
