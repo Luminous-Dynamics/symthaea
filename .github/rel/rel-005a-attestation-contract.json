@@ -1,0 +1,65 @@
+{
+  "schema": "symthaea.rel.attestation-contract.v1",
+  "authority": "AttestationContractOnly",
+  "relation": "REL-005A",
+  "parent_firewall_contract_head": "bc5992449452ecb0828c08a1ae236135b28b90c8",
+  "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+  "assembly_contract_head": "22a5e783805b8922bd370120f827f1b96b32f893",
+  "projection_contract_head": "07af7c4bdfdda377aa8175efe7a3233ce90e889e",
+  "comparison_subject_head": "9ed033eb5ad63baa90d9c25166ce9c14e68013cb",
+  "actions_attest": {
+    "release": "v4.2.2",
+    "commit": "1e69f48acb82d1966a394da916b4c1698aa569d6",
+    "mode": "provenance",
+    "subject": "rel-005a-qualified-capsule.tar"
+  },
+  "required_attestation_job_permissions": {
+    "contents": "read",
+    "id-token": "write",
+    "attestations": "write",
+    "artifact-metadata": "write"
+  },
+  "capsule_input_files": [
+    "predicate-contract-receipt.json",
+    "execution-v3-receipt.json",
+    "observation-seal-v3.json",
+    "comparison-only-qualification-receipt.json",
+    "qualification-input-manifest.json",
+    "qualification-assembly-receipt.json",
+    "qualification-only.json"
+  ],
+  "capsule_generated_files": [
+    "qualification-capsule-manifest.json"
+  ],
+  "canonical_tar": {
+    "compression": "none",
+    "sort": "bytewise basename ascending",
+    "mtime": 0,
+    "uid": 0,
+    "gid": 0,
+    "uname": "",
+    "gname": "",
+    "file_mode": "0644",
+    "pax_headers": false
+  },
+  "attestation_semantics": {
+    "proves": [
+      "the attested capsule digest was produced by the identified GitHub Actions workflow invocation",
+      "the capsule bytes are bound to GitHub OIDC/Sigstore provenance"
+    ],
+    "does_not_prove": [
+      "scientific truth",
+      "predicate correctness",
+      "qualification correctness beyond the attested bytes",
+      "independent replication"
+    ]
+  },
+  "claims": {
+    "capsule_built": false,
+    "attestation_created": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}

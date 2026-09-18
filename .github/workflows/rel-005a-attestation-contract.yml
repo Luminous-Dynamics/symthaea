@@ -1,0 +1,187 @@
+name: REL-005A Attestation Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-attestation-contract.json"
+      - ".github/rel/rel-005a-qualification-capsule.py"
+      - ".github/workflows/rel-005a-attestation-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-attestation-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: bc5992449452ecb0828c08a1ae236135b28b90c8
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  ATTEST_ACTION_COMMIT: 1e69f48acb82d1966a394da916b4c1698aa569d6
+
+jobs:
+  attestation-contract:
+    name: Verify AttestationContractOnly preregistration
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact attestation-contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-attestation-contract.json"
+            ".github/rel/rel-005a-qualification-capsule.py"
+            ".github/workflows/rel-005a-attestation-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify outcome-blind attestation authority contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path('.github/rel/rel-005a-attestation-contract.json')
+          c = json.loads(p.read_text())
+          assert c['schema'] == 'symthaea.rel.attestation-contract.v1'
+          assert c['authority'] == 'AttestationContractOnly'
+          assert c['relation'] == 'REL-005A'
+          assert c['parent_firewall_contract_head'] == 'bc5992449452ecb0828c08a1ae236135b28b90c8'
+          assert c['qualification_contract_head'] == '452f0324a561a2872c00b6197237d4db46189f8d'
+          assert c['assembly_contract_head'] == '22a5e783805b8922bd370120f827f1b96b32f893'
+          assert c['projection_contract_head'] == '07af7c4bdfdda377aa8175efe7a3233ce90e889e'
+          assert c['comparison_subject_head'] == '9ed033eb5ad63baa90d9c25166ce9c14e68013cb'
+          assert c['actions_attest'] == {
+              'release': 'v4.2.2',
+              'commit': '1e69f48acb82d1966a394da916b4c1698aa569d6',
+              'mode': 'provenance',
+              'subject': 'rel-005a-qualified-capsule.tar',
+          }
+          assert c['required_attestation_job_permissions'] == {
+              'contents': 'read',
+              'id-token': 'write',
+              'attestations': 'write',
+              'artifact-metadata': 'write',
+          }
+          assert len(c['capsule_input_files']) == 7
+          assert c['capsule_generated_files'] == ['qualification-capsule-manifest.json']
+          assert c['canonical_tar'] == {
+              'compression': 'none',
+              'sort': 'bytewise basename ascending',
+              'mtime': 0,
+              'uid': 0,
+              'gid': 0,
+              'uname': '',
+              'gname': '',
+              'file_mode': '0644',
+              'pax_headers': False,
+          }
+          assert not any(c['claims'].values())
+          semantics = c['attestation_semantics']
+          assert 'scientific truth' in semantics['does_not_prove']
+          assert 'independent replication' in semantics['does_not_prove']
+          PY
+
+      - name: Verify capsule builder capability isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/rel/rel-005a-qualification-capsule.py
+          python3 - <<'PY'
+          import pathlib
+          s = pathlib.Path('.github/rel/rel-005a-qualification-capsule.py').read_text()
+          forbidden = (
+              'import subprocess', 'from subprocess', 'import socket', 'from socket',
+              'import requests', 'from requests', 'import urllib', 'from urllib',
+              'compute_xenobot_graft_transform', 'translate_foreign_hypervector',
+              'POSITIVE_TOL', 'NEGATIVE_HELD_OUT_MIN_ERROR', 'NEGATIVE_DISPERSION_MIN',
+              'scientific_pass =', 'scientific_fail =',
+          )
+          for token in forbidden:
+              assert token not in s, f'forbidden attestation-input capability/token: {token}'
+          PY
+
+      - name: Run deterministic capsule adversarial self-test
+        shell: bash
+        env:
+          SELF_TEST: ${{ runner.temp }}/rel-005a-attestation-input-self-test.json
+        run: |
+          set -euo pipefail
+          python3 .github/rel/rel-005a-qualification-capsule.py --self-test | tee "${SELF_TEST}"
+          python3 - <<'PY'
+          import json, os, pathlib
+          r = json.loads(pathlib.Path(os.environ['SELF_TEST']).read_text())
+          assert r == {
+              'schema': 'symthaea.rel.attestation-input-self-test.v1',
+              'authority': 'AttestationContractOnly',
+              'deterministic_archive': True,
+              'creation_order_independent': True,
+              'nested_extra_rejected': True,
+              'missing_member_rejected': True,
+          }
+          PY
+
+      - name: Build static AttestationContractOnly receipt
+        shell: bash
+        env:
+          SELF_TEST: ${{ runner.temp }}/rel-005a-attestation-input-self-test.json
+          RECEIPT: ${{ runner.temp }}/rel-005a-attestation-contract-receipt.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def sha(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+          r = {
+              'schema': 'symthaea.rel.attestation-contract-static-receipt.v1',
+              'authority': 'AttestationContractOnly',
+              'subject_head': subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
+              'parent_head': subprocess.check_output(['git','rev-parse','HEAD^'], text=True).strip(),
+              'contract_sha256': sha('.github/rel/rel-005a-attestation-contract.json'),
+              'capsule_builder_sha256': sha('.github/rel/rel-005a-qualification-capsule.py'),
+              'self_test_sha256': sha(os.environ['SELF_TEST']),
+              'actions_attest_commit': os.environ['ATTEST_ACTION_COMMIT'],
+              'deterministic_capsule_contract_valid': True,
+              'attestation_created': False,
+              'claims': {
+                  'qualification_completed': False,
+                  'rel_005a_qualified': False,
+                  'scientific_pass': False,
+                  'scientific_fail': False,
+              },
+          }
+          pathlib.Path(os.environ['RECEIPT']).write_text(json.dumps(r, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(r, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload static attestation-contract evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-attestation-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/rel-005a-attestation-contract.json
+            ${{ runner.temp }}/rel-005a-attestation-input-self-test.json
+            ${{ runner.temp }}/rel-005a-attestation-contract-receipt.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          rm -rf .github/rel/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
