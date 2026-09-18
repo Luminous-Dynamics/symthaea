@@ -42,7 +42,7 @@ impl ClinicalDigestV1 {
         }
     }
 
-    pub const fn validate(&self) -> Result<(), ClinicalInferenceEnvelopeError> {
+    pub fn validate(&self) -> Result<(), ClinicalInferenceEnvelopeError> {
         if self.value == [0; 32] {
             return Err(ClinicalInferenceEnvelopeError::ZeroDigest);
         }
@@ -372,13 +372,12 @@ impl ClinicalInferenceEnvelopeV1 {
 
     /// Whether the inference was explicitly identified as out-of-distribution.
     #[must_use]
-    pub const fn is_out_of_distribution(&self) -> bool {
+    pub fn is_out_of_distribution(&self) -> bool {
         self.distribution.status == ClinicalDistributionStatusV1::OutOfDistribution
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case", tag = "kind")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ClinicalInferenceEnvelopeError {
     UnsupportedSchemaVersion { found: u16, expected: u16 },
     ClaimVocabulary(ClinicalClaimVocabularyError),
