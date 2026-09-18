@@ -6,4 +6,5 @@ license = "AGPL-3.0-or-later"
 description = "Bounded real-time runtime-plane primitives for Symthaea interfaces"
 
 [dependencies]
+arc-swap = "=1.9.2"
 symthaea-interface-types = { path = "../symthaea-interface-types" }
