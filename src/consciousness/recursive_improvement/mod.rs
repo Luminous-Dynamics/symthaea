@@ -54,6 +54,7 @@ pub mod active_inference_bridge;
 pub mod calibration;
 pub mod calibration_analytics;
 pub mod constraint_gate;
+pub mod domain_binding;
 pub mod dream_feedback;
 pub mod magi_integration;
 pub mod persistence;
@@ -80,8 +81,13 @@ pub use world_prediction::{
 
 // Calibration exports (MAGI Loop Step 2)
 pub use calibration::{
-    BrierScoreTracker, CalibrationConfig, CalibrationSummary, DomainCalibration, DomainStats,
-    ResolvedPredictionRecord,
+    BrierScoreTracker, CalibrationConfig, CalibrationSummary, DeclaredDomainCalibration,
+    DomainCalibration, DomainStats, ResolvedPredictionRecord,
+};
+
+// Typed calibration-domain binding (CAL-004A)
+pub use domain_binding::{
+    BoundPredictionDomain, CalibrationDomainSource, DeclaredCalibrationEvidence,
 };
 
 // Constraint Gate exports (MAGI Loop Step 3.5 - UPGRADE B)
