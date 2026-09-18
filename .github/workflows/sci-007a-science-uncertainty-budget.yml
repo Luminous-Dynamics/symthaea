@@ -1,0 +1,149 @@
+name: SCI-007A Science Uncertainty Budget
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-science-research/**"
+      - "crates/domains/symthaea-aesthetic-science/**"
+      - ".github/workflows/sci-007a-science-uncertainty-budget.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sci-007a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 72a9d13da7672aad5a9fa7224f5101fff5cce085
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-bootstrap:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact head, parent, and one-file qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/sci-007a-science-uncertainty-budget.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind uncertainty and downstream adapter source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/core/symthaea-science-research
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-aesthetic-science
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Materialize additive Cargo lock candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo check -p symthaea-science-research
+          cargo check -p symthaea-aesthetic-science
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.patch"
+          test -s "$RUNNER_TEMP/Cargo.lock.patch"
+          grep -F 'name = "symthaea-science-research"' Cargo.lock
+          grep -F 'name = "symthaea-aesthetic-science"' Cargo.lock
+          if grep -E '^-[^-]' "$RUNNER_TEMP/Cargo.lock.patch"; then
+            echo "SCI-007A lock materialization is not additive-only"
+            cat "$RUNNER_TEMP/Cargo.lock.patch"
+            exit 1
+          fi
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-science-research -p symthaea-aesthetic-science
+
+      - name: Unit and downstream compatibility tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-science-research
+          cargo test -p symthaea-aesthetic-science
+
+      - name: Strict Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy -p symthaea-science-research --all-targets -- -D warnings
+          cargo clippy -p symthaea-aesthetic-science --all-targets -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected="$({ git status --porcelain=v1 || true; } | grep -v '^ M Cargo.lock$' || true)"
+          if test -n "$unexpected"; then
+            echo "unexpected tracked/untracked mutation after qualification:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/core/symthaea-science-research
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-aesthetic-science
+
+      - name: Write bootstrap receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sci-007a-evidence
+          cp "$RUNNER_TEMP/Cargo.lock.generated" sci-007a-evidence/Cargo.lock.generated
+          cp "$RUNNER_TEMP/Cargo.lock.patch" sci-007a-evidence/Cargo.lock.patch
+          {
+            echo "program=SCI-007A"
+            echo "authority=bootstrap-source-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "generated_lock_sha256=$(sha256sum sci-007a-evidence/Cargo.lock.generated | cut -d' ' -f1)"
+            echo "lock_patch_sha256=$(sha256sum sci-007a-evidence/Cargo.lock.patch | cut -d' ' -f1)"
+            echo "uncertainty_source_immutable=PASS"
+            echo "downstream_adapter_tests=PASS"
+            echo "format=PASS"
+            echo "tests=PASS"
+            echo "clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > sci-007a-evidence/receipt.txt
+
+      - name: Upload bootstrap evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sci-007a-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}
+          path: sci-007a-evidence/
+          if-no-files-found: error
