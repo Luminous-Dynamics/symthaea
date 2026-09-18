@@ -7,16 +7,16 @@
 //! v1 bound exact evidence digests but deliberately left their semantic digest
 //! namespace implicit. That is sufficient for internal experiments, but not for
 //! long-lived external medical interoperability. v2 makes evidence namespace,
-//! artifact identity, digest, and execution-input binding explicit while still
-//! carrying **no clinical authority**.
+//! artifact identity, digest, execution-input binding, model lineage, calibration
+//! evidence, and distribution evidence explicit while still carrying **no
+//! clinical authority**.
 
 use crate::claims::{
     ClinicalClaimSemanticsV1, ClinicalClaimVocabularyError, ClinicalIntendedUseClass,
 };
 use crate::inference::{
     AlternativeClinicalHypothesisV1, ClinicalArtifactIdentityV1, ClinicalCalibrationStatusV1,
-    ClinicalDigestV1, ClinicalDistributionAssessmentV1, ClinicalDistributionStatusV1,
-    ClinicalEvidenceRoleV1, ClinicalModelIdentityV1, ClinicalUncertaintyV1,
+    ClinicalDigestV1, ClinicalDistributionStatusV1, ClinicalEvidenceRoleV1,
     MissingClinicalEvidenceV1, MissingEvidenceCriticalityV1,
 };
 use serde::{Deserialize, Serialize};
@@ -80,12 +80,43 @@ impl ClinicalSubjectBindingV2 {
     }
 }
 
-/// Exact execution identity whose inputs are themselves typed evidence identities.
+/// Exact model identity plus typed training/evaluation/calibration evidence.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ClinicalModelIdentityV2 {
+    pub model: ClinicalArtifactIdentityV1,
+    pub input_schema_digest: ClinicalDigestV1,
+    pub output_schema_digest: ClinicalDigestV1,
+    pub training_lineage: Option<ClinicalEvidenceIdentityV2>,
+    pub evaluation_lineage: Option<ClinicalEvidenceIdentityV2>,
+    pub calibration_evidence: Option<ClinicalEvidenceIdentityV2>,
+}
+
+impl ClinicalModelIdentityV2 {
+    fn validate(&self) -> Result<(), ClinicalInferenceEnvelopeV2Error> {
+        validate_artifact(&self.model)?;
+        validate_digest(&self.input_schema_digest)?;
+        validate_digest(&self.output_schema_digest)?;
+        for identity in [
+            self.training_lineage.as_ref(),
+            self.evaluation_lineage.as_ref(),
+            self.calibration_evidence.as_ref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            identity.validate()?;
+        }
+        Ok(())
+    }
+}
+
+/// Exact execution identity whose runtime inputs are typed evidence identities.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct ClinicalExecutionIdentityV2 {
     pub engine: ClinicalArtifactIdentityV1,
-    pub model: ClinicalModelIdentityV1,
+    pub model: ClinicalModelIdentityV2,
     pub runtime_digest: ClinicalDigestV1,
     pub configuration_digest: ClinicalDigestV1,
     pub input_evidence: Vec<ClinicalEvidenceIdentityV2>,
@@ -97,7 +128,7 @@ pub struct ClinicalExecutionIdentityV2 {
 impl ClinicalExecutionIdentityV2 {
     fn validate(&self) -> Result<(), ClinicalInferenceEnvelopeV2Error> {
         validate_artifact(&self.engine)?;
-        validate_model(&self.model)?;
+        self.model.validate()?;
         validate_digest(&self.runtime_digest)?;
         validate_digest(&self.configuration_digest)?;
         validate_identifier(&self.operation, "execution operation", MAX_ARTIFACT_ID_LEN)?;
@@ -119,6 +150,25 @@ impl ClinicalExecutionIdentityV2 {
     }
 }
 
+/// Uncertainty with typed calibration evidence.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ClinicalUncertaintyV2 {
+    pub epistemic: Option<f64>,
+    pub aleatoric: Option<f64>,
+    pub calibrated_probability: Option<f64>,
+    pub calibration_status: ClinicalCalibrationStatusV1,
+    pub calibration_evidence: Option<ClinicalEvidenceIdentityV2>,
+}
+
+/// Distribution-shift state with typed detector evidence.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ClinicalDistributionAssessmentV2 {
+    pub status: ClinicalDistributionStatusV1,
+    pub detector_evidence: Option<ClinicalEvidenceIdentityV2>,
+}
+
 /// External-interoperability form of an evidence-bound Symthaea inference.
 ///
 /// This is still evidence, not authority. No field authorizes diagnosis,
@@ -133,8 +183,8 @@ pub struct ClinicalInferenceEnvelopeV2 {
     pub evidence: Vec<ClinicalEvidenceRefV2>,
     pub alternatives: Vec<AlternativeClinicalHypothesisV1>,
     pub missing_evidence: Vec<MissingClinicalEvidenceV1>,
-    pub uncertainty: ClinicalUncertaintyV1,
-    pub distribution: ClinicalDistributionAssessmentV1,
+    pub uncertainty: ClinicalUncertaintyV2,
+    pub distribution: ClinicalDistributionAssessmentV2,
     pub execution: ClinicalExecutionIdentityV2,
     pub generated_at_micros: i64,
 }
@@ -196,11 +246,15 @@ impl ClinicalInferenceEnvelopeV2 {
         }
 
         for missing in &self.missing_evidence {
-            validate_identifier(&missing.requirement_id, "missing-evidence requirement id", MAX_ARTIFACT_ID_LEN)?;
+            validate_identifier(
+                &missing.requirement_id,
+                "missing-evidence requirement id",
+                MAX_ARTIFACT_ID_LEN,
+            )?;
             validate_identifier(&missing.description, "missing-evidence description", usize::MAX)?;
         }
 
-        validate_uncertainty(&self.uncertainty)?;
+        validate_uncertainty(&self.uncertainty, &self.execution.model)?;
         validate_distribution(&self.distribution)?;
         Ok(())
     }
@@ -255,25 +309,9 @@ fn validate_artifact(
     validate_digest(&artifact.digest)
 }
 
-fn validate_model(model: &ClinicalModelIdentityV1) -> Result<(), ClinicalInferenceEnvelopeV2Error> {
-    validate_artifact(&model.model)?;
-    validate_digest(&model.input_schema_digest)?;
-    validate_digest(&model.output_schema_digest)?;
-    for digest in [
-        model.training_lineage_digest,
-        model.evaluation_lineage_digest,
-        model.calibration_evidence_digest,
-    ]
-    .into_iter()
-    .flatten()
-    {
-        validate_digest(&digest)?;
-    }
-    Ok(())
-}
-
 fn validate_uncertainty(
-    uncertainty: &ClinicalUncertaintyV1,
+    uncertainty: &ClinicalUncertaintyV2,
+    model: &ClinicalModelIdentityV2,
 ) -> Result<(), ClinicalInferenceEnvelopeV2Error> {
     for value in [uncertainty.epistemic, uncertainty.aleatoric]
         .into_iter()
@@ -288,26 +326,32 @@ fn validate_uncertainty(
             return Err(ClinicalInferenceEnvelopeV2Error::InvalidCalibratedProbability);
         }
     }
-    if let Some(digest) = uncertainty.calibration_evidence_digest {
-        validate_digest(&digest)?;
+    if let Some(identity) = &uncertainty.calibration_evidence {
+        identity.validate()?;
     }
-    if uncertainty.calibration_status == ClinicalCalibrationStatusV1::Calibrated
-        && (uncertainty.calibrated_probability.is_none()
-            || uncertainty.calibration_evidence_digest.is_none())
-    {
-        return Err(ClinicalInferenceEnvelopeV2Error::IncompleteCalibrationEvidence);
+    if uncertainty.calibration_status == ClinicalCalibrationStatusV1::Calibrated {
+        if uncertainty.calibrated_probability.is_none() || uncertainty.calibration_evidence.is_none() {
+            return Err(ClinicalInferenceEnvelopeV2Error::IncompleteCalibrationEvidence);
+        }
+        let model_calibration = model
+            .calibration_evidence
+            .as_ref()
+            .ok_or(ClinicalInferenceEnvelopeV2Error::ModelCalibrationEvidenceRequired)?;
+        if uncertainty.calibration_evidence.as_ref() != Some(model_calibration) {
+            return Err(ClinicalInferenceEnvelopeV2Error::CalibrationEvidenceMismatch);
+        }
     }
     Ok(())
 }
 
 fn validate_distribution(
-    distribution: &ClinicalDistributionAssessmentV1,
+    distribution: &ClinicalDistributionAssessmentV2,
 ) -> Result<(), ClinicalInferenceEnvelopeV2Error> {
-    if let Some(digest) = distribution.detector_evidence_digest {
-        validate_digest(&digest)?;
+    if let Some(identity) = &distribution.detector_evidence {
+        identity.validate()?;
     }
     if distribution.status != ClinicalDistributionStatusV1::Unknown
-        && distribution.detector_evidence_digest.is_none()
+        && distribution.detector_evidence.is_none()
     {
         return Err(ClinicalInferenceEnvelopeV2Error::MissingDistributionEvidence);
     }
@@ -334,6 +378,8 @@ pub enum ClinicalInferenceEnvelopeV2Error {
     InvalidUncertainty,
     InvalidCalibratedProbability,
     IncompleteCalibrationEvidence,
+    ModelCalibrationEvidenceRequired,
+    CalibrationEvidenceMismatch,
     MissingDistributionEvidence,
 }
 
@@ -372,6 +418,11 @@ mod tests {
             "binding-1",
             10,
         );
+        let training = evidence("symthaea/model-training-lineage/v1", "train-1", 5);
+        let evaluation = evidence("symthaea/model-evaluation-lineage/v1", "eval-1", 6);
+        let calibration = evidence("symthaea/model-calibration-evidence/v1", "cal-1", 12);
+        let detector = evidence("symthaea/ood-detector-evidence/v1", "ood-1", 13);
+
         ClinicalInferenceEnvelopeV2 {
             schema_version: CLINICAL_INFERENCE_ENVELOPE_V2_VERSION,
             semantics: ClinicalClaimSemanticsV1::new(
@@ -392,26 +443,26 @@ mod tests {
             }],
             alternatives: Vec::new(),
             missing_evidence: Vec::new(),
-            uncertainty: ClinicalUncertaintyV1 {
+            uncertainty: ClinicalUncertaintyV2 {
                 epistemic: Some(0.2),
                 aleatoric: Some(0.1),
                 calibrated_probability: Some(0.7),
                 calibration_status: ClinicalCalibrationStatusV1::Calibrated,
-                calibration_evidence_digest: Some(digest(12)),
+                calibration_evidence: Some(calibration.clone()),
             },
-            distribution: ClinicalDistributionAssessmentV1 {
+            distribution: ClinicalDistributionAssessmentV2 {
                 status: ClinicalDistributionStatusV1::InDistribution,
-                detector_evidence_digest: Some(digest(13)),
+                detector_evidence: Some(detector),
             },
             execution: ClinicalExecutionIdentityV2 {
                 engine: artifact("symthaea", "0.1.0", 1),
-                model: ClinicalModelIdentityV1 {
+                model: ClinicalModelIdentityV2 {
                     model: artifact("clinical-model", "1.0.0", 2),
                     input_schema_digest: digest(3),
                     output_schema_digest: digest(4),
-                    training_lineage_digest: Some(digest(5)),
-                    evaluation_lineage_digest: Some(digest(6)),
-                    calibration_evidence_digest: Some(digest(12)),
+                    training_lineage: Some(training),
+                    evaluation_lineage: Some(evaluation),
+                    calibration_evidence: Some(calibration),
                 },
                 runtime_digest: digest(7),
                 configuration_digest: digest(8),
@@ -481,6 +532,31 @@ mod tests {
         assert!(matches!(
             candidate.validate(),
             Err(ClinicalInferenceEnvelopeV2Error::ClinicalUseWithoutSubjectBinding)
+        ));
+    }
+
+    #[test]
+    fn calibration_namespace_substitution_is_rejected() {
+        let mut candidate = envelope();
+        candidate
+            .uncertainty
+            .calibration_evidence
+            .as_mut()
+            .unwrap()
+            .namespace = "other/calibration-contract/v1".into();
+        assert!(matches!(
+            candidate.validate(),
+            Err(ClinicalInferenceEnvelopeV2Error::CalibrationEvidenceMismatch)
+        ));
+    }
+
+    #[test]
+    fn known_distribution_requires_typed_detector_evidence() {
+        let mut candidate = envelope();
+        candidate.distribution.detector_evidence = None;
+        assert!(matches!(
+            candidate.validate(),
+            Err(ClinicalInferenceEnvelopeV2Error::MissingDistributionEvidence)
         ));
     }
 
