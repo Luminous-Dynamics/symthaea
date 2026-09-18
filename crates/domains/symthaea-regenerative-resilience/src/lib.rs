@@ -322,7 +322,8 @@ pub struct ExactRatio {
 
 impl ExactRatio {
     pub fn new(numerator: u64, denominator: u64) -> Result<Self, QuantityError> {
-        let denominator = NonZeroU64::new(denominator).ok_or(QuantityError::ZeroRatioDenominator)?;
+        let denominator =
+            NonZeroU64::new(denominator).ok_or(QuantityError::ZeroRatioDenominator)?;
         let divisor = gcd(numerator, denominator.get());
         let numerator = numerator / divisor;
         let denominator = NonZeroU64::new(denominator.get() / divisor)
@@ -343,7 +344,10 @@ impl ExactRatio {
 
     /// Apply this ratio to a non-negative exact quantity using floor rounding
     /// at the quantity's existing decimal scale.
-    pub fn apply_floor(self, quantity: &NonNegativeQuantity) -> Result<NonNegativeQuantity, QuantityError> {
+    pub fn apply_floor(
+        self,
+        quantity: &NonNegativeQuantity,
+    ) -> Result<NonNegativeQuantity, QuantityError> {
         let numerator = i128::from(self.numerator);
         let denominator = i128::from(self.denominator.get());
         let scaled = quantity
