@@ -5,22 +5,33 @@
 //! The seal sidecar is not self-authenticating. This module recomputes each
 //! EKM-056 mutation-binding and record digest from the independent base restart
 //! mutation history plus the sealed census, then re-derives the capsule digest.
-//! No capsule or hydration object is constructed.
+//!
+//! Important boundary: this proves that the supplied base restart and supplied
+//! seal sidecar are mutually consistent. It does **not** independently prove that
+//! an untrusted sidecar contains the complete historical non-basis evidence census.
+//! That stronger claim requires the original EKM-056 capsule digest to be bound by
+//! a trusted restart manifest/checkpoint lineage.
+//!
+//! No EKM-056 capsule, quarantine, hydration object, or activation capability is
+//! constructed here.
 
 use super::belief_mutation_seal_wire::{
     BeliefMutationSealWireEncoding, BeliefMutationSealWireSnapshotV1,
     BeliefMutationSealWireVersion, WireBeliefMutationEvidenceSealV1,
 };
+use super::belief_revision_receipt::RevisionEvidenceSnapshot;
 use super::claim_evidence::{ClaimKind, EvidenceKind, EvidencePolarity};
 use super::epistemic_restart_wire::{WireEvidenceV1, WireMutationV1, WireRevisionReceiptV1};
 use super::epistemic_restart_wire_v2::EpistemicRestartWireSnapshotV2;
 use super::epistemic_restart_wire_v2_validation::{
     EpistemicRestartWireV2ValidationError, EpistemicRestartWireV2Validator,
 };
-use super::belief_revision_receipt::RevisionEvidenceSnapshot;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt;
+
+const MAX_VALIDATED_SEAL_RECORDS: usize = 1_000_000;
+const MAX_VALIDATED_SEALED_EVIDENCE: usize = 1_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BeliefMutationSealValidationVersion {
@@ -35,13 +46,18 @@ pub struct BeliefMutationSealValidationReportV1 {
     base_capture_cycle: u64,
     seal_capture_cycle: u64,
     recomputed_capsule_digest: [u8; 32],
-    mutation_time_census_complete: bool,
+    cross_component_consistent: bool,
+    historical_census_completeness_independently_proven: bool,
     capsule_construction_authorized: bool,
     hydration_authorized: bool,
     activation_authorized: bool,
 }
 
 impl BeliefMutationSealValidationReportV1 {
+    pub fn version(&self) -> BeliefMutationSealValidationVersion {
+        self.version
+    }
+
     pub fn mutation_count(&self) -> usize {
         self.mutation_count
     }
@@ -62,8 +78,20 @@ impl BeliefMutationSealValidationReportV1 {
         self.recomputed_capsule_digest
     }
 
-    pub fn mutation_time_census_complete(&self) -> bool {
-        self.mutation_time_census_complete
+    /// True when the supplied base restart history and supplied seal sidecar agree
+    /// under all independently reproducible EKM-056 bindings checked here.
+    pub fn cross_component_consistent(&self) -> bool {
+        self.cross_component_consistent
+    }
+
+    /// Deliberately false in EKM-058.
+    ///
+    /// An unsigned/untrusted sidecar can omit historical non-basis evidence and
+    /// recompute its own digest. Absence of omitted historical evidence becomes a
+    /// trustworthy claim only after the original EKM-056 capsule digest is bound
+    /// into protected restart lineage.
+    pub fn historical_census_completeness_independently_proven(&self) -> bool {
+        self.historical_census_completeness_independently_proven
     }
 
     pub fn capsule_construction_authorized(&self) -> bool {
@@ -93,6 +121,12 @@ impl BeliefMutationSealWireValidator {
             || seals.encoding != BeliefMutationSealWireEncoding::ExplicitMutationSealFieldsV1
         {
             return Err(BeliefMutationSealValidationError::UnsupportedSealSchema);
+        }
+        if seals.records.len() > MAX_VALIDATED_SEAL_RECORDS {
+            return Err(BeliefMutationSealValidationError::SealRecordCountTooLarge {
+                actual: seals.records.len(),
+                maximum: MAX_VALIDATED_SEAL_RECORDS,
+            });
         }
         if seals.linked_mutation_capture_cycle != base.base.captured_at_cycle {
             return Err(BeliefMutationSealValidationError::MutationCaptureCycleMismatch {
@@ -140,6 +174,12 @@ impl BeliefMutationSealWireValidator {
             sealed_evidence_count = sealed_evidence_count
                 .checked_add(record.evidence.len())
                 .ok_or(BeliefMutationSealValidationError::LengthOverflow)?;
+            if sealed_evidence_count > MAX_VALIDATED_SEALED_EVIDENCE {
+                return Err(BeliefMutationSealValidationError::SealedEvidenceCountTooLarge {
+                    actual: sealed_evidence_count,
+                    maximum: MAX_VALIDATED_SEALED_EVIDENCE,
+                });
+            }
 
             let mutation = base
                 .base
@@ -189,7 +229,8 @@ impl BeliefMutationSealWireValidator {
             base_capture_cycle: base.base.captured_at_cycle,
             seal_capture_cycle: seals.captured_at_cycle,
             recomputed_capsule_digest: expected_capsule_digest,
-            mutation_time_census_complete: true,
+            cross_component_consistent: true,
+            historical_census_completeness_independently_proven: false,
             capsule_construction_authorized: false,
             hydration_authorized: false,
             activation_authorized: false,
@@ -267,7 +308,9 @@ fn validate_sealed_evidence(
 ) -> Result<(), BeliefMutationSealValidationError> {
     let mut previous = None;
     for evidence in &record.evidence {
-        if evidence.claim_id != record.claim_id || evidence.observed_at_cycle > record.sealed_at_cycle {
+        if evidence.claim_id != record.claim_id
+            || evidence.observed_at_cycle > record.sealed_at_cycle
+        {
             return Err(BeliefMutationSealValidationError::InvalidSealedEvidence(
                 evidence.evidence_id.0,
             ));
@@ -302,13 +345,12 @@ fn validate_revision_basis_subset(
     revision: &WireRevisionReceiptV1,
 ) -> Result<(), BeliefMutationSealValidationError> {
     for basis in &revision.basis {
-        let expected = basis
-            .snapshot
-            .as_ref()
-            .ok_or(BeliefMutationSealValidationError::EligibleRevisionBasisMissingSnapshot {
+        let expected = basis.snapshot.as_ref().ok_or(
+            BeliefMutationSealValidationError::EligibleRevisionBasisMissingSnapshot {
                 revision_id: revision.id.0,
                 evidence_id: basis.requested_id.0,
-            })?;
+            },
+        )?;
         let sealed = record
             .evidence
             .iter()
@@ -338,7 +380,9 @@ fn evidence_matches(snapshot: &RevisionEvidenceSnapshot, live: &WireEvidenceV1) 
         && snapshot.method == live.method
 }
 
-fn digest_mutation(mutation: &WireMutationV1) -> Result<[u8; 32], BeliefMutationSealValidationError> {
+fn digest_mutation(
+    mutation: &WireMutationV1,
+) -> Result<[u8; 32], BeliefMutationSealValidationError> {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-ekm-belief-mutation-binding-v1");
     hasher.update(&mutation.id.0.to_le_bytes());
@@ -368,14 +412,16 @@ fn digest_record(
     hasher.update(&record.sealed_at_cycle.to_le_bytes());
     hasher.update(&record.applied_at_cycle.to_le_bytes());
     hasher.update(&mutation_binding);
-    hash_claim(&mut hasher, record)?;
+    hash_seal(&mut hasher, record)?;
     Ok(*hasher.finalize().as_bytes())
 }
 
-fn hash_claim(
+fn hash_seal(
     hasher: &mut blake3::Hasher,
     record: &WireBeliefMutationEvidenceSealV1,
 ) -> Result<(), BeliefMutationSealValidationError> {
+    // Mirrors EKM-056 `hash_seal`: the seal itself repeats the source receipt ID
+    // and seal cycle after the outer persisted-record header.
     hasher.update(&record.source_revision_receipt_id.0.to_le_bytes());
     hasher.update(&record.sealed_at_cycle.to_le_bytes());
     hasher.update(&record.claim.claim_id.0.to_le_bytes());
@@ -428,7 +474,9 @@ fn hash_optional_string(
             hasher.update(&[1]);
             hash_bytes(hasher, value.as_bytes())?;
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
     Ok(())
 }
@@ -480,8 +528,13 @@ fn evidence_polarity_tag(polarity: EvidencePolarity) -> u8 {
 pub enum BeliefMutationSealValidationError {
     BaseRestartRejected(EpistemicRestartWireV2ValidationError),
     UnsupportedSealSchema,
+    SealRecordCountTooLarge { actual: usize, maximum: usize },
+    SealedEvidenceCountTooLarge { actual: usize, maximum: usize },
     MutationCaptureCycleMismatch { base: u64, seal: u64 },
-    SealCapturePredatesMutationCapture { seal_capture_cycle: u64, mutation_capture_cycle: u64 },
+    SealCapturePredatesMutationCapture {
+        seal_capture_cycle: u64,
+        mutation_capture_cycle: u64,
+    },
     MutationSealCountMismatch { mutations: usize, seals: usize },
     DuplicateMutationSeal(u64),
     DuplicateRevisionSeal(u64),
