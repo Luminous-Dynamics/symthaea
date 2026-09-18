@@ -55,6 +55,11 @@ pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_restart_admission_review;
+#[allow(
+    unused_imports,
+    reason = "EKM-051 keeps two parent-layer type imports explicit while the quarantine API remains module-scoped"
+)]
+pub mod epistemic_restart_quarantine_admission;
 pub mod epistemic_restart_capsule;
 pub mod epistemic_restart_capsule_v2;
 pub mod epistemic_restart_continuity;
