@@ -10,3 +10,7 @@ serde = { workspace = true }
 
 [dev-dependencies]
 serde_json = { workspace = true }
+
+[[bin]]
+name = "de001a-execution-contract"
+path = "src/execution.rs"

@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "contract_id": "DE-001A-A0-A1-FIXED-POINT-v1",
+  "status": "contract-frozen-blocked",
+  "authority": "reproduction-sanity-only",
+  "parent_head": "cb5e77df52e02cad6be13f0a33abf5fd3e53bc1c",
+  "bindings": {
+    "known_answer_manifest": {
+      "path": "crates/domains/symthaea-cosmology-research/references/de001a_desi_dr2_bao_flat_lcdm_v1.json",
+      "git_blob": "38421dcaaa29f7e50dde5a3acb7075ea7bda2c25"
+    },
+    "closure_manifest": {
+      "path": "crates/domains/symthaea-cosmology-research/references/de001a_execution_closure_v2.json",
+      "git_blob": "3f3157b18cd4b994abe389561b25b9d9b715abee",
+      "qualification_state": "unqualified"
+    }
+  },
+  "a0": {
+    "subgate": "DE-001A0",
+    "mode": "artifact-integrity-only",
+    "scientific_interpretation": "forbidden",
+    "required_sha256": {
+      "dataset_mean": "9ac154ab583ce759c0f7eef3c978c7c70a6ead2d18774caceadf1a350a640585",
+      "dataset_covariance": "252a143274c8a07c78694c119617d36594f6d7965d00319ca611c6ffb886e509",
+      "likelihood_definition": "fd7e9bf2dcf5ffee90a9a30b18227f4337d6d5c1978782c63513cbe0d8280daa",
+      "official_reference_input": "34499cb78ecaec78db44da9f06f61cd9c9ee497dc5c541b72b48cda54091c6ef",
+      "official_reference_updated": "c4c23032d1695635aaea6eb47fabd909006ff32df0a27eadbf64b36c89f31ba1",
+      "official_reference_bestfit_text": "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358"
+    },
+    "hash_mismatch_class": "INVALID",
+    "unregistered_artifact_class": "INVALID"
+  },
+  "a1": {
+    "subgate": "DE-001A1",
+    "mode": "single-fixed-point-likelihood-evaluation",
+    "required_evaluation_count": 1,
+    "minimizer": "forbidden",
+    "sampler": "forbidden",
+    "parameter_mutation": "forbidden",
+    "expected_chi2_bao": 10.282299,
+    "max_absolute_delta": 0.01,
+    "published_diagnostics_only": {
+      "omegam": 0.29717936,
+      "rdrag_mpc": 150.75395,
+      "H0rdrag": 10154.786,
+      "chi2__BAO": 10.282299
+    },
+    "parameter_point": {
+      "status": "BLOCKED-MISSING-COMPLETE-UPSTREAM-PARAMETER-POINT",
+      "sha256": null,
+      "policy": "must-be-frozen-as-an-immutable-artifact; derived diagnostic values must not be inverted or guessed into sampled inputs"
+    }
+  },
+  "blockers": [
+    "environment-closure-not-yet-qualified",
+    "complete-published-parameter-point-artifact-not-yet-frozen"
+  ],
+  "promotion_rule": {
+    "requires_environment_qualification_pass": true,
+    "requires_a0_integrity_pass": true,
+    "requires_parameter_point_sha256": true,
+    "requires_exactly_one_a1_evaluation": true,
+    "requires_no_minimizer": true,
+    "requires_no_sampler": true,
+    "requires_no_parameter_mutation": true,
+    "scientific_claim": "NONE"
+  }
+}
