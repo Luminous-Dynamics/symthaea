@@ -1,0 +1,160 @@
+name: REL-005A Qualification Projection Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-qualification-projection-contract.json"
+      - ".github/rel/rel-005a-qualification-projection.py"
+      - ".github/workflows/rel-005a-qualification-projection-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-qualification-projection-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: 452f0324a561a2872c00b6197237d4db46189f8d
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  projection-contract:
+    name: Verify EvidenceProjectionOnly contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact projection-contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-qualification-projection-contract.json"
+            ".github/rel/rel-005a-qualification-projection.py"
+            ".github/workflows/rel-005a-qualification-projection-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify projection authority isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/rel/rel-005a-qualification-projection.py
+          python3 - <<'PY'
+          import json, pathlib
+          contract = json.loads(pathlib.Path(".github/rel/rel-005a-qualification-projection-contract.json").read_text())
+          source = pathlib.Path(".github/rel/rel-005a-qualification-projection.py").read_text()
+          assert contract["schema"] == "symthaea.rel.qualification-projection-contract.v1"
+          assert contract["authority"] == "EvidenceProjectionContractOnly"
+          assert contract["qualification_contract_head"] == "452f0324a561a2872c00b6197237d4db46189f8d"
+          assert contract["predicate_contract_head"] == "43bf1d588447f602ce0f1549986bb558a839762c"
+          assert contract["execution_subject_head"] == "6931639e53060809f9d459196a329c4fe983be7b"
+          assert contract["output_files"] == [
+              "predicate-contract-receipt.json",
+              "execution-v3-receipt.json",
+              "observation-seal-v3.json",
+              "comparison-only-qualification-receipt.json",
+              "qualification-input-manifest.json",
+          ]
+          forbidden = [
+              "import subprocess",
+              "from subprocess",
+              "import socket",
+              "from socket",
+              "import requests",
+              "from requests",
+              "import urllib",
+              "from urllib",
+              "compute_xenobot_graft_transform",
+              "translate_foreign_hypervector",
+          ]
+          for token in forbidden:
+              assert token not in source, f"forbidden projection capability: {token}"
+          PY
+
+      - name: Run metric-redaction projection self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/rel/rel-005a-qualification-projection.py \
+            --contract .github/rel/rel-005a-qualification-projection-contract.json \
+            --self-test | tee "${RUNNER_TEMP}/qualification-projection-self-test.json"
+          python3 -m json.tool "${RUNNER_TEMP}/qualification-projection-self-test.json" >/dev/null
+          python3 - <<'PY'
+          import json, os, pathlib
+          result = json.loads(pathlib.Path(os.environ["RUNNER_TEMP"], "qualification-projection-self-test.json").read_text())
+          assert result["authority"] == "EvidenceProjectionContractOnly"
+          assert result["metric_sentinel_rejected"] is True
+          assert result["threshold_sentinel_rejected"] is True
+          assert result["detailed_predicates_removed"] is True
+          assert result["failed_predicate_identity_preserved"] is True
+          assert result["comparison_result_preserved"] is True
+          PY
+
+      - name: Build EvidenceProjectionContractOnly receipt
+        shell: bash
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/qualification-projection-contract-receipt.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def sha(path):
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          receipt = {
+              "schema": "symthaea.rel.qualification-projection-contract-static-receipt.v1",
+              "authority": "EvidenceProjectionContractOnly",
+              "subject_head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "parent_head": subprocess.check_output(["git", "rev-parse", "HEAD^"], text=True).strip(),
+              "contract_sha256": sha(".github/rel/rel-005a-qualification-projection-contract.json"),
+              "projector_sha256": sha(".github/rel/rel-005a-qualification-projection.py"),
+              "self_tests_passed": True,
+              "raw_observation_output": False,
+              "raw_execution_logs_output": False,
+              "detailed_predicate_values_output": False,
+              "failed_predicate_identity_preserved": True,
+              "comparison_result_preserved": True,
+              "claims": {
+                  "projection_performed": False,
+                  "qualification_completed": False,
+                  "rel_005a_qualified": False,
+                  "scientific_pass": False,
+                  "scientific_fail": False,
+              },
+          }
+          pathlib.Path(os.environ["RECEIPT_PATH"]).write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload static projection-contract evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-qualification-projection-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/rel-005a-qualification-projection-contract.json
+            ${{ runner.temp }}/qualification-projection-self-test.json
+            ${{ runner.temp }}/qualification-projection-contract-receipt.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          rm -rf .github/rel/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
