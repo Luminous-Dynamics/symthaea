@@ -50,15 +50,22 @@ const BASE_PHONEME_DURATION: f32 = 0.06;
 pub struct SpeakHandle {
     thread: Option<std::thread::JoinHandle<Result<()>>>,
     speaking: Arc<AtomicBool>,
+    /// Shared lock-free signal consumed by the audio callback. Stopping an
+    /// utterance must invalidate samples already queued before the stop.
+    flush_requested: Arc<AtomicBool>,
 }
 
 impl SpeakHandle {
-    /// Stop the background utterance. The ring buffer drains naturally to silence.
+    /// Stop the background utterance and invalidate queued playback.
+    ///
+    /// This method performs only atomic stores. The audio device callback consumes
+    /// the flush request on its next invocation and drains stale ring-buffer data.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.flush_requested.store(true, Ordering::Release);
     }
 
-    /// Whether the background thread is still synthesizing.
+    /// Whether the background thread is still synthesizing/pushing this utterance.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
     }
@@ -149,7 +156,7 @@ impl LiveVoice {
         }
     }
 
-    /// Speak text in real time with enhanced prosody control
+    /// Speak text in real time with enhanced prosody control.
     pub fn speak(&mut self, text: &str) -> Result<()> {
         self.speaking.store(true, Ordering::SeqCst);
 
@@ -159,6 +166,7 @@ impl LiveVoice {
 
         for timed in &phonemes {
             if !self.speaking.load(Ordering::SeqCst) {
+                self.audio.request_flush();
                 break;
             }
 
@@ -175,6 +183,7 @@ impl LiveVoice {
 
             for _ in 0..n_frames {
                 if !self.speaking.load(Ordering::SeqCst) {
+                    self.audio.request_flush();
                     break;
                 }
 
@@ -187,7 +196,7 @@ impl LiveVoice {
         Ok(())
     }
 
-    fn analyze_prosody(&self, text: &str) -> ProsodyAnalysis {
+    fn analyze_prosody(&self, _text: &str) -> ProsodyAnalysis {
         // Analyze sentence structure, emphasis, etc.
         ProsodyAnalysis {
             pitch_range: 1.0,
@@ -196,7 +205,7 @@ impl LiveVoice {
         }
     }
 
-    fn apply_prosody(&self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
+    fn apply_prosody(&mut self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
         state.emotional_arousal = prosody.pitch_range.clamp(0.0, 1.0);
         self.modulate_tau(1.0 / prosody.speaking_rate);
     }
@@ -209,6 +218,11 @@ impl LiveVoice {
     /// # Note
     /// This takes `&mut self` to ensure exclusive synthesis access, then moves
     /// the necessary state into the thread. Only one `speak_async` at a time.
+    ///
+    /// The current implementation still pre-synthesizes the utterance before the
+    /// push thread starts. INT-008A3 will move synthesis itself behind a cancellable
+    /// phrase/chunk boundary. This tranche only guarantees stale queued playback is
+    /// invalidated when the stop state becomes observable.
     pub fn speak_async(&mut self, text: &str) -> SpeakHandle {
         self.speaking.store(true, Ordering::SeqCst);
 
@@ -216,11 +230,13 @@ impl LiveVoice {
         let speaking = Arc::clone(&self.speaking);
         let cog_state = Arc::clone(&self.cognitive_state);
 
-        // Synthesize frames into a buffer on a dedicated thread.
-        // We can't move `self` into the thread, so we pre-synthesize all audio.
+        // Synthesize frames into a buffer. We cannot move `self` into the push
+        // thread in this transitional implementation, so synthesis itself remains
+        // synchronous here even though playback pushing is asynchronous.
         let mut all_samples = Vec::new();
         for timed in &phonemes {
             if !speaking.load(Ordering::SeqCst) {
+                self.audio.request_flush();
                 break;
             }
 
@@ -233,6 +249,7 @@ impl LiveVoice {
 
             for _ in 0..n_frames {
                 if !speaking.load(Ordering::SeqCst) {
+                    self.audio.request_flush();
                     break;
                 }
 
@@ -243,8 +260,10 @@ impl LiveVoice {
         }
 
         // Push synthesized audio to the ring buffer on a background thread
-        // (backpressure may block, so we don't want to block the caller)
+        // (backpressure may block, so we do not want to block the caller further).
         let speaking_bg = Arc::clone(&self.speaking);
+        let flush_requested = self.audio.flush_handle();
+        let flush_bg = Arc::clone(&flush_requested);
         let mut audio = self.audio.take_producer();
 
         let thread = std::thread::Builder::new()
@@ -253,6 +272,7 @@ impl LiveVoice {
                 let mut offset = 0;
                 while offset < all_samples.len() {
                     if !speaking_bg.load(Ordering::SeqCst) {
+                        flush_bg.store(true, Ordering::Release);
                         break;
                     }
                     if let Some(ref mut producer) = audio {
@@ -273,6 +293,7 @@ impl LiveVoice {
         SpeakHandle {
             thread: Some(thread),
             speaking: Arc::clone(&self.speaking),
+            flush_requested,
         }
     }
 
@@ -308,18 +329,26 @@ impl LiveVoice {
     /// Push samples to the ring buffer with simple backpressure.
     fn push_with_backpressure(&mut self, samples: &[f32]) {
         let mut offset = 0;
-        while offset < samples.len() {
+        while offset < samples.len() && self.speaking.load(Ordering::SeqCst) {
             let written = self.audio.push_samples(&samples[offset..]);
             offset += written;
             if offset < samples.len() {
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
         }
+
+        if !self.speaking.load(Ordering::SeqCst) {
+            self.audio.request_flush();
+        }
     }
 
-    /// Stop speaking immediately. The ring buffer drains naturally to silence.
+    /// Stop speaking and request invalidation of already-buffered audio.
+    ///
+    /// The control path returns immediately; the audio callback consumes the
+    /// flush request on its next invocation.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.audio.request_flush();
     }
 
     /// Whether `speak()` or `speak_async()` is currently running.
@@ -328,8 +357,19 @@ impl LiveVoice {
     }
 
     /// Get a clone of the stop flag for cross-thread interruption.
+    ///
+    /// Callers using this raw flag remain supported. The synthesis/push loops now
+    /// request playback flush when they observe the flag becoming false. Prefer
+    /// [`Self::stop`] or [`SpeakHandle::stop`] when an immediate flush request is
+    /// available at the call site.
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.speaking)
+    }
+
+    /// Clone the playback flush flag for integration with a higher-level turn or
+    /// utterance cancellation token.
+    pub fn playback_flush_handle(&self) -> Arc<AtomicBool> {
+        self.audio.flush_handle()
     }
 
     /// Get a handle to the shared cognitive state for real-time prosody modulation.
@@ -434,6 +474,33 @@ mod tests {
 
         flag.store(false, Ordering::SeqCst);
         assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn speak_handle_stop_requests_playback_flush() {
+        let speaking = Arc::new(AtomicBool::new(true));
+        let flush_requested = Arc::new(AtomicBool::new(false));
+        let handle = SpeakHandle {
+            thread: None,
+            speaking: Arc::clone(&speaking),
+            flush_requested: Arc::clone(&flush_requested),
+        };
+
+        handle.stop();
+        assert!(!speaking.load(Ordering::SeqCst));
+        assert!(flush_requested.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn live_voice_stop_requests_playback_flush() {
+        let genesis = GenesisSeed::from_phrase("test-stop-flush");
+        let voice = LiveVoice::new_headless(&genesis);
+        let flush = voice.playback_flush_handle();
+        voice.speaking.store(true, Ordering::SeqCst);
+
+        voice.stop();
+        assert!(!voice.is_speaking());
+        assert!(flush.load(Ordering::Acquire));
     }
 
     #[test]
@@ -550,4 +617,12 @@ mod tests {
         }
         (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt()
     }
+}
+
+#[derive(Debug, Clone)]
+struct ProsodyAnalysis {
+    pitch_range: f32,
+    speaking_rate: f32,
+    #[allow(dead_code)]
+    emphasis: Vec<String>,
 }
