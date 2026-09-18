@@ -97,13 +97,19 @@ impl HistoricalReplayEligibilityReceiptV1 {
                 seals,
                 restart_receipt,
                 checkpoint,
-                reviewed_at_cycle,
+                admission.observed_at_cycle(),
             )
             .map_err(HistoricalReplayEligibilityError::AdmissionRejected)?;
         currentness
             .verify_internal()
             .map_err(HistoricalReplayEligibilityError::CurrentnessRejected)?;
 
+        if reviewed_at_cycle < admission.observed_at_cycle() {
+            return Err(HistoricalReplayEligibilityError::ReviewPredatesAdmission {
+                reviewed_at_cycle,
+                admission_observed_at_cycle: admission.observed_at_cycle(),
+            });
+        }
         if reviewed_at_cycle < currentness.verified_at_cycle() {
             return Err(HistoricalReplayEligibilityError::ReviewPredatesCurrentnessVerification {
                 reviewed_at_cycle,
@@ -326,6 +332,10 @@ pub enum HistoricalReplayEligibilityError {
     CheckpointRejected(RestartMutationSealCheckpointError),
     AdmissionRejected(ProtectedMutationSealAdmissionError),
     CurrentnessRejected(RestartMutationSealCurrentnessError),
+    ReviewPredatesAdmission {
+        reviewed_at_cycle: u64,
+        admission_observed_at_cycle: u64,
+    },
     ReviewPredatesCurrentnessVerification {
         reviewed_at_cycle: u64,
         currentness_verified_at_cycle: u64,
