@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-service-events"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Owner-side semantic event sequencing authority for the Symthaea service runtime"
+
+[dependencies]
+symthaea-interface-events = { path = "../symthaea-interface-events" }
+symthaea-interface-types = { path = "../symthaea-interface-types" }
+symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
