@@ -1,13 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! MEL-003B7: bind InterventionEffectEvidenceV1 to a real bounded Sonata
-//! accompaniment re-articulation rather than synthetic outcome fixtures.
+//! MEL-003B7/B9: bind intervention-effect evidence to a real bounded Sonata
+//! accompaniment re-articulation, then summarize the fixed replication panel.
 
 use symthaea_muse::cognitive_bridge::SymbolicMeasurementEvidence;
 use symthaea_muse::cognitive_selection::cognitive_target_for_source_action;
 use symthaea_muse::evidence_digest::intervention_effect_evidence::{
-    EffectRelationV1, InterventionEffectEvidenceDisposition, RequestRoleV1,
-    account_intervention_effects,
+    EffectRelationV1, InterventionEffectEvidenceDisposition, InterventionEffectEvidenceV1,
+    RequestRoleV1, account_intervention_effects,
+};
+use symthaea_muse::evidence_digest::intervention_effect_panel::{
+    ChannelEffectPanelV1, InterventionEffectPanelV1, summarize_intervention_effect_panel,
 };
 use symthaea_muse::musical_inference::MusicAction;
 use symthaea_muse::musical_policy::OutcomeChannel;
@@ -15,6 +18,9 @@ use symthaea_music_theory::{
     Duration, MusicalIntent, Score, SonataSectionKind, Style, VoiceRole, compose_sonata_with_plan,
     profile_score_region,
 };
+
+const SONATA_EFFECT_PANEL_SEEDS: [u64; 8] = [3, 11, 23, 41, 59, 79, 97, 127];
+const EFFECT_EPSILON: f32 = 0.01;
 
 fn should_rearticulate(
     note: &symthaea_music_theory::ScoreNote,
@@ -79,7 +85,7 @@ fn measured_effect(seed: u64) -> symthaea_muse::cognitive_bridge::ObservedMusica
 }
 
 fn channel(
-    evidence: &symthaea_muse::evidence_digest::intervention_effect_evidence::InterventionEffectEvidenceV1,
+    evidence: &InterventionEffectEvidenceV1,
     channel: OutcomeChannel,
 ) -> &symthaea_muse::evidence_digest::intervention_effect_evidence::ChannelInterventionEffectV1 {
     evidence
@@ -89,11 +95,33 @@ fn channel(
         .expect("all four symbolic outcome channels must be retained")
 }
 
+fn panel_channel(
+    panel: &InterventionEffectPanelV1,
+    channel: OutcomeChannel,
+) -> &ChannelEffectPanelV1 {
+    panel
+        .channels
+        .iter()
+        .find(|entry| entry.channel == channel)
+        .expect("all four symbolic outcome channels must be retained in the panel")
+}
+
+fn panel_records() -> Vec<InterventionEffectEvidenceV1> {
+    let requested = cognitive_target_for_source_action(MusicAction::IncreaseComplexity);
+    SONATA_EFFECT_PANEL_SEEDS
+        .into_iter()
+        .map(|seed| {
+            let observed = measured_effect(seed);
+            account_intervention_effects(requested, observed, EFFECT_EPSILON)
+        })
+        .collect()
+}
+
 #[test]
 fn real_sonata_density_probe_records_primary_secondary_and_preserved_channels_separately() {
     let observed = measured_effect(79);
     let requested = cognitive_target_for_source_action(MusicAction::IncreaseComplexity);
-    let evidence = account_intervention_effects(requested, observed, 0.01);
+    let evidence = account_intervention_effects(requested, observed, EFFECT_EPSILON);
 
     assert_eq!(
         evidence.disposition,
@@ -112,7 +140,7 @@ fn real_sonata_density_probe_records_primary_secondary_and_preserved_channels_se
 
     let tension = channel(&evidence, OutcomeChannel::Tension);
     assert_eq!(tension.request_role, RequestRoleV1::Secondary);
-    let expected_tension_relation = if observed.tension_delta.abs() <= 0.01 {
+    let expected_tension_relation = if observed.tension_delta.abs() <= EFFECT_EPSILON {
         EffectRelationV1::RequestedUnchanged
     } else if observed.tension_delta.is_sign_positive() {
         EffectRelationV1::RequestedAligned
@@ -137,10 +165,7 @@ fn real_sonata_density_probe_records_primary_secondary_and_preserved_channels_se
 
 #[test]
 fn real_effect_accounting_replicates_across_the_density_probe_seed_panel() {
-    let requested = cognitive_target_for_source_action(MusicAction::IncreaseComplexity);
-    for seed in [3u64, 11, 23, 41, 59, 79, 97, 127] {
-        let observed = measured_effect(seed);
-        let evidence = account_intervention_effects(requested, observed, 0.01);
+    for (seed, evidence) in SONATA_EFFECT_PANEL_SEEDS.into_iter().zip(panel_records()) {
         assert_eq!(
             evidence.disposition,
             InterventionEffectEvidenceDisposition::Valid,
@@ -192,5 +217,61 @@ fn real_effect_accounting_replicates_across_the_density_probe_seed_panel() {
             evidence.changed_unrequested_channels, 0,
             "seed {seed}: an unrequested symbolic channel changed"
         );
+    }
+}
+
+#[test]
+fn sonata_density_effect_panel_quantifies_secondary_tension_without_hiding_it() {
+    let records = panel_records();
+    let panel = summarize_intervention_effect_panel(&records).unwrap();
+
+    assert_eq!(panel.sample_count, SONATA_EFFECT_PANEL_SEEDS.len());
+    assert_eq!(panel.movement_epsilon, EFFECT_EPSILON);
+    assert_eq!(
+        panel.dominant_requested_channel,
+        Some(OutcomeChannel::Density)
+    );
+
+    let density = panel_channel(&panel, OutcomeChannel::Density);
+    assert_eq!(density.request_role, RequestRoleV1::Dominant);
+    assert_eq!(density.samples, SONATA_EFFECT_PANEL_SEEDS.len());
+    assert_eq!(
+        density.relation_counts.requested_aligned,
+        SONATA_EFFECT_PANEL_SEEDS.len()
+    );
+    assert_eq!(density.relation_counts.total(), SONATA_EFFECT_PANEL_SEEDS.len());
+    assert!(density.observed_min > EFFECT_EPSILON);
+    assert!(density.observed_min.is_finite());
+    assert!(density.observed_max.is_finite());
+    assert!(density.observed_mean.is_finite());
+    assert!(density.observed_min <= density.observed_mean);
+    assert!(density.observed_mean <= density.observed_max);
+
+    // Tension is a secondary request, so retain the complete quantitative
+    // response and categorical counts without manufacturing a pass/fail verdict.
+    let tension = panel_channel(&panel, OutcomeChannel::Tension);
+    assert_eq!(tension.request_role, RequestRoleV1::Secondary);
+    assert_eq!(tension.samples, SONATA_EFFECT_PANEL_SEEDS.len());
+    assert_eq!(tension.relation_counts.total(), SONATA_EFFECT_PANEL_SEEDS.len());
+    assert!(tension.observed_min.is_finite());
+    assert!(tension.observed_max.is_finite());
+    assert!(tension.observed_mean.is_finite());
+    assert!(tension.observed_min <= tension.observed_mean);
+    assert!(tension.observed_mean <= tension.observed_max);
+
+    // The two unrequested symbolic channels must remain preserved across every
+    // member of the exact fixed panel.
+    for channel_id in [OutcomeChannel::Familiarity, OutcomeChannel::TonalDisplacement] {
+        let channel = panel_channel(&panel, channel_id);
+        assert_eq!(channel.request_role, RequestRoleV1::Unrequested);
+        assert_eq!(
+            channel.relation_counts.unrequested_preserved,
+            SONATA_EFFECT_PANEL_SEEDS.len()
+        );
+        assert_eq!(channel.relation_counts.unrequested_changed, 0);
+        assert_eq!(channel.relation_counts.total(), SONATA_EFFECT_PANEL_SEEDS.len());
+        assert!(channel.observed_min.abs() <= f32::EPSILON);
+        assert!(channel.observed_max.abs() <= f32::EPSILON);
+        assert!(channel.observed_mean.abs() <= f32::EPSILON);
     }
 }
