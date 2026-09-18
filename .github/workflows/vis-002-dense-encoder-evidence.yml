@@ -1,0 +1,30 @@
+name: VIS-002 Dense Encoder Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-vision-manifold/**'
+      - 'docs/architecture/DENSE_VISUAL_ENCODER_EVIDENCE_V1.md'
+      - '.github/workflows/vis-002-dense-encoder-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check dense encoder evidence
+        run: cargo check -p symthaea-vision-manifold --all-targets
+      - name: Test dense encoder evidence
+        run: cargo test -p symthaea-vision-manifold
+      - name: Clippy dense encoder evidence
+        run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings
