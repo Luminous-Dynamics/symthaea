@@ -8,7 +8,10 @@ description = "Concrete Symthaea facade adapter for the single-owner service run
 [dependencies]
 anyhow = { workspace = true }
 symthaea = { path = "../../.." }
+symthaea-interface-events = { path = "../symthaea-interface-events" }
 symthaea-interface-runtime = { path = "../symthaea-interface-runtime" }
+symthaea-interface-types = { path = "../symthaea-interface-types" }
 symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
+symthaea-service-events = { path = "../symthaea-service-events" }
 symthaea-service-runtime = { path = "../symthaea-service-runtime" }
 tokio = { workspace = true }
