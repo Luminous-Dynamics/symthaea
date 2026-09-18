@@ -38,6 +38,7 @@ pub mod manifold;
 pub mod predictive;
 pub mod spatial_evidence;
 pub mod spectrum;
+pub mod stereo_disparity_evidence;
 pub mod training;
 pub mod types;
 
@@ -109,6 +110,9 @@ pub use spatial_evidence::{
 pub use spectrum::{
     BandProbeEvidence, BandProbeScore, MultiSpectralEncoder, MultiSpectralEncoderState,
     MultiSpectralFrame, SpectralBandEncoderState, SpectralLayer, SpectrumBand,
+};
+pub use stereo_disparity_evidence::{
+    PatchStereoDisparityEvidence, StereoDisparityEvidenceError,
 };
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
