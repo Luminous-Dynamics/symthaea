@@ -12,17 +12,17 @@
 //! one atomic capture cycle. Future rechecks use the existing source-live
 //! validators rather than comparing capture-cycle-sensitive restart digests.
 
-use super::belief_mutation_firewall::EpistemicSupportStore;
-use super::belief_revision_receipt::BeliefRevisionHistory;
-use super::belief_revision_schema_history::BeliefRevisionSchemaHistoryV1;
-use super::belief_revision_schema_persistence::BeliefRevisionSchemaPersistenceError;
-use super::claim_evidence::EpistemicLedger;
-use super::epistemic_restart_capsule::EpistemicRestartCapsuleError;
-use super::epistemic_restart_capsule_v2::{
+use crate::knowledge::belief_mutation_firewall::EpistemicSupportStore;
+use crate::knowledge::belief_revision_receipt::BeliefRevisionHistory;
+use crate::knowledge::belief_revision_schema_history::BeliefRevisionSchemaHistoryV1;
+use crate::knowledge::belief_revision_schema_persistence::BeliefRevisionSchemaPersistenceError;
+use crate::knowledge::claim_evidence::EpistemicLedger;
+use crate::knowledge::epistemic_restart_capsule::EpistemicRestartCapsuleError;
+use crate::knowledge::epistemic_restart_capsule_v2::{
     EpistemicRestartCapsuleV2, EpistemicRestartCapsuleV2Error,
 };
-use super::epistemic_restart_manifest::EpistemicLedgerInventoryV1;
-use super::epistemic_restart_split_state_sandbox::{
+use crate::knowledge::epistemic_restart_manifest::EpistemicLedgerInventoryV1;
+use crate::knowledge::epistemic_restart_split_state_sandbox::{
     SealedSplitStateHydrationSandboxV1, SplitStateHydrationSandboxError,
 };
 use std::error::Error;
@@ -59,11 +59,6 @@ impl LiveEpistemicEpochFenceDigestV1 {
     }
 }
 
-/// Verified baseline observation of the actual live EKM objects.
-///
-/// The source capsule is retained privately so a later recheck can ask the
-/// existing persistence layers whether those live objects have diverged from the
-/// exact baseline. No live object is retained or exposed.
 #[derive(Debug)]
 pub struct LiveEpistemicEpochObservationV1 {
     version: LiveEpistemicEpochFenceVersion,
@@ -148,59 +143,45 @@ impl LiveEpistemicEpochObservationV1 {
     pub fn version(&self) -> LiveEpistemicEpochFenceVersion {
         self.version
     }
-
     pub fn observed_at_cycle(&self) -> u64 {
         self.observed_at_cycle
     }
-
     pub fn source_capture_cycle(&self) -> u64 {
         self.source_capture_cycle
     }
-
     pub fn live_v2_digest(&self) -> [u8; 32] {
         self.live_v2_digest
     }
-
     pub fn claim_count(&self) -> usize {
         self.claim_count
     }
-
     pub fn evidence_count(&self) -> usize {
         self.evidence_count
     }
-
     pub fn provenance_count(&self) -> usize {
         self.provenance_count
     }
-
     pub fn support_state_count(&self) -> usize {
         self.support_state_count
     }
-
     pub fn mutation_count(&self) -> usize {
         self.mutation_count
     }
-
     pub fn revision_count(&self) -> usize {
         self.revision_count
     }
-
     pub fn live_objects_retained(&self) -> bool {
         self.live_objects_retained
     }
-
     pub fn mutation_authority(&self) -> bool {
         self.mutation_authority
     }
-
     pub fn activation_authorized(&self) -> bool {
         self.activation_authorized
     }
-
     pub fn trusted_checkpoint_commit_authorized(&self) -> bool {
         self.trusted_checkpoint_commit_authorized
     }
-
     pub fn observation_digest(&self) -> LiveEpistemicEpochObservationDigestV1 {
         self.observation_digest
     }
@@ -242,12 +223,10 @@ impl LiveEpistemicEpochObservationV1 {
                 rechecked_at_cycle,
             )
             .map_err(LiveEpistemicEpochFenceError::LiveSchemaDiverged)?;
-
         LiveEpistemicEpochContinuityReceiptV1::new(self, rechecked_at_cycle)
     }
 }
 
-/// Binds one verified live baseline to one exact sealed EKM-067 candidate.
 #[derive(Debug)]
 pub struct LiveEpistemicEpochFenceV1 {
     version: LiveEpistemicEpochFenceVersion,
@@ -305,34 +284,30 @@ impl LiveEpistemicEpochFenceV1 {
         Ok(out)
     }
 
+    pub fn version(&self) -> LiveEpistemicEpochFenceVersion {
+        self.version
+    }
     pub fn established_at_cycle(&self) -> u64 {
         self.established_at_cycle
     }
-
     pub fn sandbox_digest(&self) -> [u8; 32] {
         self.sandbox_digest
     }
-
     pub fn observation_digest(&self) -> LiveEpistemicEpochObservationDigestV1 {
         self.observation.observation_digest()
     }
-
     pub fn live_epoch_fence_established(&self) -> bool {
         self.live_epoch_fence_established
     }
-
     pub fn activation_preflight_authorized(&self) -> bool {
         self.activation_preflight_authorized
     }
-
     pub fn activation_authorized(&self) -> bool {
         self.activation_authorized
     }
-
     pub fn trusted_checkpoint_commit_authorized(&self) -> bool {
         self.trusted_checkpoint_commit_authorized
     }
-
     pub fn fence_digest(&self) -> LiveEpistemicEpochFenceDigestV1 {
         self.fence_digest
     }
@@ -410,30 +385,27 @@ impl LiveEpistemicEpochContinuityReceiptV1 {
         Ok(out)
     }
 
+    pub fn version(&self) -> LiveEpistemicEpochFenceVersion {
+        self.version
+    }
     pub fn baseline_observed_at_cycle(&self) -> u64 {
         self.baseline_observed_at_cycle
     }
-
     pub fn rechecked_at_cycle(&self) -> u64 {
         self.rechecked_at_cycle
     }
-
     pub fn live_state_unchanged(&self) -> bool {
         self.live_state_unchanged
     }
-
     pub fn activation_preflight_authorized(&self) -> bool {
         self.activation_preflight_authorized
     }
-
     pub fn activation_authorized(&self) -> bool {
         self.activation_authorized
     }
-
     pub fn trusted_checkpoint_commit_authorized(&self) -> bool {
         self.trusted_checkpoint_commit_authorized
     }
-
     pub fn receipt_digest(&self) -> LiveEpistemicEpochFenceDigestV1 {
         self.receipt_digest
     }
@@ -638,8 +610,7 @@ mod tests {
     #[test]
     fn live_observation_detects_ledger_divergence() {
         let cycle = 7;
-        let (capsule, mut ledger, inventory, store, history, schemas) =
-            empty_live_fixture(cycle);
+        let (capsule, mut ledger, inventory, store, history, schemas) = empty_live_fixture(cycle);
         let observation = LiveEpistemicEpochObservationV1::capture(
             capsule,
             &ledger,
