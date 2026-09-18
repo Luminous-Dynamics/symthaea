@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "closure_id": "DE-001A-EXECUTION-CLOSURE-v1",
+  "status": "closure-preregistered-incomplete",
+  "execution_authority": false,
+  "claim_policy": "reproduction-only",
+  "parent_reference": {
+    "target_id": "DE-001A-DESI-DR2-BAO-FLAT-LCDM-v1",
+    "path": "crates/domains/symthaea-cosmology-research/references/de001a_desi_dr2_bao_flat_lcdm_v1.json",
+    "repository_commit": "7c1668ed64caab6dbcfde981c928c61d6da30061"
+  },
+  "lane": {
+    "name": "independent-public-likelihood",
+    "description": "Reproduce the official DESI DR2 all-tracer BAO flat-LambdaCDM known answer through the public Cobaya bao.desi_dr2 likelihood rather than DESI's internal desi_y3_cosmo_bindings implementation.",
+    "platform": "x86_64-linux",
+    "python_attribute": "python311"
+  },
+  "nix": {
+    "flake_lock_path": "flake.lock",
+    "flake_lock_git_blob": "e71fcd4a705040f1bf55c8f2611fefec760a9188",
+    "root_nixpkgs_input": "nixpkgs_2",
+    "nixpkgs_revision": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+    "nixpkgs_nar_hash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4=",
+    "planned_dev_shell": "cosmology-verify",
+    "planned_check": "de001a-cosmology-env"
+  },
+  "nixpkgs_managed_python_dependencies": [
+    "numpy",
+    "scipy",
+    "pandas",
+    "pyyaml",
+    "requests",
+    "rapidfuzz",
+    "packaging",
+    "tqdm",
+    "portalocker",
+    "dill",
+    "typing-extensions"
+  ],
+  "nixpkgs_pinned_components": [
+    {
+      "name": "iminuit",
+      "version": "2.32.0",
+      "nixpkgs_path": "pkgs/development/python-modules/iminuit/default.nix",
+      "source_hash": "sha256-oys00YZllZvnWta9sd2ARZu5RGbGK0VWMcAFaKzN99I="
+    }
+  ],
+  "external_source_pins": [
+    {
+      "name": "cobaya",
+      "version": "3.6.2",
+      "repository": "CobayaSampler/cobaya",
+      "tag": "v3.6.2",
+      "commit": "899f30a49f85de610dac321e91a1af50018e56aa",
+      "fixed_output_hash": null
+    },
+    {
+      "name": "camb",
+      "version": "1.6.6",
+      "repository": "cmbant/CAMB",
+      "tag": "1.6.6",
+      "commit": "3ef0272d6f7ba1231128872e56e6d4c12af8267b",
+      "fixed_output_hash": null
+    },
+    {
+      "name": "getdist",
+      "version": "1.7.4",
+      "repository": "cmbant/getdist",
+      "tag": "1.7.4",
+      "commit": "f8d5fb7f39927c199dbfa1bf87eb4fac6fe7c206",
+      "fixed_output_hash": null
+    },
+    {
+      "name": "py-bobyqa",
+      "version": "1.4.1",
+      "repository": "numericalalgorithmsgroup/pybobyqa",
+      "tag": "v1.4.1",
+      "commit": "3a3bd50732a5695a0a434cba4c1fde01c0204e08",
+      "fixed_output_hash": null
+    }
+  ],
+  "network_policy": {
+    "realization": "fixed-output-fetches-only",
+    "scientific_execution": "network-disabled",
+    "runtime_package_installation": "forbidden"
+  },
+  "version_assertions_required": {
+    "cobaya": "3.6.2",
+    "camb": "1.6.6",
+    "getdist": "1.7.4",
+    "iminuit": "2.32.0",
+    "py-bobyqa": "1.4.1"
+  },
+  "blockers": [
+    "cobaya-source-fixed-output-hash",
+    "camb-source-fixed-output-hash",
+    "getdist-source-fixed-output-hash",
+    "pybobyqa-source-fixed-output-hash",
+    "nix-derivation-not-yet-implemented",
+    "realized-closure-identity-not-yet-recorded"
+  ],
+  "promotion_rule": {
+    "required_status": "closure-realized-qualified",
+    "required_execution_authority": true,
+    "requires_zero_blockers": true,
+    "requires_all_external_fixed_output_hashes": true,
+    "requires_version_assertions": true,
+    "requires_network_disabled_scientific_execution": true
+  }
+}
