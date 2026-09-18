@@ -75,7 +75,8 @@ jobs:
             de001a-a0-verify \
             de001a-a1p-point-bind \
             de001a-a1r-oracle \
-            de001a-a1n-convergence
+            de001a-a1n-convergence \
+            de001a-a1q-bundle
           do
             test -x "target/release/$binary"
             sha256sum "target/release/$binary" > "$EVIDENCE_DIR/$binary.sha256"
@@ -111,6 +112,120 @@ jobs:
           code=$?
           set -e
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Write A1Q prequalification bundle
+        id: prequal
+        if: always() && steps.software.outcome == 'success' && steps.artifacts.outcome == 'success' && (steps.chain.outputs.exit_code == '0' || steps.chain.outputs.exit_code == '1')
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          CRATE=crates/domains/symthaea-cosmology-research
+          REF="$CRATE/references"
+
+          hash_file() {
+            sha256sum "$1" | awk '{print $1}'
+          }
+          text_file() {
+            tr -d '\n' < "$1"
+          }
+
+          for required in \
+            "$EVIDENCE_DIR/a0.json" \
+            "$EVIDENCE_DIR/a1p.json" \
+            "$EVIDENCE_DIR/a1r-primary.json" \
+            "$EVIDENCE_DIR/a1r-refined.json" \
+            "$EVIDENCE_DIR/a1n.json" \
+            "$REF/de001a_a1r_oracle_v1.json" \
+            "$REF/de001a_a1r_oracle_refined_v1.json"
+          do
+            test -f "$required"
+          done
+
+          cat > "$EVIDENCE_DIR/prequalification-bundle.json" <<EOF
+          {
+            "schema_version": 1,
+            "protocol": "DE-001A1Q-PREQUALIFICATION-BUNDLE-v1",
+            "scientific_claim": "NONE",
+            "authority": "evidence-bundle-integrity-only",
+            "subject_head": "${{ steps.subject.outputs.head }}",
+            "subject_tree": "${{ steps.subject.outputs.tree }}",
+            "base": "$EXPECTED_BASE",
+            "rust": "1.96.0",
+            "nixpkgs_revision": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+            "action_commits": {
+              "checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
+              "rust_toolchain": "ebb3d1676050bfd0971c36c1e215b5751473994d",
+              "install_nix": "8aa03977d8d733052d78f4e008a241fd1dbf36b3",
+              "upload_artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+            },
+            "cargo_lock_sha256": "$(hash_file Cargo.lock)",
+            "binary_sha256": {
+              "a0": "$(hash_file target/release/de001a-a0-verify)",
+              "a1p": "$(hash_file target/release/de001a-a1p-point-bind)",
+              "a1r": "$(hash_file target/release/de001a-a1r-oracle)",
+              "a1n": "$(hash_file target/release/de001a-a1n-convergence)",
+              "a1q": "$(hash_file target/release/de001a-a1q-bundle)"
+            },
+            "a0_artifact_store": {
+              "path": "$(text_file "$EVIDENCE_DIR/a0-store-path.txt")",
+              "nar_hash": "$(text_file "$EVIDENCE_DIR/a0-nar-hash.txt")",
+              "closure_size": "$(text_file "$EVIDENCE_DIR/a0-closure-size.txt")"
+            },
+            "receipt_sha256": {
+              "a0": "$(hash_file "$EVIDENCE_DIR/a0.json")",
+              "a1p": "$(hash_file "$EVIDENCE_DIR/a1p.json")",
+              "a1r_primary": "$(hash_file "$EVIDENCE_DIR/a1r-primary.json")",
+              "a1r_refined": "$(hash_file "$EVIDENCE_DIR/a1r-refined.json")",
+              "a1n": "$(hash_file "$EVIDENCE_DIR/a1n.json")"
+            },
+            "manifest_sha256": {
+              "a1r_primary": "$(hash_file "$REF/de001a_a1r_oracle_v1.json")",
+              "a1r_refined": "$(hash_file "$REF/de001a_a1r_oracle_refined_v1.json")"
+            },
+            "workflow": {
+              "run_id": "${GITHUB_RUN_ID}",
+              "attempt": "${GITHUB_RUN_ATTEMPT}",
+              "software_outcome": "${{ steps.software.outcome }}",
+              "artifact_outcome": "${{ steps.artifacts.outcome }}",
+              "chain_outcome": "${{ steps.chain.outcome }}",
+              "chain_exit_code": "${{ steps.chain.outputs.exit_code }}"
+            }
+          }
+          EOF
+          cat "$EVIDENCE_DIR/prequalification-bundle.json"
+
+      - name: Verify A1Q evidence DAG
+        id: a1q
+        if: always() && steps.prequal.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          CRATE=crates/domains/symthaea-cosmology-research
+          REF="$CRATE/references"
+          target/release/de001a-a1q-bundle \
+            "$EVIDENCE_DIR/prequalification-bundle.json" \
+            "$EVIDENCE_DIR/a0.json" \
+            "$EVIDENCE_DIR/a1p.json" \
+            "$REF/de001a_a1r_oracle_v1.json" \
+            "$REF/de001a_a1r_oracle_refined_v1.json" \
+            "$EVIDENCE_DIR/a1r-primary.json" \
+            "$EVIDENCE_DIR/a1r-refined.json" \
+            "$EVIDENCE_DIR/a1n.json" \
+            Cargo.lock \
+            target/release/de001a-a0-verify \
+            target/release/de001a-a1p-point-bind \
+            target/release/de001a-a1r-oracle \
+            target/release/de001a-a1n-convergence \
+            target/release/de001a-a1q-bundle \
+            > "$EVIDENCE_DIR/a1q.json" \
+            2> "$EVIDENCE_DIR/a1q.stderr"
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat "$EVIDENCE_DIR/a1q.json"
           exit "$code"
 
       - name: Postflight immutability
@@ -150,7 +265,7 @@ jobs:
 
           cat > "$EVIDENCE_DIR/qualification-capsule.json" <<EOF
           {
-            "protocol": "DE-001A1R-QUALIFICATION-CAPSULE-v1",
+            "protocol": "DE-001A1R-QUALIFICATION-CAPSULE-v2",
             "scientific_claim": "NONE",
             "authority": "fixed-point-reproduction-qualification-only",
             "subject_head": "${{ steps.subject.outputs.head }}",
@@ -171,6 +286,9 @@ jobs:
               "artifact_outcome": "${{ steps.artifacts.outcome }}",
               "chain_outcome": "${{ steps.chain.outcome }}",
               "chain_exit_code": "${{ steps.chain.outputs.exit_code }}",
+              "prequalification_outcome": "${{ steps.prequal.outcome }}",
+              "a1q_outcome": "${{ steps.a1q.outcome }}",
+              "a1q_exit_code": "${{ steps.a1q.outputs.exit_code }}",
               "postflight_outcome": "${{ steps.postflight.outcome }}"
             },
             "cargo_lock_sha256": "$(hash_or_unavailable Cargo.lock)",
@@ -178,19 +296,22 @@ jobs:
               "a0": "$(hash_or_unavailable target/release/de001a-a0-verify)",
               "a1p": "$(hash_or_unavailable target/release/de001a-a1p-point-bind)",
               "a1r": "$(hash_or_unavailable target/release/de001a-a1r-oracle)",
-              "a1n": "$(hash_or_unavailable target/release/de001a-a1n-convergence)"
+              "a1n": "$(hash_or_unavailable target/release/de001a-a1n-convergence)",
+              "a1q": "$(hash_or_unavailable target/release/de001a-a1q-bundle)"
             },
             "a0_artifact_store": {
               "path": "$(text_or_unavailable "$EVIDENCE_DIR/a0-store-path.txt")",
               "nar_hash": "$(text_or_unavailable "$EVIDENCE_DIR/a0-nar-hash.txt")",
               "closure_size": "$(text_or_unavailable "$EVIDENCE_DIR/a0-closure-size.txt")"
             },
+            "prequalification_bundle_sha256": "$(hash_or_unavailable "$EVIDENCE_DIR/prequalification-bundle.json")",
             "receipt_sha256": {
               "a0": "$(hash_or_unavailable "$EVIDENCE_DIR/a0.json")",
               "a1p": "$(hash_or_unavailable "$EVIDENCE_DIR/a1p.json")",
               "a1r_primary": "$(hash_or_unavailable "$EVIDENCE_DIR/a1r-primary.json")",
               "a1r_refined": "$(hash_or_unavailable "$EVIDENCE_DIR/a1r-refined.json")",
-              "a1n": "$(hash_or_unavailable "$EVIDENCE_DIR/a1n.json")"
+              "a1n": "$(hash_or_unavailable "$EVIDENCE_DIR/a1n.json")",
+              "a1q": "$(hash_or_unavailable "$EVIDENCE_DIR/a1q.json")"
             }
           }
           EOF
@@ -214,4 +335,7 @@ jobs:
           test "${{ steps.artifacts.outcome }}" = "success"
           test "${{ steps.chain.outcome }}" = "success"
           test "${{ steps.chain.outputs.exit_code }}" = "0"
+          test "${{ steps.prequal.outcome }}" = "success"
+          test "${{ steps.a1q.outcome }}" = "success"
+          test "${{ steps.a1q.outputs.exit_code }}" = "0"
           test "${{ steps.postflight.outcome }}" = "success"

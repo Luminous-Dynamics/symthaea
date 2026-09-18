@@ -29,3 +29,7 @@ path = "src/a1p_point_bind.rs"
 [[bin]]
 name = "de001a-a1n-convergence"
 path = "src/a1n_convergence.rs"
+
+[[bin]]
+name = "de001a-a1q-bundle"
+path = "src/a1q_bundle.rs"
