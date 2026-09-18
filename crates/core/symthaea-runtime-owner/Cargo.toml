@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-runtime-owner"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Single-owner bounded command runtime for mutable Symthaea engines"
+
+[dependencies]
+tokio = { workspace = true }
