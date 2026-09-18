@@ -1,0 +1,129 @@
+name: INT-005A1 IPC Connection Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/int-005a1-ipc-connection.yml'
+      - 'src/shell/ipc_duplex.rs'
+      - 'src/shell/ipc_connection.rs'
+      - 'src/shell/mod.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: int-005a1-ipc-connection-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_SUBJECT: 07e3b5f8f9b0ba3477bfc7319f0c056eae85ea06
+  IPC_DUPLEX_BLOB: 99ff23f055a2dbb361a4345b19d28066b350ebee
+  IPC_CONNECTION_BLOB: 1392c677021f57db009439c1ba7b6d5a5919a14f
+  SHELL_MOD_BLOB: 0e50342afbcb6db366ccc5a8733932404bb4f40e
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  qualify:
+    name: exact-head IPC connection
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Bind qualifier to exact source subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SUBJECT"
+          test "$(git diff --name-only "$SOURCE_SUBJECT" HEAD)" = ".github/workflows/int-005a1-ipc-connection.yml"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/shell/ipc_duplex.rs")" = "$IPC_DUPLEX_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/shell/ipc_connection.rs")" = "$IPC_CONNECTION_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/shell/mod.rs")" = "$SHELL_MOD_BLOB"
+          test -z "$(git status --porcelain)"
+
+      - name: Install Rust 1.96 with quality components
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+      - name: Check touched shell source formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            src/shell/ipc_duplex.rs \
+            src/shell/ipc_connection.rs \
+            src/shell/mod.rs
+
+      - name: Locked root-library compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea --lib
+
+      - name: Focused duplex transport tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea --lib \
+            shell::ipc_duplex::tests -- --nocapture
+          cargo test --locked -p symthaea --lib \
+            shell::ipc_connection::tests -- --nocapture
+
+      - name: Locked root-library clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea --lib -- -D warnings
+
+      - name: Verify source immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/shell/ipc_duplex.rs")" = "$IPC_DUPLEX_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/shell/ipc_connection.rs")" = "$IPC_CONNECTION_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/shell/mod.rs")" = "$SHELL_MOD_BLOB"
+
+      - name: Emit qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qualification
+          {
+            echo 'program=INT-005A1'
+            echo 'authority=engineering-source-qualification-only'
+            echo 'scientific_claim=NONE'
+            echo "source_subject=$SOURCE_SUBJECT"
+            echo "qualifier_head=$(git rev-parse HEAD)"
+            echo "ipc_duplex_blob=$IPC_DUPLEX_BLOB"
+            echo "ipc_connection_blob=$IPC_CONNECTION_BLOB"
+            echo "shell_mod_blob=$SHELL_MOD_BLOB"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo 'format=PASS'
+            echo 'compile=PASS'
+            echo 'focused_tests=PASS'
+            echo 'clippy=PASS'
+          } | tee qualification/int-005a1-ipc-connection.txt
+
+      - name: Upload qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: int-005a1-ipc-connection-${{ github.event.pull_request.head.sha || github.sha }}
+          path: qualification/int-005a1-ipc-connection.txt
+          if-no-files-found: error
+          retention-days: 30
