@@ -196,6 +196,27 @@ fn normalized_a1r_manifest(bytes: &[u8], expected_subdivisions: u64) -> Result<V
     Ok(value)
 }
 
+fn derive_a1r_verdict(
+    reference_chi2: f64,
+    computed_chi2: f64,
+    absolute_tolerance: f64,
+) -> Result<(&'static str, f64), String> {
+    if !reference_chi2.is_finite()
+        || !computed_chi2.is_finite()
+        || !absolute_tolerance.is_finite()
+        || absolute_tolerance <= 0.0
+    {
+        return Err("cannot derive A1R verdict from invalid numerical values".into());
+    }
+    let absolute_delta = (computed_chi2 - reference_chi2).abs();
+    let verdict = if absolute_delta <= absolute_tolerance {
+        "PASS"
+    } else {
+        "NEGATIVE"
+    };
+    Ok((verdict, absolute_delta))
+}
+
 fn validate_a1r_receipt(receipt: &A1rReceipt) -> Result<(), String> {
     if receipt.protocol != "DE-001A1R-RUST-ORACLE-v1"
         || receipt.scientific_claim != "NONE"
@@ -218,6 +239,22 @@ fn validate_a1r_receipt(receipt: &A1rReceipt) -> Result<(), String> {
     {
         return Err("A1R receipt contains invalid numerical values".into());
     }
+
+    let (derived_verdict, derived_delta) = derive_a1r_verdict(
+        receipt.reference_chi2_bao,
+        receipt.computed_chi2_bao,
+        receipt.absolute_tolerance,
+    )?;
+    if derived_delta.to_bits() != receipt.absolute_delta_chi2.to_bits() {
+        return Err("A1R receipt absolute_delta_chi2 is internally inconsistent".into());
+    }
+    if receipt.verdict != derived_verdict {
+        return Err(format!(
+            "A1R receipt verdict {:?} disagrees with re-derived verdict {derived_verdict:?}",
+            receipt.verdict
+        ));
+    }
+
     if receipt.independence.measurement_data_independent
         || receipt.independence.covariance_independent
         || !receipt.independence.background_implementation_independent
@@ -302,6 +339,12 @@ fn execute(
         || primary.independence != refined.independence
     {
         return Err("primary/refined A1R receipts do not describe the same scientific subject".into());
+    }
+    if primary.verdict != refined.verdict {
+        return Err(format!(
+            "A1R reproduction verdict changes with numerical resolution: primary={:?} refined={:?}",
+            primary.verdict, refined.verdict
+        ));
     }
 
     let mut max_abs_prediction_delta = 0.0_f64;
@@ -419,5 +462,23 @@ mod tests {
     fn digest_validator_rejects_uppercase() {
         assert!(!is_lower_hex_sha256(&"A".repeat(64)));
         assert!(is_lower_hex_sha256(&"a".repeat(64)));
+    }
+
+    #[test]
+    fn reproduction_verdict_is_rederived_from_frozen_rule() {
+        let (pass, delta) = derive_a1r_verdict(10.282_299, 10.274_723_163_65, 0.01).unwrap();
+        assert_eq!(pass, "PASS");
+        assert!(delta < 0.01);
+
+        let (negative, delta) = derive_a1r_verdict(10.282_299, 10.25, 0.01).unwrap();
+        assert_eq!(negative, "NEGATIVE");
+        assert!(delta > 0.01);
+    }
+
+    #[test]
+    fn reproduction_verdict_includes_tolerance_boundary() {
+        let (verdict, delta) = derive_a1r_verdict(10.0, 10.01, 0.01).unwrap();
+        assert_eq!(verdict, "PASS");
+        assert!(delta <= 0.01);
     }
 }
