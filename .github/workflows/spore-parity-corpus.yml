@@ -1,0 +1,40 @@
+name: Spore Parity Corpus
+
+on:
+  pull_request:
+  push:
+    branches:
+      - docs/spore-extraction-boundary-v1
+      - spore/extraction-parity-corpus-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity-contract:
+    name: Behavioral parity contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact workflow head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Require clean checkout
+        run: |
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+
+      - name: Validate parity corpus
+        run: python3 scripts/check_spore_parity_corpus.py
+
+      - name: Run negative contract tests
+        run: python3 -m unittest tests.test_spore_parity_corpus
+
+      - name: Postflight immutability
+        run: |
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
