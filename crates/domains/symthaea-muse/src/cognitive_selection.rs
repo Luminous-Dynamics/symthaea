@@ -10,10 +10,14 @@ use crate::cognitive_bridge::{
     CognitiveDecisionTrace, MusicalOutcomeError, PredictedMusicalOutcome, SymbolicAction,
     SymbolicMeasurementEvidence, default_predicted_outcome,
 };
+use crate::evidence_digest::canonical_json_sha256;
 use crate::musical_inference::MusicAction;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use symthaea_music_theory::Score;
 
 pub const COGNITIVE_SELECTION_POLICY_VERSION: &str = "cognitive-alternative-selection-v1";
+pub const COGNITIVE_SCORE_COMMIT_PLAN_VERSION: &str = "cognitive-score-commit-plan-v1";
 
 /// Evidence supplied for one theory-generated alternative.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -75,6 +79,57 @@ pub struct CognitiveAlternativeSelectionV1 {
     pub formal_proposal_action: SymbolicAction,
     pub desired_outcome: PredictedMusicalOutcome,
     pub selection: SymbolicAlternativeSelection,
+}
+
+/// A theory-generated score kept inseparable from the evidence used to rank it.
+///
+/// This closes a subtle provenance hole: callers cannot pass one slice of
+/// alternative evidence and a separate map of scores that merely happen to use
+/// the same labels. The score and evidence enter the commit planner as one bound
+/// object and receive independent canonical digests.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CognitiveScoreAlternativeV1 {
+    pub evidence: SymbolicAlternativeEvidence,
+    pub score: Score,
+}
+
+/// Immutable identity record retained for every candidate in one commit plan.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CognitiveCandidateCommitmentV1 {
+    pub alternative_id: String,
+    pub score_sha256: String,
+    pub evidence_sha256: String,
+}
+
+/// Auditable shadow-vs-cognitive score selection without mutating product state.
+///
+/// `shadow_selection` uses the existing formal prediction target. The cognitive
+/// arm uses the real FEP source action through [`select_symbolic_alternative_from_inference`].
+/// Both arms see the exact same bound candidate set. A later Studio integration
+/// may commit `cognitive_selected_id`, but this type itself is evidence-only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CognitiveScoreCommitPlanV1 {
+    pub plan_version: String,
+    pub candidate_set_sha256: String,
+    pub candidates: Vec<CognitiveCandidateCommitmentV1>,
+    pub shadow_selection: SymbolicAlternativeSelection,
+    pub cognitive_selection: CognitiveAlternativeSelectionV1,
+    pub shadow_selected_id: String,
+    pub shadow_score_sha256: String,
+    pub cognitive_selected_id: String,
+    pub cognitive_score_sha256: String,
+    pub score_identity_diverged: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CognitiveScoreCommitPlanError {
+    EmptyAlternativeId,
+    NonCanonicalAlternativeId(String),
+    DuplicateAlternativeId(String),
+    NoShadowRecommendation,
+    NoCognitiveRecommendation,
+    RecommendedAlternativeMissing(String),
+    CanonicalizationFailed(String),
 }
 
 /// Select among already-valid musical alternatives.
@@ -214,6 +269,93 @@ pub fn select_symbolic_alternative_from_inference(
     }
 }
 
+/// Build a non-mutating score commit plan over one exact bound candidate set.
+///
+/// The function deliberately computes the shadow and cognitive arms in the
+/// same call so they cannot silently see different candidate sets. Candidate
+/// commitments bind both the concrete score and the ranking evidence. The
+/// resulting boolean means only that the selected symbolic score identity
+/// changed; it says nothing about musical quality or listener preference.
+pub fn plan_cognitive_score_commit(
+    trace: &CognitiveDecisionTrace,
+    alternatives: &[CognitiveScoreAlternativeV1],
+) -> Result<CognitiveScoreCommitPlanV1, CognitiveScoreCommitPlanError> {
+    let mut seen = BTreeSet::new();
+    let mut commitments = Vec::with_capacity(alternatives.len());
+    let mut evidence = Vec::with_capacity(alternatives.len());
+
+    for alternative in alternatives {
+        let raw_id = &alternative.evidence.alternative_id;
+        let id = raw_id.trim();
+        if id.is_empty() {
+            return Err(CognitiveScoreCommitPlanError::EmptyAlternativeId);
+        }
+        if id != raw_id {
+            return Err(CognitiveScoreCommitPlanError::NonCanonicalAlternativeId(
+                raw_id.clone(),
+            ));
+        }
+        if !seen.insert(id.to_owned()) {
+            return Err(CognitiveScoreCommitPlanError::DuplicateAlternativeId(
+                id.to_owned(),
+            ));
+        }
+        let score_sha256 = canonical_json_sha256(&alternative.score).map_err(|error| {
+            CognitiveScoreCommitPlanError::CanonicalizationFailed(error.to_string())
+        })?;
+        let evidence_sha256 = canonical_json_sha256(&alternative.evidence).map_err(|error| {
+            CognitiveScoreCommitPlanError::CanonicalizationFailed(error.to_string())
+        })?;
+        commitments.push(CognitiveCandidateCommitmentV1 {
+            alternative_id: id.to_owned(),
+            score_sha256,
+            evidence_sha256,
+        });
+        evidence.push(alternative.evidence.clone());
+    }
+
+    commitments.sort_by(|left, right| left.alternative_id.cmp(&right.alternative_id));
+    let candidate_set_sha256 = canonical_json_sha256(&commitments).map_err(|error| {
+        CognitiveScoreCommitPlanError::CanonicalizationFailed(error.to_string())
+    })?;
+
+    let shadow_selection = select_symbolic_alternative(trace, &evidence);
+    let cognitive_selection = select_symbolic_alternative_from_inference(trace, &evidence);
+    let shadow_selected_id = shadow_selection
+        .recommended_id
+        .clone()
+        .ok_or(CognitiveScoreCommitPlanError::NoShadowRecommendation)?;
+    let cognitive_selected_id = cognitive_selection
+        .selection
+        .recommended_id
+        .clone()
+        .ok_or(CognitiveScoreCommitPlanError::NoCognitiveRecommendation)?;
+
+    let score_hash_for = |id: &str| {
+        commitments
+            .iter()
+            .find(|candidate| candidate.alternative_id == id)
+            .map(|candidate| candidate.score_sha256.clone())
+            .ok_or_else(|| CognitiveScoreCommitPlanError::RecommendedAlternativeMissing(id.into()))
+    };
+    let shadow_score_sha256 = score_hash_for(&shadow_selected_id)?;
+    let cognitive_score_sha256 = score_hash_for(&cognitive_selected_id)?;
+    let score_identity_diverged = shadow_score_sha256 != cognitive_score_sha256;
+
+    Ok(CognitiveScoreCommitPlanV1 {
+        plan_version: COGNITIVE_SCORE_COMMIT_PLAN_VERSION.into(),
+        candidate_set_sha256,
+        candidates: commitments,
+        shadow_selection,
+        cognitive_selection,
+        shadow_selected_id,
+        shadow_score_sha256,
+        cognitive_selected_id,
+        cognitive_score_sha256,
+        score_identity_diverged,
+    })
+}
+
 /// Effect target corresponding to the FEP action before formal goal/obligation
 /// arbitration. The mapping intentionally mirrors the bridge's no-goal,
 /// no-obligation fallback and is regression-tested against that bridge so the
@@ -251,7 +393,7 @@ mod tests {
         SymbolicActionProposal, SymbolicMusicObservation, propose_symbolic_action,
     };
     use crate::musical_inference::{MusicAction, MusicInferenceResult};
-    use symthaea_music_theory::ScoreCognitiveProfile;
+    use symthaea_music_theory::{Key, PitchClass, ScoreCognitiveProfile};
 
     fn trace() -> CognitiveDecisionTrace {
         CognitiveDecisionTrace {
@@ -381,6 +523,10 @@ mod tests {
         }
     }
 
+    fn score(tempo_bpm: f32) -> Score {
+        Score::new(Key::major(PitchClass::C), tempo_bpm, 4)
+    }
+
     #[test]
     fn invalid_perfect_prediction_loses_to_valid_music() {
         let selection = select_symbolic_alternative(
@@ -444,7 +590,10 @@ mod tests {
         );
 
         let cognitive = select_symbolic_alternative_from_inference(&trace, &alternatives);
-        assert_eq!(cognitive.formal_proposal_action, SymbolicAction::ReturnOpeningMaterial);
+        assert_eq!(
+            cognitive.formal_proposal_action,
+            SymbolicAction::ReturnOpeningMaterial
+        );
         assert_eq!(cognitive.source_action, MusicAction::IncreaseComplexity);
         assert_eq!(
             cognitive.selection.recommended_id.as_deref(),
@@ -483,6 +632,155 @@ mod tests {
         assert_eq!(
             cognitive.selection.recommended_id.as_deref(),
             Some("formal-first")
+        );
+    }
+
+    #[test]
+    fn score_commit_plan_binds_shadow_and_cognitive_choices_to_content() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let formal_return = default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial);
+        let denser = default_predicted_outcome(SymbolicAction::IncreaseDensity);
+        let candidates = [
+            CognitiveScoreAlternativeV1 {
+                evidence: alternative_for_outcome(
+                    "formal-return",
+                    formal_return,
+                    true,
+                    true,
+                    0,
+                    0.0,
+                ),
+                score: score(120.0),
+            },
+            CognitiveScoreAlternativeV1 {
+                evidence: alternative_for_outcome(
+                    "cognition-dense",
+                    denser,
+                    true,
+                    true,
+                    0,
+                    0.0,
+                ),
+                score: score(121.0),
+            },
+        ];
+
+        let plan = plan_cognitive_score_commit(&trace, &candidates).unwrap();
+        assert_eq!(plan.plan_version, COGNITIVE_SCORE_COMMIT_PLAN_VERSION);
+        assert_eq!(plan.shadow_selected_id, "formal-return");
+        assert_eq!(plan.cognitive_selected_id, "cognition-dense");
+        assert_ne!(plan.shadow_score_sha256, plan.cognitive_score_sha256);
+        assert!(plan.score_identity_diverged);
+        assert_eq!(plan.candidates.len(), 2);
+        assert_eq!(plan.candidate_set_sha256.len(), 64);
+    }
+
+    #[test]
+    fn different_selected_labels_do_not_imply_score_divergence() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let shared_score = score(120.0);
+        let candidates = [
+            CognitiveScoreAlternativeV1 {
+                evidence: alternative_for_outcome(
+                    "formal-return",
+                    default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial),
+                    true,
+                    true,
+                    0,
+                    0.0,
+                ),
+                score: shared_score.clone(),
+            },
+            CognitiveScoreAlternativeV1 {
+                evidence: alternative_for_outcome(
+                    "cognition-dense",
+                    default_predicted_outcome(SymbolicAction::IncreaseDensity),
+                    true,
+                    true,
+                    0,
+                    0.0,
+                ),
+                score: shared_score,
+            },
+        ];
+
+        let plan = plan_cognitive_score_commit(&trace, &candidates).unwrap();
+        assert_ne!(plan.shadow_selected_id, plan.cognitive_selected_id);
+        assert_eq!(plan.shadow_score_sha256, plan.cognitive_score_sha256);
+        assert!(!plan.score_identity_diverged);
+    }
+
+    #[test]
+    fn candidate_set_commitment_is_order_independent() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let formal_return = default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial);
+        let denser = default_predicted_outcome(SymbolicAction::IncreaseDensity);
+        let left = CognitiveScoreAlternativeV1 {
+            evidence: alternative_for_outcome("a", formal_return, true, true, 0, 0.0),
+            score: score(120.0),
+        };
+        let right = CognitiveScoreAlternativeV1 {
+            evidence: alternative_for_outcome("b", denser, true, true, 0, 0.0),
+            score: score(121.0),
+        };
+
+        let first = plan_cognitive_score_commit(&trace, &[left.clone(), right.clone()]).unwrap();
+        let second = plan_cognitive_score_commit(&trace, &[right, left]).unwrap();
+        assert_eq!(first.candidate_set_sha256, second.candidate_set_sha256);
+    }
+
+    #[test]
+    fn noncanonical_alternative_ids_are_rejected() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let error = plan_cognitive_score_commit(
+            &trace,
+            &[CognitiveScoreAlternativeV1 {
+                evidence: alternative_for_outcome(
+                    " padded ",
+                    default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial),
+                    true,
+                    true,
+                    0,
+                    0.0,
+                ),
+                score: score(120.0),
+            }],
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            CognitiveScoreCommitPlanError::NonCanonicalAlternativeId(" padded ".into())
+        );
+    }
+
+    #[test]
+    fn duplicate_alternative_ids_are_rejected_before_selection() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let evidence = alternative_for_outcome(
+            "duplicate",
+            default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial),
+            true,
+            true,
+            0,
+            0.0,
+        );
+        let error = plan_cognitive_score_commit(
+            &trace,
+            &[
+                CognitiveScoreAlternativeV1 {
+                    evidence: evidence.clone(),
+                    score: score(120.0),
+                },
+                CognitiveScoreAlternativeV1 {
+                    evidence,
+                    score: score(121.0),
+                },
+            ],
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            CognitiveScoreCommitPlanError::DuplicateAlternativeId("duplicate".into())
         );
     }
 
