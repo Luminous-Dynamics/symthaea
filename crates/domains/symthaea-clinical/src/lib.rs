@@ -21,6 +21,7 @@ pub mod claims;
 pub mod inference;
 pub mod inference_v2;
 pub mod inference_wire;
+pub mod inference_wire_v2;
 pub mod nosology;
 pub mod rdoc;
 pub mod symptom_encoding;
@@ -50,6 +51,12 @@ pub use inference_wire::{
     CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION, ClinicalInferenceWireError,
     clinical_inference_wire_bytes, clinical_inference_wire_digest,
     clinical_inference_wire_digest_from_bytes, parse_clinical_inference_wire_bytes,
+};
+pub use inference_wire_v2::{
+    CLINICAL_INFERENCE_WIRE_V2_VERSION, ClinicalInferenceWireDigestV2,
+    ClinicalInferenceWireV2Error, clinical_inference_wire_v2_bytes,
+    clinical_inference_wire_v2_digest, clinical_inference_wire_v2_digest_from_bytes,
+    parse_clinical_inference_wire_v2,
 };
 pub use nosology::{DiagnosticCategory, DiagnosticProfile, Severity, Specifier};
 pub use rdoc::{RDocDomain, RDocProfile};
