@@ -167,7 +167,8 @@ pub use sym_rsi_fresh_evaluation::{
 };
 pub use sym_rsi_c_fresh_gate::{
     ParentQualifiedReplayFreshReceipt, QualifiedReplayFresh, QualifiedReplayFreshError,
-    SYM_RSI_001_QUALIFIED_FRESH_SCHEMA, run_fresh_c_vs_a_after_parent_c,
+    SYM_RSI_001_QUALIFIED_FRESH_SCHEMA, requalify_fresh_c_vs_a_from_receipt,
+    run_fresh_c_vs_a_after_parent_c,
 };
 pub use sym_rsi_fresh_chain_claim::{
     FreshImprovementChainDisposition, FreshImprovementChainError, FreshImprovementChainReceipt,
