@@ -1,0 +1,170 @@
+name: Workflow Syntax
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/scripts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-syntax-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    name: actionlint + GitHub shell syntax
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.12"
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          expected="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          curl -fsSLo "/tmp/${archive}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          echo "${expected}  /tmp/${archive}" | sha256sum -c -
+          mkdir -p /tmp/actionlint
+          tar -xzf "/tmp/${archive}" -C /tmp/actionlint actionlint
+          /tmp/actionlint/actionlint -version
+
+      - name: Select CI-definition files for this event
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/workflow-files.txt
+          : > /tmp/github-shell-files.txt
+
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              git fetch --no-tags origin "${GITHUB_BASE_REF}"
+              git diff --diff-filter=ACMRT --name-only \
+                "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+                > /tmp/workflow-files.txt
+              git diff --diff-filter=ACMRT --name-only \
+                "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/scripts/*.sh' \
+                > /tmp/github-shell-files.txt
+              ;;
+            push)
+              if git rev-parse HEAD^ >/dev/null 2>&1; then
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
+                  '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+                  > /tmp/workflow-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
+                  '.github/scripts/*.sh' \
+                  > /tmp/github-shell-files.txt
+              else
+                find .github/workflows -maxdepth 1 -type f \
+                  \( -name '*.yml' -o -name '*.yaml' \) -print \
+                  | sed 's#^./##' | sort > /tmp/workflow-files.txt
+                if [ -d .github/scripts ]; then
+                  find .github/scripts -maxdepth 1 -type f -name '*.sh' -print \
+                    | sed 's#^./##' | sort > /tmp/github-shell-files.txt
+                fi
+              fi
+              ;;
+            workflow_dispatch)
+              find .github/workflows -maxdepth 1 -type f \
+                \( -name '*.yml' -o -name '*.yaml' \) -print \
+                | sed 's#^./##' | sort > /tmp/workflow-files.txt
+              if [ -d .github/scripts ]; then
+                find .github/scripts -maxdepth 1 -type f -name '*.sh' -print \
+                  | sed 's#^./##' | sort > /tmp/github-shell-files.txt
+              fi
+              ;;
+            *)
+              echo "unexpected event: ${GITHUB_EVENT_NAME}" >&2
+              exit 1
+              ;;
+          esac
+
+          echo "Selected workflow files:"
+          cat /tmp/workflow-files.txt
+          echo "Selected .github shell files:"
+          cat /tmp/github-shell-files.txt
+
+          if [ -s /tmp/workflow-files.txt ]; then
+            echo "workflows=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflows=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -s /tmp/github-shell-files.txt ]; then
+            echo "shells=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "shells=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Lint changed workflows
+        if: steps.changed.outputs.workflows == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < /tmp/workflow-files.txt
+          /tmp/actionlint/actionlint \
+            -color \
+            -shellcheck "" \
+            -pyflakes "" \
+            "${files[@]}"
+
+      - name: Parse-check changed GitHub shell helpers
+        if: steps.changed.outputs.shells == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < /tmp/github-shell-files.txt
+
+      - name: Self-test changed CI helpers with embedded contracts
+        if: steps.changed.outputs.shells == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            case "$file" in
+              .github/scripts/check-showroom-hygiene.sh)
+                bash "$file" --self-test
+                ;;
+            esac
+          done < /tmp/github-shell-files.txt
+
+      - name: Record workflow-syntax evidence
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          {
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "checkout_sha=${GITHUB_SHA}"
+            if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+              echo "pr_head_sha=${PR_HEAD_SHA}"
+            fi
+            echo "actionlint_version=1.7.12"
+            echo "actionlint_archive_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+            echo "changed_workflows_only_on_pr=true"
+            echo "changed_github_shell_scripts_bash_n=true"
+            echo "showroom_hygiene_self_test_when_changed=true"
+            echo "shellcheck_integration=false"
+            echo "pyflakes_integration=false"
+          } | tee workflow-syntax-receipt.txt
