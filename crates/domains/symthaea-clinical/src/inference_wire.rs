@@ -9,6 +9,12 @@
 //! domain-separated wire identity that can be pinned by an independent admission
 //! policy.
 //!
+//! The v1 wire form is deliberately **canonical**: accepted bytes must exactly
+//! equal the bytes produced by serializing the validated v1 envelope with this
+//! module. This rejects ignored unknown fields, alternate field ordering,
+//! insignificant whitespace, and other representation drift that could otherwise
+//! make two implementations disagree about what was admitted.
+//!
 //! The wire digest proves only exact artifact identity. It does not prove that
 //! the inference is scientifically correct, clinically valid, in-distribution,
 //! trusted by Mycelix, or authorized for presentation/action.
@@ -25,9 +31,11 @@ pub const CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION: u16 = 1;
 const DERIVE_KEY_CONTEXT: &str = "symthaea.clinical.inference-envelope-wire.v1";
 const SCHEMA_TAG: &[u8] = b"symthaea/clinical-inference-envelope/v1";
 
-/// Validate and serialize the exact v1 envelope representation used for wire
-/// identity. JSON is used here as the explicit v1 encoding contract; changing
-/// encoding requires a new wire-identity version/domain rather than silent reuse.
+/// Validate and serialize the exact canonical v1 envelope representation used
+/// for wire identity.
+///
+/// JSON is the explicit v1 encoding contract. A future encoding change requires
+/// a new wire-identity version/domain rather than silent reuse.
 pub fn clinical_inference_wire_bytes(
     envelope: &ClinicalInferenceEnvelopeV1,
 ) -> Result<Vec<u8>, ClinicalInferenceWireError> {
@@ -37,18 +45,63 @@ pub fn clinical_inference_wire_bytes(
     serde_json::to_vec(envelope).map_err(|_| ClinicalInferenceWireError::SerializationFailure)
 }
 
+/// Parse only the canonical v1 wire representation.
+///
+/// The deserialize-then-reserialize equality check is intentional. Existing
+/// envelope structs predate this cross-repository contract and may ignore unknown
+/// JSON fields during ordinary serde deserialization. Such permissiveness is not
+/// acceptable at an admission boundary. Any ignored field, whitespace change,
+/// key reordering, or alternate representation changes the input bytes and is
+/// rejected as non-canonical.
+pub fn parse_clinical_inference_wire_bytes(
+    bytes: &[u8],
+) -> Result<ClinicalInferenceEnvelopeV1, ClinicalInferenceWireError> {
+    let envelope: ClinicalInferenceEnvelopeV1 =
+        serde_json::from_slice(bytes).map_err(|_| ClinicalInferenceWireError::DeserializationFailure)?;
+    envelope
+        .validate()
+        .map_err(ClinicalInferenceWireError::InvalidEnvelope)?;
+    let canonical = clinical_inference_wire_bytes(&envelope)?;
+    if canonical != bytes {
+        return Err(ClinicalInferenceWireError::NonCanonicalEncoding);
+    }
+    Ok(envelope)
+}
+
 /// Compute the exact v1 domain-separated identity of one validated inference
 /// envelope.
 pub fn clinical_inference_wire_digest(
     envelope: &ClinicalInferenceEnvelopeV1,
 ) -> Result<ClinicalDigestV1, ClinicalInferenceWireError> {
     let bytes = clinical_inference_wire_bytes(envelope)?;
+    clinical_inference_wire_digest_from_canonical_bytes(&bytes)
+}
+
+/// Verify canonical v1 wire bytes and compute their domain-separated identity.
+///
+/// This is the preferred downstream admission entry point because the digest is
+/// computed over the exact bytes that were checked for canonicality.
+pub fn clinical_inference_wire_digest_from_bytes(
+    bytes: &[u8],
+) -> Result<ClinicalDigestV1, ClinicalInferenceWireError> {
+    let _ = parse_clinical_inference_wire_bytes(bytes)?;
+    clinical_inference_wire_digest_from_canonical_bytes(bytes)
+}
+
+fn clinical_inference_wire_digest_from_canonical_bytes(
+    bytes: &[u8],
+) -> Result<ClinicalDigestV1, ClinicalInferenceWireError> {
+    let schema_len = u16::try_from(SCHEMA_TAG.len())
+        .map_err(|_| ClinicalInferenceWireError::SerializationFailure)?;
+    let byte_len = u64::try_from(bytes.len())
+        .map_err(|_| ClinicalInferenceWireError::SerializationFailure)?;
+
     let mut hasher = blake3::Hasher::new_derive_key(DERIVE_KEY_CONTEXT);
     hasher.update(&CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION.to_be_bytes());
-    hasher.update(&(SCHEMA_TAG.len() as u16).to_be_bytes());
+    hasher.update(&schema_len.to_be_bytes());
     hasher.update(SCHEMA_TAG);
-    hasher.update(&(bytes.len() as u64).to_be_bytes());
-    hasher.update(&bytes);
+    hasher.update(&byte_len.to_be_bytes());
+    hasher.update(bytes);
     Ok(ClinicalDigestV1::blake3(*hasher.finalize().as_bytes()))
 }
 
@@ -56,6 +109,8 @@ pub fn clinical_inference_wire_digest(
 pub enum ClinicalInferenceWireError {
     InvalidEnvelope(ClinicalInferenceEnvelopeError),
     SerializationFailure,
+    DeserializationFailure,
+    NonCanonicalEncoding,
 }
 
 #[cfg(test)]
@@ -155,6 +210,48 @@ mod tests {
         assert_eq!(
             clinical_inference_wire_digest(&a).unwrap(),
             clinical_inference_wire_digest(&b).unwrap()
+        );
+    }
+
+    #[test]
+    fn canonical_bytes_round_trip_exactly() {
+        let expected = envelope();
+        let bytes = clinical_inference_wire_bytes(&expected).unwrap();
+        let parsed = parse_clinical_inference_wire_bytes(&bytes).unwrap();
+        assert_eq!(parsed, expected);
+        assert_eq!(
+            clinical_inference_wire_digest_from_bytes(&bytes).unwrap(),
+            clinical_inference_wire_digest(&expected).unwrap()
+        );
+    }
+
+    #[test]
+    fn unknown_field_is_rejected_as_non_canonical() {
+        let expected = envelope();
+        let bytes = clinical_inference_wire_bytes(&expected).unwrap();
+        let mut value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("unrecognized_authority".into(), serde_json::json!(true));
+        let mutated = serde_json::to_vec(&value).unwrap();
+
+        assert_eq!(
+            parse_clinical_inference_wire_bytes(&mutated),
+            Err(ClinicalInferenceWireError::NonCanonicalEncoding)
+        );
+    }
+
+    #[test]
+    fn whitespace_variant_is_rejected_as_non_canonical() {
+        let bytes = clinical_inference_wire_bytes(&envelope()).unwrap();
+        let mut mutated = Vec::with_capacity(bytes.len() + 1);
+        mutated.push(b' ');
+        mutated.extend_from_slice(&bytes);
+
+        assert_eq!(
+            parse_clinical_inference_wire_bytes(&mutated),
+            Err(ClinicalInferenceWireError::NonCanonicalEncoding)
         );
     }
 
