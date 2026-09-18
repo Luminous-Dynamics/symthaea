@@ -15,7 +15,7 @@
 
 use super::epistemic_restart_anchor::{
     RestartAnchorDigestV1, RestartAnchorEvidenceV1, RestartAnchorEvidenceVerifierV1,
-    RestartAnchorTrackerV1, RestartAnchorTrackingError, VerifiedRestartAnchorEvidenceV1,
+    RestartAnchorTrackerV1, RestartAnchorTrackingError,
 };
 use super::epistemic_restart_anchor_policy::{
     verify_restart_anchor_evidence_under_policy, RestartAnchorPolicyVerificationError,
@@ -332,7 +332,7 @@ fn continuity_tag(disposition: RestartContinuityDispositionV1) -> u8 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum EpistemicRestartAdmissionReviewError {
     Validation(EpistemicRestartValidationReceiptError),
     PolicyVerification(RestartAnchorPolicyVerificationError),
@@ -360,8 +360,9 @@ mod tests {
         EpistemicLedger, EpistemicLedgerInventoryV1, EpistemicRestartCapsuleV1,
         EpistemicRestartCapsuleV2, EpistemicRestartWireV2, EpistemicRevisionProposal,
         EpistemicSupportStore, EvidenceKind, EvidencePolarity, RestartAnchorEvidenceKindV1,
-        RestartAnchorStatementV1, RestartAnchorTrustPolicyV1,
+        RestartAnchorStatementV1,
     };
+    use crate::knowledge::epistemic_restart_anchor_policy::RestartAnchorTrustPolicyV1;
 
     struct Accept;
 
@@ -435,7 +436,9 @@ mod tests {
         EpistemicRestartWireV2::decode(&bytes).unwrap()
     }
 
-    fn validation_receipt(snapshot: &EpistemicRestartWireSnapshotV2) -> EpistemicRestartValidationReceiptV1 {
+    fn validation_receipt(
+        snapshot: &EpistemicRestartWireSnapshotV2,
+    ) -> EpistemicRestartValidationReceiptV1 {
         EpistemicRestartValidationReceiptV1::validate_and_capture(snapshot).unwrap()
     }
 
