@@ -8,6 +8,9 @@
 //! classifies idempotent replay, forward progress, rollback, or same-epoch
 //! equivocation. It grants no restore, quarantine, or activation authority.
 
+#[path = "epistemic_restart_live_epoch_fence.rs"]
+pub mod live_epoch_fence;
+
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
 };
@@ -125,8 +128,6 @@ impl RestartContinuityGateV1 {
         let anchor_digest = anchor.receipt_digest;
 
         let disposition = if candidate_digest == anchor_digest {
-            // Receipt digests bind capture cycle, so a digest match is an exact
-            // idempotent replay under EKM-044's current canonical receipt format.
             RestartContinuityDispositionV1::IdempotentReplay
         } else if candidate_cycle < anchor_cycle {
             RestartContinuityDispositionV1::Rollback
