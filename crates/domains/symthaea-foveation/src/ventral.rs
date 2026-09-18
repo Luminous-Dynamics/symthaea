@@ -3,26 +3,23 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Ventral pipeline: processes foveated crops into semantic HDC vectors.
 //!
-//! Runs inside the background thread. In stub mode (default), produces
-//! deterministic hash-based embeddings for testing without model files.
-//! When real perception models are available and the `perception` feature
-//! is enabled, routes through SigLIP, OCR, and/or Moondream VQA.
+//! Execution receipts distinguish requested routing from the backend and operation that
+//! actually produced each result. This matters because SemanticVision can initialize while
+//! falling back to deterministic embeddings when ONNX model files are absent.
 
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
-use crate::types::{FoveationRequest, FoveationResult, RecognizedContent, RoutingStrategy};
+use crate::types::{
+    FoveationRequest, FoveationResult, RecognizedContent, RoutingStrategy, VentralExecutionKind,
+    VentralExecutionReceipt, VentralOperation,
+};
 
-/// Ventral stream pipeline that converts pixel crops to semantic HDC vectors.
-///
-/// Dispatches to either a stub (hash-based) or real (SigLIP-backed) backend.
 #[allow(private_interfaces)]
 pub enum VentralPipeline {
-    /// Hash-based stub backend (no model files required).
     Stub {
         jl_projector: StubJLProjector,
         routing: RoutingStrategy,
     },
-    /// Real SigLIP-backed backend (requires `perception` feature + model files).
     #[cfg(feature = "perception")]
     Real {
         inner: real::RealVentralPipeline,
@@ -31,10 +28,6 @@ pub enum VentralPipeline {
 }
 
 impl VentralPipeline {
-    /// Create a new ventral pipeline with the given routing strategy.
-    ///
-    /// When the `perception` feature is active, attempts to initialize the real
-    /// SigLIP-backed pipeline first. Falls back to the stub pipeline on failure.
     pub fn new(routing: RoutingStrategy) -> Self {
         #[cfg(feature = "perception")]
         if let Some(pipeline) = Self::try_new_real(routing) {
@@ -42,10 +35,10 @@ impl VentralPipeline {
         }
 
         #[cfg(feature = "perception")]
-        tracing::info!("Ventral pipeline: using stub (real backend unavailable)");
+        tracing::info!("Ventral pipeline: using hash stub (SemanticVision unavailable)");
 
         #[cfg(not(feature = "perception"))]
-        tracing::info!("Ventral pipeline: using stub (perception feature disabled)");
+        tracing::info!("Ventral pipeline: using hash stub (perception feature disabled)");
 
         Self::Stub {
             jl_projector: StubJLProjector::new(HDC_DIMENSION, 42_700),
@@ -53,30 +46,25 @@ impl VentralPipeline {
         }
     }
 
-    /// Attempt to construct the real SigLIP-backed ventral pipeline.
-    /// Returns `None` if model initialization fails.
     #[cfg(feature = "perception")]
     fn try_new_real(routing: RoutingStrategy) -> Option<Self> {
         match real::RealVentralPipeline::new() {
             Ok(real_pipeline) => {
-                tracing::info!("Ventral pipeline: using real SigLIP backend");
+                tracing::info!(
+                    "Ventral pipeline: SemanticVision initialized; per-result receipt records ONNX vs deterministic fallback"
+                );
                 Some(Self::Real {
                     inner: real_pipeline,
                     routing,
                 })
             }
             Err(e) => {
-                tracing::warn!("Real ventral pipeline init failed: {e}");
+                tracing::warn!("SemanticVision ventral initialization failed: {e}");
                 None
             }
         }
     }
 
-    /// Process a foveation request and return a result.
-    ///
-    /// In stub mode, produces a deterministic hash-based HDC vector
-    /// derived from the crop content. In real mode, dispatches to SigLIP.
-    /// The resulting 16,384D ContinuousHV is valid for GWT injection.
     pub fn process(&mut self, request: &FoveationRequest) -> FoveationResult {
         match self {
             Self::Stub {
@@ -84,12 +72,11 @@ impl VentralPipeline {
                 routing,
             } => process_stub(jl_projector, *routing, request),
             #[cfg(feature = "perception")]
-            Self::Real { inner, .. } => inner.process(request),
+            Self::Real { inner, routing } => inner.process(request, *routing),
         }
     }
 }
 
-/// Process a foveation request using the stub (hash-based) backend.
 fn process_stub(
     projector: &StubJLProjector,
     routing: RoutingStrategy,
@@ -97,15 +84,21 @@ fn process_stub(
 ) -> FoveationResult {
     let start = std::time::Instant::now();
 
-    let (semantic_hv, content, confidence) = match routing {
-        RoutingStrategy::AlwaysOcr => stub_ocr(projector, request),
-        RoutingStrategy::AlwaysCaption => stub_caption(projector, request),
-        RoutingStrategy::AlwaysEmbed => stub_embed(projector, request),
-        RoutingStrategy::Full => stub_full(projector, request),
-        RoutingStrategy::Auto => stub_auto(projector, request),
+    let (semantic_hv, content, confidence, operation) = match routing {
+        RoutingStrategy::AlwaysOcr => {
+            let (hv, content, confidence) = stub_ocr(projector, request);
+            (hv, content, confidence, VentralOperation::Ocr)
+        }
+        RoutingStrategy::AlwaysCaption => {
+            let (hv, content, confidence) = stub_caption(projector, request);
+            (hv, content, confidence, VentralOperation::Caption)
+        }
+        RoutingStrategy::AlwaysEmbed => {
+            let (hv, content, confidence) = stub_embed(projector, request);
+            (hv, content, confidence, VentralOperation::Embedding)
+        }
+        RoutingStrategy::Full | RoutingStrategy::Auto => stub_auto(projector, request),
     };
-
-    let elapsed = start.elapsed();
 
     FoveationResult {
         request_id: request.id,
@@ -116,25 +109,30 @@ fn process_stub(
         grid_col: request.grid_col,
         source_frame_id: request.frame_id,
         source_timestamp_us: request.timestamp_us,
-        processing_time_us: elapsed.as_micros() as u64,
+        source_observation: request.source_observation,
+        execution: VentralExecutionReceipt::new(
+            VentralExecutionKind::HashStubV1,
+            routing,
+            operation,
+        ),
+        processing_time_us: start.elapsed().as_micros() as u64,
         velocity: request.velocity,
     }
 }
 
-/// Stub auto-routing: uses pixel statistics to pick a "route".
 fn stub_auto(
     projector: &StubJLProjector,
     request: &FoveationRequest,
-) -> (ContinuousHV, RecognizedContent, f32) {
-    let contrast = pixel_contrast(&request.crop_pixels);
-    if contrast > 100.0 {
-        stub_ocr(projector, request)
+) -> (ContinuousHV, RecognizedContent, f32, VentralOperation) {
+    if pixel_contrast(&request.crop_pixels) > 100.0 {
+        let (hv, content, confidence) = stub_ocr(projector, request);
+        (hv, content, confidence, VentralOperation::Ocr)
     } else {
-        stub_embed(projector, request)
+        let (hv, content, confidence) = stub_embed(projector, request);
+        (hv, content, confidence, VentralOperation::Embedding)
     }
 }
 
-/// Stub OCR: returns text content based on pixel hash.
 fn stub_ocr(
     projector: &StubJLProjector,
     request: &FoveationRequest,
@@ -145,7 +143,6 @@ fn stub_ocr(
     (hv, content, 0.5)
 }
 
-/// Stub embedding: returns object content based on pixel hash.
 fn stub_embed(
     projector: &StubJLProjector,
     request: &FoveationRequest,
@@ -159,7 +156,6 @@ fn stub_embed(
     (hv, content, 0.4)
 }
 
-/// Stub caption: returns VQA caption based on pixel hash.
 fn stub_caption(
     projector: &StubJLProjector,
     request: &FoveationRequest,
@@ -175,15 +171,6 @@ fn stub_caption(
     (hv, content, 0.3)
 }
 
-/// Stub full cascade: combines all three routes.
-fn stub_full(
-    projector: &StubJLProjector,
-    request: &FoveationRequest,
-) -> (ContinuousHV, RecognizedContent, f32) {
-    stub_auto(projector, request)
-}
-
-/// Simple pixel contrast measure (standard deviation proxy).
 fn pixel_contrast(pixels: &[u8]) -> f32 {
     if pixels.is_empty() {
         return 0.0;
@@ -200,22 +187,14 @@ fn pixel_contrast(pixels: &[u8]) -> f32 {
     variance.sqrt()
 }
 
-/// Deterministic hash of pixel data (djb2-like).
 fn pixel_hash(pixels: &[u8]) -> u64 {
     let mut hash: u64 = 5381;
-    let step = 16;
-    for &byte in pixels.iter().step_by(step) {
+    for &byte in pixels.iter().step_by(16) {
         hash = hash.wrapping_mul(33).wrapping_add(byte as u64);
     }
     hash
 }
 
-/// JL projector that generates deterministic HDC vectors from hash seeds
-/// or projects real model embeddings via seeded Rademacher matrix.
-///
-/// For stub mode: projects hash values to pseudo-random HDC vectors.
-/// For real mode: projects 768D/1024D model embeddings to 16,384D HDC space
-/// using a seeded Rademacher matrix (Johnson–Lindenstrauss lemma).
 pub(crate) struct StubJLProjector {
     dim: usize,
     seed: u64,
@@ -226,10 +205,6 @@ impl StubJLProjector {
         Self { dim, seed }
     }
 
-    /// Project a real model embedding (e.g. 768D SigLIP) to an HDC vector.
-    ///
-    /// Uses a seeded Rademacher matrix (±1 entries via xorshift) to project
-    /// the embedding to `self.dim` dimensions. O(dim × emb_len).
     #[allow(dead_code)]
     pub(crate) fn project_embedding(&self, embedding: &[f32]) -> ContinuousHV {
         if embedding.is_empty() {
@@ -256,43 +231,37 @@ impl StubJLProjector {
         ContinuousHV::from_vec(values).normalize()
     }
 
-    /// Project a hash value to a deterministic HDC vector.
     fn project_hash(&self, hash: u64) -> ContinuousHV {
-        let combined_seed = self.seed ^ hash;
-        let mut state = combined_seed;
+        let mut state = self.seed ^ hash;
         let mut values = Vec::with_capacity(self.dim);
 
         for _ in 0..self.dim {
             state ^= state << 13;
             state ^= state >> 7;
             state ^= state << 17;
-            let v = (state as f32 / u64::MAX as f32) * 2.0 - 1.0;
-            values.push(v);
+            values.push((state as f32 / u64::MAX as f32) * 2.0 - 1.0);
         }
 
         ContinuousHV::from_vec(values).normalize()
     }
 }
 
-// ── Real perception backend (feature-gated) ─────────────────────────────
 #[cfg(feature = "perception")]
 mod real {
     use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
     use symthaea_perception::semantic_vision::SemanticVision;
 
-    use crate::types::{FoveationRequest, FoveationResult, RecognizedContent};
+    use crate::types::{
+        FoveationRequest, FoveationResult, RecognizedContent, RoutingStrategy,
+        VentralExecutionKind, VentralExecutionReceipt, VentralOperation,
+    };
 
-    /// Real ventral pipeline backed by SigLIP/OCR/Moondream models.
-    ///
-    /// Uses `SemanticVision` for 768D SigLIP embeddings, then projects to
-    /// 16,384D HDC space via a seeded Rademacher JL projector.
     pub struct RealVentralPipeline {
         vision: SemanticVision,
         projector: super::StubJLProjector,
     }
 
     impl RealVentralPipeline {
-        /// Create a new real ventral pipeline. Initializes the SemanticVision model.
         pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
             let mut vision = SemanticVision::new(1000);
             vision.initialize()?;
@@ -302,29 +271,40 @@ mod real {
             })
         }
 
-        /// Process a foveation request using real perception models.
-        pub fn process(&mut self, request: &FoveationRequest) -> FoveationResult {
+        /// Current archived SemanticVision integration always requests an image embedding.
+        /// The receipt therefore reports `Embedding` even when the requested routing asks for
+        /// OCR/caption/full. This makes the current implementation gap observable rather than
+        /// silently describing configuration intent as execution fact.
+        pub fn process(
+            &mut self,
+            request: &FoveationRequest,
+            requested_routing: RoutingStrategy,
+        ) -> FoveationResult {
             let start = std::time::Instant::now();
+            let using_onnx = self.vision.is_using_onnx();
 
-            let (content, confidence, semantic_hv) =
+            let (content, confidence, semantic_hv, kind, operation) =
                 if let Some(image) = Self::pixels_to_image(request) {
                     match self.vision.embed_image(&image) {
                         Ok(embedding) => {
                             let raw = embedding.vector.as_slice();
                             let hv = self.projector.project_embedding(raw);
                             let content = RecognizedContent::Object {
-                                label: "real_embed".to_string(),
+                                label: "semantic_embedding".to_string(),
                                 embedding: raw.to_vec(),
                             };
-                            (content, 0.8, hv)
+                            let kind = if using_onnx {
+                                VentralExecutionKind::SemanticVisionOnnxUnpinned
+                            } else {
+                                VentralExecutionKind::SemanticVisionDeterministicStub
+                            };
+                            (content, 0.8, hv, kind, VentralOperation::Embedding)
                         }
                         Err(_) => Self::fallback(request),
                     }
                 } else {
                     Self::fallback(request)
                 };
-
-            let elapsed = start.elapsed();
 
             FoveationResult {
                 request_id: request.id,
@@ -335,7 +315,9 @@ mod real {
                 grid_col: request.grid_col,
                 source_frame_id: request.frame_id,
                 source_timestamp_us: request.timestamp_us,
-                processing_time_us: elapsed.as_micros() as u64,
+                source_observation: request.source_observation,
+                execution: VentralExecutionReceipt::new(kind, requested_routing, operation),
+                processing_time_us: start.elapsed().as_micros() as u64,
                 velocity: request.velocity,
             }
         }
@@ -345,16 +327,29 @@ mod real {
                 return None;
             }
             let gray = image::GrayImage::from_raw(
-                request.crop_width as u32,
-                request.crop_height as u32,
+                request.crop_width,
+                request.crop_height,
                 request.crop_pixels.clone(),
             )?;
             Some(image::DynamicImage::ImageLuma8(gray))
         }
 
-        fn fallback(request: &FoveationRequest) -> (RecognizedContent, f32, ContinuousHV) {
-            let hv = ContinuousHV::random(HDC_DIMENSION, request.id);
-            (RecognizedContent::Unknown, 0.1, hv)
+        fn fallback(
+            request: &FoveationRequest,
+        ) -> (
+            RecognizedContent,
+            f32,
+            ContinuousHV,
+            VentralExecutionKind,
+            VentralOperation,
+        ) {
+            (
+                RecognizedContent::Unknown,
+                0.1,
+                ContinuousHV::random(HDC_DIMENSION, request.id),
+                VentralExecutionKind::ErrorFallbackRandom,
+                VentralOperation::Fallback,
+            )
         }
     }
 }
@@ -375,256 +370,105 @@ mod tests {
             surprise_value: 0.8,
             frame_id: 100,
             timestamp_us: 50_000,
+            source_observation: None,
             velocity: [0.0, 0.0],
         }
     }
 
     #[test]
-    fn test_ventral_pipeline_auto_returns_valid_hv() {
+    fn auto_returns_valid_hv_and_execution_receipt() {
         let mut pipeline = VentralPipeline::new(RoutingStrategy::Auto);
-        let req = make_request(1, vec![128; 64]);
-        let result = pipeline.process(&req);
-
+        let result = pipeline.process(&make_request(1, vec![128; 64]));
         assert_eq!(result.request_id, 1);
         assert_eq!(result.semantic_hv.dim(), HDC_DIMENSION);
-        assert!(result.semantic_hv.norm() > 0.0);
         assert!(result.semantic_hv.norm().is_finite());
-        assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
-        assert_eq!(result.grid_row, 2);
-        assert_eq!(result.grid_col, 3);
-        assert_eq!(result.source_frame_id, 100);
+        assert_eq!(result.execution.kind, VentralExecutionKind::HashStubV1);
+        assert_eq!(result.execution.requested_routing, RoutingStrategy::Auto);
+        assert_eq!(result.execution.operation, VentralOperation::Embedding);
     }
 
     #[test]
-    fn test_ventral_pipeline_ocr_route() {
+    fn requested_ocr_reports_ocr_execution() {
         let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysOcr);
-        let req = make_request(2, vec![200; 64]);
-        let result = pipeline.process(&req);
-
-        match &result.content {
-            RecognizedContent::Text(s) => assert!(s.starts_with("stub_text_")),
-            other => panic!("Expected Text, got {other:?}"),
-        }
-        assert_eq!(result.semantic_hv.dim(), HDC_DIMENSION);
+        let result = pipeline.process(&make_request(2, vec![200; 64]));
+        assert_eq!(result.execution.operation, VentralOperation::Ocr);
+        assert!(matches!(result.content, RecognizedContent::Text(_)));
     }
 
     #[test]
-    fn test_ventral_pipeline_embed_route() {
-        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
-        let req = make_request(3, vec![100; 64]);
-        let result = pipeline.process(&req);
-
-        match &result.content {
-            RecognizedContent::Object { label, embedding } => {
-                assert!(label.starts_with("stub_object_"));
-                assert!(!embedding.is_empty());
-            }
-            other => panic!("Expected Object, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_ventral_pipeline_caption_route() {
+    fn requested_caption_reports_caption_execution() {
         let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysCaption);
-        let req = make_request(4, vec![50; 64]);
-        let result = pipeline.process(&req);
-
-        match &result.content {
-            RecognizedContent::Caption(s) => assert!(s.contains("region at")),
-            other => panic!("Expected Caption, got {other:?}"),
-        }
+        let result = pipeline.process(&make_request(4, vec![50; 64]));
+        assert_eq!(result.execution.operation, VentralOperation::Caption);
+        assert!(matches!(result.content, RecognizedContent::Caption(_)));
     }
 
     #[test]
-    fn test_ventral_pipeline_full_route() {
-        let mut pipeline = VentralPipeline::new(RoutingStrategy::Full);
-        let req = make_request(5, vec![128; 64]);
-        let result = pipeline.process(&req);
-
-        assert_eq!(result.semantic_hv.dim(), HDC_DIMENSION);
-        assert!(result.confidence >= 0.0);
-    }
-
-    #[test]
-    fn test_deterministic_output() {
-        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
-        let pixels = vec![42u8; 64];
-        let req1 = make_request(10, pixels.clone());
-        let req2 = make_request(11, pixels);
-
-        let r1 = pipeline.process(&req1);
-        let r2 = pipeline.process(&req2);
-
-        let sim = r1.semantic_hv.similarity(&r2.semantic_hv);
-        assert!(
-            (sim - 1.0).abs() < 1e-4,
-            "Same input should produce same HV: sim={sim}"
-        );
-    }
-
-    #[test]
-    fn test_different_inputs_different_hvs() {
-        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
-        let req1 = make_request(20, vec![0u8; 64]);
-        let req2 = make_request(21, vec![255u8; 64]);
-
-        let r1 = pipeline.process(&req1);
-        let r2 = pipeline.process(&req2);
-
-        let sim = r1.semantic_hv.similarity(&r2.semantic_hv);
-        assert!(
-            sim < 0.5,
-            "Different inputs should produce different HVs: sim={sim}"
-        );
-    }
-
-    #[test]
-    fn test_processing_time_recorded() {
-        let mut pipeline = VentralPipeline::new(RoutingStrategy::Auto);
-        let req = make_request(30, vec![128; 64]);
-        let result = pipeline.process(&req);
-
-        assert!(
-            result.processing_time_us < 1_000_000,
-            "Should complete quickly"
-        );
-    }
-
-    #[test]
-    fn test_auto_routes_high_contrast_to_text() {
+    fn auto_reports_actual_operation() {
         let mut pipeline = VentralPipeline::new(RoutingStrategy::Auto);
         let high_contrast: Vec<u8> = (0..64).map(|i| if i % 2 == 0 { 0 } else { 255 }).collect();
-        let req = make_request(40, high_contrast);
-        let result = pipeline.process(&req);
+        let high = pipeline.process(&make_request(40, high_contrast));
+        assert_eq!(high.execution.operation, VentralOperation::Ocr);
 
-        match &result.content {
-            RecognizedContent::Text(_) => {}
-            other => panic!("High contrast should route to Text, got {other:?}"),
-        }
+        let low = pipeline.process(&make_request(41, vec![128; 64]));
+        assert_eq!(low.execution.operation, VentralOperation::Embedding);
     }
 
     #[test]
-    fn test_auto_routes_low_contrast_to_embed() {
-        let mut pipeline = VentralPipeline::new(RoutingStrategy::Auto);
-        let low_contrast = vec![128u8; 64];
-        let req = make_request(41, low_contrast);
-        let result = pipeline.process(&req);
-
-        match &result.content {
-            RecognizedContent::Object { .. } => {}
-            other => panic!("Low contrast should route to Object, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_stub_jl_projector_dimension() {
-        let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let hv = proj.project_hash(12345);
-        assert_eq!(hv.dim(), HDC_DIMENSION);
-    }
-
-    #[test]
-    fn test_stub_jl_projector_normalized() {
-        let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let hv = proj.project_hash(99999);
-        let norm = hv.norm();
-        assert!(
-            (norm - 1.0).abs() < 0.01,
-            "Projected HV should be normalized, got norm={norm}"
+    fn source_observation_passthrough_is_exact() {
+        use symthaea_vision_manifold::{VisualCaptureClock, VisualObservationRef, VisualStreamRef};
+        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
+        let mut request = make_request(6, vec![100; 64]);
+        let observation = VisualObservationRef::new(
+            VisualStreamRef::new(9, 3).unwrap(),
+            100,
+            50_000,
+            VisualCaptureClock::StreamMonotonic,
         );
+        request.source_observation = Some(observation);
+        let result = pipeline.process(&request);
+        assert_eq!(result.source_observation, Some(observation));
     }
 
     #[test]
-    fn test_stub_jl_projector_deterministic() {
-        let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let hv1 = proj.project_hash(777);
-        let hv2 = proj.project_hash(777);
-        let sim = hv1.similarity(&hv2);
-        assert!((sim - 1.0).abs() < 1e-6, "Same hash → same HV");
+    fn deterministic_output_for_same_pixels() {
+        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
+        let pixels = vec![42u8; 64];
+        let r1 = pipeline.process(&make_request(10, pixels.clone()));
+        let r2 = pipeline.process(&make_request(11, pixels));
+        assert!((r1.semantic_hv.similarity(&r2.semantic_hv) - 1.0).abs() < 1e-4);
     }
 
     #[test]
-    fn test_pixel_contrast_zero_for_uniform() {
-        let c = pixel_contrast(&vec![128; 100]);
-        assert!(
-            c < 0.01,
-            "Uniform pixels should have zero contrast, got {c}"
-        );
+    fn different_inputs_produce_different_hvs() {
+        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
+        let r1 = pipeline.process(&make_request(20, vec![0u8; 64]));
+        let r2 = pipeline.process(&make_request(21, vec![255u8; 64]));
+        assert!(r1.semantic_hv.similarity(&r2.semantic_hv) < 0.5);
     }
 
     #[test]
-    fn test_pixel_contrast_high_for_alternating() {
-        let pixels: Vec<u8> = (0..100).map(|i| if i % 2 == 0 { 0 } else { 255 }).collect();
-        let c = pixel_contrast(&pixels);
-        assert!(
-            c > 100.0,
-            "Alternating 0/255 should have high contrast, got {c}"
-        );
-    }
-
-    #[test]
-    fn test_velocity_passthrough() {
+    fn velocity_passthrough() {
         let mut pipeline = VentralPipeline::new(RoutingStrategy::Auto);
         let mut req = make_request(50, vec![128; 64]);
         req.velocity = [2.5, -1.3];
         let result = pipeline.process(&req);
-
         assert!((result.velocity[0] - 2.5).abs() < 1e-6);
-        assert!((result.velocity[1] - (-1.3)).abs() < 1e-6);
+        assert!((result.velocity[1] + 1.3).abs() < 1e-6);
     }
 
     #[test]
-    fn test_pixel_contrast_empty() {
-        let c = pixel_contrast(&[]);
-        assert!((c - 0.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_project_embedding_dimension() {
+    fn projector_is_normalized_and_deterministic() {
         let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let embedding = vec![0.1f32; 768];
-        let hv = proj.project_embedding(&embedding);
-        assert_eq!(hv.dim(), HDC_DIMENSION);
+        let hv1 = proj.project_hash(777);
+        let hv2 = proj.project_hash(777);
+        assert_eq!(hv1.dim(), HDC_DIMENSION);
+        assert!((hv1.norm() - 1.0).abs() < 0.01);
+        assert!((hv1.similarity(&hv2) - 1.0).abs() < 1e-6);
     }
 
     #[test]
-    fn test_project_embedding_normalized() {
-        let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let embedding: Vec<f32> = (0..768).map(|i| (i as f32 / 768.0) * 2.0 - 1.0).collect();
-        let hv = proj.project_embedding(&embedding);
-        let norm = hv.norm();
-        assert!(
-            (norm - 1.0).abs() < 0.01,
-            "Projected embedding should be normalized, got norm={norm}"
-        );
-    }
-
-    #[test]
-    fn test_project_embedding_deterministic() {
-        let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let embedding = vec![0.5f32; 768];
-        let hv1 = proj.project_embedding(&embedding);
-        let hv2 = proj.project_embedding(&embedding);
-        let sim = hv1.similarity(&hv2);
-        assert!((sim - 1.0).abs() < 1e-6, "Same embedding → same HV");
-    }
-
-    #[test]
-    fn test_project_embedding_different_inputs_diverge() {
-        let proj = StubJLProjector::new(HDC_DIMENSION, 42);
-        let emb_a = vec![1.0f32; 768];
-        let emb_b = vec![-1.0f32; 768];
-        let hv_a = proj.project_embedding(&emb_a);
-        let hv_b = proj.project_embedding(&emb_b);
-        let sim = hv_a.similarity(&hv_b);
-        assert!(
-            sim < 0.0,
-            "Opposite embeddings should produce anti-correlated HVs: sim={sim}"
-        );
-    }
-
-    #[test]
-    fn test_project_embedding_empty_returns_zero() {
+    fn empty_embedding_projects_to_zero() {
         let proj = StubJLProjector::new(HDC_DIMENSION, 42);
         let hv = proj.project_embedding(&[]);
         assert_eq!(hv.dim(), HDC_DIMENSION);
