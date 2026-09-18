@@ -34,7 +34,7 @@ The prediction provenance digest additionally commits to the model evidence iden
 
 ## Qualification dependencies
 
-D-v7 may not consume 301–304 unless all earlier public-lineage gates remain satisfied:
+D-v7 may not be admitted to the canonical 301–304 measurement lineage unless all earlier public-lineage gates remain satisfied:
 
 1. canonical 1–8 TrainingReplay corpus and candidate family;
 2. exact canonical C training-selection receipt;
@@ -42,7 +42,21 @@ D-v7 may not consume 301–304 unless all earlier public-lineage gates remain sa
 4. `ParentCQualification` minted from those frozen sources;
 5. D-v7 implementation and structural-support qualification cleanly passing format/compile/test/Clippy and relevant governance checks.
 
-Fresh 401–404 remains inaccessible until the 301–304 dream verification gate passes. OOD 1201–1204 remains inaccessible until the parent-qualified fresh D-vs-C receipt is frozen.
+The canonical lineage must not consume 401–404 until the 301–304 dream verification gate passes. It must not consume 1201–1204 until the parent-qualified fresh D-vs-C receipt is frozen.
+
+## What “sealed” means in this open-source experiment
+
+The fixture code, seed numbers, and deterministic transition functions are open source. A developer with source access can always call lower-level fixture transitions or write a separate program that evaluates a published seed. Local API visibility therefore cannot provide cryptographic outcome secrecy.
+
+For SYM-RSI-001/001D, **sealed** means evidence-lineage discipline:
+
+- the canonical experiment implementation, tests, qualification jobs, and evidence-producing workflows must not evaluate a sealed partition before its preregistered authorization gate;
+- canonical receipts must be produced only through the qualified measurement path and bind the required predecessor evidence;
+- generated or manually inspected off-protocol outcomes are not admissible as canonical evidence;
+- if a sealed outcome is manually evaluated, inspected, or used to tune the subject before authorization, the affected preregistered lineage is contaminated and must not be reported as untouched fresh evidence;
+- token-gated APIs enforce the intended canonical evidence path, not secrecy against a developer who deliberately bypasses the protocol.
+
+A future stronger experiment may use a commit–reveal or externally held blind-evaluation service so subject developers cannot know evaluation seeds/outcomes until after code and preregistration are frozen. That would be a new protocol version rather than a retroactive reinterpretation of SYM-RSI-001D.
 
 ## Epistemic boundary
 
@@ -70,4 +84,4 @@ Ordinary unit tests may use TrainingReplay and the already-designated 101-series
 
 A green implementation/CI result qualifies code execution only. It is not scientific evidence that D improves C.
 
-A later positive 301–304 verification permits fresh execution but is not the primary result. A later positive 401–404 result is a bounded D-vs-C result under the frozen fixture protocol. A two-stage recursive-improvement claim additionally requires the separately qualified C-vs-A fresh stage and the dual-token synthesis gate.
+A later positive 301–304 verification permits canonical fresh execution but is not the primary result. A later positive 401–404 result is a bounded D-vs-C result under the frozen fixture protocol. A two-stage recursive-improvement claim additionally requires the separately qualified C-vs-A fresh stage and the dual-token synthesis gate.
