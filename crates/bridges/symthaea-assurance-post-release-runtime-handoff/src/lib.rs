@@ -15,15 +15,14 @@
 #![deny(unsafe_code)]
 
 use nix::{
-    fcntl::{fcntl, FcntlArg, OFlag},
+    fcntl::{FcntlArg, OFlag, fcntl},
     unistd::{close, write},
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, fs, os::unix::io::RawFd};
-use symthaea_assurance_bootstrap_executable_mapping_continuity::
-    BootstrapExecutableMappingContinuityQualification;
+use symthaea_assurance_bootstrap_executable_mapping_continuity::BootstrapExecutableMappingContinuityQualification;
 use symthaea_assurance_bootstrap_ready_checkpoint::{
-    verify_bootstrap_ready_wire, BootstrapReadyCheckpointPolicy,
+    BootstrapReadyCheckpointPolicy, verify_bootstrap_ready_wire,
 };
 use symthaea_assurance_bootstrap_syscall_confinement::{
     BootstrapSyscallConfinementDisposition, BootstrapSyscallConfinementQualification,
@@ -44,16 +43,13 @@ pub const POST_RELEASE_RUNTIME_HANDOFF_TICKET_SCHEMA_V1: &str =
 pub const POST_RELEASE_RUNTIME_HANDOFF_REPORT_SCHEMA_V1: &str =
     "symthaea.assurance.post-release-runtime-handoff-report.v1";
 
-const POLICY_DOMAIN: &[u8] =
-    b"symthaea.assurance.post-release-runtime-handoff-policy.digest.v1\0";
+const POLICY_DOMAIN: &[u8] = b"symthaea.assurance.post-release-runtime-handoff-policy.digest.v1\0";
 const RETENTION_REPORT_DOMAIN: &[u8] =
     b"symthaea.assurance.post-release-runtime-channel-retention-report.digest.v1\0";
 const RETENTION_DOMAIN: &[u8] =
     b"symthaea.assurance.post-release-runtime-channel-retention.digest.v1\0";
-const TICKET_DOMAIN: &[u8] =
-    b"symthaea.assurance.post-release-runtime-handoff-ticket.digest.v1\0";
-const REPORT_DOMAIN: &[u8] =
-    b"symthaea.assurance.post-release-runtime-handoff-report.digest.v1\0";
+const TICKET_DOMAIN: &[u8] = b"symthaea.assurance.post-release-runtime-handoff-ticket.digest.v1\0";
+const REPORT_DOMAIN: &[u8] = b"symthaea.assurance.post-release-runtime-handoff-report.digest.v1\0";
 const QUALIFICATION_DOMAIN: &[u8] =
     b"symthaea.assurance.post-release-runtime-handoff-qualification.digest.v1\0";
 const CONFINEMENT_QUALIFICATION_DOMAIN: &[u8] =
@@ -189,7 +185,9 @@ impl PostReleaseRuntimeChannelRetentionIssue {
             Self::SourceFdNotWriteOnly => "source-fd-not-write-only".into(),
             Self::SourceFdNonBlocking => "source-fd-nonblocking".into(),
             Self::SourceFdInfoMismatch => "source-fdinfo-mismatch".into(),
-            Self::RetainedFdDuplicateFailed(value) => format!("retained-fd-duplicate-failed:{value}"),
+            Self::RetainedFdDuplicateFailed(value) => {
+                format!("retained-fd-duplicate-failed:{value}")
+            }
             Self::RetainedFdUnavailable(value) => format!("retained-fd-unavailable:{value}"),
             Self::RetainedPipeMismatch => "retained-pipe-mismatch".into(),
             Self::RetainedFdNotWriteOnly => "retained-fd-not-write-only".into(),
@@ -281,7 +279,9 @@ impl PostReleaseRuntimeChannelRetentionReport {
         b3(h.finalize())
     }
 
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 pub struct RetainedPostReleaseRuntimeHandoffChannel {
@@ -321,9 +321,15 @@ impl Drop for RetainedPostReleaseRuntimeHandoffChannel {
 }
 
 impl RetainedPostReleaseRuntimeHandoffChannel {
-    pub fn retention_digest(&self) -> &str { &self.retention_digest }
-    pub fn report_digest(&self) -> &str { &self.report_digest }
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
+    pub fn retention_digest(&self) -> &str {
+        &self.retention_digest
+    }
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
     pub fn confinement_qualification_digest(&self) -> &str {
         &self.confinement_qualification_digest
     }
@@ -333,21 +339,49 @@ impl RetainedPostReleaseRuntimeHandoffChannel {
     pub fn launch_handoff_qualification_digest(&self) -> &str {
         &self.launch_handoff_qualification_digest
     }
-    pub fn ready_checkpoint_digest(&self) -> &str { &self.ready_checkpoint_digest }
-    pub fn pipe_target(&self) -> &str { &self.pipe_target }
-    pub const fn tracee_pid(&self) -> i32 { self.tracee_pid }
-    pub fn runtime_policy_digest(&self) -> &str { &self.runtime_policy_digest }
-    pub fn runtime_verifier_ref(&self) -> &str { &self.runtime_verifier_ref }
-    pub fn backend_id(&self) -> &str { &self.backend_id }
-    pub fn executable_digest(&self) -> &str { &self.executable_digest }
+    pub fn ready_checkpoint_digest(&self) -> &str {
+        &self.ready_checkpoint_digest
+    }
+    pub fn pipe_target(&self) -> &str {
+        &self.pipe_target
+    }
+    pub const fn tracee_pid(&self) -> i32 {
+        self.tracee_pid
+    }
+    pub fn runtime_policy_digest(&self) -> &str {
+        &self.runtime_policy_digest
+    }
+    pub fn runtime_verifier_ref(&self) -> &str {
+        &self.runtime_verifier_ref
+    }
+    pub fn backend_id(&self) -> &str {
+        &self.backend_id
+    }
+    pub fn executable_digest(&self) -> &str {
+        &self.executable_digest
+    }
 
-    pub const fn constructed_while_exact_release_inputs_still_existed(&self) -> bool { true }
-    pub const fn private_cloexec_duplicate_created_from_reviewed_write_end(&self) -> bool { true }
-    pub const fn duplicate_matched_original_pipe_at_retention(&self) -> bool { true }
-    pub const fn exact_successful_release_established_yet(&self) -> bool { false }
-    pub const fn arbitrary_same_process_descriptor_sabotage_excluded(&self) -> bool { false }
-    pub const fn trusted_time_established(&self) -> bool { false }
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn constructed_while_exact_release_inputs_still_existed(&self) -> bool {
+        true
+    }
+    pub const fn private_cloexec_duplicate_created_from_reviewed_write_end(&self) -> bool {
+        true
+    }
+    pub const fn duplicate_matched_original_pipe_at_retention(&self) -> bool {
+        true
+    }
+    pub const fn exact_successful_release_established_yet(&self) -> bool {
+        false
+    }
+    pub const fn arbitrary_same_process_descriptor_sabotage_excluded(&self) -> bool {
+        false
+    }
+    pub const fn trusted_time_established(&self) -> bool {
+        false
+    }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -544,11 +578,11 @@ pub fn retain_post_release_runtime_handoff_channel(
     ) {
         Ok(value) => value,
         Err(error) => {
-            report
-                .issues
-                .push(PostReleaseRuntimeChannelRetentionIssue::RetainedFdDuplicateFailed(
+            report.issues.push(
+                PostReleaseRuntimeChannelRetentionIssue::RetainedFdDuplicateFailed(
                     error.to_string(),
-                ));
+                ),
+            );
             return Err(finalize_retention(report));
         }
     };
@@ -761,7 +795,8 @@ impl PostReleaseRuntimeHandoffTicket {
             self.runtime_config_digest.as_str(),
             self.launch_attestation_digest.as_str(),
             self.checkpoint_one_challenge_digest.as_str(),
-            self.checkpoint_one_observation_qualification_digest.as_str(),
+            self.checkpoint_one_observation_qualification_digest
+                .as_str(),
         ] {
             wire_string(&mut out, value)?;
         }
@@ -872,7 +907,9 @@ impl PostReleaseRuntimeHandoffIssue {
             Self::ConfinementReportNotQualified => "confinement-report-not-qualified".into(),
             Self::ConfinementReportIncomplete => "confinement-report-incomplete".into(),
             Self::ConfinementQualificationMismatch => "confinement-qualification-mismatch".into(),
-            Self::ConfinementReportIdentityMismatch => "confinement-report-identity-mismatch".into(),
+            Self::ConfinementReportIdentityMismatch => {
+                "confinement-report-identity-mismatch".into()
+            }
             Self::BootstrapReadyPolicyMismatch => "bootstrap-ready-policy-mismatch".into(),
             Self::BootstrapReadyWireVerificationFailed(value) => {
                 format!("bootstrap-ready-wire-verification-failed:{value}")
@@ -955,7 +992,9 @@ impl PostReleaseRuntimeHandoffReport {
                 .unwrap_or("-"),
             self.launch_handoff_qualification_digest.as_str(),
             self.bootstrap_ready_wire_digest.as_deref().unwrap_or("-"),
-            self.bootstrap_ready_checkpoint_digest.as_deref().unwrap_or("-"),
+            self.bootstrap_ready_checkpoint_digest
+                .as_deref()
+                .unwrap_or("-"),
             self.bootstrap_ready_bytes_digest.as_str(),
             self.process_instance_id.as_str(),
             self.pipe_target.as_str(),
@@ -984,7 +1023,9 @@ impl PostReleaseRuntimeHandoffReport {
         b3(h.finalize())
     }
 
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1024,74 +1065,148 @@ pub struct IssuedPostReleaseRuntimeChallenge {
 }
 
 impl IssuedPostReleaseRuntimeChallenge {
-    pub fn qualification_digest(&self) -> &str { &self.qualification_digest }
-    pub fn report_digest(&self) -> &str { &self.report_digest }
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
-    pub fn channel_retention_digest(&self) -> &str { &self.channel_retention_digest }
-    pub fn release_digest(&self) -> &str { &self.release_digest }
-    pub fn release_report_digest(&self) -> &str { &self.release_report_digest }
+    pub fn qualification_digest(&self) -> &str {
+        &self.qualification_digest
+    }
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
+    pub fn channel_retention_digest(&self) -> &str {
+        &self.channel_retention_digest
+    }
+    pub fn release_digest(&self) -> &str {
+        &self.release_digest
+    }
+    pub fn release_report_digest(&self) -> &str {
+        &self.release_report_digest
+    }
     pub fn confinement_qualification_digest(&self) -> &str {
         &self.confinement_qualification_digest
     }
     pub fn mapping_continuity_qualification_digest(&self) -> &str {
         &self.mapping_continuity_qualification_digest
     }
-    pub fn bootstrap_ready_wire_digest(&self) -> &str { &self.bootstrap_ready_wire_digest }
+    pub fn bootstrap_ready_wire_digest(&self) -> &str {
+        &self.bootstrap_ready_wire_digest
+    }
     pub fn bootstrap_ready_checkpoint_digest(&self) -> &str {
         &self.bootstrap_ready_checkpoint_digest
     }
     pub fn launch_handoff_qualification_digest(&self) -> &str {
         &self.launch_handoff_qualification_digest
     }
-    pub fn launch_ticket_digest(&self) -> &str { &self.launch_ticket_digest }
-    pub const fn tracee_pid(&self) -> i32 { self.tracee_pid }
-    pub const fn tracee_handoff_read_fd(&self) -> u32 { self.tracee_handoff_read_fd }
-    pub fn pipe_target(&self) -> &str { &self.pipe_target }
+    pub fn launch_ticket_digest(&self) -> &str {
+        &self.launch_ticket_digest
+    }
+    pub const fn tracee_pid(&self) -> i32 {
+        self.tracee_pid
+    }
+    pub const fn tracee_handoff_read_fd(&self) -> u32 {
+        self.tracee_handoff_read_fd
+    }
+    pub fn pipe_target(&self) -> &str {
+        &self.pipe_target
+    }
     pub fn original_channel_binding_digest(&self) -> &str {
         &self.original_channel_binding_digest
     }
-    pub fn process_instance_id(&self) -> &str { &self.process_instance_id }
-    pub fn runtime_policy_digest(&self) -> &str { &self.runtime_policy_digest }
-    pub fn runtime_verifier_ref(&self) -> &str { &self.runtime_verifier_ref }
-    pub fn backend_id(&self) -> &str { &self.backend_id }
-    pub fn boot_measurement_digest(&self) -> &str { &self.boot_measurement_digest }
-    pub fn executable_digest(&self) -> &str { &self.executable_digest }
-    pub fn dependency_closure_digest(&self) -> &str { &self.dependency_closure_digest }
-    pub fn runtime_config_digest(&self) -> &str { &self.runtime_config_digest }
-    pub fn launch_attestation_digest(&self) -> &str { &self.launch_attestation_digest }
+    pub fn process_instance_id(&self) -> &str {
+        &self.process_instance_id
+    }
+    pub fn runtime_policy_digest(&self) -> &str {
+        &self.runtime_policy_digest
+    }
+    pub fn runtime_verifier_ref(&self) -> &str {
+        &self.runtime_verifier_ref
+    }
+    pub fn backend_id(&self) -> &str {
+        &self.backend_id
+    }
+    pub fn boot_measurement_digest(&self) -> &str {
+        &self.boot_measurement_digest
+    }
+    pub fn executable_digest(&self) -> &str {
+        &self.executable_digest
+    }
+    pub fn dependency_closure_digest(&self) -> &str {
+        &self.dependency_closure_digest
+    }
+    pub fn runtime_config_digest(&self) -> &str {
+        &self.runtime_config_digest
+    }
+    pub fn launch_attestation_digest(&self) -> &str {
+        &self.launch_attestation_digest
+    }
     pub fn checkpoint_one_challenge_digest(&self) -> &str {
         &self.checkpoint_one_challenge_digest
     }
     pub fn checkpoint_one_observation_qualification_digest(&self) -> &str {
         &self.checkpoint_one_observation_qualification_digest
     }
-    pub const fn checkpoint_sequence(&self) -> u64 { 2 }
-    pub fn previous_checkpoint_digest(&self) -> &str { &self.bootstrap_ready_checkpoint_digest }
-    pub const fn launch_monotonic_counter(&self) -> u64 { self.launch_monotonic_counter }
+    pub const fn checkpoint_sequence(&self) -> u64 {
+        2
+    }
+    pub fn previous_checkpoint_digest(&self) -> &str {
+        &self.bootstrap_ready_checkpoint_digest
+    }
+    pub const fn launch_monotonic_counter(&self) -> u64 {
+        self.launch_monotonic_counter
+    }
     pub const fn previous_checkpoint_monotonic_counter(&self) -> u64 {
         self.previous_checkpoint_monotonic_counter
     }
-    pub fn challenge_nonce_blake3_hex(&self) -> &str { &self.challenge_nonce_blake3_hex }
-    pub fn ticket_digest(&self) -> &str { &self.ticket_digest }
-    pub fn ticket_bytes_digest(&self) -> &str { &self.ticket_bytes_digest }
+    pub fn challenge_nonce_blake3_hex(&self) -> &str {
+        &self.challenge_nonce_blake3_hex
+    }
+    pub fn ticket_digest(&self) -> &str {
+        &self.ticket_digest
+    }
+    pub fn ticket_bytes_digest(&self) -> &str {
+        &self.ticket_bytes_digest
+    }
 
     pub const fn channel_retention_precedes_exact_release_by_capability_consumption(&self) -> bool {
         true
     }
-    pub const fn post_release_write_used_pre_release_retained_duplicate(&self) -> bool { true }
-    pub const fn bootstrap_ready_wire_independently_reverified(&self) -> bool { true }
+    pub const fn post_release_write_used_pre_release_retained_duplicate(&self) -> bool {
+        true
+    }
+    pub const fn bootstrap_ready_wire_independently_reverified(&self) -> bool {
+        true
+    }
     pub const fn challenge_generated_only_after_opaque_successful_release_existed(&self) -> bool {
         true
     }
-    pub const fn checkpoint_two_predecessor_fixed_to_ready_checkpoint(&self) -> bool { true }
-    pub const fn causal_os_pid_to_runtime_process_instance_established(&self) -> bool { false }
-    pub const fn tracee_consumption_established(&self) -> bool { false }
-    pub const fn checkpoint_two_live_observation_established(&self) -> bool { false }
-    pub const fn checkpoint_two_signed_inclusion_established(&self) -> bool { false }
-    pub const fn exclusive_pipe_writer_authority_established(&self) -> bool { false }
-    pub const fn arbitrary_same_process_descriptor_sabotage_excluded(&self) -> bool { false }
-    pub const fn trusted_time_established(&self) -> bool { false }
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn checkpoint_two_predecessor_fixed_to_ready_checkpoint(&self) -> bool {
+        true
+    }
+    pub const fn causal_os_pid_to_runtime_process_instance_established(&self) -> bool {
+        false
+    }
+    pub const fn tracee_consumption_established(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_two_live_observation_established(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_two_signed_inclusion_established(&self) -> bool {
+        false
+    }
+    pub const fn exclusive_pipe_writer_authority_established(&self) -> bool {
+        false
+    }
+    pub const fn arbitrary_same_process_descriptor_sabotage_excluded(&self) -> bool {
+        false
+    }
+    pub const fn trusted_time_established(&self) -> bool {
+        false
+    }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 pub struct PostReleaseRuntimeHandoffQualification {
@@ -1101,8 +1216,12 @@ pub struct PostReleaseRuntimeHandoffQualification {
 }
 
 impl PostReleaseRuntimeHandoffQualification {
-    pub fn issued(&self) -> &IssuedPostReleaseRuntimeChallenge { &self.issued }
-    pub fn into_issued(self) -> IssuedPostReleaseRuntimeChallenge { self.issued }
+    pub fn issued(&self) -> &IssuedPostReleaseRuntimeChallenge {
+        &self.issued
+    }
+    pub fn into_issued(self) -> IssuedPostReleaseRuntimeChallenge {
+        self.issued
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1151,7 +1270,9 @@ pub fn issue_post_release_runtime_challenge(
     };
 
     if !policy.validate() {
-        report.issues.push(PostReleaseRuntimeHandoffIssue::InvalidPolicy);
+        report
+            .issues
+            .push(PostReleaseRuntimeHandoffIssue::InvalidPolicy);
     }
     if !runtime_policy.validate() || runtime_policy_digest.is_none() {
         report
@@ -1211,7 +1332,9 @@ pub fn issue_post_release_runtime_challenge(
         || launch.backend_id() != retained.backend_id
         || launch.executable_digest() != retained.executable_digest
     {
-        report.issues.push(PostReleaseRuntimeHandoffIssue::LaunchMismatch);
+        report
+            .issues
+            .push(PostReleaseRuntimeHandoffIssue::LaunchMismatch);
     }
     if ready_policy_digest.as_deref()
         != Some(policy.expected_bootstrap_ready_policy_digest.as_str())
@@ -1262,7 +1385,9 @@ pub fn issue_post_release_runtime_challenge(
         || confinement_report.exec_confirmation_digest != retained.exec_confirmation_digest
         || confinement_report.issued_challenge_qualification_digest
             != retained.launch_handoff_qualification_digest
-        || confinement_report.final_authority_snapshot_digest.as_deref()
+        || confinement_report
+            .final_authority_snapshot_digest
+            .as_deref()
             != Some(retained.authority_snapshot_digest.as_str())
         || confinement_report.syscall_sequence_digest.as_deref()
             != Some(retained.syscall_sequence_digest.as_str())
@@ -1284,11 +1409,11 @@ pub fn issue_post_release_runtime_challenge(
     let ready = match verify_bootstrap_ready_wire(ready_policy, runtime_policy, ready_wire_bytes) {
         Ok(value) => value,
         Err(ready_report) => {
-            report
-                .issues
-                .push(PostReleaseRuntimeHandoffIssue::BootstrapReadyWireVerificationFailed(
+            report.issues.push(
+                PostReleaseRuntimeHandoffIssue::BootstrapReadyWireVerificationFailed(
                     ready_report.canonical_digest(),
-                ));
+                ),
+            );
             return Err(finalize(report));
         }
     };
@@ -1345,7 +1470,9 @@ pub fn issue_post_release_runtime_challenge(
         || before.target != retained.pipe_target
         || before.inode != retained.pipe_inode
     {
-        report.issues.push(PostReleaseRuntimeHandoffIssue::RetainedFdChanged);
+        report
+            .issues
+            .push(PostReleaseRuntimeHandoffIssue::RetainedFdChanged);
         return Err(finalize(report));
     }
 
@@ -1432,7 +1559,9 @@ pub fn issue_post_release_runtime_challenge(
         Err(error) => {
             report
                 .issues
-                .push(PostReleaseRuntimeHandoffIssue::TicketWriteFailed(error.to_string()));
+                .push(PostReleaseRuntimeHandoffIssue::TicketWriteFailed(
+                    error.to_string(),
+                ));
             return Err(finalize(report));
         }
     };
@@ -1523,7 +1652,9 @@ pub fn issue_post_release_runtime_challenge(
     })
 }
 
-fn recompute_confinement_qualification(report: &BootstrapSyscallConfinementReport) -> Option<String> {
+fn recompute_confinement_qualification(
+    report: &BootstrapSyscallConfinementReport,
+) -> Option<String> {
     let policy = report.policy_digest.as_deref()?;
     let wire = report.ready_wire_digest.as_deref()?;
     let sequence = report.syscall_sequence_digest.as_deref()?;
@@ -1565,8 +1696,7 @@ fn observe_fd(fd: RawFd, maximum: u64) -> Result<FdObservation, String> {
         .into_os_string()
         .into_string()
         .map_err(|_| "non-utf8-fd-target".to_string())?;
-    let bytes = fs::read(format!("/proc/self/fdinfo/{fd}"))
-        .map_err(|error| error.to_string())?;
+    let bytes = fs::read(format!("/proc/self/fdinfo/{fd}")).map_err(|error| error.to_string())?;
     if bytes.len() as u64 > maximum {
         return Err("fdinfo-size-limit-exceeded".into());
     }
@@ -1672,7 +1802,9 @@ fn ticket_digest(ticket: &PostReleaseRuntimeHandoffTicket) -> String {
         ticket.runtime_config_digest.as_str(),
         ticket.launch_attestation_digest.as_str(),
         ticket.checkpoint_one_challenge_digest.as_str(),
-        ticket.checkpoint_one_observation_qualification_digest.as_str(),
+        ticket
+            .checkpoint_one_observation_qualification_digest
+            .as_str(),
     ] {
         field(&mut h, value);
     }
@@ -1827,12 +1959,10 @@ fn canonical_text(value: &str) -> bool {
 }
 
 fn valid_refs(values: &[String]) -> bool {
-    values.len() <= MAX_REFS
-        && values.iter().all(|value| canonical_text(value))
-        && {
-            let mut seen = BTreeSet::new();
-            values.iter().all(|value| seen.insert(value.as_str()))
-        }
+    values.len() <= MAX_REFS && values.iter().all(|value| canonical_text(value)) && {
+        let mut seen = BTreeSet::new();
+        values.iter().all(|value| seen.insert(value.as_str()))
+    }
 }
 
 fn field(h: &mut blake3::Hasher, value: &str) {

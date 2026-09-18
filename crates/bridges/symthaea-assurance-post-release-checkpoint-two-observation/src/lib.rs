@@ -14,20 +14,15 @@
 
 use nix::{fcntl::OFlag, unistd::read};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeSet,
-    fs,
-    os::unix::io::RawFd,
-    path::PathBuf,
-};
+use std::{collections::BTreeSet, fs, os::unix::io::RawFd, path::PathBuf};
 use symthaea_assurance_fresh_mapped_runtime_continuity::{
-    MappedRuntimeCheckpointChallenge, MAPPED_RUNTIME_CHECKPOINT_CHALLENGE_SCHEMA_V1,
+    MAPPED_RUNTIME_CHECKPOINT_CHALLENGE_SCHEMA_V1, MappedRuntimeCheckpointChallenge,
 };
 use symthaea_assurance_nix_bound_in_process_runtime::NixBoundInProcessRuntimePolicy;
 use symthaea_assurance_nix_runtime_closure::NixRuntimeClosureQualification;
 use symthaea_assurance_observed_mapped_nix_executable_runtime::{
-    observe_mapped_nix_executable_runtime, MappedExecutableRuntimePolicy,
-    MappedExecutableRuntimeQualification,
+    MappedExecutableRuntimePolicy, MappedExecutableRuntimeQualification,
+    observe_mapped_nix_executable_runtime,
 };
 use symthaea_assurance_post_release_runtime_handoff::PostReleaseRuntimeHandoffTicket;
 use symthaea_evidence_verifier_runtime_continuity::VerifierRuntimeContinuityPolicy;
@@ -211,7 +206,9 @@ impl PostReleaseCheckpointTwoObservationIssue {
             Self::TicketExecutableMismatch => "ticket-executable-mismatch".into(),
             Self::TicketClosureMismatch => "ticket-closure-mismatch".into(),
             Self::TicketRuntimeConfigMismatch => "ticket-runtime-config-mismatch".into(),
-            Self::HandoffFdChangedDuringConsumption => "handoff-fd-changed-during-consumption".into(),
+            Self::HandoffFdChangedDuringConsumption => {
+                "handoff-fd-changed-during-consumption".into()
+            }
             Self::ChallengeConstructionFailed => "challenge-construction-failed".into(),
             Self::RawObservationFailed(value) => format!("raw-observation-failed:{value}"),
             Self::ObservationPolicyMismatch => "observation-policy-mismatch".into(),
@@ -282,20 +279,32 @@ impl PostReleaseCheckpointTwoObservationReport {
             self.policy_id.as_str(),
             self.policy_digest.as_deref().unwrap_or("-"),
             self.pipe_target.as_deref().unwrap_or("-"),
-            self.pre_read_fd_observation_digest.as_deref().unwrap_or("-"),
-            self.post_read_fd_observation_digest.as_deref().unwrap_or("-"),
+            self.pre_read_fd_observation_digest
+                .as_deref()
+                .unwrap_or("-"),
+            self.post_read_fd_observation_digest
+                .as_deref()
+                .unwrap_or("-"),
             self.ticket_digest.as_deref().unwrap_or("-"),
             self.ticket_bytes_digest.as_deref().unwrap_or("-"),
             self.channel_retention_digest.as_deref().unwrap_or("-"),
             self.release_digest.as_deref().unwrap_or("-"),
             self.release_report_digest.as_deref().unwrap_or("-"),
-            self.confinement_qualification_digest.as_deref().unwrap_or("-"),
-            self.mapping_continuity_qualification_digest.as_deref().unwrap_or("-"),
-            self.bootstrap_ready_checkpoint_digest.as_deref().unwrap_or("-"),
+            self.confinement_qualification_digest
+                .as_deref()
+                .unwrap_or("-"),
+            self.mapping_continuity_qualification_digest
+                .as_deref()
+                .unwrap_or("-"),
+            self.bootstrap_ready_checkpoint_digest
+                .as_deref()
+                .unwrap_or("-"),
             self.process_instance_id.as_str(),
             self.previous_checkpoint_digest.as_deref().unwrap_or("-"),
             self.checkpoint_challenge_digest.as_deref().unwrap_or("-"),
-            self.raw_observation_qualification_digest.as_deref().unwrap_or("-"),
+            self.raw_observation_qualification_digest
+                .as_deref()
+                .unwrap_or("-"),
             self.mapped_object_set_digest.as_deref().unwrap_or("-"),
             self.runtime_policy_digest.as_str(),
             self.runtime_verifier_ref.as_str(),
@@ -327,7 +336,9 @@ impl PostReleaseCheckpointTwoObservationReport {
         b3(h.finalize())
     }
 
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -371,50 +382,108 @@ pub struct PostReleaseCheckpointTwoObservation {
 }
 
 impl PostReleaseCheckpointTwoObservation {
-    pub fn qualification_digest(&self) -> &str { &self.qualification_digest }
-    pub fn report_digest(&self) -> &str { &self.report_digest }
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
-    pub const fn current_pid(&self) -> i32 { self.current_pid }
-    pub const fn handoff_read_fd(&self) -> u32 { self.handoff_read_fd }
-    pub fn pipe_target(&self) -> &str { &self.pipe_target }
-    pub fn ticket_digest(&self) -> &str { &self.ticket_digest }
-    pub fn ticket_bytes_digest(&self) -> &str { &self.ticket_bytes_digest }
-    pub fn channel_retention_digest(&self) -> &str { &self.channel_retention_digest }
-    pub fn release_digest(&self) -> &str { &self.release_digest }
-    pub fn release_report_digest(&self) -> &str { &self.release_report_digest }
+    pub fn qualification_digest(&self) -> &str {
+        &self.qualification_digest
+    }
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
+    pub const fn current_pid(&self) -> i32 {
+        self.current_pid
+    }
+    pub const fn handoff_read_fd(&self) -> u32 {
+        self.handoff_read_fd
+    }
+    pub fn pipe_target(&self) -> &str {
+        &self.pipe_target
+    }
+    pub fn ticket_digest(&self) -> &str {
+        &self.ticket_digest
+    }
+    pub fn ticket_bytes_digest(&self) -> &str {
+        &self.ticket_bytes_digest
+    }
+    pub fn channel_retention_digest(&self) -> &str {
+        &self.channel_retention_digest
+    }
+    pub fn release_digest(&self) -> &str {
+        &self.release_digest
+    }
+    pub fn release_report_digest(&self) -> &str {
+        &self.release_report_digest
+    }
     pub fn confinement_qualification_digest(&self) -> &str {
         &self.confinement_qualification_digest
     }
     pub fn mapping_continuity_qualification_digest(&self) -> &str {
         &self.mapping_continuity_qualification_digest
     }
-    pub fn bootstrap_ready_wire_digest(&self) -> &str { &self.bootstrap_ready_wire_digest }
+    pub fn bootstrap_ready_wire_digest(&self) -> &str {
+        &self.bootstrap_ready_wire_digest
+    }
     pub fn bootstrap_ready_checkpoint_digest(&self) -> &str {
         &self.bootstrap_ready_checkpoint_digest
     }
     pub fn launch_handoff_qualification_digest(&self) -> &str {
         &self.launch_handoff_qualification_digest
     }
-    pub fn launch_ticket_digest(&self) -> &str { &self.launch_ticket_digest }
-    pub fn process_instance_id(&self) -> &str { &self.process_instance_id }
-    pub const fn checkpoint_sequence(&self) -> u64 { 2 }
-    pub fn previous_checkpoint_digest(&self) -> &str { &self.bootstrap_ready_checkpoint_digest }
-    pub const fn checkpoint_monotonic_counter(&self) -> u64 { self.checkpoint_monotonic_counter }
-    pub fn checkpoint_challenge_digest(&self) -> &str { &self.checkpoint_challenge_digest }
-    pub fn challenge_nonce_blake3_hex(&self) -> &str { &self.challenge_nonce_blake3_hex }
+    pub fn launch_ticket_digest(&self) -> &str {
+        &self.launch_ticket_digest
+    }
+    pub fn process_instance_id(&self) -> &str {
+        &self.process_instance_id
+    }
+    pub const fn checkpoint_sequence(&self) -> u64 {
+        2
+    }
+    pub fn previous_checkpoint_digest(&self) -> &str {
+        &self.bootstrap_ready_checkpoint_digest
+    }
+    pub const fn checkpoint_monotonic_counter(&self) -> u64 {
+        self.checkpoint_monotonic_counter
+    }
+    pub fn checkpoint_challenge_digest(&self) -> &str {
+        &self.checkpoint_challenge_digest
+    }
+    pub fn challenge_nonce_blake3_hex(&self) -> &str {
+        &self.challenge_nonce_blake3_hex
+    }
     pub fn raw_observation_qualification_digest(&self) -> &str {
         &self.raw_observation_qualification_digest
     }
-    pub fn raw_observation_report_digest(&self) -> &str { &self.raw_observation_report_digest }
-    pub fn mapped_object_set_digest(&self) -> &str { &self.mapped_object_set_digest }
-    pub fn runtime_policy_digest(&self) -> &str { &self.runtime_policy_digest }
-    pub fn runtime_verifier_ref(&self) -> &str { &self.runtime_verifier_ref }
-    pub fn backend_id(&self) -> &str { &self.backend_id }
-    pub fn boot_measurement_digest(&self) -> &str { &self.boot_measurement_digest }
-    pub fn executable_digest(&self) -> &str { &self.executable_digest }
-    pub fn dependency_closure_digest(&self) -> &str { &self.dependency_closure_digest }
-    pub fn runtime_config_digest(&self) -> &str { &self.runtime_config_digest }
-    pub fn launch_attestation_digest(&self) -> &str { &self.launch_attestation_digest }
+    pub fn raw_observation_report_digest(&self) -> &str {
+        &self.raw_observation_report_digest
+    }
+    pub fn mapped_object_set_digest(&self) -> &str {
+        &self.mapped_object_set_digest
+    }
+    pub fn runtime_policy_digest(&self) -> &str {
+        &self.runtime_policy_digest
+    }
+    pub fn runtime_verifier_ref(&self) -> &str {
+        &self.runtime_verifier_ref
+    }
+    pub fn backend_id(&self) -> &str {
+        &self.backend_id
+    }
+    pub fn boot_measurement_digest(&self) -> &str {
+        &self.boot_measurement_digest
+    }
+    pub fn executable_digest(&self) -> &str {
+        &self.executable_digest
+    }
+    pub fn dependency_closure_digest(&self) -> &str {
+        &self.dependency_closure_digest
+    }
+    pub fn runtime_config_digest(&self) -> &str {
+        &self.runtime_config_digest
+    }
+    pub fn launch_attestation_digest(&self) -> &str {
+        &self.launch_attestation_digest
+    }
     pub fn checkpoint_one_challenge_digest(&self) -> &str {
         &self.checkpoint_one_challenge_digest
     }
@@ -424,28 +493,60 @@ impl PostReleaseCheckpointTwoObservation {
     pub const fn previous_checkpoint_monotonic_counter(&self) -> u64 {
         self.previous_checkpoint_monotonic_counter
     }
-    pub const fn observed_at_ms(&self) -> u64 { self.observed_at_ms }
+    pub const fn observed_at_ms(&self) -> u64 {
+        self.observed_at_ms
+    }
 
-    pub const fn canonical_ticket_consumed_before_live_observation(&self) -> bool { true }
-    pub const fn current_os_pid_matches_consumed_ticket(&self) -> bool { true }
-    pub const fn predecessor_alias_matches_exact_ready_checkpoint(&self) -> bool { true }
-    pub const fn checkpoint_two_counter_strictly_advances(&self) -> bool { true }
-    pub const fn checkpoint_challenge_constructed_before_live_observation(&self) -> bool { true }
+    pub const fn canonical_ticket_consumed_before_live_observation(&self) -> bool {
+        true
+    }
+    pub const fn current_os_pid_matches_consumed_ticket(&self) -> bool {
+        true
+    }
+    pub const fn predecessor_alias_matches_exact_ready_checkpoint(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_counter_strictly_advances(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_challenge_constructed_before_live_observation(&self) -> bool {
+        true
+    }
     pub const fn live_mapped_runtime_observation_performed_after_ticket_consumption(&self) -> bool {
         true
     }
-    pub const fn observation_static_runtime_identity_matches_ticket_and_bound_runtime(&self) -> bool {
+    pub const fn observation_static_runtime_identity_matches_ticket_and_bound_runtime(
+        &self,
+    ) -> bool {
         true
     }
-    pub const fn supervisor_post_release_issuance_authenticated(&self) -> bool { false }
-    pub const fn exact_successful_release_authenticated(&self) -> bool { false }
-    pub const fn causal_release_to_observation_established(&self) -> bool { false }
-    pub const fn checkpoint_one_live_observation_proven_from_ticket(&self) -> bool { false }
-    pub const fn checkpoint_two_signed_inclusion_established(&self) -> bool { false }
-    pub const fn mapping_continuity_between_checkpoints_established(&self) -> bool { false }
-    pub const fn exclusive_pipe_peer_authority_established(&self) -> bool { false }
-    pub const fn trusted_time_established(&self) -> bool { false }
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn supervisor_post_release_issuance_authenticated(&self) -> bool {
+        false
+    }
+    pub const fn exact_successful_release_authenticated(&self) -> bool {
+        false
+    }
+    pub const fn causal_release_to_observation_established(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_one_live_observation_proven_from_ticket(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_two_signed_inclusion_established(&self) -> bool {
+        false
+    }
+    pub const fn mapping_continuity_between_checkpoints_established(&self) -> bool {
+        false
+    }
+    pub const fn exclusive_pipe_peer_authority_established(&self) -> bool {
+        false
+    }
+    pub const fn trusted_time_established(&self) -> bool {
+        false
+    }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 pub struct PostReleaseCheckpointTwoObservationQualification {
@@ -457,8 +558,12 @@ pub struct PostReleaseCheckpointTwoObservationQualification {
 }
 
 impl PostReleaseCheckpointTwoObservationQualification {
-    pub fn verified(&self) -> &PostReleaseCheckpointTwoObservation { &self.verified }
-    pub fn into_verified(self) -> PostReleaseCheckpointTwoObservation { self.verified }
+    pub fn verified(&self) -> &PostReleaseCheckpointTwoObservation {
+        &self.verified
+    }
+    pub fn into_verified(self) -> PostReleaseCheckpointTwoObservation {
+        self.verified
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -633,7 +738,9 @@ pub fn consume_post_release_ticket_and_observe_checkpoint_two(
         Err(error) => {
             report
                 .issues
-                .push(PostReleaseCheckpointTwoObservationIssue::TicketReadFailed(error));
+                .push(PostReleaseCheckpointTwoObservationIssue::TicketReadFailed(
+                    error,
+                ));
             return Err(finalize(report));
         }
     };
@@ -669,12 +776,12 @@ pub fn consume_post_release_ticket_and_observe_checkpoint_two(
             .push(PostReleaseCheckpointTwoObservationIssue::TicketPipeTargetMismatch);
     }
     if ticket.tracee_pid != current_pid {
-        report
-            .issues
-            .push(PostReleaseCheckpointTwoObservationIssue::TicketPidMismatch {
+        report.issues.push(
+            PostReleaseCheckpointTwoObservationIssue::TicketPidMismatch {
                 expected: ticket.tracee_pid,
                 observed: current_pid,
-            });
+            },
+        );
     }
     if ticket.checkpoint_sequence != 2 {
         report
@@ -784,11 +891,11 @@ pub fn consume_post_release_ticket_and_observe_checkpoint_two(
     ) {
         Ok(value) => value,
         Err(raw_report) => {
-            report
-                .issues
-                .push(PostReleaseCheckpointTwoObservationIssue::RawObservationFailed(
+            report.issues.push(
+                PostReleaseCheckpointTwoObservationIssue::RawObservationFailed(
                     raw_report.canonical_digest(),
-                ));
+                ),
+            );
             return Err(finalize(report));
         }
     };
@@ -806,9 +913,9 @@ pub fn consume_post_release_ticket_and_observe_checkpoint_two(
             .push(PostReleaseCheckpointTwoObservationIssue::ObservationNixBindingMismatch);
     }
     if observed.closure_qualification_digest() != bound.closure_qualification_digest() {
-        report
-            .issues
-            .push(PostReleaseCheckpointTwoObservationIssue::ObservationClosureQualificationMismatch);
+        report.issues.push(
+            PostReleaseCheckpointTwoObservationIssue::ObservationClosureQualificationMismatch,
+        );
     }
     if observed.closure_digest() != ticket.dependency_closure_digest
         || observed.closure_digest() != bound.dependency_closure_digest()
@@ -937,13 +1044,8 @@ fn observe_pipe_fd(fd: RawFd, maximum: u64) -> Result<PipeFdObservation, String>
     let bytes = read_bounded(&base.join("fdinfo").join(fd.to_string()), maximum)?;
     let raw_fdinfo_digest = format!("blake3:{}", blake3::hash(&bytes).to_hex());
     let parsed = parse_fdinfo(&bytes)?;
-    let observation_digest = pipe_observation_digest(
-        fd,
-        &target,
-        parsed.flags,
-        parsed.inode,
-        &raw_fdinfo_digest,
-    );
+    let observation_digest =
+        pipe_observation_digest(fd, &target, parsed.flags, parsed.inode, &raw_fdinfo_digest);
     Ok(PipeFdObservation {
         target,
         flags: parsed.flags,
@@ -964,7 +1066,9 @@ fn parse_fdinfo(bytes: &[u8]) -> Result<ParsedFdInfo, String> {
     let mut flags = None;
     let mut inode = None;
     for line in text.lines() {
-        let Some((key, value)) = line.split_once(':') else { continue; };
+        let Some((key, value)) = line.split_once(':') else {
+            continue;
+        };
         let value = value.trim();
         match key {
             "flags" => {
@@ -1025,7 +1129,12 @@ fn read_wire_field(fd: RawFd, out: &mut Vec<u8>, maximum: u32) -> Result<(), Str
     read_exact_append(fd, out, length as usize, maximum)
 }
 
-fn read_exact_append(fd: RawFd, out: &mut Vec<u8>, count: usize, maximum: u32) -> Result<(), String> {
+fn read_exact_append(
+    fd: RawFd,
+    out: &mut Vec<u8>,
+    count: usize,
+    maximum: u32,
+) -> Result<(), String> {
     let final_len = out
         .len()
         .checked_add(count)
@@ -1149,12 +1258,10 @@ fn canonical_text(value: &str) -> bool {
 }
 
 fn valid_refs(values: &[String]) -> bool {
-    values.len() <= MAX_REFS
-        && values.iter().all(|value| canonical_text(value))
-        && {
-            let mut seen = BTreeSet::new();
-            values.iter().all(|value| seen.insert(value.as_str()))
-        }
+    values.len() <= MAX_REFS && values.iter().all(|value| canonical_text(value)) && {
+        let mut seen = BTreeSet::new();
+        values.iter().all(|value| seen.insert(value.as_str()))
+    }
 }
 
 fn field(h: &mut blake3::Hasher, value: &str) {

@@ -11,8 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use symthaea_assurance_post_release_checkpoint_two_observation::
-    PostReleaseCheckpointTwoObservation;
+use symthaea_assurance_post_release_checkpoint_two_observation::PostReleaseCheckpointTwoObservation;
 use symthaea_assurance_post_release_runtime_handoff::IssuedPostReleaseRuntimeChallenge;
 
 pub const AUTHENTICATED_POST_RELEASE_CHECKPOINT_TWO_POLICY_SCHEMA_V1: &str =
@@ -237,7 +236,8 @@ impl AuthenticatedPostReleaseCheckpointTwoReport {
             self.executable_digest.as_str(),
             self.dependency_closure_digest.as_str(),
             self.checkpoint_two_challenge_digest.as_str(),
-            self.checkpoint_two_observation_qualification_digest.as_str(),
+            self.checkpoint_two_observation_qualification_digest
+                .as_str(),
             self.checkpoint_two_mapped_object_set_digest.as_str(),
         ] {
             field(&mut h, value);
@@ -262,7 +262,9 @@ impl AuthenticatedPostReleaseCheckpointTwoReport {
         b3(h.finalize())
     }
 
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -308,53 +310,105 @@ pub struct AuthenticatedPostReleaseCheckpointTwoObservation {
 }
 
 impl AuthenticatedPostReleaseCheckpointTwoObservation {
-    pub fn qualification_digest(&self) -> &str { &self.qualification_digest }
-    pub fn report_digest(&self) -> &str { &self.report_digest }
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
-    pub fn issuer_qualification_digest(&self) -> &str { &self.issuer_qualification_digest }
+    pub fn qualification_digest(&self) -> &str {
+        &self.qualification_digest
+    }
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
+    pub fn issuer_qualification_digest(&self) -> &str {
+        &self.issuer_qualification_digest
+    }
     pub fn tracee_observation_qualification_digest(&self) -> &str {
         &self.tracee_observation_qualification_digest
     }
-    pub fn ticket_digest(&self) -> &str { &self.ticket_digest }
-    pub fn ticket_bytes_digest(&self) -> &str { &self.ticket_bytes_digest }
-    pub fn channel_retention_digest(&self) -> &str { &self.channel_retention_digest }
-    pub fn release_digest(&self) -> &str { &self.release_digest }
-    pub fn release_report_digest(&self) -> &str { &self.release_report_digest }
+    pub fn ticket_digest(&self) -> &str {
+        &self.ticket_digest
+    }
+    pub fn ticket_bytes_digest(&self) -> &str {
+        &self.ticket_bytes_digest
+    }
+    pub fn channel_retention_digest(&self) -> &str {
+        &self.channel_retention_digest
+    }
+    pub fn release_digest(&self) -> &str {
+        &self.release_digest
+    }
+    pub fn release_report_digest(&self) -> &str {
+        &self.release_report_digest
+    }
     pub fn confinement_qualification_digest(&self) -> &str {
         &self.confinement_qualification_digest
     }
     pub fn mapping_continuity_qualification_digest(&self) -> &str {
         &self.mapping_continuity_qualification_digest
     }
-    pub fn bootstrap_ready_wire_digest(&self) -> &str { &self.bootstrap_ready_wire_digest }
+    pub fn bootstrap_ready_wire_digest(&self) -> &str {
+        &self.bootstrap_ready_wire_digest
+    }
     pub fn bootstrap_ready_checkpoint_digest(&self) -> &str {
         &self.bootstrap_ready_checkpoint_digest
     }
     pub fn launch_handoff_qualification_digest(&self) -> &str {
         &self.launch_handoff_qualification_digest
     }
-    pub fn launch_ticket_digest(&self) -> &str { &self.launch_ticket_digest }
-    pub const fn tracee_pid(&self) -> i32 { self.tracee_pid }
-    pub const fn handoff_read_fd(&self) -> u32 { self.handoff_read_fd }
-    pub fn pipe_target(&self) -> &str { &self.pipe_target }
-    pub fn process_instance_id(&self) -> &str { &self.process_instance_id }
-    pub fn runtime_policy_digest(&self) -> &str { &self.runtime_policy_digest }
-    pub fn runtime_verifier_ref(&self) -> &str { &self.runtime_verifier_ref }
-    pub fn backend_id(&self) -> &str { &self.backend_id }
-    pub fn boot_measurement_digest(&self) -> &str { &self.boot_measurement_digest }
-    pub fn executable_digest(&self) -> &str { &self.executable_digest }
-    pub fn dependency_closure_digest(&self) -> &str { &self.dependency_closure_digest }
-    pub fn runtime_config_digest(&self) -> &str { &self.runtime_config_digest }
-    pub fn launch_attestation_digest(&self) -> &str { &self.launch_attestation_digest }
+    pub fn launch_ticket_digest(&self) -> &str {
+        &self.launch_ticket_digest
+    }
+    pub const fn tracee_pid(&self) -> i32 {
+        self.tracee_pid
+    }
+    pub const fn handoff_read_fd(&self) -> u32 {
+        self.handoff_read_fd
+    }
+    pub fn pipe_target(&self) -> &str {
+        &self.pipe_target
+    }
+    pub fn process_instance_id(&self) -> &str {
+        &self.process_instance_id
+    }
+    pub fn runtime_policy_digest(&self) -> &str {
+        &self.runtime_policy_digest
+    }
+    pub fn runtime_verifier_ref(&self) -> &str {
+        &self.runtime_verifier_ref
+    }
+    pub fn backend_id(&self) -> &str {
+        &self.backend_id
+    }
+    pub fn boot_measurement_digest(&self) -> &str {
+        &self.boot_measurement_digest
+    }
+    pub fn executable_digest(&self) -> &str {
+        &self.executable_digest
+    }
+    pub fn dependency_closure_digest(&self) -> &str {
+        &self.dependency_closure_digest
+    }
+    pub fn runtime_config_digest(&self) -> &str {
+        &self.runtime_config_digest
+    }
+    pub fn launch_attestation_digest(&self) -> &str {
+        &self.launch_attestation_digest
+    }
     pub fn checkpoint_one_challenge_digest(&self) -> &str {
         &self.checkpoint_one_challenge_digest
     }
     pub fn checkpoint_one_claimed_observation_digest(&self) -> &str {
         &self.checkpoint_one_claimed_observation_digest
     }
-    pub const fn previous_checkpoint_counter(&self) -> u64 { self.previous_checkpoint_counter }
-    pub const fn checkpoint_two_counter(&self) -> u64 { self.checkpoint_two_counter }
-    pub fn checkpoint_two_challenge_digest(&self) -> &str { &self.checkpoint_two_challenge_digest }
+    pub const fn previous_checkpoint_counter(&self) -> u64 {
+        self.previous_checkpoint_counter
+    }
+    pub const fn checkpoint_two_counter(&self) -> u64 {
+        self.checkpoint_two_counter
+    }
+    pub fn checkpoint_two_challenge_digest(&self) -> &str {
+        &self.checkpoint_two_challenge_digest
+    }
     pub fn checkpoint_two_challenge_nonce_blake3_hex(&self) -> &str {
         &self.checkpoint_two_challenge_nonce_blake3_hex
     }
@@ -367,12 +421,22 @@ impl AuthenticatedPostReleaseCheckpointTwoObservation {
     pub fn checkpoint_two_mapped_object_set_digest(&self) -> &str {
         &self.checkpoint_two_mapped_object_set_digest
     }
-    pub const fn checkpoint_two_observed_at_ms(&self) -> u64 { self.checkpoint_two_observed_at_ms }
+    pub const fn checkpoint_two_observed_at_ms(&self) -> u64 {
+        self.checkpoint_two_observed_at_ms
+    }
 
-    pub const fn exact_supervisor_issued_ticket_bytes_consumed_by_tracee(&self) -> bool { true }
-    pub const fn exact_successful_release_bound_to_tracee_observation(&self) -> bool { true }
-    pub const fn release_precedes_challenge_by_capability_order(&self) -> bool { true }
-    pub const fn challenge_consumption_precedes_live_observation(&self) -> bool { true }
+    pub const fn exact_supervisor_issued_ticket_bytes_consumed_by_tracee(&self) -> bool {
+        true
+    }
+    pub const fn exact_successful_release_bound_to_tracee_observation(&self) -> bool {
+        true
+    }
+    pub const fn release_precedes_challenge_by_capability_order(&self) -> bool {
+        true
+    }
+    pub const fn challenge_consumption_precedes_live_observation(&self) -> bool {
+        true
+    }
     pub const fn causal_release_to_checkpoint_two_live_observation_established(&self) -> bool {
         true
     }
@@ -382,15 +446,33 @@ impl AuthenticatedPostReleaseCheckpointTwoObservation {
     pub const fn checkpoint_two_challenge_is_os_csprng_post_release_challenge(&self) -> bool {
         true
     }
-    pub const fn checkpoint_one_live_observation_proven_here(&self) -> bool { false }
-    pub const fn checkpoint_two_signed_inclusion_established(&self) -> bool { false }
-    pub const fn mapping_continuity_between_checkpoints_established(&self) -> bool { false }
-    pub const fn boot_measurement_live_reobserved_after_release(&self) -> bool { false }
-    pub const fn runtime_config_live_reobserved_after_release(&self) -> bool { false }
-    pub const fn exclusive_pipe_peer_authority_established(&self) -> bool { false }
-    pub const fn trusted_time_established(&self) -> bool { false }
-    pub const fn global_replay_excluded(&self) -> bool { false }
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn checkpoint_one_live_observation_proven_here(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_two_signed_inclusion_established(&self) -> bool {
+        false
+    }
+    pub const fn mapping_continuity_between_checkpoints_established(&self) -> bool {
+        false
+    }
+    pub const fn boot_measurement_live_reobserved_after_release(&self) -> bool {
+        false
+    }
+    pub const fn runtime_config_live_reobserved_after_release(&self) -> bool {
+        false
+    }
+    pub const fn exclusive_pipe_peer_authority_established(&self) -> bool {
+        false
+    }
+    pub const fn trusted_time_established(&self) -> bool {
+        false
+    }
+    pub const fn global_replay_excluded(&self) -> bool {
+        false
+    }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 pub struct AuthenticatedPostReleaseCheckpointTwoQualification {
@@ -519,7 +601,8 @@ pub fn bind_authenticated_post_release_checkpoint_two(
             .issues
             .push(AuthenticatedPostReleaseCheckpointTwoIssue::BootstrapReadyCheckpointMismatch);
     }
-    if issued.launch_handoff_qualification_digest() != observed.launch_handoff_qualification_digest()
+    if issued.launch_handoff_qualification_digest()
+        != observed.launch_handoff_qualification_digest()
     {
         report
             .issues
@@ -697,9 +780,7 @@ pub fn bind_authenticated_post_release_checkpoint_two(
         checkpoint_two_observation_qualification_digest: observed
             .raw_observation_qualification_digest()
             .into(),
-        checkpoint_two_observation_report_digest: observed
-            .raw_observation_report_digest()
-            .into(),
+        checkpoint_two_observation_report_digest: observed.raw_observation_report_digest().into(),
         checkpoint_two_mapped_object_set_digest: observed.mapped_object_set_digest().into(),
         checkpoint_two_observed_at_ms: observed.observed_at_ms(),
     };
@@ -772,12 +853,10 @@ fn canonical_text(value: &str) -> bool {
 }
 
 fn valid_refs(values: &[String]) -> bool {
-    values.len() <= MAX_REFS
-        && values.iter().all(|value| canonical_text(value))
-        && {
-            let mut seen = BTreeSet::new();
-            values.iter().all(|value| seen.insert(value.as_str()))
-        }
+    values.len() <= MAX_REFS && values.iter().all(|value| canonical_text(value)) && {
+        let mut seen = BTreeSet::new();
+        values.iter().all(|value| seen.insert(value.as_str()))
+    }
 }
 
 fn field(h: &mut blake3::Hasher, value: &str) {

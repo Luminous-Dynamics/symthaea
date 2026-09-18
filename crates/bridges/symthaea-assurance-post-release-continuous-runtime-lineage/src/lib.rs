@@ -13,13 +13,12 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use symthaea_assurance_authenticated_post_release_checkpoint_two::
-    AuthenticatedPostReleaseCheckpointTwoObservation;
+use symthaea_assurance_authenticated_post_release_checkpoint_two::AuthenticatedPostReleaseCheckpointTwoObservation;
 use symthaea_assurance_launch_to_runtime_continuity::LaunchToRuntimeContinuity;
 use symthaea_assurance_signed_post_release_checkpoint_two::SignedPostReleaseCheckpointTwo;
 use symthaea_evidence_verifier_runtime_continuity::{
-    verify_continuous_verifier_execution, RuntimeContinuityDisposition, RuntimeContinuityReport,
-    VerifierRuntimeContinuityPolicy, VerifierRuntimeEvidence,
+    RuntimeContinuityDisposition, RuntimeContinuityReport, VerifierRuntimeContinuityPolicy,
+    VerifierRuntimeEvidence, verify_continuous_verifier_execution,
 };
 
 pub const POST_RELEASE_CONTINUOUS_LINEAGE_POLICY_SCHEMA_V1: &str =
@@ -72,7 +71,8 @@ impl PostReleaseContinuousLineagePolicy {
             self.schema_version.as_str(),
             self.policy_id.as_str(),
             self.expected_launch_to_runtime_policy_digest.as_str(),
-            self.expected_authenticated_checkpoint_two_policy_digest.as_str(),
+            self.expected_authenticated_checkpoint_two_policy_digest
+                .as_str(),
             self.expected_signed_checkpoint_two_policy_digest.as_str(),
             self.expected_runtime_policy_digest.as_str(),
             self.expected_runtime_verifier_ref.as_str(),
@@ -153,14 +153,18 @@ impl PostReleaseContinuousLineageIssue {
             Self::CheckpointOneDynamicMeasurementMismatch => {
                 "checkpoint-one-dynamic-measurement-mismatch"
             }
-            Self::CheckpointOneObservationTimeMismatch => "checkpoint-one-observation-time-mismatch",
+            Self::CheckpointOneObservationTimeMismatch => {
+                "checkpoint-one-observation-time-mismatch"
+            }
             Self::CheckpointTwoDigestMismatch => "checkpoint-two-digest-mismatch",
             Self::CheckpointTwoDynamicMeasurementMismatch => {
                 "checkpoint-two-dynamic-measurement-mismatch"
             }
             Self::CheckpointTwoPredecessorMismatch => "checkpoint-two-predecessor-mismatch",
             Self::CheckpointTwoCounterMismatch => "checkpoint-two-counter-mismatch",
-            Self::CheckpointTwoObservationTimeMismatch => "checkpoint-two-observation-time-mismatch",
+            Self::CheckpointTwoObservationTimeMismatch => {
+                "checkpoint-two-observation-time-mismatch"
+            }
             Self::LaunchAttestationMismatch => "launch-attestation-mismatch",
             Self::ExecutableIdentityMismatch => "executable-identity-mismatch",
             Self::DependencyClosureMismatch => "dependency-closure-mismatch",
@@ -213,7 +217,8 @@ impl PostReleaseContinuousLineageReport {
             self.policy_id.as_str(),
             self.policy_digest.as_deref().unwrap_or("-"),
             self.launch_to_runtime_qualification_digest.as_str(),
-            self.authenticated_checkpoint_two_qualification_digest.as_str(),
+            self.authenticated_checkpoint_two_qualification_digest
+                .as_str(),
             self.signed_checkpoint_two_qualification_digest.as_str(),
             self.release_digest.as_str(),
             self.process_instance_id.as_str(),
@@ -227,7 +232,9 @@ impl PostReleaseContinuousLineageReport {
             self.final_checkpoint_digest.as_deref().unwrap_or("-"),
             self.runtime_trace_digest.as_deref().unwrap_or("-"),
             self.continuous_execution_digest.as_deref().unwrap_or("-"),
-            self.computation_attestation_digest.as_deref().unwrap_or("-"),
+            self.computation_attestation_digest
+                .as_deref()
+                .unwrap_or("-"),
         ] {
             field(&mut h, value);
         }
@@ -249,7 +256,9 @@ impl PostReleaseContinuousLineageReport {
         b3(h.finalize())
     }
 
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -282,9 +291,15 @@ pub struct PostReleaseContinuousRuntimeLineage {
 }
 
 impl PostReleaseContinuousRuntimeLineage {
-    pub fn qualification_digest(&self) -> &str { &self.qualification_digest }
-    pub fn report_digest(&self) -> &str { &self.report_digest }
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
+    pub fn qualification_digest(&self) -> &str {
+        &self.qualification_digest
+    }
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
     pub fn launch_to_runtime_qualification_digest(&self) -> &str {
         &self.launch_to_runtime_qualification_digest
     }
@@ -294,50 +309,112 @@ impl PostReleaseContinuousRuntimeLineage {
     pub fn signed_checkpoint_two_qualification_digest(&self) -> &str {
         &self.signed_checkpoint_two_qualification_digest
     }
-    pub fn release_digest(&self) -> &str { &self.release_digest }
-    pub const fn tracee_pid(&self) -> i32 { self.tracee_pid }
-    pub fn process_instance_id(&self) -> &str { &self.process_instance_id }
-    pub fn runtime_policy_digest(&self) -> &str { &self.runtime_policy_digest }
-    pub fn runtime_verifier_ref(&self) -> &str { &self.runtime_verifier_ref }
-    pub fn backend_id(&self) -> &str { &self.backend_id }
-    pub fn launch_attestation_digest(&self) -> &str { &self.launch_attestation_digest }
-    pub const fn checkpoint_count(&self) -> u64 { self.checkpoint_count }
-    pub fn checkpoint_one_digest(&self) -> &str { &self.checkpoint_one_digest }
-    pub fn checkpoint_two_digest(&self) -> &str { &self.checkpoint_two_digest }
+    pub fn release_digest(&self) -> &str {
+        &self.release_digest
+    }
+    pub const fn tracee_pid(&self) -> i32 {
+        self.tracee_pid
+    }
+    pub fn process_instance_id(&self) -> &str {
+        &self.process_instance_id
+    }
+    pub fn runtime_policy_digest(&self) -> &str {
+        &self.runtime_policy_digest
+    }
+    pub fn runtime_verifier_ref(&self) -> &str {
+        &self.runtime_verifier_ref
+    }
+    pub fn backend_id(&self) -> &str {
+        &self.backend_id
+    }
+    pub fn launch_attestation_digest(&self) -> &str {
+        &self.launch_attestation_digest
+    }
+    pub const fn checkpoint_count(&self) -> u64 {
+        self.checkpoint_count
+    }
+    pub fn checkpoint_one_digest(&self) -> &str {
+        &self.checkpoint_one_digest
+    }
+    pub fn checkpoint_two_digest(&self) -> &str {
+        &self.checkpoint_two_digest
+    }
     pub fn checkpoint_two_dynamic_measurement_digest(&self) -> &str {
         &self.checkpoint_two_dynamic_measurement_digest
     }
-    pub fn final_checkpoint_digest(&self) -> &str { &self.final_checkpoint_digest }
-    pub fn runtime_trace_digest(&self) -> &str { &self.runtime_trace_digest }
-    pub fn continuous_execution_digest(&self) -> &str { &self.continuous_execution_digest }
-    pub fn computation_attestation_digest(&self) -> &str { &self.computation_attestation_digest }
-    pub fn request_nonce_blake3_hex(&self) -> &str { &self.request_nonce_blake3_hex }
-    pub fn input_digest(&self) -> &str { &self.input_digest }
-    pub fn output_digest(&self) -> &str { &self.output_digest }
-    pub const fn assessed_at_ms(&self) -> u64 { self.assessed_at_ms }
+    pub fn final_checkpoint_digest(&self) -> &str {
+        &self.final_checkpoint_digest
+    }
+    pub fn runtime_trace_digest(&self) -> &str {
+        &self.runtime_trace_digest
+    }
+    pub fn continuous_execution_digest(&self) -> &str {
+        &self.continuous_execution_digest
+    }
+    pub fn computation_attestation_digest(&self) -> &str {
+        &self.computation_attestation_digest
+    }
+    pub fn request_nonce_blake3_hex(&self) -> &str {
+        &self.request_nonce_blake3_hex
+    }
+    pub fn input_digest(&self) -> &str {
+        &self.input_digest
+    }
+    pub fn output_digest(&self) -> &str {
+        &self.output_digest
+    }
+    pub const fn assessed_at_ms(&self) -> u64 {
+        self.assessed_at_ms
+    }
 
-    pub const fn confirmed_launch_to_live_checkpoint_one_established(&self) -> bool { true }
-    pub const fn checkpoint_one_live_observation_proven(&self) -> bool { true }
-    pub const fn successful_release_to_live_checkpoint_two_established(&self) -> bool { true }
-    pub const fn checkpoint_two_live_observation_proven(&self) -> bool { true }
-    pub const fn checkpoint_two_authorized_signature_verified(&self) -> bool { true }
-    pub const fn checkpoint_two_included_in_fully_qualified_runtime_trace(&self) -> bool { true }
-    pub const fn checkpoint_two_descends_from_exact_live_checkpoint_one(&self) -> bool { true }
+    pub const fn confirmed_launch_to_live_checkpoint_one_established(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_one_live_observation_proven(&self) -> bool {
+        true
+    }
+    pub const fn successful_release_to_live_checkpoint_two_established(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_live_observation_proven(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_authorized_signature_verified(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_included_in_fully_qualified_runtime_trace(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_descends_from_exact_live_checkpoint_one(&self) -> bool {
+        true
+    }
     pub const fn full_runtime_sequence_gap_signer_and_computation_policy_reverified(&self) -> bool {
         true
     }
     pub const fn end_to_end_launch_release_reentry_runtime_lineage_established(&self) -> bool {
         true
     }
-    pub const fn os_tracee_pid_and_runtime_process_claim_bound_across_lineage(&self) -> bool { true }
+    pub const fn os_tracee_pid_and_runtime_process_claim_bound_across_lineage(&self) -> bool {
+        true
+    }
     pub const fn uninterrupted_mapping_continuity_between_checkpoints_established(&self) -> bool {
         false
     }
-    pub const fn signature_operation_after_live_observation_established(&self) -> bool { false }
-    pub const fn signer_key_non_compromise_established(&self) -> bool { false }
-    pub const fn trusted_time_established(&self) -> bool { false }
-    pub const fn global_replay_excluded(&self) -> bool { false }
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn signature_operation_after_live_observation_established(&self) -> bool {
+        false
+    }
+    pub const fn signer_key_non_compromise_established(&self) -> bool {
+        false
+    }
+    pub const fn trusted_time_established(&self) -> bool {
+        false
+    }
+    pub const fn global_replay_excluded(&self) -> bool {
+        false
+    }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 pub struct PostReleaseContinuousRuntimeLineageQualification {
@@ -347,8 +424,12 @@ pub struct PostReleaseContinuousRuntimeLineageQualification {
 }
 
 impl PostReleaseContinuousRuntimeLineageQualification {
-    pub fn verified(&self) -> &PostReleaseContinuousRuntimeLineage { &self.verified }
-    pub fn into_verified(self) -> PostReleaseContinuousRuntimeLineage { self.verified }
+    pub fn verified(&self) -> &PostReleaseContinuousRuntimeLineage {
+        &self.verified
+    }
+    pub fn into_verified(self) -> PostReleaseContinuousRuntimeLineage {
+        self.verified
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -360,10 +441,7 @@ pub fn verify_post_release_continuous_runtime_lineage(
     runtime_policy: &VerifierRuntimeContinuityPolicy,
     evidence: &VerifierRuntimeEvidence,
     assessed_at_ms: u64,
-) -> Result<
-    PostReleaseContinuousRuntimeLineageQualification,
-    PostReleaseContinuousLineageReport,
-> {
+) -> Result<PostReleaseContinuousRuntimeLineageQualification, PostReleaseContinuousLineageReport> {
     let policy_digest = policy.canonical_digest();
     let runtime_policy_digest = runtime_policy.canonical_digest();
     let assessment = verify_continuous_verifier_execution(runtime_policy, evidence, assessed_at_ms);
@@ -382,7 +460,9 @@ pub fn verify_post_release_continuous_runtime_lineage(
         policy_id: policy.policy_id.clone(),
         policy_digest: policy_digest.clone(),
         launch_to_runtime_qualification_digest: launch.qualification_digest().into(),
-        authenticated_checkpoint_two_qualification_digest: authenticated.qualification_digest().into(),
+        authenticated_checkpoint_two_qualification_digest: authenticated
+            .qualification_digest()
+            .into(),
         signed_checkpoint_two_qualification_digest: signed.qualification_digest().into(),
         release_digest: authenticated.release_digest().into(),
         tracee_pid: authenticated.tracee_pid(),
@@ -409,10 +489,14 @@ pub fn verify_post_release_continuous_runtime_lineage(
     };
 
     if !policy.validate() {
-        report.issues.push(PostReleaseContinuousLineageIssue::InvalidPolicy);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::InvalidPolicy);
     }
     if !runtime_policy.validate() || runtime_policy_digest.is_none() {
-        report.issues.push(PostReleaseContinuousLineageIssue::InvalidRuntimePolicy);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::InvalidRuntimePolicy);
     }
     if !report.issues.is_empty() {
         return Err(finalize(report));
@@ -426,7 +510,9 @@ pub fn verify_post_release_continuous_runtime_lineage(
             .push(PostReleaseContinuousLineageIssue::FullRuntimeContinuityNotQualified);
         return Err(finalize(report));
     }
-    let continuous = assessment.continuous().expect("qualified assessment has capability");
+    let continuous = assessment
+        .continuous()
+        .expect("qualified assessment has capability");
 
     if launch.policy_digest() != policy.expected_launch_to_runtime_policy_digest {
         report
@@ -443,7 +529,8 @@ pub fn verify_post_release_continuous_runtime_lineage(
             .issues
             .push(PostReleaseContinuousLineageIssue::SignedCheckpointTwoPolicyMismatch);
     }
-    if signed.authenticated_observation_qualification_digest() != authenticated.qualification_digest()
+    if signed.authenticated_observation_qualification_digest()
+        != authenticated.qualification_digest()
     {
         report
             .issues
@@ -455,7 +542,9 @@ pub fn verify_post_release_continuous_runtime_lineage(
         || signed.runtime_policy_digest() != policy.expected_runtime_policy_digest
         || continuous.policy_digest() != policy.expected_runtime_policy_digest
     {
-        report.issues.push(PostReleaseContinuousLineageIssue::RuntimePolicyMismatch);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::RuntimePolicyMismatch);
     }
     if runtime_policy.verifier_ref != policy.expected_runtime_verifier_ref
         || launch.runtime_verifier_ref() != policy.expected_runtime_verifier_ref
@@ -464,33 +553,45 @@ pub fn verify_post_release_continuous_runtime_lineage(
         || continuous.verifier_ref() != policy.expected_runtime_verifier_ref
         || evidence.launch.verifier_ref != policy.expected_runtime_verifier_ref
     {
-        report.issues.push(PostReleaseContinuousLineageIssue::RuntimeVerifierMismatch);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::RuntimeVerifierMismatch);
     }
     if launch.backend_id() != policy.expected_backend_id
         || authenticated.backend_id() != policy.expected_backend_id
         || signed.backend_id() != policy.expected_backend_id
     {
-        report.issues.push(PostReleaseContinuousLineageIssue::BackendMismatch);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::BackendMismatch);
     }
     if launch.tracee_pid() != authenticated.tracee_pid() {
-        report.issues.push(PostReleaseContinuousLineageIssue::TraceePidMismatch);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::TraceePidMismatch);
     }
     if launch.process_instance_id() != authenticated.process_instance_id()
         || signed.process_instance_id() != authenticated.process_instance_id()
         || continuous.process_instance_id() != authenticated.process_instance_id()
         || evidence.launch.process_instance_id != authenticated.process_instance_id()
     {
-        report.issues.push(PostReleaseContinuousLineageIssue::ProcessInstanceMismatch);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::ProcessInstanceMismatch);
     }
     if evidence.checkpoints.len() < 2 {
-        report.issues.push(PostReleaseContinuousLineageIssue::CheckpointCountTooSmall);
+        report
+            .issues
+            .push(PostReleaseContinuousLineageIssue::CheckpointCountTooSmall);
         return Err(finalize(report));
     }
 
     let checkpoint_one = &evidence.checkpoints[0];
     let checkpoint_two = &evidence.checkpoints[1];
-    let checkpoint_one_digest = checkpoint_one_digest.expect("qualified trace checkpoint one digest");
-    let checkpoint_two_digest = checkpoint_two_digest.expect("qualified trace checkpoint two digest");
+    let checkpoint_one_digest =
+        checkpoint_one_digest.expect("qualified trace checkpoint one digest");
+    let checkpoint_two_digest =
+        checkpoint_two_digest.expect("qualified trace checkpoint two digest");
     let launch_digest = launch_digest.expect("qualified trace launch digest");
 
     if checkpoint_one_digest != launch.first_checkpoint_digest()
@@ -617,7 +718,9 @@ pub fn verify_post_release_continuous_runtime_lineage(
         report_digest,
         policy_digest,
         launch_to_runtime_qualification_digest: launch.qualification_digest().into(),
-        authenticated_checkpoint_two_qualification_digest: authenticated.qualification_digest().into(),
+        authenticated_checkpoint_two_qualification_digest: authenticated
+            .qualification_digest()
+            .into(),
         signed_checkpoint_two_qualification_digest: signed.qualification_digest().into(),
         release_digest: authenticated.release_digest().into(),
         tracee_pid: authenticated.tracee_pid(),
@@ -629,7 +732,9 @@ pub fn verify_post_release_continuous_runtime_lineage(
         checkpoint_count: evidence.checkpoints.len() as u64,
         checkpoint_one_digest,
         checkpoint_two_digest,
-        checkpoint_two_dynamic_measurement_digest: checkpoint_two.dynamic_measurement_digest.clone(),
+        checkpoint_two_dynamic_measurement_digest: checkpoint_two
+            .dynamic_measurement_digest
+            .clone(),
         final_checkpoint_digest,
         runtime_trace_digest,
         continuous_execution_digest: continuity_digest,
@@ -707,12 +812,10 @@ fn canonical_text(value: &str) -> bool {
 }
 
 fn valid_refs(values: &[String]) -> bool {
-    values.len() <= MAX_REFS
-        && values.iter().all(|value| canonical_text(value))
-        && {
-            let mut seen = BTreeSet::new();
-            values.iter().all(|value| seen.insert(value.as_str()))
-        }
+    values.len() <= MAX_REFS && values.iter().all(|value| canonical_text(value)) && {
+        let mut seen = BTreeSet::new();
+        values.iter().all(|value| seen.insert(value.as_str()))
+    }
 }
 
 fn field(h: &mut blake3::Hasher, value: &str) {

@@ -15,8 +15,7 @@
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-use symthaea_assurance_authenticated_post_release_checkpoint_two::
-    AuthenticatedPostReleaseCheckpointTwoObservation;
+use symthaea_assurance_authenticated_post_release_checkpoint_two::AuthenticatedPostReleaseCheckpointTwoObservation;
 use symthaea_evidence_verifier_runtime_continuity::{
     RuntimeMeasurementCheckpoint, RuntimeMeasurementScope, VerifierRuntimeContinuityPolicy,
 };
@@ -66,7 +65,8 @@ impl SignedPostReleaseCheckpointTwoPolicy {
         for value in [
             self.schema_version.as_str(),
             self.policy_id.as_str(),
-            self.expected_authenticated_observation_policy_digest.as_str(),
+            self.expected_authenticated_observation_policy_digest
+                .as_str(),
             self.expected_runtime_policy_digest.as_str(),
             self.expected_runtime_verifier_ref.as_str(),
             self.expected_backend_id.as_str(),
@@ -125,7 +125,9 @@ impl SignedPostReleaseCheckpointTwoIssue {
             Self::InvalidPolicy => "invalid-policy",
             Self::InvalidRuntimePolicy => "invalid-runtime-policy",
             Self::InvalidCheckpoint => "invalid-checkpoint",
-            Self::AuthenticatedObservationPolicyMismatch => "authenticated-observation-policy-mismatch",
+            Self::AuthenticatedObservationPolicyMismatch => {
+                "authenticated-observation-policy-mismatch"
+            }
             Self::RuntimePolicyMismatch => "runtime-policy-mismatch",
             Self::RuntimeVerifierMismatch => "runtime-verifier-mismatch",
             Self::BackendMismatch => "backend-mismatch",
@@ -214,7 +216,9 @@ impl SignedPostReleaseCheckpointTwoReport {
         b3(h.finalize())
     }
 
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -242,46 +246,114 @@ pub struct SignedPostReleaseCheckpointTwo {
 }
 
 impl SignedPostReleaseCheckpointTwo {
-    pub fn qualification_digest(&self) -> &str { &self.qualification_digest }
-    pub fn report_digest(&self) -> &str { &self.report_digest }
-    pub fn policy_digest(&self) -> &str { &self.policy_digest }
+    pub fn qualification_digest(&self) -> &str {
+        &self.qualification_digest
+    }
+    pub fn report_digest(&self) -> &str {
+        &self.report_digest
+    }
+    pub fn policy_digest(&self) -> &str {
+        &self.policy_digest
+    }
     pub fn authenticated_observation_qualification_digest(&self) -> &str {
         &self.authenticated_observation_qualification_digest
     }
-    pub fn runtime_policy_digest(&self) -> &str { &self.runtime_policy_digest }
-    pub fn checkpoint_digest(&self) -> &str { &self.checkpoint_digest }
-    pub fn launch_attestation_digest(&self) -> &str { &self.launch_attestation_digest }
-    pub fn process_instance_id(&self) -> &str { &self.process_instance_id }
-    pub fn verifier_ref(&self) -> &str { &self.verifier_ref }
-    pub fn backend_id(&self) -> &str { &self.backend_id }
-    pub const fn sequence(&self) -> u64 { 2 }
-    pub fn previous_checkpoint_digest(&self) -> &str { &self.previous_checkpoint_digest }
-    pub const fn observed_at_ms(&self) -> u64 { self.observed_at_ms }
-    pub const fn monotonic_counter(&self) -> u64 { self.monotonic_counter }
-    pub fn boot_measurement_digest(&self) -> &str { &self.boot_measurement_digest }
-    pub fn executable_digest(&self) -> &str { &self.executable_digest }
-    pub fn dependency_closure_digest(&self) -> &str { &self.dependency_closure_digest }
-    pub fn runtime_config_digest(&self) -> &str { &self.runtime_config_digest }
-    pub fn dynamic_measurement_digest(&self) -> &str { &self.dynamic_measurement_digest }
-    pub fn signer_key_id(&self) -> &str { &self.signer_key_id }
-    pub fn signer_public_key_ed25519_hex(&self) -> &str { &self.signer_public_key_ed25519_hex }
+    pub fn runtime_policy_digest(&self) -> &str {
+        &self.runtime_policy_digest
+    }
+    pub fn checkpoint_digest(&self) -> &str {
+        &self.checkpoint_digest
+    }
+    pub fn launch_attestation_digest(&self) -> &str {
+        &self.launch_attestation_digest
+    }
+    pub fn process_instance_id(&self) -> &str {
+        &self.process_instance_id
+    }
+    pub fn verifier_ref(&self) -> &str {
+        &self.verifier_ref
+    }
+    pub fn backend_id(&self) -> &str {
+        &self.backend_id
+    }
+    pub const fn sequence(&self) -> u64 {
+        2
+    }
+    pub fn previous_checkpoint_digest(&self) -> &str {
+        &self.previous_checkpoint_digest
+    }
+    pub const fn observed_at_ms(&self) -> u64 {
+        self.observed_at_ms
+    }
+    pub const fn monotonic_counter(&self) -> u64 {
+        self.monotonic_counter
+    }
+    pub fn boot_measurement_digest(&self) -> &str {
+        &self.boot_measurement_digest
+    }
+    pub fn executable_digest(&self) -> &str {
+        &self.executable_digest
+    }
+    pub fn dependency_closure_digest(&self) -> &str {
+        &self.dependency_closure_digest
+    }
+    pub fn runtime_config_digest(&self) -> &str {
+        &self.runtime_config_digest
+    }
+    pub fn dynamic_measurement_digest(&self) -> &str {
+        &self.dynamic_measurement_digest
+    }
+    pub fn signer_key_id(&self) -> &str {
+        &self.signer_key_id
+    }
+    pub fn signer_public_key_ed25519_hex(&self) -> &str {
+        &self.signer_public_key_ed25519_hex
+    }
 
-    pub const fn checkpoint_signature_valid(&self) -> bool { true }
-    pub const fn checkpoint_signer_authorized_by_exact_runtime_policy(&self) -> bool { true }
-    pub const fn checkpoint_uses_frozen_runtime_checkpoint_encoding(&self) -> bool { true }
-    pub const fn checkpoint_two_descends_from_exact_checkpoint_one(&self) -> bool { true }
-    pub const fn checkpoint_two_static_identity_matches_authenticated_runtime(&self) -> bool { true }
-    pub const fn signed_checkpoint_commits_authenticated_release_to_live_observation_chain(&self) -> bool {
+    pub const fn checkpoint_signature_valid(&self) -> bool {
         true
     }
-    pub const fn signature_operation_after_live_observation_established(&self) -> bool { false }
-    pub const fn checkpoint_gap_policy_established_here(&self) -> bool { false }
-    pub const fn checkpoint_one_live_observation_proven_here(&self) -> bool { false }
-    pub const fn mapping_continuity_between_checkpoints_established(&self) -> bool { false }
-    pub const fn signer_key_non_compromise_established(&self) -> bool { false }
-    pub const fn trusted_time_established(&self) -> bool { false }
-    pub const fn global_replay_excluded(&self) -> bool { false }
-    pub const fn grants_physical_authority(&self) -> bool { false }
+    pub const fn checkpoint_signer_authorized_by_exact_runtime_policy(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_uses_frozen_runtime_checkpoint_encoding(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_descends_from_exact_checkpoint_one(&self) -> bool {
+        true
+    }
+    pub const fn checkpoint_two_static_identity_matches_authenticated_runtime(&self) -> bool {
+        true
+    }
+    pub const fn signed_checkpoint_commits_authenticated_release_to_live_observation_chain(
+        &self,
+    ) -> bool {
+        true
+    }
+    pub const fn signature_operation_after_live_observation_established(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_gap_policy_established_here(&self) -> bool {
+        false
+    }
+    pub const fn checkpoint_one_live_observation_proven_here(&self) -> bool {
+        false
+    }
+    pub const fn mapping_continuity_between_checkpoints_established(&self) -> bool {
+        false
+    }
+    pub const fn signer_key_non_compromise_established(&self) -> bool {
+        false
+    }
+    pub const fn trusted_time_established(&self) -> bool {
+        false
+    }
+    pub const fn global_replay_excluded(&self) -> bool {
+        false
+    }
+    pub const fn grants_physical_authority(&self) -> bool {
+        false
+    }
 }
 
 pub struct SignedPostReleaseCheckpointTwoQualification {
@@ -290,8 +362,12 @@ pub struct SignedPostReleaseCheckpointTwoQualification {
 }
 
 impl SignedPostReleaseCheckpointTwoQualification {
-    pub fn signed(&self) -> &SignedPostReleaseCheckpointTwo { &self.signed }
-    pub fn into_signed(self) -> SignedPostReleaseCheckpointTwo { self.signed }
+    pub fn signed(&self) -> &SignedPostReleaseCheckpointTwo {
+        &self.signed
+    }
+    pub fn into_signed(self) -> SignedPostReleaseCheckpointTwo {
+        self.signed
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -332,13 +408,19 @@ pub fn verify_signed_post_release_checkpoint_two(
     };
 
     if !policy.validate() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::InvalidPolicy);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::InvalidPolicy);
     }
     if !runtime_policy.validate() || runtime_policy_digest.is_none() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::InvalidRuntimePolicy);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::InvalidRuntimePolicy);
     }
     if !checkpoint.validate() || checkpoint_digest.is_none() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::InvalidCheckpoint);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::InvalidCheckpoint);
     }
     if !report.issues.is_empty() {
         return Err(finalize(report));
@@ -352,69 +434,97 @@ pub fn verify_signed_post_release_checkpoint_two(
     if runtime_policy_digest.as_deref() != Some(policy.expected_runtime_policy_digest.as_str())
         || authenticated.runtime_policy_digest() != policy.expected_runtime_policy_digest
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::RuntimePolicyMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::RuntimePolicyMismatch);
     }
     if runtime_policy.verifier_ref != policy.expected_runtime_verifier_ref
         || authenticated.runtime_verifier_ref() != policy.expected_runtime_verifier_ref
         || checkpoint.verifier_ref != policy.expected_runtime_verifier_ref
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::RuntimeVerifierMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::RuntimeVerifierMismatch);
     }
     if authenticated.backend_id() != policy.expected_backend_id {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::BackendMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::BackendMismatch);
     }
     if checkpoint.launch_attestation_digest != authenticated.launch_attestation_digest() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::LaunchAttestationMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::LaunchAttestationMismatch);
     }
     if checkpoint.process_instance_id != authenticated.process_instance_id() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::ProcessInstanceMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::ProcessInstanceMismatch);
     }
     if checkpoint.sequence != 2 {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::CheckpointSequenceMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::CheckpointSequenceMismatch);
     }
     if checkpoint.previous_checkpoint_digest.as_deref()
         != Some(authenticated.bootstrap_ready_checkpoint_digest())
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::PreviousCheckpointMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::PreviousCheckpointMismatch);
     }
     if checkpoint.observed_at_ms != authenticated.checkpoint_two_observed_at_ms() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::ObservationTimeMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::ObservationTimeMismatch);
     }
     if checkpoint.monotonic_counter != authenticated.checkpoint_two_counter() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::MonotonicCounterMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::MonotonicCounterMismatch);
     }
     if checkpoint.boot_measurement_digest != authenticated.boot_measurement_digest()
         || checkpoint.boot_measurement_digest != runtime_policy.expected_boot_measurement_digest
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::BootMeasurementMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::BootMeasurementMismatch);
     }
     if checkpoint.executable_digest != authenticated.executable_digest()
         || checkpoint.executable_digest != runtime_policy.expected_executable_digest
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::ExecutableMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::ExecutableMismatch);
     }
     if checkpoint.dependency_closure_digest != authenticated.dependency_closure_digest()
         || checkpoint.dependency_closure_digest != runtime_policy.expected_dependency_closure_digest
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::DependencyClosureMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::DependencyClosureMismatch);
     }
     if checkpoint.runtime_config_digest != authenticated.runtime_config_digest()
         || checkpoint.runtime_config_digest != runtime_policy.expected_runtime_config_digest
     {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::RuntimeConfigMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::RuntimeConfigMismatch);
     }
     if checkpoint.dynamic_measurement_digest != authenticated.qualification_digest() {
-        report.issues.push(SignedPostReleaseCheckpointTwoIssue::DynamicMeasurementMismatch);
+        report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::DynamicMeasurementMismatch);
     }
 
     match verify_checkpoint_signature(runtime_policy, checkpoint) {
         SignatureTrust::Trusted => {}
-        SignatureTrust::Untrusted => {
-            report.issues.push(SignedPostReleaseCheckpointTwoIssue::CheckpointSignerUntrusted)
-        }
-        SignatureTrust::Invalid => {
-            report.issues.push(SignedPostReleaseCheckpointTwoIssue::CheckpointSignatureInvalid)
-        }
+        SignatureTrust::Untrusted => report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::CheckpointSignerUntrusted),
+        SignatureTrust::Invalid => report
+            .issues
+            .push(SignedPostReleaseCheckpointTwoIssue::CheckpointSignatureInvalid),
     }
 
     if !report.issues.is_empty() {
@@ -489,7 +599,9 @@ fn verify_checkpoint_signature(
             .revoked_at_ms
             .map(|revoked| checkpoint.observed_at_ms < revoked)
             .unwrap_or(true)
-        && key.allowed_scopes.contains(&RuntimeMeasurementScope::Checkpoint);
+        && key
+            .allowed_scopes
+            .contains(&RuntimeMeasurementScope::Checkpoint);
     if key.public_key_ed25519_hex != checkpoint.signer_public_key_ed25519_hex || !usable {
         return SignatureTrust::Untrusted;
     }
@@ -512,7 +624,8 @@ fn verify_ed25519(public_key_hex: &str, message: &[u8], signature_hex: &str) -> 
     let Ok(key) = VerifyingKey::from_bytes(&public_key) else {
         return false;
     };
-    key.verify(message, &Signature::from_bytes(&signature)).is_ok()
+    key.verify(message, &Signature::from_bytes(&signature))
+        .is_ok()
 }
 
 fn qualification_digest(
@@ -530,7 +643,9 @@ fn qualification_digest(
     b3(h.finalize())
 }
 
-fn finalize(mut report: SignedPostReleaseCheckpointTwoReport) -> SignedPostReleaseCheckpointTwoReport {
+fn finalize(
+    mut report: SignedPostReleaseCheckpointTwoReport,
+) -> SignedPostReleaseCheckpointTwoReport {
     report.disposition = if report
         .issues
         .iter()
@@ -560,12 +675,10 @@ fn canonical_text(value: &str) -> bool {
 }
 
 fn valid_refs(values: &[String]) -> bool {
-    values.len() <= MAX_REFS
-        && values.iter().all(|value| canonical_text(value))
-        && {
-            let mut seen = BTreeSet::new();
-            values.iter().all(|value| seen.insert(value.as_str()))
-        }
+    values.len() <= MAX_REFS && values.iter().all(|value| canonical_text(value)) && {
+        let mut seen = BTreeSet::new();
+        values.iter().all(|value| seen.insert(value.as_str()))
+    }
 }
 
 fn field(h: &mut blake3::Hasher, value: &str) {
@@ -591,8 +704,8 @@ mod tests {
     use super::*;
     use ed25519_dalek::{Signer, SigningKey};
     use symthaea_evidence_verifier_runtime_continuity::{
-        RuntimeMeasurementAuthorityKey, RUNTIME_CHECKPOINT_SCHEMA_V1,
-        RUNTIME_CONTINUITY_POLICY_SCHEMA_V1,
+        RUNTIME_CHECKPOINT_SCHEMA_V1, RUNTIME_CONTINUITY_POLICY_SCHEMA_V1,
+        RuntimeMeasurementAuthorityKey,
     };
 
     fn d(label: &str) -> String {
@@ -680,7 +793,10 @@ mod tests {
         let runtime = runtime_policy(hex::encode(signing.verifying_key().to_bytes()));
         let checkpoint = signed_checkpoint(&signing);
         assert!(checkpoint.validate());
-        assert_eq!(verify_checkpoint_signature(&runtime, &checkpoint), SignatureTrust::Trusted);
+        assert_eq!(
+            verify_checkpoint_signature(&runtime, &checkpoint),
+            SignatureTrust::Trusted
+        );
 
         let mut wrong_scope = runtime.clone();
         wrong_scope.trusted_keys[0].allowed_scopes = vec![RuntimeMeasurementScope::Launch];
