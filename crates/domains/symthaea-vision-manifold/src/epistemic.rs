@@ -14,7 +14,8 @@
 //! This module does not grant action authority. It only preserves what kind of visual
 //! claim a datum represents and the evidence it is allowed to cite.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::fmt;
 
 /// Epistemic origin of a visual claim.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -65,8 +66,19 @@ impl VisualObservationRef {
 }
 
 /// A compact, typed provenance envelope for visual claims.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
+/// Fields are private so production code cannot construct contradictory provenance directly.
+/// Deserialization is also validated before a `VisualEvidence` value can exist.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VisualEvidence {
+    origin: VisualOrigin,
+    observation: Option<VisualObservationRef>,
+    parent_observations: Vec<VisualObservationRef>,
+    confidence: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+struct VisualEvidenceWire {
     origin: VisualOrigin,
     observation: Option<VisualObservationRef>,
     parent_observations: Vec<VisualObservationRef>,
@@ -77,10 +89,57 @@ pub struct VisualEvidence {
 pub enum VisualEvidenceError {
     InvalidConfidence,
     ObservedRequiresObservation,
+    ObservedCannotCarryParentLineage,
     NonObservedCannotCarryDirectObservation,
     RememberedRequiresObservationLineage,
     InferredRequiresObservationLineage,
     DuplicateParentObservation,
+}
+
+impl fmt::Display for VisualEvidenceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let message = match self {
+            Self::InvalidConfidence => "visual confidence must be finite and within [0, 1]",
+            Self::ObservedRequiresObservation => {
+                "observed visual evidence requires a direct observation reference"
+            }
+            Self::ObservedCannotCarryParentLineage => {
+                "observed visual evidence cannot carry derived parent-observation lineage"
+            }
+            Self::NonObservedCannotCarryDirectObservation => {
+                "non-observed visual evidence cannot carry the direct-observation slot"
+            }
+            Self::RememberedRequiresObservationLineage => {
+                "remembered visual evidence requires original observation lineage"
+            }
+            Self::InferredRequiresObservationLineage => {
+                "inferred visual evidence requires supporting observation lineage"
+            }
+            Self::DuplicateParentObservation => {
+                "visual evidence cannot count the same parent observation more than once"
+            }
+        };
+        f.write_str(message)
+    }
+}
+
+impl std::error::Error for VisualEvidenceError {}
+
+impl<'de> Deserialize<'de> for VisualEvidence {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = VisualEvidenceWire::deserialize(deserializer)?;
+        let evidence = Self {
+            origin: wire.origin,
+            observation: wire.observation,
+            parent_observations: wire.parent_observations,
+            confidence: wire.confidence,
+        };
+        evidence.validate().map_err(serde::de::Error::custom)?;
+        Ok(evidence)
+    }
 }
 
 impl VisualEvidence {
@@ -157,7 +216,9 @@ impl VisualEvidence {
         self.confidence
     }
 
-    /// Revalidate an envelope after deserialization or trust-boundary crossing.
+    /// Revalidate an envelope after any in-memory trust-boundary crossing.
+    ///
+    /// Wire deserialization already performs this validation automatically.
     pub fn validate(&self) -> Result<(), VisualEvidenceError> {
         Self::validate_confidence(self.confidence)?;
         Self::validate_unique_parents(&self.parent_observations)?;
@@ -168,7 +229,7 @@ impl VisualEvidence {
                     return Err(VisualEvidenceError::ObservedRequiresObservation);
                 }
                 if !self.parent_observations.is_empty() {
-                    return Err(VisualEvidenceError::NonObservedCannotCarryDirectObservation);
+                    return Err(VisualEvidenceError::ObservedCannotCarryParentLineage);
                 }
             }
             VisualOrigin::Remembered => {
@@ -326,32 +387,24 @@ mod tests {
     }
 
     #[test]
-    fn tampered_wire_state_cannot_validate_as_observed() {
+    fn tampered_wire_state_cannot_deserialize_as_observed() {
         let json = r#"{
-            \"origin\":\"observed\",
-            \"observation\":null,
-            \"parent_observations\":[],
-            \"confidence\":0.99
+            "origin":"observed",
+            "observation":null,
+            "parent_observations":[],
+            "confidence":0.99
         }"#;
-        let decoded: VisualEvidence = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            decoded.validate(),
-            Err(VisualEvidenceError::ObservedRequiresObservation)
-        );
+        assert!(serde_json::from_str::<VisualEvidence>(json).is_err());
     }
 
     #[test]
     fn tampered_simulation_cannot_carry_direct_observation() {
         let json = r#"{
-            \"origin\":\"simulated\",
-            \"observation\":{\"source_id\":1,\"frame_id\":9,\"captured_at_us\":10},
-            \"parent_observations\":[],
-            \"confidence\":0.5
+            "origin":"simulated",
+            "observation":{"source_id":1,"frame_id":9,"captured_at_us":10},
+            "parent_observations":[],
+            "confidence":0.5
         }"#;
-        let decoded: VisualEvidence = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            decoded.validate(),
-            Err(VisualEvidenceError::NonObservedCannotCarryDirectObservation)
-        );
+        assert!(serde_json::from_str::<VisualEvidence>(json).is_err());
     }
 }
