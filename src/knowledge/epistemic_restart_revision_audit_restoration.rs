@@ -15,10 +15,11 @@
 
 use super::belief_mutation_firewall::BeliefMutationReceiptId;
 use super::belief_mutation_seal_wire::BeliefMutationSealWireSnapshotV1;
-use super::belief_revision_receipt::{BeliefRevisionReceiptId, RevisionEvidenceReference};
+use super::belief_revision_receipt::BeliefRevisionReceiptId;
 use super::belief_revision_snapshot::{
     BeliefRevisionDecisionSnapshotV1, BeliefRevisionPolicySchemaV1,
 };
+use super::claim_evidence::{ClaimId, EvidenceId};
 use super::epistemic_restart_historical_firewall_replay::HistoricalFirewallReplayReportV1;
 use super::epistemic_restart_historical_projection::HistoricalEvidenceProjectionV1;
 use super::epistemic_restart_historical_replay_eligibility::HistoricalReplayEligibilityReceiptV1;
@@ -33,7 +34,6 @@ use super::epistemic_restart_trust_checkpoint::VerifiedRestartTrustContextCheckp
 use super::epistemic_restart_validation_receipt::EpistemicRestartValidationReceiptV1;
 use super::epistemic_restart_wire::{WireRevisionBasisV1, WireUncertaintyAssessmentV1};
 use super::epistemic_restart_wire_v2::EpistemicRestartWireSnapshotV2;
-use super::claim_evidence::{ClaimId, EvidenceId};
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt;
@@ -237,6 +237,9 @@ impl ImmutableRevisionAuditRestorationV1 {
             .iter()
             .map(|record| record.source_revision_receipt_id())
             .collect::<HashSet<_>>();
+        if replayed_revision_ids.len() != replay_report.mutation_replays().len() {
+            return Err(ImmutableRevisionAuditRestorationError::DuplicateReplayedSourceRevision);
+        }
         let mutation_by_revision = restart
             .base
             .mutations
@@ -245,6 +248,15 @@ impl ImmutableRevisionAuditRestorationV1 {
             .collect::<HashMap<_, _>>();
         if mutation_by_revision.len() != restart.base.mutations.len() {
             return Err(ImmutableRevisionAuditRestorationError::DuplicateMutationSourceRevision);
+        }
+        if mutation_by_revision.len() != replayed_revision_ids.len()
+            || mutation_by_revision.len() != replay_report.mutation_count()
+        {
+            return Err(ImmutableRevisionAuditRestorationError::ReplayMutationCountMismatch {
+                persisted: mutation_by_revision.len(),
+                replayed: replayed_revision_ids.len(),
+                report: replay_report.mutation_count(),
+            });
         }
 
         let mut records = Vec::with_capacity(restart.base.revisions.len());
@@ -259,13 +271,14 @@ impl ImmutableRevisionAuditRestorationV1 {
             .iter()
             .zip(&restart.revision_schemas.records)
         {
+            let declared_roots = usize::try_from(wire.declared_provenance_root_count)
+                .map_err(|_| ImmutableRevisionAuditRestorationError::LengthOverflow)?;
             if wire.id != schema.receipt_id
                 || wire.claim_id != schema.claim_id
                 || wire.proposed_delta.to_bits() != schema.proposed_delta.to_bits()
                 || wire.evaluated_at_cycle != schema.evaluated_at_cycle
                 || wire.decision_eligible != schema.decision_snapshot.eligible
-                || wire.declared_provenance_root_count as usize
-                    != schema.decision_snapshot.declared_provenance_root_count
+                || declared_roots != schema.decision_snapshot.declared_provenance_root_count
             {
                 return Err(ImmutableRevisionAuditRestorationError::RevisionSchemaMismatch(
                     wire.id.0,
@@ -324,6 +337,16 @@ impl ImmutableRevisionAuditRestorationV1 {
                 historically_reexecuted,
                 restored_from_typed_persistence: true,
                 mutation_authority: false,
+            });
+        }
+
+        if mutation_source_count != mutation_by_revision.len()
+            || historically_reexecuted_count != replayed_revision_ids.len()
+        {
+            return Err(ImmutableRevisionAuditRestorationError::ReplayMutationCountMismatch {
+                persisted: mutation_source_count,
+                replayed: historically_reexecuted_count,
+                report: replay_report.mutation_count(),
             });
         }
 
@@ -555,7 +578,13 @@ pub enum ImmutableRevisionAuditRestorationError {
         maximum: usize,
     },
     RevisionSchemaCountMismatch,
+    DuplicateReplayedSourceRevision,
     DuplicateMutationSourceRevision,
+    ReplayMutationCountMismatch {
+        persisted: usize,
+        replayed: usize,
+        report: usize,
+    },
     RevisionSchemaMismatch(u64),
     MutationSourceNotHistoricallyReexecuted(u64),
     UnexpectedHistoricalReexecution(u64),
