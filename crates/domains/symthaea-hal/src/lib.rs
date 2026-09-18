@@ -15,6 +15,7 @@
 //!   → humanoid ActuationAdapter
 //!   → PhysicalActuationCommand(NormalizedPosition)
 //!   → PCA9685 position-profile admission
+//!   → host-side command lease admission
 //!   → legacy HAL safety/runtime compatibility path
 //!   → ServoOutput::apply()                ← calibration, slew-rate limit
 //!   → Pca9685 boards (I2C → PWM → position servos)
@@ -29,6 +30,11 @@
 //! The typed PCA9685 boundary is explicitly position-actuated. The existing
 //! `HumanoidCommand` runtime path remains a compatibility carrier during the
 //! migration and must not be interpreted as evidence of physical torque control.
+//!
+//! `CommandLeaseGuard` is host-process enforcement only. It rejects expired,
+//! replayed, reordered, overlong, future-issued, or command-mismatched leases,
+//! but it is not an independent deadman because a dead host process cannot poll
+//! its own lease. MCU/drive/watchdog enforcement requires a later layer.
 //!
 //! ## Board Layout
 //!
@@ -74,6 +80,7 @@ pub mod gpio_estop;
 pub mod imu;
 pub mod ina219;
 pub mod interlock;
+pub mod lease;
 pub mod mock;
 pub mod motor_safety;
 pub mod pca9685;
@@ -91,6 +98,9 @@ pub use gpio_estop::{EstopPoller, GpioEstop};
 pub use imu::{ComplementaryFilter, Mpu6050Decoder};
 pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
+pub use lease::{
+    ActuationLeaseV1, CommandLeaseGuard, LeaseAdmission, LeaseEnforcementClass, LeaseRejection,
+};
 pub use motor_safety::MotorSafetyLevel;
 pub use pca9685::Pca9685;
 pub use position_actuation::{
