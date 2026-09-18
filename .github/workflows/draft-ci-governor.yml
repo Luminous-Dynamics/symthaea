@@ -3,6 +3,11 @@ name: Draft CI Governor
 on:
   schedule:
     - cron: '*/15 * * * *'
+  pull_request:
+    paths:
+      - ".github/workflows/draft-ci-governor.yml"
+      - ".github/scripts/draft-ci-ghost-policy.cjs"
+      - ".github/rel/draft-ci-ghost-prequeue-contract.json"
   pull_request_target:
     types: [ready_for_review]
   workflow_dispatch:
@@ -22,11 +27,29 @@ permissions: {}
 
 concurrency:
   # Ready transitions are isolated per PR. Scheduled/manual reconciliations share
-  # one group so two cancellation batches cannot race each other.
-  group: draft-ci-governor-${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || 'reconcile' }}
+  # one group so two cancellation batches cannot race each other. Pull-request
+  # contract tests are isolated by PR and never share write authority.
+  group: draft-ci-governor-${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event_name == 'pull_request' && format('verify-{0}', github.event.pull_request.number) || 'reconcile' }}
   cancel-in-progress: false
 
 jobs:
+  verify-ghost-prequeue-policy:
+    name: Verify ghost-prequeue policy contract
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run executable ghost-prequeue contract
+        shell: bash
+        run: node .github/scripts/draft-ci-ghost-policy.cjs
+
   dispatch-ready-full-ci:
     name: Dispatch full matrix when draft becomes ready
     if: github.event_name == 'pull_request_target'
@@ -95,14 +118,26 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions:
       actions: write
+      contents: read
       pull-requests: read
     runs-on: ubuntu-slim
     timeout-minutes: 15
     steps:
+      - name: Checkout exact governor subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
       - name: Reconcile only draft PR full-CI runs
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
+            const path = require('path');
+            const {
+              isGhostPrequeue,
+            } = require(path.join(
+              process.env.GITHUB_WORKSPACE,
+              '.github/scripts/draft-ci-ghost-policy.cjs',
+            ));
+
             const { owner, repo } = context.repo;
             const fullName = `${owner}/${repo}`;
             const scheduled = context.eventName === 'schedule';
@@ -225,7 +260,6 @@ jobs:
             let ghostForceConflicts = 0;
             let rateLimited = false;
             const unresolvedGhosts = [];
-            const ghostMinAgeMs = 30 * 60 * 1000;
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
             runLoop:
@@ -261,9 +295,8 @@ jobs:
                   // GitHub can expose a contradictory control-plane state where a
                   // run is reported as queued but cancellation says it has not been
                   // queued yet. Do not immediately force-cancel: first require a
-                  // fresh queued state, zero instantiated jobs, and >=30 minutes
-                  // without any run metadata update. This excludes normal brief
-                  // pre-provisioning windows and protects real queued work.
+                  // fresh queued state, zero instantiated jobs, and the minimum
+                  // stale windows frozen in the executable policy module.
                   const { data: freshRun } = await github.rest.actions.getWorkflowRun({
                     owner,
                     repo,
@@ -279,13 +312,16 @@ jobs:
                     },
                   );
                   const jobCount = jobsResponse.data.total_count;
-                  const ageMs = Date.now() - Date.parse(freshRun.created_at);
-                  const sinceUpdateMs = Date.now() - Date.parse(freshRun.updated_at);
-                  const ghostPrequeue =
-                    freshRun.status === 'queued' &&
-                    jobCount === 0 &&
-                    ageMs >= ghostMinAgeMs &&
-                    sinceUpdateMs >= ghostMinAgeMs;
+                  const nowMs = Date.now();
+                  const ageMs = nowMs - Date.parse(freshRun.created_at);
+                  const sinceUpdateMs = nowMs - Date.parse(freshRun.updated_at);
+                  const ghostPrequeue = isGhostPrequeue({
+                    status: freshRun.status,
+                    jobCount,
+                    createdAt: freshRun.created_at,
+                    updatedAt: freshRun.updated_at,
+                    nowMs,
+                  });
 
                   if (!ghostPrequeue) {
                     nonGhostConflicts += 1;
