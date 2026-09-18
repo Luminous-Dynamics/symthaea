@@ -28,6 +28,7 @@ pub mod ipc_adapter;
 pub mod ipc_client;
 pub mod ipc_connection;
 pub mod ipc_duplex;
+pub mod ipc_request_bridge;
 pub mod ipc_server;
 pub mod keybindings;
 pub mod notifications;
@@ -84,6 +85,7 @@ pub use ipc_client::{
 };
 pub use ipc_connection::{DuplexShellConnection, LEGACY_IPC_PROTOCOL_VERSION};
 pub use ipc_duplex::LegacyDuplexPump;
+pub use ipc_request_bridge::send_shell_request;
 pub use ipc_server::{
     CommandExecutor, ExecutionResult, IpcServer, IpcServerConfig, MetricsProvider,
     StubCommandExecutor, StubMetricsProvider, ValidationResult,
