@@ -1,0 +1,84 @@
+{
+  "schema": "symthaea.rel.qualification-assembly-contract.v1",
+  "authority": "QualificationAssemblyContractOnly",
+  "relation": "REL-005A",
+  "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+  "projection_contract_head": "07af7c4bdfdda377aa8175efe7a3233ce90e889e",
+  "projection_contract_run_id": 35324485955,
+  "comparison_subject_head": "9ed033eb5ad63baa90d9c25166ce9c14e68013cb",
+  "comparison_run_id": 35324217302,
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "observation_seal_head": "0a94ed976926fbdcd6b752f94e174df21f915fc8",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+  "required_predicate_count": 41,
+  "allowed_comparison_results": [
+    "ALL_PREDICATES_PASS",
+    "PREDICATE_FAILURES"
+  ],
+  "selected_comparison_result": null,
+  "future_source_binding_required_fields": {
+    "comparison": [
+      "subject_head",
+      "source_run_id",
+      "source_job_id",
+      "artifact_id",
+      "artifact_name",
+      "artifact_digest"
+    ],
+    "projection_contract": [
+      "subject_head",
+      "source_run_id",
+      "source_job_id",
+      "artifact_id",
+      "artifact_name",
+      "artifact_digest"
+    ]
+  },
+  "assembly_topology": [
+    {
+      "stage": "EvidenceProjectionOnly",
+      "may_read_detailed_comparison": true,
+      "may_read_raw_observation": false,
+      "may_issue_qualification": false,
+      "must_validate_exact_source_metadata_before_projection": true
+    },
+    {
+      "stage": "artifact_boundary",
+      "required_files": [
+        "predicate-contract-receipt.json",
+        "execution-v3-receipt.json",
+        "observation-seal-v3.json",
+        "comparison-only-qualification-receipt.json",
+        "qualification-input-manifest.json",
+        "qualification-assembly-receipt.json"
+      ],
+      "forbidden_content_classes": [
+        "raw observation JSON",
+        "execution stdout/stderr",
+        "detailed predicate array",
+        "individual observed values",
+        "individual expected values",
+        "scientific threshold table"
+      ]
+    },
+    {
+      "stage": "QualificationOnly",
+      "fresh_job_required": true,
+      "may_download_detailed_comparison_artifact": false,
+      "may_download_execution_artifact": false,
+      "may_download_projection_contract_artifact": false,
+      "may_read_only_sanitized_assembly_artifact": true
+    }
+  ],
+  "qualification_mapping_source": "rel-005a-qualification-only-contract.json",
+  "claims": {
+    "projection_performed": false,
+    "comparison_only_adjudicated": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
