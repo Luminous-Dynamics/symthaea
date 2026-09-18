@@ -1,0 +1,33 @@
+name: VIS-004C Belief Revision Ledger
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-vision-manifold/src/belief_revision.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/competing_beliefs.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/entity_identity.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/lib.rs'
+      - 'docs/architecture/VISUAL_BELIEF_REVISION_LEDGER_V1.md'
+      - '.github/workflows/vis-004c-belief-revision.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check belief revision ledger
+        run: cargo check -p symthaea-vision-manifold --all-targets
+      - name: Test belief revision ledger
+        run: cargo test -p symthaea-vision-manifold belief_revision
+      - name: Clippy belief revision ledger
+        run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings

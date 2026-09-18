@@ -29,6 +29,7 @@
 //! - **TemporalPredictor**: Implements the shared trait for cross-domain integration.
 
 pub mod attention;
+pub mod belief_revision;
 pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
@@ -46,6 +47,10 @@ pub mod types;
 mod epistemic_tests;
 
 pub use attention::SurpriseMap;
+pub use belief_revision::{
+    BeliefRevision, BeliefRevisionError, BeliefRevisionLedger, BeliefRevisionOperation,
+    VisualBeliefSnapshot,
+};
 pub use bridge::{
     CROSS_MANIFOLD_PREDICTOR_STATE_SCHEMA_VERSION, CognitiveGoalSignal, CognitiveGoalSignalState,
     CrossManifoldPredictor, CrossManifoldPredictorState, VISION_BRIDGE_STATE_SCHEMA_VERSION,
