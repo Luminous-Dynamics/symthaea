@@ -1,4 +1,0 @@
-schema=symthaea.ci.draft-governor-candidate.v1
-base_sha=a4168072a9cd29fafbb99928c33005ee4ba8d924
-candidate_parent=18c1485da0b9e1ceddbff33a17466f2df33f7a92
-purpose=draft-pr-full-ci-runner-demand-elimination
