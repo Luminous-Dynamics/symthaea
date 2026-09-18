@@ -36,7 +36,9 @@ pub mod encoder;
 pub mod epistemic;
 pub mod manifold;
 pub mod predictive;
+pub mod spatial_evidence;
 pub mod spectrum;
+pub mod stereo_disparity_evidence;
 pub mod training;
 pub mod types;
 
@@ -100,9 +102,17 @@ pub use manifold::{
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
 };
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
+pub use spatial_evidence::{
+    CameraBearingEvidence, CameraOpticalFrameRef, ImageFrameRef, ImagePlaneKind, ImagePlaneRef,
+    ImagePointEvidence, PatchGridCellRef, PatchRelativeDepthEvidence, RelativeDepthSource,
+    SpatialEvidenceError,
+};
 pub use spectrum::{
     BandProbeEvidence, BandProbeScore, MultiSpectralEncoder, MultiSpectralEncoderState,
     MultiSpectralFrame, SpectralBandEncoderState, SpectralLayer, SpectrumBand,
+};
+pub use stereo_disparity_evidence::{
+    PatchStereoDisparityEvidence, StereoDisparityEvidenceError,
 };
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{

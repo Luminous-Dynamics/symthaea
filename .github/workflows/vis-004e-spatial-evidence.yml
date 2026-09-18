@@ -1,0 +1,34 @@
+name: VIS-004E Visual Spatial Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-vision-manifold/src/spatial_evidence.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/stereo_disparity_evidence.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/lib.rs'
+      - 'docs/architecture/VISUAL_SPATIAL_EVIDENCE_V1.md'
+      - '.github/workflows/vis-004e-spatial-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check visual spatial evidence
+        run: cargo check -p symthaea-vision-manifold --all-targets
+      - name: Test spatial frame contract
+        run: cargo test -p symthaea-vision-manifold spatial_evidence
+      - name: Test stereo disparity contract
+        run: cargo test -p symthaea-vision-manifold stereo_disparity_evidence
+      - name: Clippy visual spatial evidence
+        run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings
