@@ -19,6 +19,7 @@
 
 pub mod claims;
 pub mod inference;
+pub mod inference_v2;
 pub mod inference_wire;
 pub mod nosology;
 pub mod rdoc;
@@ -38,6 +39,11 @@ pub use inference::{
     ClinicalInferenceEnvelopeError, ClinicalInferenceEnvelopeV1, ClinicalModelIdentityV1,
     ClinicalSubjectBindingV1, ClinicalUncertaintyV1, MissingClinicalEvidenceV1,
     MissingEvidenceCriticalityV1,
+};
+pub use inference_v2::{
+    CLINICAL_EVIDENCE_IDENTITY_V2_VERSION, CLINICAL_INFERENCE_ENVELOPE_V2_VERSION,
+    ClinicalEvidenceIdentityV2, ClinicalEvidenceRefV2, ClinicalExecutionIdentityV2,
+    ClinicalInferenceEnvelopeV2, ClinicalInferenceEnvelopeV2Error, ClinicalSubjectBindingV2,
 };
 pub use inference_wire::{
     CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION, ClinicalInferenceWireError,
