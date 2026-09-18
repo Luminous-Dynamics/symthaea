@@ -18,6 +18,8 @@ pub mod trust_checkpoint_currentness;
 pub mod activation_review_eligibility;
 #[path = "epistemic_restart_activation_transaction_contract.rs"]
 pub mod activation_transaction_contract;
+#[path = "epistemic_restart_revision_authority_contract.rs"]
+pub mod revision_authority_contract;
 
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
