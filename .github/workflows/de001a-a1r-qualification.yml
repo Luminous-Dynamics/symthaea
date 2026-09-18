@@ -1,0 +1,216 @@
+name: DE-001A1 Rust Fixed-Point Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-cosmology-research/**"
+      - ".github/workflows/de001a-a1r-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: de001a-a1r-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: A1R exact-head qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
+      EVIDENCE_DIR: ${{ runner.temp }}/de001a-a1r-evidence
+      A0_LINK: ${{ runner.temp }}/de001a-a0-artifacts
+
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind subject identity
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$EXPECTED_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          mkdir -p "$EVIDENCE_DIR"
+          printf '%s\n' "$head" > "$EVIDENCE_DIR/subject-head.txt"
+          printf '%s\n' "$tree" > "$EVIDENCE_DIR/subject-tree.txt"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3
+        with:
+          extra_nix_config: |
+            sandbox = true
+
+      - name: Qualify and build Rust subject
+        id: software
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bins --release --locked
+
+          for binary in \
+            de001a-a0-verify \
+            de001a-a1p-point-bind \
+            de001a-a1r-oracle \
+            de001a-a1n-convergence
+          do
+            test -x "target/release/$binary"
+            sha256sum "target/release/$binary" > "$EVIDENCE_DIR/$binary.sha256"
+          done
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+
+      - name: Realize frozen A0 artifacts
+        id: artifacts
+        if: steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAKE=./crates/domains/symthaea-cosmology-research/nix
+          nix build "$FLAKE#checks.x86_64-linux.a0-artifacts" --no-update-lock-file --no-link
+          nix build "$FLAKE#a0-artifacts" --no-update-lock-file --out-link "$A0_LINK"
+          store_path="$(realpath "$A0_LINK")"
+          nar_hash="$(nix path-info --nar-hash "$store_path" | awk '{print $2}')"
+          closure_size="$(nix path-info -S "$store_path" | awk '{print $2}')"
+          printf '%s\n' "$store_path" > "$EVIDENCE_DIR/a0-store-path.txt"
+          printf '%s\n' "$nar_hash" > "$EVIDENCE_DIR/a0-nar-hash.txt"
+          printf '%s\n' "$closure_size" > "$EVIDENCE_DIR/a0-closure-size.txt"
+
+      - name: Execute A0 → A1P → A1R → A1N
+        id: chain
+        if: steps.software.outcome == 'success' && steps.artifacts.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          crates/domains/symthaea-cosmology-research/scripts/qualify_a1r.sh \
+            "$A0_LINK" "$EVIDENCE_DIR"
+          code=$?
+          set -e
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit "$code"
+
+      - name: Postflight immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write qualification capsule
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+
+          hash_or_unavailable() {
+            if [[ -f "$1" ]]; then
+              sha256sum "$1" | awk '{print $1}'
+            else
+              printf '%s' 'UNAVAILABLE'
+            fi
+          }
+          text_or_unavailable() {
+            if [[ -f "$1" ]]; then
+              tr -d '\n' < "$1"
+            else
+              printf '%s' 'UNAVAILABLE'
+            fi
+          }
+
+          cat > "$EVIDENCE_DIR/qualification-capsule.json" <<EOF
+          {
+            "protocol": "DE-001A1R-QUALIFICATION-CAPSULE-v1",
+            "scientific_claim": "NONE",
+            "authority": "fixed-point-reproduction-qualification-only",
+            "subject_head": "${{ steps.subject.outputs.head }}",
+            "subject_tree": "${{ steps.subject.outputs.tree }}",
+            "base": "$EXPECTED_BASE",
+            "rust": "1.96.0",
+            "nixpkgs_revision": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+            "action_commits": {
+              "checkout": "11bd71901bbe5b1630ceea73d27597364c9af683",
+              "rust_toolchain": "ebb3d1676050bfd0971c36c1e215b5751473994d",
+              "install_nix": "8aa03977d8d733052d78f4e008a241fd1dbf36b3",
+              "upload_artifact": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+            },
+            "workflow": {
+              "run_id": "${GITHUB_RUN_ID}",
+              "attempt": "${GITHUB_RUN_ATTEMPT}",
+              "software_outcome": "${{ steps.software.outcome }}",
+              "artifact_outcome": "${{ steps.artifacts.outcome }}",
+              "chain_outcome": "${{ steps.chain.outcome }}",
+              "chain_exit_code": "${{ steps.chain.outputs.exit_code }}",
+              "postflight_outcome": "${{ steps.postflight.outcome }}"
+            },
+            "cargo_lock_sha256": "$(hash_or_unavailable Cargo.lock)",
+            "binary_sha256": {
+              "a0": "$(hash_or_unavailable target/release/de001a-a0-verify)",
+              "a1p": "$(hash_or_unavailable target/release/de001a-a1p-point-bind)",
+              "a1r": "$(hash_or_unavailable target/release/de001a-a1r-oracle)",
+              "a1n": "$(hash_or_unavailable target/release/de001a-a1n-convergence)"
+            },
+            "a0_artifact_store": {
+              "path": "$(text_or_unavailable "$EVIDENCE_DIR/a0-store-path.txt")",
+              "nar_hash": "$(text_or_unavailable "$EVIDENCE_DIR/a0-nar-hash.txt")",
+              "closure_size": "$(text_or_unavailable "$EVIDENCE_DIR/a0-closure-size.txt")"
+            },
+            "receipt_sha256": {
+              "a0": "$(hash_or_unavailable "$EVIDENCE_DIR/a0.json")",
+              "a1p": "$(hash_or_unavailable "$EVIDENCE_DIR/a1p.json")",
+              "a1r_primary": "$(hash_or_unavailable "$EVIDENCE_DIR/a1r-primary.json")",
+              "a1r_refined": "$(hash_or_unavailable "$EVIDENCE_DIR/a1r-refined.json")",
+              "a1n": "$(hash_or_unavailable "$EVIDENCE_DIR/a1n.json")"
+            }
+          }
+          EOF
+          cat "$EVIDENCE_DIR/qualification-capsule.json"
+
+      - name: Upload evidence capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a1r-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a1r-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce qualification verdict
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.artifacts.outcome }}" = "success"
+          test "${{ steps.chain.outcome }}" = "success"
+          test "${{ steps.chain.outputs.exit_code }}" = "0"
+          test "${{ steps.postflight.outcome }}" = "success"
