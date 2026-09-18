@@ -1,0 +1,121 @@
+name: SYM-RSI Focused Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "src/consciousness/recursive_improvement/**"
+      - "src/consciousness/mod.rs"
+      - "src/lib.rs"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain*"
+      - "scripts/check-sym-rsi-test-measurement-boundary.py"
+      - ".github/workflows/sym-rsi-focused-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-rsi-focused-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  qualify-rsi:
+    name: Exact-head RSI compile, lint, and unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact-head checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'requested_subject=%s\ncheckout_subject=%s\n' "$SUBJECT_SHA" "$actual"
+          test "$actual" = "$SUBJECT_SHA"
+
+      - name: Install pinned Rust qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Install root-package system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
+            libasound2-dev \
+            libdbus-1-dev
+
+      - name: Self-test protected-measurement boundary scanner
+        shell: bash
+        run: python3 scripts/check-sym-rsi-test-measurement-boundary.py --self-test
+
+      - name: Prove unit tests cannot directly consume sealed partitions
+        shell: bash
+        run: python3 scripts/check-sym-rsi-test-measurement-boundary.py
+
+      - name: Check root-package formatting
+        shell: bash
+        run: cargo fmt --check -p symthaea
+
+      - name: Compile root library and all inline unit tests
+        shell: bash
+        run: cargo test -p symthaea --lib --no-run
+
+      - name: Clippy root library with warnings denied
+        shell: bash
+        run: cargo clippy -p symthaea --lib -- -D warnings
+
+      - name: Run recursive-improvement unit tests only
+        shell: bash
+        run: cargo test -p symthaea --lib recursive_improvement -- --test-threads=1
+
+      - name: Record exact-head qualification receipt
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          source_digest="$({
+            find src/consciousness/recursive_improvement -maxdepth 1 -type f -name '*.rs' -print0
+            printf '%s\0' scripts/check-sym-rsi-test-measurement-boundary.py
+          } | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
+          rustc_version="$(rustc --version)"
+          cargo_version="$(cargo --version)"
+          {
+            echo "schema=symthaea.sym-rsi.focused-qualification.v1"
+            echo "subject_sha=${actual}"
+            echo "rsi_source_set_sha256=${source_digest}"
+            echo "rustc=${rustc_version}"
+            echo "cargo=${cargo_version}"
+            echo "format_scope=package:symthaea"
+            echo "compile_scope=cargo-test-p-symthaea-lib-no-run"
+            echo "clippy_scope=package:symthaea-lib-default-features-D-warnings"
+            echo "test_scope=lib-name-filter:recursive_improvement;threads=1"
+            echo "protected_measurement_test_boundary=pass"
+            echo "full_workspace_qualification=false"
+            echo "full_feature_matrix_qualification=false"
+          } | tee sym-rsi-focused-qualification-receipt.txt
+          {
+            echo '### SYM-RSI focused qualification'
+            echo '```text'
+            cat sym-rsi-focused-qualification-receipt.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
