@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   generate-and-compare-lock:
-    name: Reconcile and compare Cargo.lock
+    name: Reconcile lock and qualify math-research crate
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -42,6 +42,10 @@ jobs:
           git rev-parse HEAD | tee math-lock-evidence/head-sha.txt
           git rev-parse HEAD^ | tee math-lock-evidence/parent-sha.txt
           sha256sum Cargo.lock rust-toolchain.toml flake.nix flake.lock | tee math-lock-evidence/input-sha256.txt
+          find crates/core/symthaea-math-research -type f -print0 \
+            | sort -z \
+            | xargs -0 sha256sum \
+            | tee math-lock-evidence/math-research-source-sha256.txt
           rustc --version --verbose | tee math-lock-evidence/rustc-version.txt
           cargo --version --verbose | tee math-lock-evidence/cargo-version.txt
           nix --version | tee math-lock-evidence/nix-version.txt
@@ -52,9 +56,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Start from the existing lock. Ordinary metadata resolution may add only
-          # what the new workspace member requires; unlike generate-lockfile it
-          # does not intentionally discard the existing resolution.
+          # Preserve the existing resolution. Ordinary metadata resolution may add
+          # only what the new workspace member requires; unlike generate-lockfile
+          # it does not intentionally discard the existing lock resolution.
           cargo metadata --format-version 1 > math-lock-evidence/metadata.rustup.unlocked.json
           cargo metadata --format-version 1 --locked > math-lock-evidence/metadata.rustup.locked.json
           cmp math-lock-evidence/metadata.rustup.unlocked.json math-lock-evidence/metadata.rustup.locked.json
@@ -85,16 +89,18 @@ jobs:
           set -euo pipefail
           cmp math-lock-evidence/Cargo.lock.rustup math-lock-evidence/Cargo.lock.nix
           cmp math-lock-evidence/metadata.rustup.locked.json math-lock-evidence/metadata.nix.locked.json
+          grep -Fx 'release: 1.96.0' math-lock-evidence/rustc-version.txt
+          grep -Fx 'release: 1.96.0' math-lock-evidence/rustc-version.nix.txt
+          grep -E '^cargo 1\.96\.0 ' math-lock-evidence/cargo-version.txt
+          grep -E '^cargo 1\.96\.0 ' math-lock-evidence/cargo-version.nix.txt
 
           python3 - <<'PY'
           import json
           import tomllib
           from pathlib import Path
 
-          before_path = Path('math-lock-evidence/Cargo.lock.before')
-          after_path = Path('math-lock-evidence/Cargo.lock.nix')
-          before = tomllib.loads(before_path.read_text())
-          after = tomllib.loads(after_path.read_text())
+          before = tomllib.loads(Path('math-lock-evidence/Cargo.lock.before').read_text())
+          after = tomllib.loads(Path('math-lock-evidence/Cargo.lock.nix').read_text())
 
           def keyed(lock):
               out = {}
@@ -152,7 +158,33 @@ jobs:
           git diff --name-only | tee math-lock-evidence/generated-diff-files.txt
           test "$(cat math-lock-evidence/generated-diff-files.txt)" = "Cargo.lock"
 
-      - name: Upload lock qualification evidence
+      - name: Qualify exact crate bytes with pinned Rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --check -p symthaea-math-research 2>&1 \
+            | tee math-lock-evidence/rustup-fmt.log
+          cargo test -p symthaea-math-research --locked 2>&1 \
+            | tee math-lock-evidence/rustup-test.log
+          cargo clippy -p symthaea-math-research --all-targets --locked -- -D warnings 2>&1 \
+            | tee math-lock-evidence/rustup-clippy.log
+
+      - name: Independently qualify exact crate bytes inside Nix
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop --command bash -lc '
+            set -euo pipefail
+            set -o pipefail
+            cargo fmt --check -p symthaea-math-research 2>&1 \
+              | tee math-lock-evidence/nix-fmt.log
+            cargo test -p symthaea-math-research --locked 2>&1 \
+              | tee math-lock-evidence/nix-test.log
+            cargo clippy -p symthaea-math-research --all-targets --locked -- -D warnings 2>&1 \
+              | tee math-lock-evidence/nix-clippy.log
+          '
+
+      - name: Upload lock and crate qualification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
