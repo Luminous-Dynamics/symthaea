@@ -1,0 +1,120 @@
+name: HUM-WRENCH-001B Surface Wrench Feasibility
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/contact_patch.rs"
+      - "crates/domains/symthaea-humanoid/src/contact_wrench.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/hum-wrench-001b-surface-wrench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001b-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 29e632fd47849f49386efb5541c26561868be03b
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-surface-wrench-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact head, parent, and workflow-only qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001b-surface-wrench.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen humanoid source and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked compile
+        run: cargo check -p symthaea-humanoid --all-targets --locked
+
+      - name: Focused geometry and wrench tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-humanoid contact_patch --locked -- --nocapture
+          cargo test -p symthaea-humanoid contact_wrench --locked -- --nocapture
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --locked -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001b-evidence
+          {
+            echo "program=HUM-WRENCH-001B"
+            echo "authority=surface-wrench-source-qualification-only"
+            echo "interaction_evidence_model=SEPARATE_FROM_GEOMETRY"
+            echo "qp_authority=NONE"
+            echo "physical_claim=NONE"
+            echo "hardware_measurement_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile=PASS"
+            echo "focused_tests=PASS"
+            echo "clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001b-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001b-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001b-evidence/
+          if-no-files-found: error
