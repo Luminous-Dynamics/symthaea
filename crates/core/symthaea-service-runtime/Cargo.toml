@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-service-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Typed service command, activity, and snapshot contracts for the Symthaea runtime owner"
+
+[dependencies]
+symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
