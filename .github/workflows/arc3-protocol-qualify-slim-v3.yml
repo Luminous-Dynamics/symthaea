@@ -1,0 +1,197 @@
+name: ARC3 Protocol Qualification Slim V3
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arc3-protocol-qualify-slim-v3.yml'
+      - '.github/arc3/protocol-qualification-subject.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arc3-protocol-qualify-slim-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  full-exact-head:
+    name: ARC3 protocol full exact-head qualification
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate recipe
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: helper
+
+      - name: Validate helper and exact subject binding
+        id: bind
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C helper status --porcelain=v1 --untracked-files=no)"
+
+          python3 - <<'PY'
+          from hashlib import sha256
+          from pathlib import Path
+          import os
+          import re
+          import sys
+
+          path = Path('helper/.github/arc3/protocol-qualification-subject.txt')
+          raw = path.read_bytes()
+          if re.fullmatch(rb'[0-9a-f]{40}\n?', raw) is None:
+              print('ARC3 protocol subject binding must be exactly 40 lowercase hex bytes plus at most one final LF', file=sys.stderr)
+              sys.exit(1)
+
+          subject = raw[:-1] if raw.endswith(b'\n') else raw
+          digest = sha256(raw).hexdigest()
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as out:
+              out.write(f'subject_sha={subject.decode()}\n')
+              out.write(f'subject_binding_sha256={digest}\n')
+          print(f'ARC3 protocol subject: {subject.decode()}')
+          print(f'ARC3 subject-binding SHA-256: {digest}')
+          PY
+
+      - name: Checkout exact product subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.bind.outputs.subject_sha }}
+          path: subject
+
+      - name: Bind exact product and record preflight identity
+        shell: bash
+        env:
+          SUBJECT_SHA: ${{ steps.bind.outputs.subject_sha }}
+          SUBJECT_BINDING_SHA256: ${{ steps.bind.outputs.subject_binding_sha256 }}
+        run: |
+          set -euo pipefail
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git -C subject status --porcelain=v1 --untracked-files=no)"
+          printf 'subject_sha=%s\n' "$SUBJECT_SHA"
+          printf 'subject_tree=%s\n' "$(git -C subject rev-parse HEAD^{tree})"
+          printf 'subject_binding_sha256=%s\n' "$SUBJECT_BINDING_SHA256"
+          printf 'cargo_lock_sha256=' && sha256sum subject/Cargo.lock | awk '{print $1}'
+
+      - name: Independent protocol oracle precheck
+        working-directory: subject
+        run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: 1.96.0
+          components: rustfmt,clippy
+
+      - name: Record Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose
+          cargo --version --verbose
+          rustfmt --version
+          cargo clippy --version
+          python3 --version
+
+      - name: Require exact committed Cargo.lock resolution
+        working-directory: subject
+        run: cargo check --locked -p symthaea-arc3-protocol
+
+      - name: Check affected formatting
+        working-directory: subject
+        run: cargo fmt -p symthaea-arc3-protocol -p symthaea-psych-bench -- --check
+
+      - name: Test protocol crate
+        working-directory: subject
+        run: cargo test --locked -p symthaea-arc3-protocol
+
+      - name: Strict Clippy protocol crate
+        working-directory: subject
+        run: cargo clippy --locked -p symthaea-arc3-protocol --all-targets -- -D warnings
+
+      - name: Check psych-bench integration
+        working-directory: subject
+        run: cargo check --locked -p symthaea-psych-bench
+
+      - name: Test psych-bench compatibility namespace
+        working-directory: subject
+        run: cargo test --locked -p symthaea-psych-bench --lib
+
+      - name: Independent protocol oracle postcheck
+        working-directory: subject
+        run: python3 scripts/arc3_protocol_oracle.py
+
+      - name: Verify helper and subject immutability
+        if: always()
+        shell: bash
+        env:
+          SUBJECT_SHA: ${{ steps.bind.outputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C helper rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test -z "$(git -C helper status --porcelain=v1 --untracked-files=no)"
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git -C subject status --porcelain=v1 --untracked-files=no)"
+
+      - name: Emit candidate qualification provenance
+        if: success()
+        shell: bash
+        env:
+          SUBJECT_SHA: ${{ steps.bind.outputs.subject_sha }}
+          SUBJECT_BINDING_SHA256: ${{ steps.bind.outputs.subject_binding_sha256 }}
+        run: |
+          set -euo pipefail
+          helper_sha="$(git -C helper rev-parse HEAD)"
+          helper_tree="$(git -C helper rev-parse HEAD^{tree})"
+          workflow_blob="$(git -C helper rev-parse HEAD:.github/workflows/arc3-protocol-qualify-slim-v3.yml)"
+          subject_tree="$(git -C subject rev-parse HEAD^{tree})"
+          lock_sha256="$(sha256sum subject/Cargo.lock | awk '{print $1}')"
+          oracle_sha256="$(sha256sum subject/scripts/arc3_protocol_oracle.py | awk '{print $1}')"
+          fixture_sha256="$(sha256sum subject/docs/arc-agi-3/fixtures/protocol-v1-observation.json | awk '{print $1}')"
+          vector_sha256="$(sha256sum subject/docs/arc-agi-3/fixtures/protocol-v1-observation.hex | awk '{print $1}')"
+
+          cat <<EOF
+          schema=symthaea.arc3.protocol.hosted-slim-v3.candidate.v1
+          result=CANDIDATE_PASS
+          repository=$GITHUB_REPOSITORY
+          run_id=$GITHUB_RUN_ID
+          run_attempt=$GITHUB_RUN_ATTEMPT
+          helper_sha=$helper_sha
+          helper_tree=$helper_tree
+          workflow_blob=$workflow_blob
+          subject_sha=$SUBJECT_SHA
+          subject_tree=$subject_tree
+          subject_binding_sha256=$SUBJECT_BINDING_SHA256
+          cargo_lock_sha256=$lock_sha256
+          oracle_sha256=$oracle_sha256
+          fixture_sha256=$fixture_sha256
+          vector_sha256=$vector_sha256
+          runner_class=ubuntu-slim
+          oracle_precheck=PASS
+          locked_protocol_check=PASS
+          affected_format=PASS
+          protocol_tests=PASS
+          protocol_strict_clippy=PASS
+          psych_bench_locked_check=PASS
+          psych_bench_lib_tests=PASS
+          oracle_postcheck=PASS
+          helper_immutable=PASS
+          subject_immutable=PASS
+          EOF
+
+          {
+            echo '## ARC3 hosted-slim-v3 candidate qualification: PASS'
+            echo
+            echo "- Subject: \`$SUBJECT_SHA\`"
+            echo "- Subject tree: \`$subject_tree\`"
+            echo "- Recipe head: \`$helper_sha\`"
+            echo "- Workflow blob: \`$workflow_blob\`"
+            echo "- Cargo.lock SHA-256: \`$lock_sha256\`"
+            echo
+            echo 'Candidate evidence only. Trusted ARC3-001 still requires ARC3-QUAL-001 recipe admission.'
+          } >> "$GITHUB_STEP_SUMMARY"
