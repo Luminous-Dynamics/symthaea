@@ -1,0 +1,127 @@
+name: ASSURE Policy Manifest Rust 1.96 Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/qualification/assure-policy-manifest-rust196-qualify.sh'
+      - '.github/workflows/assure-policy-manifest-rust196.yml'
+      - 'crates/domains/symthaea-assurance-policy-manifest/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assure-policy-manifest-rust196-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  PRODUCT_HEAD: 84afa68c9391c2dff99ec5373adf01b480c99806
+  PRODUCT_PARENT: 6de8ddb67b491c30e2147728d2db52f39e7bdf9b
+  PACKAGE: symthaea-assurance-policy-manifest
+  MANIFEST_PATH: crates/domains/symthaea-assurance-policy-manifest/Cargo.toml
+  PRODUCT_PATH: crates/domains/symthaea-assurance-policy-manifest/src/lib.rs
+  EXPECTED_BLOB: d7df11f2c00381989d4fc57c9926dbef11d92884
+  QUALIFIER_PATH: .github/qualification/assure-policy-manifest-rust196-qualify.sh
+  WORKFLOW_PATH: .github/workflows/assure-policy-manifest-rust196.yml
+  QUALIFIER_BLOB: f51dcf621db2101d8221553deaa070ef2fd43258
+
+jobs:
+  qualify:
+    name: Exact-head policy-manifest Rust 1.96
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Bind exact subject and freeze preflight state
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_HEAD"
+          test "$(git rev-parse "$PRODUCT_HEAD^")" = "$PRODUCT_PARENT"
+          test "$(git rev-parse "HEAD:$QUALIFIER_PATH")" = "$QUALIFIER_BLOB"
+          test "$(git rev-parse "$PRODUCT_HEAD:$PRODUCT_PATH")" = "$EXPECTED_BLOB"
+          git rev-parse HEAD > "$RUNNER_TEMP/pre-head"
+          git rev-parse 'HEAD^{tree}' > "$RUNNER_TEMP/pre-tree"
+          sha256sum Cargo.lock | awk '{print $1}' > "$RUNNER_TEMP/pre-lock"
+          {
+            echo 'schema=symthaea.assurance.policy-manifest-rust196.v1'
+            echo 'qualification_result=NOT_ESTABLISHED'
+            echo 'authority=QualificationPending'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse 'HEAD^{tree}')"
+            echo "product_head=$PRODUCT_HEAD"
+            echo "product_parent=$PRODUCT_PARENT"
+            echo "product_blob=$EXPECTED_BLOB"
+            echo "product_sha256=$(git show "$PRODUCT_HEAD:$PRODUCT_PATH" | sha256sum | awk '{print $1}')"
+            echo "qualifier_blob=$QUALIFIER_BLOB"
+            echo "workflow_blob=$(git rev-parse "HEAD:$WORKFLOW_PATH")"
+            echo "source_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+          } > "$RUNNER_TEMP/assure-policy-manifest-rust196-outer-receipt.txt"
+
+      - name: Execute exact product qualification
+        shell: bash
+        run: bash "$QUALIFIER_PATH" 2>&1 | tee "$RUNNER_TEMP/assure-policy-manifest-rust196-contract.log"
+
+      - name: Prove immutable postflight
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(cat "$RUNNER_TEMP/pre-head")"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat "$RUNNER_TEMP/pre-tree")"
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = "$(cat "$RUNNER_TEMP/pre-lock")"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          echo 'postflight_immutable=PASS' >> "$RUNNER_TEMP/assure-policy-manifest-rust196-outer-receipt.txt"
+
+      - name: Finalize exact-head PASS
+        shell: bash
+        run: |
+          set -euo pipefail
+          outcome="$RUNNER_TEMP/assure-rust196-single-package/contract-outcome.txt"
+          test -f "$outcome"
+          grep -Fx 'contract_result=PASS' "$outcome"
+          grep -Fx 'qualification_result=PENDING_POSTFLIGHT' "$outcome"
+          grep -Fx 'authority=ContractPassedPendingPostflight' "$outcome"
+          grep -Fx 'postflight_immutable=PASS' "$RUNNER_TEMP/assure-policy-manifest-rust196-outer-receipt.txt"
+          echo 'qualification_result=PASS' >> "$RUNNER_TEMP/assure-policy-manifest-rust196-outer-receipt.txt"
+          echo 'authority=QualifiedExactHead' >> "$RUNNER_TEMP/assure-policy-manifest-rust196-outer-receipt.txt"
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-policy-manifest-rust196-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ runner.temp }}/assure-policy-manifest-rust196-outer-receipt.txt
+            ${{ runner.temp }}/assure-policy-manifest-rust196-contract.log
+            ${{ runner.temp }}/pre-head
+            ${{ runner.temp }}/pre-tree
+            ${{ runner.temp }}/pre-lock
+            ${{ runner.temp }}/assure-rust196-single-package/contract-outcome.txt
+            ${{ runner.temp }}/assure-rust196-single-package/rustc-version.txt
+            ${{ runner.temp }}/assure-rust196-single-package/cargo-version.txt
+            ${{ runner.temp }}/assure-rust196-single-package/metadata.json
+            ${{ runner.temp }}/assure-rust196-single-package/local-closure.tsv
+            ${{ runner.temp }}/assure-rust196-single-package/check.log
+            ${{ runner.temp }}/assure-rust196-single-package/test-list.txt
+            ${{ runner.temp }}/assure-rust196-single-package/test.log
+            ${{ runner.temp }}/assure-rust196-single-package/clippy.log
+            ${{ env.QUALIFIER_PATH }}
+            ${{ env.WORKFLOW_PATH }}
+          if-no-files-found: ignore
+          retention-days: 90
