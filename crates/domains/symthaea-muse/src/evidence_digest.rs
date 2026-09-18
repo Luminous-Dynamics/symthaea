@@ -6,6 +6,8 @@
 pub mod intervention_effect_evidence;
 #[path = "intervention_effect_panel.rs"]
 pub mod intervention_effect_panel;
+#[path = "rendered_attack_evidence.rs"]
+pub mod rendered_attack_evidence;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
