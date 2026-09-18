@@ -1,0 +1,144 @@
+name: CI Draft Admission Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/ci-draft-admission-contract.json"
+      - ".github/scripts/verify-ci-draft-admission-contract.py"
+      - ".github/workflows/ci-draft-admission-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-draft-admission-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: a4168072a9cd29fafbb99928c33005ee4ba8d924
+  SOURCE_CI_BLOB: a48366076b30eb8e12d22c927a3b8bf333181409
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  contract:
+    name: Verify outcome-blind draft admission transformation contract
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent, source CI, and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:.github/workflows/ci.yml)" = "${SOURCE_CI_BLOB}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/ci-draft-admission-contract.json"
+            ".github/scripts/verify-ci-draft-admission-contract.py"
+            ".github/workflows/ci-draft-admission-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Run parser/admission contract self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/scripts/verify-ci-draft-admission-contract.py
+          python3 .github/scripts/verify-ci-draft-admission-contract.py --self-test \
+            | tee "${RUNNER_TEMP}/draft-admission-self-test.json"
+          python3 -m json.tool "${RUNNER_TEMP}/draft-admission-self-test.json" >/dev/null
+
+      - name: Audit exact current full-CI job surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/verify-ci-draft-admission-contract.py \
+            --contract .github/rel/ci-draft-admission-contract.json \
+            --workflow .github/workflows/ci.yml \
+            | tee "${RUNNER_TEMP}/draft-admission-plan.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          p = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'draft-admission-plan.json').read_text())
+          assert p['schema'] == 'symthaea.ci.draft-admission-plan.v2'
+          assert p['authority'] == 'RunnerPlaneContractOnly'
+          assert p['job_count'] > 0
+          assert p['job_count'] == p['jobs_without_if'] + p['jobs_with_scalar_if'] + p['jobs_with_block_if']
+          assert p['jobs_with_block_if'] == 1
+          assert p['block_if_jobs'] == ['psych-bench']
+          assert p['mechanically_transformable'] is True
+          assert p['claims'] == {
+              'ci_modified': False,
+              'queue_repaired': False,
+              'runner_capacity_increased': False,
+              'scientific_authority': False,
+          }
+          block = [j for j in p['jobs'] if j['source_if_kind'] == 'block']
+          assert len(block) == 1
+          assert block[0]['job'] == 'psych-bench'
+          assert block[0]['source_block_marker'] in {'|','>','|-','>-','|+','>+'}
+          assert len(block[0]['source_block_payload_sha256']) == 64
+          PY
+
+      - name: Build DraftAdmissionContractOnly receipt
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/draft-admission-contract-receipt.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def sha(p): return hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest()
+          plan = json.loads(pathlib.Path(os.environ['RUNNER_TEMP'], 'draft-admission-plan.json').read_text())
+          receipt = {
+              'schema': 'symthaea.ci.draft-admission-contract-static-receipt.v2',
+              'authority': 'RunnerPlaneContractOnly',
+              'subject_head': subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(),
+              'parent_head': subprocess.check_output(['git','rev-parse','HEAD^'], text=True).strip(),
+              'source_ci_blob': os.environ['SOURCE_CI_BLOB'],
+              'source_ci_sha256': sha('.github/workflows/ci.yml'),
+              'contract_sha256': sha('.github/rel/ci-draft-admission-contract.json'),
+              'verifier_sha256': sha('.github/scripts/verify-ci-draft-admission-contract.py'),
+              'job_count': plan['job_count'],
+              'jobs_without_if': plan['jobs_without_if'],
+              'jobs_with_scalar_if': plan['jobs_with_scalar_if'],
+              'jobs_with_block_if': plan['jobs_with_block_if'],
+              'block_if_jobs': plan['block_if_jobs'],
+              'mechanically_transformable': plan['mechanically_transformable'],
+              'ci_modified': False,
+              'scientific_authority': False,
+          }
+          pathlib.Path(os.environ['RECEIPT']).write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload static admission-contract evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-draft-admission-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/ci-draft-admission-contract.json
+            ${{ runner.temp }}/draft-admission-self-test.json
+            ${{ runner.temp }}/draft-admission-plan.json
+            ${{ runner.temp }}/draft-admission-contract-receipt.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:.github/workflows/ci.yml)" = "${SOURCE_CI_BLOB}"
+          rm -rf .github/scripts/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"

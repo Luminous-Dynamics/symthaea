@@ -1,0 +1,49 @@
+{
+  "schema": "symthaea.ci.draft-admission-contract.v2",
+  "authority": "RunnerPlaneContractOnly",
+  "source_main_head": "a4168072a9cd29fafbb99928c33005ee4ba8d924",
+  "source_ci_blob": "a48366076b30eb8e12d22c927a3b8bf333181409",
+  "source_workflow": ".github/workflows/ci.yml",
+  "target_workflow_name": "CI",
+  "admission_predicate": "github.event_name != 'pull_request' || github.event.pull_request.draft == false",
+  "expected_block_if_jobs": ["psych-bench"],
+  "required_event_semantics": {
+    "draft_pull_request": "every top-level full-CI job is server-side skipped before runner allocation",
+    "ready_pull_request": "the pre-existing job-level if condition, if any, remains authoritative",
+    "push": "the pre-existing job-level if condition, if any, remains authoritative",
+    "schedule": "the pre-existing job-level if condition, if any, remains authoritative",
+    "workflow_dispatch": "the pre-existing job-level if condition, if any, remains authoritative"
+  },
+  "permitted_transformations": [
+    "job with no job-level if: insert exactly one scalar admission predicate",
+    "job with scalar job-level if: replace it with admission AND parenthesized exact original scalar condition",
+    "job with block-scalar job-level if: preserve the exact block marker and payload bytes, prepend an admission-and-open-parenthesis payload line, and append one closing-parenthesis payload line"
+  ],
+  "hard_stops": [
+    "unexpected block-scalar job census",
+    "empty block-scalar payload",
+    "unsupported block-scalar marker or nonstandard block indentation",
+    "duplicate job-level if keys",
+    "inline-comment scalar if requiring expression-aware rewriting",
+    "nonstandard top-level jobs indentation",
+    "any edit outside top-level job-level if insertion/replacement/wrapping",
+    "any change to steps, permissions, needs, strategy, runs-on, timeout, env, concurrency, triggers, or action pins"
+  ],
+  "future_patch_proof_obligations": [
+    "source ci.yml Git blob matches source_ci_blob",
+    "top-level job key order is unchanged",
+    "every source job exists exactly once in transformed workflow",
+    "no new or deleted top-level jobs",
+    "every transformed job contains the admission predicate exactly once",
+    "every pre-existing scalar if expression is preserved byte-for-byte as a parenthesized conjunct",
+    "every pre-existing block marker and block payload are preserved byte-for-byte inside the new admission wrapper",
+    "removing only the admission insertion/conjunct/wrapper reconstructs source ci.yml exactly",
+    "draft PR event admits zero full-CI jobs by construction"
+  ],
+  "claims": {
+    "ci_modified": false,
+    "queue_repaired": false,
+    "runner_capacity_increased": false,
+    "scientific_authority": false
+  }
+}
