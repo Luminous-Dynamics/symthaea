@@ -1,0 +1,61 @@
+name: NEUROARCH-001 PR Lock Promotion
+
+on:
+  pull_request:
+    branches:
+      - neuroarch-001-topology-contract
+    paths:
+      - '.github/workflows/neuroarch-001-lock-promote-pr.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  promote-lock:
+    name: Regenerate and promote exact Rust-1.96 lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout auxiliary promotion branch
+        uses: actions/checkout@v4
+        with:
+          ref: aux/neuroarch-001-lock-promotion-pr
+          fetch-depth: 2
+
+      - name: Assert exact bootstrap parent
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 'f953e47e54958bcc2db6fc1e05b6530b554e31e5'
+          test "$(git diff --name-only HEAD^ HEAD)" = '.github/workflows/neuroarch-001-lock-promote-pr.yml'
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Regenerate exact lock and verify qualified identity
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 >/dev/null
+          printf '%s  Cargo.lock\n' 'dd2266f8ca64c200a2878bce9ce3ae62bdc33b557f6f01763d2dfdc67f1503da' | sha256sum -c -
+
+          git diff --check -- Cargo.lock
+          test -n "$(git diff -- Cargo.lock)"
+          test "$(git diff --name-only)" = 'Cargo.lock'
+
+          if git diff -- Cargo.lock | grep -E '^-[^-]'; then
+            echo 'Cargo.lock removed existing content; refusing promotion.' >&2
+            exit 1
+          fi
+
+          test "$(git diff -- Cargo.lock | grep -c '^+\[\[package\]\]$')" -eq 2
+          grep -q '^+name = "symthaea-neuroarch-adapters"$' <(git diff -- Cargo.lock)
+          grep -q '^+name = "symthaea-neuroarch-types"$' <(git diff -- Cargo.lock)
+
+      - name: Commit only the verified lock
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add Cargo.lock
+          test "$(git diff --cached --name-only)" = 'Cargo.lock'
+          git commit -m 'chore(neuroarch): commit qualified Rust 1.96 lock'
+          git push origin HEAD:aux/neuroarch-001-lock-promotion-pr
