@@ -1,0 +1,76 @@
+{
+  "schema": "symthaea.rel.attestation-contract.v3",
+  "authority": "AttestationContractOnly",
+  "relation": "REL-005A",
+  "parent_firewall_contract_head": "952ca3d7754a043f03da0875cf63b8665e63bf91",
+  "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+  "assembly_contract_head": "3dc01663ff8b2f9f6eb0568f8649ccdd999ddf29",
+  "projection_contract_head": "07af7c4bdfdda377aa8175efe7a3233ce90e889e",
+  "comparison_subject_head": "a47efccf80fa66bacbdfa9930f59c8439be7ee38",
+  "source_extraction_boundary": {
+    "authority": "AuthorityReceiptExtractionOnly",
+    "projection_raw_observation_visibility": false,
+    "projection_execution_log_visibility": false,
+    "raw_observation_may_enter_final_capsule": false,
+    "execution_logs_may_enter_final_capsule": false
+  },
+  "actions_attest": {
+    "release": "v4.2.2",
+    "commit": "1e69f48acb82d1966a394da916b4c1698aa569d6",
+    "mode": "provenance",
+    "subject": "rel-005a-qualified-capsule.tar"
+  },
+  "required_attestation_job_permissions": {
+    "contents": "read",
+    "id-token": "write",
+    "attestations": "write",
+    "artifact-metadata": "write"
+  },
+  "capsule_input_files": [
+    "predicate-contract-receipt.json",
+    "execution-v3-receipt.json",
+    "observation-seal-v3.json",
+    "comparison-only-qualification-receipt.json",
+    "qualification-input-manifest.json",
+    "qualification-assembly-receipt.json",
+    "qualification-only.json"
+  ],
+  "capsule_generated_files": [
+    "qualification-capsule-manifest.json"
+  ],
+  "canonical_tar": {
+    "compression": "none",
+    "sort": "bytewise basename ascending",
+    "mtime": 0,
+    "uid": 0,
+    "gid": 0,
+    "uname": "",
+    "gname": "",
+    "file_mode": "0644",
+    "pax_headers": false
+  },
+  "attestation_semantics": {
+    "proves": [
+      "the attested capsule digest was produced by the identified GitHub Actions workflow invocation",
+      "the capsule bytes are bound to GitHub OIDC/Sigstore provenance"
+    ],
+    "does_not_prove": [
+      "scientific truth",
+      "predicate correctness",
+      "qualification correctness beyond the attested bytes",
+      "independent replication"
+    ]
+  },
+  "transport_semantics": {
+    "artifact_transport_identity_is_scientific_authority": false,
+    "attestation_subject_is_final_capsule_digest": true
+  },
+  "claims": {
+    "capsule_built": false,
+    "attestation_created": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
