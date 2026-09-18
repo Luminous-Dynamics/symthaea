@@ -24,6 +24,10 @@ pub mod revision_authority_contract;
 pub mod authority_epoch_contract;
 #[path = "epistemic_restart_epoch_bound_receipt_schema.rs"]
 pub mod epoch_bound_receipt_schema;
+#[path = "epistemic_restart_epoch_bound_receipt_data.rs"]
+pub mod epoch_bound_receipt_data;
+#[path = "epistemic_restart_epoch_bound_receipt_status.rs"]
+pub mod epoch_bound_receipt_status;
 
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
