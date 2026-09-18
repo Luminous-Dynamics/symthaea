@@ -23,7 +23,7 @@ const REGION_AREA_EPS: f64 = 1.0e-12;
 pub struct MuJoCoSupportContactToleranceV1 {
     /// Allowed difference between resolved friction parameters across point contacts.
     pub friction_abs: f64,
-    /// XY tolerance when deciding whether a contact point lies on the declared patch.
+    /// Geometric distance tolerance for patch-edge membership.
     pub patch_xy_m: f64,
     /// Absolute distance from the declared support plane admitted as plantar support.
     pub support_plane_m: f64,
@@ -158,6 +158,7 @@ pub struct MuJoCoContactInteractionRecordV1 {
     pub sampled_at_s: f64,
     pub foot_geom_id: usize,
     pub foot_geom_name: String,
+    pub environment_body_id: usize,
     pub environment_geom_id: usize,
     pub environment_geom_name: String,
     /// Exact live-contact indices admitted as plantar support.
@@ -181,12 +182,17 @@ impl MuJoCoContactInteractionRecordV1 {
             && self.sampled_at_s >= 0.0
             && !self.foot_geom_name.trim().is_empty()
             && !self.environment_geom_name.trim().is_empty()
+            && self.environment_body_id == 0
             && !self.contact_indices.is_empty()
             && self.contact_indices.windows(2).all(|pair| pair[0] < pair[1])
             && self
                 .non_supporting_contact_indices
                 .windows(2)
                 .all(|pair| pair[0] < pair[1])
+            && self
+                .non_supporting_contact_indices
+                .iter()
+                .all(|index| !self.contact_indices.contains(index))
             && self.active_region.validate()
             && self.active_region.contact_positions_world_m.len() == self.contact_indices.len()
             && self.extraction_tolerance.validate()
@@ -227,6 +233,7 @@ pub enum MuJoCoContactInteractionError {
     InvalidContactGeom,
     InvalidContactPoint,
     MissingEnvironmentName,
+    UnsupportedEnvironmentBody,
     AmbiguousEnvironmentGeom,
     UnsupportedContactDimensionality(i32),
     InvalidResolvedFriction,
@@ -264,6 +271,9 @@ pub fn extract_mujoco_contact_interaction(
 }
 
 /// Extract exact current MuJoCo pair limits plus the actual plantar contact hull.
+///
+/// v1 admits only contacts against world-body geoms. Dynamic support bodies need
+/// a later contract with explicit support-body identity and relative kinematics.
 pub fn extract_mujoco_contact_interaction_with_tolerance(
     model: &MjModel,
     data: &MjData<Arc<MjModel>>,
@@ -369,6 +379,14 @@ pub fn extract_mujoco_contact_interaction_with_tolerance(
         .id_to_name(MjtObj::mjOBJ_GEOM, environment_geom_id)
         .ok_or(MuJoCoContactInteractionError::MissingEnvironmentName)?
         .to_string();
+    let environment_body_id = model
+        .geom_bodyid()
+        .get(environment_geom_id)
+        .copied()
+        .ok_or(MuJoCoContactInteractionError::InvalidContactGeom)?;
+    if environment_body_id != 0 {
+        return Err(MuJoCoContactInteractionError::UnsupportedEnvironmentBody);
+    }
 
     let active_region = build_active_region(&samples)?;
     let sliding_friction_coefficient = if dimensionality.grants_sliding() {
@@ -383,11 +401,12 @@ pub fn extract_mujoco_contact_interaction_with_tolerance(
     };
     let sampled_at_s = data.time();
     let interaction_id = format!(
-        "{}:sig:{:016x}:site:{site:?}:foot:{}:{}:env:{}:{}:dim:{}:friction:{:.17e}:{:.17e}:{:.17e}:{:.17e}:{:.17e}:projection:min-tangent-v1",
+        "{}:sig:{:016x}:site:{site:?}:foot:{}:{}:envbody:{}:env:{}:{}:dim:{}:friction:{:.17e}:{:.17e}:{:.17e}:{:.17e}:{:.17e}:projection:min-tangent-v1",
         patches.model_id,
         model.signature(),
         patch_record.physical_geom_name,
         foot_geom_id,
+        environment_body_id,
         environment_geom_name,
         environment_geom_id,
         dimensionality.dim(),
@@ -416,6 +435,7 @@ pub fn extract_mujoco_contact_interaction_with_tolerance(
         sampled_at_s,
         foot_geom_id,
         foot_geom_name: patch_record.physical_geom_name.clone(),
+        environment_body_id: environment_body_id as usize,
         environment_geom_id,
         environment_geom_name,
         contact_indices,
@@ -535,12 +555,14 @@ fn project_contact_to_patch(
     )
 }
 
-fn point_in_convex_patch(vertices: &[[f64; 2]], point: [f64; 2], tolerance: f64) -> bool {
+fn point_in_convex_patch(vertices: &[[f64; 2]], point: [f64; 2], tolerance_m: f64) -> bool {
     vertices.len() >= 3
         && (0..vertices.len()).all(|index| {
             let a = vertices[index];
             let b = vertices[(index + 1) % vertices.len()];
-            cross2(a, b, point) >= -tolerance
+            let edge_length_m = (b[0] - a[0]).hypot(b[1] - a[1]);
+            edge_length_m > 0.0
+                && cross2(a, b, point) >= -tolerance_m * edge_length_m
         })
 }
 
@@ -765,6 +787,7 @@ mod tests {
             "generated standing humanoid should have at least one active plantar foot contact"
         );
         for record in extracted {
+            assert_eq!(record.environment_body_id, 0);
             assert_eq!(record.environment_geom_name, "floor");
             assert_eq!(record.dimensionality, MuJoCoContactDimensionalityV1::Tangential);
             assert!(record.limits.sliding_friction_coefficient > 0.0);
@@ -786,7 +809,7 @@ mod tests {
 
     #[test]
     fn stale_patch_set_time_is_rejected() {
-        let mut sim = MuJoHumanoidSimulator::for_morphology(HumanoidMorphology::Dmc21).unwrap();
+        let mut sim = MuJoCoHumanoidSimulator::for_morphology(HumanoidMorphology::Dmc21).unwrap();
         let model = Arc::clone(sim.model_arc());
         let patches =
             extract_mujoco_foot_patch_set(model.as_ref(), sim.data_mut(), MODEL_ID).unwrap();
