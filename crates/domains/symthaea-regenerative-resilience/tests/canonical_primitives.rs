@@ -48,7 +48,7 @@ fn canonical_id_preserves_exact_case_and_path_punctuation() {
 
 #[test]
 fn fixed_decimal_quantity_has_one_trailing_zero_normal_form() {
-    let quantity = CanonicalQuantity::new(1200, 2, unit("kg"), basis("dry")) .unwrap();
+    let quantity = CanonicalQuantity::new(1200, 2, unit("kg"), basis("dry")).unwrap();
     assert_eq!(quantity.mantissa(), 12);
     assert_eq!(quantity.scale(), 0);
 
