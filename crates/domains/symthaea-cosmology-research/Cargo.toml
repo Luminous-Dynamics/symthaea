@@ -33,3 +33,7 @@ path = "src/a1n_convergence.rs"
 [[bin]]
 name = "de001a-a1q-bundle"
 path = "src/a1q_bundle.rs"
+
+[[bin]]
+name = "de001a-a1c-contract"
+path = "src/a1c_contract.rs"
