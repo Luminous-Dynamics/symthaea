@@ -66,7 +66,9 @@ pub mod dream_confidence_gate;
 pub mod epistemic_world;
 pub mod exact_replay;
 pub mod experience_tree;
+pub mod narrative_evidence;
 pub mod replay_policy;
+pub mod semantic_context;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
@@ -146,7 +148,14 @@ pub use exact_replay::{ExactReplayWorld, ReplayError};
 pub use experience_tree::{
     ExperienceNode, ExperienceNodeId, ExperienceProvenance, ExperienceTree, ExperienceTreeError,
 };
+pub use narrative_evidence::{
+    NarrativeEvidenceError, NarrativeEvidenceReceipt, ingest_narrative_evidence,
+};
 pub use replay_policy::{PolicySelectionError, ReplayPolicyScore, select_replay_policy};
+pub use semantic_context::{
+    DEFAULT_CONTEXT_CLAMP_ABS, DEFAULT_SEMANTIC_LEVELS, SemanticContextEncoder,
+    SemanticContextError, SemanticContextIndex, SemanticContextMatch,
+};
 pub use sym_rsi_candidate_family::{
     FrozenReplayCorpus, ReplayAcquisitionError, ReplayCorpusAcquisitionReceipt,
     SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA, SYM_RSI_001_INCUMBENT_POLICY_ID,
