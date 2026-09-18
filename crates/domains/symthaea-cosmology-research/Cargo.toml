@@ -21,3 +21,7 @@ path = "src/a0_verify.rs"
 [[bin]]
 name = "de001a-a1r-oracle"
 path = "src/a1r_oracle.rs"
+
+[[bin]]
+name = "de001a-a1p-point-bind"
+path = "src/a1p_point_bind.rs"
