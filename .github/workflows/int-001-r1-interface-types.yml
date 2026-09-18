@@ -1,0 +1,136 @@
+name: INT-001 r1 Interface Types Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-interface-types/**"
+      - ".github/workflows/int-001-r1-interface-types.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: int-001-r1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_CARRIER_PARENT: ad981939876d73410414bf51cda9986a2c0fbd9a
+  EXPECTED_TYPES_MANIFEST_BLOB: f3d07d32bd3e4b243b0f978db5044b42e77bd6b2
+  EXPECTED_TYPES_LIB_BLOB: d3d7318ef3c53e03a413dc0f525c53d63984476d
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-bootstrap-standard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact qualifier, parent, and source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_CARRIER_PARENT"
+          test "$(git hash-object crates/core/symthaea-interface-types/Cargo.toml)" = "$EXPECTED_TYPES_MANIFEST_BLOB"
+          test "$(git hash-object crates/core/symthaea-interface-types/src/lib.rs)" = "$EXPECTED_TYPES_LIB_BLOB"
+          mapfile -t changed < <(git diff --name-only "$EXPECTED_CARRIER_PARENT" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/int-001-r1-interface-types.yml"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Materialize additive Cargo lock delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo check -p symthaea-interface-types
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.patch"
+          test -s "$RUNNER_TEMP/Cargo.lock.patch"
+          grep -F 'name = "symthaea-interface-types"' Cargo.lock
+          if grep -E '^-[^-]' "$RUNNER_TEMP/Cargo.lock.patch"; then
+            echo "INT-001 r1 lock materialization is not additive-only"
+            cat "$RUNNER_TEMP/Cargo.lock.patch"
+            exit 1
+          fi
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-interface-types
+
+      - name: Unit and wire-contract tests
+        run: cargo test -p symthaea-interface-types
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-interface-types --all-targets -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object crates/core/symthaea-interface-types/Cargo.toml)" = "$EXPECTED_TYPES_MANIFEST_BLOB"
+          test "$(git hash-object crates/core/symthaea-interface-types/src/lib.rs)" = "$EXPECTED_TYPES_LIB_BLOB"
+          unexpected="$({ git status --porcelain=v1 || true; } | grep -v '^ M Cargo.lock$' || true)"
+          if test -n "$unexpected"; then
+            echo "unexpected tracked/untracked mutation after qualification:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Write bootstrap receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p int-001-r1-evidence
+          cp "$RUNNER_TEMP/Cargo.lock.generated" int-001-r1-evidence/Cargo.lock.generated
+          cp "$RUNNER_TEMP/Cargo.lock.patch" int-001-r1-evidence/Cargo.lock.patch
+          {
+            echo "program=INT-001-r1"
+            echo "authority=bootstrap-source-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "qualifier_head=$(git rev-parse HEAD)"
+            echo "source_parent=$EXPECTED_CARRIER_PARENT"
+            echo "source_tree=$(git rev-parse HEAD^{tree})"
+            echo "types_manifest_blob=$EXPECTED_TYPES_MANIFEST_BLOB"
+            echo "types_lib_blob=$EXPECTED_TYPES_LIB_BLOB"
+            echo "runner_image=ubuntu-24.04"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "generated_lock_sha256=$(sha256sum int-001-r1-evidence/Cargo.lock.generated | cut -d' ' -f1)"
+            echo "lock_patch_sha256=$(sha256sum int-001-r1-evidence/Cargo.lock.patch | cut -d' ' -f1)"
+            echo "format=PASS"
+            echo "tests=PASS"
+            echo "clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > int-001-r1-evidence/receipt.txt
+          cat int-001-r1-evidence/receipt.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bootstrap evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: int-001-r1-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}
+          path: int-001-r1-evidence/
+          if-no-files-found: error
