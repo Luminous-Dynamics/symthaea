@@ -1,0 +1,625 @@
+name: PARADOX A0R F0 V4 Transport Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/paradox-a0r-f0-v4-qualification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paradox-a0r-f0-v4-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  RUNNER_SHA: ${{ github.event.pull_request.head.sha }}
+  RUNNER_BASE_SHA: a4168072a9cd29fafbb99928c33005ee4ba8d924
+  SUBJECT_SHA: 8a0fbe3b780a9a0c92ce5bf2e2c84fb0bc4b80f0
+  M0_SHA: 306b0471a0854d2e77c1d50438fc493806fe1564
+  A0_SHA: 8cc2651576f0068a1ccac3ef21c8a0a0eb3c2afb
+  G2B_SHA: 09d83a1d1fddbbbd30e4eba7cc95946c8eab871f
+  PRODUCTION_SHA: eb73527d05a913e79d1f05135ad6b06c1da8e2ee
+  CONFIG_SHA: 2cd99b06cf2cf11cfc0612c0db818355099b48b04bd687ca66a31a08680be1f9
+  CARGO_BLOB_SHA: 10f004ce824af40c069cc630ad867d9d2cfabd10
+  LOCK_BLOB_SHA: 1d5b6c3dffb474fabef0f8237c6741b4f252bc62
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact runner plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.RUNNER_SHA }}
+          fetch-depth: 2
+
+      - name: Bind runner plane
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${RUNNER_SHA}"
+          test "$(git rev-parse HEAD^)" = "${RUNNER_BASE_SHA}"
+          test "$(git rev-list --count "${RUNNER_BASE_SHA}..${RUNNER_SHA}")" = 1
+          test -z "$(git status --porcelain --untracked-files=all)"
+          changed="$(git diff --name-only "${RUNNER_BASE_SHA}" "${RUNNER_SHA}")"
+          test "${changed}" = '.github/workflows/paradox-a0r-f0-v4-qualification.yml'
+          printf 'runner-plane subject=%s base=%s\n' "${RUNNER_SHA}" "${RUNNER_BASE_SHA}"
+
+      - name: Checkout exact F0 V4 subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+
+      - name: Bind exact subject, ancestry, dependency plane, and five-path surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git rev-parse HEAD^)" = "${M0_SHA}"
+          test "$(git rev-list --count "${M0_SHA}..${SUBJECT_SHA}")" = 1
+          git cat-file -e "${A0_SHA}^{commit}"
+          git cat-file -e "${G2B_SHA}^{commit}"
+          git cat-file -e "${PRODUCTION_SHA}^{commit}"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+          actual="$(git diff --name-only "${M0_SHA}" "${SUBJECT_SHA}" | LC_ALL=C sort)"
+          expected="$(printf '%s\n' \
+            src/bin/paradox_a0r_f0_worker.rs \
+            tools/paradox_a0_native_readout/f0/PROTOCOL.md \
+            tools/paradox_a0_native_readout/f0/f0_pair_audit.py \
+            tools/paradox_a0_native_readout/f0/f0_static_audit.py \
+            tools/paradox_a0_native_readout/f0/f0_transport_contract.json | LC_ALL=C sort)"
+          test "${actual}" = "${expected}"
+          test "$(git diff --name-only "${M0_SHA}" "${SUBJECT_SHA}" | wc -l | tr -d '[:space:]')" = 5
+          test "$(git hash-object Cargo.toml)" = "${CARGO_BLOB_SHA}"
+          test "$(git hash-object Cargo.lock)" = "${LOCK_BLOB_SHA}"
+          test -z "$(git diff --name-only "${M0_SHA}" "${SUBJECT_SHA}" -- Cargo.toml Cargo.lock src/cognitive_loop crates)"
+          printf 'subject=%s parent=%s five-path-surface=PASS cargo=%s lock=%s\n' \
+            "${SUBJECT_SHA}" "${M0_SHA}" "${CARGO_BLOB_SHA}" "${LOCK_BLOB_SHA}"
+
+      - name: Install exact Rust 1.96 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt
+          rustup default 1.96.0
+          rustc -vV
+          cargo -V
+          rustfmt -V
+
+      - name: Acquire locked dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fetch --locked
+
+      - name: Static contract and focused binary build gates
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          evidence="${RUNNER_TEMP}/f0-evidence"
+          mkdir -p "${evidence}"
+
+          python3 -B tools/paradox_a0_native_readout/f0/f0_static_audit.py > "${evidence}/static-a.json"
+          python3 -B tools/paradox_a0_native_readout/f0/f0_static_audit.py > "${evidence}/static-b.json"
+          cmp -s "${evidence}/static-a.json" "${evidence}/static-b.json"
+
+          rustfmt --edition 2024 --check src/bin/paradox_a0r_f0_worker.rs
+          cargo check --locked --offline --bin paradox_a0r_f0_worker
+          cargo build --locked --offline --bin paradox_a0r_f0_worker
+
+          cp "${evidence}/static-a.json" "${evidence}/static-audit.json"
+          rm "${evidence}/static-b.json"
+          rustc -vV > "${evidence}/rustc-vv.txt"
+          cargo -V > "${evidence}/cargo-version.txt"
+          printf 'contract-sha256=%s\n' "$(sha256sum tools/paradox_a0_native_readout/f0/f0_transport_contract.json | awk '{print $1}')"
+          printf 'worker-sha256=%s\n' "$(sha256sum src/bin/paradox_a0r_f0_worker.rs | awk '{print $1}')"
+          printf 'pair-auditor-sha256=%s\n' "$(sha256sum tools/paradox_a0_native_readout/f0/f0_pair_audit.py | awk '{print $1}')"
+
+      - name: Execute label-blind transport and mutation qualification
+        shell: bash
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          export EVIDENCE_DIR="${RUNNER_TEMP}/f0-evidence"
+          export F0_BIN="$(realpath target/debug/paradox_a0r_f0_worker)"
+          export F0_EXEC_SHA="$(sha256sum "${F0_BIN}" | awk '{print $1}')"
+          python3 -B - <<'PY'
+          from __future__ import annotations
+
+          import copy
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import platform
+          import subprocess
+          import sys
+
+          root = pathlib.Path.cwd()
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          binary = pathlib.Path(os.environ["F0_BIN"])
+          subject_sha = os.environ["SUBJECT_SHA"]
+          config_sha = os.environ["CONFIG_SHA"]
+          executable_sha = os.environ["F0_EXEC_SHA"]
+          pair_auditor = root / "tools/paradox_a0_native_readout/f0/f0_pair_audit.py"
+
+          SCIENCE_DOMAIN = b"PARADOX-A0R-F0-SCIENTIFIC-V1"
+          RECEIPT_DOMAIN = b"PARADOX-A0R-F0-RECEIPT-V2"
+          FEATURE_DOMAIN = b"PARADOX-A0R-F0-FEATURE-BUNDLE-V1"
+          EVENTS_DOMAIN = b"PARADOX-A0R-F0-EVENTS-V1"
+          SOURCE_DOMAIN = b"PARADOX-A0R-F0-SOURCE-BINDING-V1"
+          ENV_DOMAIN = b"PARADOX-A0R-F0-ENVIRONMENT-CAPSULE-V1"
+          BINDING_DOMAIN = b"PARADOX-A0R-F0-EXECUTION-BINDING-V1"
+
+          def canonical(value):
+              return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+
+          def frame(name: str, value: bytes) -> bytes:
+              key = name.encode()
+              return len(key).to_bytes(4, "little") + key + len(value).to_bytes(8, "little") + value
+
+          def domain_hash(domain: bytes, payload: bytes) -> str:
+              h = hashlib.sha256()
+              h.update(len(domain).to_bytes(8, "little"))
+              h.update(domain)
+              h.update(len(payload).to_bytes(8, "little"))
+              h.update(payload)
+              return h.hexdigest()
+
+          def hash_frames(domain: bytes, fields):
+              return domain_hash(domain, b"".join(frame(name, value) for name, value in fields))
+
+          def event_digest(events):
+              return hash_frames(EVENTS_DOMAIN, [("event_utf8", event.encode()) for event in events])
+
+          def sha256(data: bytes) -> str:
+              return hashlib.sha256(data).hexdigest()
+
+          launch_env = {
+              "HOME": os.environ["HOME"],
+              "LANG": "C.UTF-8",
+              "LC_ALL": "C.UTF-8",
+              "PATH": os.environ["PATH"],
+              "RUST_BACKTRACE": "1",
+              "TMPDIR": os.environ["RUNNER_TEMP"],
+              "TZ": "UTC",
+          }
+
+          cpu_model = "unknown"
+          cpuinfo = pathlib.Path("/proc/cpuinfo")
+          if cpuinfo.exists():
+              for line in cpuinfo.read_text(errors="replace").splitlines():
+                  if line.lower().startswith("model name") and ":" in line:
+                      cpu_model = line.split(":", 1)[1].strip()
+                      break
+
+          env_capsule = {
+              "schema_version": "PARADOX-A0R-F0-ENVIRONMENT-CAPSULE-V1",
+              "runner_image_os": os.environ.get("ImageOS", "unknown"),
+              "runner_image_version": os.environ.get("ImageVersion", "unknown"),
+              "kernel": platform.release(),
+              "machine": platform.machine(),
+              "cpu_model": cpu_model,
+              "rustc_vv": subprocess.check_output(["rustc", "-vV"], text=True).strip(),
+              "cargo_version": subprocess.check_output(["cargo", "-V"], text=True).strip(),
+              "cargo_toml_sha256": sha256((root / "Cargo.toml").read_bytes()),
+              "cargo_lock_sha256": sha256((root / "Cargo.lock").read_bytes()),
+              "launch_environment": launch_env,
+          }
+          env_capsule_sha = domain_hash(ENV_DOMAIN, canonical(env_capsule))
+          (evidence / "environment-capsule.json").write_bytes(canonical(env_capsule) + b"\n")
+
+          source_paths = [
+              "Cargo.toml",
+              "Cargo.lock",
+              "src/bin/paradox_a0r_f0_worker.rs",
+              "tools/paradox_a0_native_readout/f0/PROTOCOL.md",
+              "tools/paradox_a0_native_readout/f0/f0_pair_audit.py",
+              "tools/paradox_a0_native_readout/f0/f0_static_audit.py",
+              "tools/paradox_a0_native_readout/f0/f0_transport_contract.json",
+              "src/cognitive_loop/cycle.rs",
+              "src/cognitive_loop/cycle_phase_output/mod.rs",
+              "src/cognitive_loop/types/output.rs",
+              "src/cognitive_loop/helpers/mod.rs",
+              "src/cognitive_loop/config/mod.rs",
+              "src/cognitive_loop/config/temporal.rs",
+              "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+          ]
+          source_manifest = {
+              "schema_version": "PARADOX-A0R-F0-SOURCE-BINDING-V1",
+              "subject_sha": subject_sha,
+              "files": [
+                  {
+                      "path": path,
+                      "git_blob_sha": subprocess.check_output(["git", "hash-object", path], text=True).strip(),
+                      "sha256": sha256((root / path).read_bytes()),
+                  }
+                  for path in source_paths
+              ],
+          }
+          source_binding_sha = domain_hash(SOURCE_DOMAIN, canonical(source_manifest))
+          (evidence / "source-binding.json").write_bytes(canonical(source_manifest) + b"\n")
+
+          # >64 UTF-8 bytes so the worker's local SHA-256 exercises multi-block input.
+          events = ["F0 neutral transport qualification stimulus: " + ("x" * 128)]
+          binding = {
+              "schema_version": "PARADOX-A0R-F0-EXECUTION-BINDING-V1",
+              "f0_subject_sha": subject_sha,
+              "opaque_measurement_id": "01010101010101010101010101010101",
+              "opaque_base_fixture_id": "02020202020202020202020202020202",
+              "opaque_transform_id": "03030303030303030303030303030303",
+              "technical_pair_id": "04040404040404040404040404040404",
+              "agent_visible_event_count": len(events),
+              "agent_visible_events_sha256": event_digest(events),
+              "measurement_cycle_index": len(events) - 1,
+              "runner_config_projection_sha256": config_sha,
+              "executable_sha256": executable_sha,
+              "environment_capsule_sha256": env_capsule_sha,
+              "source_binding_sha256": source_binding_sha,
+          }
+          (evidence / "execution-binding.json").write_bytes(canonical(binding) + b"\n")
+
+          attempts = []
+
+          def request_for(index, *, ids=None, events_override=None, cycle_override=None):
+              selected_events = events if events_override is None else events_override
+              selected = ids or (
+                  binding["opaque_measurement_id"], binding["opaque_base_fixture_id"],
+                  binding["opaque_transform_id"], binding["technical_pair_id"],
+              )
+              return {
+                  "schema_version": "PARADOX-A0R-F0-WORKER-REQUEST-V4",
+                  "opaque_measurement_id": selected[0],
+                  "opaque_base_fixture_id": selected[1],
+                  "opaque_transform_id": selected[2],
+                  "technical_pair_id": selected[3],
+                  "technical_replicate_index": index,
+                  "agent_visible_events": selected_events,
+                  "measurement_cycle_index": len(selected_events) - 1 if cycle_override is None else cycle_override,
+                  "f0_subject_sha": subject_sha,
+                  "runner_config_projection_sha256": config_sha,
+                  "executable_sha256": executable_sha,
+                  "environment_capsule_sha256": env_capsule_sha,
+                  "source_binding_sha256": source_binding_sha,
+              }
+
+          def run_worker(name, request_texts, expect_ok, extra_args=()):
+              if isinstance(request_texts, str):
+                  request_texts = [request_texts]
+              payload = "\n".join(request_texts) + "\n"
+              proc = subprocess.run(
+                  [str(binary), *extra_args], input=payload, text=True, capture_output=True,
+                  env=launch_env, timeout=300,
+              )
+              attempts.append({
+                  "name": name,
+                  "request_count": len(request_texts),
+                  "request_sha256": [sha256(text.encode()) for text in request_texts],
+                  "expected_ok": expect_ok,
+                  "returncode": proc.returncode,
+                  "stdout_sha256": sha256(proc.stdout.encode()),
+                  "stderr_sha256": sha256(proc.stderr.encode()),
+              })
+              if (proc.returncode == 0) != expect_ok:
+                  raise RuntimeError(f"worker expectation failed:{name}:rc={proc.returncode}:stderr={proc.stderr[:400]}")
+              if not expect_ok:
+                  return []
+              lines = [line for line in proc.stdout.splitlines() if line.strip()]
+              if len(lines) != len(request_texts):
+                  raise RuntimeError(f"worker response count mismatch:{name}")
+              return [json.loads(line) for line in lines]
+
+          def dump(path, value):
+              path.write_bytes(canonical(value) + b"\n")
+
+          def run_auditor(name, binding_value, a, b, expect_ok=True):
+              bpath = evidence / f"tmp-{name}-binding.json"
+              apath = evidence / f"tmp-{name}-a.json"
+              cpath = evidence / f"tmp-{name}-b.json"
+              dump(bpath, binding_value); dump(apath, a); dump(cpath, b)
+              proc = subprocess.run(
+                  [sys.executable, str(pair_auditor), str(bpath), str(apath), str(cpath)],
+                  text=True, capture_output=True, timeout=60,
+              )
+              if (proc.returncode == 0) != expect_ok:
+                  raise RuntimeError(f"auditor expectation failed:{name}:rc={proc.returncode}:out={proc.stdout[:400]}")
+              return json.loads(proc.stdout)
+
+          r0 = run_worker("primary-replicate-0", canonical(request_for(0)).decode(), True)[0]
+          r1 = run_worker("primary-replicate-1", canonical(request_for(1)).decode(), True)[0]
+          dump(evidence / "replicate-0.json", r0)
+          dump(evidence / "replicate-1.json", r1)
+
+          # Independent SHA-256 oracle cross-checks the worker's local implementation.
+          if r0["provenance_envelope"]["agent_visible_events_sha256"] != event_digest(events):
+              raise RuntimeError("worker event SHA-256 disagrees with hashlib oracle")
+          raw = r0["raw_feature_bundle"]
+          science = r0["scientific_payload"]
+          for raw_key, digest_key in (
+              ("recurrent_f32le_hex", "recurrent_f32le_sha256"),
+              ("thought_f32le_hex", "thought_vector_f32le_sha256"),
+              ("wisdom_hv_hex", "wisdom_hv_sha256"),
+          ):
+              if sha256(bytes.fromhex(raw[raw_key])) != science[digest_key]:
+                  raise RuntimeError(f"worker SHA-256 disagrees with hashlib oracle:{raw_key}")
+
+          pair = run_auditor("primary", binding, r0, r1, True)
+          if pair["status"] != "ELIGIBLE_F0_TECHNICAL_PAIR":
+              raise RuntimeError("primary pair not eligible")
+          dump(evidence / "technical-pair.json", pair)
+
+          primary_text = canonical(request_for(0)).decode()
+          duplicate_request = primary_text[:-1] + ',"schema_version":"PARADOX-A0R-F0-WORKER-REQUEST-V4"}'
+          run_worker("duplicate-request-key", duplicate_request, False)
+          semantic = request_for(0); semantic["target_label"] = "forbidden"
+          run_worker("unknown-semantic-key", canonical(semantic).decode(), False)
+          rep2 = request_for(0); rep2["technical_replicate_index"] = 2
+          run_worker("replicate-index-2", canonical(rep2).decode(), False)
+          two_events = ["first neutral event", "second neutral event"]
+          nonfinal = request_for(0, events_override=two_events, cycle_override=0)
+          run_worker("nonfinal-measurement-cycle", canonical(nonfinal).decode(), False)
+          float_rep = primary_text.replace('"technical_replicate_index":0', '"technical_replicate_index":0.0')
+          run_worker("float-replicate-index", float_rep, False)
+          run_worker("sidecar-argument", primary_text, False, extra_args=("forbidden-sidecar",))
+
+          renamed_ids = (
+              "11111111111111111111111111111111", "22222222222222222222222222222222",
+              "33333333333333333333333333333333", "44444444444444444444444444444444",
+          )
+          renamed = run_worker("opaque-id-rename", canonical(request_for(0, ids=renamed_ids)).decode(), True)[0]
+          if renamed["scientific_payload_sha256"] != r0["scientific_payload_sha256"]:
+              raise RuntimeError("opaque-ID rename changed science")
+          if renamed["receipt_binding_sha256"] == r0["receipt_binding_sha256"]:
+              raise RuntimeError("opaque-ID rename failed to change provenance binding")
+          dump(evidence / "opaque-id-rename.json", renamed)
+
+          row_a_ids = (
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "abababababababababababababababab",
+              "acacacacacacacacacacacacacacacac", "adadadadadadadadadadadadadadadad",
+          )
+          row_b_ids = (
+              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+              "bdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbd", "bebebebebebebebebebebebebebebebe",
+          )
+          req_a = request_for(0, ids=row_a_ids, events_override=["plan-order row A neutral stimulus"])
+          req_b = request_for(0, ids=row_b_ids, events_override=["plan-order row B neutral stimulus"])
+          ab = run_worker("plan-order-ab", [canonical(req_a).decode(), canonical(req_b).decode()], True)
+          ba = run_worker("plan-order-ba", [canonical(req_b).decode(), canonical(req_a).decode()], True)
+          by_id_ab = {doc["provenance_envelope"]["opaque_measurement_id"]: doc["scientific_payload_sha256"] for doc in ab}
+          by_id_ba = {doc["provenance_envelope"]["opaque_measurement_id"]: doc["scientific_payload_sha256"] for doc in ba}
+          if by_id_ab != by_id_ba:
+              raise RuntimeError("measurement-plan order changed per-row science")
+          dump(evidence / "plan-order-ab.json", ab); dump(evidence / "plan-order-ba.json", ba)
+
+          def science_bytes(s):
+              fields = [
+                  ("schema", b"PARADOX-A0R-F0-SCIENTIFIC-PAYLOAD-V1"),
+                  ("measurement_cycle_index", int(s["measurement_cycle_index"]).to_bytes(8, "little")),
+                  ("recurrent_length", int(s["recurrent_length"]).to_bytes(8, "little")),
+                  ("recurrent_sha256", str(s["recurrent_f32le_sha256"]).encode()),
+                  ("recurrent_nonfinite_count", int(s["recurrent_nonfinite_count"]).to_bytes(8, "little")),
+                  ("recurrent_all_zero", bytes([1 if s["recurrent_all_zero"] else 0])),
+                  ("thought_length", int(s["thought_vector_length"]).to_bytes(8, "little")),
+                  ("thought_sha256", str(s["thought_vector_f32le_sha256"]).encode()),
+                  ("thought_nonfinite_count", int(s["thought_vector_nonfinite_count"]).to_bytes(8, "little")),
+                  ("wisdom_byte_length", int(s["wisdom_hv_byte_length"]).to_bytes(8, "little")),
+                  ("wisdom_sha256", str(s["wisdom_hv_sha256"]).encode()),
+                  ("feature_bundle_sha256", str(s["sealed_feature_bundle_sha256"]).encode()),
+                  ("recurrent_masking_enabled", bytes([1 if s["recurrent_masking_enabled"] else 0])),
+                  ("spectral_entropy_masking_enabled", bytes([1 if s["spectral_entropy_masking_enabled"] else 0])),
+                  ("effective_dim_fraction_override_is_none", bytes([1 if s["effective_dim_fraction_override_is_none"] else 0])),
+                  ("measurement_validity", str(s["measurement_validity"]).encode()),
+              ]
+              fields.extend(("invalidity_reason", reason.encode()) for reason in s["invalidity_reasons"])
+              return b"".join(frame(name, value) for name, value in fields)
+
+          def provenance_bytes(p):
+              ordered = [
+                  ("schema", "PARADOX-A0R-F0-PROVENANCE-ENVELOPE-V2"),
+                  ("production_subject_sha", p["production_subject_sha"]),
+                  ("g2b_subject_sha", p["g2b_subject_sha"]),
+                  ("a0_subject_sha", p["a0_subject_sha"]),
+                  ("m0_subject_sha", p["m0_subject_sha"]),
+                  ("f0_subject_sha", p["f0_subject_sha"]),
+                  ("opaque_measurement_id", p["opaque_measurement_id"]),
+                  ("opaque_base_fixture_id", p["opaque_base_fixture_id"]),
+                  ("opaque_transform_id", p["opaque_transform_id"]),
+                  ("technical_pair_id", p["technical_pair_id"]),
+                  ("service_instance_id", p["service_instance_id"]),
+                  ("agent_visible_events_sha256", p["agent_visible_events_sha256"]),
+                  ("runner_config_projection_sha256", p["runner_config_projection_sha256"]),
+                  ("executable_sha256", p["executable_sha256"]),
+                  ("environment_capsule_sha256", p["environment_capsule_sha256"]),
+                  ("source_binding_sha256", p["source_binding_sha256"]),
+                  ("scientific_payload_sha256", p["scientific_payload_sha256"]),
+              ]
+              out = b"".join(frame(name, value.encode()) for name, value in ordered)
+              out += frame("technical_replicate_index", int(p["technical_replicate_index"]).to_bytes(8, "little"))
+              out += frame("agent_visible_event_count", int(p["agent_visible_event_count"]).to_bytes(8, "little"))
+              return out
+
+          def reseal(doc, science_reseal=True):
+              if science_reseal:
+                  sci = domain_hash(SCIENCE_DOMAIN, science_bytes(doc["scientific_payload"]))
+                  doc["scientific_payload_sha256"] = sci
+                  doc["provenance_envelope"]["scientific_payload_sha256"] = sci
+              doc["receipt_binding_sha256"] = domain_hash(RECEIPT_DOMAIN, provenance_bytes(doc["provenance_envelope"]))
+              return doc
+
+          def refresh_raw_hashes(doc):
+              raw = doc["raw_feature_bundle"]
+              recurrent = bytes.fromhex(raw["recurrent_f32le_hex"])
+              thought = bytes.fromhex(raw["thought_f32le_hex"])
+              wisdom = bytes.fromhex(raw["wisdom_hv_hex"])
+              science = doc["scientific_payload"]
+              science["recurrent_f32le_sha256"] = sha256(recurrent)
+              science["thought_vector_f32le_sha256"] = sha256(thought)
+              science["wisdom_hv_sha256"] = sha256(wisdom)
+              feature = hash_frames(FEATURE_DOMAIN, [("recurrent_f32le", recurrent), ("thought_f32le", thought), ("wisdom_hv", wisdom)])
+              raw["sealed_feature_bundle_sha256"] = feature
+              science["sealed_feature_bundle_sha256"] = feature
+
+          wrong_binding = copy.deepcopy(binding)
+          wrong_binding["executable_sha256"] = "f" * 64 if executable_sha != "f" * 64 else "e" * 64
+          run_auditor("wrong-execution-binding", wrong_binding, r0, r1, False)
+
+          raw_mut = copy.deepcopy(r0)
+          hx = raw_mut["raw_feature_bundle"]["recurrent_f32le_hex"]
+          raw_mut["raw_feature_bundle"]["recurrent_f32le_hex"] = ("00" if hx[:2] != "00" else "01") + hx[2:]
+          run_auditor("raw-postseal-mutation", binding, raw_mut, r1, False)
+
+          nonfinite = copy.deepcopy(r0)
+          hx = nonfinite["raw_feature_bundle"]["recurrent_f32le_hex"]
+          nonfinite["raw_feature_bundle"]["recurrent_f32le_hex"] = "0000c07f" + hx[8:]
+          refresh_raw_hashes(nonfinite)
+          nonfinite["scientific_payload"]["recurrent_nonfinite_count"] = 0
+          reseal(nonfinite)
+          run_auditor("coherent-nonfinite-lie", binding, nonfinite, r1, False)
+
+          zero_lie = copy.deepcopy(r0)
+          zero_lie["scientific_payload"]["recurrent_all_zero"] = not zero_lie["scientific_payload"]["recurrent_all_zero"]
+          reseal(zero_lie)
+          run_auditor("coherent-allzero-lie", binding, zero_lie, r1, False)
+
+          mask_lie = copy.deepcopy(r0)
+          mask_lie["scientific_payload"]["recurrent_masking_enabled"] = True
+          reseal(mask_lie)
+          run_auditor("coherent-mask-lie", binding, mask_lie, r1, False)
+
+          reused = copy.deepcopy(r1)
+          reused["provenance_envelope"]["service_instance_id"] = r0["provenance_envelope"]["service_instance_id"]
+          reseal(reused, science_reseal=False)
+          run_auditor("service-identity-reuse", binding, r0, reused, False)
+
+          peer_drift = copy.deepcopy(r1)
+          peer_drift["provenance_envelope"]["environment_capsule_sha256"] = "d" * 64
+          reseal(peer_drift, science_reseal=False)
+          run_auditor("peer-provenance-drift", binding, r0, peer_drift, False)
+
+          type_alias = copy.deepcopy(r0)
+          type_alias["scientific_payload"]["recurrent_length"] = str(type_alias["scientific_payload"]["recurrent_length"])
+          run_auditor("science-type-alias", binding, type_alias, r1, False)
+
+          def run_raw_binding_control(name, binding_text):
+              bpath = evidence / f"raw-{name}-binding.json"
+              apath = evidence / f"raw-{name}-a.json"
+              cpath = evidence / f"raw-{name}-b.json"
+              bpath.write_text(binding_text, encoding="utf-8")
+              dump(apath, r0); dump(cpath, r1)
+              proc = subprocess.run([sys.executable, str(pair_auditor), str(bpath), str(apath), str(cpath)], text=True, capture_output=True, timeout=60)
+              if proc.returncode == 0:
+                  raise RuntimeError(f"raw binding mutation accepted:{name}")
+
+          binding_text = canonical(binding).decode()
+          run_raw_binding_control("duplicate-key", binding_text[:-1] + ',"schema_version":"PARADOX-A0R-F0-EXECUTION-BINDING-V1"}')
+          run_raw_binding_control("float-token", binding_text.replace('"measurement_cycle_index":0', '"measurement_cycle_index":0.0'))
+          run_raw_binding_control("nan-token", binding_text.replace('"measurement_cycle_index":0', '"measurement_cycle_index":NaN'))
+          nfd_binding = copy.deepcopy(binding); nfd_binding["schema_version"] = "E\u0301"
+          run_raw_binding_control("non-nfc", json.dumps(nfd_binding, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+
+          r0_text = canonical(r0).decode()
+          dup_receipt = r0_text[:-1] + ',"schema_version":"PARADOX-A0R-F0-WORKER-RESPONSE-V3"}'
+          dup_path = evidence / "raw-duplicate-receipt-a.json"; dup_path.write_text(dup_receipt, encoding="utf-8")
+          proc = subprocess.run([sys.executable, str(pair_auditor), str(evidence / "execution-binding.json"), str(dup_path), str(evidence / "replicate-1.json")], text=True, capture_output=True, timeout=60)
+          if proc.returncode == 0:
+              raise RuntimeError("duplicate receipt key accepted")
+
+          worker_source = (root / "src/bin/paradox_a0r_f0_worker.rs").read_text()
+          def source_gate(source):
+              if ".cycle_with_hv(" in source:
+                  raise ValueError("cycle_with_hv substitution")
+              frozen = source[source.index("fn frozen_config()") : source.index("fn execute_request")]
+              if any(token in frozen for token in ("request.", "opaque_", "technical_pair_id")):
+                  raise ValueError("provenance-to-config path")
+          source_gate(worker_source)
+          for forbidden in ("retry", "target_label", "oracle", "split_membership", "probe_artifact", "prediction", "score"):
+              if forbidden in worker_source.lower():
+                  raise RuntimeError(f"forbidden label/retry surface in worker:{forbidden}")
+          try:
+              source_gate(worker_source.replace("service.cycle(event)", "service.cycle_with_hv(event)"))
+          except ValueError:
+              pass
+          else:
+              raise RuntimeError("cycle_with_hv mutation not detected")
+          try:
+              source_gate(worker_source.replace("fn frozen_config() -> CognitiveLoopConfig {", "fn frozen_config() -> CognitiveLoopConfig { /* request.opaque_measurement_id */"))
+          except ValueError:
+              pass
+          else:
+              raise RuntimeError("provenance-to-config mutation not detected")
+
+          expected_attempt_names = {
+              "primary-replicate-0", "primary-replicate-1", "duplicate-request-key",
+              "unknown-semantic-key", "replicate-index-2", "nonfinal-measurement-cycle",
+              "float-replicate-index", "sidecar-argument", "opaque-id-rename",
+              "plan-order-ab", "plan-order-ba",
+          }
+          actual_names = {entry["name"] for entry in attempts}
+          if actual_names != expected_attempt_names or len(attempts) != len(expected_attempt_names):
+              raise RuntimeError("attempt ledger incomplete")
+          damaged = attempts[:-1]
+          if {entry["name"] for entry in damaged} == expected_attempt_names:
+              raise RuntimeError("unretained-attempt mutation not detected")
+
+          with (evidence / "attempts.ndjson").open("w", encoding="utf-8") as handle:
+              for entry in attempts:
+                  handle.write(canonical(entry).decode() + "\n")
+
+          summary = {
+              "schema_version": "PARADOX-A0R-F0-V4-QUALIFICATION-SUMMARY-V1",
+              "subject_sha": subject_sha,
+              "status": "PASS",
+              "execution_binding_sha256": domain_hash(BINDING_DOMAIN, canonical(binding)),
+              "environment_capsule_sha256": env_capsule_sha,
+              "source_binding_sha256": source_binding_sha,
+              "executable_sha256": executable_sha,
+              "scientific_payload_sha256": r0["scientific_payload_sha256"],
+              "technical_pair_sha256": pair["pair_receipt_sha256"],
+              "worker_attempt_records": len(attempts),
+              "retry_policy": "NONE",
+              "labels_splits_probes_scores_loaded": False,
+              "dependency_plane": "auto-discovered-bin / Cargo.toml+Cargo.lock unchanged / no dev-dependency delta",
+              "claim_ceiling": "transport-only; no dataset, decodability, behavior, causal-use, metacognition, ontology-repair, consciousness, sentience or phenomenology claim",
+          }
+          dump(evidence / "qualification-summary.json", summary)
+          print(json.dumps(summary, sort_keys=True, separators=(",", ":")))
+          PY
+
+      - name: Seal evidence manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="${RUNNER_TEMP}/f0-evidence"
+          (
+            cd "${evidence}"
+            find . -type f ! -name 'EVIDENCE_MANIFEST.sha256' -print0 \
+              | LC_ALL=C sort -z \
+              | xargs -0 sha256sum > EVIDENCE_MANIFEST.sha256
+          )
+          cat "${evidence}/qualification-summary.json"
+          printf 'evidence-manifest-sha256=%s\n' "$(sha256sum "${evidence}/EVIDENCE_MANIFEST.sha256" | awk '{print $1}')"
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: paradox-a0r-f0-v4-${{ env.SUBJECT_SHA }}
+          path: ${{ runner.temp }}/f0-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Postflight exact-subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git rev-parse HEAD^)" = "${M0_SHA}"
+          test "$(git hash-object Cargo.toml)" = "${CARGO_BLOB_SHA}"
+          test "$(git hash-object Cargo.lock)" = "${LOCK_BLOB_SHA}"
+          test -z "$(git status --porcelain --untracked-files=all)"
