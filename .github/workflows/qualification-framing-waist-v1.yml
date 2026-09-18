@@ -1,0 +1,221 @@
+name: Qualification Framing Waist V1
+
+on:
+  pull_request:
+    branches:
+      - qual-001a1-source-manifest
+    paths:
+      - '.github/workflows/qualification-framing-waist-v1.yml'
+      - 'scripts/qualification_framing_v1.py'
+      - 'tests/python/test_qualification_framing_v1.py'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  candidate-conformance:
+    name: Exact framing-waist candidate conformance
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+
+    env:
+      SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+      EXPECTED_FRAMING_BLOB: ab5f50d9d2e68fadd42f171e66855eba60d03930
+      HISTORICAL_SOURCE_SHA: 5d951664ff2608d231da258b2a29db56d07e83f5
+      PYTHONDONTWRITEBYTECODE: '1'
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+
+      - name: Verify exact head, parent, scope and source blob
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test -n "$BASE_SHA"
+            test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          else
+            BASE_SHA="$(git rev-parse HEAD^)"
+          fi
+
+          git diff --check "$BASE_SHA" HEAD
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA" HEAD)
+          test "${#changed[@]}" -eq 3
+
+          for path in "${changed[@]}"; do
+            case "$path" in
+              .github/workflows/qualification-framing-waist-v1.yml|scripts/qualification_framing_v1.py|tests/python/test_qualification_framing_v1.py)
+                ;;
+              *)
+                echo "out-of-scope path: $path" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          actual_blob="$(git rev-parse HEAD:scripts/qualification_framing_v1.py)"
+          test "$actual_blob" = "$EXPECTED_FRAMING_BLOB"
+          echo "framing_blob=$actual_blob"
+          echo "historical_source_sha=$HISTORICAL_SOURCE_SHA"
+
+      - name: Setup exact Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12.11'
+
+      - name: Parse framing and oracle without repository writes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          for raw in (
+              "scripts/qualification_framing_v1.py",
+              "tests/python/test_qualification_framing_v1.py",
+          ):
+              path = Path(raw)
+              compile(path.read_text(encoding="utf-8"), str(path), "exec")
+              print(f"parsed: {path}")
+          PY
+
+      - name: Run independent framing oracle and negative vectors
+        run: |
+          python tests/python/test_qualification_framing_v1.py -v
+
+      - name: Verify frozen framing IDs independently
+        run: |
+          python - <<'PY'
+          import hashlib
+
+          vectors = {
+              "empty": bytes.fromhex(
+                  "53594d5146524d310001001673796d74686165612e746573742e656d7074792e7631"
+                  "00000000"
+              ),
+              "scalar": bytes.fromhex(
+                  "53594d5146524d310001001773796d74686165612e746573742e7363616c61722e7631"
+                  "00000003"
+                  "00046e616d65000000000000000e540000000000000005616c706861"
+                  "0005636f756e740000000000000009550000000000000007"
+                  "0007656e61626c656400000000000000025901"
+              ),
+              "collections": bytes.fromhex(
+                  "53594d5146524d310001001c73796d74686165612e746573742e636f6c6c656374696f6e732e7631"
+                  "00000002"
+                  "00076f726465726564000000000000002d4c0000000000000002"
+                  "000000000000000a54000000000000000162"
+                  "000000000000000a54000000000000000161"
+                  "00076d656d62657273000000000000002d530000000000000002"
+                  "000000000000000a54000000000000000161"
+                  "000000000000000a54000000000000000162"
+              ),
+          }
+          expected = {
+              "empty": "69ff1fa39afc4e827669c2e79605836ce2507f9c974a0511a5b72b0ee4170837",
+              "scalar": "0df9fe4f5d557dd815fbe50f7d120c866fbe7601efbb877b1eed4d30176a63f9",
+              "collections": "980fa1204aa741835ee0f463e6a09c3696a49af89a1021d41df5825e93b21292",
+          }
+          for name, framed in vectors.items():
+              actual = hashlib.sha256(framed).hexdigest()
+              if actual != expected[name]:
+                  raise SystemExit(f"{name}: {actual} != {expected[name]}")
+              print(f"{name}=sha256:{actual}")
+          PY
+
+      - name: Postflight exact-subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Emit framing candidate receipt
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.repository_id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/qual-framing-receipt"
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          def git(*args: str) -> str:
+              return subprocess.run(
+                  ["git", *args], check=True, text=True,
+                  stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+              ).stdout.strip()
+
+          subject = os.environ["SUBJECT_SHA"]
+          base = os.environ.get("BASE_SHA") or git("rev-parse", "HEAD^")
+          receipt = {
+              "schema": "symthaea.qualification-framing-waist-candidate-receipt.v1",
+              "qualification_era": "QERA-001",
+              "candidate_disposition": "CandidateConformancePass",
+              "repository": os.environ["REPOSITORY"],
+              "repository_id": os.environ["REPOSITORY_ID"],
+              "subject_sha": subject,
+              "subject_tree": git("rev-parse", f"{subject}^{{tree}}"),
+              "base_sha": base,
+              "run_id": int(os.environ["RUN_ID"]),
+              "run_attempt": int(os.environ["RUN_ATTEMPT"]),
+              "historical_source_sha": os.environ["HISTORICAL_SOURCE_SHA"],
+              "historical_source_blob": os.environ["EXPECTED_FRAMING_BLOB"],
+              "framing_blob": git("rev-parse", f"{subject}:scripts/qualification_framing_v1.py"),
+              "test_blob": git("rev-parse", f"{subject}:tests/python/test_qualification_framing_v1.py"),
+              "workflow_blob": git("rev-parse", f"{subject}:.github/workflows/qualification-framing-waist-v1.yml"),
+              "golden_ids": [
+                  "sha256:69ff1fa39afc4e827669c2e79605836ce2507f9c974a0511a5b72b0ee4170837",
+                  "sha256:0df9fe4f5d557dd815fbe50f7d120c866fbe7601efbb877b1eed4d30176a63f9",
+                  "sha256:980fa1204aa741835ee0f463e6a09c3696a49af89a1021d41df5825e93b21292",
+              ],
+              "claim_ceiling": [
+                  "candidate framing-byte conformance only",
+                  "no independent recipe admission",
+                  "no historical PASS transfer",
+                  "no recipe profile subject receipt or domain claim authority",
+                  "no merge deployment or execution authority",
+              ],
+          }
+          out = Path(os.environ["RUNNER_TEMP"]) / "qual-framing-receipt" / "receipt.json"
+          encoded = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+          out.write_bytes(encoded)
+          digest = hashlib.sha256(encoded).hexdigest()
+          (out.parent / "receipt.sha256").write_text(f"{digest}  receipt.json\n", encoding="utf-8")
+          print(f"candidate_receipt_sha256={digest}")
+          PY
+
+      - name: Upload framing candidate receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qual-framing-candidate-${{ env.SUBJECT_SHA }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/qual-framing-receipt/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record claim boundary
+        if: always()
+        run: |
+          {
+            echo '## QUAL-001A1D1 framing candidate conformance'
+            echo
+            echo "- exact subject: \`$SUBJECT_SHA\`"
+            echo "- exact framing blob required: \`$EXPECTED_FRAMING_BLOB\`"
+            echo '- successful execution is candidate evidence only'
+            echo '- no independent recipe admission or domain claim authority is created here'
+          } >> "$GITHUB_STEP_SUMMARY"
