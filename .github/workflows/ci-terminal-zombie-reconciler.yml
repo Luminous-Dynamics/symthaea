@@ -1,0 +1,208 @@
+name: CI Terminal-Zombie Reconciler
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Actually cancel eligible terminal-zombie CI parents (false = dry run)"
+        required: true
+        default: false
+        type: boolean
+      max_runs:
+        description: "Maximum eligible runs to mutate in one reconciliation"
+        required: true
+        default: 20
+        type: number
+  pull_request:
+    paths:
+      - ".github/rel/ci-terminal-zombie-contract.json"
+      - ".github/scripts/ci-terminal-zombie-policy.cjs"
+      - ".github/workflows/ci-terminal-zombie-reconciler.yml"
+
+permissions: {}
+
+concurrency:
+  group: ci-terminal-zombie-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'reconcile' }}
+  cancel-in-progress: false
+
+jobs:
+  contract-self-test:
+    name: Verify terminal-zombie recovery contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact PR subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate declarative contract and executable policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .github/scripts/ci-terminal-zombie-policy.cjs | tee "${RUNNER_TEMP}/terminal-zombie-self-test.json"
+          node - <<'NODE'
+          const fs = require('fs');
+          const contract = JSON.parse(fs.readFileSync('.github/rel/ci-terminal-zombie-contract.json', 'utf8'));
+          const result = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/terminal-zombie-self-test.json', 'utf8'));
+          if (contract.schema !== 'symthaea.ci.terminal-zombie-contract.v1') throw new Error('schema');
+          if (contract.authority !== 'RunnerPlaneContractOnly') throw new Error('authority');
+          if (contract.workflow !== 'ci.yml' || contract.event !== 'pull_request') throw new Error('scope');
+          if (contract.candidate_parent_status !== 'in_progress') throw new Error('status');
+          if (contract.minimum_stale_minutes !== 30) throw new Error('stale window');
+          if (contract.authority_boundary.scientific_authority !== false) throw new Error('authority leak');
+          if (!result.pass || result.cases !== 9) throw new Error('self-test');
+          NODE
+
+      - name: Assert PR event has no write-capable reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PR validation is read-only; reconcile job is event-gated to schedule/workflow_dispatch."
+
+  reconcile:
+    name: Reconcile stale CI parents with all child jobs terminal
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout recovery policy
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Reconcile terminal-zombie CI parents
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        env:
+          MANUAL_APPLY: ${{ inputs.apply || 'false' }}
+          MANUAL_MAX_RUNS: ${{ inputs.max_runs || '20' }}
+        with:
+          script: |
+            const { classifyTerminalZombie } = require('./.github/scripts/ci-terminal-zombie-policy.cjs');
+            const { owner, repo } = context.repo;
+            const scheduled = context.eventName === 'schedule';
+            const apply = scheduled || String(process.env.MANUAL_APPLY) === 'true';
+            const requestedMax = scheduled ? 20 : Number(process.env.MANUAL_MAX_RUNS);
+            if (!Number.isInteger(requestedMax) || requestedMax < 1 || requestedMax > 50) {
+              core.setFailed(`max_runs must be an integer in [1,50], got ${requestedMax}`);
+              return;
+            }
+
+            const candidates = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              event: 'pull_request',
+              status: 'in_progress',
+              per_page: 100,
+            });
+            const eligible = [];
+            const observations = [];
+
+            for (const candidate of candidates) {
+              const { data: freshRun } = await github.rest.actions.getWorkflowRun({
+                owner, repo, run_id: candidate.id,
+              });
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner, repo, run_id: candidate.id, per_page: 100,
+              });
+              const classification = classifyTerminalZombie({
+                run: freshRun,
+                jobs,
+                nowMs: Date.now(),
+                minimumStaleMinutes: 30,
+              });
+              observations.push({
+                runId: candidate.id,
+                headSha: freshRun.head_sha,
+                headBranch: freshRun.head_branch,
+                jobCount: jobs.length,
+                eligible: classification.eligible,
+                reasons: classification.reasons,
+              });
+              if (classification.eligible) eligible.push({ run: freshRun, jobs, classification });
+            }
+
+            core.notice(`Terminal-zombie census: in_progress pull-request CI runs=${candidates.length}; eligible=${eligible.length}; apply=${apply}.`);
+            for (const o of observations) {
+              core.notice(`run=${o.runId} head=${o.headSha} branch=${o.headBranch} jobs=${o.jobCount} eligible=${o.eligible} reasons=${o.reasons.join(',') || 'none'}`);
+            }
+
+            if (!apply) {
+              for (const item of eligible.slice(0, requestedMax)) {
+                core.notice(`[dry-run] would reconcile terminal-zombie CI run ${item.run.id} at ${item.run.head_sha}; jobs=${item.jobs.length}`);
+              }
+              return;
+            }
+
+            let normalAccepted = 0;
+            let forceAccepted = 0;
+            let unresolved409 = 0;
+            let becameIneligible = 0;
+            const unresolved = [];
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            for (const item of eligible.slice(0, requestedMax)) {
+              // Re-read immediately before mutation; classification is a candidate
+              // observation, never authority to cancel stale state later.
+              const { data: liveRun } = await github.rest.actions.getWorkflowRun({
+                owner, repo, run_id: item.run.id,
+              });
+              const liveJobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                owner, repo, run_id: item.run.id, per_page: 100,
+              });
+              const live = classifyTerminalZombie({
+                run: liveRun,
+                jobs: liveJobs,
+                nowMs: Date.now(),
+                minimumStaleMinutes: 30,
+              });
+              if (!live.eligible) {
+                becameIneligible += 1;
+                core.notice(`Leaving run ${item.run.id} untouched after fresh reclassification: ${live.reasons.join(',')}`);
+                continue;
+              }
+
+              try {
+                await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id: item.run.id });
+                normalAccepted += 1;
+                core.notice(`Normal cancellation accepted for terminal-zombie run ${item.run.id}.`);
+              } catch (error) {
+                if (error.status !== 409) throw error;
+                core.warning(`Normal cancellation returned 409 for terminal-zombie run ${item.run.id}; attempting one force-cancel.`);
+                try {
+                  await github.request(
+                    'POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel',
+                    { owner, repo, run_id: item.run.id },
+                  );
+                  forceAccepted += 1;
+                  core.notice(`Force-cancel accepted for terminal-zombie run ${item.run.id}.`);
+                } catch (forceError) {
+                  if (forceError.status !== 409) throw forceError;
+                  unresolved409 += 1;
+                  unresolved.push({ runId: item.run.id, headSha: liveRun.head_sha, headBranch: liveRun.head_branch });
+                  core.warning(`Terminal-zombie run ${item.run.id} remains inconsistent after force-cancel 409; no further mutation this reconciliation.`);
+                }
+              }
+              await sleep(1000);
+            }
+
+            const summary = [
+              '## CI terminal-zombie reconciliation',
+              '',
+              `- Candidate in-progress pull-request CI runs: ${candidates.length}`,
+              `- Eligible all-terminal stale parents: ${eligible.length}`,
+              `- Normal cancellations accepted: ${normalAccepted}`,
+              `- Force-cancellations accepted: ${forceAccepted}`,
+              `- Reclassified safe/active before mutation: ${becameIneligible}`,
+              `- Unresolved force-cancel 409s: ${unresolved409}`,
+            ];
+            if (unresolved.length) {
+              summary.push('', '### Unresolved platform state');
+              for (const u of unresolved) summary.push(`- run ${u.runId}; branch \`${u.headBranch}\`; head \`${u.headSha}\``);
+            }
+            await core.summary.addRaw(`${summary.join('\n')}\n`).write();
