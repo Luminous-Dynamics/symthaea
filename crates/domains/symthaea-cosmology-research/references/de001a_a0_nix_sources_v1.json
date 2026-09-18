@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A0-NIX-FIXED-OUTPUT-v1",
+  "scientific_claim": "NONE",
+  "artifacts": [
+    {"role":"dataset-mean","expected_size":472,"sha256":"9ac154ab583ce759c0f7eef3c978c7c70a6ead2d18774caceadf1a350a640585","nix_sri":"sha256-msFUq1g851nA9+7zyXjHxwpurS0Yd0ys6t8aNQpkBYU=","url":"https://raw.githubusercontent.com/CobayaSampler/bao_data/bb0c1c9009dc76d1391300e169e8df38fd1096db/desi_bao_dr2/desi_gaussian_bao_ALL_GCcomb_mean.txt"},
+    {"role":"dataset-covariance","expected_size":2547,"sha256":"252a143274c8a07c78694c119617d36594f6d7965d00319ca611c6ffb886e509","nix_sri":"sha256-JSoUMnTIoHx4aUwRlhfTZZT215ZdADGcphHG/7iG5Qk=","url":"https://raw.githubusercontent.com/CobayaSampler/bao_data/bb0c1c9009dc76d1391300e169e8df38fd1096db/desi_bao_dr2/desi_gaussian_bao_ALL_GCcomb_cov.txt"},
+    {"role":"likelihood-definition","expected_size":368,"sha256":"fd7e9bf2dcf5ffee90a9a30b18227f4337d6d5c1978782c63513cbe0d8280daa","nix_sri":"sha256-/X6b8tz1/+6QqaMLGCJ/QzfW1cGXh4LGNRPL4NgoDao=","url":"https://raw.githubusercontent.com/CobayaSampler/cobaya/899f30a49f85de610dac321e91a1af50018e56aa/cobaya/likelihoods/bao/desi_dr2/desi_bao_all.yaml"},
+    {"role":"reference-input-configuration","expected_size":2381,"sha256":"34499cb78ecaec78db44da9f06f61cd9c9ee497dc5c541b72b48cda54091c6ef","nix_sri":"sha256-NEmct47K7HjbRNqfBvYc2cnuSX3FxUG3K0jNpUCRxu8=","url":"https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/iminuit/base/desi-bao-all/bestfit.minimize.input.yaml"},
+    {"role":"reference-expanded-configuration","expected_size":3969,"sha256":"c4c23032d1695635aaea6eb47fabd909006ff32df0a27eadbf64b36c89f31ba1","nix_sri":"sha256-xMIwMtFpVjWq6m60f6vZCQBv8y3won6tv2SzbInzG6E=","url":"https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/iminuit/base/desi-bao-all/bestfit.minimize.updated.yaml"},
+    {"role":"reference-minimizer-configuration","expected_size":2484,"sha256":"6b51048b359e4b9d646de09379ca273a8d6a1bc1b5a88f585a09d8f2e61f290c","nix_sri":"sha256-a1EEizWeS51kbeCTeconOo1qG8G1qI9YWgnY8uYfKQw=","url":"https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/iminuit/base/desi-bao-all/minimizer.yaml"},
+    {"role":"reference-bestfit-text","expected_size":902,"sha256":"bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358","nix_sri":"sha256-v4414jgO81sTendkXcs1GvLtKpPKjaFsH9cctd16E1g=","url":"https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/iminuit/base/desi-bao-all/bestfit.minimum.txt"},
+    {"role":"reference-bestfit-getdist","expected_size":3940,"sha256":"4f6437661facb925673155efad0f27478ce08f0bfc9f58e0bf03bddfc96c9f21","nix_sri":"sha256-T2Q3Zh+suSVnMVXvrQ8nR4zgjwv8n1jgvwO938lsnyE=","url":"https://data.desi.lbl.gov/public/papers/y3/bao-cosmo-params/iminuit/base/desi-bao-all/bestfit.minimum"}
+  ]
+}
