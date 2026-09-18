@@ -1,0 +1,12 @@
+{
+  "schema": "symthaea.merge-admission-policy.v1",
+  "policy_id": "symthaea-main-merge-admission@v1",
+  "target": "~DEFAULT_BRANCH",
+  "required_checks": [
+    "Governance Check (Class A/B Changes)"
+  ],
+  "require_pull_request": true,
+  "block_force_push": true,
+  "block_deletion": true,
+  "require_no_bypass": true
+}
