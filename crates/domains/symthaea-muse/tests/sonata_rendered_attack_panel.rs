@@ -1,15 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! MEL-003C4B: observational eight-seed replication of the already-frozen
-//! rendered-attack gate. Gate rejections are retained as evidence rather than
-//! converted into test failures; malformed or structurally invalid evidence
-//! still fails closed.
+//! MEL-003C4D: bind the observational eight-seed rendered-attack panel to
+//! exact per-seed score and native-waveform identities. Gate rejections remain
+//! data; provenance mismatch or malformed evidence fails closed.
 
 use symthaea_muse::evidence_digest::{
     canonical_json_sha256,
     rendered_attack_evidence::measure_rendered_attack,
     rendered_attack_gate::{RenderedAttackGateConfigV1, evaluate_rendered_attack_gate},
     rendered_attack_panel::{RenderedAttackPanelSampleV1, summarize_rendered_attack_panel},
+    rendered_attack_provenance::{
+        RENDERED_ATTACK_PROVENANCE_VERSION, RenderedAttackPanelProvenanceV1,
+        RenderedAttackSubjectProvenanceV1, bind_rendered_attack_panel,
+    },
+    sha256_hex,
 };
 use symthaea_muse::theory_realize::{PerformedVoice, perform_with_spec, realize_with_spec};
 use symthaea_muse::{AudioData, MusicalState};
@@ -23,6 +27,7 @@ const START_MATCH_EPSILON_SECS: f32 = 0.000_1;
 const FREQUENCY_MATCH_EPSILON_HZ: f32 = 0.001;
 const PRE_WINDOW_SECS: f32 = 0.005;
 const POST_WINDOW_SECS: f32 = 0.050;
+const RENDERER_ID: &str = "symthaea-muse::theory_realize::realize_with_spec/native";
 
 fn should_rearticulate(
     note: &symthaea_music_theory::ScoreNote,
@@ -63,6 +68,17 @@ fn stereo_frames(audio: &AudioData) -> &[[f32; 2]] {
         AudioData::StereoF32(frames) => frames,
         other => panic!("native Sonata renderer must emit StereoF32, got {other:?}"),
     }
+}
+
+fn stereo_sha256(frames: &[[f32; 2]]) -> String {
+    let mut bytes = Vec::with_capacity(frames.len() * 2 * std::mem::size_of::<f32>());
+    for frame in frames {
+        for sample in frame {
+            assert!(sample.is_finite(), "audio provenance cannot hash NaN/Inf");
+            bytes.extend_from_slice(&sample.to_le_bytes());
+        }
+    }
+    sha256_hex(&bytes)
 }
 
 #[derive(Debug, Clone)]
@@ -118,7 +134,7 @@ fn newly_introduced_attacks(
 }
 
 #[test]
-fn fixed_sonata_seed_panel_records_every_frozen_gate_result_without_hiding_rejections() {
+fn fixed_sonata_seed_panel_binds_gate_results_to_exact_score_and_audio_identities() {
     let config = RenderedAttackGateConfigV1::default();
     // Lock the exact C3B operating point. C4 is replication, not retuning.
     assert_eq!(config.ratio_floor_rms, 1.0e-6);
@@ -128,6 +144,7 @@ fn fixed_sonata_seed_panel_records_every_frozen_gate_result_without_hiding_rejec
     let spec = Style::Sonata.spec();
     let state = MusicalState::default();
     let mut samples = Vec::new();
+    let mut provenance_subjects = Vec::new();
     let mut expected_attack_count = 0usize;
 
     for seed in SEEDS {
@@ -153,6 +170,13 @@ fn fixed_sonata_seed_panel_records_every_frozen_gate_result_without_hiding_rejec
 
         let candidate_score =
             rearticulate_accompaniment(&realization.score, target.start, target.end);
+        let baseline_score_sha256 = canonical_json_sha256(&realization.score).unwrap();
+        let candidate_score_sha256 = canonical_json_sha256(&candidate_score).unwrap();
+        assert_ne!(
+            baseline_score_sha256, candidate_score_sha256,
+            "seed {seed}: the bounded intervention must change concrete score identity"
+        );
+
         let baseline_performed = perform_with_spec(&realization.score, &spec, seed, &state);
         let candidate_performed = perform_with_spec(&candidate_score, &spec, seed, &state);
         let baseline_attacks = accompaniment_attacks(&baseline_performed);
@@ -178,6 +202,15 @@ fn fixed_sonata_seed_panel_records_every_frozen_gate_result_without_hiding_rejec
         );
 
         let subject_id = format!("sonata-seed-{seed}");
+        provenance_subjects.push(RenderedAttackSubjectProvenanceV1 {
+            subject_id: subject_id.clone(),
+            seed,
+            baseline_score_sha256,
+            candidate_score_sha256,
+            baseline_audio_sha256: stereo_sha256(baseline_frames),
+            candidate_audio_sha256: stereo_sha256(candidate_frames),
+        });
+
         for (attack_ordinal, attack) in introduced.iter().enumerate() {
             let evidence = measure_rendered_attack(
                 baseline_frames,
@@ -226,17 +259,32 @@ fn fixed_sonata_seed_panel_records_every_frozen_gate_result_without_hiding_rejec
     assert!(panel.post_to_pre_ratio.maximum.is_finite());
     assert!(panel.post_to_pre_ratio.mean.is_finite());
 
-    // The canonical digest binds one exact observational panel without making
-    // the digest itself a pass criterion. A later qualification tranche may
-    // freeze/replay the measured panel after runner evidence actually exists.
-    let digest = canonical_json_sha256(&panel).unwrap();
-    assert_eq!(digest.len(), 64);
-    assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    let provenance = RenderedAttackPanelProvenanceV1 {
+        provenance_version: RENDERED_ATTACK_PROVENANCE_VERSION.into(),
+        renderer_id: RENDERER_ID.into(),
+        sample_rate: SAMPLE_RATE,
+        pre_window_seconds: PRE_WINDOW_SECS,
+        post_window_seconds: POST_WINDOW_SECS,
+        subjects: provenance_subjects,
+    };
+    let bound = bind_rendered_attack_panel(&panel, &provenance).unwrap();
+    let panel_digest = canonical_json_sha256(&panel).unwrap();
+    assert_eq!(bound.panel_sha256, panel_digest);
+    assert_eq!(bound.provenance.subjects.len(), SEEDS.len());
+    for digest in [
+        &bound.panel_sha256,
+        &bound.provenance_sha256,
+        &bound.binding_sha256,
+    ] {
+        assert_eq!(digest.len(), 64);
+        assert!(digest.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    }
 
-    // Useful under --nocapture / targeted qualification runs. Rejections are
-    // intentionally printed rather than asserted away.
+    // Useful under --nocapture / targeted qualification runs. Gate rejections
+    // remain observations; the binding digest commits the complete panel plus
+    // exact score/audio provenance without turning it into a success score.
     println!(
-        "MEL003C4B subjects={} attacks={} localized={} rejected={} post_energy={} growth={} pre_rms=[{:.8},{:.8}] mean={:.8} post_rms=[{:.8},{:.8}] mean={:.8} ratio=[{:.3},{:.3}] mean={:.3} sha256={}",
+        "MEL003C4D subjects={} attacks={} localized={} rejected={} post_energy={} growth={} pre_rms=[{:.8},{:.8}] mean={:.8} post_rms=[{:.8},{:.8}] mean={:.8} ratio=[{:.3},{:.3}] mean={:.3} panel_sha256={} provenance_sha256={} binding_sha256={}",
         panel.subject_count,
         panel.attack_count,
         panel.localized_change_count,
@@ -252,6 +300,8 @@ fn fixed_sonata_seed_panel_records_every_frozen_gate_result_without_hiding_rejec
         panel.post_to_pre_ratio.minimum,
         panel.post_to_pre_ratio.maximum,
         panel.post_to_pre_ratio.mean,
-        digest
+        bound.panel_sha256,
+        bound.provenance_sha256,
+        bound.binding_sha256
     );
 }
