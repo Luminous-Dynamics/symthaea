@@ -6,9 +6,9 @@
 //! This crate is intentionally dependency-light and non-executing. It defines
 //! identities, bounded authority, evidence classes, independence descriptors,
 //! scientific subjects, claims, typed provenance graphs, frozen study protocols,
-//! immutable execution/conformance records, and adversarial falsification
-//! campaigns. It does not run experiments, solvers, LLMs, HDC, statistics,
-//! formal provers, or network operations.
+//! immutable execution/conformance records, adversarial falsification campaigns,
+//! and explicit scientific uncertainty budgets. It does not run experiments,
+//! solvers, LLMs, HDC, statistics, formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Qualification is intentionally reserved for a later non-forgeable wrapper.
@@ -23,6 +23,7 @@ pub mod independence;
 pub mod protocol;
 pub mod provenance;
 pub mod subject;
+pub mod uncertainty;
 
 pub use authority::*;
 pub use claim::*;
@@ -34,3 +35,4 @@ pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
 pub use subject::*;
+pub use uncertainty::*;
