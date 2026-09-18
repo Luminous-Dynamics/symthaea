@@ -63,6 +63,7 @@ pub mod world_prediction;
 // Replay-grounded recursive improvement. Measurement functions are sealed behind
 // qualification tokens; serializable receipts alone must not unlock fresh seeds.
 pub mod dream_confidence_gate;
+pub mod dream_semantic_coordinator;
 pub mod epistemic_world;
 pub mod exact_replay;
 pub mod experience_tree;
@@ -144,6 +145,9 @@ pub use dream_feedback::{
 
 // Replay-grounded RSI exports
 pub use dream_confidence_gate::DreamConfidenceGate;
+pub use dream_semantic_coordinator::{
+    DreamSemanticCoordinatorError, DreamSemanticOutcome, process_semantic_insight_atomically,
+};
 pub use epistemic_world::{EpistemicWorldRecord, WorldEvidenceKind};
 pub use exact_replay::{ExactReplayWorld, ReplayError};
 pub use experience_tree::{
