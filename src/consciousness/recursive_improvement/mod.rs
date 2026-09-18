@@ -9,6 +9,42 @@
 //! - Dream feedback (counterfactual learning)
 //! - Replay-grounded policy improvement with explicit epistemic boundaries
 //! - Active inference bridge (MAGI + PAC + signals)
+//!
+//! ## MAGI Loop (Minimum AGI Loop) Implementation
+//!
+//! The MAGI Loop is a falsifiable AGI crossing criterion with 6 steps:
+//!
+//! ```text
+//! ┌─────────────────────────────────────────────────────────────────────┐
+//! │                        THE MAGI LOOP                                │
+//! │                                                                     │
+//! │   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐          │
+//! │   │ 1. PREDICT  │────▶│ 2. RESOLVE  │────▶│ 3. SELECT   │          │
+//! │   │   (World)   │     │ (Calibrate) │     │  (Action)   │          │
+//! │   └─────────────┘     └─────────────┘     └──────┬──────┘          │
+//! │                                                   │                 │
+//! │   ┌─────────────┐     ┌─────────────┐     ┌──────▼──────┐          │
+//! │   │ 6. UPDATE   │◀────│ 5. ATTRIB   │◀────│ 4. OBSERVE  │          │
+//! │   │   (Safe)    │     │  (Causal)   │     │  (Reality)  │          │
+//! │   └──────┬──────┘     └─────────────┘     └─────────────┘          │
+//! │          │                                                          │
+//! │          └──────────────────────────────────────────────────────────│
+//! │                     LOOP BACK TO STEP 1                             │
+//! └─────────────────────────────────────────────────────────────────────┘
+//! ```
+//!
+//! ### Key MAGI Loop Components
+//!
+//! - [`WorldPrediction`]: Falsifiable predictions about external reality
+//! - [`BrierScoreTracker`]: Proper calibration with ECE measurement
+//! - [`ConstraintGate`]: Safety gate controlling execution mode
+//! - [`WorldGroundedSelfModel`]: Integrated system combining all components
+//!
+//! See `docs/architecture/MAGI_LOOP_SPECIFICATION.md` for full specification.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAGI Loop Core - Always available (self-contained, no broken dependencies)
+// ═══════════════════════════════════════════════════════════════════════════
 
 pub mod core;
 pub mod types;
@@ -102,6 +138,7 @@ pub use dream_feedback::{
     hash_context,
 };
 
+// Replay-grounded RSI exports
 pub use dream_confidence_gate::DreamConfidenceGate;
 pub use epistemic_world::{EpistemicWorldRecord, WorldEvidenceKind};
 pub use exact_replay::{ExactReplayWorld, ReplayError};
