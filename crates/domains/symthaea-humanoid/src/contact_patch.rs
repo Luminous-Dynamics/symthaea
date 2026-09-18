@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Explicit contact-patch geometry and world placement.
 //!
-//! A planted foot or hand is a surface, not a single point.  This module keeps
+//! A planted foot or hand is a surface, not a single point. This module keeps
 //! contact-patch geometry separate from contact activation so support-area and
 //! future wrench/COP constraints cannot silently infer physical area from a
 //! contact centre.
@@ -283,7 +283,7 @@ fn cross3(left: [f64; 3], right: [f64; 3]) -> [f64; 3] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contact::{ContactFoot, ContactFrame, ContactSource};
+    use crate::contact::{ContactFrame, ContactSource, FootContact};
 
     fn rectangle(site: ContactSite, half_x: f64, half_y: f64) -> ContactPatchGeometryV1 {
         ContactPatchGeometryV1 {
@@ -314,12 +314,13 @@ mod tests {
         }
     }
 
-    fn foot(active: bool, x: f64, y: f64) -> ContactFoot {
-        ContactFoot {
+    fn foot(active: bool, x: f64, y: f64) -> FootContact {
+        FootContact {
             in_contact: active,
             point_world_m: [x, y, 0.0],
             force_world_n: [0.0, 0.0, if active { 100.0 } else { 0.0 }],
             torque_world_nm: [0.0; 3],
+            center_of_pressure_world_m: [x, y],
             confidence: 1.0,
         }
     }
