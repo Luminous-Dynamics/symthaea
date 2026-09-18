@@ -42,8 +42,9 @@ pub use inference::{
 };
 pub use inference_v2::{
     CLINICAL_EVIDENCE_IDENTITY_V2_VERSION, CLINICAL_INFERENCE_ENVELOPE_V2_VERSION,
-    ClinicalEvidenceIdentityV2, ClinicalEvidenceRefV2, ClinicalExecutionIdentityV2,
-    ClinicalInferenceEnvelopeV2, ClinicalInferenceEnvelopeV2Error, ClinicalSubjectBindingV2,
+    ClinicalDistributionAssessmentV2, ClinicalEvidenceIdentityV2, ClinicalEvidenceRefV2,
+    ClinicalExecutionIdentityV2, ClinicalInferenceEnvelopeV2, ClinicalInferenceEnvelopeV2Error,
+    ClinicalModelIdentityV2, ClinicalSubjectBindingV2, ClinicalUncertaintyV2,
 };
 pub use inference_wire::{
     CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION, ClinicalInferenceWireError,
