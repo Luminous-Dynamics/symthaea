@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 45
     env:
       FLAKE_PATH: ./crates/domains/symthaea-cosmology-research/nix
+      CLOSURE_MANIFEST: ./crates/domains/symthaea-cosmology-research/references/de001a_execution_closure_v2.json
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
       EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
 
@@ -55,15 +56,52 @@ jobs:
             sandbox = true
             experimental-features = nix-command flakes
 
+      - name: Verify runtime Nix identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(nix --version)"
+          test "$actual" = "nix (Nix) 2.34.7"
+          printf 'nix_version=%s\n' "$actual" >> "$GITHUB_ENV"
+
+      - name: Bind reusable environment definition
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$FLAKE_PATH/flake.nix"
+          test -f "$FLAKE_PATH/flake.lock"
+          test -f "$CLOSURE_MANIFEST"
+
+          flake_nix_sha256="$(sha256sum "$FLAKE_PATH/flake.nix" | awk '{print $1}')"
+          flake_lock_sha256="$(sha256sum "$FLAKE_PATH/flake.lock" | awk '{print $1}')"
+          closure_manifest_sha256="$(sha256sum "$CLOSURE_MANIFEST" | awk '{print $1}')"
+
+          {
+            echo "protocol=DE-001A-ENVIRONMENT-DEFINITION-v1"
+            echo "platform=x86_64-linux"
+            echo "nix_version=${nix_version}"
+            echo "flake_nix_sha256=${flake_nix_sha256}"
+            echo "flake_lock_sha256=${flake_lock_sha256}"
+            echo "closure_manifest_sha256=${closure_manifest_sha256}"
+          } > de001a-environment-definition.txt
+
+          definition_sha256="$(sha256sum de001a-environment-definition.txt | awk '{print $1}')"
+          printf 'flake_nix_sha256=%s\n' "$flake_nix_sha256" >> "$GITHUB_ENV"
+          printf 'flake_lock_sha256=%s\n' "$flake_lock_sha256" >> "$GITHUB_ENV"
+          printf 'closure_manifest_sha256=%s\n' "$closure_manifest_sha256" >> "$GITHUB_ENV"
+          printf 'environment_definition_sha256=%s\n' "$definition_sha256" >> "$GITHUB_ENV"
+
       - name: Verify flake lock is immutable
         shell: bash
         run: |
           set -euo pipefail
           before="$(sha256sum "$FLAKE_PATH/flake.lock" | awk '{print $1}')"
+          test "$before" = "$flake_lock_sha256"
           nix flake metadata "$FLAKE_PATH" --no-update-lock-file --json > de001a-flake-metadata.json
           after="$(sha256sum "$FLAKE_PATH/flake.lock" | awk '{print $1}')"
           test "$before" = "$after"
-          echo "flake_lock_sha256=$before" >> "$GITHUB_ENV"
+          metadata_sha256="$(sha256sum de001a-flake-metadata.json | awk '{print $1}')"
+          printf 'flake_metadata_sha256=%s\n' "$metadata_sha256" >> "$GITHUB_ENV"
 
       - name: Qualify environment
         shell: bash
@@ -85,9 +123,34 @@ jobs:
           closure_size="$(nix path-info -S "$env_path" | awk '{print $2}')"
           nix path-info --json "$env_path" > de001a-environment-path-info.json
           printf '%s\n' "$env_path" > de001a-environment-store-path.txt
+
+          "$env_path/bin/python" - <<'PY' > de001a-environment-versions.json
+          import importlib.metadata as md
+          import json
+          import sys
+
+          expected = {
+              "cobaya": "3.6.2",
+              "camb": "1.6.6",
+              "getdist": "1.7.4",
+              "iminuit": "2.32.0",
+              "Py-BOBYQA": "1.4.1",
+          }
+          actual = {name: md.version(name) for name in expected}
+          if actual != expected:
+              raise SystemExit(f"version mismatch: expected={expected!r}, actual={actual!r}")
+          print(json.dumps({
+              "python": sys.version.split()[0],
+              "packages": actual,
+              "scientific_claim": "NONE",
+          }, sort_keys=True, separators=(",", ":")))
+          PY
+
+          versions_sha256="$(sha256sum de001a-environment-versions.json | awk '{print $1}')"
           echo "store_path=$env_path" >> "$GITHUB_OUTPUT"
           echo "nar_hash=$nar_hash" >> "$GITHUB_OUTPUT"
           echo "closure_size=$closure_size" >> "$GITHUB_OUTPUT"
+          echo "versions_sha256=$versions_sha256" >> "$GITHUB_OUTPUT"
 
       - name: Postflight immutability
         shell: bash
@@ -95,6 +158,9 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.head }}"
           test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.tree }}"
+          test "$(sha256sum "$FLAKE_PATH/flake.nix" | awk '{print $1}')" = "$flake_nix_sha256"
+          test "$(sha256sum "$FLAKE_PATH/flake.lock" | awk '{print $1}')" = "$flake_lock_sha256"
+          test "$(sha256sum "$CLOSURE_MANIFEST" | awk '{print $1}')" = "$closure_manifest_sha256"
           git diff --exit-code
           git diff --cached --exit-code
 
@@ -102,23 +168,45 @@ jobs:
         if: always()
         shell: bash
         run: |
-          metadata_sha256="$(sha256sum de001a-flake-metadata.json 2>/dev/null | awk '{print $1}' || true)"
+          set -u
+          status="${{ job.status }}"
+          verdict="INVALID"
+          if test "$status" = "success" \
+            && test -n "${environment_definition_sha256:-}" \
+            && test -n "${flake_nix_sha256:-}" \
+            && test -n "${flake_lock_sha256:-}" \
+            && test -n "${closure_manifest_sha256:-}" \
+            && test -n "${flake_metadata_sha256:-}" \
+            && test -n "${nix_version:-}" \
+            && test -n "${{ steps.environment.outputs.store_path }}" \
+            && test -n "${{ steps.environment.outputs.nar_hash }}" \
+            && test -n "${{ steps.environment.outputs.closure_size }}" \
+            && test -n "${{ steps.environment.outputs.versions_sha256 }}"; then
+            verdict="PASS"
+          fi
+
           {
-            echo "protocol=DE-001A-closure-v2"
-            echo "head=$(git rev-parse HEAD)"
-            echo "tree=$(git rev-parse HEAD^{tree})"
-            echo "base=${EXPECTED_BASE}"
+            echo "protocol=DE-001A-ENVIRONMENT-QUALIFICATION-v3"
+            echo "verdict=${verdict}"
+            echo "authority=environment-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "reuse_policy=current-checkout-must-match-environment-definition-sha256"
+            echo "source_head=$(git rev-parse HEAD 2>/dev/null || echo UNAVAILABLE)"
+            echo "source_tree=$(git rev-parse HEAD^{tree} 2>/dev/null || echo UNAVAILABLE)"
+            echo "source_base=${EXPECTED_BASE}"
+            echo "environment_definition_sha256=${environment_definition_sha256:-UNAVAILABLE}"
+            echo "flake_nix_sha256=${flake_nix_sha256:-UNAVAILABLE}"
             echo "flake_lock_sha256=${flake_lock_sha256:-UNAVAILABLE}"
-            echo "flake_metadata_sha256=${metadata_sha256:-UNAVAILABLE}"
-            echo "nix_version=$(nix --version 2>/dev/null || echo UNAVAILABLE)"
+            echo "closure_manifest_sha256=${closure_manifest_sha256:-UNAVAILABLE}"
+            echo "flake_metadata_sha256=${flake_metadata_sha256:-UNAVAILABLE}"
+            echo "nix_version=${nix_version:-UNAVAILABLE}"
             echo "environment_store_path=${{ steps.environment.outputs.store_path }}"
             echo "environment_nar_hash=${{ steps.environment.outputs.nar_hash }}"
             echo "environment_closure_size=${{ steps.environment.outputs.closure_size }}"
+            echo "environment_versions_sha256=${{ steps.environment.outputs.versions_sha256 }}"
             echo "workflow_run_id=${GITHUB_RUN_ID}"
             echo "workflow_attempt=${GITHUB_RUN_ATTEMPT}"
-            echo "job_status=${{ job.status }}"
-            echo "authority=environment-qualification-only"
-            echo "scientific_claim=NONE"
+            echo "job_status=${status}"
           } > de001a-environment-receipt.txt
           cat de001a-environment-receipt.txt
 
@@ -129,6 +217,8 @@ jobs:
           name: de001a-environment-receipt-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             de001a-environment-receipt.txt
+            de001a-environment-definition.txt
+            de001a-environment-versions.json
             de001a-flake-metadata.json
             de001a-environment-path-info.json
             de001a-environment-store-path.txt
