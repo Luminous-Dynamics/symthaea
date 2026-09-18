@@ -54,6 +54,7 @@ pub mod claim_evidence;
 pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
+pub mod epistemic_restart_admission_review;
 pub mod epistemic_restart_capsule;
 pub mod epistemic_restart_capsule_v2;
 pub mod epistemic_restart_continuity;
