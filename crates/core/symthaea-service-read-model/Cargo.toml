@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-service-read-model"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Truthful read-only projections of Symthaea service runtime state"
+
+[dependencies]
+symthaea-interface-runtime = { path = "../symthaea-interface-runtime" }
+symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
+symthaea-service-runtime = { path = "../symthaea-service-runtime" }
