@@ -36,7 +36,8 @@ pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
 mod sym_rsi_fresh_evaluation;
 mod sym_rsi_c_fresh_gate;
-pub mod sym_rsi_fresh_chain_claim;
+mod sym_rsi_fresh_chain_claim;
+mod sym_rsi_fresh_chain_gate;
 pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_dream_protocol;
 mod sym_rsi_dream_parent_gate;
@@ -133,7 +134,11 @@ pub use sym_rsi_c_fresh_gate::{
 };
 pub use sym_rsi_fresh_chain_claim::{
     FreshImprovementChainDisposition, FreshImprovementChainError, FreshImprovementChainReceipt,
-    SYM_RSI_FRESH_CHAIN_CLAIM_SCHEMA, build_fresh_improvement_chain_receipt,
+    SYM_RSI_FRESH_CHAIN_CLAIM_SCHEMA,
+};
+pub use sym_rsi_fresh_chain_gate::{
+    QualifiedFreshChainError, QualifiedFreshImprovementChainReceipt,
+    SYM_RSI_QUALIFIED_FRESH_CHAIN_SCHEMA, build_qualified_fresh_improvement_chain,
 };
 pub use sym_rsi_grounded_dream::{
     DreamActionPrediction, DreamActionSupport, DreamDecisionRecord, DreamFixtureAction,
