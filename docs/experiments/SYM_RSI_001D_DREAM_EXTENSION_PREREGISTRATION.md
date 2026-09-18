@@ -88,7 +88,7 @@ A result is **PositiveUnderProtocol** only if:
 - every domain and the macro-average satisfy quality non-inferiority,
 - macro quality delta is strictly greater than 0.
 
-Evaluator calls, dream-model simulations, override rate, model-prediction counts, and local-support distances are reported separately. This protocol does not call D more compute-efficient merely because environment calls are unchanged; model-simulation cost remains explicit rather than silently treated as free.
+Evaluator calls, dream-model simulations, override rate, and model-prediction counts are reported separately. Local support distance remains bound at the per-prediction epistemic-provenance layer in v6 rather than being represented as a separate aggregate receipt metric. This protocol does not call D more compute-efficient merely because environment calls are unchanged; model-simulation cost remains explicit rather than silently treated as free.
 
 With only 12 deterministic/seed-controlled pairs, no asymptotic p-value is manufactured.
 
