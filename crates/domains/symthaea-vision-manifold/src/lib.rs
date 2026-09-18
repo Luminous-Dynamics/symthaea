@@ -32,6 +32,7 @@ pub mod attention;
 pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
+pub mod dense_encoder;
 pub mod encoder;
 pub mod epistemic;
 pub mod manifold;
@@ -89,6 +90,11 @@ pub use checkpoint::{
     save_checkpoint_file_report, save_checkpoint_file_with_retention,
     save_checkpoint_file_with_retention_locked_report, save_checkpoint_file_with_retention_report,
     with_checkpoint_writer_lock, write_checkpoint_atomic, write_checkpoint_atomic_report,
+};
+pub use dense_encoder::{
+    ArtifactDigest, ArtifactIdentity, ArtifactIdentityKind, DenseEncoderBackend, DenseEncoderError,
+    DenseEncoderReceipt, DenseFeatureMap, DenseFeatureSemantics, DenseVisualEncoder,
+    DenseVisualInput, MAX_DENSE_FEATURE_ELEMENTS, MAX_DENSE_INPUT_BYTES,
 };
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder, StereoDepthEstimate};
 pub use epistemic::{
