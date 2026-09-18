@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "record_id": "DE-001A-LIKELIHOOD-PROVENANCE-v1",
+  "status": "provenance-correction-frozen",
+  "recorded_at": "2026-09-18",
+  "source": {
+    "kind": "official-desi-data-q-and-a",
+    "url": "https://help.desi.lbl.gov/index.php?qa=182&qa_1=provenance-external-cobaya-likelihood-public-cosmology-chains",
+    "question_topic": "provenance of external Cobaya likelihood used for public DESI DR2 cosmology chains"
+  },
+  "historical_likelihood": "desi_y3_cosmo_bindings.cobaya_likelihoods.bao_likelihoods_v1p2.desi_bao_all",
+  "released_public_likelihood": "bao.desi_dr2.desi_bao_all",
+  "desi_attestation": {
+    "likelihood_identical": true,
+    "measurement_files_byte_identical": true,
+    "covariance_files_byte_identical": true
+  },
+  "methodological_classification": {
+    "same_likelihood_semantics": true,
+    "cross_package_execution_path": true,
+    "independent_likelihood_implementation": false,
+    "de001a_authority": "reproduction-and-plumbing-only",
+    "true_independent_implementation_gate": "DE-001I"
+  },
+  "correction": {
+    "supersedes_phrase": "independent-public-likelihood",
+    "preferred_phrase": "public released likelihood reproduction through a separately packaged execution path",
+    "reason": "DESI states the historical internal desi_bao_all likelihood is identical to the released Cobaya bao.desi_dr2.desi_bao_all likelihood and that the measurement/covariance files are byte-identical"
+  },
+  "scientific_claim": "NONE"
+}
