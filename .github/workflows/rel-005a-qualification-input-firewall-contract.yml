@@ -1,0 +1,150 @@
+name: REL-005A Qualification Input Firewall Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-qualification-input-firewall-contract.json"
+      - ".github/rel/rel-005a-qualification-input-firewall.py"
+      - ".github/workflows/rel-005a-qualification-input-firewall-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-qualification-input-firewall-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: 22a5e783805b8922bd370120f827f1b96b32f893
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  firewall-contract:
+    name: Verify QualificationInputFirewallOnly contract
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout exact firewall-contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-qualification-input-firewall-contract.json"
+            ".github/rel/rel-005a-qualification-input-firewall.py"
+            ".github/workflows/rel-005a-qualification-input-firewall-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify firewall capability isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/rel/rel-005a-qualification-input-firewall.py
+          python3 - <<'PY'
+          import json, pathlib
+          contract = json.loads(pathlib.Path('.github/rel/rel-005a-qualification-input-firewall-contract.json').read_text())
+          source = pathlib.Path('.github/rel/rel-005a-qualification-input-firewall.py').read_text()
+          assert contract['schema'] == 'symthaea.rel.qualification-input-firewall-contract.v1'
+          assert contract['authority'] == 'QualificationInputFirewallContractOnly'
+          assert contract['assembly_contract_head'] == '22a5e783805b8922bd370120f827f1b96b32f893'
+          assert contract['qualification_contract_head'] == '452f0324a561a2872c00b6197237d4db46189f8d'
+          assert contract['required_predicate_count'] == 41
+          assert len(contract['allowed_failed_predicate_ids']) == 41
+          assert contract['allowed_failed_predicate_ids'] == [f'REL005A-P{i:03d}' for i in range(1, 42)]
+          assert not any(contract['claims'].values())
+          for token in (
+              'import subprocess', 'from subprocess', 'import socket', 'from socket',
+              'import requests', 'from requests', 'import urllib', 'from urllib',
+              'compute_xenobot_graft_transform', 'translate_foreign_hypervector',
+          ):
+              assert token not in source, f'forbidden firewall capability: {token}'
+          PY
+
+      - name: Run adversarial firewall self-test
+        shell: bash
+        env:
+          SELF_TEST: ${{ runner.temp }}/qualification-input-firewall-self-test.json
+        run: |
+          set -euo pipefail
+          python3 .github/rel/rel-005a-qualification-input-firewall.py \
+            --contract .github/rel/rel-005a-qualification-input-firewall-contract.json \
+            --self-test | tee "${SELF_TEST}"
+          python3 -m json.tool "${SELF_TEST}" >/dev/null
+          python3 - <<'PY'
+          import json, os, pathlib
+          result = json.loads(pathlib.Path(os.environ['SELF_TEST']).read_text())
+          assert result['authority'] == 'QualificationInputFirewallContractOnly'
+          assert result['pass_bundle'] == 'PASS'
+          assert result['failure_bundle'] == 'PASS'
+          assert result['contradictory_final_claims_rejected'] is True
+          assert result['detailed_metric_leakage_rejected_after_manifest_rehash'] is True
+          assert result['nested_extra_file_rejected'] is True
+          assert result['duplicate_json_key_rejected'] is True
+          PY
+
+      - name: Build static firewall-contract receipt
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/qualification-input-firewall-contract-receipt.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          def sha(path):
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          receipt = {
+              'schema': 'symthaea.rel.qualification-input-firewall-contract-static-receipt.v1',
+              'authority': 'QualificationInputFirewallContractOnly',
+              'subject_head': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'parent_head': subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip(),
+              'contract_sha256': sha('.github/rel/rel-005a-qualification-input-firewall-contract.json'),
+              'firewall_sha256': sha('.github/rel/rel-005a-qualification-input-firewall.py'),
+              'pass_and_failure_bundles_tested': True,
+              'contradictory_final_claims_rejected': True,
+              'detailed_metric_leakage_rejected': True,
+              'nested_extra_file_rejected': True,
+              'duplicate_json_key_rejected': True,
+              'claims': {
+                  'firewall_executed': False,
+                  'qualification_completed': False,
+                  'rel_005a_qualified': False,
+                  'scientific_pass': False,
+                  'scientific_fail': False,
+              },
+          }
+          pathlib.Path(os.environ['RECEIPT']).write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload static firewall-contract evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-qualification-input-firewall-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/rel-005a-qualification-input-firewall-contract.json
+            ${{ runner.temp }}/qualification-input-firewall-self-test.json
+            ${{ runner.temp }}/qualification-input-firewall-contract-receipt.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          rm -rf .github/rel/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
