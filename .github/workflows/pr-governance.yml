@@ -33,6 +33,10 @@ jobs:
         shell: bash
         run: bash .github/scripts/check-showroom-hygiene.sh
 
+      - name: Ratchet draft-safe full-CI topology
+        shell: bash
+        run: python3 .github/scripts/check-draft-ci-gates.py
+
       - name: Record governance evidence
         shell: bash
         env:
@@ -49,4 +53,5 @@ jobs:
             echo "pr_draft=${PR_DRAFT}"
             echo "governance_check=pass"
             echo "showroom_hygiene_check=pass"
+            echo "draft_ci_gate_check=pass"
           } | tee pr-governance-receipt.txt
