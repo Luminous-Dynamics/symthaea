@@ -10,38 +10,63 @@ use symthaea_vision_manifold::VisualObservationRef;
 /// What the dorsal stream found interesting — a salient region to analyze.
 #[derive(Debug, Clone)]
 pub struct FoveationRequest {
+    /// Unique request identifier.
     pub id: u64,
+    /// High-resolution pixel crop (RGB or grayscale bytes).
     pub crop_pixels: Vec<u8>,
+    /// Crop width in pixels.
     pub crop_width: u32,
+    /// Crop height in pixels.
     pub crop_height: u32,
+    /// Number of color channels (1 = grayscale, 3 = RGB).
     pub channels: usize,
+    /// Grid row of the patch that triggered this request.
     pub grid_row: usize,
+    /// Grid column of the patch that triggered this request.
     pub grid_col: usize,
+    /// Surprise value from the SurpriseMap (priority ordering).
     pub surprise_value: f32,
+    /// Source frame sequence number for temporal binding.
     pub frame_id: u64,
+    /// Timestamp (microseconds) when the saliency was detected.
     pub timestamp_us: u64,
-    /// Exact source observation when supplied by the capture owner. `None` means the legacy
-    /// unproven frame path was used; downstream structured evidence must fail closed.
+    /// Exact source observation when supplied by the capture owner.
+    ///
+    /// `None` means the compatibility frame path was used. Downstream structured evidence must
+    /// not reconstruct or invent a source identity after recognition.
     pub source_observation: Option<VisualObservationRef>,
+    /// Motion velocity at this patch [dx, dy] in pixels/frame.
+    /// Used for predictive binding: when the ventral result arrives later, the cognitive loop
+    /// can compensate for source-patch motion.
     pub velocity: [f32; 2],
 }
 
 /// What the ventral stream recognized from a foveated region.
 #[derive(Debug, Clone)]
 pub struct FoveationResult {
+    /// Corresponding request ID.
     pub request_id: u64,
+    /// 16,384-dimensional HDC vector ready for GWT injection.
     pub semantic_hv: ContinuousHV,
+    /// What was found in the crop.
     pub content: RecognizedContent,
+    /// Recognition confidence (0.0–1.0).
     pub confidence: f32,
+    /// Original grid row (spatial binding).
     pub grid_row: usize,
+    /// Original grid col (spatial binding).
     pub grid_col: usize,
+    /// Source frame sequence number (temporal binding anchor).
     pub source_frame_id: u64,
+    /// Source timestamp in microseconds (temporal binding anchor).
     pub source_timestamp_us: u64,
-    /// Exact source observation when the capture owner supplied one.
+    /// Exact capture-owner provenance, when supplied at the frame boundary.
     pub source_observation: Option<VisualObservationRef>,
-    /// What actually produced the semantic result, kept distinct from requested routing.
+    /// What semantic backend and operation actually produced this result.
     pub execution: VentralExecutionReceipt,
+    /// Processing time in microseconds.
     pub processing_time_us: u64,
+    /// Motion velocity at the source patch [dx, dy] in pixels/frame.
     pub velocity: [f32; 2],
 }
 
@@ -49,7 +74,7 @@ pub struct FoveationResult {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VentralExecutionKind {
-    /// Built-in deterministic pixel-hash + JL backend.
+    /// Built-in deterministic pixel-hash + JL test backend.
     HashStubV1,
     /// SemanticVision executed an ONNX SigLIP session, but exact model bytes are not pinned.
     SemanticVisionOnnxUnpinned,
@@ -74,9 +99,9 @@ pub enum VentralOperation {
 
 /// Execution receipt attached to every foveation result.
 ///
-/// `requested_routing` records configuration intent. `operation` and `kind` record execution.
-/// They are deliberately separate because current/future backends may degrade or route
-/// differently from the requested strategy.
+/// `requested_routing` is configuration intent. `operation` and `kind` are execution facts.
+/// They are deliberately separate because a backend may degrade or execute a different
+/// operation than was requested.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VentralExecutionReceipt {
     pub kind: VentralExecutionKind,
@@ -98,18 +123,18 @@ impl VentralExecutionReceipt {
     }
 
     /// True only when an ONNX learned backend actually executed.
-    /// This still does not mean exact model bytes were pinned.
+    /// This still does not establish exact model artifact identity.
     pub const fn used_learned_model(self) -> bool {
         matches!(self.kind, VentralExecutionKind::SemanticVisionOnnxUnpinned)
     }
 
-    /// v1 receipts intentionally do not establish exact model artifact identity.
+    /// Current v1 execution receipts intentionally do not pin exact model bytes.
     pub const fn exact_model_artifact_pinned(self) -> bool {
         false
     }
 }
 
-/// Error when capture provenance disagrees with the frame bytes it is intended to identify.
+/// Error when capture provenance disagrees with the framebuffer it is intended to identify.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrameObservationError {
     FrameIdMismatch {
@@ -148,20 +173,30 @@ impl std::error::Error for FrameObservationError {}
 /// What was recognized in a foveated crop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RecognizedContent {
+    /// OCR result — text found in the region.
     Text(String),
+    /// Object classification — label + raw embedding.
     Object { label: String, embedding: Vec<f32> },
+    /// Visual question answering caption.
     Caption(String),
+    /// Below confidence threshold or stub/fallback mode.
     Unknown,
 }
 
 /// Configuration for the foveation bridge.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FoveationConfig {
+    /// Maximum concurrent in-flight foveation requests (default: 2).
     pub max_concurrent: usize,
+    /// Bounded channel capacity for backpressure (default: 4).
     pub channel_depth: usize,
+    /// Minimum surprise value to trigger foveation (default: 0.5).
     pub min_surprise_threshold: f32,
+    /// Minimum time between dispatches in milliseconds (default: 50).
     pub cooldown_ms: u64,
+    /// Maximum crop size in pixels before downscaling (default: 384*384).
     pub max_crop_pixels: usize,
+    /// How the caller requests the ventral system to route crop analysis.
     pub routing: RoutingStrategy,
 }
 
@@ -178,49 +213,77 @@ impl Default for FoveationConfig {
     }
 }
 
-/// Requested ventral routing strategy.
+/// How the caller requests crop analysis to be routed.
+///
+/// This is intent, not execution evidence. Consult `VentralExecutionReceipt` on the result for
+/// what actually ran.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RoutingStrategy {
+    /// Heuristic: text-like → OCR, objects → embed, fallback → VQA.
     #[default]
     Auto,
+    /// Embedding only.
     AlwaysEmbed,
+    /// OCR only.
     AlwaysOcr,
+    /// Caption/VQA only.
     AlwaysCaption,
+    /// Requested comprehensive cascade.
     Full,
 }
 
 /// A salient region identified by the dorsal stream with pixel coordinates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SalientRegion {
+    /// Grid row in the PatchGrid.
     pub grid_row: usize,
+    /// Grid col in the PatchGrid.
     pub grid_col: usize,
+    /// Surprise value (higher = more unexpected).
     pub surprise: f32,
+    /// Pixel X coordinate of the region's top-left corner.
     pub pixel_x: usize,
+    /// Pixel Y coordinate of the region's top-left corner.
     pub pixel_y: usize,
+    /// Width in pixels.
     pub pixel_w: usize,
+    /// Height in pixels.
     pub pixel_h: usize,
 }
 
 /// Telemetry from the foveation subsystem for CycleMetadata.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FoveationTelemetry {
+    /// Number of requests currently queued.
     pub pending_count: usize,
+    /// Number of requests currently being processed.
     pub in_flight_count: usize,
+    /// Number of results ready for GWT injection.
     pub ready_count: usize,
+    /// Total requests dispatched since startup.
     pub total_dispatched: u64,
+    /// Total results received since startup.
     pub total_completed: u64,
+    /// Average processing time in microseconds (exponential moving average).
     pub avg_processing_time_us: f32,
+    /// Most recent result confidence (or 0.0 if none).
     pub last_confidence: f32,
 }
 
 /// Wraps a stored full-resolution frame for later cropping.
 #[derive(Debug, Clone)]
 pub struct FrameBuffer {
+    /// Raw pixel data.
     pub pixels: Vec<u8>,
+    /// Frame width.
     pub width: u32,
+    /// Frame height.
     pub height: u32,
+    /// Number of channels.
     pub channels: usize,
+    /// Frame sequence number.
     pub frame_id: u64,
+    /// Capture timestamp in microseconds.
     pub timestamp_us: u64,
 }
 
@@ -242,6 +305,22 @@ mod tests {
     #[test]
     fn test_routing_strategy_default() {
         assert_eq!(RoutingStrategy::default(), RoutingStrategy::Auto);
+    }
+
+    #[test]
+    fn test_recognized_content_variants() {
+        let text = RecognizedContent::Text("STOP".to_string());
+        let obj = RecognizedContent::Object {
+            label: "cat".to_string(),
+            embedding: vec![0.1, 0.2, 0.3],
+        };
+        let caption = RecognizedContent::Caption("A red stop sign".to_string());
+        let unknown = RecognizedContent::Unknown;
+
+        assert!(!format!("{text:?}").is_empty());
+        assert!(!format!("{obj:?}").is_empty());
+        assert!(!format!("{caption:?}").is_empty());
+        assert!(!format!("{unknown:?}").is_empty());
     }
 
     #[test]
@@ -272,16 +351,30 @@ mod tests {
     }
 
     #[test]
-    fn execution_receipt_separates_request_from_execution() {
-        let receipt = VentralExecutionReceipt::new(
-            VentralExecutionKind::SemanticVisionOnnxUnpinned,
-            RoutingStrategy::AlwaysCaption,
-            VentralOperation::Embedding,
-        );
-        assert_eq!(receipt.requested_routing, RoutingStrategy::AlwaysCaption);
-        assert_eq!(receipt.operation, VentralOperation::Embedding);
-        assert!(receipt.used_learned_model());
-        assert!(!receipt.exact_model_artifact_pinned());
+    fn test_salient_region_fields() {
+        let region = SalientRegion {
+            grid_row: 2,
+            grid_col: 3,
+            surprise: 0.8,
+            pixel_x: 24,
+            pixel_y: 16,
+            pixel_w: 8,
+            pixel_h: 8,
+        };
+        assert_eq!(region.pixel_x, 24);
+        assert_eq!(region.pixel_y, 16);
+        assert!((region.surprise - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_foveation_telemetry_default() {
+        let tel = FoveationTelemetry::default();
+        assert_eq!(tel.pending_count, 0);
+        assert_eq!(tel.in_flight_count, 0);
+        assert_eq!(tel.ready_count, 0);
+        assert_eq!(tel.total_dispatched, 0);
+        assert_eq!(tel.total_completed, 0);
+        assert!((tel.avg_processing_time_us - 0.0).abs() < 1e-6);
     }
 
     #[test]
@@ -296,5 +389,29 @@ mod tests {
         };
         assert_eq!(fb.pixels.len(), 64 * 64 * 3);
         assert_eq!(fb.frame_id, 42);
+    }
+
+    #[test]
+    fn execution_receipt_separates_requested_route_from_actual_operation() {
+        let receipt = VentralExecutionReceipt::new(
+            VentralExecutionKind::SemanticVisionOnnxUnpinned,
+            RoutingStrategy::AlwaysCaption,
+            VentralOperation::Embedding,
+        );
+        assert_eq!(receipt.requested_routing, RoutingStrategy::AlwaysCaption);
+        assert_eq!(receipt.operation, VentralOperation::Embedding);
+        assert!(receipt.used_learned_model());
+        assert!(!receipt.exact_model_artifact_pinned());
+    }
+
+    #[test]
+    fn deterministic_stub_is_not_a_learned_model() {
+        let receipt = VentralExecutionReceipt::new(
+            VentralExecutionKind::SemanticVisionDeterministicStub,
+            RoutingStrategy::AlwaysEmbed,
+            VentralOperation::Embedding,
+        );
+        assert!(!receipt.used_learned_model());
+        assert!(!receipt.exact_model_artifact_pinned());
     }
 }
