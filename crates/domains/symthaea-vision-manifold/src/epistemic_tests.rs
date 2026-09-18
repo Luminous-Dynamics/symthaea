@@ -9,7 +9,19 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::epistemic::{VisualEvidence, VisualEvidenceError, VisualObservationRef, VisualOrigin};
+    use crate::epistemic::{
+        VisualCaptureClock, VisualEvidence, VisualEvidenceError, VisualObservationRef, VisualOrigin,
+        VisualStreamRef,
+    };
+
+    fn observation(source_id: u64, epoch: u64, frame_id: u64) -> VisualObservationRef {
+        VisualObservationRef::new(
+            VisualStreamRef::new(source_id, epoch).unwrap(),
+            frame_id,
+            88_000 + frame_id,
+            VisualCaptureClock::StreamMonotonic,
+        )
+    }
 
     #[test]
     fn confidence_never_upgrades_origin() {
@@ -20,7 +32,7 @@ mod tests {
 
     #[test]
     fn prediction_grounded_in_observation_remains_prediction() {
-        let observation = VisualObservationRef::new(3, 17, 88_000);
+        let observation = observation(3, 1, 17);
         let evidence = VisualEvidence::predicted(vec![observation], 0.99).unwrap();
         assert_eq!(evidence.origin(), VisualOrigin::Predicted);
         assert_eq!(evidence.parent_observations(), &[observation]);
@@ -29,8 +41,15 @@ mod tests {
 
     #[test]
     fn duplicate_lineage_does_not_inflate_evidence() {
-        let observation = VisualObservationRef::new(5, 9, 100);
+        let observation = observation(5, 1, 9);
         let result = VisualEvidence::inferred(vec![observation, observation], 0.5);
         assert_eq!(result, Err(VisualEvidenceError::DuplicateParentObservation));
+    }
+
+    #[test]
+    fn same_frame_number_after_restart_is_not_same_observation() {
+        let before_restart = observation(9, 1, 42);
+        let after_restart = observation(9, 2, 42);
+        assert_ne!(before_restart, after_restart);
     }
 }

@@ -91,7 +91,10 @@ pub use checkpoint::{
     with_checkpoint_writer_lock, write_checkpoint_atomic, write_checkpoint_atomic_report,
 };
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder, StereoDepthEstimate};
-pub use epistemic::{VisualEvidence, VisualEvidenceError, VisualObservationRef, VisualOrigin};
+pub use epistemic::{
+    VisualCaptureClock, VisualEvidence, VisualEvidenceError, VisualObservationError,
+    VisualObservationRef, VisualOrigin, VisualStreamRef,
+};
 pub use manifold::{
     DelayedHorizonEvaluator, HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory,
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
