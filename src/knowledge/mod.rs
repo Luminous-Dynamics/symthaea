@@ -66,6 +66,7 @@ pub mod epistemic_restart_manifest;
 pub mod epistemic_restart_anchor;
 pub mod epistemic_restart_anchor_policy;
 pub mod epistemic_restart_validation_receipt;
+pub mod epistemic_restart_verifier_provenance;
 #[allow(
     unused_imports,
     reason = "EKM-034 imports the support store only for its cfg(test) cold-restart fixture"
