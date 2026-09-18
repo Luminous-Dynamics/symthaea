@@ -1,0 +1,297 @@
+name: REL-005A ComparisonOnly V3 R2
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-comparison-source.json"
+      - ".github/workflows/rel-005a-comparison-v3.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: rel-005a-comparison-v3-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: 1e445d072c269d189145c98118b60e8d174a5495
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  PREDICATE_CONTRACT_HEAD: 43bf1d588447f602ce0f1549986bb558a839762c
+  PREDICATE_CONTRACT_BLOB: 3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a
+  PREDICATE_RUN_ID: "35278498517"
+  PREDICATE_ARTIFACT_NAME: rel-005a-full-predicate-contract-43bf1d588447f602ce0f1549986bb558a839762c
+  EXECUTION_HEAD: 6931639e53060809f9d459196a329c4fe983be7b
+  EXECUTION_RUN_ID: "35284116872"
+  SEAL_BOUND_EXECUTION_ARTIFACT_ID: "10523783298"
+  SEAL_BOUND_EXECUTION_ARTIFACT_DIGEST: sha256:a2d6e8421eee59fd0569a0fc7e996276248040ad8075911472ad0491044ff57b
+  OBSERVATION_SHA256: e271a5c2e6b51fda15cd6c3209e52859296f44ecd790b9c5e72f769d4aec1c4d
+  SEAL_HEAD: 0a94ed976926fbdcd6b752f94e174df21f915fc8
+  SEAL_RUN_ID: "35284772522"
+  SEAL_JOB_ID: "105414583527"
+  SEAL_ARTIFACT_NAME: rel-005a-observation-seal-v3-6931639e53060809f9d459196a329c4fe983be7b
+  SEAL_CHAIN_SHA256: a3a288caa9221ec5859b5ac81fcc55f61b4ff43d5e52ad096021c99ea6bf31ab
+  COMPARISON_CONTRACT_BLOB: 827ca80d3f8897e6de0caf867415553ff9d951bb
+  COMPARISON_EVALUATOR_BLOB: ab9e68b48989db9dfec48181a052ed58f937a692
+  FROZEN_SCIENTIFIC_SUBJECT: 7f5826675b44dd0d3f702f62bc9818f7990e4a01
+  FROZEN_TEST_BLOB: 787ea051ae0bf8e5667b6925481afd46c15d0bc4
+
+jobs:
+  compare:
+    name: Adjudicate content-addressed sealed REL-005A v3 observation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact ComparisonOnly subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent, frozen evaluator, and two-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-full-predicate-contract.json)" = "${PREDICATE_CONTRACT_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-comparison-only-contract.json)" = "${COMPARISON_CONTRACT_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-comparison-only.py)" = "${COMPARISON_EVALUATOR_BLOB}"
+          test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-comparison-source.json"
+            ".github/workflows/rel-005a-comparison-v3.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Validate content-addressed evidence-source binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          s = json.loads(pathlib.Path('.github/rel/rel-005a-comparison-source.json').read_text())
+          assert s['schema'] == 'symthaea.rel.comparison-source.v3'
+          assert s['authority'] == 'EvidenceSourceBinding' and s['relation'] == 'REL-005A'
+          p = s['predicate_contract']
+          assert p == {'head': os.environ['PREDICATE_CONTRACT_HEAD'], 'blob': os.environ['PREDICATE_CONTRACT_BLOB'], 'source_run_id': int(os.environ['PREDICATE_RUN_ID']), 'artifact_name': os.environ['PREDICATE_ARTIFACT_NAME']}
+          e = s['execution']
+          assert e['head'] == os.environ['EXECUTION_HEAD']
+          assert e['source_run_id'] == int(os.environ['EXECUTION_RUN_ID'])
+          assert e['seal_bound_artifact_id'] == int(os.environ['SEAL_BOUND_EXECUTION_ARTIFACT_ID'])
+          assert e['seal_bound_artifact_digest'] == os.environ['SEAL_BOUND_EXECUTION_ARTIFACT_DIGEST']
+          assert e['observation_sha256'] == os.environ['OBSERVATION_SHA256']
+          seal = s['observation_seal']
+          assert seal == {'head': os.environ['SEAL_HEAD'], 'source_run_id': int(os.environ['SEAL_RUN_ID']), 'source_job_id': int(os.environ['SEAL_JOB_ID']), 'artifact_name': os.environ['SEAL_ARTIFACT_NAME'], 'chain_commitment_sha256': os.environ['SEAL_CHAIN_SHA256']}
+          assert s['transport_resolution'] == {
+              'policy': 'resolve_current_unique_unexpired_exact_name_artifact_within_frozen_run',
+              'artifact_id_is_scientific_authority': False,
+              'artifact_zip_digest_is_scientific_authority': False,
+              'resolved_transport_identity_must_be_recorded': True,
+              'inner_content_commitments_are_authoritative': True,
+          }
+          assert s['comparison_contract'] == {'head': os.environ['EXPECTED_PARENT'], 'contract_blob': os.environ['COMPARISON_CONTRACT_BLOB'], 'evaluator_blob': os.environ['COMPARISON_EVALUATOR_BLOB']}
+          assert s['frozen_scientific_subject'] == os.environ['FROZEN_SCIENTIFIC_SUBJECT']
+          assert s['frozen_test_blob'] == os.environ['FROZEN_TEST_BLOB']
+          assert s['claims'] == {'comparison_only_adjudicated': False, 'rel_005a_qualified': False, 'scientific_pass': False, 'scientific_fail': False}
+          assert 'artifact_id' not in p and 'artifact_digest' not in p
+          assert 'artifact_id' not in seal and 'artifact_digest' not in seal
+          PY
+
+      - name: Resolve current transport artifacts inside frozen runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${PREDICATE_RUN_ID}" > "${RUNNER_TEMP}/predicate-run.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${PREDICATE_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/predicate-artifacts.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}" > "${RUNNER_TEMP}/seal-run.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}/jobs?per_page=100" > "${RUNNER_TEMP}/seal-jobs.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/seal-artifacts.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          t = pathlib.Path(os.environ['RUNNER_TEMP'])
+          prun = json.loads((t/'predicate-run.json').read_text())
+          pa = json.loads((t/'predicate-artifacts.json').read_text())
+          srun = json.loads((t/'seal-run.json').read_text())
+          sjobs = json.loads((t/'seal-jobs.json').read_text())['jobs']
+          sa = json.loads((t/'seal-artifacts.json').read_text())
+          assert prun['id'] == int(os.environ['PREDICATE_RUN_ID']) and prun['head_sha'] == os.environ['PREDICATE_CONTRACT_HEAD']
+          assert prun['status'] == 'completed' and prun['conclusion'] == 'success'
+          assert srun['id'] == int(os.environ['SEAL_RUN_ID']) and srun['head_sha'] == os.environ['SEAL_HEAD']
+          assert srun['status'] == 'completed' and srun['conclusion'] == 'success'
+          jobs = [j for j in sjobs if j['id'] == int(os.environ['SEAL_JOB_ID'])]
+          assert len(jobs) == 1 and jobs[0]['name'] == 'Seal exact ExecutionOnly v3 observation' and jobs[0]['conclusion'] == 'success'
+          def resolve(payload, name, run_id, head):
+              assert payload['total_count'] <= 100, 'artifact page unexpectedly truncated'
+              m = [a for a in payload['artifacts'] if a['name'] == name and a['expired'] is False]
+              assert len(m) == 1, f'exact-name unexpired artifact census={len(m)} for {name}'
+              a = m[0]
+              assert a['workflow_run']['id'] == run_id and a['workflow_run']['head_sha'] == head
+              assert isinstance(a.get('digest'), str) and a['digest'].startswith('sha256:')
+              return a
+          pred = resolve(pa, os.environ['PREDICATE_ARTIFACT_NAME'], int(os.environ['PREDICATE_RUN_ID']), os.environ['PREDICATE_CONTRACT_HEAD'])
+          seal = resolve(sa, os.environ['SEAL_ARTIFACT_NAME'], int(os.environ['SEAL_RUN_ID']), os.environ['SEAL_HEAD'])
+          with pathlib.Path(os.environ['GITHUB_ENV']).open('a') as f:
+              f.write(f"RESOLVED_PREDICATE_ARTIFACT_ID={pred['id']}\n")
+              f.write(f"RESOLVED_PREDICATE_ARTIFACT_DIGEST={pred['digest']}\n")
+              f.write(f"RESOLVED_SEAL_ARTIFACT_ID={seal['id']}\n")
+              f.write(f"RESOLVED_SEAL_ARTIFACT_DIGEST={seal['digest']}\n")
+          receipt = {
+              'schema': 'symthaea.rel.transport-resolution-receipt.v1',
+              'authority': 'TransportResolutionOnly',
+              'predicate': {'run_id': pred['workflow_run']['id'], 'artifact_id': pred['id'], 'name': pred['name'], 'digest': pred['digest']},
+              'seal': {'run_id': seal['workflow_run']['id'], 'artifact_id': seal['id'], 'name': seal['name'], 'digest': seal['digest']},
+              'claims': {'comparison_only_adjudicated': False, 'rel_005a_qualified': False, 'scientific_pass': False, 'scientific_fail': False},
+          }
+          (t/'transport-resolution-receipt.json').write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Download and hash resolved transport ZIPs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          mkdir -p "${RUNNER_TEMP}/sealed-evidence" "${RUNNER_TEMP}/predicate-evidence"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${RESOLVED_SEAL_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/seal.zip"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${RESOLVED_PREDICATE_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/predicate.zip"
+          seal_expected="${RESOLVED_SEAL_ARTIFACT_DIGEST#sha256:}"
+          predicate_expected="${RESOLVED_PREDICATE_ARTIFACT_DIGEST#sha256:}"
+          test "$(sha256sum "${RUNNER_TEMP}/seal.zip" | cut -d' ' -f1)" = "${seal_expected}"
+          test "$(sha256sum "${RUNNER_TEMP}/predicate.zip" | cut -d' ' -f1)" = "${predicate_expected}"
+          unzip -q "${RUNNER_TEMP}/seal.zip" -d "${RUNNER_TEMP}/sealed-evidence"
+          unzip -q "${RUNNER_TEMP}/predicate.zip" -d "${RUNNER_TEMP}/predicate-evidence"
+
+      - name: Validate inner content commitments and stage evaluator inputs
+        shell: bash
+        env:
+          SEALED_ROOT: ${{ runner.temp }}/sealed-evidence
+          PREDICATE_ROOT: ${{ runner.temp }}/predicate-evidence
+          INPUT_ROOT: ${{ runner.temp }}/comparison-input
+        run: |
+          set -euo pipefail
+          mkdir -p "${INPUT_ROOT}"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, shutil
+          sealed = pathlib.Path(os.environ['SEALED_ROOT']); predicate_root = pathlib.Path(os.environ['PREDICATE_ROOT']); out = pathlib.Path(os.environ['INPUT_ROOT'])
+          def unique(root, name):
+              found = [p for p in root.rglob(name) if p.is_file()]
+              if len(found) != 1: raise SystemExit(f'expected one {name}; found {len(found)}')
+              return found[0]
+          def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+          def canonical(v): return json.dumps(v, sort_keys=True, separators=(',', ':'), ensure_ascii=True).encode()
+          obs_path = unique(sealed, 'rel-005a-execution-v3-observation.json'); exe_path = unique(sealed, 'execution-v3-receipt.json'); manifest_path = unique(sealed, 'execution-artifact-manifest.json'); seal_path = unique(sealed, 'observation-seal-v3.json'); pred_path = unique(predicate_root, 'predicate-contract-receipt.json')
+          obs = json.loads(obs_path.read_text()); exe = json.loads(exe_path.read_text()); seal = json.loads(seal_path.read_text()); pred = json.loads(pred_path.read_text())
+          assert obs['schema'] == 'symthaea.rel.graft-frame-execution-observation.v3' and obs['authority'] == 'ExecutionOnly'
+          assert sha(obs_path) == os.environ['OBSERVATION_SHA256'] and not any(obs['claims'].values())
+          assert exe['schema'] == 'symthaea.rel.execution-only-receipt.v3' and exe['authority'] == 'ExecutionOnly'
+          assert exe['subject_head'] == os.environ['EXECUTION_HEAD'] and exe['predicate_contract_parent'] == os.environ['PREDICATE_CONTRACT_HEAD'] and exe['predicate_contract_blob'] == os.environ['PREDICATE_CONTRACT_BLOB']
+          assert exe['frozen_scientific_subject'] == os.environ['FROZEN_SCIENTIFIC_SUBJECT'] and exe['frozen_test_blob'] == os.environ['FROZEN_TEST_BLOB']
+          assert exe['result'] == 'EXECUTION_OK' and str(exe['measurement_exit_code']) == '0' and exe['observation_present'] is True and exe['observation_sha256'] == os.environ['OBSERVATION_SHA256'] and not any(exe['claims'].values())
+          assert seal['schema'] == 'symthaea.rel.observation-seal.v3' and seal['authority'] == 'ObservationSeal' and seal['observation_status'] == 'sealed'
+          assert seal['adjudication'] == 'not_run' and seal['scientific_result'] == 'not_run'
+          assert seal['execution_subject_head'] == os.environ['EXECUTION_HEAD'] and seal['predicate_contract_head'] == os.environ['PREDICATE_CONTRACT_HEAD']
+          assert seal['frozen_scientific_subject'] == os.environ['FROZEN_SCIENTIFIC_SUBJECT'] and seal['frozen_test_blob'] == os.environ['FROZEN_TEST_BLOB']
+          assert seal['source_run_id'] == int(os.environ['EXECUTION_RUN_ID']) and seal['source_artifact_id'] == int(os.environ['SEAL_BOUND_EXECUTION_ARTIFACT_ID']) and seal['source_artifact_digest'] == os.environ['SEAL_BOUND_EXECUTION_ARTIFACT_DIGEST']
+          assert seal['observation_sha256'] == os.environ['OBSERVATION_SHA256'] and seal['chain_commitment_sha256'] == os.environ['SEAL_CHAIN_SHA256']
+          assert seal['claims'] == {'observation_sealed': True, 'comparison_only_adjudicated': False, 'rel_005a_qualified': False, 'scientific_pass': False, 'scientific_fail': False}
+          assert sha(exe_path) == seal['execution_receipt_sha256'] and sha(manifest_path) == seal['artifact_manifest_sha256']
+          chain = {'artifact_manifest_sha256': seal['artifact_manifest_sha256'], 'execution_receipt_sha256': seal['execution_receipt_sha256'], 'execution_subject_head': seal['execution_subject_head'], 'observation_sha256': seal['observation_sha256']}
+          assert hashlib.sha256(canonical(chain)).hexdigest() == os.environ['SEAL_CHAIN_SHA256']
+          assert pred['authority'] == 'PredicateContractOnly' and pred['subject_head'] == os.environ['PREDICATE_CONTRACT_HEAD'] and pred['predicate_count'] == 41
+          assert pred['source_grounded'] is True and pred['predicate_contract_static_valid'] is True
+          assert pred['frozen_scientific_subject'] == os.environ['FROZEN_SCIENTIFIC_SUBJECT'] and pred['frozen_test_blob'] == os.environ['FROZEN_TEST_BLOB'] and not any(pred['claims'].values())
+          shutil.copy2(obs_path, out/'observation.json'); shutil.copy2(seal_path, out/'seal.json')
+          PY
+
+      - name: Run byte-frozen generic ComparisonOnly evaluator
+        shell: bash
+        env:
+          INPUT_ROOT: ${{ runner.temp }}/comparison-input
+          COMPARISON_OUTPUT: ${{ runner.temp }}/comparison-only-v1.json
+        run: |
+          set -euo pipefail
+          python3 -I .github/rel/rel-005a-comparison-only.py \
+            --predicate-contract .github/rel/rel-005a-full-predicate-contract.json \
+            --comparison-contract .github/rel/rel-005a-comparison-only-contract.json \
+            --observation "${INPUT_ROOT}/observation.json" \
+            --seal "${INPUT_ROOT}/seal.json" \
+            --output "${COMPARISON_OUTPUT}"
+
+      - name: Validate adjudication boundary
+        shell: bash
+        env:
+          COMPARISON_OUTPUT: ${{ runner.temp }}/comparison-only-v1.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          r = json.loads(pathlib.Path(os.environ['COMPARISON_OUTPUT']).read_text())
+          assert r['schema'] == 'symthaea.rel.comparison-only.v1' and r['authority'] == 'ComparisonOnly'
+          assert r['predicate_contract_head'] == os.environ['PREDICATE_CONTRACT_HEAD'] and r['execution_subject_head'] == os.environ['EXECUTION_HEAD']
+          assert r['frozen_scientific_subject'] == os.environ['FROZEN_SCIENTIFIC_SUBJECT'] and r['frozen_test_blob'] == os.environ['FROZEN_TEST_BLOB']
+          assert r['observation_sha256'] == os.environ['OBSERVATION_SHA256'] and r['seal_chain_commitment_sha256'] == os.environ['SEAL_CHAIN_SHA256']
+          assert r['predicate_count'] == 41 and r['passed_count'] + r['failed_count'] == 41 and r['failed_count'] == len(r['failed_predicate_ids'])
+          assert r['comparison_result'] in {'ALL_PREDICATES_PASS', 'PREDICATE_FAILURES'}
+          if r['comparison_result'] == 'ALL_PREDICATES_PASS': assert r['passed_count'] == 41 and r['failed_count'] == 0
+          else: assert r['failed_count'] > 0
+          assert r['claims'] == {'comparison_only_adjudicated': True, 'rel_005a_qualified': False, 'scientific_pass': False, 'scientific_fail': False}
+          PY
+
+      - name: Build transport-aware orchestration receipt
+        shell: bash
+        env:
+          COMPARISON_OUTPUT: ${{ runner.temp }}/comparison-only-v1.json
+          RECEIPT: ${{ runner.temp }}/comparison-v3-orchestration-receipt.json
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          p = pathlib.Path(os.environ['COMPARISON_OUTPUT']); r = json.loads(p.read_text())
+          receipt = {
+              'schema': 'symthaea.rel.comparison-orchestration-receipt.v2', 'authority': 'ComparisonInfrastructureOnly',
+              'subject_head': subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(), 'parent_head': subprocess.check_output(['git','rev-parse','HEAD^'], text=True).strip(),
+              'predicate_contract_head': os.environ['PREDICATE_CONTRACT_HEAD'], 'resolved_predicate_artifact_id': int(os.environ['RESOLVED_PREDICATE_ARTIFACT_ID']), 'resolved_predicate_artifact_digest': os.environ['RESOLVED_PREDICATE_ARTIFACT_DIGEST'],
+              'execution_subject_head': os.environ['EXECUTION_HEAD'], 'seal_subject_head': os.environ['SEAL_HEAD'], 'resolved_seal_artifact_id': int(os.environ['RESOLVED_SEAL_ARTIFACT_ID']), 'resolved_seal_artifact_digest': os.environ['RESOLVED_SEAL_ARTIFACT_DIGEST'],
+              'seal_chain_commitment_sha256': os.environ['SEAL_CHAIN_SHA256'], 'transport_identity_is_scientific_authority': False,
+              'comparison_contract_blob': os.environ['COMPARISON_CONTRACT_BLOB'], 'comparison_evaluator_blob': os.environ['COMPARISON_EVALUATOR_BLOB'], 'comparison_output_sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
+              'comparison_result': r['comparison_result'], 'predicate_count': r['predicate_count'], 'passed_count': r['passed_count'], 'failed_count': r['failed_count'],
+              'claims': {'rel_005a_qualified': False, 'scientific_pass': False, 'scientific_fail': False},
+          }
+          pathlib.Path(os.environ['RECEIPT']).write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n'); print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload detailed ComparisonOnly evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-comparison-v3-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/comparison-only-v1.json
+            ${{ runner.temp }}/comparison-v3-orchestration-receipt.json
+            ${{ runner.temp }}/transport-resolution-receipt.json
+            .github/rel/rel-005a-comparison-source.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-comparison-only.py)" = "${COMPARISON_EVALUATOR_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-full-predicate-contract.json)" = "${PREDICATE_CONTRACT_BLOB}"
+          test "$(git rev-parse HEAD:crates/core/symthaea-fep/tests/rel_graft_frame.rs)" = "${FROZEN_TEST_BLOB}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
