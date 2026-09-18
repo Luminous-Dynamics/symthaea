@@ -11,10 +11,12 @@ pub enum ArtifactRole {
     Configuration,
     ReferenceResult,
     EnvironmentLock,
+    ResultBundle,
     Other(String),
 }
 
-/// Immutable identity for any external scientific artifact consumed by a run.
+/// Immutable identity for any external scientific artifact consumed or emitted
+/// by a run.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImmutableArtifact {
     pub role: ArtifactRole,
@@ -90,23 +92,18 @@ impl ComparisonCriterion {
         if self.statistic.trim().is_empty() {
             return Err(ReproductionSpecError::EmptyComparisonStatistic);
         }
-        let abs_ok = self
-            .max_absolute_delta
-            .is_some_and(|value| value.is_finite() && value >= 0.0);
-        let rel_ok = self
-            .max_relative_delta
-            .is_some_and(|value| value.is_finite() && value >= 0.0);
-        if !abs_ok && !rel_ok {
-            return Err(ReproductionSpecError::MissingValidTolerance);
-        }
-        if self
-            .max_absolute_delta
-            .is_some_and(|value| !value.is_finite() || value < 0.0)
-            || self
-                .max_relative_delta
-                .is_some_and(|value| !value.is_finite() || value < 0.0)
+
+        for tolerance in [self.max_absolute_delta, self.max_relative_delta]
+            .into_iter()
+            .flatten()
         {
-            return Err(ReproductionSpecError::InvalidTolerance);
+            if !tolerance.is_finite() || tolerance < 0.0 {
+                return Err(ReproductionSpecError::InvalidTolerance);
+            }
+        }
+
+        if self.max_absolute_delta.is_none() && self.max_relative_delta.is_none() {
+            return Err(ReproductionSpecError::MissingValidTolerance);
         }
         Ok(())
     }
@@ -182,6 +179,62 @@ impl De001aReproductionSpec {
     }
 }
 
+/// Classification of a DE-001A execution.
+///
+/// `Negative` means the frozen reproduction executed but did not satisfy one or
+/// more preregistered criteria. It is not evidence against ΛCDM. `Invalid`
+/// means the evidence lineage itself is not admissible.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum De001aResultClass {
+    Pass,
+    Negative,
+    Indeterminate,
+    Invalid,
+}
+
+impl De001aResultClass {
+    pub const fn is_completed_reproduction_outcome(self) -> bool {
+        matches!(self, Self::Pass | Self::Negative)
+    }
+}
+
+/// Receipt for an executed DE-001A reproduction.
+///
+/// The reported result class is never trusted by itself. Provenance or
+/// preregistration violations force the effective class to `Invalid`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct De001aExecutionReceipt {
+    pub subject_commit: GitObjectId,
+    pub spec_digest: Sha256Digest,
+    pub result_bundle: ImmutableArtifact,
+    pub reported_result_class: De001aResultClass,
+    pub postflight_immutable: bool,
+    pub preregistration_intact: bool,
+    /// True if thresholds, model choices, data cuts, or analysis logic were
+    /// changed after the reproduction result was exposed.
+    pub development_after_result_exposure: bool,
+}
+
+impl De001aExecutionReceipt {
+    pub fn effective_result_class(&self) -> De001aResultClass {
+        let result_identity_valid = self.result_bundle.validate().is_ok()
+            && self.result_bundle.role == ArtifactRole::ResultBundle;
+        if !result_identity_valid
+            || !self.postflight_immutable
+            || !self.preregistration_intact
+            || self.development_after_result_exposure
+        {
+            De001aResultClass::Invalid
+        } else {
+            self.reported_result_class
+        }
+    }
+
+    pub fn is_qualified_reproduction_pass(&self) -> bool {
+        self.effective_result_class() == De001aResultClass::Pass
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReproductionSpecError {
     EmptyExperimentId,
@@ -250,6 +303,18 @@ mod tests {
         }
     }
 
+    fn valid_receipt() -> De001aExecutionReceipt {
+        De001aExecutionReceipt {
+            subject_commit: GitObjectId::parse(&"a".repeat(40)).unwrap(),
+            spec_digest: digest('f'),
+            result_bundle: artifact(ArtifactRole::ResultBundle, "result", '1'),
+            reported_result_class: De001aResultClass::Pass,
+            postflight_immutable: true,
+            preregistration_intact: true,
+            development_after_result_exposure: false,
+        }
+    }
+
     #[test]
     fn valid_reproduction_spec_is_accepted() {
         assert_eq!(valid_spec().validate(), Ok(()));
@@ -280,9 +345,19 @@ mod tests {
     }
 
     #[test]
-    fn malformed_tolerance_is_rejected() {
+    fn malformed_tolerance_is_explicitly_invalid() {
         let mut spec = valid_spec();
         spec.criteria[0].max_absolute_delta = Some(f64::NAN);
+        assert_eq!(
+            spec.validate(),
+            Err(ReproductionSpecError::InvalidTolerance)
+        );
+    }
+
+    #[test]
+    fn absent_tolerance_is_distinct_from_invalid_tolerance() {
+        let mut spec = valid_spec();
+        spec.criteria[0].max_absolute_delta = None;
         assert_eq!(
             spec.validate(),
             Err(ReproductionSpecError::MissingValidTolerance)
@@ -292,5 +367,57 @@ mod tests {
     #[test]
     fn de001a_never_licenses_an_anomaly_claim() {
         assert!(!De001aClaimPolicy::ReproductionOnly.allows_observational_anomaly_claim());
+    }
+
+    #[test]
+    fn clean_pass_receipt_qualifies_reproduction_only() {
+        let receipt = valid_receipt();
+        assert_eq!(receipt.effective_result_class(), De001aResultClass::Pass);
+        assert!(receipt.is_qualified_reproduction_pass());
+    }
+
+    #[test]
+    fn broken_postflight_forces_invalid_even_if_reported_pass() {
+        let mut receipt = valid_receipt();
+        receipt.postflight_immutable = false;
+        assert_eq!(
+            receipt.effective_result_class(),
+            De001aResultClass::Invalid
+        );
+        assert!(!receipt.is_qualified_reproduction_pass());
+    }
+
+    #[test]
+    fn post_result_tuning_forces_invalid() {
+        let mut receipt = valid_receipt();
+        receipt.development_after_result_exposure = true;
+        assert_eq!(
+            receipt.effective_result_class(),
+            De001aResultClass::Invalid
+        );
+    }
+
+    #[test]
+    fn wrong_result_artifact_role_forces_invalid() {
+        let mut receipt = valid_receipt();
+        receipt.result_bundle.role = ArtifactRole::ReferenceResult;
+        assert_eq!(
+            receipt.effective_result_class(),
+            De001aResultClass::Invalid
+        );
+    }
+
+    #[test]
+    fn negative_reproduction_is_not_an_invalid_lineage() {
+        let mut receipt = valid_receipt();
+        receipt.reported_result_class = De001aResultClass::Negative;
+        assert_eq!(
+            receipt.effective_result_class(),
+            De001aResultClass::Negative
+        );
+        assert!(!receipt.is_qualified_reproduction_pass());
+        assert!(receipt
+            .effective_result_class()
+            .is_completed_reproduction_outcome());
     }
 }
