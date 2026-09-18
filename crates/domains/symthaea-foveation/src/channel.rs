@@ -2,26 +2,44 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Background-thread foveation channel using std::sync::mpsc.
+//!
+//! Follows the `EmbeddingChannel` pattern from `symthaea-embeddings/src/channel.rs`.
+//! No tokio dependency — compatible with the sync cognitive loop.
+//!
+//! ```rust,ignore
+//! use symthaea_foveation::{FoveationChannel, FoveationConfig, FoveationRequest};
+//!
+//! let channel = FoveationChannel::spawn(FoveationConfig::default());
+//! let rx = channel.request(my_request).unwrap();
+//! let result = rx.recv().unwrap();
+//! ```
 
 use std::sync::mpsc;
 
 use crate::types::{FoveationConfig, FoveationRequest, FoveationResult, RoutingStrategy};
 use crate::ventral::VentralPipeline;
 
+/// Handle to a background foveation thread.
+///
+/// Requests are submitted via a bounded channel (default capacity from config).
+/// Drop the handle to shut down the background thread.
 pub struct FoveationChannel {
     request_tx: mpsc::SyncSender<ChannelRequest>,
 }
 
+/// Internal request wrapper with response channel.
 struct ChannelRequest {
     request: FoveationRequest,
     response_tx: mpsc::SyncSender<FoveationResult>,
 }
 
 impl FoveationChannel {
+    /// Spawn a background foveation thread with the given config.
     pub fn spawn(config: &FoveationConfig) -> Self {
         Self::spawn_with_capacity(config.routing, config.channel_depth)
     }
 
+    /// Spawn a background foveation thread with explicit capacity.
     pub fn spawn_with_capacity(routing: RoutingStrategy, depth: usize) -> Self {
         let (request_tx, request_rx) = mpsc::sync_channel::<ChannelRequest>(depth);
 
@@ -29,8 +47,10 @@ impl FoveationChannel {
             .name("symthaea-foveation".into())
             .spawn(move || {
                 let mut pipeline = VentralPipeline::new(routing);
+
                 while let Ok(channel_req) = request_rx.recv() {
                     let result = pipeline.process(&channel_req.request);
+                    // If the receiver was dropped, just discard the response
                     let _ = channel_req.response_tx.try_send(result);
                 }
             })
@@ -39,11 +59,16 @@ impl FoveationChannel {
         Self { request_tx }
     }
 
+    /// Submit a non-blocking foveation request.
+    ///
+    /// Returns a receiver for the result. Fails with `TrySendError::Full`
+    /// if the channel is at capacity (backpressure).
     pub fn request(
         &self,
         request: FoveationRequest,
     ) -> Result<mpsc::Receiver<FoveationResult>, mpsc::TrySendError<()>> {
         let (response_tx, response_rx) = mpsc::sync_channel(1);
+
         let channel_req = ChannelRequest {
             request,
             response_tx,
@@ -57,10 +82,12 @@ impl FoveationChannel {
         Ok(response_rx)
     }
 
+    /// Submit a request and block until the result is available.
     pub fn request_blocking(&self, request: FoveationRequest) -> Result<FoveationResult, String> {
         let rx = self
             .request(request)
             .map_err(|e| format!("Channel send failed: {e:?}"))?;
+
         rx.recv().map_err(|e| format!("Channel recv failed: {e}"))
     }
 }
@@ -89,50 +116,50 @@ mod tests {
     }
 
     #[test]
-    fn spawn_and_request() {
-        let channel = FoveationChannel::spawn(&FoveationConfig::default());
-        let result = channel.request(make_request(1)).unwrap().recv().unwrap();
+    fn test_channel_spawn_and_request() {
+        let config = FoveationConfig::default();
+        let channel = FoveationChannel::spawn(&config);
+        let rx = channel.request(make_request(1)).unwrap();
+        let result = rx.recv().unwrap();
+
         assert_eq!(result.request_id, 1);
         assert_eq!(result.semantic_hv.dim(), 16_384);
+        assert!(result.semantic_hv.norm() > 0.0);
         assert_eq!(result.execution.kind, VentralExecutionKind::HashStubV1);
     }
 
     #[test]
-    fn multiple_requests_preserve_identity() {
+    fn test_channel_multiple_requests() {
         let channel = FoveationChannel::spawn_with_capacity(RoutingStrategy::Auto, 16);
+
         let mut receivers = Vec::new();
         for i in 0..10 {
-            receivers.push((i, channel.request(make_request(i)).unwrap()));
+            let rx = channel.request(make_request(i)).unwrap();
+            receivers.push((i, rx));
         }
+
         for (id, rx) in receivers {
-            assert_eq!(rx.recv().unwrap().request_id, id);
+            let result = rx.recv().unwrap();
+            assert_eq!(result.request_id, id);
+            assert_eq!(result.semantic_hv.dim(), 16_384);
         }
     }
 
     #[test]
-    fn blocking_request_works() {
-        let channel = FoveationChannel::spawn(&FoveationConfig::default());
-        assert_eq!(channel.request_blocking(make_request(99)).unwrap().request_id, 99);
+    fn test_channel_blocking_request() {
+        let config = FoveationConfig::default();
+        let channel = FoveationChannel::spawn(&config);
+        let result = channel.request_blocking(make_request(99)).unwrap();
+
+        assert_eq!(result.request_id, 99);
+        assert_eq!(result.semantic_hv.dim(), 16_384);
     }
 
     #[test]
-    fn provenance_survives_background_channel() {
-        let channel = FoveationChannel::spawn(&FoveationConfig::default());
-        let mut request = make_request(7);
-        let observation = VisualObservationRef::new(
-            VisualStreamRef::new(5, 6).unwrap(),
-            request.frame_id,
-            request.timestamp_us,
-            VisualCaptureClock::StreamMonotonic,
-        );
-        request.source_observation = Some(observation);
-        let result = channel.request_blocking(request).unwrap();
-        assert_eq!(result.source_observation, Some(observation));
-    }
-
-    #[test]
-    fn backpressure_is_bounded() {
+    fn test_channel_backpressure() {
+        // Capacity of 2
         let channel = FoveationChannel::spawn_with_capacity(RoutingStrategy::Auto, 2);
+
         let mut sent = 0;
         let mut receivers = Vec::new();
         for i in 0..100u64 {
@@ -141,20 +168,64 @@ mod tests {
                     sent += 1;
                     receivers.push(rx);
                 }
-                Err(mpsc::TrySendError::Full(())) => break,
+                Err(mpsc::TrySendError::Full(())) => {
+                    break;
+                }
                 Err(mpsc::TrySendError::Disconnected(())) => {
-                    panic!("Channel disconnected unexpectedly")
+                    panic!("Channel disconnected unexpectedly");
                 }
             }
         }
-        assert!(sent >= 2);
+
+        // Should have sent at least the capacity
+        assert!(
+            sent >= 2,
+            "Should send at least capacity messages, sent {sent}"
+        );
+
+        // All sent requests should eventually complete
         for rx in receivers {
-            assert_eq!(rx.recv().unwrap().semantic_hv.dim(), 16_384);
+            let result = rx.recv().unwrap();
+            assert_eq!(result.semantic_hv.dim(), 16_384);
         }
     }
 
     #[test]
-    fn requested_routing_is_retained_in_execution_receipt() {
+    fn test_channel_drop_shuts_down() {
+        let config = FoveationConfig::default();
+        let channel = FoveationChannel::spawn(&config);
+
+        // Do one request to confirm thread is alive
+        let result = channel.request_blocking(make_request(1)).unwrap();
+        assert_eq!(result.request_id, 1);
+
+        // Drop channel — thread should exit when request_rx disconnects
+        drop(channel);
+
+        // Give thread a moment to notice disconnect
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    #[test]
+    fn test_channel_preserves_spatial_info() {
+        let config = FoveationConfig::default();
+        let channel = FoveationChannel::spawn(&config);
+
+        let mut req = make_request(50);
+        req.grid_row = 5;
+        req.grid_col = 7;
+        req.frame_id = 200;
+        req.timestamp_us = 999_000;
+
+        let result = channel.request_blocking(req).unwrap();
+        assert_eq!(result.grid_row, 5);
+        assert_eq!(result.grid_col, 7);
+        assert_eq!(result.source_frame_id, 200);
+        assert_eq!(result.source_timestamp_us, 999_000);
+    }
+
+    #[test]
+    fn test_channel_different_routing_strategies() {
         for routing in [
             RoutingStrategy::Auto,
             RoutingStrategy::AlwaysEmbed,
@@ -164,7 +235,24 @@ mod tests {
         ] {
             let channel = FoveationChannel::spawn_with_capacity(routing, 4);
             let result = channel.request_blocking(make_request(1)).unwrap();
+            assert_eq!(result.semantic_hv.dim(), 16_384, "Failed for {routing:?}");
             assert_eq!(result.execution.requested_routing, routing);
         }
+    }
+
+    #[test]
+    fn test_channel_preserves_capture_provenance() {
+        let channel = FoveationChannel::spawn(&FoveationConfig::default());
+        let mut req = make_request(77);
+        let observation = VisualObservationRef::new(
+            VisualStreamRef::new(5, 6).unwrap(),
+            req.frame_id,
+            req.timestamp_us,
+            VisualCaptureClock::StreamMonotonic,
+        );
+        req.source_observation = Some(observation);
+
+        let result = channel.request_blocking(req).unwrap();
+        assert_eq!(result.source_observation, Some(observation));
     }
 }
