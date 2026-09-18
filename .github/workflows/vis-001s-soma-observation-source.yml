@@ -1,0 +1,32 @@
+name: VIS-001S Soma Visual Observation Source
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-soma/**'
+      - 'crates/domains/symthaea-foveation/**'
+      - 'crates/domains/symthaea-vision-manifold/**'
+      - 'docs/architecture/SOMA_VISUAL_OBSERVATION_SOURCE_V1.md'
+      - '.github/workflows/vis-001s-soma-observation-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check Soma visual provenance stack
+        run: cargo check -p symthaea-vision-manifold -p symthaea-foveation -p symthaea-soma --all-targets
+      - name: Test Soma visual provenance stack
+        run: cargo test -p symthaea-vision-manifold -p symthaea-foveation -p symthaea-soma
+      - name: Clippy Soma visual provenance stack
+        run: cargo clippy -p symthaea-vision-manifold -p symthaea-foveation -p symthaea-soma --all-targets -- -D warnings
