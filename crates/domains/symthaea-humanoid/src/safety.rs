@@ -6,6 +6,11 @@
 //! This layer is deliberately independent of learned confidence, Phi, and FEP.
 //! Cognitive signals may request less authority, but they cannot bypass joint,
 //! velocity, finite-value, morphology, or slew-rate constraints.
+//!
+//! Rate limiting is applied before state-dependent hard constraints. This
+//! ordering is intentional: command history may bound a requested transition,
+//! but it must never resurrect outward authority that a current joint-position
+//! or joint-velocity constraint has removed.
 
 use serde::{Deserialize, Serialize};
 
@@ -136,6 +141,26 @@ impl HumanoidSafetyProjector {
             }
         }
 
+        // History-dependent rate limiting is deliberately performed before the
+        // state-dependent hard constraints below. If a joint reaches a limit
+        // between two ticks, the previous command must not be able to leak back
+        // through the slew limiter after the hard constraint removes it.
+        let max_step =
+            (self.envelope.max_command_slew_per_second * dt.max(0.0) as f32).max(0.0);
+        for (value, previous) in values.iter_mut().zip(self.previous.torques.iter()) {
+            let low = *previous - max_step;
+            let high = *previous + max_step;
+            let clipped = value.clamp(low, high);
+            if clipped != *value {
+                report.slew_clips += 1;
+                *value = clipped;
+            }
+        }
+
+        // Terminal state-dependent physical constraints. These are permitted to
+        // override the slew envelope because preserving an old outward command
+        // is less important than refusing to drive farther through a current
+        // position or velocity boundary.
         let limits = self.morphology.joint_limits();
         let margin = self.envelope.joint_limit_margin_rad.max(1.0e-6);
         let velocity_limit = self.envelope.joint_velocity_soft_limit_rad_s.max(1.0e-6);
@@ -164,17 +189,6 @@ impl HumanoidSafetyProjector {
                     values[i] = 0.0;
                     report.velocity_interventions += 1;
                 }
-            }
-        }
-
-        let max_step = (self.envelope.max_command_slew_per_second * dt.max(0.0) as f32).max(0.0);
-        for (value, previous) in values.iter_mut().zip(self.previous.torques.iter()) {
-            let low = *previous - max_step;
-            let high = *previous + max_step;
-            let clipped = value.clamp(low, high);
-            if clipped != *value {
-                report.slew_clips += 1;
-                *value = clipped;
             }
         }
 
@@ -234,5 +248,57 @@ mod tests {
         let result = projector.project(&requested, &state, ActuationMode::NormalizedTorque, 1.0);
         assert_eq!(result.command.torques[0], 0.0);
         assert!(result.report.joint_limit_interventions > 0);
+    }
+
+    #[test]
+    fn terminal_joint_limit_cannot_be_undone_by_slew_history() {
+        let envelope = SafetyEnvelope {
+            max_command_slew_per_second: 2.0,
+            ..SafetyEnvelope::default()
+        };
+        let mut projector =
+            HumanoidSafetyProjector::with_envelope(HumanoidMorphology::Dmc21, envelope);
+        let mut state = HumanoidState::standing();
+        let mut requested = HumanoidCommand::zero();
+        requested.torques[0] = 1.0;
+
+        let priming =
+            projector.project(&requested, &state, ActuationMode::NormalizedTorque, 1.0);
+        assert!(priming.command.torques[0] > 0.0);
+
+        let limits = HumanoidMorphology::Dmc21.joint_limits();
+        state.joint_angles[0] = limits[0][1];
+        let result =
+            projector.project(&requested, &state, ActuationMode::NormalizedTorque, 0.025);
+
+        assert_eq!(result.command.torques[0], 0.0);
+        assert!(result.report.joint_limit_interventions > 0);
+        assert!(result.report.slew_clips > 0);
+    }
+
+    #[test]
+    fn terminal_velocity_limit_cannot_be_undone_by_slew_history() {
+        let envelope = SafetyEnvelope {
+            max_command_slew_per_second: 2.0,
+            joint_velocity_soft_limit_rad_s: 5.0,
+            ..SafetyEnvelope::default()
+        };
+        let mut projector =
+            HumanoidSafetyProjector::with_envelope(HumanoidMorphology::Dmc21, envelope);
+        let mut state = HumanoidState::standing();
+        let mut requested = HumanoidCommand::zero();
+        requested.torques[0] = 1.0;
+
+        let priming =
+            projector.project(&requested, &state, ActuationMode::NormalizedTorque, 1.0);
+        assert!(priming.command.torques[0] > 0.0);
+
+        state.joint_velocities[0] = 5.0;
+        let result =
+            projector.project(&requested, &state, ActuationMode::NormalizedTorque, 0.025);
+
+        assert_eq!(result.command.torques[0], 0.0);
+        assert!(result.report.velocity_interventions > 0);
+        assert!(result.report.slew_clips > 0);
     }
 }
