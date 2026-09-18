@@ -35,6 +35,7 @@ pub mod checkpoint;
 pub mod encoder;
 pub mod epistemic;
 pub mod manifold;
+pub mod object_geometry;
 pub mod predictive;
 pub mod spectrum;
 pub mod training;
@@ -98,6 +99,11 @@ pub use epistemic::{
 pub use manifold::{
     DelayedHorizonEvaluator, HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory,
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
+};
+pub use object_geometry::{
+    GeometryError, GeometryKind, GeometryMetricEligibility, GeometrySupport, GeometryUncertainty,
+    InferredObjectGeometry, MaskRun, PixelPoint, PixelRect, SegmentationMaskRle,
+    VisualKeypoint, VisualObjectGeometry,
 };
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{
