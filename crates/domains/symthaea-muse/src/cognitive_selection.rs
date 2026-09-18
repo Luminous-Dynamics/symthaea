@@ -7,9 +7,13 @@
 //! rather than hiding musical judgment inside one opaque quality score.
 
 use crate::cognitive_bridge::{
-    CognitiveDecisionTrace, MusicalOutcomeError, SymbolicMeasurementEvidence,
+    CognitiveDecisionTrace, MusicalOutcomeError, PredictedMusicalOutcome, SymbolicAction,
+    SymbolicMeasurementEvidence, default_predicted_outcome,
 };
+use crate::musical_inference::MusicAction;
 use serde::{Deserialize, Serialize};
+
+pub const COGNITIVE_SELECTION_POLICY_VERSION: &str = "cognitive-alternative-selection-v1";
 
 /// Evidence supplied for one theory-generated alternative.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -56,6 +60,21 @@ pub struct SymbolicAlternativeSelection {
     pub recommended_id: Option<String>,
     pub rationale: Vec<String>,
     pub assessments: Vec<SymbolicAlternativeAssessment>,
+}
+
+/// Explicit evidence for the opt-in cognitive influence boundary.
+///
+/// The formal proposal remains authoritative about *what obligation is being
+/// served*. This record only allows the FEP source action to express a desired
+/// effect while choosing among alternatives that already survived theory,
+/// Preserve-contract, and formal-obligation gates.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CognitiveAlternativeSelectionV1 {
+    pub policy_version: String,
+    pub source_action: MusicAction,
+    pub formal_proposal_action: SymbolicAction,
+    pub desired_outcome: PredictedMusicalOutcome,
+    pub selection: SymbolicAlternativeSelection,
 }
 
 /// Select among already-valid musical alternatives.
@@ -163,6 +182,59 @@ pub fn select_symbolic_alternative(
     }
 }
 
+/// Select with a preference derived from the *actual* FEP source action.
+///
+/// This is deliberately opt-in. `trace.proposal.action` remains the formal
+/// action selected after obligation/goal arbitration; cognition cannot use
+/// this function to bypass that action, make an invalid candidate eligible,
+/// or outrank overdue formal promises. It can only decide which eligible
+/// alternative best matches the effect implied by its own source action.
+pub fn select_symbolic_alternative_from_inference(
+    trace: &CognitiveDecisionTrace,
+    alternatives: &[SymbolicAlternativeEvidence],
+) -> CognitiveAlternativeSelectionV1 {
+    let desired_outcome = cognitive_target_for_source_action(trace.inference.source_action);
+    let mut cognitive_trace = trace.clone();
+    cognitive_trace.predicted_outcome = desired_outcome;
+    let mut selection = select_symbolic_alternative(&cognitive_trace, alternatives);
+    selection.rationale.insert(
+        0,
+        format!(
+            "cognitive preference derived from {:?}; formal proposal {:?} remains authoritative",
+            trace.inference.source_action, trace.proposal.action
+        ),
+    );
+
+    CognitiveAlternativeSelectionV1 {
+        policy_version: COGNITIVE_SELECTION_POLICY_VERSION.into(),
+        source_action: trace.inference.source_action,
+        formal_proposal_action: trace.proposal.action,
+        desired_outcome,
+        selection,
+    }
+}
+
+/// Effect target corresponding to the FEP action before formal goal/obligation
+/// arbitration. The mapping intentionally mirrors the bridge's no-goal,
+/// no-obligation fallback and is regression-tested against that bridge so the
+/// two semantics cannot silently drift.
+pub fn cognitive_target_for_source_action(source_action: MusicAction) -> PredictedMusicalOutcome {
+    default_predicted_outcome(symbolic_action_for_source(source_action))
+}
+
+fn symbolic_action_for_source(source_action: MusicAction) -> SymbolicAction {
+    match source_action {
+        MusicAction::FollowHarmony => SymbolicAction::Maintain,
+        MusicAction::ChromaticExplore => SymbolicAction::IncreaseHarmonicInstability,
+        MusicAction::RepeatMotif => SymbolicAction::DevelopMotif,
+        MusicAction::ModulateKey => SymbolicAction::ModulateToRelatedKey,
+        MusicAction::IncreaseComplexity => SymbolicAction::IncreaseDensity,
+        MusicAction::ResolveTension => SymbolicAction::StrengthenCadence,
+        MusicAction::AddCountermelody => SymbolicAction::AddCounterline,
+        MusicAction::Maintain => SymbolicAction::Maintain,
+    }
+}
+
 fn target_verification_rank(value: Option<bool>) -> u8 {
     match value {
         Some(true) => 0,
@@ -176,9 +248,9 @@ mod tests {
     use super::*;
     use crate::cognitive_bridge::{
         ActionScope, CognitiveSection, InferenceEvidence, PredictedMusicalOutcome, SymbolicAction,
-        SymbolicActionProposal, SymbolicMusicObservation,
+        SymbolicActionProposal, SymbolicMusicObservation, propose_symbolic_action,
     };
-    use crate::musical_inference::MusicAction;
+    use crate::musical_inference::{MusicAction, MusicInferenceResult};
     use symthaea_music_theory::ScoreCognitiveProfile;
 
     fn trace() -> CognitiveDecisionTrace {
@@ -253,6 +325,62 @@ mod tests {
         }
     }
 
+    fn alternative_for_outcome(
+        id: &str,
+        outcome: PredictedMusicalOutcome,
+        valid: bool,
+        preserved: bool,
+        overdue: usize,
+        pressure: f32,
+    ) -> SymbolicAlternativeEvidence {
+        let baseline = ScoreCognitiveProfile {
+            tension: 0.5,
+            density: 0.5,
+            familiarity: 0.5,
+            tonal_displacement: 0.5,
+            ..ScoreCognitiveProfile::default()
+        };
+        let candidate = ScoreCognitiveProfile {
+            tension: baseline.tension + outcome.tension_delta,
+            density: baseline.density + outcome.density_delta,
+            familiarity: baseline.familiarity + outcome.familiarity_delta,
+            tonal_displacement: baseline.tonal_displacement + outcome.tonal_displacement_delta,
+            ..baseline
+        };
+        SymbolicAlternativeEvidence {
+            alternative_id: id.into(),
+            measurement: SymbolicMeasurementEvidence::new(baseline, candidate),
+            hard_constraints_valid: valid,
+            preserved_invariants: preserved,
+            overdue_obligations_remaining: overdue,
+            unresolved_obligations_remaining: overdue,
+            obligation_pressure_remaining: pressure,
+            target_obligation_verified: Some(true),
+            motif_return_similarity: Some(1.0),
+        }
+    }
+
+    fn return_trace(source_action: MusicAction) -> CognitiveDecisionTrace {
+        let mut value = trace();
+        value.inference.source_action = source_action;
+        value.proposal.action = SymbolicAction::ReturnOpeningMaterial;
+        value.predicted_outcome = default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial);
+        value
+    }
+
+    fn inference(action: MusicAction) -> MusicInferenceResult {
+        MusicInferenceResult {
+            action,
+            free_energy: 0.2,
+            prediction_error: 0.2,
+            surprise: 0.1,
+            is_surprised: false,
+            learning_rate_mod: 1.0,
+            sensory_precision: 1.0,
+            prior_precision: 1.0,
+        }
+    }
+
     #[test]
     fn invalid_perfect_prediction_loses_to_valid_music() {
         let selection = select_symbolic_alternative(
@@ -297,5 +425,100 @@ mod tests {
         verified.target_obligation_verified = Some(true);
         let selection = select_symbolic_alternative(&trace(), &[failed, verified]);
         assert_eq!(selection.recommended_id.as_deref(), Some("promise-kept"));
+    }
+
+    #[test]
+    fn source_cognition_can_change_choice_without_changing_formal_action() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let formal_return = default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial);
+        let denser = default_predicted_outcome(SymbolicAction::IncreaseDensity);
+        let alternatives = [
+            alternative_for_outcome("formal-return", formal_return, true, true, 0, 0.0),
+            alternative_for_outcome("cognition-dense", denser, true, true, 0, 0.0),
+        ];
+
+        let formal_selection = select_symbolic_alternative(&trace, &alternatives);
+        assert_eq!(
+            formal_selection.recommended_id.as_deref(),
+            Some("formal-return")
+        );
+
+        let cognitive = select_symbolic_alternative_from_inference(&trace, &alternatives);
+        assert_eq!(cognitive.formal_proposal_action, SymbolicAction::ReturnOpeningMaterial);
+        assert_eq!(cognitive.source_action, MusicAction::IncreaseComplexity);
+        assert_eq!(
+            cognitive.selection.recommended_id.as_deref(),
+            Some("cognition-dense")
+        );
+    }
+
+    #[test]
+    fn cognition_cannot_make_invalid_candidate_eligible() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let desired = cognitive_target_for_source_action(MusicAction::IncreaseComplexity);
+        let fallback = default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial);
+        let alternatives = [
+            alternative_for_outcome("invalid-perfect", desired, false, true, 0, 0.0),
+            alternative_for_outcome("valid-fallback", fallback, true, true, 0, 0.0),
+        ];
+
+        let cognitive = select_symbolic_alternative_from_inference(&trace, &alternatives);
+        assert_eq!(
+            cognitive.selection.recommended_id.as_deref(),
+            Some("valid-fallback")
+        );
+    }
+
+    #[test]
+    fn overdue_formal_promise_still_outranks_cognitive_fit() {
+        let trace = return_trace(MusicAction::IncreaseComplexity);
+        let desired = cognitive_target_for_source_action(MusicAction::IncreaseComplexity);
+        let fallback = default_predicted_outcome(SymbolicAction::ReturnOpeningMaterial);
+        let alternatives = [
+            alternative_for_outcome("cognitive-fit-overdue", desired, true, true, 1, 1.0),
+            alternative_for_outcome("formal-first", fallback, true, true, 0, 0.0),
+        ];
+
+        let cognitive = select_symbolic_alternative_from_inference(&trace, &alternatives);
+        assert_eq!(
+            cognitive.selection.recommended_id.as_deref(),
+            Some("formal-first")
+        );
+    }
+
+    #[test]
+    fn source_action_mapping_matches_bridge_fallback_semantics() {
+        for action in [
+            MusicAction::FollowHarmony,
+            MusicAction::ChromaticExplore,
+            MusicAction::RepeatMotif,
+            MusicAction::ModulateKey,
+            MusicAction::IncreaseComplexity,
+            MusicAction::ResolveTension,
+            MusicAction::AddCountermelody,
+            MusicAction::Maintain,
+        ] {
+            let observation = SymbolicMusicObservation {
+                section: CognitiveSection::Development,
+                active_goal: None,
+                goal_urgency: 0.0,
+                valence: 0.0,
+                arousal: 0.5,
+                prediction_error: 0.2,
+                consciousness_level: 0.5,
+                dominant_harmony: 0,
+                dominant_harmony_activation: 0.7,
+                pending_obligations: 0,
+                overdue_obligations: Vec::new(),
+                obligation_demands: Vec::new(),
+                obligation_pressure: 0.0,
+            };
+            let bridge = propose_symbolic_action(&inference(action), observation);
+            assert_eq!(bridge.proposal.action, symbolic_action_for_source(action));
+            assert_eq!(
+                bridge.predicted_outcome,
+                cognitive_target_for_source_action(action)
+            );
+        }
     }
 }
