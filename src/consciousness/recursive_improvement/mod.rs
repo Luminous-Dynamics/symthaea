@@ -74,6 +74,7 @@ mod sym_rsi_fresh_evaluation;
 mod sym_rsi_c_fresh_gate;
 mod sym_rsi_fresh_chain_claim;
 mod sym_rsi_fresh_chain_gate;
+mod sym_rsi_qualification_anchor;
 pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_dream_protocol;
 mod sym_rsi_dream_parent_gate;
@@ -177,6 +178,11 @@ pub use sym_rsi_fresh_chain_claim::{
 pub use sym_rsi_fresh_chain_gate::{
     QualifiedFreshChainError, QualifiedFreshImprovementChainReceipt,
     SYM_RSI_QUALIFIED_FRESH_CHAIN_SCHEMA, build_qualified_fresh_improvement_chain,
+};
+pub use sym_rsi_qualification_anchor::{
+    QualificationAnchor, QualificationAnchorError, QualificationAnchorStage,
+    SYM_RSI_QUALIFICATION_ANCHOR_SCHEMA, requalify_dream_fresh_from_anchor,
+    requalify_replay_fresh_from_anchor,
 };
 pub use sym_rsi_grounded_dream::{
     DreamActionPrediction, DreamActionSupport, DreamDecisionRecord, DreamFixtureAction,
