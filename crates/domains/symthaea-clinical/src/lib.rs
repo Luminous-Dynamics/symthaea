@@ -42,6 +42,7 @@ pub use inference::{
 pub use inference_wire::{
     CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION, ClinicalInferenceWireError,
     clinical_inference_wire_bytes, clinical_inference_wire_digest,
+    clinical_inference_wire_digest_from_bytes, parse_clinical_inference_wire_bytes,
 };
 pub use nosology::{DiagnosticCategory, DiagnosticProfile, Severity, Specifier};
 pub use rdoc::{RDocDomain, RDocProfile};
