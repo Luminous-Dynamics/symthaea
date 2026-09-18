@@ -33,11 +33,21 @@ The 301-304, 401-404, and 1201-1204 partitions are disjoint from every SYM-RSI-0
 
 **D — replay plus grounded dreaming.** Arm C wrapped by the frozen grounded dream model. The dream model may alter action choice only through predictions produced from learned transition memory.
 
-D's frozen v5 action-scoring rule is:
+D's frozen v6 action-scoring rule is:
 
-`domain-conditioned action memory; recorded-training-support gate; up to 5 legality- and support-aware model simulations per actionable candidate; mean predicted task quality - 0.10 × predicted task-regression probability`
+`domain-conditioned action memory; recorded-training-support gate; local-state support shrinkage; up to 5 legality- and support-aware model simulations per actionable candidate; support-adjusted predicted task quality - 0.10 × predicted task-regression probability`
 
-Dream action identity includes the fixture domain as well as the discrete action ID, so numerically identical actions from different domains cannot share one transition-memory fingerprint. The dream model also carries a domain/action support census derived only from recorded training edges. D may override C only when both the base C action class and the proposed action class have nonzero recorded training support. Illegal or unsupported perturbation samples fall back to the original supported legal action; non-actionable candidates receive no model simulations. D overrides the base C action only when the supported candidate score exceeds C's supported score by more than `0.01`. A perturbation that is illegal in the current state falls back to the original legal action rather than being simulated as if executable. Task-regression probability is the fraction of those five model predictions whose task quality is below the current state's quality. Predicted task quality is read from the task-quality channels of the model-generated outcome representation. D-v5 does not invoke the generic Φ/magnitude distribution during action selection. Each prediction records its actual model-simulation count, including zero for non-actionable unsupported candidates, so verification/fresh/OOD receipts report the exact decision-path model-call count rather than an inferred or partial count.
+Dream action identity includes the fixture domain as well as the discrete action ID, so numerically identical actions from different domains cannot share one transition-memory fingerprint. The dream model also carries a domain/action support census derived only from recorded training edges. D may override C only when both the base C action class and the proposed action class have nonzero recorded training support. Illegal or unsupported perturbation samples fall back to the original supported legal action; non-actionable candidates receive no model simulations.
+
+For each model-generated outcome, D-v6 also records the nearest observed training-state similarity available through the learned transition model. Predicted task-quality change is shrunk toward the current observed quality in proportion to that local support:
+
+`q_grounded = q_current + support_similarity × (q_predicted - q_current)`
+
+The similarity is clamped to `[0, 1]`. Zero local similarity therefore gives the model no quality leverage over the currently observed state, while exact similarity permits the full predicted quality change. The corresponding epistemic `support_distance` is recorded as `1 - mean_support_similarity`, and model confidence is multiplied by mean local support. D overrides the base C action only when a supported candidate score exceeds C's supported score by more than `0.01`.
+
+Task-regression probability is the fraction of executed model simulations whose support-adjusted task quality is below the current state's quality. Predicted task quality is read from the task-quality channels of the model-generated outcome representation. D-v6 does not invoke the generic Φ/magnitude distribution during action selection. Each prediction records its actual model-simulation count, including zero for non-actionable unsupported candidates, so verification/fresh/OOD receipts report the exact decision-path model-call count rather than an inferred or partial count.
+
+**Known representation limitation frozen with v6:** the transition model's current nearest-state cosine support is computed over the same 16-dimensional dream-state representation that also carries repeated task-quality channels. D-v6 therefore treats this support signal conservatively, but does not claim that it is an independently pure structural-state distance. A later policy version must separate structural-state support from outcome-quality representation before making stronger locality/generalization claims.
 
 D is forbidden from:
 - calling the true fixture transition function during action selection,
@@ -78,7 +88,7 @@ A result is **PositiveUnderProtocol** only if:
 - every domain and the macro-average satisfy quality non-inferiority,
 - macro quality delta is strictly greater than 0.
 
-Evaluator calls, dream-model simulations, override rate, and model-prediction counts are reported separately. This protocol does not call D more compute-efficient merely because environment calls are unchanged; model-simulation cost remains explicit rather than silently treated as free.
+Evaluator calls, dream-model simulations, override rate, model-prediction counts, and local-support distances are reported separately. This protocol does not call D more compute-efficient merely because environment calls are unchanged; model-simulation cost remains explicit rather than silently treated as free.
 
 With only 12 deterministic/seed-controlled pairs, no asymptotic p-value is manufactured.
 
@@ -92,4 +102,4 @@ A positive result supports only:
 
 > Under the frozen SYM-RSI-001D fixture domains and protocol, a learned counterfactual dream policy improved fresh solution quality beyond the exact-replay-selected policy while respecting the preregistered non-inferiority and epistemic boundaries.
 
-It does not by itself establish open-ended RSI, universal improvement, consciousness, or monotonic improvement outside the tested distributions.
+It does not by itself establish open-ended RSI, universal improvement, consciousness, or monotonic improvement outside the tested distributions. D-v6 also does not establish that its locality metric is independent of task-quality representation; that limitation is explicit in the evidence lineage.
