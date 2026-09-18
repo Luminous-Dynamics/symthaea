@@ -517,13 +517,7 @@ fn hash_run_receipt(hasher: &mut blake3::Hasher, receipt: &SymRsiRunReceipt) {
     hasher.update(&receipt.metrics.best_solution_quality.to_bits().to_le_bytes());
     hasher.update(&receipt.metrics.evaluator_calls.to_le_bytes());
     hasher.update(&receipt.metrics.normalized_compute_cost.to_bits().to_le_bytes());
-    match receipt.metrics.brier_score {
-        Some(value) => {
-            hasher.update(&[1]);
-            hasher.update(&value.to_bits().to_le_bytes());
-        }
-        None => hasher.update(&[0]),
-    }
+    hash_option_f64(hasher, receipt.metrics.brier_score);
     hasher.update(&receipt.metrics.regression_rate.to_bits().to_le_bytes());
     hasher.update(&receipt.metrics.policy_churn_rate.to_bits().to_le_bytes());
     hasher.update(&receipt.metrics.replay_pool_coverage.to_bits().to_le_bytes());
@@ -617,7 +611,9 @@ fn hash_option_f64(hasher: &mut blake3::Hasher, value: Option<f64>) {
             hasher.update(&[1]);
             hasher.update(&value.to_bits().to_le_bytes());
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 
@@ -627,7 +623,9 @@ fn hash_option_i128(hasher: &mut blake3::Hasher, value: Option<i128>) {
             hasher.update(&[1]);
             hasher.update(&value.to_le_bytes());
         }
-        None => hasher.update(&[0]),
+        None => {
+            hasher.update(&[0]);
+        }
     }
 }
 
