@@ -35,6 +35,7 @@ mod belief_mutation_authority;
 mod belief_mutation_decision_guard;
 mod belief_mutation_firewall;
 mod belief_mutation_persistence;
+pub mod belief_mutation_seal_persistence;
 mod belief_mutation_transaction;
 mod belief_mutation_verifier;
 pub mod belief_revision_gate;
