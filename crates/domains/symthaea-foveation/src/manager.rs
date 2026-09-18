@@ -10,10 +10,13 @@
 use std::collections::{BinaryHeap, VecDeque};
 use std::sync::mpsc;
 
+use symthaea_vision_manifold::VisualObservationRef;
+
 use crate::channel::FoveationChannel;
 use crate::crop::extract_crop;
 use crate::types::{
     FoveationConfig, FoveationRequest, FoveationResult, FoveationTelemetry, FrameBuffer,
+    FrameObservationError,
 };
 
 /// Prioritized request wrapper for the BinaryHeap (highest surprise first).
@@ -24,6 +27,7 @@ struct PrioritizedRequest {
     surprise: f32,
     frame_id: u64,
     timestamp_us: u64,
+    source_observation: Option<VisualObservationRef>,
     velocity: [f32; 2],
 }
 
@@ -53,7 +57,7 @@ impl Ord for PrioritizedRequest {
 ///
 /// # Lifecycle
 ///
-/// 1. `on_frame()` — store the latest full-res frame for cropping
+/// 1. `on_frame()` or `on_observed_frame()` — store the latest full-res frame for cropping
 /// 2. `on_saliency()` — enqueue salient patches from the SurpriseMap
 /// 3. `tick()` — dispatch highest-priority request + collect completed results
 /// 4. `drain_results()` — pop all ready results for GWT injection
@@ -66,6 +70,9 @@ pub struct FoveationManager {
     last_dispatch_us: u64,
     next_id: u64,
     frame_buffer: Option<FrameBuffer>,
+    /// Exact provenance for `frame_buffer`, when supplied by the capture owner.
+    /// Legacy `on_frame()` always clears this to prevent stale provenance carry-over.
+    frame_observation: Option<VisualObservationRef>,
     patch_size: usize,
     // Neuromodulated effective parameters (updated via modulate())
     effective_surprise_threshold: f32,
@@ -92,6 +99,7 @@ impl FoveationManager {
             last_dispatch_us: 0,
             next_id: 0,
             frame_buffer: None,
+            frame_observation: None,
             patch_size,
             effective_surprise_threshold,
             effective_max_concurrent,
@@ -102,9 +110,40 @@ impl FoveationManager {
         }
     }
 
-    /// Store the latest full-resolution frame for future cropping.
+    /// Store an unproven frame through the legacy compatibility path.
+    ///
+    /// Any prior observation provenance is explicitly cleared so a new frame can never inherit
+    /// the identity of the previous observed frame accidentally.
     pub fn on_frame(&mut self, frame: FrameBuffer) {
         self.frame_buffer = Some(frame);
+        self.frame_observation = None;
+    }
+
+    /// Store a frame together with capture-owner provenance.
+    ///
+    /// Legacy frame metadata and the typed observation must agree exactly. A mismatch fails
+    /// before either the frame or provenance state is mutated.
+    pub fn on_observed_frame(
+        &mut self,
+        frame: FrameBuffer,
+        observation: VisualObservationRef,
+    ) -> Result<(), FrameObservationError> {
+        if frame.frame_id != observation.frame_id() {
+            return Err(FrameObservationError::FrameIdMismatch {
+                frame_id: frame.frame_id,
+                observation_frame_id: observation.frame_id(),
+            });
+        }
+        if frame.timestamp_us != observation.captured_at_us() {
+            return Err(FrameObservationError::TimestampMismatch {
+                timestamp_us: frame.timestamp_us,
+                observation_timestamp_us: observation.captured_at_us(),
+            });
+        }
+
+        self.frame_buffer = Some(frame);
+        self.frame_observation = Some(observation);
+        Ok(())
     }
 
     /// Enqueue salient patches from the dorsal stream.
@@ -119,6 +158,7 @@ impl FoveationManager {
             Some(fb) => (fb.frame_id, fb.timestamp_us),
             None => return, // No frame stored yet
         };
+        let source_observation = self.frame_observation;
 
         for &(row, col, surprise, velocity) in patches {
             if surprise >= self.effective_surprise_threshold {
@@ -128,6 +168,7 @@ impl FoveationManager {
                     surprise,
                     frame_id,
                     timestamp_us,
+                    source_observation,
                     velocity,
                 });
             }
@@ -181,6 +222,7 @@ impl FoveationManager {
                     surprise_value: prioritized.surprise,
                     frame_id: prioritized.frame_id,
                     timestamp_us: prioritized.timestamp_us,
+                    source_observation: prioritized.source_observation,
                     velocity: prioritized.velocity,
                 };
 
@@ -270,7 +312,7 @@ impl FoveationManager {
         &self.config
     }
 
-    /// Apply neuromodulated budgeting from the cognitive loop.
+    /// Apply neuromulated budgeting from the cognitive loop.
     ///
     /// Called once per tick with the current neuromodulator levels (0.0–2.0).
     ///
@@ -324,6 +366,7 @@ impl FoveationManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_vision_manifold::{VisualCaptureClock, VisualStreamRef};
 
     fn make_frame(w: u32, h: u32, val: u8) -> FrameBuffer {
         FrameBuffer {
@@ -334,6 +377,15 @@ mod tests {
             frame_id: 1,
             timestamp_us: 1_000_000,
         }
+    }
+
+    fn make_observation(frame_id: u64, timestamp_us: u64) -> VisualObservationRef {
+        VisualObservationRef::new(
+            VisualStreamRef::new(12, 34).unwrap(),
+            frame_id,
+            timestamp_us,
+            VisualCaptureClock::StreamMonotonic,
+        )
     }
 
     fn default_manager() -> FoveationManager {
@@ -349,12 +401,55 @@ mod tests {
     }
 
     #[test]
-    fn test_on_frame_stores_buffer() {
+    fn test_on_frame_stores_buffer_and_clears_provenance() {
         let mut mgr = default_manager();
         assert!(mgr.frame_buffer.is_none());
 
-        mgr.on_frame(make_frame(64, 64, 128));
+        let frame = make_frame(64, 64, 128);
+        let observation = make_observation(frame.frame_id, frame.timestamp_us);
+        mgr.on_observed_frame(frame, observation).unwrap();
+        assert_eq!(mgr.frame_observation, Some(observation));
+
+        mgr.on_frame(make_frame(64, 64, 129));
         assert!(mgr.frame_buffer.is_some());
+        assert_eq!(mgr.frame_observation, None);
+    }
+
+    #[test]
+    fn observed_frame_rejects_frame_id_mismatch_without_mutation() {
+        let mut mgr = default_manager();
+        let frame = make_frame(64, 64, 128);
+        let observation = make_observation(frame.frame_id + 1, frame.timestamp_us);
+        assert!(matches!(
+            mgr.on_observed_frame(frame, observation),
+            Err(FrameObservationError::FrameIdMismatch { .. })
+        ));
+        assert!(mgr.frame_buffer.is_none());
+        assert_eq!(mgr.frame_observation, None);
+    }
+
+    #[test]
+    fn observed_frame_rejects_timestamp_mismatch_without_mutation() {
+        let mut mgr = default_manager();
+        let frame = make_frame(64, 64, 128);
+        let observation = make_observation(frame.frame_id, frame.timestamp_us + 1);
+        assert!(matches!(
+            mgr.on_observed_frame(frame, observation),
+            Err(FrameObservationError::TimestampMismatch { .. })
+        ));
+        assert!(mgr.frame_buffer.is_none());
+        assert_eq!(mgr.frame_observation, None);
+    }
+
+    #[test]
+    fn observed_frame_provenance_is_frozen_into_pending_request() {
+        let mut mgr = default_manager();
+        let frame = make_frame(64, 64, 128);
+        let observation = make_observation(frame.frame_id, frame.timestamp_us);
+        mgr.on_observed_frame(frame, observation).unwrap();
+        mgr.on_saliency(&[(1, 1, 0.8, [0.0, 0.0])]);
+        let pending = mgr.pending.pop().unwrap();
+        assert_eq!(pending.source_observation, Some(observation));
     }
 
     #[test]
@@ -362,12 +457,11 @@ mod tests {
         let mut mgr = default_manager();
         mgr.on_frame(make_frame(64, 64, 128));
 
-        // Default threshold is 0.5
         let patches = vec![
-            (0, 0, 0.3, [0.0, 0.0]), // Below threshold
-            (1, 1, 0.7, [0.0, 0.0]), // Above threshold
-            (2, 2, 0.9, [0.0, 0.0]), // Above threshold
-            (3, 3, 0.1, [0.0, 0.0]), // Below threshold
+            (0, 0, 0.3, [0.0, 0.0]),
+            (1, 1, 0.7, [0.0, 0.0]),
+            (2, 2, 0.9, [0.0, 0.0]),
+            (3, 3, 0.1, [0.0, 0.0]),
         ];
         mgr.on_saliency(&patches);
 
@@ -381,7 +475,6 @@ mod tests {
     #[test]
     fn test_on_saliency_without_frame_is_noop() {
         let mut mgr = default_manager();
-        // No frame stored yet
         mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]);
         assert_eq!(mgr.pending_count(), 0);
     }
@@ -393,12 +486,11 @@ mod tests {
 
         let patches = vec![
             (0, 0, 0.6, [0.0, 0.0]),
-            (1, 1, 0.9, [1.5, -0.3]), // highest — also has velocity
+            (1, 1, 0.9, [1.5, -0.3]),
             (2, 2, 0.7, [0.0, 0.0]),
         ];
         mgr.on_saliency(&patches);
 
-        // Pop should give highest first
         let top = mgr.pending.pop().unwrap();
         assert_eq!(top.grid_row, 1);
         assert_eq!(top.grid_col, 1);
@@ -411,19 +503,15 @@ mod tests {
         mgr.on_frame(make_frame(64, 64, 128));
         mgr.on_saliency(&[(2, 3, 0.8, [0.5, -0.2])]);
 
-        // First tick: dispatch
         mgr.tick(1_000_000);
         assert_eq!(mgr.pending_count(), 0);
         assert_eq!(mgr.total_dispatched, 1);
 
-        // Wait for background thread to complete
         std::thread::sleep(std::time::Duration::from_millis(100));
 
-        // Second tick: collect
         mgr.tick(1_100_000);
         assert!(mgr.ready_count() > 0 || mgr.in_flight_count() > 0);
 
-        // Keep ticking until result arrives
         for i in 0..10 {
             if mgr.ready_count() > 0 {
                 break;
@@ -437,55 +525,76 @@ mod tests {
         assert_eq!(results[0].grid_row, 2);
         assert_eq!(results[0].grid_col, 3);
         assert_eq!(results[0].semantic_hv.dim(), 16_384);
-        // Verify velocity propagated through the full pipeline
+        assert_eq!(results[0].source_observation, None);
         assert!((results[0].velocity[0] - 0.5).abs() < 1e-6);
         assert!((results[0].velocity[1] - (-0.2)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn observed_frame_provenance_reaches_completed_result() {
+        let config = FoveationConfig {
+            cooldown_ms: 0,
+            ..FoveationConfig::default()
+        };
+        let mut mgr = FoveationManager::new(config, 8);
+        let frame = make_frame(64, 64, 128);
+        let observation = make_observation(frame.frame_id, frame.timestamp_us);
+        mgr.on_observed_frame(frame, observation).unwrap();
+        mgr.on_saliency(&[(2, 3, 0.8, [0.0, 0.0])]);
+        mgr.tick(1_000_000);
+
+        for i in 0..10 {
+            std::thread::sleep(std::time::Duration::from_millis(25));
+            mgr.tick(1_100_000 + i * 50_000);
+            if mgr.ready_count() > 0 {
+                break;
+            }
+        }
+
+        let results = mgr.drain_results();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].source_observation, Some(observation));
     }
 
     #[test]
     fn test_tick_respects_max_concurrent() {
         let config = FoveationConfig {
             max_concurrent: 1,
-            cooldown_ms: 0, // no cooldown for test
+            cooldown_ms: 0,
             ..FoveationConfig::default()
         };
         let mut mgr = FoveationManager::new(config, 8);
         mgr.on_frame(make_frame(64, 64, 128));
         mgr.on_saliency(&[(0, 0, 0.8, [0.0, 0.0]), (1, 1, 0.9, [0.0, 0.0])]);
 
-        // First tick: dispatch one
         mgr.tick(1_000_000);
         assert_eq!(mgr.total_dispatched, 1);
 
-        // Second tick immediately: should NOT dispatch (1 in-flight, max=1)
         mgr.tick(1_000_001);
         assert_eq!(mgr.total_dispatched, 1);
-        assert_eq!(mgr.pending_count(), 1); // Still one pending
+        assert_eq!(mgr.pending_count(), 1);
     }
 
     #[test]
     fn test_tick_respects_cooldown() {
         let config = FoveationConfig {
             max_concurrent: 10,
-            cooldown_ms: 100, // 100ms cooldown
+            cooldown_ms: 100,
             ..FoveationConfig::default()
         };
         let mut mgr = FoveationManager::new(config, 8);
         mgr.on_frame(make_frame(64, 64, 128));
         mgr.on_saliency(&[(0, 0, 0.8, [0.0, 0.0]), (1, 1, 0.9, [0.0, 0.0])]);
 
-        // First tick at t=1_000_000us
         mgr.tick(1_000_000);
         assert_eq!(mgr.total_dispatched, 1);
 
-        // Second tick at t=1_050_000us (50ms later, within cooldown)
         mgr.tick(1_050_000);
         assert_eq!(
             mgr.total_dispatched, 1,
             "Should not dispatch within cooldown"
         );
 
-        // Third tick at t=1_200_000us (200ms later, past cooldown)
         mgr.tick(1_200_000);
         assert_eq!(mgr.total_dispatched, 2, "Should dispatch after cooldown");
     }
@@ -504,7 +613,6 @@ mod tests {
         let results2 = mgr.drain_results();
 
         assert!(!results.is_empty() || results2.is_empty());
-        // After drain, ready_count should be 0
         assert_eq!(mgr.ready_count(), 0);
     }
 
@@ -560,7 +668,6 @@ mod tests {
         let mut mgr = FoveationManager::new(config, 8);
         mgr.on_frame(make_frame(64, 64, 128));
 
-        // Simulate 3 saliency cycles
         for cycle in 0..3 {
             mgr.on_saliency(&[
                 (cycle, 0, 0.5 + cycle as f32 * 0.1, [0.0, 0.0]),
@@ -569,10 +676,8 @@ mod tests {
             mgr.tick(cycle as u64 * 200_000);
         }
 
-        // Wait for all to complete
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        // Collect everything
         for i in 0..5 {
             mgr.tick(1_000_000 + i * 200_000);
         }
@@ -591,7 +696,6 @@ mod tests {
     #[test]
     fn test_modulate_default_is_baseline() {
         let mgr = default_manager();
-        // Before modulate(), effective values match config
         assert!(
             (mgr.effective_surprise_threshold() - 0.5).abs() < 1e-6,
             "Default threshold should be 0.5"
@@ -602,23 +706,21 @@ mod tests {
     #[test]
     fn test_modulate_high_ne_raises_threshold() {
         let mut mgr = default_manager();
-        mgr.modulate(1.5, 1.0); // high NE, neutral DA
+        mgr.modulate(1.5, 1.0);
 
-        // Threshold should increase: 0.5 * 1.5 = 0.75
         assert!(
             (mgr.effective_surprise_threshold() - 0.75).abs() < 1e-4,
             "High NE should raise threshold, got {}",
             mgr.effective_surprise_threshold()
         );
-        assert_eq!(mgr.effective_max_concurrent(), 2); // DA=1.0, unchanged
+        assert_eq!(mgr.effective_max_concurrent(), 2);
     }
 
     #[test]
     fn test_modulate_low_ne_lowers_threshold() {
         let mut mgr = default_manager();
-        mgr.modulate(0.5, 1.0); // low NE
+        mgr.modulate(0.5, 1.0);
 
-        // Threshold should decrease: 0.5 * 0.5 = 0.25
         assert!(
             (mgr.effective_surprise_threshold() - 0.25).abs() < 1e-4,
             "Low NE should lower threshold, got {}",
@@ -629,9 +731,8 @@ mod tests {
     #[test]
     fn test_modulate_high_da_increases_budget() {
         let mut mgr = default_manager();
-        mgr.modulate(1.0, 2.0); // neutral NE, high DA
+        mgr.modulate(1.0, 2.0);
 
-        // Budget: 2 * 2.0 = 4
         assert_eq!(
             mgr.effective_max_concurrent(),
             4,
@@ -642,9 +743,8 @@ mod tests {
     #[test]
     fn test_modulate_low_da_decreases_budget() {
         let mut mgr = default_manager();
-        mgr.modulate(1.0, 0.3); // neutral NE, low DA
+        mgr.modulate(1.0, 0.3);
 
-        // Budget: round(2 * 0.3) = round(0.6) = 1 (min 1)
         assert_eq!(
             mgr.effective_max_concurrent(),
             1,
@@ -655,14 +755,12 @@ mod tests {
     #[test]
     fn test_modulate_clamps_input() {
         let mut mgr = default_manager();
-        mgr.modulate(5.0, -1.0); // out of range
+        mgr.modulate(5.0, -1.0);
 
-        // NE clamped to 2.0: threshold = 0.5 * 2.0 = 1.0
         assert!(
             (mgr.effective_surprise_threshold() - 1.0).abs() < 1e-4,
             "NE should clamp to 2.0"
         );
-        // DA clamped to 0.0: budget = max(round(0), 1) = 1
         assert_eq!(mgr.effective_max_concurrent(), 1, "DA should clamp to 0.0");
     }
 
@@ -671,17 +769,15 @@ mod tests {
         let mut mgr = default_manager();
         mgr.on_frame(make_frame(64, 64, 128));
 
-        // With high NE, raise threshold to 1.0 → no patches qualify
-        mgr.modulate(2.0, 1.0); // threshold = 0.5 * 2.0 = 1.0
-        mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]); // 0.9 < 1.0 threshold
+        mgr.modulate(2.0, 1.0);
+        mgr.on_saliency(&[(0, 0, 0.9, [0.0, 0.0])]);
         assert_eq!(
             mgr.pending_count(),
             0,
             "High NE should filter out 0.9 surprise"
         );
 
-        // With low NE, lower threshold to 0.1 → all patches qualify
-        mgr.modulate(0.2, 1.0); // threshold = 0.5 * 0.2 = 0.1
+        mgr.modulate(0.2, 1.0);
         mgr.on_saliency(&[(0, 0, 0.3, [0.0, 0.0])]);
         assert_eq!(mgr.pending_count(), 1, "Low NE should accept 0.3 surprise");
     }
