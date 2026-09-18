@@ -59,9 +59,13 @@ impl TrustedRestartValidationAnchorV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RestartContinuityDispositionV1 {
+    /// The exact same validated state is being presented again.
     IdempotentReplay,
+    /// A different validated state advances beyond the trusted capture cycle.
     ForwardProgress,
+    /// The candidate predates the trusted checkpoint.
     Rollback,
+    /// A different validated state claims the same logical capture cycle.
     SameCycleEquivocation,
 }
 
@@ -78,14 +82,39 @@ pub struct RestartContinuityDecisionV1 {
 }
 
 impl RestartContinuityDecisionV1 {
-    pub fn disposition(self) -> RestartContinuityDispositionV1 { self.disposition }
-    pub fn candidate_cycle(self) -> u64 { self.candidate_cycle }
-    pub fn anchor_cycle(self) -> u64 { self.anchor_cycle }
-    pub fn candidate_digest(self) -> EpistemicRestartValidationReceiptDigest { self.candidate_digest }
-    pub fn anchor_digest(self) -> EpistemicRestartValidationReceiptDigest { self.anchor_digest }
-    pub fn further_review_eligible(self) -> bool { self.further_review_eligible }
-    pub fn quarantine_construction_authorized(self) -> bool { self.quarantine_construction_authorized }
-    pub fn activation_authorized(self) -> bool { self.activation_authorized }
+    pub fn disposition(self) -> RestartContinuityDispositionV1 {
+        self.disposition
+    }
+
+    pub fn candidate_cycle(self) -> u64 {
+        self.candidate_cycle
+    }
+
+    pub fn anchor_cycle(self) -> u64 {
+        self.anchor_cycle
+    }
+
+    pub fn candidate_digest(self) -> EpistemicRestartValidationReceiptDigest {
+        self.candidate_digest
+    }
+
+    pub fn anchor_digest(self) -> EpistemicRestartValidationReceiptDigest {
+        self.anchor_digest
+    }
+
+    /// True only for an exact replay or monotonic forward progress. This means
+    /// only "eligible for the next review layer"; it is not restore authority.
+    pub fn further_review_eligible(self) -> bool {
+        self.further_review_eligible
+    }
+
+    pub fn quarantine_construction_authorized(self) -> bool {
+        self.quarantine_construction_authorized
+    }
+
+    pub fn activation_authorized(self) -> bool {
+        self.activation_authorized
+    }
 }
 
 pub struct RestartContinuityGateV1;
@@ -143,36 +172,63 @@ mod tests {
 
     fn receipt(capture_cycle: u64, statement: &str) -> EpistemicRestartValidationReceiptV1 {
         let mut ledger = EpistemicLedger::new();
-        let provenance = ledger.add_provenance("lab", None, None, 1, vec![]).unwrap();
+        let provenance = ledger
+            .add_provenance("lab", None, None, 1, vec![])
+            .unwrap();
         let claim = ledger.add_claim(statement, ClaimKind::Predictive, None, None, 1);
-        let evidence = ledger.add_evidence(
-            claim,
-            EvidenceKind::Measurement,
-            EvidencePolarity::Supports,
-            provenance,
-            2,
-            None,
-            None,
-        ).unwrap();
+        let evidence = ledger
+            .add_evidence(
+                claim,
+                EvidenceKind::Measurement,
+                EvidencePolarity::Supports,
+                provenance,
+                2,
+                None,
+                None,
+            )
+            .unwrap();
         let inventory = EpistemicLedgerInventoryV1::new(
-            vec![claim], vec![evidence], vec![provenance]
-        ).unwrap();
-        let proposal = EpistemicRevisionProposal::new(claim, 0.1, vec![evidence], "measurement").unwrap();
+            vec![claim],
+            vec![evidence],
+            vec![provenance],
+        )
+        .unwrap();
+        let proposal = EpistemicRevisionProposal::new(claim, 0.1, vec![evidence], "measurement")
+            .unwrap();
         let schema = BeliefRevisionPolicySchemaV1::new(0.2, 1, false, 0, 1.0).unwrap();
         let mut receipts = BeliefRevisionHistory::new();
         let mut schema_history = BeliefRevisionSchemaHistoryV1::new();
-        schema_history.evaluate_and_record(
-            &mut receipts, &ledger, &proposal, &schema, None, None, 3,
-        ).unwrap();
+        schema_history
+            .evaluate_and_record(
+                &mut receipts,
+                &ledger,
+                &proposal,
+                &schema,
+                None,
+                None,
+                3,
+            )
+            .unwrap();
         let store = EpistemicSupportStore::new();
-        let mutations = BeliefMutationPersistenceCapsuleV1::capture(&store, &[], capture_cycle).unwrap();
-        let revisions = BeliefRevisionHistoryCapsuleV1::capture(&receipts, &mutations, capture_cycle).unwrap();
+        let mutations =
+            BeliefMutationPersistenceCapsuleV1::capture(&store, &[], capture_cycle).unwrap();
+        let revisions =
+            BeliefRevisionHistoryCapsuleV1::capture(&receipts, &mutations, capture_cycle).unwrap();
         let schemas = BeliefRevisionSchemaHistoryCapsuleV1::capture(
-            &schema_history, &receipts, &revisions, capture_cycle,
-        ).unwrap();
+            &schema_history,
+            &receipts,
+            &revisions,
+            capture_cycle,
+        )
+        .unwrap();
         let base = EpistemicRestartCapsuleV1::capture(
-            &ledger, &inventory, &mutations, &revisions, capture_cycle,
-        ).unwrap();
+            &ledger,
+            &inventory,
+            &mutations,
+            &revisions,
+            capture_cycle,
+        )
+        .unwrap();
         let v2 = EpistemicRestartCapsuleV2::capture(&base, &schemas).unwrap();
         let bytes = EpistemicRestartWireV2::encode(&v2).unwrap();
         let snapshot = EpistemicRestartWireV2::decode(&bytes).unwrap();
@@ -184,7 +240,10 @@ mod tests {
         let current = receipt(4, "X predicts Y");
         let anchor = TrustedRestartValidationAnchorV1::from_receipt(&current);
         let decision = RestartContinuityGateV1::evaluate(anchor, &current);
-        assert_eq!(decision.disposition(), RestartContinuityDispositionV1::IdempotentReplay);
+        assert_eq!(
+            decision.disposition(),
+            RestartContinuityDispositionV1::IdempotentReplay
+        );
         assert!(decision.further_review_eligible());
         assert!(!decision.quarantine_construction_authorized());
         assert!(!decision.activation_authorized());
@@ -206,7 +265,10 @@ mod tests {
         let right = receipt(4, "X predicts Z");
         let anchor = TrustedRestartValidationAnchorV1::from_receipt(&left);
         let decision = RestartContinuityGateV1::evaluate(anchor, &right);
-        assert_eq!(decision.disposition(), RestartContinuityDispositionV1::SameCycleEquivocation);
+        assert_eq!(
+            decision.disposition(),
+            RestartContinuityDispositionV1::SameCycleEquivocation
+        );
         assert!(!decision.further_review_eligible());
     }
 
@@ -216,7 +278,10 @@ mod tests {
         let newer = receipt(5, "X predicts Z");
         let anchor = TrustedRestartValidationAnchorV1::from_receipt(&old);
         let decision = RestartContinuityGateV1::evaluate(anchor, &newer);
-        assert_eq!(decision.disposition(), RestartContinuityDispositionV1::ForwardProgress);
+        assert_eq!(
+            decision.disposition(),
+            RestartContinuityDispositionV1::ForwardProgress
+        );
         assert!(decision.further_review_eligible());
         assert!(!decision.quarantine_construction_authorized());
         assert!(!decision.activation_authorized());
