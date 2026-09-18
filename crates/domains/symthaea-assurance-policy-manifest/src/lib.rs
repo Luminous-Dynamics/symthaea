@@ -287,7 +287,8 @@ pub fn bind_receipt_to_assurance_manifest(
         || deployment_receipt.deployment_id != manifest.deployment_id
         || deployment_receipt.configuration_digest != manifest.configuration_digest
         || deployment_receipt.model_manifest_digest != manifest.model_manifest_digest
-        || deployment_receipt.calibration_manifest_digest != manifest.calibration_manifest_digest
+        || deployment_receipt.calibration_manifest_digest
+            != manifest.calibration_manifest_digest
     {
         return Err(PolicyScopeError::DeploymentScopeMismatch);
     }
@@ -315,7 +316,9 @@ fn push_optional(hasher: &mut blake3::Hasher, value: Option<&str>) {
             hasher.update(b"some\0");
             push_field(hasher, value);
         }
-        None => hasher.update(b"none\0"),
+        None => {
+            hasher.update(b"none\0");
+        }
     }
 }
 
