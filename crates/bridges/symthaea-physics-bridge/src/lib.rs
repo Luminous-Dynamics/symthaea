@@ -55,6 +55,7 @@ pub mod pde_wave_stage_a;
 pub mod pde_wave_stage_b;
 pub mod query;
 pub mod recognize;
+pub mod strict_dimensional_inference;
 pub mod symmetry;
 pub mod symmetry_inference;
 pub mod tensor_structure;
@@ -70,6 +71,9 @@ pub use equation_ast::EquationEncoder;
 pub use query::{PhysicsSearchEngine, SearchWeights};
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
+};
+pub use strict_dimensional_inference::{
+    StrictInferenceFailure, StrictInferenceResult, infer_dimensions_strict,
 };
 pub use symmetry::SymmetryEncoder;
 pub use symmetry_inference::infer_symmetry;
