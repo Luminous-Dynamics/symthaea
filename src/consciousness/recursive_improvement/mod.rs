@@ -53,6 +53,7 @@ pub mod types;
 pub mod active_inference_bridge;
 pub mod calibration;
 pub mod calibration_analytics;
+pub mod calibration_key;
 pub mod constraint_gate;
 pub mod domain_binding;
 pub mod dream_feedback;
@@ -83,6 +84,11 @@ pub use world_prediction::{
 pub use calibration::{
     BrierScoreTracker, CalibrationConfig, CalibrationSummary, DeclaredDomainCalibration,
     DomainCalibration, DomainStats, ResolvedPredictionRecord,
+};
+
+// Versioned calibration population identity (CAL-004B)
+pub use calibration_key::{
+    CalibrationIdentity, CalibrationKeyError, CalibrationKeyV1, PredictionHorizon,
 };
 
 // Typed calibration-domain binding (CAL-004A)
