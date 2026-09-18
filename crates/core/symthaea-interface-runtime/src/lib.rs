@@ -303,6 +303,84 @@ pub fn classify_cursor_continuity(
     }
 }
 
+/// One provenance-bearing state observation with transport and semantic continuity
+/// kept deliberately separate.
+#[derive(Debug, Clone)]
+pub struct RuntimeStateObservation<T> {
+    /// Latest-wins transport observation, including local coalescing count.
+    pub transport: LatestRuntimeStateSample<T>,
+    /// Semantic cursor relationship to the last cursor this observer consumed.
+    ///
+    /// `None` means the state has no authoritative runtime cursor (for example
+    /// `Unknown` or an unbound simulation). It does not mean continuity was proven.
+    pub cursor_continuity: Option<CursorContinuity>,
+}
+
+/// Stateful runtime-state observer that remembers the last authoritative cursor.
+///
+/// A client using this wrapper cannot accidentally turn state-plane coalescing into
+/// a semantic event-loss claim: both facts are returned independently.
+#[derive(Debug, Clone)]
+pub struct RuntimeStateObserver<T> {
+    receiver: LatestRuntimeStateReceiver<T>,
+    last_cursor: Option<RuntimeCursor>,
+}
+
+impl<T> RuntimeStateObserver<T> {
+    pub fn new(receiver: LatestRuntimeStateReceiver<T>) -> Self {
+        Self {
+            receiver,
+            last_cursor: None,
+        }
+    }
+
+    /// Observe the newest changed runtime state and advance both transport and
+    /// semantic observation points.
+    pub fn latest_if_changed(
+        &mut self,
+    ) -> Result<Option<RuntimeStateObservation<T>>, StatePlaneError> {
+        let Some(transport) = self.receiver.latest_if_changed()? else {
+            return Ok(None);
+        };
+
+        let cursor_continuity = transport.value.cursor().cloned().map(|current| {
+            let continuity = classify_cursor_continuity(self.last_cursor.as_ref(), &current);
+            self.last_cursor = Some(current);
+            continuity
+        });
+
+        Ok(Some(RuntimeStateObservation {
+            transport,
+            cursor_continuity,
+        }))
+    }
+
+    pub fn last_cursor(&self) -> Option<&RuntimeCursor> {
+        self.last_cursor.as_ref()
+    }
+
+    pub fn pending_revision_distance(&self) -> Result<u64, StatePlaneError> {
+        self.receiver.pending_revision_distance()
+    }
+}
+
+impl<T> LatestStatePublisher<RuntimeState<T>> {
+    /// Subscribe with automatic semantic-cursor continuity classification.
+    pub fn subscribe_runtime(&self) -> Result<RuntimeStateObserver<T>, StatePlaneError> {
+        self.subscribe().map(RuntimeStateObserver::new)
+    }
+}
+
+/// Create a provenance-bearing runtime-state channel whose initial consumer tracks
+/// both transport coalescing and semantic cursor continuity.
+pub fn latest_runtime_state_observer_channel<T>() -> (
+    LatestRuntimeStatePublisher<T>,
+    RuntimeStateObserver<T>,
+) {
+    let (publisher, receiver) = latest_runtime_state_channel();
+    (publisher, RuntimeStateObserver::new(receiver))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,6 +391,13 @@ mod tests {
             RuntimeId::new(runtime).unwrap(),
             EventSeq::new(seq).unwrap(),
         )
+    }
+
+    fn live(runtime: &str, seq: u64, value: u64) -> RuntimeState<u64> {
+        RuntimeState::Live {
+            cursor: cursor(runtime, seq),
+            value,
+        }
     }
 
     #[test]
@@ -439,5 +524,64 @@ mod tests {
         let sample = receiver.latest_if_changed().unwrap().unwrap();
         assert_eq!(*sample.value, 127);
         assert_eq!(receiver.pending_revision_distance().unwrap(), 0);
+    }
+
+    #[test]
+    fn runtime_observer_separates_transport_coalescing_from_semantic_gap() {
+        let (publisher, mut observer) = latest_runtime_state_observer_channel();
+
+        publisher.publish(live("runtime-a", 1, 10)).unwrap();
+        let first = observer.latest_if_changed().unwrap().unwrap();
+        assert_eq!(first.transport.skipped_revisions, 0);
+        assert_eq!(
+            first.cursor_continuity,
+            Some(CursorContinuity::FirstObservation)
+        );
+
+        // Two state publications are coalesced into one UI observation, but the
+        // semantic cursor jumps from 1 to 5. These are different quantities.
+        publisher.publish(live("runtime-a", 2, 20)).unwrap();
+        publisher.publish(live("runtime-a", 5, 50)).unwrap();
+        let observed = observer.latest_if_changed().unwrap().unwrap();
+        assert_eq!(observed.transport.skipped_revisions, 1);
+        assert_eq!(
+            observed.cursor_continuity,
+            Some(CursorContinuity::Gap { missed_events: 3 })
+        );
+        assert_eq!(observed.transport.value.value(), Some(&50));
+    }
+
+    #[test]
+    fn runtime_observer_keeps_last_cursor_across_uncursored_state() {
+        let (publisher, mut observer) = latest_runtime_state_observer_channel();
+        publisher.publish(live("runtime-a", 1, 10)).unwrap();
+        let _ = observer.latest_if_changed().unwrap().unwrap();
+
+        publisher.publish(RuntimeState::Unknown).unwrap();
+        let unknown = observer.latest_if_changed().unwrap().unwrap();
+        assert_eq!(unknown.cursor_continuity, None);
+        assert_eq!(unknown.transport.value.provenance(), StateProvenance::Unknown);
+
+        publisher.publish(live("runtime-a", 2, 20)).unwrap();
+        let resumed = observer.latest_if_changed().unwrap().unwrap();
+        assert_eq!(
+            resumed.cursor_continuity,
+            Some(CursorContinuity::ImmediateSuccessor)
+        );
+    }
+
+    #[test]
+    fn runtime_subscriber_sees_current_as_first_without_historical_transport_lag() {
+        let (publisher, _) = latest_runtime_state_channel();
+        publisher.publish(live("runtime-a", 7, 70)).unwrap();
+        let mut observer = publisher.subscribe_runtime().unwrap();
+
+        let observed = observer.latest_if_changed().unwrap().unwrap();
+        assert_eq!(observed.transport.skipped_revisions, 0);
+        assert_eq!(
+            observed.cursor_continuity,
+            Some(CursorContinuity::FirstObservation)
+        );
+        assert_eq!(observed.transport.value.value(), Some(&70));
     }
 }
