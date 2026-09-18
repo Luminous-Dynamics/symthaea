@@ -1,0 +1,148 @@
+name: REGEN-042S0 Exact Subject Qualification
+
+on:
+  push:
+    branches:
+      - 'ci/regen-042s0-exact-subject-v1'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-s0:
+    name: REGEN-042S0 exact-subject isolated qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TARGET_SHA: 0f71c0e11f34e31ce734ec8927ed87ec773947a7
+      PROFILE_PARENT_SHA: 76d8f630c569443462b7094930e72ac52555a936
+      EXPECTED_AHEAD_COUNT: '5'
+      CRATE_DIR: crates/domains/symthaea-regenerative-resilience
+      PINNED_TOOLCHAIN: 1.96.0
+      EXPECTED_MANIFEST_BLOB: 0138f1aea78d496543ce28b5a511ccabd0d15ad7
+      EXPECTED_SOURCE_BLOB: d2405a80b754e41aa9710f50bc48338a4ea6c813
+      EXPECTED_TEST_BLOB: 6564bb30b4d47f443917f040a48b6209b1724ae7
+
+    steps:
+      - name: Checkout exact S0 subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          ref: ${{ env.TARGET_SHA }}
+          fetch-depth: 0
+
+      - name: Verify exact subject lineage scope and blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          test "$(git merge-base "$PROFILE_PARENT_SHA" HEAD)" = "$PROFILE_PARENT_SHA"
+          test "$(git rev-list --count "$PROFILE_PARENT_SHA"..HEAD)" = "$EXPECTED_AHEAD_COUNT"
+          test "$(git rev-list --count HEAD.."$PROFILE_PARENT_SHA")" = '0'
+
+          expected="$(printf '%s\n' \
+            "$CRATE_DIR/Cargo.toml" \
+            "$CRATE_DIR/src/lib.rs" \
+            "$CRATE_DIR/tests/canonical_primitives.rs" | sort)"
+          actual="$(git diff --name-only "$PROFILE_PARENT_SHA" HEAD | sort)"
+          printf '%s\n' '---BEGIN_S0_SCOPE---' "$actual" '---END_S0_SCOPE---'
+          test "$actual" = "$expected"
+
+          test "$(git rev-parse HEAD:"$CRATE_DIR/Cargo.toml")" = "$EXPECTED_MANIFEST_BLOB"
+          test "$(git rev-parse HEAD:"$CRATE_DIR/src/lib.rs")" = "$EXPECTED_SOURCE_BLOB"
+          test "$(git rev-parse HEAD:"$CRATE_DIR/tests/canonical_primitives.rs")" = "$EXPECTED_TEST_BLOB"
+
+          test "$(awk '/^\[dependencies\]/{seen=1; next} seen && NF{print; exit}' "$CRATE_DIR/Cargo.toml" | wc -l)" = '0'
+          grep -F '#![forbid(unsafe_code)]' "$CRATE_DIR/src/lib.rs"
+
+      - name: Install and prove Rust 1.96
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$PINNED_TOOLCHAIN" --profile minimal --component rustfmt,clippy
+          test "$(rustc +"$PINNED_TOOLCHAIN" --version | awk '{print $2}')" = "$PINNED_TOOLCHAIN"
+          test "$(cargo +"$PINNED_TOOLCHAIN" --version | awk '{print $2}')" = "$PINNED_TOOLCHAIN"
+          rustfmt +"$PINNED_TOOLCHAIN" --version
+
+      - name: Construct dependency-isolated exact-byte crate
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/regen042s0
+          mkdir -p /tmp/regen042s0/src /tmp/regen042s0/tests
+          cp "$CRATE_DIR/Cargo.toml" /tmp/regen042s0/Cargo.toml
+          cp "$CRATE_DIR/src/lib.rs" /tmp/regen042s0/src/lib.rs
+          cp "$CRATE_DIR/tests/canonical_primitives.rs" /tmp/regen042s0/tests/canonical_primitives.rs
+          test "$(sha256sum "$CRATE_DIR/Cargo.toml" | awk '{print $1}')" = "$(sha256sum /tmp/regen042s0/Cargo.toml | awk '{print $1}')"
+          test "$(sha256sum "$CRATE_DIR/src/lib.rs" | awk '{print $1}')" = "$(sha256sum /tmp/regen042s0/src/lib.rs | awk '{print $1}')"
+          test "$(sha256sum "$CRATE_DIR/tests/canonical_primitives.rs" | awk '{print $1}')" = "$(sha256sum /tmp/regen042s0/tests/canonical_primitives.rs | awk '{print $1}')"
+
+      - name: Resolve zero-dependency standalone lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +"$PINNED_TOOLCHAIN" generate-lockfile --manifest-path /tmp/regen042s0/Cargo.toml
+          test -f /tmp/regen042s0/Cargo.lock
+          sha256sum /tmp/regen042s0/Cargo.lock
+
+      - name: Format exact S0 source without mutation
+        run: cargo +"$PINNED_TOOLCHAIN" fmt --manifest-path /tmp/regen042s0/Cargo.toml -- --check
+
+      - name: Test canonical primitive contract
+        run: cargo +"$PINNED_TOOLCHAIN" test --manifest-path /tmp/regen042s0/Cargo.toml --locked
+
+      - name: Strict Clippy over all isolated targets
+        run: cargo +"$PINNED_TOOLCHAIN" clippy --manifest-path /tmp/regen042s0/Cargo.toml --all-targets --locked -- -D warnings
+
+      - name: Record explicit S0A follow-up boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          count="$(grep -Ec '\.(expect|unwrap)\(|panic!\(|unreachable!\(' "$CRATE_DIR/src/lib.rs" || true)"
+          printf 'production_panic_api_occurrences=%s\n' "$count"
+          printf 'panic_free_claim=NOT_ESTABLISHED_S0A_REQUIRED\n'
+          test "$count" -ge 1
+
+      - name: Prove exact subject remained immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -z "$(git status --short)"
+          test "$(git rev-parse HEAD:"$CRATE_DIR/Cargo.toml")" = "$EXPECTED_MANIFEST_BLOB"
+          test "$(git rev-parse HEAD:"$CRATE_DIR/src/lib.rs")" = "$EXPECTED_SOURCE_BLOB"
+          test "$(git rev-parse HEAD:"$CRATE_DIR/tests/canonical_primitives.rs")" = "$EXPECTED_TEST_BLOB"
+
+      - name: Emit bounded qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/regen042s0-receipt
+          cat > /tmp/regen042s0-receipt/QUALIFICATION_RECEIPT.txt <<EOF
+          subject=REGEN-042S0
+          subject_sha=$TARGET_SHA
+          profile_parent_sha=$PROFILE_PARENT_SHA
+          profile_ahead_count=$EXPECTED_AHEAD_COUNT
+          rustc=$(rustc +"$PINNED_TOOLCHAIN" --version | tr '\n' ' ')
+          cargo=$(cargo +"$PINNED_TOOLCHAIN" --version | tr '\n' ' ')
+          rustfmt=$(rustfmt +"$PINNED_TOOLCHAIN" --version | tr '\n' ' ')
+          dependency_state=IsolatedZeroDependencyResolved
+          system_closure=unfrozen
+          workspace_integration=NOT_ESTABLISHED_GENERIC_CI_SEPARATE
+          panic_free_claim=NOT_ESTABLISHED_S0A_REQUIRED
+          source_scope=three_files
+          result=PASS
+          proposition=The exact REGEN-042S0 source bytes satisfy their canonical primitive tests and strict all-target Clippy under an isolated zero-dependency Rust 1.96 crate execution.
+          nonclaim=No full-workspace integration, S0A panic-freedom, S1 model-state, shock-model, hazard-probability, authority, recommendation, or physical-control theorem is established.
+          EOF
+          sha256sum "$CRATE_DIR/Cargo.toml" "$CRATE_DIR/src/lib.rs" "$CRATE_DIR/tests/canonical_primitives.rs" /tmp/regen042s0/Cargo.lock > /tmp/regen042s0-receipt/FILES.sha256
+          cat /tmp/regen042s0-receipt/QUALIFICATION_RECEIPT.txt
+          cat /tmp/regen042s0-receipt/FILES.sha256
+
+      - name: Upload exact qualification receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: regen042s0-exact-subject-${{ env.TARGET_SHA }}
+          path: /tmp/regen042s0-receipt
+          if-no-files-found: error
+          retention-days: 90
