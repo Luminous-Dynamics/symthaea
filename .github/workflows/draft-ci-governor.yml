@@ -3,6 +3,11 @@ name: Draft CI Governor
 on:
   schedule:
     - cron: '*/15 * * * *'
+  pull_request:
+    paths:
+      - ".github/workflows/draft-ci-governor.yml"
+      - ".github/scripts/draft-ci-ghost-policy.cjs"
+      - ".github/rel/draft-ci-ghost-prequeue-contract.json"
   pull_request_target:
     types: [ready_for_review]
   workflow_dispatch:
@@ -22,11 +27,29 @@ permissions: {}
 
 concurrency:
   # Ready transitions are isolated per PR. Scheduled/manual reconciliations share
-  # one group so two cancellation batches cannot race each other.
-  group: draft-ci-governor-${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || 'reconcile' }}
+  # one group so two cancellation batches cannot race each other. Pull-request
+  # contract tests are isolated by PR and never share write authority.
+  group: draft-ci-governor-${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || github.event_name == 'pull_request' && format('verify-{0}', github.event.pull_request.number) || 'reconcile' }}
   cancel-in-progress: false
 
 jobs:
+  verify-ghost-prequeue-policy:
+    name: Verify ghost-prequeue policy contract
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Run executable ghost-prequeue contract
+        shell: bash
+        run: node .github/scripts/draft-ci-ghost-policy.cjs
+
   dispatch-ready-full-ci:
     name: Dispatch full matrix when draft becomes ready
     if: github.event_name == 'pull_request_target'
@@ -95,14 +118,26 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     permissions:
       actions: write
+      contents: read
       pull-requests: read
     runs-on: ubuntu-slim
     timeout-minutes: 15
     steps:
+      - name: Checkout exact governor subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
       - name: Reconcile only draft PR full-CI runs
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
         with:
           script: |
+            const path = require('path');
+            const {
+              isGhostPrequeue,
+            } = require(path.join(
+              process.env.GITHUB_WORKSPACE,
+              '.github/scripts/draft-ci-ghost-policy.cjs',
+            ));
+
             const { owner, repo } = context.repo;
             const fullName = `${owner}/${repo}`;
             const scheduled = context.eventName === 'schedule';
@@ -187,17 +222,16 @@ jobs:
               return timeDelta || a.run.id - b.run.id;
             });
 
-            // GITHUB_TOKEN normally has a 1,000-request/hour repository budget.
-            // Each destructive iteration uses one PR re-read plus one cancellation.
-            // Keep a 200-request reserve for the rest of the repository and derive
-            // the actual cap from the live primary-rate budget rather than assuming
-            // the requested cap is safe. Discovery requests occurred before this
-            // read, so `remaining` already accounts for them.
+            // A normal destructive iteration uses one PR re-read and one cancel.
+            // A contradictory 409 can require three additional calls: fresh run
+            // metadata, a one-item jobs census, and one documented force-cancel
+            // attempt. Size the batch for that five-request worst case rather than
+            // assuming every queued record has a coherent scheduler state.
             const { data: rate } = await github.rest.rateLimit.get();
             const remaining = rate.resources.core.remaining;
             const resetAt = new Date(rate.resources.core.reset * 1000).toISOString();
             const reserve = 200;
-            const rateSafeMax = Math.max(0, Math.floor((remaining - reserve) / 2));
+            const rateSafeMax = Math.max(0, Math.floor((remaining - reserve) / 5));
             const effectiveMax = Math.min(requestedMax, rateSafeMax);
 
             core.notice(`Draft CI reconciliation examined ${runs.length} live pull-request CI runs across statuses: ${liveStatuses.join(', ')}.`);
@@ -219,11 +253,16 @@ jobs:
             }
 
             let cancelled = 0;
-            let alreadyGone = 0;
             let noLongerEligible = 0;
+            let nonGhostConflicts = 0;
+            let ghostPrequeueDetected = 0;
+            let ghostForceCancelled = 0;
+            let ghostForceConflicts = 0;
             let rateLimited = false;
+            const unresolvedGhosts = [];
             const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+            runLoop:
             for (const { run, pr } of eligibleRuns.slice(0, effectiveMax)) {
               // The initial open-PR census is only candidate discovery. Re-read
               // immediately before the destructive action so a concurrent
@@ -253,7 +292,71 @@ jobs:
                 cancelled += 1;
               } catch (error) {
                 if (error.status === 409) {
-                  alreadyGone += 1;
+                  // GitHub can expose a contradictory control-plane state where a
+                  // run is reported as queued but cancellation says it has not been
+                  // queued yet. Do not immediately force-cancel: first require a
+                  // fresh queued state, zero instantiated jobs, and the minimum
+                  // stale windows frozen in the executable policy module.
+                  const { data: freshRun } = await github.rest.actions.getWorkflowRun({
+                    owner,
+                    repo,
+                    run_id: run.id,
+                  });
+                  const jobsResponse = await github.request(
+                    'GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs',
+                    {
+                      owner,
+                      repo,
+                      run_id: run.id,
+                      per_page: 1,
+                    },
+                  );
+                  const jobCount = jobsResponse.data.total_count;
+                  const nowMs = Date.now();
+                  const ageMs = nowMs - Date.parse(freshRun.created_at);
+                  const sinceUpdateMs = nowMs - Date.parse(freshRun.updated_at);
+                  const ghostPrequeue = isGhostPrequeue({
+                    status: freshRun.status,
+                    jobCount,
+                    createdAt: freshRun.created_at,
+                    updatedAt: freshRun.updated_at,
+                    nowMs,
+                  });
+
+                  if (!ghostPrequeue) {
+                    nonGhostConflicts += 1;
+                    core.notice(`Cancellation conflict for run ${run.id} is not classified as ghost-prequeue: status=${freshRun.status}; jobs=${jobCount}; age_minutes=${Math.floor(ageMs / 60000)}; since_update_minutes=${Math.floor(sinceUpdateMs / 60000)}. Leaving it untouched.`);
+                  } else {
+                    ghostPrequeueDetected += 1;
+                    core.warning(`Run ${run.id} is a stale zero-job queued record after normal cancellation returned 409: age_minutes=${Math.floor(ageMs / 60000)}; since_update_minutes=${Math.floor(sinceUpdateMs / 60000)}. Attempting one force-cancel recovery.`);
+                    try {
+                      await github.request(
+                        'POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel',
+                        { owner, repo, run_id: run.id },
+                      );
+                      ghostForceCancelled += 1;
+                      core.notice(`Force-cancel accepted for ghost-prequeue run ${run.id}.`);
+                    } catch (forceError) {
+                      if (forceError.status === 409) {
+                        ghostForceConflicts += 1;
+                        unresolvedGhosts.push({
+                          runId: run.id,
+                          prNumber: pr.number,
+                          headSha: run.head_sha,
+                          createdAt: freshRun.created_at,
+                          updatedAt: freshRun.updated_at,
+                        });
+                        core.warning(`Ghost-prequeue run ${run.id} remains internally inconsistent: force-cancel also returned 409. Recording it as unresolved platform state; no further mutation will be attempted this run.`);
+                      } else if (forceError.status === 403 || forceError.status === 429) {
+                        rateLimited = true;
+                        const retryAfter = forceError.response?.headers?.['retry-after'];
+                        core.warning(`Stopping reconciliation after force-cancel rate-limit response ${forceError.status}; retry-after=${retryAfter ?? 'unspecified'}. No further cancellation requests will be sent in this run.`);
+                        break runLoop;
+                      } else {
+                        throw forceError;
+                      }
+                    }
+                  }
                 } else if (error.status === 403 || error.status === 429) {
                   rateLimited = true;
                   const retryAfter = error.response?.headers?.['retry-after'];
@@ -270,4 +373,25 @@ jobs:
               await sleep(1000);
             }
 
-            core.notice(`Cancellation accepted: ${cancelled}; no-longer-eligible: ${noLongerEligible}; already non-cancellable: ${alreadyGone}; rate_limited=${rateLimited}; requested_max=${requestedMax}; effective_max=${effectiveMax}.`);
+            core.notice(`Cancellation accepted: ${cancelled}; no-longer-eligible: ${noLongerEligible}; non-ghost-409: ${nonGhostConflicts}; ghost-prequeue-detected: ${ghostPrequeueDetected}; ghost-force-cancelled: ${ghostForceCancelled}; ghost-force-409: ${ghostForceConflicts}; rate_limited=${rateLimited}; requested_max=${requestedMax}; effective_max=${effectiveMax}.`);
+
+            const summary = [
+              '## Draft CI governor reconciliation',
+              '',
+              `- Live pull-request CI runs examined: ${runs.length}`,
+              `- Eligible same-repo draft full-CI runs: ${eligibleRuns.length}`,
+              `- Normal cancellations accepted: ${cancelled}`,
+              `- No longer eligible at mutation time: ${noLongerEligible}`,
+              `- Non-ghost cancellation conflicts: ${nonGhostConflicts}`,
+              `- Ghost-prequeue records detected: ${ghostPrequeueDetected}`,
+              `- Ghost force-cancellations accepted: ${ghostForceCancelled}`,
+              `- Ghost force-cancel 409 conflicts: ${ghostForceConflicts}`,
+              `- Rate limited: ${rateLimited}`,
+            ];
+            if (unresolvedGhosts.length > 0) {
+              summary.push('', '### Unresolved ghost-prequeue records');
+              for (const ghost of unresolvedGhosts) {
+                summary.push(`- run ${ghost.runId}; PR #${ghost.prNumber}; head \`${ghost.headSha}\`; created ${ghost.createdAt}; updated ${ghost.updatedAt}`);
+              }
+            }
+            await core.summary.addRaw(`${summary.join('\n')}\n`).write();

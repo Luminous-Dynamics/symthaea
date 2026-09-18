@@ -1,0 +1,28 @@
+{
+  "schema": "symthaea.ci.draft-governor-ghost-prequeue-contract.v1",
+  "authority": "RunnerPlaneOnly",
+  "scope": "draft full-CI queue reconciliation",
+  "ghost_prequeue_requires": {
+    "fresh_run_status": "queued",
+    "instantiated_job_count": 0,
+    "minimum_age_minutes": 30,
+    "minimum_since_update_minutes": 30,
+    "normal_cancel_result": 409,
+    "same_repo_open_draft_revalidated_immediately_before_mutation": true
+  },
+  "recovery": {
+    "force_cancel_attempts_per_reconciliation": 1,
+    "force_cancel_409_is_terminal_for_that_reconciliation": true,
+    "unresolved_state_is_recorded_not_retried_in_loop": true
+  },
+  "protected_non_targets": [
+    "runs with one or more instantiated jobs",
+    "runs updated within the last 30 minutes",
+    "non-draft pull requests",
+    "closed pull requests",
+    "fork pull requests",
+    "focused qualification workflows other than ci.yml"
+  ],
+  "scientific_authority": false,
+  "qualification_authority": false
+}
