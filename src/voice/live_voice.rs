@@ -22,8 +22,8 @@
 //! Feature-gated under `live-voice`.
 
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
@@ -44,34 +44,57 @@ const DT: f32 = 1.0 / FRAME_RATE as f32;
 /// Base phoneme duration (seconds) for G2P timing.
 const BASE_PHONEME_DURATION: f32 = 0.06;
 
+/// Maximum producer-side batch attempted while holding playback-generation control.
+///
+/// Bounding the batch keeps a newer generation from waiting behind a large ring
+/// fill while still ensuring that generation check + producer write are ordered
+/// against generation replacement.
+const PLAYBACK_PUSH_BATCH_SAMPLES: usize = 512;
+
 /// Handle to a background playback push started by `speak_async()`.
 ///
 /// Dropping the handle does NOT stop playback — call [`SpeakHandle::stop()`] explicitly,
-/// or use [`SpeakHandle::join()`] to wait for completion.
+/// or use [`SpeakHandle::join()`] to wait for producer completion.
 pub struct SpeakHandle {
     thread: Option<std::thread::JoinHandle<Result<()>>>,
     speaking: Arc<AtomicBool>,
-    /// Shared lock-free signal consumed by the audio callback. Stopping an
-    /// utterance must invalidate samples already queued before the stop.
+    /// Generation represented by this handle.
+    generation: u64,
+    /// Current generation allowed to write/stop playback.
+    current_playback: Arc<AtomicU64>,
+    /// Serializes generation transitions with producer-side write batches.
+    playback_control: Arc<Mutex<()>>,
+    /// Shared lock-free signal consumed by the audio callback.
     flush_requested: Arc<AtomicBool>,
 }
 
 impl SpeakHandle {
-    /// Stop the background utterance and invalidate queued playback.
+    /// Stop this utterance only if it is still the current playback generation.
     ///
-    /// This method performs only atomic stores. The audio device callback consumes
-    /// the flush request on its next invocation and drains stale ring-buffer data.
+    /// A stale handle is intentionally a no-op: it cannot stop or flush audio that
+    /// belongs to a newer utterance. Generation transition and stop are serialized
+    /// with producer-side batches; the device callback remains lock-free.
     pub fn stop(&self) {
+        let _guard = self
+            .playback_control
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if self.current_playback.load(Ordering::Acquire) != self.generation {
+            return;
+        }
+
+        self.current_playback.store(0, Ordering::Release);
         self.speaking.store(false, Ordering::SeqCst);
         self.flush_requested.store(true, Ordering::Release);
     }
 
-    /// Whether the background thread is still pushing this utterance.
+    /// Whether this handle still owns the actively-pushing generation.
     pub fn is_speaking(&self) -> bool {
-        self.speaking.load(Ordering::SeqCst)
+        self.current_playback.load(Ordering::Acquire) == self.generation
+            && self.speaking.load(Ordering::SeqCst)
     }
 
-    /// Block until the utterance finishes (or is stopped).
+    /// Block until this generation's background producer thread exits.
     pub fn join(mut self) -> Result<()> {
         if let Some(handle) = self.thread.take() {
             handle
@@ -101,7 +124,15 @@ pub struct LiveVoice {
     formant_db: FormantDatabase,
     /// Shared cognitive state — can be updated from another thread mid-utterance.
     cognitive_state: Arc<parking_lot::Mutex<VoiceCognitiveState>>,
+    /// Legacy/global stop signal. Generation identity is authoritative for async
+    /// ownership; this flag remains for compatibility with `stop_flag()`.
     speaking: Arc<AtomicBool>,
+    /// Monotonic allocator for playback generations. Zero is reserved for none.
+    playback_counter: AtomicU64,
+    /// Current playback generation, or zero when explicitly stopped/uninitialized.
+    current_playback: Arc<AtomicU64>,
+    /// Non-real-time control serialization. The CPAL callback never takes this lock.
+    playback_control: Arc<Mutex<()>>,
     genesis: GenesisSeed,
 }
 
@@ -125,6 +156,9 @@ impl LiveVoice {
             formant_db: db,
             cognitive_state: Arc::new(parking_lot::Mutex::new(VoiceCognitiveState::default())),
             speaking: Arc::new(AtomicBool::new(false)),
+            playback_counter: AtomicU64::new(0),
+            current_playback: Arc::new(AtomicU64::new(0)),
+            playback_control: Arc::new(Mutex::new(())),
             genesis: genesis.clone(),
         })
     }
@@ -143,9 +177,6 @@ impl LiveVoice {
         let db = FormantDatabase::new();
         train_controller_on_phoneme_db(&mut streaming.pipeline.controller, genesis, &db, 30);
 
-        // AudioOutput::new() would fail headless, so we create a dummy.
-        // speak() and speak_async() will fail if called, but speak_to_file() works.
-        // We use a separate struct field to track this.
         Self {
             streaming,
             audio: AudioOutput::new_dummy(sample_rate),
@@ -153,21 +184,74 @@ impl LiveVoice {
             formant_db: db,
             cognitive_state: Arc::new(parking_lot::Mutex::new(VoiceCognitiveState::default())),
             speaking: Arc::new(AtomicBool::new(false)),
+            playback_counter: AtomicU64::new(0),
+            current_playback: Arc::new(AtomicU64::new(0)),
+            playback_control: Arc::new(Mutex::new(())),
             genesis: genesis.clone(),
+        }
+    }
+
+    /// Allocate and install a new playback generation.
+    ///
+    /// If the previous generation is still actively pushing, its queued playback
+    /// is invalidated before this transition completes. If the previous producer
+    /// already finished, its queued tail is allowed to drain naturally so normal
+    /// sequential speech does not truncate itself.
+    fn begin_playback_generation(&self) -> u64 {
+        let _guard = self
+            .playback_control
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+        let previous_was_pushing = self.current_playback.load(Ordering::Acquire) != 0
+            && self.speaking.load(Ordering::SeqCst);
+
+        let previous = self
+            .playback_counter
+            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+                current.checked_add(1)
+            })
+            .expect("playback generation counter exhausted");
+        let generation = previous + 1;
+
+        self.current_playback.store(generation, Ordering::Release);
+        self.speaking.store(true, Ordering::SeqCst);
+        if previous_was_pushing {
+            self.audio.request_flush();
+        }
+        generation
+    }
+
+    fn generation_is_active(&self, generation: u64) -> bool {
+        generation != 0
+            && self.current_playback.load(Ordering::Acquire) == generation
+            && self.speaking.load(Ordering::SeqCst)
+    }
+
+    /// Mark producer work complete if this generation still owns playback.
+    ///
+    /// We retain `current_playback = generation` after producer completion so its
+    /// handle may still flush samples already queued in the device ring. A future
+    /// generation replaces this token atomically under the same control lock.
+    fn finish_playback_generation(&self, generation: u64) {
+        let _guard = self
+            .playback_control
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if self.current_playback.load(Ordering::Acquire) == generation {
+            self.speaking.store(false, Ordering::SeqCst);
         }
     }
 
     /// Speak text in real time with enhanced prosody control.
     pub fn speak(&mut self, text: &str) -> Result<()> {
-        self.speaking.store(true, Ordering::SeqCst);
+        let generation = self.begin_playback_generation();
 
-        // Enhanced text analysis
         let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
         let prosody = self.analyze_prosody(text);
 
-        for timed in &phonemes {
-            if !self.speaking.load(Ordering::SeqCst) {
-                self.audio.request_flush();
+        'phonemes: for timed in &phonemes {
+            if !self.generation_is_active(generation) {
                 break;
             }
 
@@ -178,27 +262,26 @@ impl LiveVoice {
                 Some(timed.phoneme.as_str())
             };
 
-            // Apply prosody modulation
             let mut state = self.cognitive_state.lock().clone();
             self.apply_prosody(&mut state, &prosody);
 
             for _ in 0..n_frames {
-                if !self.speaking.load(Ordering::SeqCst) {
-                    self.audio.request_flush();
-                    break;
+                if !self.generation_is_active(generation) {
+                    break 'phonemes;
                 }
 
                 let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
-                self.push_with_backpressure(&chunk);
+                if !self.push_with_backpressure(&chunk, generation) {
+                    break 'phonemes;
+                }
             }
         }
 
-        self.speaking.store(false, Ordering::SeqCst);
+        self.finish_playback_generation(generation);
         Ok(())
     }
 
     fn analyze_prosody(&self, _text: &str) -> ProsodyAnalysis {
-        // Analyze sentence structure, emphasis, etc.
         ProsodyAnalysis {
             pitch_range: 1.0,
             speaking_rate: 1.0,
@@ -217,24 +300,19 @@ impl LiveVoice {
     /// tract synthesis still run on the caller before the returned [`SpeakHandle`]
     /// exists. The cognitive-loop voice worker uses a separate persistent worker.
     ///
-    /// Sequential calls are repeatable after the prior handle has completed or
-    /// been stopped: producer ownership is shared rather than destructively moved
-    /// out of `AudioOutput`. Overlapping calls are not yet generation-safe and are
-    /// intentionally not claimed as supported.
+    /// Playback generations make overlapping calls latest-wins on the producer
+    /// side: starting a newer call invalidates the older writer and flushes its
+    /// queued samples if that older generation is still actively pushing. A stale
+    /// `SpeakHandle` cannot stop or flush the newer generation.
     pub fn speak_async(&mut self, text: &str) -> SpeakHandle {
-        self.speaking.store(true, Ordering::SeqCst);
+        let generation = self.begin_playback_generation();
 
         let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
-        let speaking = Arc::clone(&self.speaking);
         let cog_state = Arc::clone(&self.cognitive_state);
 
-        // Synthesize frames into a buffer. We cannot move `self` into the push
-        // thread in this transitional implementation, so synthesis itself remains
-        // synchronous here even though playback pushing is asynchronous.
         let mut all_samples = Vec::new();
-        for timed in &phonemes {
-            if !speaking.load(Ordering::SeqCst) {
-                self.audio.request_flush();
+        'phonemes: for timed in &phonemes {
+            if !self.generation_is_active(generation) {
                 break;
             }
 
@@ -246,9 +324,8 @@ impl LiveVoice {
             };
 
             for _ in 0..n_frames {
-                if !speaking.load(Ordering::SeqCst) {
-                    self.audio.request_flush();
-                    break;
+                if !self.generation_is_active(generation) {
+                    break 'phonemes;
                 }
 
                 let state = cog_state.lock().clone();
@@ -257,9 +334,9 @@ impl LiveVoice {
             }
         }
 
-        // Keep a cloneable producer-side handle instead of taking the producer
-        // out of AudioOutput. This makes later sequential async utterances usable.
         let speaking_bg = Arc::clone(&self.speaking);
+        let current_playback = Arc::clone(&self.current_playback);
+        let playback_control = Arc::clone(&self.playback_control);
         let flush_requested = self.audio.flush_handle();
         let flush_bg = Arc::clone(&flush_requested);
         let audio = self.audio.producer_handle();
@@ -267,32 +344,57 @@ impl LiveVoice {
         let thread = std::thread::Builder::new()
             .name("live-voice-push".into())
             .spawn(move || {
-                if !audio.is_attached() {
-                    speaking_bg.store(false, Ordering::SeqCst);
-                    return Ok(());
-                }
+                let mut offset = 0usize;
 
-                let mut offset = 0;
                 while offset < all_samples.len() {
-                    if !speaking_bg.load(Ordering::SeqCst) {
-                        flush_bg.store(true, Ordering::Release);
+                    let mut stop_loop = false;
+                    let written = {
+                        let _guard = playback_control
+                            .lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+                        if current_playback.load(Ordering::Acquire) != generation {
+                            // Superseded: the newer generation owns flushing and
+                            // playback now. A stale writer must not flush it.
+                            stop_loop = true;
+                            0
+                        } else if !speaking_bg.load(Ordering::SeqCst) {
+                            // Current generation was stopped through the legacy
+                            // global stop flag. Invalidate and flush while control
+                            // is still serialized against a newer generation.
+                            current_playback.store(0, Ordering::Release);
+                            flush_bg.store(true, Ordering::Release);
+                            stop_loop = true;
+                            0
+                        } else if !audio.is_attached() {
+                            speaking_bg.store(false, Ordering::SeqCst);
+                            stop_loop = true;
+                            0
+                        } else {
+                            let end = (offset + PLAYBACK_PUSH_BATCH_SAMPLES)
+                                .min(all_samples.len());
+                            audio.push_samples(&all_samples[offset..end])
+                        }
+                    };
+
+                    if stop_loop {
                         break;
                     }
 
-                    let written = audio.push_samples(&all_samples[offset..]);
                     offset += written;
-
                     if offset < all_samples.len() {
-                        // Zero can mean ordinary ring backpressure. If producer
-                        // ownership has actually been detached, however, there is
-                        // nothing left to wait for.
-                        if written == 0 && !audio.is_attached() {
-                            break;
-                        }
                         std::thread::sleep(std::time::Duration::from_millis(1));
                     }
                 }
-                speaking_bg.store(false, Ordering::SeqCst);
+
+                // Completion may race with a newer generation. Only the current
+                // generation may mutate the shared speaking flag.
+                let _guard = playback_control
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                if current_playback.load(Ordering::Acquire) == generation {
+                    speaking_bg.store(false, Ordering::SeqCst);
+                }
                 Ok(())
             })
             .expect("failed to spawn speak thread");
@@ -300,6 +402,9 @@ impl LiveVoice {
         SpeakHandle {
             thread: Some(thread),
             speaking: Arc::clone(&self.speaking),
+            generation,
+            current_playback: Arc::clone(&self.current_playback),
+            playback_control: Arc::clone(&self.playback_control),
             flush_requested,
         }
     }
@@ -333,42 +438,61 @@ impl LiveVoice {
         Ok(all_samples.len())
     }
 
-    /// Push samples to the ring buffer with simple backpressure.
-    fn push_with_backpressure(&mut self, samples: &[f32]) {
-        let mut offset = 0;
-        while offset < samples.len() && self.speaking.load(Ordering::SeqCst) {
-            let written = self.audio.push_samples(&samples[offset..]);
+    /// Push samples to the ring buffer while preserving playback-generation order.
+    ///
+    /// Returns false if this generation was stopped or superseded.
+    fn push_with_backpressure(&mut self, samples: &[f32], generation: u64) -> bool {
+        let mut offset = 0usize;
+        while offset < samples.len() {
+            let written = {
+                let _guard = self
+                    .playback_control
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+                if self.current_playback.load(Ordering::Acquire) != generation {
+                    return false;
+                }
+                if !self.speaking.load(Ordering::SeqCst) {
+                    self.current_playback.store(0, Ordering::Release);
+                    self.audio.request_flush();
+                    return false;
+                }
+
+                let end = (offset + PLAYBACK_PUSH_BATCH_SAMPLES).min(samples.len());
+                self.audio.push_samples(&samples[offset..end])
+            };
+
             offset += written;
             if offset < samples.len() {
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
         }
-
-        if !self.speaking.load(Ordering::SeqCst) {
-            self.audio.request_flush();
-        }
+        true
     }
 
-    /// Stop speaking and request invalidation of already-buffered audio.
-    ///
-    /// The control path returns immediately; the audio callback consumes the
-    /// flush request on its next invocation.
+    /// Stop whichever playback generation is current and invalidate queued audio.
     pub fn stop(&self) {
+        let _guard = self
+            .playback_control
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.current_playback.store(0, Ordering::Release);
         self.speaking.store(false, Ordering::SeqCst);
         self.audio.request_flush();
     }
 
-    /// Whether `speak()` or `speak_async()` is currently running.
+    /// Whether the current generation is still synthesizing/pushing.
     pub fn is_speaking(&self) -> bool {
-        self.speaking.load(Ordering::SeqCst)
+        self.current_playback.load(Ordering::Acquire) != 0
+            && self.speaking.load(Ordering::SeqCst)
     }
 
-    /// Get a clone of the stop flag for cross-thread interruption.
+    /// Get the legacy global stop flag for cross-thread interruption.
     ///
-    /// Callers using this raw flag remain supported. The synthesis/push loops now
-    /// request playback flush when they observe the flag becoming false. Prefer
-    /// [`Self::stop`] or [`SpeakHandle::stop`] when an immediate flush request is
-    /// available at the call site.
+    /// This flag is not generation-scoped: setting it false requests that whichever
+    /// generation is current stop. Prefer [`Self::stop`] or [`SpeakHandle::stop`]
+    /// when generation-safe ownership matters.
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.speaking)
     }
@@ -380,9 +504,6 @@ impl LiveVoice {
     }
 
     /// Get a handle to the shared cognitive state for real-time prosody modulation.
-    ///
-    /// Lock the mutex and modify the state from any thread; changes take effect
-    /// on the next motor frame (~5ms).
     pub fn cognitive_state_handle(&self) -> Arc<parking_lot::Mutex<VoiceCognitiveState>> {
         Arc::clone(&self.cognitive_state)
     }
@@ -393,10 +514,6 @@ impl LiveVoice {
     }
 
     /// Modulate the LTC controller's time constant for speech rate control.
-    ///
-    /// `factor > 1.0` → slower, more deliberate formant transitions (max 3.0).
-    /// `factor < 1.0` → faster, more agile transitions.
-    /// `factor = 1.0` → default rate.
     pub fn modulate_tau(&mut self, factor: f32) {
         self.streaming.pipeline.controller.modulate_tau(factor);
     }
@@ -443,6 +560,25 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
 mod tests {
     use super::*;
 
+    fn test_handle(
+        generation: u64,
+        current_generation: u64,
+        speaking_value: bool,
+    ) -> (SpeakHandle, Arc<AtomicBool>, Arc<AtomicU64>, Arc<AtomicBool>) {
+        let speaking = Arc::new(AtomicBool::new(speaking_value));
+        let current_playback = Arc::new(AtomicU64::new(current_generation));
+        let flush_requested = Arc::new(AtomicBool::new(false));
+        let handle = SpeakHandle {
+            thread: None,
+            speaking: Arc::clone(&speaking),
+            generation,
+            current_playback: Arc::clone(&current_playback),
+            playback_control: Arc::new(Mutex::new(())),
+            flush_requested: Arc::clone(&flush_requested),
+        };
+        (handle, speaking, current_playback, flush_requested)
+    }
+
     #[test]
     fn test_phoneme_sequence_generation() {
         let g2p = SimpleG2P::new();
@@ -461,37 +597,55 @@ mod tests {
     }
 
     #[test]
-    fn test_stop_flag_works() {
-        let flag = Arc::new(AtomicBool::new(true));
-        assert!(flag.load(Ordering::SeqCst));
-
-        flag.store(false, Ordering::SeqCst);
-        assert!(!flag.load(Ordering::SeqCst));
-    }
-
-    #[test]
-    fn speak_handle_stop_requests_playback_flush() {
-        let speaking = Arc::new(AtomicBool::new(true));
-        let flush_requested = Arc::new(AtomicBool::new(false));
-        let handle = SpeakHandle {
-            thread: None,
-            speaking: Arc::clone(&speaking),
-            flush_requested: Arc::clone(&flush_requested),
-        };
-
+    fn current_handle_stop_invalidates_and_flushes() {
+        let (handle, speaking, current, flush) = test_handle(7, 7, true);
         handle.stop();
+        assert_eq!(current.load(Ordering::Acquire), 0);
         assert!(!speaking.load(Ordering::SeqCst));
-        assert!(flush_requested.load(Ordering::Acquire));
+        assert!(flush.load(Ordering::Acquire));
     }
 
     #[test]
-    fn live_voice_stop_requests_playback_flush() {
+    fn stale_handle_cannot_stop_or_flush_newer_generation() {
+        let (handle, speaking, current, flush) = test_handle(7, 8, true);
+        handle.stop();
+        assert_eq!(current.load(Ordering::Acquire), 8);
+        assert!(speaking.load(Ordering::SeqCst));
+        assert!(!flush.load(Ordering::Acquire));
+        assert!(!handle.is_speaking());
+    }
+
+    #[test]
+    fn handle_is_speaking_is_generation_scoped() {
+        let (current_handle, _, _, _) = test_handle(4, 4, true);
+        assert!(current_handle.is_speaking());
+
+        let (stale_handle, _, _, _) = test_handle(3, 4, true);
+        assert!(!stale_handle.is_speaking());
+    }
+
+    #[test]
+    fn beginning_new_generation_supersedes_active_generation() {
+        let genesis = GenesisSeed::from_phrase("test-generation");
+        let voice = LiveVoice::new_headless(&genesis);
+        let first = voice.begin_playback_generation();
+        let second = voice.begin_playback_generation();
+        assert!(second > first);
+        assert_eq!(voice.current_playback.load(Ordering::Acquire), second);
+        assert!(voice.generation_is_active(second));
+        assert!(!voice.generation_is_active(first));
+    }
+
+    #[test]
+    fn live_voice_stop_invalidates_current_generation_and_flushes() {
         let genesis = GenesisSeed::from_phrase("test-stop-flush");
         let voice = LiveVoice::new_headless(&genesis);
         let flush = voice.playback_flush_handle();
-        voice.speaking.store(true, Ordering::SeqCst);
+        let generation = voice.begin_playback_generation();
+        assert!(voice.generation_is_active(generation));
 
         voice.stop();
+        assert_eq!(voice.current_playback.load(Ordering::Acquire), 0);
         assert!(!voice.is_speaking());
         assert!(flush.load(Ordering::Acquire));
     }
@@ -511,7 +665,6 @@ mod tests {
         assert!(n_samples > 0, "Should produce audio samples");
         assert!(wav_path.exists(), "WAV file should be created");
 
-        // Verify WAV is readable
         let reader = hound::WavReader::open(&wav_path).expect("Should read WAV");
         assert_eq!(reader.spec().channels, 1);
         assert_eq!(reader.spec().sample_rate, 24000);
@@ -523,7 +676,6 @@ mod tests {
         let state = Arc::new(parking_lot::Mutex::new(VoiceCognitiveState::default()));
         let handle = Arc::clone(&state);
 
-        // Modify from "another thread" (simulated)
         {
             let mut s = handle.lock();
             s.emotional_arousal = 0.9;
@@ -540,7 +692,6 @@ mod tests {
 
         let dir = tempfile::tempdir().expect("tempdir");
 
-        // Calm state
         voice.set_cognitive_state(VoiceCognitiveState {
             emotional_arousal: 0.1,
             ..Default::default()
@@ -548,10 +699,8 @@ mod tests {
         let calm_path = dir.path().join("calm.wav");
         let calm_n = voice.speak_to_file("hello", &calm_path).unwrap();
 
-        // Reset pipeline state between utterances
         voice.reset();
 
-        // Excited state
         voice.set_cognitive_state(VoiceCognitiveState {
             emotional_arousal: 0.9,
             emotional_valence: 0.8,
@@ -561,12 +710,9 @@ mod tests {
         let excited_path = dir.path().join("excited.wav");
         let excited_n = voice.speak_to_file("hello", &excited_path).unwrap();
 
-        // Both should produce audio
         assert!(calm_n > 0);
         assert!(excited_n > 0);
 
-        // Read both WAVs and compare RMS — different cognitive states should
-        // produce different audio content (even if same phonemes)
         let calm_reader = hound::WavReader::open(&calm_path).unwrap();
         let excited_reader = hound::WavReader::open(&excited_path).unwrap();
 
@@ -582,7 +728,6 @@ mod tests {
         let calm_rms = rms(&calm_samples);
         let excited_rms = rms(&excited_samples);
 
-        // Both should have non-trivial content
         assert!(
             calm_rms > 1e-6,
             "Calm audio should have content: rms={calm_rms}"
