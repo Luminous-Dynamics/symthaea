@@ -37,11 +37,15 @@
 
 pub mod channel;
 pub mod crop;
+pub mod evidence;
 pub mod manager;
 pub mod types;
 pub mod ventral;
 
 pub use channel::FoveationChannel;
+pub use evidence::{
+    StructuredFoveationEvidence, StructuredFoveationEvidenceError, VisualSourceId,
+};
 pub use manager::FoveationManager;
 pub use types::{
     FoveationConfig, FoveationRequest, FoveationResult, FoveationTelemetry, FrameBuffer,
