@@ -75,6 +75,8 @@ pub mod replay_policy;
 pub mod semantic_context;
 pub mod semantic_null_calibration;
 pub mod semantic_prior;
+pub mod semantic_support;
+pub mod semantic_supported_retrieval;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
@@ -179,6 +181,14 @@ pub use semantic_null_calibration::{
 pub use semantic_prior::{
     CalibratedSemanticPriorCandidate, SemanticPriorCandidate, SemanticPriorError,
     SemanticPriorMemory,
+};
+pub use semantic_support::{
+    SemanticContextSupport, SemanticPairSupport, SemanticSupportError,
+    assess_semantic_context_support, assess_semantic_pair_support,
+};
+pub use semantic_supported_retrieval::{
+    QuerySupportedSemanticPriorRetrieval, QuerySupportedSemanticRetrieval,
+    SemanticQuerySupportError,
 };
 pub use sym_rsi_candidate_family::{
     FrozenReplayCorpus, ReplayAcquisitionError, ReplayCorpusAcquisitionReceipt,
