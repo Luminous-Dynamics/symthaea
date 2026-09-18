@@ -4,13 +4,13 @@
 //! Claim synthesis for the two-stage SYM-RSI fresh evidence chain.
 //!
 //! This module consumes no environment seeds and performs no selection. It combines
-//! already-frozen C-vs-A and D-vs-C fresh receipts so a narrow incremental result
+//! already-frozen C-vs-A and D-vs-C fresh evidence so a narrow incremental result
 //! cannot be mislabeled as a complete recursive-improvement chain.
 
 use super::sym_rsi_dream_fresh_evaluation::{
-    DreamFreshDisposition, SYM_RSI_001D_FRESH_EVALUATION_SCHEMA,
+    DreamFreshDisposition, DreamFreshEvaluationReceipt, SYM_RSI_001D_FRESH_EVALUATION_SCHEMA,
 };
-use super::sym_rsi_dream_parent_gate::ParentQualifiedDreamFreshReceipt;
+use super::sym_rsi_dream_parent_gate::QualifiedDreamFresh;
 use super::sym_rsi_experiment::EvaluationSplit;
 use super::sym_rsi_fresh_evaluation::{
     FreshCvsADisposition, FreshCvsAReceipt, SYM_RSI_001_C_VS_A_ANALYSIS_RULE,
@@ -55,19 +55,24 @@ pub struct FreshImprovementChainReceipt {
 
 /// Synthesize already-measured fresh evidence. This function never executes a
 /// fixture, never chooses a policy, and never changes either source disposition.
+///
+/// D-vs-C must arrive as the private-constructor `QualifiedDreamFresh` token rather
+/// than a serializable receipt, so the chain cannot bypass the parent-C and dream
+/// verification qualification path.
 pub fn build_fresh_improvement_chain_receipt(
     c_vs_a: &FreshCvsAReceipt,
-    qualified_d_vs_c: &ParentQualifiedDreamFreshReceipt,
+    qualified_d_vs_c: &QualifiedDreamFresh,
 ) -> Result<FreshImprovementChainReceipt, FreshImprovementChainError> {
-    let d_vs_c = &qualified_d_vs_c.fresh;
+    let qualified_receipt = qualified_d_vs_c.receipt();
+    let d_vs_c = qualified_d_vs_c.fresh();
     validate_c_vs_a_receipt(c_vs_a)?;
-    validate_d_vs_c_receipt(qualified_d_vs_c)?;
+    validate_d_vs_c_token(qualified_d_vs_c)?;
 
     if c_vs_a.subject_digest != d_vs_c.subject_digest
         || c_vs_a.environment_digest != d_vs_c.environment_digest
         || c_vs_a.selected_policy_id != d_vs_c.c_policy_id
         || c_vs_a.holdout_gate_evidence_digest
-            != qualified_d_vs_c.parent_holdout_gate_evidence_digest
+            != qualified_receipt.parent_holdout_gate_evidence_digest
     {
         return Err(FreshImprovementChainError::CrossLineageMismatch);
     }
@@ -89,7 +94,7 @@ pub fn build_fresh_improvement_chain_receipt(
         shared_parent_holdout_gate_evidence_digest:
             c_vs_a.holdout_gate_evidence_digest.clone(),
         c_vs_a_fresh_evidence_digest: c_vs_a.evidence_digest.clone(),
-        qualified_d_vs_c_fresh_evidence_digest: qualified_d_vs_c.evidence_digest.clone(),
+        qualified_d_vs_c_fresh_evidence_digest: qualified_receipt.evidence_digest.clone(),
         d_vs_c_fresh_evidence_digest: d_vs_c.evidence_digest.clone(),
         c_vs_a_disposition: c_vs_a.disposition,
         d_vs_c_disposition: d_vs_c.disposition,
@@ -131,21 +136,18 @@ fn validate_c_vs_a_receipt(
             return Err(FreshImprovementChainError::InvalidCvsAReceipt);
         }
         validate_consumed_c_vs_a_numeric_consistency(receipt)?;
-    } else {
-        if receipt.pair_count != 0
-            || !receipt.pairs.is_empty()
-            || !receipt.domain_summaries.is_empty()
-            || receipt.macro_quality_delta.is_some()
-            || receipt.total_evaluator_call_delta.is_some()
-            || receipt.worst_domain_quality_delta.is_some()
-            || !matches!(
-                receipt.disposition,
-                FreshCvsADisposition::NoCandidatePromotion
-                    | FreshCvsADisposition::BlockedByHoldout
-            )
-        {
-            return Err(FreshImprovementChainError::InvalidCvsAReceipt);
-        }
+    } else if receipt.pair_count != 0
+        || !receipt.pairs.is_empty()
+        || !receipt.domain_summaries.is_empty()
+        || receipt.macro_quality_delta.is_some()
+        || receipt.total_evaluator_call_delta.is_some()
+        || receipt.worst_domain_quality_delta.is_some()
+        || !matches!(
+            receipt.disposition,
+            FreshCvsADisposition::NoCandidatePromotion | FreshCvsADisposition::BlockedByHoldout
+        )
+    {
+        return Err(FreshImprovementChainError::InvalidCvsAReceipt);
     }
     Ok(())
 }
@@ -214,10 +216,11 @@ fn validate_consumed_c_vs_a_numeric_consistency(
     Ok(())
 }
 
-fn validate_d_vs_c_receipt(
-    receipt: &ParentQualifiedDreamFreshReceipt,
+fn validate_d_vs_c_token(
+    qualified: &QualifiedDreamFresh,
 ) -> Result<(), FreshImprovementChainError> {
-    let fresh = &receipt.fresh;
+    let receipt = qualified.receipt();
+    let fresh = qualified.fresh();
     if fresh.schema != SYM_RSI_001D_FRESH_EVALUATION_SCHEMA
         || fresh.experiment_id != "SYM-RSI-001D"
         || receipt.parent_c_qualification_evidence_digest.trim().is_empty()
@@ -266,7 +269,7 @@ fn validate_d_vs_c_receipt(
 }
 
 fn validate_consumed_d_vs_c_numeric_consistency(
-    fresh: &super::sym_rsi_dream_fresh_evaluation::DreamFreshEvaluationReceipt,
+    fresh: &DreamFreshEvaluationReceipt,
 ) -> Result<(), FreshImprovementChainError> {
     let macro_quality_delta = fresh
         .domain_summaries
@@ -343,9 +346,9 @@ fn validate_consumed_d_vs_c_numeric_consistency(
 
 fn source_integrity_ok(
     c_vs_a: &FreshCvsAReceipt,
-    qualified_d_vs_c: &ParentQualifiedDreamFreshReceipt,
+    qualified_d_vs_c: &QualifiedDreamFresh,
 ) -> bool {
-    let d_vs_c = &qualified_d_vs_c.fresh;
+    let d_vs_c = qualified_d_vs_c.fresh();
     let c_pair_set = c_vs_a
         .pairs
         .iter()
@@ -395,10 +398,11 @@ fn classify_chain(
 
 fn chain_evidence_digest(
     c_vs_a: &FreshCvsAReceipt,
-    qualified_d_vs_c: &ParentQualifiedDreamFreshReceipt,
+    qualified_d_vs_c: &QualifiedDreamFresh,
     disposition: FreshImprovementChainDisposition,
 ) -> String {
-    let d_vs_c = &qualified_d_vs_c.fresh;
+    let qualified_receipt = qualified_d_vs_c.receipt();
+    let d_vs_c = qualified_d_vs_c.fresh();
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi.fresh-improvement-chain.v1\0");
     for value in [
@@ -407,10 +411,10 @@ fn chain_evidence_digest(
         c_vs_a.evidence_digest.as_str(),
         c_vs_a.holdout_gate_evidence_digest.as_str(),
         c_vs_a.selected_policy_id.as_str(),
-        qualified_d_vs_c.parent_c_qualification_evidence_digest.as_str(),
-        qualified_d_vs_c.parent_holdout_gate_evidence_digest.as_str(),
-        qualified_d_vs_c.qualified_verification_evidence_digest.as_str(),
-        qualified_d_vs_c.evidence_digest.as_str(),
+        qualified_receipt.parent_c_qualification_evidence_digest.as_str(),
+        qualified_receipt.parent_holdout_gate_evidence_digest.as_str(),
+        qualified_receipt.qualified_verification_evidence_digest.as_str(),
+        qualified_receipt.evidence_digest.as_str(),
         d_vs_c.evidence_digest.as_str(),
         d_vs_c.grounded_dream_model_evidence_digest.as_str(),
         d_vs_c.c_policy_id.as_str(),
