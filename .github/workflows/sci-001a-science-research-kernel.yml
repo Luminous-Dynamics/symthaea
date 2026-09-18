@@ -1,0 +1,133 @@
+name: SCI-001A Science Research Kernel
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/sci-001a-science-research-kernel.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sci-001a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_PARENT: aeeea202c89d0ab96166bec5674d95695df5f56c
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact qualification head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact source parent and qualification-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_SOURCE_PARENT"
+          test -z "$(git status --porcelain=v1)"
+
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_SOURCE_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/sci-001a-science-research-kernel.yml")
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+          test "$(git rev-parse "$EXPECTED_SOURCE_PARENT^{tree}:crates/core/symthaea-science-research")" \
+            = "$(git rev-parse "HEAD^{tree}:crates/core/symthaea-science-research")"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Materialize minimal Cargo lock delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo metadata --format-version 1 >/dev/null
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.patch"
+
+          test -s "$RUNNER_TEMP/Cargo.lock.patch"
+          grep -F 'name = "symthaea-science-research"' Cargo.lock
+
+          if grep -E '^-[^-]' "$RUNNER_TEMP/Cargo.lock.patch"; then
+            echo "SCI-001A lock materialization is not additive-only"
+            cat "$RUNNER_TEMP/Cargo.lock.patch"
+            exit 1
+          fi
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-science-research
+
+      - name: Unit and authority-contract tests
+        run: cargo test -p symthaea-science-research
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-science-research --all-targets -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected="$({ git status --porcelain=v1 || true; } | grep -v '^ M Cargo.lock$' || true)"
+          if test -n "$unexpected"; then
+            echo "unexpected tracked/untracked mutation after qualification:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse "$EXPECTED_SOURCE_PARENT^{tree}:crates/core/symthaea-science-research")" \
+            = "$(git rev-parse "HEAD^{tree}:crates/core/symthaea-science-research")"
+
+      - name: Write bootstrap receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p sci-001a-evidence
+          cp "$RUNNER_TEMP/Cargo.lock.generated" sci-001a-evidence/Cargo.lock.generated
+          cp "$RUNNER_TEMP/Cargo.lock.patch" sci-001a-evidence/Cargo.lock.patch
+          {
+            echo "program=SCI-001A"
+            echo "authority=bootstrap-source-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "source_subject_sha=$EXPECTED_SOURCE_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "source_tree_sha=$(git rev-parse "$EXPECTED_SOURCE_PARENT^{tree}:crates/core/symthaea-science-research")"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "generated_lock_sha256=$(sha256sum sci-001a-evidence/Cargo.lock.generated | cut -d' ' -f1)"
+            echo "lock_patch_sha256=$(sha256sum sci-001a-evidence/Cargo.lock.patch | cut -d' ' -f1)"
+            echo "format=PASS"
+            echo "tests=PASS"
+            echo "clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > sci-001a-evidence/receipt.txt
+
+      - name: Upload bootstrap evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sci-001a-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}
+          path: sci-001a-evidence/
+          if-no-files-found: error
