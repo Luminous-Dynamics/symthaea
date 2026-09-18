@@ -69,8 +69,13 @@ use super::world_prediction::PredictionDomain;
 // VERSION & CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Current state file version
-pub const STATE_VERSION: &str = "1.0.0";
+/// Current state file version.
+///
+/// v1.1.0 makes calibration persistence statistically complete enough for a
+/// warm start: measured/unmeasured ECE state, overconfidence direction, and
+/// bounded rolling outcomes are now explicit wire data rather than inferred or
+/// discarded during `update_from_tracker`.
+pub const STATE_VERSION: &str = "1.1.0";
 
 /// Default state file path
 pub const DEFAULT_STATE_PATH: &str = ".symthaea/magi_state.json";
@@ -151,6 +156,12 @@ pub struct PersistedDomainCalibration {
     /// Expected Calibration Error
     pub ece: f64,
 
+    /// Whether `ece` is a measured value rather than an unmeasured 0.0
+    /// sentinel. Missing in v1.0 snapshots, so old exact-zero ECE remains
+    /// conservatively unmeasured.
+    #[serde(default)]
+    pub ece_computed: bool,
+
     /// Total predictions made
     pub prediction_count: usize,
 
@@ -166,7 +177,8 @@ pub struct PersistedDomainCalibration {
     /// Is this domain overconfident?
     pub is_overconfident: bool,
 
-    /// Recent prediction outcomes (limited history for rolling calculations)
+    /// Recent prediction outcomes (bounded rolling history for calibration)
+    #[serde(default)]
     pub recent_outcomes: Vec<PersistedPredictionOutcome>,
 }
 
@@ -248,7 +260,7 @@ impl From<CausalAttribution> for PersistedCausalAttribution {
 // MAGI STATE SNAPSHOT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Complete MAGI state snapshot for persistence
+/// Complete MAGI state snapshot
 ///
 /// This is the "Epistemic Save File" - it captures everything needed to
 /// restore the system's learned calibration and wisdom.
@@ -298,11 +310,21 @@ pub struct GlobalCalibrationStats {
     pub rolling_brier: f64,
     pub lifetime_brier: f64,
     pub ece: f64,
+    /// Whether ECE was actually measured. v1.0 snapshots default to false;
+    /// nonzero legacy ECE is recognized conservatively during tracker restore.
+    #[serde(default)]
+    pub ece_computed: bool,
     pub total_predictions: usize,
     pub correct_predictions: usize,
     pub brier_sum: f64,
     pub confidence_adjustment: f64,
+    /// Overconfidence direction is not the inverse of `is_well_calibrated`.
+    #[serde(default)]
+    pub is_overconfident: bool,
     pub is_well_calibrated: bool,
+    /// Bounded global rolling history. Missing in v1.0 snapshots.
+    #[serde(default)]
+    pub recent_outcomes: Vec<PersistedPredictionOutcome>,
 }
 
 /// Persisted loop state
@@ -345,11 +367,14 @@ impl MagiStateSnapshot {
                 rolling_brier: 0.0,
                 lifetime_brier: 0.0,
                 ece: 0.0,
+                ece_computed: false,
                 total_predictions: 0,
                 correct_predictions: 0,
                 brier_sum: 0.0,
                 confidence_adjustment: 1.0,
+                is_overconfident: false,
                 is_well_calibrated: false,
+                recent_outcomes: Vec::new(),
             },
             gate_config: ConstraintGateConfig::default(),
             attribution_history: Vec::new(),
@@ -641,33 +666,45 @@ impl PersistenceManager {
     /// without wrapping it in a full `WorldGroundedSelfModel`. The restored
     /// tracker comes back via [`super::calibration::BrierScoreTracker::from_persisted`].
     pub fn update_from_tracker(&mut self, tracker: &super::calibration::BrierScoreTracker) {
-        let cal_summary = tracker.calibration_summary();
+        let global = tracker.global_calibration();
         self.current.global_stats = GlobalCalibrationStats {
-            rolling_brier: tracker.rolling_brier_score(),
-            lifetime_brier: cal_summary.global_brier,
-            ece: cal_summary.global_ece,
-            total_predictions: cal_summary.total_predictions,
-            correct_predictions: (cal_summary.global_accuracy
-                * cal_summary.total_predictions as f64) as usize,
-            brier_sum: cal_summary.global_brier * cal_summary.total_predictions as f64,
-            confidence_adjustment: 1.0, // Global doesn't have single adjustment
-            is_well_calibrated: cal_summary.is_well_calibrated,
+            rolling_brier: global.rolling_brier,
+            lifetime_brier: global.lifetime_brier,
+            ece: global.ece,
+            ece_computed: global.ece_computed,
+            total_predictions: global.prediction_count,
+            correct_predictions: global.correct_count,
+            brier_sum: global.brier_sum(),
+            confidence_adjustment: global.confidence_adjustment,
+            is_overconfident: global.is_overconfident,
+            is_well_calibrated: tracker.is_well_calibrated(0.15),
+            recent_outcomes: global.recent_outcomes_for_persistence(),
         };
 
-        for (domain, stats) in cal_summary.domain_stats {
+        // Rebuild the map from the exact tracker state rather than leaving
+        // stale domains from an older snapshot behind.
+        self.current.calibration.clear();
+        for domain in PredictionDomain::all() {
+            let Some(calibration) = tracker.domain_calibration(domain) else {
+                continue;
+            };
+            if calibration.prediction_count == 0 {
+                continue;
+            }
             self.current.calibration.insert(
                 domain,
                 PersistedDomainCalibration {
                     domain,
-                    rolling_brier: stats.brier_score, // Using lifetime as proxy
-                    lifetime_brier: stats.brier_score,
-                    ece: stats.ece,
-                    prediction_count: stats.prediction_count,
-                    correct_count: (stats.accuracy * stats.prediction_count as f64) as usize,
-                    brier_sum: stats.brier_score * stats.prediction_count as f64,
-                    confidence_adjustment: stats.confidence_adjustment,
-                    is_overconfident: stats.is_overconfident,
-                    recent_outcomes: Vec::new(), // Don't persist all outcomes
+                    rolling_brier: calibration.rolling_brier,
+                    lifetime_brier: calibration.lifetime_brier,
+                    ece: calibration.ece,
+                    ece_computed: calibration.ece_computed,
+                    prediction_count: calibration.prediction_count,
+                    correct_count: calibration.correct_count,
+                    brier_sum: calibration.brier_sum(),
+                    confidence_adjustment: calibration.confidence_adjustment,
+                    is_overconfident: calibration.is_overconfident,
+                    recent_outcomes: calibration.recent_outcomes_for_persistence(),
                 },
             );
         }
@@ -966,6 +1003,50 @@ mod tests {
         }
     }
 
+    fn calibration_config() -> super::super::calibration::CalibrationConfig {
+        super::super::calibration::CalibrationConfig {
+            ece_bins: 4,
+            max_history: 100,
+            min_predictions_for_ece: 4,
+            rolling_window: 4,
+            adjustment_rate: 0.1,
+        }
+    }
+
+    fn resolved_prediction(
+        confidence: f64,
+        correct: bool,
+    ) -> super::super::world_prediction::WorldPrediction {
+        use super::super::world_prediction::{
+            OutcomeCategory, ResolutionContract, RiskTier, WorldActionContext, WorldPrediction,
+        };
+
+        let action = WorldActionContext::new("test", "calibration persistence regression")
+            .with_risk_tier(RiskTier::Observation);
+        let mut prediction = WorldPrediction::new(
+            "calibration persistence regression",
+            OutcomeCategory::Success,
+            confidence,
+            action,
+            ResolutionContract::shell_command(),
+        );
+        if correct {
+            prediction.resolve_true(OutcomeCategory::Success, 1.0);
+        } else {
+            prediction.resolve_false(OutcomeCategory::SafeFailure, 1.0);
+        }
+        prediction
+    }
+
+    fn record_sequence(
+        tracker: &mut super::super::calibration::BrierScoreTracker,
+        sequence: &[(f64, bool)],
+    ) {
+        for &(confidence, correct) in sequence {
+            tracker.record_prediction(&resolved_prediction(confidence, correct));
+        }
+    }
+
     #[test]
     fn test_cold_start() {
         let temp_dir = TempDir::new().unwrap();
@@ -1077,6 +1158,7 @@ mod tests {
                 rolling_brier: 0.15,
                 lifetime_brier: 0.18,
                 ece: 0.05,
+                ece_computed: true,
                 prediction_count: 50,
                 correct_count: 42,
                 brier_sum: 9.0,
@@ -1104,6 +1186,7 @@ mod tests {
         assert_eq!(cal.prediction_count, 50);
         assert!((cal.confidence_adjustment - 0.85).abs() < 0.001);
         assert!(cal.is_overconfident);
+        assert!(cal.ece_computed);
     }
 
     #[test]
@@ -1135,6 +1218,117 @@ mod tests {
         assert!(summary.contains("5 sessions"));
         assert!(summary.contains("100 lifetime iterations"));
         assert!(summary.contains("500 predictions"));
+    }
+
+    #[test]
+    fn tracker_persistence_preserves_exact_zero_ece_and_rolling_history() {
+        use super::super::calibration::BrierScoreTracker;
+
+        let config = calibration_config();
+        let initial = [(0.75, true), (0.75, true), (0.75, true), (0.75, false)];
+
+        let mut source = BrierScoreTracker::new(config.clone());
+        record_sequence(&mut source, &initial);
+        assert_eq!(source.expected_calibration_error(), 0.0);
+        assert!(source.is_well_calibrated(0.15));
+
+        let mut manager = PersistenceManager::new(PersistenceConfig {
+            enabled: false,
+            ..PersistenceConfig::default()
+        });
+        manager.update_from_tracker(&source);
+        let snapshot = manager.current().clone();
+
+        assert!(snapshot.global_stats.ece_computed);
+        assert_eq!(snapshot.global_stats.ece, 0.0);
+        assert_eq!(snapshot.global_stats.recent_outcomes.len(), 4);
+        let code = snapshot
+            .calibration
+            .get(&PredictionDomain::CodeExecution)
+            .unwrap();
+        assert!(code.ece_computed);
+        assert_eq!(code.ece, 0.0);
+        assert_eq!(code.recent_outcomes.len(), 4);
+
+        let mut restored = BrierScoreTracker::from_persisted(
+            config.clone(),
+            &snapshot.calibration,
+            &snapshot.global_stats,
+        );
+        assert!(restored.is_well_calibrated(0.15));
+
+        // Continuous and warm-started trackers must evolve identically after
+        // the next observation; the restart may not collapse the rolling
+        // population to a single post-restart sample.
+        let mut continuous = BrierScoreTracker::new(config);
+        record_sequence(&mut continuous, &initial);
+        let next = resolved_prediction(0.75, false);
+        continuous.record_prediction(&next);
+        restored.record_prediction(&next);
+
+        assert!(
+            (restored.expected_calibration_error()
+                - continuous.expected_calibration_error())
+            .abs()
+                < 1e-12
+        );
+        assert!(
+            (restored.rolling_brier_score() - continuous.rolling_brier_score()).abs() < 1e-12
+        );
+        assert!(
+            (restored.global_calibration().confidence_adjustment
+                - continuous.global_calibration().confidence_adjustment)
+                .abs()
+                < 1e-12
+        );
+    }
+
+    #[test]
+    fn global_underconfidence_does_not_restore_as_overconfidence() {
+        use super::super::calibration::BrierScoreTracker;
+
+        let config = calibration_config();
+        let mut source = BrierScoreTracker::new(config.clone());
+        record_sequence(
+            &mut source,
+            &[(0.25, true), (0.25, true), (0.25, true), (0.25, true)],
+        );
+        assert!(!source.is_well_calibrated(0.15));
+        assert!(!source.global_calibration().is_overconfident);
+
+        let mut manager = PersistenceManager::new(PersistenceConfig {
+            enabled: false,
+            ..PersistenceConfig::default()
+        });
+        manager.update_from_tracker(&source);
+        let snapshot = manager.current().clone();
+        assert!(!snapshot.global_stats.is_well_calibrated);
+        assert!(!snapshot.global_stats.is_overconfident);
+
+        let restored = BrierScoreTracker::from_persisted(
+            config,
+            &snapshot.calibration,
+            &snapshot.global_stats,
+        );
+        assert!(!restored.global_calibration().is_overconfident);
+    }
+
+    #[test]
+    fn legacy_global_calibration_fields_default_conservatively() {
+        let legacy = serde_json::json!({
+            "rolling_brier": 0.2,
+            "lifetime_brier": 0.2,
+            "ece": 0.0,
+            "total_predictions": 100,
+            "correct_predictions": 80,
+            "brier_sum": 20.0,
+            "confidence_adjustment": 1.0,
+            "is_well_calibrated": false
+        });
+        let restored: GlobalCalibrationStats = serde_json::from_value(legacy).unwrap();
+        assert!(!restored.ece_computed);
+        assert!(!restored.is_overconfident);
+        assert!(restored.recent_outcomes.is_empty());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1237,6 +1431,7 @@ mod tests {
                     rolling_brier: 0.12,
                     lifetime_brier: 0.15,
                     ece: 0.04,
+                    ece_computed: true,
                     prediction_count: 100,
                     correct_count: 88,
                     brier_sum: 15.0,
@@ -1305,6 +1500,7 @@ mod tests {
             assert_eq!(sys_cal.correct_count, 88);
             assert!((sys_cal.confidence_adjustment - 0.92).abs() < 0.001);
             assert!(!sys_cal.is_overconfident);
+            assert!(sys_cal.ece_computed);
             assert_eq!(sys_cal.recent_outcomes.len(), 2);
 
             // Check causal attribution

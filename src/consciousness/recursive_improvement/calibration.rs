@@ -167,6 +167,14 @@ pub struct DomainCalibration {
     #[serde(skip)]
     recent_predictions: VecDeque<PredictionOutcome>,
 
+    /// True only for legacy/restored snapshots that had lifetime calibration
+    /// state but no persisted rolling sample history. While true, the persisted
+    /// rolling/ECE/adjustment state is retained until enough new observations
+    /// exist to rebuild a meaningful rolling window instead of replacing a
+    /// mature calibration estimate with one post-restart sample.
+    #[serde(skip)]
+    rolling_history_warmup_required: bool,
+
     /// When this was last updated
     #[serde(skip, default = "instant_now")]
     pub last_updated: Instant,
@@ -195,6 +203,7 @@ impl DomainCalibration {
             confidence_adjustment: 1.0, // No adjustment initially
             is_overconfident: false,
             recent_predictions: VecDeque::new(),
+            rolling_history_warmup_required: false,
             last_updated: Instant::now(),
         }
     }
@@ -232,23 +241,38 @@ impl DomainCalibration {
             self.recent_predictions.pop_front();
         }
 
-        // Update rolling Brier score
-        if !self.recent_predictions.is_empty() {
-            self.rolling_brier = self
-                .recent_predictions
-                .iter()
-                .map(|p| p.brier_component)
-                .sum::<f64>()
-                / self.recent_predictions.len() as f64;
+        // Legacy snapshots did not actually persist their rolling samples even
+        // though the persistence schema contained a recent_outcomes field. Do
+        // not immediately overwrite their saved rolling statistics with one
+        // fresh sample. Rebuild first, then resume ordinary rolling updates.
+        if self.rolling_history_warmup_required {
+            let warmup_target = config
+                .min_predictions_for_ece
+                .min(config.rolling_window.max(1));
+            if self.recent_predictions.len() >= warmup_target {
+                self.rolling_history_warmup_required = false;
+            }
         }
 
-        // Update ECE if we have enough predictions
-        if self.prediction_count >= config.min_predictions_for_ece {
-            self.update_ece(config.ece_bins);
-        }
+        if !self.rolling_history_warmup_required {
+            // Update rolling Brier score
+            if !self.recent_predictions.is_empty() {
+                self.rolling_brier = self
+                    .recent_predictions
+                    .iter()
+                    .map(|p| p.brier_component)
+                    .sum::<f64>()
+                    / self.recent_predictions.len() as f64;
+            }
 
-        // Update confidence adjustment based on calibration
-        self.update_confidence_adjustment(config);
+            // Update ECE if we have enough predictions
+            if self.prediction_count >= config.min_predictions_for_ece {
+                self.update_ece(config.ece_bins);
+            }
+
+            // Update confidence adjustment based on calibration
+            self.update_confidence_adjustment(config);
+        }
 
         self.last_updated = Instant::now();
     }
@@ -358,37 +382,59 @@ impl DomainCalibration {
         }
     }
 
-    /// Restore domain calibration from persisted state
+    /// Restore domain calibration from persisted state.
     ///
-    /// This reconstructs the calibration state from a persistence snapshot,
-    /// allowing the system to resume with its learned wisdom intact.
+    /// In v1.1 snapshots the bounded rolling sample history is restored as
+    /// well as aggregate state. Older snapshots may have aggregate calibration
+    /// but no recent samples; those enter a guarded warmup mode so one new
+    /// observation cannot silently redefine the saved rolling estimate.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_persisted(
         domain: PredictionDomain,
         rolling_brier: f64,
         lifetime_brier: f64,
         ece: f64,
+        ece_computed: bool,
         prediction_count: usize,
         correct_count: usize,
         brier_sum: f64,
         confidence_adjustment: f64,
         is_overconfident: bool,
+        recent_outcomes: &[super::persistence::PersistedPredictionOutcome],
+        rolling_window: usize,
     ) -> Self {
+        let mut recent_predictions: VecDeque<_> = recent_outcomes
+            .iter()
+            .map(|outcome| PredictionOutcome {
+                confidence: outcome.confidence,
+                was_correct: outcome.was_correct,
+                brier_component: outcome.brier_component,
+            })
+            .collect();
+        while recent_predictions.len() > rolling_window {
+            recent_predictions.pop_front();
+        }
+
+        let has_lifetime_state = prediction_count > 0;
+        let rolling_history_warmup_required = has_lifetime_state && recent_predictions.is_empty();
+
         Self {
             domain,
             rolling_brier,
             lifetime_brier,
             ece,
-            // Persisted snapshots predate the ece_computed flag. Trust a
-            // persisted nonzero ECE as computed; a persisted 0.0 is ambiguous
-            // (could be the old never-computed sentinel) — treat as uncomputed
-            // and let the next update_ece() re-establish it honestly.
-            ece_computed: ece != 0.0,
+            // v1.0 snapshots did not persist this bit. A nonzero historical
+            // ECE can safely prove it had been measured; exact-zero legacy ECE
+            // remains conservatively unmeasured because the old wire format
+            // cannot distinguish "perfect" from "never computed".
+            ece_computed: ece_computed || ece != 0.0,
             prediction_count,
             correct_count,
             brier_sum,
             confidence_adjustment,
             is_overconfident,
-            recent_predictions: VecDeque::new(), // Will rebuild as new predictions come in
+            recent_predictions,
+            rolling_history_warmup_required,
             last_updated: Instant::now(),
         }
     }
@@ -396,6 +442,20 @@ impl DomainCalibration {
     /// Get the brier_sum for persistence
     pub fn brier_sum(&self) -> f64 {
         self.brier_sum
+    }
+
+    /// Snapshot the bounded rolling outcomes for the MAGI persistence layer.
+    pub(crate) fn recent_outcomes_for_persistence(
+        &self,
+    ) -> Vec<super::persistence::PersistedPredictionOutcome> {
+        self.recent_predictions
+            .iter()
+            .map(|outcome| super::persistence::PersistedPredictionOutcome {
+                confidence: outcome.confidence,
+                was_correct: outcome.was_correct,
+                brier_component: outcome.brier_component,
+            })
+            .collect()
     }
 }
 
@@ -540,6 +600,13 @@ impl BrierScoreTracker {
         self.domain_calibration.get(&domain)
     }
 
+    /// Internal exact global calibration state for persistence. Global state is
+    /// not exposed as a decision-domain calibration API because its statistics
+    /// must not be used to grant domain-specific autonomy.
+    pub(crate) fn global_calibration(&self) -> &DomainCalibration {
+        &self.global_calibration
+    }
+
     /// Adjust confidence based on domain calibration
     pub fn adjust_confidence(&self, domain: PredictionDomain, raw_confidence: f64) -> f64 {
         self.domain_calibration
@@ -652,11 +719,14 @@ impl BrierScoreTracker {
                     persisted.rolling_brier,
                     persisted.lifetime_brier,
                     persisted.ece,
+                    persisted.ece_computed,
                     persisted.prediction_count,
                     persisted.correct_count,
                     persisted.brier_sum,
                     persisted.confidence_adjustment,
                     persisted.is_overconfident,
+                    &persisted.recent_outcomes,
+                    config.rolling_window,
                 )
             } else {
                 DomainCalibration::new(domain)
@@ -664,24 +734,29 @@ impl BrierScoreTracker {
             domain_calibration.insert(domain, cal);
         }
 
-        // Reconstruct global calibration
+        // Reconstruct global calibration. `is_overconfident` is persisted as
+        // its own semantic state: "not well calibrated" does not imply
+        // overconfidence because a system may instead be underconfident.
         let global_calibration = DomainCalibration::from_persisted(
             PredictionDomain::Factual, // Placeholder domain for global
             global_stats.rolling_brier,
             global_stats.lifetime_brier,
             global_stats.ece,
+            global_stats.ece_computed,
             global_stats.total_predictions,
             global_stats.correct_predictions,
             global_stats.brier_sum,
             global_stats.confidence_adjustment,
-            !global_stats.is_well_calibrated,
+            global_stats.is_overconfident,
+            &global_stats.recent_outcomes,
+            config.rolling_window,
         );
 
         Self {
             config,
             domain_calibration,
             global_calibration,
-            prediction_history: VecDeque::new(), // History is not persisted (too large)
+            prediction_history: VecDeque::new(), // Detailed category history is not persisted
             _created_at: Instant::now(),
         }
     }
