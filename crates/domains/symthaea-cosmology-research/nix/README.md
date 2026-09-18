@@ -1,10 +1,26 @@
 # DE-001A Nix environment
 
-This subflake is the isolated numerical environment for the first cosmology reproduction lane.
+This subflake is the isolated numerical environment and fixed-output input closure for the first cosmology reproduction lane.
 
 It is intentionally separate from Symthaea's root development shell so Cobaya/CAMB dependencies do not become ambient dependencies of unrelated work.
 
-## Inspect
+## Realize the A0 scientific bytes
+
+```bash
+nix build ./crates/domains/symthaea-cosmology-research/nix#a0-artifacts --no-update-lock-file
+```
+
+The eight inputs are fixed-output derivations. Nix will refuse to realize a source whose bytes do not match its preregistered SHA-256. The package copies them into regular files named by A0 role so the Rust `de001a-a0-verify` binary can independently verify them.
+
+The A0 check also verifies every expected byte count and SHA-256:
+
+```bash
+nix build ./crates/domains/symthaea-cosmology-research/nix#checks.x86_64-linux.a0-artifacts --no-update-lock-file
+```
+
+Neither realization nor this check evaluates a cosmological likelihood.
+
+## Inspect the numerical environment
 
 ```bash
 nix develop ./crates/domains/symthaea-cosmology-research/nix#cosmology-verify
@@ -19,6 +35,6 @@ nix flake check ./crates/domains/symthaea-cosmology-research/nix --no-update-loc
 nix build ./crates/domains/symthaea-cosmology-research/nix#checks.x86_64-linux.environment --no-update-lock-file
 ```
 
-The check runs inside a Nix build sandbox and asserts exact distribution versions plus successful imports.
+The checks run inside Nix build sandboxes. One asserts exact scientific-input bytes; the other asserts exact distribution versions plus successful numerical-package imports.
 
-The scientific DESI reproduction is **not** performed by this subflake yet. Environment qualification licenses only the statement that the frozen numerical environment built and satisfied its internal version/import contract.
+The scientific DESI reproduction is **not** performed by this subflake yet. These checks license only their narrow integrity/environment statements.
