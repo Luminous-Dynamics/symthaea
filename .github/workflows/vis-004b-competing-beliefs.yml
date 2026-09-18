@@ -1,0 +1,32 @@
+name: VIS-004B Competing Visual Beliefs
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-vision-manifold/src/competing_beliefs.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/entity_identity.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/lib.rs'
+      - 'docs/architecture/VISUAL_COMPETING_BELIEFS_V1.md'
+      - '.github/workflows/vis-004b-competing-beliefs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check competing visual beliefs
+        run: cargo check -p symthaea-vision-manifold --all-targets
+      - name: Test competing visual beliefs
+        run: cargo test -p symthaea-vision-manifold competing_beliefs
+      - name: Clippy competing visual beliefs
+        run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings
