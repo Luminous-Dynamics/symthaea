@@ -70,6 +70,21 @@ Epistemic support distance is:
 
 `1 - mean_structural_support`.
 
+## Frozen transition-predictor scope
+
+D-v7 changes the **epistemic support/trust calculation**, not the internal transition-prediction retrieval rule of `symthaea-dream`.
+
+The learned transition predictor continues to receive the existing 16-dimensional dream-state representation and, for a domain-conditioned action fingerprint, chooses the recorded transition-memory observation with greatest cosine similarity in that model space before blending its observed outcome with the action heuristic.
+
+Therefore:
+- task quality may remain an input feature to the transition predictor;
+- repeated quality channels may influence which recorded transition supplies the model-generated outcome;
+- that 16-D similarity is **not** used as v7 structural support, epistemic confidence, support distance, or the amount of predictive leverage granted to D;
+- v7 makes no claim that transition retrieval itself is quality-independent;
+- v7 makes no claim that the transition selected by the predictive model is necessarily the same training observation that maximizes 7-D structural support.
+
+This distinction is intentional and frozen before measurement. A future protocol may align predictive retrieval and structural support to the same observed transition, but that would be a new model/protocol version and may not be introduced after seeing v7 sealed outcomes.
+
 ## Frozen decision rule
 
 D-v7 retains the existing boundaries:
@@ -115,10 +130,11 @@ Before v7 may be used for SYM-RSI-001D measurement, qualification must show:
 7. candidates with zero structural/action support cannot override C;
 8. support-adjusted quality is bounded to `[0, 1]`;
 9. prediction provenance binds raw quality, grounded quality, structural support, action support, actionability, and exact model-call count;
-10. ordinary CI/unit tests do not consume sealed evaluation seeds.
+10. ordinary CI/unit tests do not consume sealed evaluation seeds;
+11. no implementation or report describes the 16-D transition-retrieval similarity as v7 structural support.
 
 ## Claim boundary
 
 A later positive D-vs-C result under v7 could support only the claim that structurally grounded learned counterfactual predictions improved the frozen fixture tasks under the preregistered protocol.
 
-It would not establish that cosine similarity is an optimal notion of semantic locality, that the result generalizes beyond the tested domains, or that Symthaea has achieved open-ended recursive self-improvement.
+It would not establish that the transition predictor itself is quality-independent, that structural support and transition retrieval identify the same training observation, that cosine similarity is an optimal notion of semantic locality, that the result generalizes beyond the tested domains, or that Symthaea has achieved open-ended recursive self-improvement.
