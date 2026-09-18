@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A1C-COBAYA-FIXED-POINT-v1",
+  "scientific_claim": "NONE",
+  "authority": "released-likelihood-fixed-point-reproduction-only",
+  "status": "preregistered-contract-only",
+  "source": {
+    "cobaya_version": "3.6.2",
+    "cobaya_source_commit": "899f30a49f85de610dac321e91a1af50018e56aa",
+    "cobaya_sdist_sha256": "8f1061d6347427f08380e1e0c0b766d695d3978b5439fb0b1cc1a7002152d9c8",
+    "likelihood_alias": "bao.desi_dr2",
+    "likelihood_class": "cobaya.likelihoods.bao.desi_dr2.desi_bao_all.desi_bao_all",
+    "likelihood_class_path": "cobaya/likelihoods/bao/desi_dr2/desi_bao_all.py",
+    "likelihood_base_path": "cobaya/likelihoods/base_classes/bao.py",
+    "likelihood_definition_role": "likelihood-definition",
+    "likelihood_definition_sha256": "fd7e9bf2dcf5ffee90a9a30b18227f4337d6d5c1978782c63513cbe0d8280daa",
+    "bao_data_commit": "bb0c1c9009dc76d1391300e169e8df38fd1096db"
+  },
+  "subject": {
+    "model": "flat-lambda-cdm-bao-only-late-background",
+    "bestfit_role": "reference-bestfit-text",
+    "bestfit_sha256": "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358",
+    "mean_role": "dataset-mean",
+    "mean_size": 472,
+    "mean_sha256": "9ac154ab583ce759c0f7eef3c978c7c70a6ead2d18774caceadf1a350a640585",
+    "covariance_role": "dataset-covariance",
+    "covariance_size": 2547,
+    "covariance_sha256": "252a143274c8a07c78694c119617d36594f6d7965d00319ca611c6ffb886e509",
+    "row_count": 13,
+    "omega_m": 0.29717787,
+    "h_r_d_mpc": 101.54786,
+    "reference_chi2_bao": 10.282299,
+    "absolute_tolerance": 0.01
+  },
+  "provider": {
+    "implementation": "python-analytic-flat-lcdm-hrdrag-gauge-v1",
+    "rdrag_gauge_mpc": 100.0,
+    "h0_formula": "100*h_r_d_mpc/rdrag_gauge_mpc",
+    "speed_of_light_km_s": 299792.458,
+    "required_provider_methods": [
+      "get_angular_diameter_distance",
+      "get_Hubble",
+      "get_param:rdrag"
+    ],
+    "gauge_statement": "rdrag_gauge_mpc is a computational normalization only. A1C makes no physical inference for H0 or rdrag separately; BAO-only ratios depend on their product at the frozen h*r_d point.",
+    "camb_forbidden": true
+  },
+  "execution_policy": {
+    "likelihood_calls": 1,
+    "sampler_forbidden": true,
+    "minimizer_forbidden": true,
+    "parameter_mutation_forbidden": true,
+    "network_forbidden": true,
+    "data_install_forbidden": true,
+    "packages_path_mutation_forbidden": true,
+    "optimization_forbidden": true,
+    "required_outputs": [
+      "logp_bao",
+      "chi2_bao",
+      "point_manifest_sha256",
+      "a0_receipt_sha256",
+      "environment_receipt_sha256",
+      "cobaya_version"
+    ]
+  },
+  "independence": {
+    "measurement_data_independent": false,
+    "covariance_independent": false,
+    "model_family_independent": false,
+    "background_code_independent_from_a1r": true,
+    "gaussian_likelihood_code_independent_from_a1r": true,
+    "scope": "A1C uses the released Cobaya BAO likelihood code with a separately implemented Python flat-LambdaCDM background provider over the same A0-authenticated DESI compressed data. This tests implementation agreement, not independent observations or an independent cosmological model family."
+  },
+  "execution_prerequisites": [
+    "qualified DE-001A1Q PASS",
+    "qualified DE-001A numerical environment PASS"
+  ]
+}
