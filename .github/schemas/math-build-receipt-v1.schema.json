@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/math-build-receipt-v1.schema.json",
+  "title": "Symthaea MATH-BUILD-002 receipt v1",
+  "description": "Structural interchange schema. Semantic authority transitions and receipt digest verification are enforced by .github/scripts/validate-math-build-receipt.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_domain",
+    "receipt_role",
+    "outcome",
+    "payload",
+    "authority",
+    "provenance",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "symthaea.math.build.receipt/v1" },
+    "receipt_domain": { "const": "symthaea.math.build" },
+    "receipt_role": {
+      "enum": [
+        "artifact_generation",
+        "artifact_replay",
+        "exact_head_build_qualification"
+      ]
+    },
+    "outcome": { "enum": ["pass", "fail"] },
+    "payload": { "type": "object" },
+    "authority": { "$ref": "#/$defs/authority" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "receipt_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "receipt_role": { "const": "artifact_generation" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/generationPayload" } } }
+    },
+    {
+      "if": { "properties": { "receipt_role": { "const": "artifact_replay" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/replayPayload" } } }
+    },
+    {
+      "if": { "properties": { "receipt_role": { "const": "exact_head_build_qualification" } } },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/exactHeadPayload" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "gitOid": {
+      "type": "string",
+      "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit_sha", "tree_sha"],
+      "properties": {
+        "commit_sha": { "$ref": "#/$defs/gitOid" },
+        "tree_sha": { "$ref": "#/$defs/gitOid" }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recipe_semantics_sha256",
+        "action_pin_set_sha256",
+        "rust_toolchain_identity",
+        "nix_environment_identity",
+        "target_identity"
+      ],
+      "properties": {
+        "recipe_semantics_sha256": { "$ref": "#/$defs/sha256" },
+        "action_pin_set_sha256": { "$ref": "#/$defs/sha256" },
+        "rust_toolchain_identity": { "type": "string", "minLength": 1 },
+        "nix_environment_identity": { "type": "string", "minLength": 1 },
+        "target_identity": { "type": "string", "minLength": 1 }
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "result",
+        "command_sha256",
+        "stdout_sha256",
+        "stderr_sha256"
+      ],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "result": { "enum": ["pass", "fail", "not_run"] },
+        "command_sha256": { "$ref": "#/$defs/sha256" },
+        "stdout_sha256": { "$ref": "#/$defs/sha256" },
+        "stderr_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "gateArray": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/gate" }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_contained_in_source_subject",
+        "subject_build_qualified",
+        "formal_authority",
+        "mathematical_authority"
+      ],
+      "properties": {
+        "artifact_contained_in_source_subject": { "type": "boolean" },
+        "subject_build_qualified": { "type": "boolean" },
+        "formal_authority": { "const": false },
+        "mathematical_authority": { "const": false }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "run_id", "started_at", "finished_at"],
+      "properties": {
+        "provider": { "type": "string" },
+        "run_id": { "type": "string" },
+        "started_at": { "type": "string" },
+        "finished_at": { "type": "string" }
+      }
+    },
+    "sortedPathArray": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "generationPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_subject",
+        "qualification_subject",
+        "qualification_overlay_digest",
+        "qualification_overlay_paths",
+        "recipe",
+        "lock_before_sha256",
+        "lock_candidate_sha256",
+        "canonical_metadata_graph_sha256",
+        "crate_source_set_sha256",
+        "output_artifact_manifest_sha256",
+        "gates"
+      ],
+      "properties": {
+        "source_subject": { "$ref": "#/$defs/subject" },
+        "qualification_subject": { "$ref": "#/$defs/subject" },
+        "qualification_overlay_digest": { "$ref": "#/$defs/sha256" },
+        "qualification_overlay_paths": { "$ref": "#/$defs/sortedPathArray" },
+        "recipe": { "$ref": "#/$defs/recipe" },
+        "lock_before_sha256": { "$ref": "#/$defs/sha256" },
+        "lock_candidate_sha256": { "$ref": "#/$defs/sha256" },
+        "canonical_metadata_graph_sha256": { "$ref": "#/$defs/sha256" },
+        "crate_source_set_sha256": { "$ref": "#/$defs/sha256" },
+        "output_artifact_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "gates": { "$ref": "#/$defs/gateArray" }
+      }
+    },
+    "replayPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_receipt_sha256",
+        "old_subject",
+        "repaired_subject",
+        "generated_artifact_sha256",
+        "replayed_artifact_sha256",
+        "source_delta_digest",
+        "changed_paths"
+      ],
+      "properties": {
+        "generation_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "old_subject": { "$ref": "#/$defs/subject" },
+        "repaired_subject": { "$ref": "#/$defs/subject" },
+        "generated_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "replayed_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "source_delta_digest": { "$ref": "#/$defs/sha256" },
+        "changed_paths": { "$ref": "#/$defs/sortedPathArray" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["package", "profile", "whole_workspace_qualified"],
+      "properties": {
+        "package": { "type": "string", "minLength": 1 },
+        "profile": { "type": "string", "minLength": 1 },
+        "whole_workspace_qualified": { "const": false }
+      }
+    },
+    "exactHeadPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "replay_receipt_sha256",
+        "subject",
+        "contained_lock_sha256",
+        "recipe",
+        "scope",
+        "gates"
+      ],
+      "properties": {
+        "replay_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "subject": { "$ref": "#/$defs/subject" },
+        "contained_lock_sha256": { "$ref": "#/$defs/sha256" },
+        "recipe": { "$ref": "#/$defs/recipe" },
+        "scope": { "$ref": "#/$defs/scope" },
+        "gates": { "$ref": "#/$defs/gateArray" }
+      }
+    }
+  }
+}
