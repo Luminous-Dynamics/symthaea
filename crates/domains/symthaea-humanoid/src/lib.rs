@@ -38,6 +38,8 @@ pub mod morphology;
 pub mod mujoco_contact_interaction;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_contact_patch;
+#[cfg(feature = "mujoco")]
+pub mod mujoco_support_normal;
 pub mod mujoco_oracle_protocol;
 pub mod multi_contact;
 pub mod oracle_dataset;
@@ -92,6 +94,8 @@ pub use inverse_dynamics::*;
 pub use mujoco_contact_interaction::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_contact_patch::*;
+#[cfg(feature = "mujoco")]
+pub use mujoco_support_normal::*;
 pub use mujoco_oracle_protocol::*;
 pub use multi_contact::*;
 pub use oracle_dataset::*;
