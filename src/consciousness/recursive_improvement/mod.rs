@@ -46,11 +46,9 @@
 // MAGI Loop Core - Always available (self-contained, no broken dependencies)
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Core infrastructure for MAGI Loop
 pub mod core;
 pub mod types;
 
-// MAGI Loop implementation (World-Grounded Prediction)
 pub mod active_inference_bridge;
 pub mod calibration;
 pub mod calibration_analytics;
@@ -73,6 +71,7 @@ pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
 pub mod sym_rsi_fresh_evaluation;
+pub mod sym_rsi_fresh_chain_claim;
 pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_dream_protocol;
 mod sym_rsi_dream_parent_gate;
@@ -85,7 +84,6 @@ pub mod sym_rsi_replay_selection;
 pub mod sym_rsi_runner;
 pub mod sym_rsi_structural_support;
 
-// Re-export key types from core infrastructure
 pub use types::{
     ActionContext, InputModality, SemanticInput, TimeWindow, calculate_trend, instant_now,
 };
@@ -95,70 +93,44 @@ pub use core::{
     MonitorConfig, PerformanceMonitor,
 };
 
-// MAGI Loop exports (World-Grounded Prediction)
 pub use world_prediction::{
     ContractRegistry, DiffTolerance, OutcomeCategory, PredictionDomain, Resolution,
     ResolutionAuthority, ResolutionContract, ResourceExpectation, RiskTier, WorldActionContext,
     WorldPrediction,
 };
 
-// Calibration exports (MAGI Loop Step 2)
 pub use calibration::{
     BrierScoreTracker, CalibrationConfig, CalibrationSummary, DomainCalibration, DomainStats,
     ResolvedPredictionRecord,
 };
 
-// Constraint Gate exports (MAGI Loop Step 3.5 - UPGRADE B)
 pub use constraint_gate::{
     ConstraintGate, ConstraintGateConfig, DryRunReason, ExecutionMode, GateDecision, GateFactor,
     GateStatistics, SupervisionReason,
 };
 
-// MAGI Loop Integration exports
 pub use magi_integration::{
-    CalibratedEfe,
-    CalibrationQuality,
-    CausalAttribution,
-    EfeContribution,
-    EfeWeights,
-    MagiLoopState,
-    ModelUpdate,
-    RollbackCondition,
-    SafeUpdate,
-    SafeUpdateManager,
-    SystemSnapshot,
-    UpdateStatistics,
-    UpdateStatus,
-    WorldGroundedConfig,
-    WorldGroundedSelfModel,
+    CalibratedEfe, CalibrationQuality, CausalAttribution, EfeContribution, EfeWeights,
+    MagiLoopState, ModelUpdate, RollbackCondition, SafeUpdate, SafeUpdateManager, SystemSnapshot,
+    UpdateStatistics, UpdateStatus, WorldGroundedConfig, WorldGroundedSelfModel,
 };
 
-// Active Inference Bridge exports (MAGI + PAC + Signals)
 pub use active_inference_bridge::{
     ActiveInferenceBridge, ActiveInferenceBridgeConfig, BridgeStatistics, CouplingQuality,
     MagiActiveInferenceController,
 };
 
-// Persistence exports (Epistemic Save File)
 pub use persistence::{
-    GlobalCalibrationStats,
-    MagiPersistentModel,
-    MagiStateSnapshot,
-    PersistedCausalAttribution,
-    PersistedDomainCalibration,
-    PersistedLoopState,
-    PersistenceConfig,
-    PersistenceManager,
+    GlobalCalibrationStats, MagiPersistentModel, MagiStateSnapshot, PersistedCausalAttribution,
+    PersistedDomainCalibration, PersistedLoopState, PersistenceConfig, PersistenceManager,
     StartupMode,
 };
 
-// Runtime exports (MAGI Loop Heartbeat)
 pub use runtime::{
     AutoResolveType, LogLevel, MagiLoopRuntime, PendingPrediction, RuntimeConfig, RuntimeEvent,
     RuntimeLogEntry, RuntimeSignals, RuntimeSnapshot, RuntimeState,
 };
 
-// Dream Feedback exports (Counterfactual Learning)
 pub use dream_feedback::{
     ActionPrior, ConfidenceAdjustment, DreamFeedbackBridge, DreamFeedbackStats, DreamInsight,
     hash_context,
@@ -192,6 +164,10 @@ pub use sym_rsi_fresh_evaluation::{
     FreshPairReceipt, SYM_RSI_001_C_VS_A_ANALYSIS_RULE, SYM_RSI_001_FRESH_EVALUATION_SCHEMA,
     run_fresh_c_vs_a,
 };
+pub use sym_rsi_fresh_chain_claim::{
+    FreshImprovementChainDisposition, FreshImprovementChainError, FreshImprovementChainReceipt,
+    SYM_RSI_FRESH_CHAIN_CLAIM_SCHEMA, build_fresh_improvement_chain_receipt,
+};
 pub use sym_rsi_grounded_dream::{
     DreamActionPrediction, DreamActionSupport, DreamDecisionRecord, DreamFixtureAction,
     GroundedDreamError, GroundedDreamModel, GroundedDreamPolicy,
@@ -220,8 +196,7 @@ pub use sym_rsi_dream_parent_gate::{
 };
 pub use sym_rsi_dream_fresh_evaluation::{
     DreamFreshDisposition, DreamFreshDomainSummary, DreamFreshEvaluationError,
-    DreamFreshEvaluationReceipt, DreamFreshPairReceipt,
-    SYM_RSI_001D_FRESH_EVALUATION_SCHEMA,
+    DreamFreshEvaluationReceipt, DreamFreshPairReceipt, SYM_RSI_001D_FRESH_EVALUATION_SCHEMA,
 };
 pub use sym_rsi_dream_ood_evaluation::{
     DreamOodDisposition, DreamOodDomainSummary, DreamOodEvaluationError,
@@ -256,10 +231,6 @@ pub use sym_rsi_structural_support::{
     STRUCTURAL_SUPPORT_DIM, SYM_RSI_STRUCTURAL_SUPPORT_SCHEMA,
     build_structural_support_index, structural_state_vector,
 };
-
-// ═══════════════════════════════════════════════════════════════════════════
-// World Model — gated behind full_consciousness feature flag
-// ═══════════════════════════════════════════════════════════════════════════
 
 #[cfg(feature = "full_consciousness")]
 pub mod world_model;
