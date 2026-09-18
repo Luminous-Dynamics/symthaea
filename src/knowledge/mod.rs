@@ -55,16 +55,17 @@ pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_restart_admission_review;
+pub mod epistemic_restart_quarantine_facade;
 #[allow(
     unused_imports,
-    reason = "EKM-051 keeps two parent-layer type imports explicit while the quarantine API remains module-scoped"
+    reason = "EKM-051 retains internal parent-layer types while the raw quarantine API is sealed behind EKM-053"
 )]
-pub mod epistemic_restart_quarantine_admission;
+pub(crate) mod epistemic_restart_quarantine_admission;
 #[allow(
     unused_imports,
-    reason = "EKM-052 keeps the quarantine admission digest type explicit for the joint-context boundary"
+    reason = "EKM-052 retains internal quarantine types while the raw joint-context API is sealed behind EKM-053"
 )]
-pub mod epistemic_restart_trusted_context;
+pub(crate) mod epistemic_restart_trusted_context;
 pub mod epistemic_restart_capsule;
 pub mod epistemic_restart_capsule_v2;
 pub mod epistemic_restart_continuity;
