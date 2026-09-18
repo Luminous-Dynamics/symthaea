@@ -1,0 +1,105 @@
+name: INT-005A2 IPC Adapter Qualification
+
+on:
+  pull_request:
+    paths:
+      - src/shell/ipc_adapter.rs
+      - src/shell/mod.rs
+      - .github/workflows/int-005a2-ipc-adapter.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: int-005a2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_PARENT: 62bb29b9368fb23c5648e426c1c380c57473253f
+  EXPECTED_ADAPTER_BLOB: caa407bdcba15f3b18ecb8b8c10ef19c6f336a41
+  EXPECTED_MOD_BLOB: 41f23fe679c061235b1af067b446e395541125ed
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  exact-head-adapter:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind exact qualifier and source subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_SOURCE_PARENT"
+          test "$(git hash-object src/shell/ipc_adapter.rs)" = "$EXPECTED_ADAPTER_BLOB"
+          test "$(git hash-object src/shell/mod.rs)" = "$EXPECTED_MOD_BLOB"
+          mapfile -t changed < <(git diff --name-only "$EXPECTED_SOURCE_PARENT" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/int-005a2-ipc-adapter.yml"
+          test -z "$(git status --porcelain)"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc --version
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+      - name: Check touched-file formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/shell/ipc_adapter.rs src/shell/mod.rs
+
+      - name: Locked root-library compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked --lib
+
+      - name: Run adapter parity tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --lib shell::ipc_adapter::tests
+
+      - name: Locked root-library Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked --lib -- -D warnings
+
+      - name: Verify source immutability and emit receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object src/shell/ipc_adapter.rs)" = "$EXPECTED_ADAPTER_BLOB"
+          test "$(git hash-object src/shell/mod.rs)" = "$EXPECTED_MOD_BLOB"
+          test -z "$(git status --porcelain)"
+          {
+            echo "program=INT-005A2"
+            echo "authority=engineering-source-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "qualifier_head=$(git rev-parse HEAD)"
+            echo "source_parent=$EXPECTED_SOURCE_PARENT"
+            echo "source_tree=$(git rev-parse HEAD^{tree})"
+            echo "adapter_blob=$EXPECTED_ADAPTER_BLOB"
+            echo "mod_blob=$EXPECTED_MOD_BLOB"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile=PASS"
+            echo "tests=PASS"
+            echo "clippy=PASS"
+          } | tee int-005a2-receipt.txt
+          cat int-005a2-receipt.txt >> "$GITHUB_STEP_SUMMARY"
