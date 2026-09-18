@@ -112,7 +112,7 @@ impl ActivationTransactionReviewEligibilityReceiptV1 {
         live_schema_history: &BeliefRevisionSchemaHistoryV1,
         reviewed_at_cycle: u64,
     ) -> Result<Self, ActivationTransactionReviewEligibilityError> {
-        // Recompute EKM-069 at the *current* review cycle rather than accepting a
+        // Recompute EKM-069 at the current review cycle rather than accepting a
         // stale detached preflight receipt.
         let preflight = ActivationPreflightReceiptV1::evaluate(
             restart,
@@ -299,6 +299,65 @@ impl ActivationTransactionReviewEligibilityReceiptV1 {
     pub fn receipt_digest(&self) -> ActivationTransactionReviewEligibilityDigestV1 {
         self.receipt_digest
     }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn verify_against(
+        &self,
+        restart: &EpistemicRestartWireSnapshotV2,
+        seals: &BeliefMutationSealWireSnapshotV1,
+        restart_receipt: &EpistemicRestartValidationReceiptV1,
+        mutation_checkpoint: &VerifiedRestartMutationSealCheckpointV1,
+        admission: &ProtectedMutationSealAdmissionV1,
+        candidate_currentness: &VerifiedRestartMutationSealCurrentnessV1,
+        eligibility: &HistoricalReplayEligibilityReceiptV1,
+        projection: &HistoricalEvidenceProjectionV1,
+        replay_report: &HistoricalFirewallReplayReportV1,
+        quarantine: &ReadOnlyEpistemicRestartQuarantineV2,
+        trust_checkpoint: &VerifiedRestartTrustContextCheckpointV1,
+        trust_currentness: &VerifiedRestartTrustContextCurrentnessV1,
+        support_eligibility: &SupportHydrationEligibilityReceiptV1,
+        audit: &ImmutableRevisionAuditRestorationV1,
+        sandbox: &SealedSplitStateHydrationSandboxV1,
+        live_fence: &LiveEpistemicEpochFenceV1,
+        live_ledger: &EpistemicLedger,
+        live_inventory: &EpistemicLedgerInventoryV1,
+        live_store: &EpistemicSupportStore,
+        live_history: &BeliefRevisionHistory,
+        live_schema_history: &BeliefRevisionSchemaHistoryV1,
+        reviewed_at_cycle: u64,
+    ) -> Result<(), ActivationTransactionReviewEligibilityError> {
+        let live = Self::evaluate(
+            restart,
+            seals,
+            restart_receipt,
+            mutation_checkpoint,
+            admission,
+            candidate_currentness,
+            eligibility,
+            projection,
+            replay_report,
+            quarantine,
+            trust_checkpoint,
+            trust_currentness,
+            support_eligibility,
+            audit,
+            sandbox,
+            live_fence,
+            live_ledger,
+            live_inventory,
+            live_store,
+            live_history,
+            live_schema_history,
+            reviewed_at_cycle,
+        )?;
+        if &live != self {
+            return Err(ActivationTransactionReviewEligibilityError::ReceiptMismatch);
+        }
+        if digest_receipt(self)? != self.receipt_digest {
+            return Err(ActivationTransactionReviewEligibilityError::ReceiptDigestMismatch);
+        }
+        Ok(())
+    }
 }
 
 fn digest_receipt(
@@ -358,6 +417,8 @@ pub enum ActivationTransactionReviewEligibilityError {
     TrustCurrentnessCheckpointMismatch,
     UnexpectedPreflightClaims,
     UnexpectedTrustCurrentnessAuthority,
+    ReceiptMismatch,
+    ReceiptDigestMismatch,
 }
 
 impl fmt::Display for ActivationTransactionReviewEligibilityError {
