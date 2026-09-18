@@ -10,9 +10,11 @@
 //! bounded drop-oldest buffer and retrieved in subsequent cycles.
 //!
 //! A newer request invalidates completed output from every older generation.
-//! This does not yet interrupt an in-progress `VoiceOrchestrator` call, but it
-//! prevents superseded speech from leaking back into playback after synthesis
-//! eventually returns. INT-008A will add renderer-level cooperative cancellation.
+//! Multi-phrase requests are synthesized cooperatively: generation is checked
+//! before and after every semantic phrase, so a superseding utterance can stop
+//! an older multi-sentence synthesis before the full request completes. A single
+//! long phrase remains one renderer call; frame-level cancellation is a later
+//! qualification tranche.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -44,6 +46,102 @@ fn resample_linear(input: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
             }
         })
         .collect()
+}
+
+/// Split text only at strong semantic boundaries where resetting the existing
+/// whole-phrase renderer is least surprising.
+///
+/// Terminator runs such as `?!` stay attached to the same phrase. We deliberately
+/// do not split on commas/semicolons or arbitrary byte/word counts: those would
+/// improve worst-case cancellation latency at the cost of injecting additional
+/// vocoder resets inside clauses. Frame-level cooperative cancellation belongs in
+/// the renderer itself and is intentionally not approximated here.
+fn split_voice_phrases(text: &str) -> Vec<&str> {
+    let mut phrases = Vec::new();
+    let mut start = 0usize;
+    let mut chars = text.char_indices().peekable();
+
+    while let Some((idx, ch)) = chars.next() {
+        let strong_boundary = matches!(ch, '.' | '!' | '?') || ch == '\n';
+        if !strong_boundary {
+            continue;
+        }
+
+        let next_is_terminator = chars
+            .peek()
+            .map(|(_, next)| matches!(*next, '.' | '!' | '?'))
+            .unwrap_or(false);
+        if next_is_terminator && ch != '\n' {
+            continue;
+        }
+
+        let end = idx + ch.len_utf8();
+        let phrase = text[start..end].trim();
+        if !phrase.is_empty() {
+            phrases.push(phrase);
+        }
+        start = end;
+    }
+
+    let tail = text[start..].trim();
+    if !tail.is_empty() {
+        phrases.push(tail);
+    }
+
+    phrases
+}
+
+/// Sample-count-weighted aggregation for phrase-level synthesis metrics.
+///
+/// Each phrase still produces real `VoiceOutputMetrics`. Weighting by produced
+/// audio samples avoids a short interjection dominating a much longer phrase.
+#[derive(Debug, Default)]
+struct WeightedVoiceMetrics {
+    weight: f64,
+    articulation_score: f64,
+    formant_accuracy: f64,
+    speech_rate: f64,
+    pitch_stability: f64,
+    coarticulation_smoothness: f64,
+    listener_prediction: f64,
+    duration_accuracy: f64,
+    energy_consistency: f64,
+}
+
+impl WeightedVoiceMetrics {
+    fn push(
+        &mut self,
+        metrics: &crate::voice::voice_feedback::VoiceOutputMetrics,
+        sample_count: usize,
+    ) {
+        let weight = sample_count.max(1) as f64;
+        self.weight += weight;
+        self.articulation_score += metrics.articulation_score as f64 * weight;
+        self.formant_accuracy += metrics.formant_accuracy as f64 * weight;
+        self.speech_rate += metrics.speech_rate as f64 * weight;
+        self.pitch_stability += metrics.pitch_stability as f64 * weight;
+        self.coarticulation_smoothness += metrics.coarticulation_smoothness as f64 * weight;
+        self.listener_prediction += metrics.listener_prediction as f64 * weight;
+        self.duration_accuracy += metrics.duration_accuracy as f64 * weight;
+        self.energy_consistency += metrics.energy_consistency as f64 * weight;
+    }
+
+    fn finish(self) -> crate::voice::voice_feedback::VoiceOutputMetrics {
+        if self.weight <= 0.0 {
+            return crate::voice::voice_feedback::VoiceOutputMetrics::default();
+        }
+        let inv = 1.0 / self.weight;
+        crate::voice::voice_feedback::VoiceOutputMetrics {
+            articulation_score: (self.articulation_score * inv) as f32,
+            formant_accuracy: (self.formant_accuracy * inv) as f32,
+            speech_rate: (self.speech_rate * inv) as f32,
+            pitch_stability: (self.pitch_stability * inv) as f32,
+            coarticulation_smoothness: (self.coarticulation_smoothness * inv) as f32,
+            listener_prediction: (self.listener_prediction * inv) as f32,
+            duration_accuracy: (self.duration_accuracy * inv) as f32,
+            energy_consistency: (self.energy_consistency * inv) as f32,
+        }
+    }
 }
 
 /// Snapshot of consciousness state needed for prosody modulation.
@@ -110,8 +208,8 @@ struct RequestState {
 /// Single-slot mailbox for synthesis requests.
 ///
 /// Producers overwrite the pending request instead of accumulating work. A
-/// currently-running synthesis may finish, but generation checks ensure its
-/// result is discarded if a newer request arrived in the meantime.
+/// currently-running phrase may finish, but generation checks ensure synthesis
+/// stops before the next phrase and no superseded result is exposed.
 #[derive(Debug)]
 struct RequestMailbox {
     state: Mutex<RequestState>,
@@ -311,24 +409,49 @@ impl VoiceSynthesisChannel {
         while let Some(queued) = mailbox.take_blocking() {
             let generation = queued.generation;
             let request = queued.request;
+            let phrases = split_voice_phrases(&request.text);
+            let mut audio = Vec::new();
+            let mut weighted_metrics = WeightedVoiceMetrics::default();
+            let mut superseded = false;
 
-            // Real formant synthesis via the low-level pipeline. The previous
-            // routing (synthesize_from_cycle_result on an uninitialized
-            // VoiceOutput) fell through to simulate_tts — a placeholder sine
-            // wave — so the loop's "voice" was never speech.
-            let (audio, metrics) = orchestrator.thought_to_speech_paced(
-                &request.text,
-                &request.cfc_output,
-                request.tau,
-                request.prediction_error,
-                request.detected_primitives.clone(),
-                request.speech_rate_multiplier,
-                request.pause_multiplier,
-            );
+            for phrase in phrases {
+                // Cooperative cancellation boundary before entering the existing
+                // synchronous renderer. This keeps stale queued work from starting.
+                if !mailbox.is_current(generation) {
+                    superseded = true;
+                    break;
+                }
 
-            if audio.is_empty() || !mailbox.is_current(generation) {
+                let (phrase_audio, phrase_metrics) = orchestrator.thought_to_speech_paced(
+                    phrase,
+                    &request.cfc_output,
+                    request.tau,
+                    request.prediction_error,
+                    request.detected_primitives.clone(),
+                    request.speech_rate_multiplier,
+                    request.pause_multiplier,
+                );
+
+                // A newer request may arrive while the renderer is inside this
+                // phrase. Never append the just-finished stale phrase in that case.
+                if !mailbox.is_current(generation) {
+                    superseded = true;
+                    break;
+                }
+
+                if !phrase_audio.is_empty() {
+                    weighted_metrics.push(&phrase_metrics, phrase_audio.len());
+                    audio.extend(phrase_audio);
+                }
+            }
+
+            // Partial audio from a superseded generation is intentionally thrown
+            // away. The consumer sees either the complete current request or none.
+            if superseded || audio.is_empty() || !mailbox.is_current(generation) {
                 continue;
             }
+
+            let metrics = weighted_metrics.finish();
 
             // Self-hearing: encode the produced audio through the native
             // acoustic ear (24kHz vocoder output → 16kHz ear input).
@@ -415,6 +538,54 @@ mod tests {
         assert!(!mailbox.is_current(first.generation));
         let second = mailbox.try_take().expect("second request should be queued");
         assert!(mailbox.is_current(second.generation));
+    }
+
+    #[test]
+    fn phrase_split_preserves_strong_boundaries() {
+        let phrases = split_voice_phrases("Hello there. How are you?! Fine\nNext line");
+        assert_eq!(
+            phrases,
+            vec!["Hello there.", "How are you?!", "Fine", "Next line"]
+        );
+    }
+
+    #[test]
+    fn single_phrase_keeps_existing_whole_request_path() {
+        let phrases = split_voice_phrases("hello world without punctuation");
+        assert_eq!(phrases, vec!["hello world without punctuation"]);
+    }
+
+    #[test]
+    fn generation_can_preempt_between_phrases() {
+        let mailbox = RequestMailbox::new();
+        assert!(mailbox.submit(request(1, "first sentence. second sentence.")));
+        let first = mailbox.try_take().expect("first request should be queued");
+        let phrases = split_voice_phrases(&first.request.text);
+        assert_eq!(phrases.len(), 2);
+        assert!(mailbox.is_current(first.generation));
+
+        assert!(mailbox.submit(request(2, "interrupt")));
+        assert!(!mailbox.is_current(first.generation));
+    }
+
+    #[test]
+    fn weighted_metrics_use_audio_length() {
+        let mut weighted = WeightedVoiceMetrics::default();
+        let short = crate::voice::voice_feedback::VoiceOutputMetrics {
+            articulation_score: 0.0,
+            speech_rate: 2.0,
+            ..Default::default()
+        };
+        let long = crate::voice::voice_feedback::VoiceOutputMetrics {
+            articulation_score: 1.0,
+            speech_rate: 4.0,
+            ..Default::default()
+        };
+        weighted.push(&short, 100);
+        weighted.push(&long, 300);
+        let metrics = weighted.finish();
+        assert!((metrics.articulation_score - 0.75).abs() < 1e-6);
+        assert!((metrics.speech_rate - 3.5).abs() < 1e-6);
     }
 
     #[test]
