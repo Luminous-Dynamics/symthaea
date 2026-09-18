@@ -7,6 +7,7 @@
 //! already-frozen C-vs-A and D-vs-C fresh evidence so a narrow incremental result
 //! cannot be mislabeled as a complete recursive-improvement chain.
 
+use super::sym_rsi_candidate_family::canonical_candidate_family_digest;
 use super::sym_rsi_dream_fresh_evaluation::{
     DreamFreshDisposition, DreamFreshEvaluationReceipt, SYM_RSI_001D_FRESH_EVALUATION_SCHEMA,
 };
@@ -113,6 +114,8 @@ fn validate_c_vs_a_receipt(
         || receipt.experiment_id != "SYM-RSI-001"
         || receipt.subject_digest.trim().is_empty()
         || receipt.environment_digest.trim().is_empty()
+        || receipt.candidate_family_digest != canonical_candidate_family_digest()
+        || receipt.incumbent_policy_id.trim().is_empty()
         || receipt.selected_policy_id.trim().is_empty()
         || receipt.holdout_gate_evidence_digest.trim().is_empty()
         || receipt.evidence_digest.trim().is_empty()
@@ -147,6 +150,10 @@ fn validate_c_vs_a_receipt(
             FreshCvsADisposition::NoCandidatePromotion | FreshCvsADisposition::BlockedByHoldout
         )
     {
+        return Err(FreshImprovementChainError::InvalidCvsAReceipt);
+    }
+
+    if recompute_c_vs_a_evidence_digest(receipt) != receipt.evidence_digest {
         return Err(FreshImprovementChainError::InvalidCvsAReceipt);
     }
     Ok(())
@@ -214,6 +221,82 @@ fn validate_consumed_c_vs_a_numeric_consistency(
         return Err(FreshImprovementChainError::InvalidCvsAReceipt);
     }
     Ok(())
+}
+
+fn recompute_c_vs_a_evidence_digest(receipt: &FreshCvsAReceipt) -> String {
+    let mut hasher = blake3::Hasher::new();
+    if receipt.fresh_seeds_consumed {
+        hasher.update(b"symthaea.sym-rsi-001.fresh-c-vs-a.v1\0");
+    } else {
+        hasher.update(b"symthaea.sym-rsi-001.fresh-c-vs-a.empty.v1\0");
+    }
+    for value in [
+        receipt.experiment_id.as_str(),
+        receipt.preregistration_digest.as_str(),
+        receipt.subject_digest.as_str(),
+        receipt.environment_digest.as_str(),
+        receipt.holdout_gate_evidence_digest.as_str(),
+        receipt.incumbent_policy_id.as_str(),
+        receipt.selected_policy_id.as_str(),
+    ] {
+        hasher.update(&(value.len() as u64).to_le_bytes());
+        hasher.update(value.as_bytes());
+    }
+
+    if receipt.fresh_seeds_consumed {
+        for pair in &receipt.pairs {
+            for value in [
+                pair.domain_id.as_str(),
+                pair.baseline.evidence_digest.as_str(),
+                pair.replay_selected.evidence_digest.as_str(),
+            ] {
+                hasher.update(&(value.len() as u64).to_le_bytes());
+                hasher.update(value.as_bytes());
+            }
+            hasher.update(&pair.seed.to_le_bytes());
+            hasher.update(&pair.contrast.quality_delta.to_bits().to_le_bytes());
+            hasher.update(&pair.contrast.evaluator_call_delta.to_le_bytes());
+        }
+        for summary in &receipt.domain_summaries {
+            hasher.update(&(summary.domain_id.len() as u64).to_le_bytes());
+            hasher.update(summary.domain_id.as_bytes());
+            hasher.update(&summary.mean_quality_delta.to_bits().to_le_bytes());
+            hasher.update(&summary.total_evaluator_call_delta.to_le_bytes());
+        }
+        hasher.update(
+            &receipt
+                .macro_quality_delta
+                .expect("validated consumed receipt has macro quality")
+                .to_bits()
+                .to_le_bytes(),
+        );
+        hasher.update(
+            &receipt
+                .total_evaluator_call_delta
+                .expect("validated consumed receipt has evaluator-call delta")
+                .to_le_bytes(),
+        );
+        hasher.update(
+            &receipt
+                .worst_domain_quality_delta
+                .expect("validated consumed receipt has worst-domain quality")
+                .to_bits()
+                .to_le_bytes(),
+        );
+    }
+    hasher.update(&[c_vs_a_disposition_tag(receipt.disposition)]);
+    format!("blake3:{}", hasher.finalize().to_hex())
+}
+
+fn c_vs_a_disposition_tag(disposition: FreshCvsADisposition) -> u8 {
+    match disposition {
+        FreshCvsADisposition::NoCandidatePromotion => 0,
+        FreshCvsADisposition::BlockedByHoldout => 1,
+        FreshCvsADisposition::PositiveUnderProtocol => 2,
+        FreshCvsADisposition::QualityNonInferiorityFailed => 3,
+        FreshCvsADisposition::NoStrictGain => 4,
+        FreshCvsADisposition::IntegrityFailure => 5,
+    }
 }
 
 fn validate_d_vs_c_token(
