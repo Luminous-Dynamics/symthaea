@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_vision_manifold::VisualObservationRef;
 
 /// What the dorsal stream found interesting — a salient region to analyze.
 #[derive(Debug, Clone)]
@@ -29,6 +30,9 @@ pub struct FoveationRequest {
     pub frame_id: u64,
     /// Timestamp (microseconds) when the saliency was detected.
     pub timestamp_us: u64,
+    /// Optional exact source observation. `None` means the caller used the legacy unproven
+    /// frame path; downstream structured evidence must fail closed rather than invent it.
+    pub source_observation: Option<VisualObservationRef>,
     /// Motion velocity at this patch [dx, dy] in pixels/frame.
     /// Used for predictive binding: when the ventral result arrives 100-200ms
     /// later, the cognitive loop compensates for object motion by projecting
@@ -55,6 +59,10 @@ pub struct FoveationResult {
     pub source_frame_id: u64,
     /// Source timestamp in microseconds (temporal binding anchor).
     pub source_timestamp_us: u64,
+    /// Exact source observation when the capture owner supplied one.
+    pub source_observation: Option<VisualObservationRef>,
+    /// What actually produced the semantic result.
+    pub execution: VentralExecutionReceipt,
     /// Processing time in microseconds.
     pub processing_time_us: u64,
     /// Motion velocity at the source patch [dx, dy] in pixels/frame.
@@ -62,6 +70,89 @@ pub struct FoveationResult {
     /// `predicted_pos = (grid_row, grid_col) + velocity * processing_time`.
     pub velocity: [f32; 2],
 }
+
+/// What actually executed in the ventral path.
+///
+/// This deliberately distinguishes high-level pipeline selection from the backend that really
+/// produced the vector. A configured "real" pipeline may still execute a deterministic model
+/// fallback when model files are absent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VentralExecutionKind {
+    /// The built-in deterministic pixel-hash + JL test backend.
+    HashStubV1,
+    /// SemanticVision ran an ONNX SigLIP session, but the exact model bytes are not pinned by
+    /// this receipt and therefore must not be treated as reproducible model identity.
+    SemanticVisionOnnxUnpinned,
+    /// SemanticVision returned its deterministic stub embedding because no ONNX session ran.
+    SemanticVisionDeterministicStub,
+    /// Recognition failed and the ventral path emitted a random/low-confidence fallback vector.
+    ErrorFallbackRandom,
+    /// Execution identity is unavailable. Downstream assurance must not infer a stronger kind.
+    Unknown,
+}
+
+/// Execution receipt attached to every foveation result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VentralExecutionReceipt {
+    pub kind: VentralExecutionKind,
+    pub routing: RoutingStrategy,
+}
+
+impl VentralExecutionReceipt {
+    pub const fn new(kind: VentralExecutionKind, routing: RoutingStrategy) -> Self {
+        Self { kind, routing }
+    }
+
+    /// True only when a learned ONNX backend actually executed.
+    ///
+    /// This still does not mean the exact model artifact was pinned.
+    pub const fn used_learned_model(self) -> bool {
+        matches!(self.kind, VentralExecutionKind::SemanticVisionOnnxUnpinned)
+    }
+
+    /// Current v1 receipts never establish exact model-byte identity.
+    pub const fn exact_model_artifact_pinned(self) -> bool {
+        false
+    }
+}
+
+/// Error when a caller tries to bind capture provenance to frame bytes whose legacy metadata
+/// disagrees with the observation reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameObservationError {
+    FrameIdMismatch {
+        frame_id: u64,
+        observation_frame_id: u64,
+    },
+    TimestampMismatch {
+        timestamp_us: u64,
+        observation_timestamp_us: u64,
+    },
+}
+
+impl std::fmt::Display for FrameObservationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FrameIdMismatch {
+                frame_id,
+                observation_frame_id,
+            } => write!(
+                f,
+                "frame id {frame_id} does not match observation frame id {observation_frame_id}"
+            ),
+            Self::TimestampMismatch {
+                timestamp_us,
+                observation_timestamp_us,
+            } => write!(
+                f,
+                "frame timestamp {timestamp_us} does not match observation timestamp {observation_timestamp_us}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for FrameObservationError {}
 
 /// What was recognized in a foveated crop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,9 +256,9 @@ pub struct FoveationTelemetry {
 pub struct FrameBuffer {
     /// Raw pixel data.
     pub pixels: Vec<u8>,
-    /// Frame width.
+    /// Frame width in pixels.
     pub width: u32,
-    /// Frame height.
+    /// Frame height in pixels.
     pub height: u32,
     /// Number of channels.
     pub channels: usize,
@@ -207,7 +298,6 @@ mod tests {
         let caption = RecognizedContent::Caption("A red stop sign".to_string());
         let unknown = RecognizedContent::Unknown;
 
-        // Verify Debug works for all variants
         assert!(!format!("{text:?}").is_empty());
         assert!(!format!("{obj:?}").is_empty());
         assert!(!format!("{caption:?}").is_empty());
@@ -239,6 +329,16 @@ mod tests {
         let back: FoveationConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(back.max_concurrent, 4);
         assert_eq!(back.routing, RoutingStrategy::Full);
+    }
+
+    #[test]
+    fn test_execution_receipt_does_not_claim_model_pin() {
+        let receipt = VentralExecutionReceipt::new(
+            VentralExecutionKind::SemanticVisionOnnxUnpinned,
+            RoutingStrategy::AlwaysEmbed,
+        );
+        assert!(receipt.used_learned_model());
+        assert!(!receipt.exact_model_artifact_pinned());
     }
 
     #[test]
