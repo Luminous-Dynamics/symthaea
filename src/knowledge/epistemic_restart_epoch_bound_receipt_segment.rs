@@ -6,6 +6,9 @@
 //! one authority epoch must be grouped and chained without constructing an
 //! operational history or exporting mutation authority.
 
+#[path = "epistemic_restart_multi_epoch_revision_chain.rs"]
+pub mod multi_epoch_history_chain;
+
 use crate::knowledge::belief_revision_receipt::BeliefRevisionReceiptId;
 use crate::knowledge::epistemic_restart_continuity::epoch_bound_receipt_data::{
     EpochBoundRevisionReceiptDataError, EpochBoundRevisionReceiptDataV2,
