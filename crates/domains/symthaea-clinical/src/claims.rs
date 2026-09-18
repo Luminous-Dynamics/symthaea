@@ -155,8 +155,7 @@ impl ClinicalClaimSemanticsV1 {
 }
 
 /// Schema errors for [`ClinicalClaimSemanticsV1`].
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case", tag = "kind")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ClinicalClaimVocabularyError {
     UnsupportedSchemaVersion { found: u16, expected: u16 },
 }
