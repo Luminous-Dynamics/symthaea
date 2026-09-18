@@ -23,8 +23,6 @@ jobs:
     env:
       EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
       EXPECTED_BASE: ${{ github.event.pull_request.base.sha || '' }}
-      EVIDENCE_DIR: ${{ runner.temp }}/de001a-a1r-evidence
-      A0_LINK: ${{ runner.temp }}/de001a-a0-artifacts
 
     steps:
       - name: Check out exact subject
@@ -33,7 +31,7 @@ jobs:
           ref: ${{ env.EXPECTED_HEAD }}
           fetch-depth: 0
 
-      - name: Bind subject identity
+      - name: Bind subject identity and runner paths
         id: subject
         shell: bash
         run: |
@@ -43,9 +41,15 @@ jobs:
           test "$head" = "$EXPECTED_HEAD"
           echo "head=$head" >> "$GITHUB_OUTPUT"
           echo "tree=$tree" >> "$GITHUB_OUTPUT"
-          mkdir -p "$EVIDENCE_DIR"
-          printf '%s\n' "$head" > "$EVIDENCE_DIR/subject-head.txt"
-          printf '%s\n' "$tree" > "$EVIDENCE_DIR/subject-tree.txt"
+
+          evidence_dir="$RUNNER_TEMP/de001a-a1r-evidence"
+          a0_link="$RUNNER_TEMP/de001a-a0-artifacts"
+          echo "EVIDENCE_DIR=$evidence_dir" >> "$GITHUB_ENV"
+          echo "A0_LINK=$a0_link" >> "$GITHUB_ENV"
+
+          mkdir -p "$evidence_dir"
+          printf '%s\n' "$head" > "$evidence_dir/subject-head.txt"
+          printf '%s\n' "$tree" > "$evidence_dir/subject-tree.txt"
 
       - name: Install Rust 1.96.0
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
