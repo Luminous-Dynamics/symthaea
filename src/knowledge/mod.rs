@@ -67,6 +67,11 @@ pub mod epistemic_restart_mutation_seal_checkpoint;
 pub mod epistemic_restart_mutation_seal_currentness;
 pub mod epistemic_restart_quarantine_facade;
 pub mod epistemic_restart_revision_audit_restoration;
+#[allow(
+    unused_imports,
+    reason = "EKM-067 keeps the split-state replay implementation isolated while CI qualification is pending"
+)]
+pub mod epistemic_restart_split_state_sandbox;
 pub mod epistemic_restart_support_hydration_eligibility;
 pub mod epistemic_restart_trust_checkpoint;
 #[allow(
