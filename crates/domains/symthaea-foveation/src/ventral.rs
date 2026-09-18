@@ -6,15 +6,22 @@
 //! Runs inside the background thread. In stub mode (default), produces
 //! deterministic hash-based embeddings for testing without model files.
 //! When real perception models are available and the `perception` feature
-//! is enabled, routes through SigLIP, OCR, and/or Moondream VQA.
+//! is enabled, routes through SemanticVision.
+//!
+//! VIS-001R records requested routing separately from the backend and operation that actually
+//! execute. This matters because SemanticVision may initialize without a SigLIP ONNX session
+//! and then return deterministic fallback embeddings.
 
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
-use crate::types::{FoveationRequest, FoveationResult, RecognizedContent, RoutingStrategy};
+use crate::types::{
+    FoveationRequest, FoveationResult, RecognizedContent, RoutingStrategy, VentralExecutionKind,
+    VentralExecutionReceipt, VentralOperation,
+};
 
 /// Ventral stream pipeline that converts pixel crops to semantic HDC vectors.
 ///
-/// Dispatches to either a stub (hash-based) or real (SigLIP-backed) backend.
+/// Dispatches to either a stub (hash-based) or feature-gated SemanticVision backend.
 #[allow(private_interfaces)]
 pub enum VentralPipeline {
     /// Hash-based stub backend (no model files required).
@@ -22,7 +29,7 @@ pub enum VentralPipeline {
         jl_projector: StubJLProjector,
         routing: RoutingStrategy,
     },
-    /// Real SigLIP-backed backend (requires `perception` feature + model files).
+    /// SemanticVision-backed backend (feature-gated).
     #[cfg(feature = "perception")]
     Real {
         inner: real::RealVentralPipeline,
@@ -33,8 +40,9 @@ pub enum VentralPipeline {
 impl VentralPipeline {
     /// Create a new ventral pipeline with the given routing strategy.
     ///
-    /// When the `perception` feature is active, attempts to initialize the real
-    /// SigLIP-backed pipeline first. Falls back to the stub pipeline on failure.
+    /// When the `perception` feature is active, attempts to initialize SemanticVision first.
+    /// Per-result execution receipts still distinguish actual ONNX inference from deterministic
+    /// fallback; initialization success alone is not a learned-model claim.
     pub fn new(routing: RoutingStrategy) -> Self {
         #[cfg(feature = "perception")]
         if let Some(pipeline) = Self::try_new_real(routing) {
@@ -42,10 +50,10 @@ impl VentralPipeline {
         }
 
         #[cfg(feature = "perception")]
-        tracing::info!("Ventral pipeline: using stub (real backend unavailable)");
+        tracing::info!("Ventral pipeline: using hash stub (SemanticVision unavailable)");
 
         #[cfg(not(feature = "perception"))]
-        tracing::info!("Ventral pipeline: using stub (perception feature disabled)");
+        tracing::info!("Ventral pipeline: using hash stub (perception feature disabled)");
 
         Self::Stub {
             jl_projector: StubJLProjector::new(HDC_DIMENSION, 42_700),
@@ -53,30 +61,27 @@ impl VentralPipeline {
         }
     }
 
-    /// Attempt to construct the real SigLIP-backed ventral pipeline.
-    /// Returns `None` if model initialization fails.
+    /// Attempt to construct the feature-gated SemanticVision pipeline.
     #[cfg(feature = "perception")]
     fn try_new_real(routing: RoutingStrategy) -> Option<Self> {
         match real::RealVentralPipeline::new() {
             Ok(real_pipeline) => {
-                tracing::info!("Ventral pipeline: using real SigLIP backend");
+                tracing::info!(
+                    "Ventral pipeline: SemanticVision initialized; per-result receipt distinguishes ONNX from deterministic fallback"
+                );
                 Some(Self::Real {
                     inner: real_pipeline,
                     routing,
                 })
             }
             Err(e) => {
-                tracing::warn!("Real ventral pipeline init failed: {e}");
+                tracing::warn!("SemanticVision ventral initialization failed: {e}");
                 None
             }
         }
     }
 
     /// Process a foveation request and return a result.
-    ///
-    /// In stub mode, produces a deterministic hash-based HDC vector
-    /// derived from the crop content. In real mode, dispatches to SigLIP.
-    /// The resulting 16,384D ContinuousHV is valid for GWT injection.
     pub fn process(&mut self, request: &FoveationRequest) -> FoveationResult {
         match self {
             Self::Stub {
@@ -84,12 +89,12 @@ impl VentralPipeline {
                 routing,
             } => process_stub(jl_projector, *routing, request),
             #[cfg(feature = "perception")]
-            Self::Real { inner, .. } => inner.process(request),
+            Self::Real { inner, routing } => inner.process(request, *routing),
         }
     }
 }
 
-/// Process a foveation request using the stub (hash-based) backend.
+/// Process a foveation request using the deterministic hash backend.
 fn process_stub(
     projector: &StubJLProjector,
     routing: RoutingStrategy,
@@ -97,12 +102,20 @@ fn process_stub(
 ) -> FoveationResult {
     let start = std::time::Instant::now();
 
-    let (semantic_hv, content, confidence) = match routing {
-        RoutingStrategy::AlwaysOcr => stub_ocr(projector, request),
-        RoutingStrategy::AlwaysCaption => stub_caption(projector, request),
-        RoutingStrategy::AlwaysEmbed => stub_embed(projector, request),
-        RoutingStrategy::Full => stub_full(projector, request),
-        RoutingStrategy::Auto => stub_auto(projector, request),
+    let (semantic_hv, content, confidence, operation) = match routing {
+        RoutingStrategy::AlwaysOcr => {
+            let (hv, content, confidence) = stub_ocr(projector, request);
+            (hv, content, confidence, VentralOperation::Ocr)
+        }
+        RoutingStrategy::AlwaysCaption => {
+            let (hv, content, confidence) = stub_caption(projector, request);
+            (hv, content, confidence, VentralOperation::Caption)
+        }
+        RoutingStrategy::AlwaysEmbed => {
+            let (hv, content, confidence) = stub_embed(projector, request);
+            (hv, content, confidence, VentralOperation::Embedding)
+        }
+        RoutingStrategy::Full | RoutingStrategy::Auto => stub_auto_with_operation(projector, request),
     };
 
     let elapsed = start.elapsed();
@@ -116,22 +129,38 @@ fn process_stub(
         grid_col: request.grid_col,
         source_frame_id: request.frame_id,
         source_timestamp_us: request.timestamp_us,
+        source_observation: request.source_observation,
+        execution: VentralExecutionReceipt::new(
+            VentralExecutionKind::HashStubV1,
+            routing,
+            operation,
+        ),
         processing_time_us: elapsed.as_micros() as u64,
         velocity: request.velocity,
     }
 }
 
-/// Stub auto-routing: uses pixel statistics to pick a "route".
+/// Stub auto-routing: uses pixel statistics to pick a route and records which route executed.
+fn stub_auto_with_operation(
+    projector: &StubJLProjector,
+    request: &FoveationRequest,
+) -> (ContinuousHV, RecognizedContent, f32, VentralOperation) {
+    if pixel_contrast(&request.crop_pixels) > 100.0 {
+        let (hv, content, confidence) = stub_ocr(projector, request);
+        (hv, content, confidence, VentralOperation::Ocr)
+    } else {
+        let (hv, content, confidence) = stub_embed(projector, request);
+        (hv, content, confidence, VentralOperation::Embedding)
+    }
+}
+
+/// Stub auto-routing compatibility helper.
 fn stub_auto(
     projector: &StubJLProjector,
     request: &FoveationRequest,
 ) -> (ContinuousHV, RecognizedContent, f32) {
-    let contrast = pixel_contrast(&request.crop_pixels);
-    if contrast > 100.0 {
-        stub_ocr(projector, request)
-    } else {
-        stub_embed(projector, request)
-    }
+    let (hv, content, confidence, _) = stub_auto_with_operation(projector, request);
+    (hv, content, confidence)
 }
 
 /// Stub OCR: returns text content based on pixel hash.
@@ -175,7 +204,7 @@ fn stub_caption(
     (hv, content, 0.3)
 }
 
-/// Stub full cascade: combines all three routes.
+/// Stub full cascade currently retains historical auto behavior.
 fn stub_full(
     projector: &StubJLProjector,
     request: &FoveationRequest,
@@ -212,10 +241,6 @@ fn pixel_hash(pixels: &[u8]) -> u64 {
 
 /// JL projector that generates deterministic HDC vectors from hash seeds
 /// or projects real model embeddings via seeded Rademacher matrix.
-///
-/// For stub mode: projects hash values to pseudo-random HDC vectors.
-/// For real mode: projects 768D/1024D model embeddings to 16,384D HDC space
-/// using a seeded Rademacher matrix (Johnson–Lindenstrauss lemma).
 pub(crate) struct StubJLProjector {
     dim: usize,
     seed: u64,
@@ -227,9 +252,6 @@ impl StubJLProjector {
     }
 
     /// Project a real model embedding (e.g. 768D SigLIP) to an HDC vector.
-    ///
-    /// Uses a seeded Rademacher matrix (±1 entries via xorshift) to project
-    /// the embedding to `self.dim` dimensions. O(dim × emb_len).
     #[allow(dead_code)]
     pub(crate) fn project_embedding(&self, embedding: &[f32]) -> ContinuousHV {
         if embedding.is_empty() {
@@ -280,19 +302,18 @@ mod real {
     use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
     use symthaea_perception::semantic_vision::SemanticVision;
 
-    use crate::types::{FoveationRequest, FoveationResult, RecognizedContent};
+    use crate::types::{
+        FoveationRequest, FoveationResult, RecognizedContent, RoutingStrategy,
+        VentralExecutionKind, VentralExecutionReceipt, VentralOperation,
+    };
 
-    /// Real ventral pipeline backed by SigLIP/OCR/Moondream models.
-    ///
-    /// Uses `SemanticVision` for 768D SigLIP embeddings, then projects to
-    /// 16,384D HDC space via a seeded Rademacher JL projector.
+    /// Feature-gated SemanticVision ventral pipeline.
     pub struct RealVentralPipeline {
         vision: SemanticVision,
         projector: super::StubJLProjector,
     }
 
     impl RealVentralPipeline {
-        /// Create a new real ventral pipeline. Initializes the SemanticVision model.
         pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
             let mut vision = SemanticVision::new(1000);
             vision.initialize()?;
@@ -302,21 +323,35 @@ mod real {
             })
         }
 
-        /// Process a foveation request using real perception models.
-        pub fn process(&mut self, request: &FoveationRequest) -> FoveationResult {
+        /// Current archived integration always invokes `embed_image`.
+        ///
+        /// The receipt therefore reports the actual operation as `Embedding`, even when another
+        /// route was requested. This records the implementation gap instead of presenting
+        /// requested routing as execution fact.
+        pub fn process(
+            &mut self,
+            request: &FoveationRequest,
+            requested_routing: RoutingStrategy,
+        ) -> FoveationResult {
             let start = std::time::Instant::now();
+            let using_onnx = self.vision.is_using_onnx();
 
-            let (content, confidence, semantic_hv) =
+            let (content, confidence, semantic_hv, kind, operation) =
                 if let Some(image) = Self::pixels_to_image(request) {
                     match self.vision.embed_image(&image) {
                         Ok(embedding) => {
                             let raw = embedding.vector.as_slice();
                             let hv = self.projector.project_embedding(raw);
                             let content = RecognizedContent::Object {
-                                label: "real_embed".to_string(),
+                                label: "semantic_embedding".to_string(),
                                 embedding: raw.to_vec(),
                             };
-                            (content, 0.8, hv)
+                            let kind = if using_onnx {
+                                VentralExecutionKind::SemanticVisionOnnxUnpinned
+                            } else {
+                                VentralExecutionKind::SemanticVisionDeterministicStub
+                            };
+                            (content, 0.8, hv, kind, VentralOperation::Embedding)
                         }
                         Err(_) => Self::fallback(request),
                     }
@@ -335,6 +370,8 @@ mod real {
                 grid_col: request.grid_col,
                 source_frame_id: request.frame_id,
                 source_timestamp_us: request.timestamp_us,
+                source_observation: request.source_observation,
+                execution: VentralExecutionReceipt::new(kind, requested_routing, operation),
                 processing_time_us: elapsed.as_micros() as u64,
                 velocity: request.velocity,
             }
@@ -345,16 +382,29 @@ mod real {
                 return None;
             }
             let gray = image::GrayImage::from_raw(
-                request.crop_width as u32,
-                request.crop_height as u32,
+                request.crop_width,
+                request.crop_height,
                 request.crop_pixels.clone(),
             )?;
             Some(image::DynamicImage::ImageLuma8(gray))
         }
 
-        fn fallback(request: &FoveationRequest) -> (RecognizedContent, f32, ContinuousHV) {
-            let hv = ContinuousHV::random(HDC_DIMENSION, request.id);
-            (RecognizedContent::Unknown, 0.1, hv)
+        fn fallback(
+            request: &FoveationRequest,
+        ) -> (
+            RecognizedContent,
+            f32,
+            ContinuousHV,
+            VentralExecutionKind,
+            VentralOperation,
+        ) {
+            (
+                RecognizedContent::Unknown,
+                0.1,
+                ContinuousHV::random(HDC_DIMENSION, request.id),
+                VentralExecutionKind::ErrorFallbackRandom,
+                VentralOperation::Fallback,
+            )
         }
     }
 }
@@ -375,6 +425,7 @@ mod tests {
             surprise_value: 0.8,
             frame_id: 100,
             timestamp_us: 50_000,
+            source_observation: None,
             velocity: [0.0, 0.0],
         }
     }
@@ -393,6 +444,8 @@ mod tests {
         assert_eq!(result.grid_row, 2);
         assert_eq!(result.grid_col, 3);
         assert_eq!(result.source_frame_id, 100);
+        assert_eq!(result.execution.kind, VentralExecutionKind::HashStubV1);
+        assert_eq!(result.execution.operation, VentralOperation::Embedding);
     }
 
     #[test]
@@ -406,6 +459,7 @@ mod tests {
             other => panic!("Expected Text, got {other:?}"),
         }
         assert_eq!(result.semantic_hv.dim(), HDC_DIMENSION);
+        assert_eq!(result.execution.operation, VentralOperation::Ocr);
     }
 
     #[test]
@@ -421,6 +475,7 @@ mod tests {
             }
             other => panic!("Expected Object, got {other:?}"),
         }
+        assert_eq!(result.execution.operation, VentralOperation::Embedding);
     }
 
     #[test]
@@ -433,6 +488,7 @@ mod tests {
             RecognizedContent::Caption(s) => assert!(s.contains("region at")),
             other => panic!("Expected Caption, got {other:?}"),
         }
+        assert_eq!(result.execution.operation, VentralOperation::Caption);
     }
 
     #[test]
@@ -443,6 +499,7 @@ mod tests {
 
         assert_eq!(result.semantic_hv.dim(), HDC_DIMENSION);
         assert!(result.confidence >= 0.0);
+        assert_eq!(result.execution.requested_routing, RoutingStrategy::Full);
     }
 
     #[test]
@@ -501,6 +558,7 @@ mod tests {
             RecognizedContent::Text(_) => {}
             other => panic!("High contrast should route to Text, got {other:?}"),
         }
+        assert_eq!(result.execution.operation, VentralOperation::Ocr);
     }
 
     #[test]
@@ -514,6 +572,7 @@ mod tests {
             RecognizedContent::Object { .. } => {}
             other => panic!("Low contrast should route to Object, got {other:?}"),
         }
+        assert_eq!(result.execution.operation, VentralOperation::Embedding);
     }
 
     #[test]
@@ -629,5 +688,40 @@ mod tests {
         let hv = proj.project_embedding(&[]);
         assert_eq!(hv.dim(), HDC_DIMENSION);
         assert!(hv.norm() < 1e-6);
+    }
+
+    #[test]
+    fn test_source_observation_passthrough() {
+        use symthaea_vision_manifold::{VisualCaptureClock, VisualObservationRef, VisualStreamRef};
+
+        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
+        let mut req = make_request(60, vec![128; 64]);
+        let observation = VisualObservationRef::new(
+            VisualStreamRef::new(9, 3).unwrap(),
+            req.frame_id,
+            req.timestamp_us,
+            VisualCaptureClock::StreamMonotonic,
+        );
+        req.source_observation = Some(observation);
+        let result = pipeline.process(&req);
+        assert_eq!(result.source_observation, Some(observation));
+    }
+
+    #[test]
+    fn test_default_backend_does_not_claim_learned_model() {
+        let mut pipeline = VentralPipeline::new(RoutingStrategy::AlwaysEmbed);
+        let result = pipeline.process(&make_request(61, vec![128; 64]));
+        assert_eq!(result.execution.kind, VentralExecutionKind::HashStubV1);
+        assert!(!result.execution.used_learned_model());
+        assert!(!result.execution.exact_model_artifact_pinned());
+    }
+
+    #[test]
+    fn test_stub_full_compatibility_helper() {
+        let projector = StubJLProjector::new(HDC_DIMENSION, 42);
+        let request = make_request(62, vec![128; 64]);
+        let (hv, _, confidence) = stub_full(&projector, &request);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+        assert!(confidence >= 0.0);
     }
 }

@@ -1,0 +1,31 @@
+name: VIS-001R Structured Foveation Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-foveation/**'
+      - 'crates/domains/symthaea-vision-manifold/**'
+      - 'docs/architecture/STRUCTURED_FOVEATION_EVIDENCE_V2.md'
+      - '.github/workflows/vis-001r-structured-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check vision provenance and foveation
+        run: cargo check -p symthaea-vision-manifold -p symthaea-foveation --all-targets
+      - name: Test vision provenance and foveation
+        run: cargo test -p symthaea-vision-manifold -p symthaea-foveation
+      - name: Clippy vision provenance and foveation
+        run: cargo clippy -p symthaea-vision-manifold -p symthaea-foveation --all-targets -- -D warnings

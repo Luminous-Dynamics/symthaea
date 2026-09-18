@@ -5,6 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
+use symthaea_vision_manifold::VisualObservationRef;
 
 /// What the dorsal stream found interesting — a salient region to analyze.
 #[derive(Debug, Clone)]
@@ -29,10 +30,14 @@ pub struct FoveationRequest {
     pub frame_id: u64,
     /// Timestamp (microseconds) when the saliency was detected.
     pub timestamp_us: u64,
+    /// Exact source observation when supplied by the capture owner.
+    ///
+    /// `None` means the compatibility frame path was used. Downstream structured evidence must
+    /// not reconstruct or invent a source identity after recognition.
+    pub source_observation: Option<VisualObservationRef>,
     /// Motion velocity at this patch [dx, dy] in pixels/frame.
-    /// Used for predictive binding: when the ventral result arrives 100-200ms
-    /// later, the cognitive loop compensates for object motion by projecting
-    /// the semantic HV to the predicted current position.
+    /// Used for predictive binding: when the ventral result arrives later, the cognitive loop
+    /// can compensate for source-patch motion.
     pub velocity: [f32; 2],
 }
 
@@ -55,13 +60,115 @@ pub struct FoveationResult {
     pub source_frame_id: u64,
     /// Source timestamp in microseconds (temporal binding anchor).
     pub source_timestamp_us: u64,
+    /// Exact capture-owner provenance, when supplied at the frame boundary.
+    pub source_observation: Option<VisualObservationRef>,
+    /// What semantic backend and operation actually produced this result.
+    pub execution: VentralExecutionReceipt,
     /// Processing time in microseconds.
     pub processing_time_us: u64,
     /// Motion velocity at the source patch [dx, dy] in pixels/frame.
-    /// The cognitive loop uses this to compute predicted current position:
-    /// `predicted_pos = (grid_row, grid_col) + velocity * processing_time`.
     pub velocity: [f32; 2],
 }
+
+/// Backend that actually produced a ventral result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VentralExecutionKind {
+    /// Built-in deterministic pixel-hash + JL test backend.
+    HashStubV1,
+    /// SemanticVision executed an ONNX SigLIP session, but exact model bytes are not pinned.
+    SemanticVisionOnnxUnpinned,
+    /// SemanticVision returned its deterministic fallback embedding because no ONNX session ran.
+    SemanticVisionDeterministicStub,
+    /// Recognition failed and a random low-confidence fallback vector was emitted.
+    ErrorFallbackRandom,
+    /// Execution identity is unavailable. Consumers must not infer a stronger kind.
+    Unknown,
+}
+
+/// Semantic operation that actually ran, independently of requested routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum VentralOperation {
+    Ocr,
+    Embedding,
+    Caption,
+    Fallback,
+    Unknown,
+}
+
+/// Execution receipt attached to every foveation result.
+///
+/// `requested_routing` is configuration intent. `operation` and `kind` are execution facts.
+/// They are deliberately separate because a backend may degrade or execute a different
+/// operation than was requested.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VentralExecutionReceipt {
+    pub kind: VentralExecutionKind,
+    pub requested_routing: RoutingStrategy,
+    pub operation: VentralOperation,
+}
+
+impl VentralExecutionReceipt {
+    pub const fn new(
+        kind: VentralExecutionKind,
+        requested_routing: RoutingStrategy,
+        operation: VentralOperation,
+    ) -> Self {
+        Self {
+            kind,
+            requested_routing,
+            operation,
+        }
+    }
+
+    /// True only when an ONNX learned backend actually executed.
+    /// This still does not establish exact model artifact identity.
+    pub const fn used_learned_model(self) -> bool {
+        matches!(self.kind, VentralExecutionKind::SemanticVisionOnnxUnpinned)
+    }
+
+    /// Current v1 execution receipts intentionally do not pin exact model bytes.
+    pub const fn exact_model_artifact_pinned(self) -> bool {
+        false
+    }
+}
+
+/// Error when capture provenance disagrees with the framebuffer it is intended to identify.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameObservationError {
+    FrameIdMismatch {
+        frame_id: u64,
+        observation_frame_id: u64,
+    },
+    TimestampMismatch {
+        timestamp_us: u64,
+        observation_timestamp_us: u64,
+    },
+}
+
+impl std::fmt::Display for FrameObservationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::FrameIdMismatch {
+                frame_id,
+                observation_frame_id,
+            } => write!(
+                f,
+                "frame id {frame_id} does not match observation frame id {observation_frame_id}"
+            ),
+            Self::TimestampMismatch {
+                timestamp_us,
+                observation_timestamp_us,
+            } => write!(
+                f,
+                "frame timestamp {timestamp_us} does not match observation timestamp {observation_timestamp_us}"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for FrameObservationError {}
 
 /// What was recognized in a foveated crop.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +179,7 @@ pub enum RecognizedContent {
     Object { label: String, embedding: Vec<f32> },
     /// Visual question answering caption.
     Caption(String),
-    /// Below confidence threshold or stub mode.
+    /// Below confidence threshold or stub/fallback mode.
     Unknown,
 }
 
@@ -89,7 +196,7 @@ pub struct FoveationConfig {
     pub cooldown_ms: u64,
     /// Maximum crop size in pixels before downscaling (default: 384*384).
     pub max_crop_pixels: usize,
-    /// How to decide which ventral model to use.
+    /// How the caller requests the ventral system to route crop analysis.
     pub routing: RoutingStrategy,
 }
 
@@ -106,19 +213,22 @@ impl Default for FoveationConfig {
     }
 }
 
-/// How the ventral pipeline routes crop analysis.
+/// How the caller requests crop analysis to be routed.
+///
+/// This is intent, not execution evidence. Consult `VentralExecutionReceipt` on the result for
+/// what actually ran.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RoutingStrategy {
     /// Heuristic: text-like → OCR, objects → embed, fallback → VQA.
     #[default]
     Auto,
-    /// SigLIP embedding only (fastest, ~100ms).
+    /// Embedding only.
     AlwaysEmbed,
-    /// OCR only (text-focused).
+    /// OCR only.
     AlwaysOcr,
-    /// Moondream VQA only (most descriptive).
+    /// Caption/VQA only.
     AlwaysCaption,
-    /// SigLIP + OCR + VQA cascade (most comprehensive, ~300ms).
+    /// Requested comprehensive cascade.
     Full,
 }
 
@@ -207,7 +317,6 @@ mod tests {
         let caption = RecognizedContent::Caption("A red stop sign".to_string());
         let unknown = RecognizedContent::Unknown;
 
-        // Verify Debug works for all variants
         assert!(!format!("{text:?}").is_empty());
         assert!(!format!("{obj:?}").is_empty());
         assert!(!format!("{caption:?}").is_empty());
@@ -280,5 +389,29 @@ mod tests {
         };
         assert_eq!(fb.pixels.len(), 64 * 64 * 3);
         assert_eq!(fb.frame_id, 42);
+    }
+
+    #[test]
+    fn execution_receipt_separates_requested_route_from_actual_operation() {
+        let receipt = VentralExecutionReceipt::new(
+            VentralExecutionKind::SemanticVisionOnnxUnpinned,
+            RoutingStrategy::AlwaysCaption,
+            VentralOperation::Embedding,
+        );
+        assert_eq!(receipt.requested_routing, RoutingStrategy::AlwaysCaption);
+        assert_eq!(receipt.operation, VentralOperation::Embedding);
+        assert!(receipt.used_learned_model());
+        assert!(!receipt.exact_model_artifact_pinned());
+    }
+
+    #[test]
+    fn deterministic_stub_is_not_a_learned_model() {
+        let receipt = VentralExecutionReceipt::new(
+            VentralExecutionKind::SemanticVisionDeterministicStub,
+            RoutingStrategy::AlwaysEmbed,
+            VentralOperation::Embedding,
+        );
+        assert!(!receipt.used_learned_model());
+        assert!(!receipt.exact_model_artifact_pinned());
     }
 }

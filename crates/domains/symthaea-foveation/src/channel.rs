@@ -95,7 +95,8 @@ impl FoveationChannel {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::FoveationConfig;
+    use crate::types::{FoveationConfig, VentralExecutionKind};
+    use symthaea_vision_manifold::{VisualCaptureClock, VisualObservationRef, VisualStreamRef};
 
     fn make_request(id: u64) -> FoveationRequest {
         FoveationRequest {
@@ -109,6 +110,7 @@ mod tests {
             surprise_value: 0.7,
             frame_id: 42,
             timestamp_us: 10_000,
+            source_observation: None,
             velocity: [0.0, 0.0],
         }
     }
@@ -123,6 +125,7 @@ mod tests {
         assert_eq!(result.request_id, 1);
         assert_eq!(result.semantic_hv.dim(), 16_384);
         assert!(result.semantic_hv.norm() > 0.0);
+        assert_eq!(result.execution.kind, VentralExecutionKind::HashStubV1);
     }
 
     #[test]
@@ -201,7 +204,6 @@ mod tests {
 
         // Give thread a moment to notice disconnect
         std::thread::sleep(std::time::Duration::from_millis(50));
-        // If we get here without hanging, the thread exited cleanly
     }
 
     #[test]
@@ -234,6 +236,23 @@ mod tests {
             let channel = FoveationChannel::spawn_with_capacity(routing, 4);
             let result = channel.request_blocking(make_request(1)).unwrap();
             assert_eq!(result.semantic_hv.dim(), 16_384, "Failed for {routing:?}");
+            assert_eq!(result.execution.requested_routing, routing);
         }
+    }
+
+    #[test]
+    fn test_channel_preserves_capture_provenance() {
+        let channel = FoveationChannel::spawn(&FoveationConfig::default());
+        let mut req = make_request(77);
+        let observation = VisualObservationRef::new(
+            VisualStreamRef::new(5, 6).unwrap(),
+            req.frame_id,
+            req.timestamp_us,
+            VisualCaptureClock::StreamMonotonic,
+        );
+        req.source_observation = Some(observation);
+
+        let result = channel.request_blocking(req).unwrap();
+        assert_eq!(result.source_observation, Some(observation));
     }
 }
