@@ -37,3 +37,7 @@ path = "src/a1q_bundle.rs"
 [[bin]]
 name = "de001a-a1c-contract"
 path = "src/a1c_contract.rs"
+
+[[bin]]
+name = "de001a-a1e-environment"
+path = "src/a1e_environment.rs"
