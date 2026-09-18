@@ -7,6 +7,11 @@
 //! what they physically accept; this adapter performs the conversion rather than
 //! allowing the same vector to silently mean torque in one simulator and joint
 //! position in another.
+//!
+//! [`PhysicalActuationCommand`] binds the numeric vector to its physical mode.
+//! The legacy [`HumanoidCommand`] compatibility view remains available while
+//! simulators/backends migrate, but claim-bearing boundaries should consume the
+//! typed command so numeric equality cannot erase torque-vs-position semantics.
 
 use crate::morphology::HumanoidMorphology;
 use crate::types::{ActuationMode, HumanoidCommand, HumanoidState};
@@ -16,10 +21,77 @@ pub enum ActuationAdaptationError {
     ActuatorCount { expected: usize, actual: usize },
     StateCount { expected: usize, actual: usize },
     NonFiniteValue { index: usize },
+    NormalizedValueOutOfRange { index: usize },
+}
+
+/// Backend-facing actuation values with their physical interpretation bound.
+///
+/// `values` deliberately does not use a torque-specific field name: the same
+/// carrier can represent normalized torque, physical torque, normalized joint
+/// position, or absolute joint position, but the accompanying mode is part of
+/// the command identity and validation contract.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PhysicalActuationCommand {
+    pub mode: ActuationMode,
+    pub values: Vec<f32>,
+}
+
+impl PhysicalActuationCommand {
+    pub fn new(
+        mode: ActuationMode,
+        values: Vec<f32>,
+        expected_actuators: usize,
+    ) -> Result<Self, ActuationAdaptationError> {
+        let command = Self { mode, values };
+        command.validate_for(expected_actuators)?;
+        Ok(command)
+    }
+
+    pub fn validate_for(&self, expected_actuators: usize) -> Result<(), ActuationAdaptationError> {
+        if self.values.len() != expected_actuators {
+            return Err(ActuationAdaptationError::ActuatorCount {
+                expected: expected_actuators,
+                actual: self.values.len(),
+            });
+        }
+        let normalized = matches!(
+            self.mode,
+            ActuationMode::NormalizedTorque | ActuationMode::NormalizedPosition
+        );
+        for (index, value) in self.values.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(ActuationAdaptationError::NonFiniteValue { index });
+            }
+            if normalized && !(-1.0..=1.0).contains(&value) {
+                return Err(ActuationAdaptationError::NormalizedValueOutOfRange { index });
+            }
+        }
+        Ok(())
+    }
+
+    pub fn num_actuators(&self) -> usize {
+        self.values.len()
+    }
+
+    /// Explicit compatibility projection for legacy simulator/backend APIs.
+    ///
+    /// The returned `HumanoidCommand` carries only numbers; callers must retain
+    /// `self.mode` separately. New physical boundaries should prefer this typed
+    /// command directly rather than treating the compatibility vector as a
+    /// semantically complete actuation record.
+    pub fn legacy_vector(&self) -> HumanoidCommand {
+        HumanoidCommand {
+            torques: self.values.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct ActuationAdaptation {
+    /// Typed backend-facing command. This is the claim-bearing representation.
+    pub physical_command: PhysicalActuationCommand,
+    /// Compatibility vector for existing simulator/backend APIs. Its physical
+    /// meaning is `physical_command.mode`; the field name does not redefine it.
     pub command: HumanoidCommand,
     pub source_mode: ActuationMode,
     pub target_mode: ActuationMode,
@@ -110,8 +182,11 @@ impl ActuationAdapter {
             }
         }
 
+        let physical_command = PhysicalActuationCommand::new(target_mode, output, n)?;
+        let command = physical_command.legacy_vector();
         Ok(ActuationAdaptation {
-            command: HumanoidCommand { torques: output },
+            physical_command,
+            command,
             source_mode: ActuationMode::NormalizedTorque,
             target_mode,
             clipped_joints,
@@ -122,6 +197,36 @@ impl ActuationAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn physical_mode_is_part_of_command_identity() {
+        let torque = PhysicalActuationCommand::new(
+            ActuationMode::NormalizedTorque,
+            vec![0.25; 21],
+            21,
+        )
+        .unwrap();
+        let position = PhysicalActuationCommand::new(
+            ActuationMode::NormalizedPosition,
+            vec![0.25; 21],
+            21,
+        )
+        .unwrap();
+        assert_ne!(torque, position);
+    }
+
+    #[test]
+    fn normalized_physical_command_rejects_out_of_range_values() {
+        let result = PhysicalActuationCommand::new(
+            ActuationMode::NormalizedPosition,
+            vec![1.5; 21],
+            21,
+        );
+        assert!(matches!(
+            result,
+            Err(ActuationAdaptationError::NormalizedValueOutOfRange { .. })
+        ));
+    }
 
     #[test]
     fn torque_backend_preserves_normalized_intent() {
@@ -137,6 +242,8 @@ mod tests {
             )
             .unwrap();
         assert_eq!(adapted.command.torques, intent.torques);
+        assert_eq!(adapted.physical_command.mode, ActuationMode::NormalizedTorque);
+        assert_eq!(adapted.physical_command.values, intent.torques);
     }
 
     #[test]
@@ -154,6 +261,11 @@ mod tests {
                 ActuationMode::PositionTargetRadians,
             )
             .unwrap();
+        assert_eq!(
+            adapted.physical_command.mode,
+            ActuationMode::PositionTargetRadians
+        );
+        assert!((adapted.physical_command.values[0] - 0.05).abs() < 1.0e-6);
         assert!((adapted.command.torques[0] - 0.05).abs() < 1.0e-6);
     }
 
@@ -170,6 +282,11 @@ mod tests {
                 ActuationMode::TorqueNewtonMetres,
             )
             .unwrap();
+        assert_eq!(
+            adapted.physical_command.mode,
+            ActuationMode::TorqueNewtonMetres
+        );
+        assert!((adapted.physical_command.values[0] - 50.0).abs() < 1.0e-6);
         assert!((adapted.command.torques[0] - 50.0).abs() < 1.0e-6);
     }
 }
