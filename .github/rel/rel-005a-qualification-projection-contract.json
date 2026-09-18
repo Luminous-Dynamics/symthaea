@@ -1,0 +1,49 @@
+{
+  "schema": "symthaea.rel.qualification-projection-contract.v1",
+  "authority": "EvidenceProjectionContractOnly",
+  "relation": "REL-005A",
+  "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+  "input_authorities": [
+    "PredicateContractOnly",
+    "ExecutionOnly",
+    "ObservationSeal",
+    "ComparisonOnly"
+  ],
+  "output_files": [
+    "predicate-contract-receipt.json",
+    "execution-v3-receipt.json",
+    "observation-seal-v3.json",
+    "comparison-only-qualification-receipt.json",
+    "qualification-input-manifest.json"
+  ],
+  "comparison_projection_fields": [
+    "schema",
+    "authority",
+    "predicate_contract_head",
+    "execution_subject_head",
+    "frozen_scientific_subject",
+    "frozen_test_blob",
+    "observation_sha256",
+    "seal_chain_commitment_sha256",
+    "predicate_count",
+    "passed_count",
+    "failed_count",
+    "failed_predicate_ids",
+    "comparison_result",
+    "claims",
+    "full_comparison_sha256"
+  ],
+  "forbidden_output_material": [
+    "raw ExecutionOnly observation",
+    "execution stdout/stderr",
+    "per-predicate observed values",
+    "per-predicate expected values",
+    "scientific threshold table",
+    "detailed predicates array"
+  ],
+  "projection_principle": "Preserve only authority identities, commitments, aggregate counts, failed predicate identifiers, adjudication result, and claims required by QualificationOnly. Scientific metric values are intentionally non-recoverable from the projected bundle."
+}
