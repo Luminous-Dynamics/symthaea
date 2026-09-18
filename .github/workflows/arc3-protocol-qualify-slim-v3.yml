@@ -138,7 +138,8 @@ jobs:
           test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
           test -z "$(git -C subject status --porcelain=v1 --untracked-files=no)"
 
-      - name: Emit candidate qualification provenance
+      - name: Emit candidate qualification receipt
+        id: receipt
         if: success()
         shell: bash
         env:
@@ -154,8 +155,9 @@ jobs:
           oracle_sha256="$(sha256sum subject/scripts/arc3_protocol_oracle.py | awk '{print $1}')"
           fixture_sha256="$(sha256sum subject/docs/arc-agi-3/fixtures/protocol-v1-observation.json | awk '{print $1}')"
           vector_sha256="$(sha256sum subject/docs/arc-agi-3/fixtures/protocol-v1-observation.hex | awk '{print $1}')"
+          receipt="$RUNNER_TEMP/arc3-protocol-slim-v3-candidate-receipt.txt"
 
-          cat <<EOF
+          cat > "$receipt" <<EOF
           schema=symthaea.arc3.protocol.hosted-slim-v3.candidate.v1
           result=CANDIDATE_PASS
           repository=$GITHUB_REPOSITORY
@@ -184,6 +186,15 @@ jobs:
           subject_immutable=PASS
           EOF
 
+          receipt_sha256="$(sha256sum "$receipt" | awk '{print $1}')"
+          receipt_bytes="$(wc -c < "$receipt" | tr -d '[:space:]')"
+          echo "receipt_sha256=$receipt_sha256" >> "$GITHUB_OUTPUT"
+          echo "receipt_bytes=$receipt_bytes" >> "$GITHUB_OUTPUT"
+
+          cat "$receipt"
+          printf 'candidate_receipt_sha256=%s\n' "$receipt_sha256"
+          printf 'candidate_receipt_bytes=%s\n' "$receipt_bytes"
+
           {
             echo '## ARC3 hosted-slim-v3 candidate qualification: PASS'
             echo
@@ -192,6 +203,17 @@ jobs:
             echo "- Recipe head: \`$helper_sha\`"
             echo "- Workflow blob: \`$workflow_blob\`"
             echo "- Cargo.lock SHA-256: \`$lock_sha256\`"
+            echo "- Candidate receipt SHA-256: \`$receipt_sha256\`"
+            echo "- Candidate receipt bytes: \`$receipt_bytes\`"
             echo
             echo 'Candidate evidence only. Trusted ARC3-001 still requires ARC3-QUAL-001 recipe admission.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload candidate qualification receipt
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arc3-protocol-slim-v3-candidate-${{ steps.bind.outputs.subject_sha }}
+          path: ${{ runner.temp }}/arc3-protocol-slim-v3-candidate-receipt.txt
+          if-no-files-found: error
+          retention-days: 30
