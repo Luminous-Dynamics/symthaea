@@ -329,6 +329,10 @@ pub mod unified_ltc;
 // HDC-LTC Unified Network Bridge (alternative to CfC)
 pub mod hdc_ltc_bridge;
 
+// Persistent mathematical proof-search working memory.
+// Proof authority remains distinct from exploratory admission.
+pub mod proof_state;
+
 // Cross-environment transport and localization policy
 pub mod domain;
 
