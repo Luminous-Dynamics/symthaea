@@ -1,0 +1,8 @@
+[package]
+name = "symthaea-regenerative-resilience"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Deterministic, authority-free compound-shock modeling primitives for Symthaea REGEN resilience analysis."
+
+[dependencies]
