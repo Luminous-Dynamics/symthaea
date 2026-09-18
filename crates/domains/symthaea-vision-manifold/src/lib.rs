@@ -33,6 +33,7 @@ pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
 pub mod encoder;
+pub mod entity_identity;
 pub mod epistemic;
 pub mod manifold;
 pub mod predictive;
@@ -91,6 +92,11 @@ pub use checkpoint::{
     with_checkpoint_writer_lock, write_checkpoint_atomic, write_checkpoint_atomic_report,
 };
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder, StereoDepthEstimate};
+pub use entity_identity::{
+    EntityAssociation, EntityAssociationKind, EntityIdentityError, EntityIdentityLevel,
+    EntityReference, ExternalEntityAssertionRef, ObservationEntityRef, VisualEntityHypothesisRef,
+    VisualTrackRef,
+};
 pub use epistemic::{
     VisualCaptureClock, VisualEvidence, VisualEvidenceError, VisualObservationError,
     VisualObservationRef, VisualOrigin, VisualStreamRef,
