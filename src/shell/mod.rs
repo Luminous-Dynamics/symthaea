@@ -24,6 +24,7 @@ pub mod context;
 pub mod epistemic_overlay;
 pub mod error_explainer;
 pub mod flake_context;
+pub mod ipc_adapter;
 pub mod ipc_client;
 pub mod ipc_connection;
 pub mod ipc_duplex;
@@ -63,6 +64,7 @@ pub use epistemic_overlay::{
 };
 pub use error_explainer::{ErrorExplainer, ErrorExplanation, quick_error_check};
 pub use flake_context::{ContextualSuggestion, FlakeContext, SuggestionSource};
+pub use ipc_adapter::{ResponseMapContext, map_request as map_ipc_request, map_response as map_ipc_response};
 pub use ipc_client::{
     ConnectionState,
     IpcClientConfig,
