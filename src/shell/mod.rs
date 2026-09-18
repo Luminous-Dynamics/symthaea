@@ -27,6 +27,7 @@ pub mod flake_context;
 pub mod ipc_client;
 pub mod ipc_server;
 pub mod keybindings;
+pub mod metrics_view;
 pub mod notifications;
 pub mod service_state;
 pub mod syntax_highlight;
@@ -82,6 +83,7 @@ pub use ipc_server::{
     CommandExecutor, ExecutionResult, IpcServer, IpcServerConfig, MetricsProvider,
     StubCommandExecutor, StubMetricsProvider, ValidationResult,
 };
+pub use metrics_view::MetricsView;
 pub use service_state::StateManager;
 pub use undo::{ActionData, ActionType, UndoAction};
 pub use whatif::{WhatIfResult, WhatIfSimulator};
