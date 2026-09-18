@@ -6,6 +6,8 @@
 //! capability rather than a raw `ServiceMutationCommand` handle, while the owner
 //! still rejects unsupported mutation variants defensively.
 
+pub mod semantic;
+
 use std::fmt;
 
 use symthaea::Symthaea;
