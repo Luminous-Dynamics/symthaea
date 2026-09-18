@@ -63,6 +63,7 @@ pub mod world_prediction;
 // Replay-grounded recursive improvement. Measurement functions are sealed behind
 // qualification tokens; serializable receipts alone must not unlock fresh seeds.
 pub mod dream_confidence_gate;
+pub mod dream_epistemic_memory;
 pub mod dream_semantic_coordinator;
 pub mod dream_wisdom_provenance;
 pub mod epistemic_world;
