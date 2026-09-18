@@ -54,6 +54,7 @@ pub mod active_inference_bridge;
 pub mod calibration;
 pub mod calibration_analytics;
 pub mod calibration_key;
+pub mod calibration_observation;
 pub mod constraint_gate;
 pub mod domain_binding;
 pub mod dream_feedback;
@@ -89,6 +90,12 @@ pub use calibration::{
 // Versioned calibration population identity (CAL-004B)
 pub use calibration_key::{
     CalibrationIdentity, CalibrationKeyError, CalibrationKeyV1, PredictionHorizon,
+};
+
+// Exact-key calibration observations/cohorts (CAL-004C)
+pub use calibration_observation::{
+    BinaryCalibrationObservationV1, CalibrationCohortError, CalibrationCohortV1,
+    CalibrationObservationError, ProbabilityError, UnitProbability,
 };
 
 // Typed calibration-domain binding (CAL-004A)
