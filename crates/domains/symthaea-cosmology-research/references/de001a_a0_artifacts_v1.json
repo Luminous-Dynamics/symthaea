@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A0-BYTE-INTEGRITY-v1",
+  "scientific_claim": "NONE",
+  "mirror_policy": "A mirror is never authoritative by origin; it is usable only when its bytes match the frozen authoritative size and SHA-256.",
+  "artifacts": [
+    {
+      "role": "dataset-mean",
+      "authority": "CobayaSampler/bao_data@bb0c1c9009dc76d1391300e169e8df38fd1096db",
+      "locator": "desi_bao_dr2/desi_gaussian_bao_ALL_GCcomb_mean.txt",
+      "expected_size": 472,
+      "sha256": "9ac154ab583ce759c0f7eef3c978c7c70a6ead2d18774caceadf1a350a640585"
+    },
+    {
+      "role": "dataset-covariance",
+      "authority": "CobayaSampler/bao_data@bb0c1c9009dc76d1391300e169e8df38fd1096db",
+      "locator": "desi_bao_dr2/desi_gaussian_bao_ALL_GCcomb_cov.txt",
+      "expected_size": 2547,
+      "sha256": "252a143274c8a07c78694c119617d36594f6d7965d00319ca611c6ffb886e509"
+    },
+    {
+      "role": "likelihood-definition",
+      "authority": "CobayaSampler/cobaya@899f30a49f85de610dac321e91a1af50018e56aa",
+      "locator": "cobaya/likelihoods/bao/desi_dr2/desi_bao_all.yaml",
+      "expected_size": 368,
+      "sha256": "fd7e9bf2dcf5ffee90a9a30b18227f4337d6d5c1978782c63513cbe0d8280daa"
+    },
+    {
+      "role": "reference-input-configuration",
+      "authority": "DESI DR2 official SHA-256 manifest",
+      "locator": "iminuit/base/desi-bao-all/bestfit.minimize.input.yaml",
+      "expected_size": 2381,
+      "sha256": "34499cb78ecaec78db44da9f06f61cd9c9ee497dc5c541b72b48cda54091c6ef"
+    },
+    {
+      "role": "reference-expanded-configuration",
+      "authority": "DESI DR2 official SHA-256 manifest",
+      "locator": "iminuit/base/desi-bao-all/bestfit.minimize.updated.yaml",
+      "expected_size": 3969,
+      "sha256": "c4c23032d1695635aaea6eb47fabd909006ff32df0a27eadbf64b36c89f31ba1"
+    },
+    {
+      "role": "reference-minimizer-configuration",
+      "authority": "DESI DR2 official SHA-256 manifest",
+      "locator": "iminuit/base/desi-bao-all/minimizer.yaml",
+      "expected_size": 2484,
+      "sha256": "6b51048b359e4b9d646de09379ca273a8d6a1bc1b5a88f585a09d8f2e61f290c"
+    },
+    {
+      "role": "reference-bestfit-text",
+      "authority": "DESI DR2 official SHA-256 manifest",
+      "locator": "iminuit/base/desi-bao-all/bestfit.minimum.txt",
+      "expected_size": 902,
+      "sha256": "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358"
+    },
+    {
+      "role": "reference-bestfit-getdist",
+      "authority": "DESI DR2 official SHA-256 manifest",
+      "locator": "iminuit/base/desi-bao-all/bestfit.minimum",
+      "expected_size": 3940,
+      "sha256": "4f6437661facb925673155efad0f27478ce08f0bfc9f58e0bf03bddfc96c9f21"
+    }
+  ]
+}
