@@ -30,6 +30,7 @@
 
 pub mod axiom_gate; // End-to-end axiom-provenance + spec gate via symthaea-proof-audit
 pub mod bridge;
+pub mod certification; // Authenticated Lean execution → sealed mathematical evidence receipt
 pub mod fol_ext_bridge; // Phase 2: FolFormulaExt → Lean proof script w/ Mathlib
 pub mod minif2f_ingest; // Phase 4: miniF2F-v2 automated parser + translator
 pub mod runner;
