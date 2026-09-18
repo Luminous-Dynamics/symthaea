@@ -71,6 +71,7 @@ pub struct ProtectedMutationSealAdmissionV1 {
     cross_component_consistent: bool,
     protected_source_capsule_equivalent: bool,
     historical_census_completeness_protected: bool,
+    protected_checkpoint_currentness_independently_proven: bool,
     capsule_construction_authorized: bool,
     writable_hydration_authorized: bool,
     activation_authorized: bool,
@@ -212,6 +213,7 @@ impl ProtectedMutationSealAdmissionV1 {
             cross_component_consistent: true,
             protected_source_capsule_equivalent: true,
             historical_census_completeness_protected: true,
+            protected_checkpoint_currentness_independently_proven: false,
             capsule_construction_authorized: false,
             writable_hydration_authorized: false,
             activation_authorized: false,
@@ -276,6 +278,13 @@ impl ProtectedMutationSealAdmissionV1 {
     /// sidecar independently reproduces that exact capsule digest.
     pub fn historical_census_completeness_protected(&self) -> bool {
         self.historical_census_completeness_protected
+    }
+
+    /// EKM-060 establishes protected content equivalence, not that this protected
+    /// checkpoint is the latest checkpoint in the deployment. Freshness/rollback
+    /// currentness requires the separate EKM-059 continuity/protected-state story.
+    pub fn protected_checkpoint_currentness_independently_proven(&self) -> bool {
+        self.protected_checkpoint_currentness_independently_proven
     }
 
     pub fn capsule_construction_authorized(&self) -> bool {
@@ -343,6 +352,9 @@ fn digest_admission(
     hasher.update(&[u8::from(receipt.protected_source_capsule_equivalent)]);
     hasher.update(&[u8::from(
         receipt.historical_census_completeness_protected,
+    )]);
+    hasher.update(&[u8::from(
+        receipt.protected_checkpoint_currentness_independently_proven,
     )]);
     hasher.update(&[u8::from(receipt.capsule_construction_authorized)]);
     hasher.update(&[u8::from(receipt.writable_hydration_authorized)]);
