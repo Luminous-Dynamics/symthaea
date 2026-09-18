@@ -25,7 +25,7 @@
       "commit_verification": "unsigned",
       "qualification_boundary": "not-assessed",
       "source_mutation_in_qualification": false,
-      "notes": "The branch head commit message says it qualifies an exact repaired source head, but destination migration does not inherit that claim. The commit/tree distinction is explicit here: 937b... is the commit and 16c3... is its tree."
+      "notes": "The branch head commit message says it qualifies an exact repaired source head, but destination migration does not inherit that claim. The commit/tree distinction is explicit here: 937b... is the commit and 16c3... is its tree. Independent inspection confirms that host_rehydration.rs defines OS clean-host recovery/evidence contracts rather than cognitive persistence semantics."
     }
   ],
   "artifacts": [
@@ -46,7 +46,7 @@
       "id": "systemd-authority-checker",
       "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
       "source_path": "scripts/check_spore_systemd_authority.py",
-      "source_blob_sha1": "7b587682011939479d6db6d903d62f3187d6fedd",
+      "source_blob_sha1": "7b587682011939d6db6d903d62f3187d6fedd",
       "source_role": "qualification-tool",
       "authority_class": "qualification",
       "target_owner": "spore",
@@ -147,17 +147,30 @@
       "notes": "Historical transformed-candidate proof workflow. Destination qualification must exercise exact committed product bytes."
     },
     {
+      "id": "host-rehydration-contract",
+      "lineage_id": "symthaea-clean-host-rehydration-v1",
+      "source_path": "crates/domains/symthaea-spore/src/host_rehydration.rs",
+      "source_blob_sha1": "2dc33a73c02418663135527dc0ad82f5d62d2119",
+      "source_role": "product-source",
+      "authority_class": "recovery",
+      "target_owner": "spore",
+      "migration_kind": "extract",
+      "destination_path": null,
+      "destination_qualification": "required",
+      "notes": "Clean-host OS recovery/evidence contracts belong to standalone Spore. This source explicitly separates host reconstruction evidence from Symthaea cognitive checkpoint persistence and binds immutable installer/declaration identity, target identity, restore references, and post-install evidence."
+    },
+    {
       "id": "symthaea-rehydration-workflow",
       "lineage_id": "symthaea-clean-host-rehydration-v1",
       "source_path": ".github/workflows/spore-rehydration.yml",
       "source_blob_sha1": "fa8bfae9eeb4090557f35fad0ef1165465441ddf",
       "source_role": "workflow",
       "authority_class": "workflow",
-      "target_owner": "undecided",
+      "target_owner": "spore",
       "migration_kind": "reference",
       "destination_path": null,
       "destination_qualification": "required",
-      "notes": "Seed provenance only. Ownership and migration relevance should be decided after the rehydration boundary is inspected independently."
+      "notes": "Historical exact-head workflow provenance for the host-rehydration contract. The destination repository should recreate equivalent qualification over exact committed destination bytes rather than inherit this result."
     }
   ]
 }
