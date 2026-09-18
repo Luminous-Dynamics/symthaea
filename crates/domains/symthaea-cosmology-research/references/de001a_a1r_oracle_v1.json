@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A1R-RUST-ORACLE-v1",
+  "scientific_claim": "NONE",
+  "authority": "fixed-point-reproduction-sanity-only",
+  "model": "flat-lambda-cdm-bao-only-late-background",
+  "source": {
+    "statement": "DESI DR2 BAO-only fits sample Omega_m and h*r_d; this point is transcribed from the official bestfit.minimum.txt.",
+    "bestfit_role": "reference-bestfit-text",
+    "bestfit_size": 902,
+    "bestfit_sha256": "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358"
+  },
+  "data": {
+    "mean_role": "dataset-mean",
+    "mean_size": 472,
+    "mean_sha256": "9ac154ab583ce759c0f7eef3c978c7c70a6ead2d18774caceadf1a350a640585",
+    "covariance_role": "dataset-covariance",
+    "covariance_size": 2547,
+    "covariance_sha256": "252a143274c8a07c78694c119617d36594f6d7965d00319ca611c6ffb886e509",
+    "row_count": 13
+  },
+  "parameters": {
+    "omega_m": 0.29717787,
+    "h_r_d_mpc": 101.54786
+  },
+  "reference": {
+    "chi2_bao": 10.282299,
+    "absolute_tolerance": 0.01
+  },
+  "numerics": {
+    "speed_of_light_km_s": 299792.458,
+    "simpson_subdivisions": 1024
+  },
+  "independence": {
+    "measurement_data_independent": false,
+    "covariance_independent": false,
+    "background_implementation_independent": true,
+    "gaussian_likelihood_implementation_independent": true,
+    "scope": "Independent Rust FLRW-background and Gaussian-covariance evaluation over the same released DESI compressed measurement and covariance; this is not independent data reduction."
+  }
+}
