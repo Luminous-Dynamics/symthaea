@@ -13,6 +13,11 @@
 //! returns a [`RuntimeCommandTicket`]; callers may await its result without holding
 //! engine ownership or a service-wide mutex.
 //!
+//! Each admitted command carries one immutable [`OwnerCommandContext`] into the
+//! owner task. The context contains the same submission sequence exposed by the
+//! caller's ticket, allowing owner-side activity/state/event publication to be
+//! ordered around the actual mutation without a caller/owner race.
+//!
 //! Read-only UI/status traffic should eventually come from the runtime state plane,
 //! not from commands that compete with cognition. This owner core intentionally
 //! contains no snapshot/event implementation so those delivery semantics remain
@@ -54,20 +59,38 @@ impl fmt::Display for OwnerCommandSeq {
     }
 }
 
+/// Immutable metadata bound to one admitted owner command.
+///
+/// This context is created only after mailbox capacity has been reserved and is
+/// delivered through the same envelope as the command. It therefore cannot race
+/// with caller-side publication of command activity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OwnerCommandContext {
+    sequence: OwnerCommandSeq,
+}
+
+impl OwnerCommandContext {
+    pub fn sequence(self) -> OwnerCommandSeq {
+        self.sequence
+    }
+}
+
 /// Handles one admitted command while holding the only mutable engine reference.
 ///
 /// Implementations may await internally. Because the owner loop invokes this trait
 /// sequentially, no second command can concurrently mutate the same engine.
-pub trait RuntimeCommandHandler<E, C>: Send + 'static {
+pub trait RuntimeCommandHandler<E, C>: Send + 'static
+where
+    C: Send + 'static,
+{
     type Reply: Send + 'static;
 
     fn handle<'a>(
         &'a mut self,
         engine: &'a mut E,
+        context: OwnerCommandContext,
         command: C,
-    ) -> HandlerFuture<'a, Self::Reply>
-    where
-        C: 'a;
+    ) -> HandlerFuture<'a, Self::Reply>;
 }
 
 /// Invalid owner construction.
@@ -147,6 +170,7 @@ impl fmt::Display for OwnerCompletionError {
 impl std::error::Error for OwnerCompletionError {}
 
 struct CommandEnvelope<C, R> {
+    context: OwnerCommandContext,
     command: C,
     reply: oneshot::Sender<R>,
 }
@@ -200,9 +224,14 @@ impl<C, R> RuntimeOwnerHandle<C, R> {
             Ok(current) => OwnerCommandSeq(current),
             Err(_) => return Err(OwnerSubmitError::SequenceExhausted(command)),
         };
+        let context = OwnerCommandContext { sequence };
 
         let (reply, receiver) = oneshot::channel();
-        permit.send(CommandEnvelope { command, reply });
+        permit.send(CommandEnvelope {
+            context,
+            command,
+            reply,
+        });
         Ok(RuntimeCommandTicket { sequence, receiver })
     }
 }
@@ -254,7 +283,9 @@ where
         let mut commands_completed = 0_u64;
 
         while let Some(envelope) = receiver.recv().await {
-            let response = handler.handle(&mut engine, envelope.command).await;
+            let response = handler
+                .handle(&mut engine, envelope.context, envelope.command)
+                .await;
             commands_completed = commands_completed.saturating_add(1);
             // Dropping a client ticket abandons the reply, not the command.
             let _ = envelope.reply.send(response);
@@ -277,35 +308,45 @@ mod tests {
     struct AppendHandler;
 
     impl RuntimeCommandHandler<Vec<u64>, u64> for AppendHandler {
-        type Reply = (usize, Vec<u64>);
+        type Reply = (OwnerCommandSeq, usize, Vec<u64>);
 
         fn handle<'a>(
             &'a mut self,
             engine: &'a mut Vec<u64>,
+            context: OwnerCommandContext,
             command: u64,
         ) -> HandlerFuture<'a, Self::Reply> {
             Box::pin(async move {
                 engine.push(command);
-                (engine.len(), engine.clone())
+                (context.sequence(), engine.len(), engine.clone())
             })
         }
     }
 
     #[tokio::test]
-    async fn commands_mutate_one_engine_sequentially() {
+    async fn commands_mutate_one_engine_sequentially_and_receive_ticket_context() {
         let (handle, task) = spawn_runtime_owner(Vec::new(), AppendHandler, 4).unwrap();
 
         let first = handle.try_submit(10).unwrap();
         let second = handle.try_submit(20).unwrap();
         let third = handle.try_submit(30).unwrap();
 
-        assert_eq!(first.sequence().get(), 1);
-        assert_eq!(second.sequence().get(), 2);
-        assert_eq!(third.sequence().get(), 3);
+        let first_seq = first.sequence();
+        let second_seq = second.sequence();
+        let third_seq = third.sequence();
+        assert_eq!(first_seq.get(), 1);
+        assert_eq!(second_seq.get(), 2);
+        assert_eq!(third_seq.get(), 3);
 
-        assert_eq!(first.resolve().await.unwrap(), (1, vec![10]));
-        assert_eq!(second.resolve().await.unwrap(), (2, vec![10, 20]));
-        assert_eq!(third.resolve().await.unwrap(), (3, vec![10, 20, 30]));
+        assert_eq!(first.resolve().await.unwrap(), (first_seq, 1, vec![10]));
+        assert_eq!(
+            second.resolve().await.unwrap(),
+            (second_seq, 2, vec![10, 20])
+        );
+        assert_eq!(
+            third.resolve().await.unwrap(),
+            (third_seq, 3, vec![10, 20, 30])
+        );
 
         drop(handle);
         let exit = task.await.unwrap();
@@ -319,11 +360,12 @@ mod tests {
     }
 
     impl RuntimeCommandHandler<Vec<u64>, u64> for BlockingFirstHandler {
-        type Reply = usize;
+        type Reply = (OwnerCommandSeq, usize);
 
         fn handle<'a>(
             &'a mut self,
             engine: &'a mut Vec<u64>,
+            context: OwnerCommandContext,
             command: u64,
         ) -> HandlerFuture<'a, Self::Reply> {
             Box::pin(async move {
@@ -333,7 +375,7 @@ mod tests {
                     permit.forget();
                 }
                 engine.push(command);
-                engine.len()
+                (context.sequence(), engine.len())
             })
         }
     }
@@ -349,9 +391,11 @@ mod tests {
         let (handle, task) = spawn_runtime_owner(Vec::new(), handler, 1).unwrap();
 
         let first = handle.try_submit(1).unwrap();
+        let first_seq = first.sequence();
         started_rx.await.unwrap();
 
         let second = handle.try_submit(2).unwrap();
+        let second_seq = second.sequence();
         let rejected = match handle.try_submit(3) {
             Err(OwnerSubmitError::Full(command)) => command,
             Err(other) => panic!("expected full mailbox, got {other:?}"),
@@ -360,12 +404,13 @@ mod tests {
         assert_eq!(rejected, 3);
 
         gate.add_permits(1);
-        assert_eq!(first.resolve().await.unwrap(), 1);
-        assert_eq!(second.resolve().await.unwrap(), 2);
+        assert_eq!(first.resolve().await.unwrap(), (first_seq, 1));
+        assert_eq!(second.resolve().await.unwrap(), (second_seq, 2));
 
         let third = handle.try_submit(3).unwrap();
-        assert_eq!(third.sequence().get(), 3);
-        assert_eq!(third.resolve().await.unwrap(), 3);
+        let third_seq = third.sequence();
+        assert_eq!(third_seq.get(), 3);
+        assert_eq!(third.resolve().await.unwrap(), (third_seq, 3));
 
         drop(handle);
         assert_eq!(task.await.unwrap().commands_completed, 3);
@@ -378,7 +423,11 @@ mod tests {
         drop(abandoned);
 
         let observed = handle.try_submit(8).unwrap();
-        assert_eq!(observed.resolve().await.unwrap(), (2, vec![7, 8]));
+        let observed_seq = observed.sequence();
+        assert_eq!(
+            observed.resolve().await.unwrap(),
+            (observed_seq, 2, vec![7, 8])
+        );
 
         drop(handle);
         assert_eq!(task.await.unwrap().commands_completed, 2);
