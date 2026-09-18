@@ -3,15 +3,28 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Semantic context retrieval for dream/replay reasoning.
 //!
-//! Exact context hashes remain the identity/provenance key. This module adds a
-//! separate HDC similarity key for approximate retrieval only. Semantic matches
-//! carry no evidence authority and cannot by themselves promote confidence.
+//! Context memory deliberately uses three different representations for three
+//! different jobs:
+//!
+//! - a fast 64-bit hash for legacy lookup/bucketing;
+//! - a collision-resistant BLAKE3 digest for exact identity/provenance;
+//! - a deterministic HDC key for approximate semantic retrieval.
+//!
+//! None of these representations is evidence authority. Semantic matches may
+//! retrieve candidate prior contexts, but callers must resolve exact provenance
+//! through the evidence store before making empirical or confidence claims.
 
 use super::dream_feedback::hash_context;
 use symthaea_core::hdc::BinaryHV;
 
 pub const DEFAULT_SEMANTIC_LEVELS: u16 = 64;
 pub const DEFAULT_CONTEXT_CLAMP_ABS: f32 = 1.0;
+
+/// Expected Hamming similarity for unrelated binary hypervectors.
+///
+/// This is used only to normalize retrieval support. It is not a probability,
+/// evidence score, confidence value, or validation threshold.
+pub const HDC_CHANCE_SIMILARITY: f32 = 0.5;
 
 const ROLE_SALT: u64 = 0x5345_4d41_4e54_4943;
 const LEVEL_LOW_SEED: u64 = 0x4c45_5645_4c5f_4c4f;
@@ -28,12 +41,54 @@ pub enum SemanticContextError {
     InvalidSimilarityThreshold,
 }
 
+/// Exact context identity.
+///
+/// `fast_hash` preserves the historical 64-bit FNV-derived lookup key. It is not
+/// sufficient for durable identity on its own. `exact_digest` is the canonical
+/// BLAKE3 digest over little-endian `f32` bytes and is the collision-resistant
+/// identity used for deduplication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ContextIdentity {
+    pub fast_hash: u64,
+    pub exact_digest: [u8; 32],
+}
+
+impl ContextIdentity {
+    pub fn from_context(context: &[f32]) -> Result<Self, SemanticContextError> {
+        validate_context(context)?;
+        Ok(Self {
+            fast_hash: hash_context(context),
+            exact_digest: exact_context_digest(context),
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SemanticContextMatch {
-    /// Exact identity/provenance key for the indexed context.
-    pub exact_context_hash: u64,
-    /// HDC similarity only. This is not an evidence or validation score.
+    /// Collision-resistant exact identity of the indexed context.
+    pub identity: ContextIdentity,
+    /// HDC Hamming similarity in [0, 1]. This is not evidence confidence.
     pub similarity: f32,
+    /// Semantic distance = 1 - similarity.
+    pub semantic_distance: f32,
+    /// Chance-corrected retrieval weight in [0, 1].
+    ///
+    /// Unrelated binary hypervectors average around 0.5 similarity, so chance
+    /// similarity maps to zero retrieval support. This value is appropriate for
+    /// ranking or attenuating candidate priors only; it grants no epistemic authority.
+    pub retrieval_weight: f32,
+}
+
+impl SemanticContextMatch {
+    fn new(identity: ContextIdentity, similarity: f32) -> Self {
+        let similarity = similarity.clamp(0.0, 1.0);
+        Self {
+            identity,
+            similarity,
+            semantic_distance: 1.0 - similarity,
+            retrieval_weight: retrieval_weight(similarity),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,9 +132,7 @@ impl SemanticContextEncoder {
     /// Dimension-role binding prevents equal scalar values in different positions
     /// from collapsing to the same representation; bundling forms the context key.
     pub fn encode(&self, context: &[f32]) -> Result<BinaryHV, SemanticContextError> {
-        if context.is_empty() {
-            return Err(SemanticContextError::EmptyContext);
-        }
+        validate_context(context)?;
 
         let mut components = Vec::with_capacity(context.len() + 1);
         components.push(BinaryHV::random(mix64(
@@ -87,9 +140,6 @@ impl SemanticContextEncoder {
         )));
 
         for (index, &value) in context.iter().enumerate() {
-            if !value.is_finite() {
-                return Err(SemanticContextError::NonFiniteValue { index });
-            }
             let role = BinaryHV::random(mix64(ROLE_SALT ^ index as u64));
             let level = self.level_hv(value);
             components.push(role.bind(&level));
@@ -141,7 +191,7 @@ impl SemanticContextEncoder {
 
 #[derive(Clone)]
 struct SemanticContextEntry {
-    exact_context_hash: u64,
+    identity: ContextIdentity,
     semantic_key: BinaryHV,
 }
 
@@ -149,6 +199,7 @@ struct SemanticContextEntry {
 ///
 /// The index intentionally stores no evidence kind, validation token, confidence
 /// authority, or generated outcome. Retrieval produces candidate identities only.
+/// Exact deduplication uses the 256-bit digest, never the legacy 64-bit hash.
 #[derive(Clone, Default)]
 pub struct SemanticContextIndex {
     encoder: SemanticContextEncoder,
@@ -175,24 +226,47 @@ impl SemanticContextIndex {
         self.entries.is_empty()
     }
 
-    /// Insert or refresh a context. The returned key is the pre-existing exact
-    /// FNV identity used by the dream-feedback bridge, not the HDC similarity key.
-    pub fn insert(&mut self, context: &[f32]) -> Result<u64, SemanticContextError> {
-        let exact_context_hash = hash_context(context);
+    /// Insert or refresh a context.
+    ///
+    /// Deduplication is based on BLAKE3 exact identity. The 64-bit hash remains a
+    /// lookup hint only, so two contexts that collide in the fast hash cannot
+    /// overwrite each other unless they also collide in the 256-bit digest.
+    pub fn insert(&mut self, context: &[f32]) -> Result<ContextIdentity, SemanticContextError> {
+        let identity = ContextIdentity::from_context(context)?;
         let semantic_key = self.encoder.encode(context)?;
         if let Some(entry) = self
             .entries
             .iter_mut()
-            .find(|entry| entry.exact_context_hash == exact_context_hash)
+            .find(|entry| entry.identity.exact_digest == identity.exact_digest)
         {
+            entry.identity = identity;
             entry.semantic_key = semantic_key;
         } else {
             self.entries.push(SemanticContextEntry {
-                exact_context_hash,
+                identity,
                 semantic_key,
             });
         }
-        Ok(exact_context_hash)
+        Ok(identity)
+    }
+
+    /// Return whether this exact collision-resistant context identity is indexed.
+    pub fn contains_exact(&self, identity: ContextIdentity) -> bool {
+        self.entries
+            .iter()
+            .any(|entry| entry.identity == identity)
+    }
+
+    /// Return exact identities sharing a fast-hash bucket.
+    ///
+    /// Multiple results are valid and must remain distinct; callers must compare
+    /// `exact_digest` before treating any candidate as an exact match.
+    pub fn identities_for_fast_hash(&self, fast_hash: u64) -> Vec<ContextIdentity> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.identity.fast_hash == fast_hash)
+            .map(|entry| entry.identity)
+            .collect()
     }
 
     pub fn similarity(
@@ -207,8 +281,9 @@ impl SemanticContextIndex {
 
     /// Return the nearest exact context identities by semantic similarity.
     ///
-    /// No returned match is empirical evidence. Callers must resolve the exact
-    /// hash back through their own provenance/evidence store before using it for
+    /// `min_similarity` must be in the actual BinaryHV Hamming-similarity range
+    /// [0, 1]. No returned match is empirical evidence. Callers must resolve the
+    /// exact identity through their provenance/evidence store before using it for
     /// anything stronger than retrieval or hypothesis generation.
     pub fn nearest(
         &self,
@@ -216,9 +291,30 @@ impl SemanticContextIndex {
         min_similarity: f32,
         limit: usize,
     ) -> Result<Vec<SemanticContextMatch>, SemanticContextError> {
-        if !min_similarity.is_finite() || !(-1.0..=1.0).contains(&min_similarity) {
+        if !min_similarity.is_finite() || !(0.0..=1.0).contains(&min_similarity) {
             return Err(SemanticContextError::InvalidSimilarityThreshold);
         }
+        self.nearest_impl(query, Some(min_similarity), limit)
+    }
+
+    /// Return nearest contexts without applying a similarity cutoff.
+    ///
+    /// This explicit API replaces the old convention of passing a negative
+    /// threshold, which was outside BinaryHV's real similarity range.
+    pub fn nearest_unfiltered(
+        &self,
+        query: &[f32],
+        limit: usize,
+    ) -> Result<Vec<SemanticContextMatch>, SemanticContextError> {
+        self.nearest_impl(query, None, limit)
+    }
+
+    fn nearest_impl(
+        &self,
+        query: &[f32],
+        min_similarity: Option<f32>,
+        limit: usize,
+    ) -> Result<Vec<SemanticContextMatch>, SemanticContextError> {
         if limit == 0 {
             return Ok(Vec::new());
         }
@@ -229,21 +325,52 @@ impl SemanticContextIndex {
             .iter()
             .filter_map(|entry| {
                 let similarity = query_key.similarity(&entry.semantic_key);
-                (similarity >= min_similarity).then_some(SemanticContextMatch {
-                    exact_context_hash: entry.exact_context_hash,
-                    similarity,
-                })
+                if min_similarity.is_some_and(|minimum| similarity < minimum) {
+                    return None;
+                }
+                Some(SemanticContextMatch::new(entry.identity, similarity))
             })
             .collect();
         matches.sort_by(|left, right| {
             right
                 .similarity
                 .total_cmp(&left.similarity)
-                .then_with(|| left.exact_context_hash.cmp(&right.exact_context_hash))
+                .then_with(|| left.identity.exact_digest.cmp(&right.identity.exact_digest))
         });
         matches.truncate(limit);
         Ok(matches)
     }
+}
+
+fn validate_context(context: &[f32]) -> Result<(), SemanticContextError> {
+    if context.is_empty() {
+        return Err(SemanticContextError::EmptyContext);
+    }
+    for (index, value) in context.iter().enumerate() {
+        if !value.is_finite() {
+            return Err(SemanticContextError::NonFiniteValue { index });
+        }
+    }
+    Ok(())
+}
+
+/// Canonical collision-resistant digest for an exact numeric context.
+///
+/// This intentionally mirrors Symthaea's existing integrity convention: each
+/// `f32` contributes its IEEE-754 little-endian bytes to BLAKE3. The helper is
+/// local because recursive-improvement is available without the optional
+/// `integrity` feature.
+fn exact_context_digest(context: &[f32]) -> [u8; 32] {
+    let mut hasher = blake3::Hasher::new();
+    for value in context {
+        hasher.update(&value.to_le_bytes());
+    }
+    *hasher.finalize().as_bytes()
+}
+
+#[inline]
+fn retrieval_weight(similarity: f32) -> f32 {
+    ((similarity - HDC_CHANCE_SIMILARITY) / (1.0 - HDC_CHANCE_SIMILARITY)).clamp(0.0, 1.0)
 }
 
 #[inline]
@@ -266,11 +393,22 @@ mod tests {
     }
 
     #[test]
+    fn exact_identity_uses_digest_in_addition_to_fast_hash() {
+        let left = ContextIdentity::from_context(&[0.20, -0.40, 0.80]).unwrap();
+        let right = ContextIdentity::from_context(&[0.21, -0.40, 0.80]).unwrap();
+        assert_ne!(left, right);
+        assert_ne!(left.exact_digest, right.exact_digest);
+    }
+
+    #[test]
     fn tiny_float_change_keeps_semantic_similarity_while_exact_identity_changes() {
         let encoder = SemanticContextEncoder::default();
         let left = [0.20, -0.40, 0.80];
         let right = [0.21, -0.40, 0.80];
-        assert_ne!(hash_context(&left), hash_context(&right));
+        assert_ne!(
+            ContextIdentity::from_context(&left).unwrap(),
+            ContextIdentity::from_context(&right).unwrap()
+        );
         let similarity = encoder
             .encode(&left)
             .unwrap()
@@ -290,15 +428,43 @@ mod tests {
     }
 
     #[test]
-    fn nearest_returns_exact_identity_not_generated_evidence() {
+    fn nearest_returns_collision_resistant_identity_not_generated_evidence() {
         let mut index = SemanticContextIndex::default();
         let exact = index.insert(&[0.1, 0.2, 0.3]).unwrap();
         index.insert(&[-0.9, 0.8, -0.7]).unwrap();
 
-        let matches = index.nearest(&[0.11, 0.2, 0.3], -1.0, 1).unwrap();
+        let matches = index.nearest_unfiltered(&[0.11, 0.2, 0.3], 1).unwrap();
         assert_eq!(matches.len(), 1);
-        assert_eq!(matches[0].exact_context_hash, exact);
+        assert_eq!(matches[0].identity, exact);
         assert!(matches[0].similarity.is_finite());
+        assert!(matches[0].semantic_distance.is_finite());
+        assert!(matches[0].retrieval_weight.is_finite());
+    }
+
+    #[test]
+    fn exact_reinsert_deduplicates_by_digest() {
+        let mut index = SemanticContextIndex::default();
+        let identity = index.insert(&[0.3, 0.4]).unwrap();
+        assert_eq!(index.len(), 1);
+        assert_eq!(index.insert(&[0.3, 0.4]).unwrap(), identity);
+        assert_eq!(index.len(), 1);
+        assert!(index.contains_exact(identity));
+    }
+
+    #[test]
+    fn chance_similarity_has_zero_retrieval_weight() {
+        assert_eq!(retrieval_weight(HDC_CHANCE_SIMILARITY), 0.0);
+        assert_eq!(retrieval_weight(1.0), 1.0);
+        assert_eq!(retrieval_weight(0.0), 0.0);
+    }
+
+    #[test]
+    fn negative_similarity_threshold_is_rejected() {
+        let index = SemanticContextIndex::default();
+        assert_eq!(
+            index.nearest(&[0.1], -0.01, 1),
+            Err(SemanticContextError::InvalidSimilarityThreshold)
+        );
     }
 
     #[test]
@@ -307,6 +473,10 @@ mod tests {
         assert_eq!(
             encoder.encode(&[0.0, f32::NAN]),
             Err(SemanticContextError::NonFiniteValue { index: 1 })
+        );
+        assert_eq!(
+            ContextIdentity::from_context(&[f32::INFINITY]),
+            Err(SemanticContextError::NonFiniteValue { index: 0 })
         );
     }
 }
