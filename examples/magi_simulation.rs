@@ -1,446 +1,138 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! # MAGI Loop Simulation: The "Hello World" of Agency
+//! # MAGI calibration / autonomy demonstration
 //!
-//! This example demonstrates the complete MAGI Loop (Minimum AGI Loop) working
-//! as a closed cybernetic system. It proves that the epistemic engine can:
+//! This example demonstrates a narrow MAGI contract:
 //!
-//! 1. Make falsifiable predictions about the world
-//! 2. Fail and recognize failure through external resolution
-//! 3. Update calibration based on prediction errors (Brier scores)
-//! 4. Have its autonomy mechanically restricted by poor calibration
-//! 5. Recover calibration and regain autonomy
+//! 1. predictions carry falsifiable probabilities;
+//! 2. external outcomes update calibration;
+//! 3. autonomy is evaluated from matching, explicitly declared domain evidence;
+//! 4. the constraint gate returns a disposition plus reasons — not another
+//!    probability or "confidence" score;
+//! 5. later miscalibration can revoke previously earned autonomy.
 //!
-//! ## The "Toy World"
-//!
-//! We use a simple deterministic function: `f(x) = x % 2`
-//! - f(3) = 1 (odd)
-//! - f(4) = 0 (even)
-//!
-//! The system starts overconfident and must learn humility through failure.
-//!
-//! ## Running
+//! It is a deterministic toy demonstration, not evidence that a real-world
+//! deployment is calibrated or safe.
 //!
 //! ```bash
 //! cargo run --example magi_simulation --features magi_loop
 //! ```
 
-// Import MAGI Loop components
 use symthaea::consciousness::recursive_improvement::{
-    // EFE Integration (Phase 3)
-    EfeWeights,
-
-    // Constraint Gate (Phase 3.5)
-    ExecutionMode,
-
-    // World Prediction (Phase 1)
-    OutcomeCategory,
-    RiskTier,
-    // Safe Update (Phase 6)
-    SafeUpdateManager,
-    WorldActionContext,
-
-    WorldGroundedConfig,
-
-    // MAGI Integration
-    WorldGroundedSelfModel,
+    ExecutionMode, OutcomeCategory, PredictionDomain, RiskTier, WorldActionContext,
+    WorldGroundedConfig, WorldGroundedSelfModel,
 };
 
-/// The "Toy World" - a simple deterministic environment
-/// f(x) = x % 2 (returns 0 for even, 1 for odd)
-struct ToyWorld;
+fn action_for(x: i32) -> WorldActionContext {
+    WorldActionContext::new(
+        "predict_parity",
+        format!("Predict whether {x} is even"),
+    )
+    .with_risk_tier(RiskTier::Observation)
+    .with_prediction_domain(PredictionDomain::Factual)
+}
 
-impl ToyWorld {
-    fn evaluate(x: i32) -> i32 {
-        x % 2
-    }
+fn observe_prediction(
+    magi: &mut WorldGroundedSelfModel,
+    x: i32,
+    predict_even: bool,
+    probability: f64,
+) {
+    let predicted_outcome = if predict_even {
+        OutcomeCategory::Success
+    } else {
+        OutcomeCategory::SafeFailure
+    };
+    let prediction = magi.predict(
+        format!("{x} is {}", if predict_even { "even" } else { "odd" }),
+        predicted_outcome,
+        probability,
+        action_for(x),
+    );
 
-    fn is_even(x: i32) -> bool {
-        Self::evaluate(x) == 0
+    let actually_even = x % 2 == 0;
+    let actual_outcome = if actually_even {
+        OutcomeCategory::Success
+    } else {
+        OutcomeCategory::SafeFailure
+    };
+    let correct = predict_even == actually_even;
+    magi.resolve_prediction(&prediction.id, actual_outcome, 1.0);
+
+    println!(
+        "  {} x={x:>2} predicted={} p={probability:.2}",
+        if correct { "✓" } else { "✗" },
+        if predict_even { "even" } else { "odd " },
+    );
+}
+
+fn print_gate(label: &str, magi: &mut WorldGroundedSelfModel) -> ExecutionMode {
+    let decision = magi.check_execution_mode(&action_for(100));
+    println!("\n{label}");
+    println!("  mode: {:?}", decision.mode);
+    for factor in &decision.factors {
+        println!("  - {} = {} ({})", factor.name, factor.value, factor.description);
     }
+    decision.mode
 }
 
 fn main() {
-    println!("\n╔══════════════════════════════════════════════════════════════════╗");
-    println!("║         MAGI LOOP SIMULATION: Hello World of Agency             ║");
-    println!("║                                                                  ║");
-    println!("║  Proving: predict → fail → calibrate → constrain → recover      ║");
-    println!("╚══════════════════════════════════════════════════════════════════╝\n");
+    println!("MAGI calibrated-decision boundary demonstration\n");
 
-    // =========================================================================
-    // PHASE 0: Initialize the Epistemic Engine
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 0: Initializing Epistemic Engine");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    // Small thresholds make the state transition visible in a short toy run.
+    // Production/default thresholds remain unchanged.
+    let mut config = WorldGroundedConfig::default();
+    config.calibration.min_predictions_for_ece = 5;
+    config.calibration.rolling_window = 20;
+    config.constraint_gate.min_predictions_for_autonomy = 5;
+    config.constraint_gate.calibration_threshold = 0.15;
+    config.constraint_gate.min_accuracy_for_autonomy = 0.70;
+    config.constraint_gate.always_preview_state_changes = false;
 
-    // Create the World-Grounded Self Model with default config
-    let config = WorldGroundedConfig::default();
     let mut magi = WorldGroundedSelfModel::new(config);
 
-    // Create EFE weights for action evaluation
-    let efe_weights = EfeWeights {
-        pragmatic: 0.5,
-        epistemic: 0.3,
-        novelty: 0.2,
-    };
+    // No matching evidence yet: explicit domain binding alone is not enough.
+    let initial = print_gate("Initial gate", &mut magi);
+    assert!(!initial.is_autonomous());
 
-    // Create Safe Update Manager (available for production use)
-    let _update_manager = SafeUpdateManager::new();
-
-    println!("  ✓ WorldGroundedSelfModel initialized");
-    println!("  ✓ Initial state: {:?}", magi.loop_state());
-    println!(
-        "  ✓ Calibration quality: {:?}",
-        magi.loop_state().calibration_quality
-    );
-    println!();
-
-    // =========================================================================
-    // PHASE 1: The Overconfident Prediction (WILL FAIL)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 1: The Overconfident Prediction");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // Create an action context for predicting f(3)
-    let action_3 = WorldActionContext::new("predict_parity", "Predict whether f(3) returns even")
-        .with_risk_tier(RiskTier::Observation);
-
-    // System predicts f(3) is EVEN with 90% confidence (WRONG - 3 is odd!)
-    let prediction_3 = magi.predict(
-        "f(3) is even",
-        OutcomeCategory::Success, // Predicting "is_even" = true
-        0.9,                      // 90% confidence (overconfident!)
-        action_3.clone(),
-    );
-
-    println!("  Action: Predict if f(3) is even");
-    println!("  Prediction: f(3) IS even (confidence: 90%)");
-    println!("  Prediction ID: {}", prediction_3.id);
-    println!();
-
-    // Check execution mode BEFORE we know we're wrong
-    let gate_decision_before = magi.check_execution_mode(&action_3);
-    println!("  Gate Decision (before failure):");
-    println!("    Mode: {:?}", gate_decision_before.mode);
-    println!("    Confidence: {:.2}", gate_decision_before.confidence);
-    if let Some(factor) = gate_decision_before.factors.first() {
-        println!(
-            "    Primary factor: {} ({})",
-            factor.name, factor.description
-        );
-    }
-    println!();
-
-    // =========================================================================
-    // PHASE 2: Reality Check (THE FAILURE)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 2: Reality Check - The Failure");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // Actually evaluate f(3) in the toy world
-    let actual_3 = ToyWorld::evaluate(3);
-    println!("  Toy World says: f(3) = {} (odd)", actual_3);
-    println!("  System predicted: f(3) is even");
-    println!("  RESULT: ❌ PREDICTION FAILED\n");
-
-    // Resolve the prediction - f(3) is ODD, so "is_even" prediction is wrong
-    // We expected Success (even) but got SafeFailure (not even)
-    magi.resolve_prediction(
-        &prediction_3.id,
-        OutcomeCategory::SafeFailure, // Actually odd, not even
-        0.99,                         // High confidence in the resolution
-    );
-
-    // Check calibration after failure
-    let summary_after_fail = magi.calibration_summary();
-    println!("  Calibration After Failure:");
-    println!(
-        "    Total predictions: {}",
-        summary_after_fail.total_predictions
-    );
-    println!("    Overall Brier: {:.4}", summary_after_fail.global_brier);
-    println!("    Mean ECE: {:.4}", summary_after_fail.global_ece);
-    println!("    Quality: {:?}", magi.loop_state().calibration_quality);
-    println!();
-
-    // =========================================================================
-    // PHASE 3: The Gate Responds (LOCKDOWN)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 3: The Gate Responds - Autonomy Restricted");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // Check the gate again - should now be more restrictive
-    let gate_decision_after = magi.check_execution_mode(&action_3);
-    println!("  Gate Decision (after failure):");
-    println!("    Mode: {:?}", gate_decision_after.mode);
-    println!("    Confidence: {:.2}", gate_decision_after.confidence);
-    if let Some(factor) = gate_decision_after.factors.first() {
-        println!(
-            "    Primary factor: {} ({})",
-            factor.name, factor.description
-        );
-    }
-    let is_autonomous = gate_decision_after.mode.is_autonomous();
-    println!("    Autonomous: {}", is_autonomous);
-
-    if !is_autonomous {
-        println!("\n  ⚠️  AUTONOMY RESTRICTED - System must operate under supervision");
-    }
-    println!();
-
-    // Show EFE contribution - being wrong should increase epistemic value
-    let efe_contrib = magi.compute_efe_contribution(&action_3);
-    println!("  EFE Contribution (learning potential):");
-    println!("    Pragmatic: {:.3}", efe_contrib.pragmatic);
-    println!(
-        "    Epistemic: {:.3} (higher = more to learn)",
-        efe_contrib.epistemic
-    );
-    println!("    Novelty: {:.3}", efe_contrib.novelty);
-    println!();
-
-    // =========================================================================
-    // PHASE 4: The Humble Prediction (WILL SUCCEED)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 4: The Humble Prediction - Learning Humility");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // Now predict f(4) with LOWER confidence (system has learned humility)
-    let action_4 = WorldActionContext::new("predict_parity", "Predict whether f(4) returns even")
-        .with_risk_tier(RiskTier::Observation);
-
-    // System predicts f(4) is EVEN with only 60% confidence (humble!)
-    let prediction_4 = magi.predict(
-        "f(4) is even",
-        OutcomeCategory::Success, // Predicting "is_even" = true
-        0.6,                      // 60% confidence (humble)
-        action_4.clone(),
-    );
-
-    println!("  Action: Predict if f(4) is even");
-    println!("  Prediction: f(4) IS even (confidence: 60% - more humble!)");
-    println!("  Prediction ID: {}", prediction_4.id);
-    println!();
-
-    // =========================================================================
-    // PHASE 5: Reality Check (THE SUCCESS)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 5: Reality Check - The Success");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    let actual_4 = ToyWorld::evaluate(4);
-    println!("  Toy World says: f(4) = {} (even)", actual_4);
-    println!("  System predicted: f(4) is even");
-    println!("  RESULT: ✅ PREDICTION SUCCEEDED\n");
-
-    magi.resolve_prediction(
-        &prediction_4.id,
-        OutcomeCategory::Success, // Correct - it is even
-        0.99,
-    );
-
-    let summary_after_success = magi.calibration_summary();
-    println!("  Calibration After Success:");
-    println!(
-        "    Total predictions: {}",
-        summary_after_success.total_predictions
-    );
-    println!(
-        "    Overall Brier: {:.4} (lower is better)",
-        summary_after_success.global_brier
-    );
-    println!("    Mean ECE: {:.4}", summary_after_success.global_ece);
-    println!("    Quality: {:?}", magi.loop_state().calibration_quality);
-    println!();
-
-    // =========================================================================
-    // PHASE 6: More Learning (Building Calibration)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 6: Building Calibration Through Experience");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // Make several more predictions to build up calibration
-    // (x, predict_even, confidence)
-    let test_cases = vec![
-        (5, false, 0.7),  // 5 is odd, predict odd with 70% confidence
-        (6, true, 0.7),   // 6 is even, predict even with 70% confidence
-        (7, false, 0.8),  // 7 is odd, predict odd with 80% confidence
-        (8, true, 0.8),   // 8 is even, predict even with 80% confidence
-        (9, false, 0.85), // 9 is odd, predict odd with 85% confidence
-    ];
-
-    for (x, predict_even, confidence) in test_cases {
-        let action = WorldActionContext::new(
-            "predict_parity",
-            format!("Predict whether f({}) returns even", x),
-        )
-        .with_risk_tier(RiskTier::Observation);
-
-        // If we predict even, we predict Success
-        // If we predict odd, we predict SafeFailure (not even)
-        let prediction_outcome = if predict_even {
-            OutcomeCategory::Success
-        } else {
-            OutcomeCategory::SafeFailure
-        };
-
-        let prediction = magi.predict(
-            format!("f({}) is {}", x, if predict_even { "even" } else { "odd" }),
-            prediction_outcome,
-            confidence,
-            action,
-        );
-
-        // Resolve based on actual value
-        let is_actually_even = ToyWorld::is_even(x);
-        let actual_outcome = if is_actually_even {
-            OutcomeCategory::Success
-        } else {
-            OutcomeCategory::SafeFailure
-        };
-
-        let was_correct = predict_even == is_actually_even;
-        magi.resolve_prediction(&prediction.id, actual_outcome, 0.99);
-
-        let symbol = if was_correct { "✅" } else { "❌" };
-        println!(
-            "  {} f({}) = {} | predicted {} | conf: {:.0}%",
-            symbol,
-            x,
-            ToyWorld::evaluate(x),
-            if predict_even { "even" } else { "odd" },
-            confidence * 100.0
-        );
+    println!("\nBuilding a calibrated Factual-domain cohort:");
+    // Five p=0.8 predictions, four correct -> empirical frequency 0.8.
+    for (x, predict_even) in [(1, false), (2, true), (3, false), (4, true), (5, true)] {
+        observe_prediction(&mut magi, x, predict_even, 0.8);
     }
 
-    println!();
-    let final_summary = magi.calibration_summary();
-    println!("  Final Calibration:");
-    println!("    Total predictions: {}", final_summary.total_predictions);
-    println!("    Overall Brier: {:.4}", final_summary.global_brier);
-    println!("    Mean ECE: {:.4}", final_summary.global_ece);
-    println!("    Quality: {:?}", magi.loop_state().calibration_quality);
-    println!();
+    let declared = magi
+        .calibration()
+        .declared_domain_calibration(PredictionDomain::Factual);
+    println!(
+        "\nDeclared Factual cohort: n={}, accuracy={:.3}, ece={:?}",
+        declared.sample_count, declared.accuracy, declared.ece
+    );
 
-    // =========================================================================
-    // PHASE 7: The Gate Reopens (AUTONOMY RESTORED)
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 7: The Gate Reopens - Autonomy Status");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    let calibrated_mode = print_gate("Gate after matching calibration", &mut magi);
+    assert!(calibrated_mode.is_autonomous());
 
-    let final_gate = magi.check_execution_mode(&action_4);
-    println!("  Final Gate Decision:");
-    println!("    Mode: {:?}", final_gate.mode);
-    println!("    Confidence: {:.2}", final_gate.confidence);
-    if let Some(factor) = final_gate.factors.first() {
-        println!(
-            "    Primary factor: {} ({})",
-            factor.name, factor.description
-        );
+    println!("\nAdding an overconfident shifted batch:");
+    // Five p=.95 predictions with only two correct. This deliberately changes
+    // the empirical relationship between stated probability and outcomes.
+    for (x, predict_even) in [(6, true), (7, false), (8, false), (9, true), (10, false)] {
+        observe_prediction(&mut magi, x, predict_even, 0.95);
     }
-    println!("    Autonomous: {}", final_gate.mode.is_autonomous());
 
-    match final_gate.mode {
-        ExecutionMode::Autonomous => {
-            println!("\n  🎉 AUTONOMY RESTORED - System has proven calibration!");
-        }
-        ExecutionMode::Supervised { .. } => {
-            println!("\n  ⚠️  Still supervised - needs more calibration data");
-        }
-        ExecutionMode::DryRun { .. } => {
-            println!("\n  🔒 Still in dry-run - significant calibration issues");
-        }
-    }
-    println!();
-
-    // =========================================================================
-    // PHASE 8: EFE Integration Check
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("PHASE 8: EFE Integration - Calibration Affects Decision Making");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
-    // Compute calibrated EFE for a new action
-    let new_action =
-        WorldActionContext::new("predict_parity", "Predict whether f(100) returns even")
-            .with_risk_tier(RiskTier::Observation);
-
-    let base_efe = -0.5; // Hypothetical base EFE from Active Inference
-    let calibrated = magi.compute_calibrated_efe(&new_action, base_efe, &efe_weights);
-
-    println!("  Evaluating action: predict f(100)");
-    println!("    Base EFE: {:.3}", calibrated.base_efe);
-    println!("    Combined EFE: {:.3}", calibrated.combined_efe);
-    println!("    Execution Mode: {:?}", calibrated.execution_mode);
-    println!("    Recommended: {}", calibrated.recommended);
-    println!();
-
-    println!("  EFE Contribution from Calibration:");
+    let shifted = magi
+        .calibration()
+        .declared_domain_calibration(PredictionDomain::Factual);
     println!(
-        "    Pragmatic: {:.3}",
-        calibrated.calibration_contribution.pragmatic
+        "\nShifted Factual cohort: n={}, accuracy={:.3}, ece={:?}",
+        shifted.sample_count, shifted.accuracy, shifted.ece
     );
-    println!(
-        "    Epistemic: {:.3}",
-        calibrated.calibration_contribution.epistemic
-    );
-    println!(
-        "    Novelty: {:.3}",
-        calibrated.calibration_contribution.novelty
-    );
-    println!(
-        "    Domain: {:?}",
-        calibrated.calibration_contribution.domain
-    );
-    println!();
 
-    // =========================================================================
-    // SUMMARY: The MAGI Loop Closes
-    // =========================================================================
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("SUMMARY: The MAGI Loop Closes");
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+    let restricted_mode = print_gate("Gate after miscalibration", &mut magi);
+    assert!(!restricted_mode.is_autonomous());
 
-    println!("  The simulation demonstrated the complete MAGI Loop:");
-    println!();
-    println!("  ┌─────────────────────────────────────────────────────────────┐");
-    println!("  │  1. PREDICT  │ Made falsifiable prediction about f(x)       │");
-    println!("  │  2. RESOLVE  │ External authority confirmed failure         │");
-    println!("  │  3. SELECT   │ Gate restricted autonomy due to poor cal.    │");
-    println!("  │  4. OBSERVE  │ Reality provided ground truth                │");
-    println!("  │  5. ATTRIB   │ Brier score attributed prediction error      │");
-    println!("  │  6. UPDATE   │ Calibration improved through experience      │");
-    println!("  └─────────────────────────────────────────────────────────────┘");
-    println!();
-    println!("  Key Mechanisms Verified:");
-    println!("    ✓ ResolutionAuthority prevents self-hallucinated success");
-    println!("    ✓ BrierScoreTracker mathematically enforces humility");
-    println!("    ✓ ConstraintGate mechanically restricts overconfident agents");
-    println!("    ✓ EFE integration penalizes historically delusional actions");
-    println!();
-    println!("  Final State:");
-    println!("    Loop State: {:?}", magi.loop_state());
-    println!(
-        "    Calibration: {:?}",
-        magi.loop_state().calibration_quality
-    );
-    println!("    Predictions Made: {}", final_summary.total_predictions);
-    println!(
-        "    Brier Score: {:.4} (0 = perfect)",
-        final_summary.global_brier
-    );
-    println!();
-    println!("╔══════════════════════════════════════════════════════════════════╗");
-    println!("║                    THE LOOP IS CLOSED                            ║");
-    println!("║           The Epistemic Engine is operational.                   ║");
-    println!("╚══════════════════════════════════════════════════════════════════╝\n");
+    println!("\nKey distinction:");
+    println!("  prediction probability -> empirically scored against outcomes");
+    println!("  gate disposition       -> rule-based execution mode + diagnostic reasons");
+    println!("  gate disposition is not a probability and does not mint authority by itself");
 }

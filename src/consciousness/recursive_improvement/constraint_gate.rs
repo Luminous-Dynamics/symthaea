@@ -184,7 +184,7 @@ impl Default for ConstraintGateConfig {
     fn default() -> Self {
         Self {
             supervision_threshold: RiskTier::Destructive,
-            calibration_threshold: 0.15, // ECE > 15% triggers dry-run
+            calibration_threshold: 0.15,
             min_predictions_for_autonomy: 50,
             always_preview_state_changes: true,
             always_supervise_destructive: true,
@@ -237,31 +237,32 @@ impl ConstraintGateConfig {
 // CONSTRAINT GATE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Gate decision result
+/// Gate decision result.
+///
+/// Deliberately contains no aggregate `confidence` or `suggested_confidence`
+/// scalar. The gate decides a mode from typed rules and exposes the individual
+/// diagnostic factors that caused that disposition. A heterogeneous mix of
+/// risk, accuracy, experience and calibration error has no justified
+/// probabilistic interpretation merely because each input is numeric.
 #[derive(Debug, Clone)]
 pub struct GateDecision {
     /// The execution mode determined
     pub mode: ExecutionMode,
 
-    /// Legacy aggregate disposition scalar. CAL-003A is expected to remove or
-    /// rename this because it is not an empirically calibrated probability.
-    pub confidence: f64,
-
     /// Factors that influenced the decision
     pub factors: Vec<GateFactor>,
-
-    /// Suggested confidence adjustment for the action
-    pub suggested_confidence: f64,
 }
 
-/// Factor that influenced a gate decision
+/// One diagnostic factor that influenced a gate decision.
+///
+/// `value` retains the native numeric meaning documented by `name` and
+/// `description`; values across different factors must not be averaged into a
+/// probability or authority score.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GateFactor {
     /// Name of the factor
     pub name: String,
-    /// Weight of this factor
-    pub weight: f64,
-    /// Value of this factor
+    /// Native value of this factor
     pub value: f64,
     /// Description
     pub description: String,
@@ -310,10 +311,10 @@ impl ConstraintGate {
     /// Check an action and determine execution mode.
     ///
     /// Risk supervision remains independent of calibration. If an action is
-    /// otherwise eligible for autonomous execution, however, CAL-002A requires
-    /// an explicit typed prediction domain plus sufficient *declared-domain*
-    /// session evidence. Global calibration and heuristic domain inference can
-    /// no longer subsidize an unrelated autonomous action.
+    /// otherwise eligible for autonomous execution, CAL-002A requires an
+    /// explicit typed prediction domain plus sufficient *declared-domain*
+    /// session evidence. CAL-003A preserves those exact decisions while
+    /// removing the legacy pseudo-probability outputs from the gate result.
     pub fn check(
         &mut self,
         action: &WorldActionContext,
@@ -330,26 +331,21 @@ impl ConstraintGate {
                 mode: ExecutionMode::Supervised {
                     reason: SupervisionReason::ForcedSupervision,
                 },
-                confidence: 1.0,
                 factors: vec![GateFactor {
                     name: "force_supervised_mode".to_string(),
-                    weight: 1.0,
                     value: 1.0,
                     description: "Global supervision mode is enabled".to_string(),
                 }],
-                suggested_confidence: action.urgency as f64 * 0.5,
             };
         }
 
         // Factor 2: Risk tier check. High risk never needs calibration evidence
         // merely to be denied autonomy; supervision wins first.
-        let risk_factor = GateFactor {
+        factors.push(GateFactor {
             name: "risk_tier".to_string(),
-            weight: 0.4,
             value: action.risk_tier.level(),
             description: format!("Action risk: {:?}", action.risk_tier),
-        };
-        factors.push(risk_factor);
+        });
 
         if action.risk_tier >= self.config.supervision_threshold {
             self.supervision_required += 1;
@@ -358,15 +354,9 @@ impl ConstraintGate {
                 RiskTier::Destructive => SupervisionReason::Destructive,
                 _ => SupervisionReason::HighRisk,
             };
-            let suggested_confidence = action
-                .declared_prediction_domain()
-                .map(|domain| calibration.adjust_confidence(domain, 0.5))
-                .unwrap_or(0.5);
             return GateDecision {
                 mode: ExecutionMode::Supervised { reason },
-                confidence: 1.0,
                 factors,
-                suggested_confidence,
             };
         }
 
@@ -377,9 +367,7 @@ impl ConstraintGate {
                 mode: ExecutionMode::Supervised {
                     reason: SupervisionReason::Destructive,
                 },
-                confidence: 1.0,
                 factors,
-                suggested_confidence: 0.5,
             };
         }
 
@@ -390,7 +378,6 @@ impl ConstraintGate {
             self.dry_run_forced += 1;
             factors.push(GateFactor {
                 name: "calibration_domain_bound".to_string(),
-                weight: 0.0,
                 value: 0.0,
                 description: "No explicit typed prediction domain".to_string(),
             });
@@ -398,29 +385,23 @@ impl ConstraintGate {
                 mode: ExecutionMode::DryRun {
                     reason: DryRunReason::CalibrationDomainUnbound,
                 },
-                confidence: 0.5,
                 factors,
-                suggested_confidence: 0.5,
             };
         };
 
         let domain_calibration = calibration.declared_domain_calibration(domain);
 
         // Factor 5: Minimum matching declared-domain observations.
-        let experience_factor = GateFactor {
+        factors.push(GateFactor {
             name: "declared_domain_prediction_experience".to_string(),
-            weight: 0.2,
-            value: (domain_calibration.sample_count as f64
-                / self.config.min_predictions_for_autonomy.max(1) as f64)
-                .min(1.0),
+            value: domain_calibration.sample_count as f64,
             description: format!(
                 "{:?} declared predictions: {}/{}",
                 domain,
                 domain_calibration.sample_count,
                 self.config.min_predictions_for_autonomy
             ),
-        };
-        factors.push(experience_factor);
+        });
 
         if domain_calibration.sample_count < self.config.min_predictions_for_autonomy {
             self.dry_run_forced += 1;
@@ -428,9 +409,7 @@ impl ConstraintGate {
                 mode: ExecutionMode::DryRun {
                     reason: DryRunReason::UnexploredDomain,
                 },
-                confidence: 0.6,
                 factors,
-                suggested_confidence: calibration.adjust_confidence(domain, 0.5),
             };
         }
 
@@ -439,7 +418,6 @@ impl ConstraintGate {
             self.dry_run_forced += 1;
             factors.push(GateFactor {
                 name: "declared_domain_calibration_measured".to_string(),
-                weight: 0.0,
                 value: 0.0,
                 description: format!("{:?} declared-domain ECE is unmeasured", domain),
             });
@@ -447,19 +425,15 @@ impl ConstraintGate {
                 mode: ExecutionMode::DryRun {
                     reason: DryRunReason::CalibrationUnmeasured,
                 },
-                confidence: 0.6,
                 factors,
-                suggested_confidence: calibration.adjust_confidence(domain, 0.5),
             };
         };
 
-        let calibration_factor = GateFactor {
+        factors.push(GateFactor {
             name: "declared_domain_calibration_error".to_string(),
-            weight: 0.3,
             value: ece,
             description: format!("{:?} declared-domain ECE: {:.3}", domain, ece),
-        };
-        factors.push(calibration_factor);
+        });
 
         if ece > self.config.calibration_threshold {
             self.dry_run_forced += 1;
@@ -467,21 +441,17 @@ impl ConstraintGate {
                 mode: ExecutionMode::DryRun {
                     reason: DryRunReason::PoorCalibration,
                 },
-                confidence: 0.7,
                 factors,
-                suggested_confidence: calibration.adjust_confidence(domain, 0.6),
             };
         }
 
         // Factor 7: Matching-domain accuracy check.
         let accuracy = domain_calibration.accuracy;
-        let accuracy_factor = GateFactor {
+        factors.push(GateFactor {
             name: "declared_domain_accuracy".to_string(),
-            weight: 0.25,
             value: accuracy,
             description: format!("{:?} declared-domain accuracy: {:.1}%", domain, accuracy * 100.0),
-        };
-        factors.push(accuracy_factor);
+        });
 
         if accuracy < self.config.min_accuracy_for_autonomy {
             self.dry_run_forced += 1;
@@ -489,9 +459,7 @@ impl ConstraintGate {
                 mode: ExecutionMode::DryRun {
                     reason: DryRunReason::PoorCalibration,
                 },
-                confidence: 0.65,
                 factors,
-                suggested_confidence: calibration.adjust_confidence(domain, accuracy),
             };
         }
 
@@ -503,30 +471,14 @@ impl ConstraintGate {
                 mode: ExecutionMode::DryRun {
                     reason: DryRunReason::StateModifying,
                 },
-                confidence: 0.8,
                 factors,
-                suggested_confidence: calibration.adjust_confidence(domain, 0.7),
             };
         }
 
-        // All checks passed - allow autonomous execution
         self.autonomous_allowed += 1;
-
-        // Legacy aggregate disposition scalar. This calculation is retained in
-        // CAL-002A only to keep API scope narrow; CAL-003A should remove/rename
-        // it because differently oriented factors do not form a probability.
-        let total_weight: f64 = factors.iter().map(|f| f.weight).sum();
-        let weighted_confidence: f64 = factors
-            .iter()
-            .map(|f| f.weight * (1.0 - f.value.abs()))
-            .sum::<f64>()
-            / total_weight;
-
         GateDecision {
             mode: ExecutionMode::Autonomous,
-            confidence: weighted_confidence.clamp(0.5, 0.95),
             factors,
-            suggested_confidence: calibration.adjust_confidence(domain, 0.8),
         }
     }
 
@@ -616,7 +568,6 @@ mod tests {
             ..Default::default()
         };
         let mut tracker = BrierScoreTracker::new(config);
-        // 80% confidence / 80% accuracy, explicitly domain-bound.
         add_resolved_predictions(
             &mut tracker,
             PredictionDomain::CodeExecution,
@@ -627,6 +578,16 @@ mod tests {
             true,
         );
         tracker
+    }
+
+    #[test]
+    fn gate_decision_exposes_factors_not_aggregate_confidence() {
+        let mut gate = ConstraintGate::with_defaults();
+        let tracker = BrierScoreTracker::with_defaults();
+        let action = WorldActionContext::new("test", "test").with_risk_tier(RiskTier::Observation);
+        let decision = gate.check(&action, &tracker);
+        assert!(!decision.factors.is_empty());
+        assert!(decision.mode.is_dry_run());
     }
 
     #[test]
@@ -812,7 +773,6 @@ mod tests {
         let mut gate = ConstraintGate::with_defaults();
         let tracker = create_calibrated_tracker();
 
-        // Check a few actions
         for risk in [
             RiskTier::Observation,
             RiskTier::Destructive,
@@ -826,6 +786,6 @@ mod tests {
 
         let stats = gate.statistics();
         assert_eq!(stats.total_checked, 3);
-        assert!(stats.supervision_required >= 2); // Destructive and Critical
+        assert!(stats.supervision_required >= 2);
     }
 }
