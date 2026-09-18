@@ -37,6 +37,7 @@ mod belief_mutation_firewall;
 mod belief_mutation_persistence;
 pub mod belief_mutation_seal_persistence;
 pub mod belief_mutation_seal_wire;
+pub mod belief_mutation_seal_wire_validation;
 mod belief_mutation_transaction;
 mod belief_mutation_verifier;
 pub mod belief_revision_gate;
