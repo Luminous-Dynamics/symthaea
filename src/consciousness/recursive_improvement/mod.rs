@@ -93,6 +93,7 @@ pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
 pub mod sym_rsi_runner;
+pub mod sym_rsi_semantic_calibration_experiment;
 pub mod sym_rsi_structural_support;
 
 pub use types::{
