@@ -2,18 +2,25 @@
 """Fail closed if ci.yml can enqueue heavyweight jobs for a draft PR.
 
 This is intentionally a tiny structural ratchet rather than a general YAML
-interpreter.  The full CI workflow is large and runner-expensive; the contract
+interpreter. The full CI workflow is large and runner-expensive; the contract
 we need to preserve is correspondingly narrow:
 
 * directly runnable pull-request jobs must have the frozen draft guard;
 * jobs that rely on `needs: test` may stay unguarded only while `test` itself is
-  directly draft-gated and they do not use `always()` to bypass that skip;
+  directly draft-gated and their JOB-LEVEL condition cannot override normal
+  prerequisite-success propagation;
+* step-level cleanup/upload conditions such as `if: always()` are irrelevant to
+  runner admission because they are evaluated only after the job has started;
 * the only root jobs without a draft guard are jobs already restricted away
   from pull_request events (SBOM and scheduled/manual stress tests);
 * adding/removing/renaming a CI job requires an explicit update here.
 
 GitHub evaluates jobs.<job_id>.if before matrix expansion, so a false root-job
-condition prevents matrix legs from requesting runners.
+condition prevents matrix legs from requesting runners. A skipped `needs`
+prerequisite also skips dependent jobs unless a job-level conditional overrides
+that propagation. GitHub's status-check functions suppress the implicit
+`success()` guard, so dependent jobs using any such function require an explicit
+review instead of being accepted transitively here.
 """
 
 from __future__ import annotations
@@ -88,6 +95,9 @@ EXPECTED_JOBS = (
 )
 
 JOB_HEADER = re.compile(r"^  ([A-Za-z0-9_-]+):\s*$")
+JOB_LEVEL_IF = re.compile(r"^    if:\s*(.*)$")
+STATUS_CHECK = re.compile(r"\b(?:always|cancelled|failure|success)\s*\(")
+BLOCK_MARKERS = {"|", "|-", "|+", ">", ">-", ">+"}
 
 
 def fail(message: str) -> None:
@@ -122,7 +132,11 @@ def parse_jobs(text: str) -> dict[str, str]:
 
 def require_exact_line(block: str, line: str, job: str) -> None:
     expected = f"    {line}"
-    observed = [candidate for candidate in block.splitlines() if candidate.strip().startswith("if:")]
+    observed = [
+        candidate
+        for candidate in block.splitlines()
+        if candidate.strip().startswith("if:")
+    ]
     if expected not in block.splitlines():
         fail(
             f"job {job!r} is missing exact line {expected!r}; "
@@ -130,7 +144,99 @@ def require_exact_line(block: str, line: str, job: str) -> None:
         )
 
 
+def job_level_if_expression(block: str, job: str) -> str | None:
+    """Return only the job-level `if` expression, never step-level conditions.
+
+    The workflow currently contains one block-scalar job condition (psych-bench),
+    so support the standard literal/folded YAML markers while failing closed on
+    malformed or duplicate job-level `if` keys.
+    """
+
+    lines = block.splitlines()
+    matches: list[tuple[int, str]] = []
+    for index, line in enumerate(lines):
+        match = JOB_LEVEL_IF.fullmatch(line)
+        if match:
+            matches.append((index, match.group(1).strip()))
+
+    if len(matches) > 1:
+        fail(f"job {job!r} has duplicate job-level if keys")
+    if not matches:
+        return None
+
+    index, value = matches[0]
+    if value not in BLOCK_MARKERS:
+        if not value:
+            fail(f"job {job!r} has an empty job-level if expression")
+        return value
+
+    payload: list[str] = []
+    for line in lines[index + 1 :]:
+        if not line.strip():
+            payload.append("")
+            continue
+        # A job-level YAML key is indented four spaces. The block-scalar payload
+        # must be deeper; once indentation returns to job scope, the expression
+        # is complete. Step-level `if` keys therefore never enter this payload.
+        indent = len(line) - len(line.lstrip(" "))
+        if indent <= 4:
+            break
+        payload.append(line.strip())
+
+    if not payload or not any(payload):
+        fail(f"job {job!r} has an empty block-scalar job-level if expression")
+    return "\n".join(payload)
+
+
+def require_transitive_draft_safety(block: str, job: str) -> None:
+    if "    needs: test" not in block.splitlines():
+        fail(f"dependent job {job!r} no longer has exact `needs: test`")
+
+    expression = job_level_if_expression(block, job)
+    if expression is not None and STATUS_CHECK.search(expression):
+        fail(
+            f"dependent job {job!r} uses a job-level status-check function; "
+            "that can suppress GitHub's implicit success() prerequisite guard "
+            "and requires explicit draft-admission review"
+        )
+
+
+def self_test_job_scope_parser() -> None:
+    safe = """  psych-bench:
+    needs: test
+    if: |
+      github.event_name == 'pull_request'
+    steps:
+      - name: Upload even after a failing step
+        if: steps.example.outcome == 'failure' && always()
+"""
+    expression = job_level_if_expression(safe, "self-test-safe")
+    if expression != "github.event_name == 'pull_request'":
+        fail(
+            "internal self-test failed: block job-level expression was not "
+            f"isolated correctly: {expression!r}"
+        )
+    if STATUS_CHECK.search(expression):
+        fail("internal self-test failed: step-level always() leaked into job scope")
+
+    for function in ("always", "cancelled", "failure", "success"):
+        unsafe = f"""  dependent:
+    needs: test
+    if: {function}() || github.event_name == 'pull_request'
+    steps:
+      - run: true
+"""
+        observed = job_level_if_expression(unsafe, f"self-test-{function}")
+        if observed is None or not STATUS_CHECK.search(observed):
+            fail(
+                "internal self-test failed: job-level status function was not "
+                f"detected: {function}"
+            )
+
+
 def main() -> int:
+    self_test_job_scope_parser()
+
     text = CI_PATH.read_text(encoding="utf-8")
     jobs = parse_jobs(text)
 
@@ -153,14 +259,7 @@ def main() -> int:
     )
 
     for job in sorted(DEPENDENT_ON_TEST):
-        block = jobs[job]
-        if "    needs: test" not in block.splitlines():
-            fail(f"dependent job {job!r} no longer has exact `needs: test`")
-        if "always()" in block:
-            fail(
-                f"dependent job {job!r} contains always(), which can bypass a "
-                "skipped draft-safe prerequisite"
-            )
+        require_transitive_draft_safety(jobs[job], job)
 
     for job, guard in sorted(NON_PULL_REQUEST_ROOTS.items()):
         require_exact_line(jobs[job], guard, job)
@@ -174,6 +273,7 @@ def main() -> int:
     print(f"direct_special_guarded={len(DIRECT_SPECIAL)}")
     print(f"transitively_guarded_via_test={len(DEPENDENT_ON_TEST)}")
     print(f"non_pull_request_roots={len(NON_PULL_REQUEST_ROOTS)}")
+    print("job_scope_status_override_check=PASS")
     return 0
 
 
