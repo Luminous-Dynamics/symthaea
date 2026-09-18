@@ -38,6 +38,7 @@ pub mod encoder;
 pub mod entity_identity;
 pub mod epistemic;
 pub mod manifold;
+pub mod observation_freshness;
 pub mod predictive;
 pub mod spectrum;
 pub mod training;
@@ -114,6 +115,9 @@ pub use epistemic::{
 pub use manifold::{
     DelayedHorizonEvaluator, HorizonAccuracy, ObjectMemory, ObjectTrackingResult, SceneMemory,
     TrackedObject, VisionManifold, VisualSceneGraph, VisualWorkingMemory, WorkingMemorySlot,
+};
+pub use observation_freshness::{
+    EntityObservationFreshness, EntityVisibilityState, FreshnessError, ObservationFreshnessPolicy,
 };
 pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{
