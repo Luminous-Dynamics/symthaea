@@ -3,17 +3,16 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Honest object-image geometry for VIS-003.
 //!
-//! This module intentionally distinguishes geometry that only supports a point claim from
-//! patch-cluster extent, detector boxes, segmentation masks, and keypoints. Metric eligibility is
-//! encoded explicitly so a centroid tracker cannot accidentally advertise box-IoU/HOTA readiness.
+//! Point tracking, patch support, detector boxes, masks, and keypoints are distinct claims.
+//! Invariant-bearing geometry is constructor-only and intentionally Serialize-only in v1: wire
+//! deserialization will be added only with validating deserializers.
 
 use serde::{Deserialize, Serialize};
 
 use crate::epistemic::{VisualEvidence, VisualOrigin};
 use crate::types::{ObjectHypothesis, PatchGrid};
 
-/// A sub-pixel point in image coordinates. Origin is the top-left pixel corner; +x is right and
-/// +y is down.
+/// Sub-pixel image point. Origin is the top-left pixel corner; +x is right, +y is down.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct PixelPoint {
     pub x: f32,
@@ -50,21 +49,19 @@ impl PixelRect {
     }
 }
 
-/// One run in a row-major binary segmentation mask.
+/// One run in a row-major binary mask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MaskRun {
-    /// Flattened row-major start index.
     pub start: u32,
-    /// Number of foreground pixels in this run.
     pub len: u32,
 }
 
-/// Compact, exact binary mask using sorted, non-overlapping row-major runs.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// Exact binary segmentation mask encoded as sorted, non-overlapping row-major runs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SegmentationMaskRle {
-    pub width: u32,
-    pub height: u32,
-    pub runs: Vec<MaskRun>,
+    width: u32,
+    height: u32,
+    runs: Vec<MaskRun>,
 }
 
 impl SegmentationMaskRle {
@@ -102,17 +99,27 @@ impl SegmentationMaskRle {
         })
     }
 
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn runs(&self) -> &[MaskRun] {
+        &self.runs
+    }
+
     pub fn foreground_pixels(&self) -> u64 {
         self.runs.iter().map(|run| u64::from(run.len)).sum()
     }
 
-    /// Exact foreground bounding box in pixel coordinates.
     pub fn bounds(&self) -> PixelRect {
         let mut min_x = self.width;
         let mut min_y = self.height;
         let mut max_x_exclusive = 0u32;
         let mut max_y_exclusive = 0u32;
-
         for run in &self.runs {
             let mut cursor = run.start;
             let mut remaining = run.len;
@@ -128,7 +135,6 @@ impl SegmentationMaskRle {
                 remaining -= take;
             }
         }
-
         PixelRect {
             left: min_x as f32,
             top: min_y as f32,
@@ -137,19 +143,24 @@ impl SegmentationMaskRle {
         }
     }
 
-    /// Foreground centroid in pixel-center coordinates.
+    /// Foreground centroid in pixel-center coordinates, O(runs + crossed rows).
     pub fn centroid(&self) -> PixelPoint {
         let mut sum_x = 0.0f64;
         let mut sum_y = 0.0f64;
         let mut count = 0u64;
         for run in &self.runs {
-            let end = run.start + run.len;
-            for flat in run.start..end {
-                let y = flat / self.width;
-                let x = flat % self.width;
-                sum_x += f64::from(x) + 0.5;
-                sum_y += f64::from(y) + 0.5;
-                count += 1;
+            let mut cursor = run.start;
+            let mut remaining = run.len;
+            while remaining > 0 {
+                let y = cursor / self.width;
+                let x = cursor % self.width;
+                let take = remaining.min(self.width - x);
+                let n = f64::from(take);
+                sum_x += n * (f64::from(x) + 0.5) + n * (n - 1.0) * 0.5;
+                sum_y += n * (f64::from(y) + 0.5);
+                count += u64::from(take);
+                cursor += take;
+                remaining -= take;
             }
         }
         PixelPoint {
@@ -159,7 +170,6 @@ impl SegmentationMaskRle {
     }
 }
 
-/// Named object keypoint with its own confidence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VisualKeypoint {
     pub name: String,
@@ -168,14 +178,11 @@ pub struct VisualKeypoint {
 }
 
 /// Uncertainty attached to a geometry estimate.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct GeometryUncertainty {
-    /// Overall confidence in this geometry estimate.
-    pub confidence: f32,
-    /// Optional 1σ centroid uncertainty `[x, y]` in pixels.
-    pub centroid_std_px: Option<[f32; 2]>,
-    /// Optional 1σ extent uncertainty `[width, height]` in pixels.
-    pub extent_std_px: Option<[f32; 2]>,
+    confidence: f32,
+    centroid_std_px: Option<[f32; 2]>,
+    extent_std_px: Option<[f32; 2]>,
 }
 
 impl GeometryUncertainty {
@@ -199,25 +206,30 @@ impl GeometryUncertainty {
         })
     }
 
-    pub const fn unknown(confidence: f32) -> Result<Self, GeometryError> {
-        if !confidence.is_finite() || confidence < 0.0 || confidence > 1.0 {
-            return Err(GeometryError::InvalidConfidence);
-        }
-        Ok(Self {
-            confidence,
-            centroid_std_px: None,
-            extent_std_px: None,
-        })
+    pub fn unknown(confidence: f32) -> Result<Self, GeometryError> {
+        Self::new(confidence, None, None)
+    }
+
+    pub const fn confidence(self) -> f32 {
+        self.confidence
+    }
+
+    pub const fn centroid_std_px(self) -> Option<[f32; 2]> {
+        self.centroid_std_px
+    }
+
+    pub const fn extent_std_px(self) -> Option<[f32; 2]> {
+        self.extent_std_px
     }
 }
 
-/// What spatial support actually exists for the object claim.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Spatial support that actually exists for an object claim.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GeometrySupport {
     /// Legacy point tracker: no area claim exists.
     CentroidPoint,
-    /// Envelope of spatially clustered HDC patches. This is not a detector-produced box.
+    /// Envelope of clustered HDC patches. This is not a detector-produced box.
     PatchClusterExtent {
         min_row: usize,
         max_row_exclusive: usize,
@@ -226,15 +238,14 @@ pub enum GeometrySupport {
         patch_indices: Vec<usize>,
         bounds: PixelRect,
     },
-    /// A box explicitly emitted by a detector/localizer.
+    /// Box explicitly emitted by a detector/localizer.
     DetectorBox { bounds: PixelRect },
     /// Exact binary segmentation support.
     SegmentationMask { mask: SegmentationMaskRle },
-    /// Named keypoints. The object centroid is represented separately.
+    /// Named keypoints; the object centroid is stored separately.
     Keypoints { points: Vec<VisualKeypoint> },
 }
 
-/// Geometry representation level, ordered by meaning rather than presumed quality.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GeometryKind {
@@ -245,8 +256,7 @@ pub enum GeometryKind {
     Keypoints,
 }
 
-/// Explicit evaluation eligibility. `false` means the representation cannot honestly support the
-/// corresponding metric, not that performance on that metric is poor.
+/// Explicit representation-level evaluation eligibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GeometryMetricEligibility {
     pub centroid_distance: bool,
@@ -256,14 +266,14 @@ pub struct GeometryMetricEligibility {
     pub keypoint_distance: bool,
 }
 
-/// One object geometry estimate in a concrete image coordinate frame.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// One validated geometry estimate in a concrete image coordinate frame.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct VisualObjectGeometry {
-    pub frame_width: u32,
-    pub frame_height: u32,
-    pub centroid: PixelPoint,
-    pub support: GeometrySupport,
-    pub uncertainty: GeometryUncertainty,
+    frame_width: u32,
+    frame_height: u32,
+    centroid: PixelPoint,
+    support: GeometrySupport,
+    uncertainty: GeometryUncertainty,
 }
 
 impl VisualObjectGeometry {
@@ -283,10 +293,8 @@ impl VisualObjectGeometry {
         })
     }
 
-    /// Adapter for the current patch-cluster `ObjectHypothesis` representation.
-    ///
-    /// The resulting bounds are a patch envelope, not a detector box. Consequently `box_iou`
-    /// remains false in metric eligibility.
+    /// Convert today's patch-cluster hypothesis into honest patch support.
+    /// The derived rectangle is an envelope of supporting patches, not a detector box.
     pub fn from_patch_hypothesis(
         hypothesis: &ObjectHypothesis,
         grid: &PatchGrid,
@@ -425,8 +433,28 @@ impl VisualObjectGeometry {
         })
     }
 
-    pub const fn kind(&self) -> GeometryKind {
-        match self.support {
+    pub const fn frame_width(&self) -> u32 {
+        self.frame_width
+    }
+
+    pub const fn frame_height(&self) -> u32 {
+        self.frame_height
+    }
+
+    pub const fn centroid(&self) -> PixelPoint {
+        self.centroid
+    }
+
+    pub const fn uncertainty(&self) -> GeometryUncertainty {
+        self.uncertainty
+    }
+
+    pub fn support(&self) -> &GeometrySupport {
+        &self.support
+    }
+
+    pub fn kind(&self) -> GeometryKind {
+        match &self.support {
             GeometrySupport::CentroidPoint => GeometryKind::CentroidPoint,
             GeometrySupport::PatchClusterExtent { .. } => GeometryKind::PatchClusterExtent,
             GeometrySupport::DetectorBox { .. } => GeometryKind::DetectorBox,
@@ -435,8 +463,8 @@ impl VisualObjectGeometry {
         }
     }
 
-    pub const fn metric_eligibility(&self) -> GeometryMetricEligibility {
-        match self.support {
+    pub fn metric_eligibility(&self) -> GeometryMetricEligibility {
+        match &self.support {
             GeometrySupport::CentroidPoint => GeometryMetricEligibility {
                 centroid_distance: true,
                 patch_overlap: false,
@@ -476,14 +504,11 @@ impl VisualObjectGeometry {
     }
 }
 
-/// Geometry plus the epistemic lineage supporting the estimate.
-///
-/// VIS-003 deliberately requires `Inferred` evidence: a box, mask, keypoint set, or patch envelope
-/// is an interpretation of sensor data, not the raw sensor observation itself.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Geometry bound to validated `Inferred` visual evidence.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct InferredObjectGeometry {
-    pub geometry: VisualObjectGeometry,
-    pub evidence: VisualEvidence,
+    geometry: VisualObjectGeometry,
+    evidence: VisualEvidence,
 }
 
 impl InferredObjectGeometry {
@@ -498,6 +523,26 @@ impl InferredObjectGeometry {
             return Err(GeometryError::RequiresInferredEvidence);
         }
         Ok(Self { geometry, evidence })
+    }
+
+    pub fn from_patch_hypothesis(
+        hypothesis: &ObjectHypothesis,
+        grid: &PatchGrid,
+        uncertainty: GeometryUncertainty,
+        evidence: VisualEvidence,
+    ) -> Result<Self, GeometryError> {
+        Self::new(
+            VisualObjectGeometry::from_patch_hypothesis(hypothesis, grid, uncertainty)?,
+            evidence,
+        )
+    }
+
+    pub const fn geometry(&self) -> &VisualObjectGeometry {
+        &self.geometry
+    }
+
+    pub const fn evidence(&self) -> &VisualEvidence {
+        &self.evidence
     }
 }
 
@@ -527,25 +572,54 @@ pub enum GeometryError {
 impl std::fmt::Display for GeometryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidFrameDimensions => f.write_str("visual geometry frame dimensions must be non-zero"),
+            Self::InvalidFrameDimensions => {
+                f.write_str("visual geometry frame dimensions must be non-zero")
+            }
             Self::GeometryOverflow => f.write_str("visual geometry arithmetic overflow"),
             Self::PointOutOfBounds => f.write_str("visual geometry point lies outside its frame"),
-            Self::InvalidRectangle => f.write_str("visual geometry rectangle is empty, non-finite, or outside its frame"),
-            Self::InvalidConfidence => f.write_str("visual geometry confidence must be finite and within [0, 1]"),
-            Self::InvalidStandardDeviation => f.write_str("visual geometry standard deviations must be finite and non-negative"),
-            Self::EmptyPatchSupport => f.write_str("patch-cluster geometry requires at least one supporting patch"),
-            Self::PatchIndexOutOfBounds { index } => write!(f, "patch index {index} lies outside the patch grid"),
-            Self::DuplicatePatchIndex { index } => write!(f, "patch index {index} appears more than once"),
-            Self::CentroidPatchOutOfBounds => f.write_str("object centroid patch lies outside the patch grid"),
+            Self::InvalidRectangle => f.write_str(
+                "visual geometry rectangle is empty, non-finite, or outside its frame",
+            ),
+            Self::InvalidConfidence => {
+                f.write_str("visual geometry confidence must be finite and within [0, 1]")
+            }
+            Self::InvalidStandardDeviation => f.write_str(
+                "visual geometry standard deviations must be finite and non-negative",
+            ),
+            Self::EmptyPatchSupport => {
+                f.write_str("patch-cluster geometry requires at least one supporting patch")
+            }
+            Self::PatchIndexOutOfBounds { index } => {
+                write!(f, "patch index {index} lies outside the patch grid")
+            }
+            Self::DuplicatePatchIndex { index } => {
+                write!(f, "patch index {index} appears more than once")
+            }
+            Self::CentroidPatchOutOfBounds => {
+                f.write_str("object centroid patch lies outside the patch grid")
+            }
             Self::EmptyMask => f.write_str("segmentation mask must contain foreground support"),
-            Self::ZeroLengthMaskRun { index } => write!(f, "segmentation mask run {index} has zero length"),
-            Self::MaskRunOutOfBounds { index } => write!(f, "segmentation mask run {index} exceeds mask dimensions"),
-            Self::OverlappingMaskRuns { index } => write!(f, "segmentation mask run {index} overlaps or is out of order"),
-            Self::MaskFrameMismatch => f.write_str("segmentation mask dimensions do not match the image frame"),
-            Self::EmptyKeypoints => f.write_str("keypoint geometry requires at least one keypoint"),
+            Self::ZeroLengthMaskRun { index } => {
+                write!(f, "segmentation mask run {index} has zero length")
+            }
+            Self::MaskRunOutOfBounds { index } => {
+                write!(f, "segmentation mask run {index} exceeds mask dimensions")
+            }
+            Self::OverlappingMaskRuns { index } => write!(
+                f,
+                "segmentation mask run {index} overlaps or is out of order"
+            ),
+            Self::MaskFrameMismatch => {
+                f.write_str("segmentation mask dimensions do not match the image frame")
+            }
+            Self::EmptyKeypoints => {
+                f.write_str("keypoint geometry requires at least one keypoint")
+            }
             Self::EmptyKeypointName => f.write_str("visual keypoint names must be non-empty"),
             Self::InvalidVisualEvidence => f.write_str("geometry carries invalid visual evidence"),
-            Self::RequiresInferredEvidence => f.write_str("object geometry must be carried as inferred visual evidence"),
+            Self::RequiresInferredEvidence => {
+                f.write_str("object geometry must be carried as inferred visual evidence")
+            }
         }
     }
 }
@@ -580,8 +654,9 @@ fn validate_rect(
     if frame_width == 0 || frame_height == 0 {
         return Err(GeometryError::InvalidFrameDimensions);
     }
-    let values = [rect.left, rect.top, rect.right, rect.bottom];
-    if values.into_iter().any(|value| !value.is_finite())
+    if [rect.left, rect.top, rect.right, rect.bottom]
+        .into_iter()
+        .any(|value| !value.is_finite())
         || rect.left < 0.0
         || rect.top < 0.0
         || rect.right > frame_width as f32
@@ -602,9 +677,8 @@ mod tests {
     use crate::epistemic::{VisualCaptureClock, VisualObservationRef, VisualStreamRef};
 
     fn inferred_evidence(confidence: f32) -> VisualEvidence {
-        let stream = VisualStreamRef::new(11, 5).unwrap();
         let observation = VisualObservationRef::new(
-            stream,
+            VisualStreamRef::new(11, 5).unwrap(),
             9,
             123_000,
             VisualCaptureClock::StreamMonotonic,
@@ -651,7 +725,7 @@ mod tests {
         let metrics = geometry.metric_eligibility();
         assert!(metrics.patch_overlap);
         assert!(!metrics.box_iou);
-        match geometry.support {
+        match geometry.support() {
             GeometrySupport::PatchClusterExtent { bounds, .. } => {
                 assert_eq!(bounds.left, 0.0);
                 assert_eq!(bounds.top, 0.0);
@@ -674,7 +748,7 @@ mod tests {
     }
 
     #[test]
-    fn detector_box_is_box_iou_eligible() {
+    fn detector_box_alone_is_box_iou_eligible() {
         let geometry = VisualObjectGeometry::detector_box(
             100,
             80,
@@ -693,7 +767,6 @@ mod tests {
 
     #[test]
     fn mask_rle_validates_and_computes_exact_bounds() {
-        // 4x3 mask, foreground: row0 x1..2 and row1 x0..1.
         let mask = SegmentationMaskRle::new(
             4,
             3,
@@ -742,12 +815,10 @@ mod tests {
             GeometryUncertainty::unknown(1.0).unwrap(),
         )
         .unwrap();
-        let inferred = InferredObjectGeometry::new(geometry.clone(), inferred_evidence(1.0));
-        assert!(inferred.is_ok());
+        assert!(InferredObjectGeometry::new(geometry.clone(), inferred_evidence(1.0)).is_ok());
 
-        let stream = VisualStreamRef::new(11, 5).unwrap();
         let observation = VisualObservationRef::new(
-            stream,
+            VisualStreamRef::new(11, 5).unwrap(),
             9,
             123_000,
             VisualCaptureClock::StreamMonotonic,
@@ -756,6 +827,18 @@ mod tests {
         assert_eq!(
             InferredObjectGeometry::new(geometry, observed),
             Err(GeometryError::RequiresInferredEvidence)
+        );
+    }
+
+    #[test]
+    fn invalid_uncertainty_cannot_be_constructed() {
+        assert_eq!(
+            GeometryUncertainty::new(0.8, Some([-1.0, 0.0]), None),
+            Err(GeometryError::InvalidStandardDeviation)
+        );
+        assert_eq!(
+            GeometryUncertainty::unknown(f32::NAN),
+            Err(GeometryError::InvalidConfidence)
         );
     }
 }
