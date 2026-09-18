@@ -73,6 +73,7 @@ pub mod mce_narrative_boundary;
 pub mod narrative_evidence;
 pub mod replay_policy;
 pub mod semantic_context;
+pub mod semantic_null_calibration;
 pub mod semantic_prior;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
@@ -152,8 +153,9 @@ pub use dream_semantic_coordinator::{
     DreamSemanticCoordinatorError, DreamSemanticOutcome, process_semantic_insight_atomically,
 };
 pub use dream_wisdom_provenance::{
-    DreamWisdomBatchIdentity, DreamWisdomIdentity, DreamWisdomProvenanceError,
-    dream_wisdom_batch_identity, dream_wisdom_identity,
+    DreamWisdomBatchIdentity, DreamWisdomIdentity, DreamWisdomProposalIdentity,
+    DreamWisdomProvenanceError, dream_wisdom_batch_identity, dream_wisdom_identity,
+    dream_wisdom_proposal_identity,
 };
 pub use epistemic_world::{EpistemicWorldRecord, WorldEvidenceKind};
 pub use exact_replay::{ExactReplayWorld, ReplayError};
@@ -168,7 +170,16 @@ pub use semantic_context::{
     ContextIdentity, DEFAULT_CONTEXT_CLAMP_ABS, DEFAULT_SEMANTIC_LEVELS, HDC_CHANCE_SIMILARITY,
     SemanticContextEncoder, SemanticContextError, SemanticContextIndex, SemanticContextMatch,
 };
-pub use semantic_prior::{SemanticPriorCandidate, SemanticPriorError, SemanticPriorMemory};
+pub use semantic_null_calibration::{
+    DEFAULT_MAX_NULL_CONTEXTS_PER_DIMENSION, DEFAULT_MIN_NULL_PAIRS_PER_DIMENSION,
+    SEMANTIC_NULL_CALIBRATION_SCHEMA, SemanticNullAssessment, SemanticNullCalibration,
+    SemanticNullCalibrationError, SemanticNullCalibrationIdentity, SemanticNullConfig,
+    SemanticNullStratumSummary,
+};
+pub use semantic_prior::{
+    CalibratedSemanticPriorCandidate, SemanticPriorCandidate, SemanticPriorError,
+    SemanticPriorMemory,
+};
 pub use sym_rsi_candidate_family::{
     FrozenReplayCorpus, ReplayAcquisitionError, ReplayCorpusAcquisitionReceipt,
     SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA, SYM_RSI_001_INCUMBENT_POLICY_ID,
