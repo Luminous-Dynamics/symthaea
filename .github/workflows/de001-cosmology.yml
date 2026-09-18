@@ -105,5 +105,3 @@ jobs:
   a1r-qualification:
     name: DE-001A1 fixed-point qualification
     uses: ./.github/workflows/de001a-a1r-qualification.yml
-    permissions:
-      contents: read
