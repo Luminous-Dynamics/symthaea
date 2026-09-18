@@ -1,10 +1,6 @@
 name: DE-001A1 Rust Fixed-Point Qualification
 
 on:
-  pull_request:
-    paths:
-      - "crates/domains/symthaea-cosmology-research/**"
-      - ".github/workflows/de001a-a1r-qualification.yml"
   workflow_dispatch:
   workflow_call:
 
