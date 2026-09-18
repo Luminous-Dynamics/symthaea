@@ -107,7 +107,7 @@ jobs:
           } > hum-wrench-001a-evidence/receipt.txt
 
       - name: Upload qualification evidence
-        uses: actions/upload-artifact@ea165f8d65b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: hum-wrench-001a-${{ github.event.pull_request.head.sha || github.sha }}
           path: hum-wrench-001a-evidence/
