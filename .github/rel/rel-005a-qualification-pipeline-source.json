@@ -47,7 +47,8 @@
     "attestation_contract": "418e84cfcd097f15191afed42be8859fd951a326",
     "capsule_builder": "6a4bfbc29926be0a2efa0b7443cbdd476dbb4c2e",
     "authority_receipt_extractor": "70b94a183b79764ee8a83320776588773e2a4bab",
-    "qualification_assembler": "34406caf7c98bc9de28953f7727b3c059c5af473"
+    "sealed_manifest_replay": "2500f14919a2ee586ba14f836b766aea5b09bb75",
+    "qualification_assembler": "a10f0841e3bfaca0c85b76714fa47cf2c2ad9a91"
   },
   "job_visibility": {
     "AuthorityReceiptExtractionOnly": {

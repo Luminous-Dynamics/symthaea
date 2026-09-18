@@ -1,10 +1,11 @@
-name: REL-005A Qualification Pipeline V2
+name: REL-005A Qualification Pipeline V3
 
 on:
   pull_request:
     paths:
       - ".github/rel/rel-005a-qualification-pipeline-source.json"
       - ".github/rel/rel-005a-authority-receipt-extract.py"
+      - ".github/rel/rel-005a-sealed-manifest-replay.py"
       - ".github/rel/rel-005a-qualification-assemble.py"
       - ".github/workflows/rel-005a-qualification-pipeline.yml"
   workflow_dispatch:
@@ -44,8 +45,9 @@ env:
   QUALIFICATION_EVALUATOR_BLOB: 60663a6e797008669d75712e67acba9e3151a825
   CAPSULE_BUILDER_BLOB: 6a4bfbc29926be0a2efa0b7443cbdd476dbb4c2e
   EXTRACTOR_BLOB: 70b94a183b79764ee8a83320776588773e2a4bab
-  ASSEMBLER_BLOB: 34406caf7c98bc9de28953f7727b3c059c5af473
-  PIPELINE_SOURCE_BLOB: 4d1e339378b607b6a2cf5093d761db17d00a5b1f
+  MANIFEST_REPLAY_BLOB: 2500f14919a2ee586ba14f836b766aea5b09bb75
+  ASSEMBLER_BLOB: a10f0841e3bfaca0c85b76714fa47cf2c2ad9a91
+  PIPELINE_SOURCE_BLOB: 143232fda854a8603225841ee155a60963c69619
   CAPSULE_NAME: rel-005a-qualification-capsule.tar
 
 jobs:
@@ -58,6 +60,7 @@ jobs:
       predicate_artifact_digest: ${{ steps.source_meta.outputs.predicate_artifact_digest }}
       seal_artifact_id: ${{ steps.source_meta.outputs.seal_artifact_id }}
       seal_artifact_digest: ${{ steps.source_meta.outputs.seal_artifact_digest }}
+      manifest_replay_receipt_sha256: ${{ steps.manifest_replay.outputs.manifest_replay_receipt_sha256 }}
       predicate_receipt_sha256: ${{ steps.extract.outputs.predicate_receipt_sha256 }}
       execution_receipt_sha256: ${{ steps.extract.outputs.execution_receipt_sha256 }}
       seal_receipt_sha256: ${{ steps.extract.outputs.seal_receipt_sha256 }}
@@ -66,7 +69,8 @@ jobs:
       - name: Checkout exact pipeline subject
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: {ref: "${{ env.EXPECTED_HEAD }}", fetch-depth: 0}
-      - name: Bind exact parent, code blobs, and four-file scope
+
+      - name: Bind exact parent, code blobs, and five-file scope
         shell: bash
         run: |
           set -euo pipefail
@@ -74,36 +78,93 @@ jobs:
           test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-pipeline-source.json)" = "${PIPELINE_SOURCE_BLOB}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-authority-receipt-extract.py)" = "${EXTRACTOR_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-sealed-manifest-replay.py)" = "${MANIFEST_REPLAY_BLOB}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-assemble.py)" = "${ASSEMBLER_BLOB}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-projection.py)" = "${PROJECTION_EVALUATOR_BLOB}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-input-firewall.py)" = "${FIREWALL_EVALUATOR_BLOB}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-only.py)" = "${QUALIFICATION_EVALUATOR_BLOB}"
           test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-capsule.py)" = "${CAPSULE_BUILDER_BLOB}"
           mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
-          expected=(".github/rel/rel-005a-authority-receipt-extract.py" ".github/rel/rel-005a-qualification-assemble.py" ".github/rel/rel-005a-qualification-pipeline-source.json" ".github/workflows/rel-005a-qualification-pipeline.yml")
-          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort); test "${changed[*]}" = "${expected_sorted[*]}"
+          expected=(
+            ".github/rel/rel-005a-authority-receipt-extract.py"
+            ".github/rel/rel-005a-sealed-manifest-replay.py"
+            ".github/rel/rel-005a-qualification-assemble.py"
+            ".github/rel/rel-005a-qualification-pipeline-source.json"
+            ".github/workflows/rel-005a-qualification-pipeline.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
       - name: Resolve predicate and seal transport identities
         id: source_meta
         shell: bash
         env: {GH_TOKEN: "${{ github.token }}"}
         run: |
           set -euo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"; auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
-          curl -fsSL "${auth[@]}" "${api}/actions/runs/${PREDICATE_RUN_ID}" > "${RUNNER_TEMP}/predicate-run.json"; curl -fsSL "${auth[@]}" "${api}/actions/runs/${PREDICATE_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/predicate-artifacts.json"; curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}" > "${RUNNER_TEMP}/seal-run.json"; curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}/jobs?per_page=100" > "${RUNNER_TEMP}/seal-jobs.json"; curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/seal-artifacts.json"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${PREDICATE_RUN_ID}" > "${RUNNER_TEMP}/predicate-run.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${PREDICATE_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/predicate-artifacts.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}" > "${RUNNER_TEMP}/seal-run.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}/jobs?per_page=100" > "${RUNNER_TEMP}/seal-jobs.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SEAL_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/seal-artifacts.json"
           python3 - <<'PY'
           import json,os,pathlib
-          root=pathlib.Path(os.environ['RUNNER_TEMP']); pr=json.loads((root/'predicate-run.json').read_text()); sr=json.loads((root/'seal-run.json').read_text()); assert pr['id']==int(os.environ['PREDICATE_RUN_ID']) and pr['head_sha']==os.environ['PREDICATE_HEAD'] and pr['status']=='completed' and pr['conclusion']=='success'; assert sr['id']==int(os.environ['SEAL_RUN_ID']) and sr['head_sha']==os.environ['SEAL_HEAD'] and sr['status']=='completed' and sr['conclusion']=='success'; jobs=json.loads((root/'seal-jobs.json').read_text())['jobs']; selected=[j for j in jobs if j['id']==int(os.environ['SEAL_JOB_ID'])]; assert len(selected)==1 and selected[0]['conclusion']=='success'
+          root=pathlib.Path(os.environ['RUNNER_TEMP'])
+          pr=json.loads((root/'predicate-run.json').read_text()); sr=json.loads((root/'seal-run.json').read_text())
+          assert pr['id']==int(os.environ['PREDICATE_RUN_ID']) and pr['head_sha']==os.environ['PREDICATE_HEAD'] and pr['status']=='completed' and pr['conclusion']=='success'
+          assert sr['id']==int(os.environ['SEAL_RUN_ID']) and sr['head_sha']==os.environ['SEAL_HEAD'] and sr['status']=='completed' and sr['conclusion']=='success'
+          jobs=json.loads((root/'seal-jobs.json').read_text())['jobs']; selected=[j for j in jobs if j['id']==int(os.environ['SEAL_JOB_ID'])]; assert len(selected)==1 and selected[0]['conclusion']=='success'
           def resolve(path,name,run_id,head):
-              x=json.loads(path.read_text()); assert x['total_count']<=100; found=[a for a in x['artifacts'] if a['name']==name and a['expired'] is False]; assert len(found)==1; a=found[0]; assert a['workflow_run']['id']==run_id and a['workflow_run']['head_sha']==head and a['digest'].startswith('sha256:'); return a
-          pa=resolve(root/'predicate-artifacts.json',os.environ['PREDICATE_ARTIFACT_NAME'],int(os.environ['PREDICATE_RUN_ID']),os.environ['PREDICATE_HEAD']); sa=resolve(root/'seal-artifacts.json',os.environ['SEAL_ARTIFACT_NAME'],int(os.environ['SEAL_RUN_ID']),os.environ['SEAL_HEAD'])
-          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:f.write(f"predicate_artifact_id={pa['id']}\npredicate_artifact_digest={pa['digest']}\nseal_artifact_id={sa['id']}\nseal_artifact_digest={sa['digest']}\n")
+              x=json.loads(path.read_text()); assert x['total_count']<=100
+              found=[a for a in x['artifacts'] if a['name']==name and a['expired'] is False]; assert len(found)==1
+              a=found[0]; assert a['workflow_run']['id']==run_id and a['workflow_run']['head_sha']==head and a['digest'].startswith('sha256:'); return a
+          pa=resolve(root/'predicate-artifacts.json',os.environ['PREDICATE_ARTIFACT_NAME'],int(os.environ['PREDICATE_RUN_ID']),os.environ['PREDICATE_HEAD'])
+          sa=resolve(root/'seal-artifacts.json',os.environ['SEAL_ARTIFACT_NAME'],int(os.environ['SEAL_RUN_ID']),os.environ['SEAL_HEAD'])
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"predicate_artifact_id={pa['id']}\npredicate_artifact_digest={pa['digest']}\nseal_artifact_id={sa['id']}\nseal_artifact_digest={sa['digest']}\n")
           PY
+
       - name: Download and verify source transport ZIPs
         shell: bash
-        env: {GH_TOKEN: "${{ github.token }}", PREDICATE_ARTIFACT_ID: "${{ steps.source_meta.outputs.predicate_artifact_id }}", PREDICATE_ARTIFACT_DIGEST: "${{ steps.source_meta.outputs.predicate_artifact_digest }}", SEAL_ARTIFACT_ID: "${{ steps.source_meta.outputs.seal_artifact_id }}", SEAL_ARTIFACT_DIGEST: "${{ steps.source_meta.outputs.seal_artifact_digest }}"}
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          PREDICATE_ARTIFACT_ID: "${{ steps.source_meta.outputs.predicate_artifact_id }}"
+          PREDICATE_ARTIFACT_DIGEST: "${{ steps.source_meta.outputs.predicate_artifact_digest }}"
+          SEAL_ARTIFACT_ID: "${{ steps.source_meta.outputs.seal_artifact_id }}"
+          SEAL_ARTIFACT_DIGEST: "${{ steps.source_meta.outputs.seal_artifact_digest }}"
         run: |
           set -euo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"; auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"); mkdir -p "${RUNNER_TEMP}/predicate-source" "${RUNNER_TEMP}/seal-source"; curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${PREDICATE_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/predicate.zip"; curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${SEAL_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/seal.zip"; test "$(sha256sum "${RUNNER_TEMP}/predicate.zip"|cut -d' ' -f1)" = "${PREDICATE_ARTIFACT_DIGEST#sha256:}"; test "$(sha256sum "${RUNNER_TEMP}/seal.zip"|cut -d' ' -f1)" = "${SEAL_ARTIFACT_DIGEST#sha256:}"; unzip -q "${RUNNER_TEMP}/predicate.zip" -d "${RUNNER_TEMP}/predicate-source"; unzip -q "${RUNNER_TEMP}/seal.zip" -d "${RUNNER_TEMP}/seal-source"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          mkdir -p "${RUNNER_TEMP}/predicate-source" "${RUNNER_TEMP}/seal-source"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${PREDICATE_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/predicate.zip"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${SEAL_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/seal.zip"
+          test "$(sha256sum "${RUNNER_TEMP}/predicate.zip" | cut -d' ' -f1)" = "${PREDICATE_ARTIFACT_DIGEST#sha256:}"
+          test "$(sha256sum "${RUNNER_TEMP}/seal.zip" | cut -d' ' -f1)" = "${SEAL_ARTIFACT_DIGEST#sha256:}"
+          unzip -q "${RUNNER_TEMP}/predicate.zip" -d "${RUNNER_TEMP}/predicate-source"
+          unzip -q "${RUNNER_TEMP}/seal.zip" -d "${RUNNER_TEMP}/seal-source"
+
+      - name: Replay complete sealed execution manifest
+        id: manifest_replay
+        shell: bash
+        env: {MANIFEST_REPLAY_RECEIPT: "${{ runner.temp }}/sealed-manifest-replay.json"}
+        run: |
+          set -euo pipefail
+          python3 .github/rel/rel-005a-sealed-manifest-replay.py --seal-root "${RUNNER_TEMP}/seal-source" | tee "${MANIFEST_REPLAY_RECEIPT}"
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib
+          p=pathlib.Path(os.environ['MANIFEST_REPLAY_RECEIPT']); r=json.loads(p.read_text())
+          assert r['authority']=='SealedManifestReplayOnly'
+          assert r['manifest_entry_count']==10
+          assert r['exact_file_census_verified'] is True
+          assert r['byte_lengths_verified'] is True and r['sha256_commitments_verified'] is True
+          assert r['scientific_observation_fields_parsed'] is False and r['execution_logs_parsed'] is False
+          assert not any(r['claims'].values())
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"manifest_replay_receipt_sha256={hashlib.sha256(p.read_bytes()).hexdigest()}\n")
+          PY
+
       - name: Verify commitments and extract only authority receipts
         id: extract
         shell: bash
@@ -113,13 +174,23 @@ jobs:
           python3 .github/rel/rel-005a-authority-receipt-extract.py --source .github/rel/rel-005a-qualification-pipeline-source.json --predicate-root "${RUNNER_TEMP}/predicate-source" --seal-root "${RUNNER_TEMP}/seal-source" --output-dir "${RUNNER_TEMP}/authority-receipts" | tee "${EXTRACTION_RECEIPT}"
           python3 - <<'PY'
           import hashlib,json,os,pathlib
-          path=pathlib.Path(os.environ['EXTRACTION_RECEIPT']); r=json.loads(path.read_text()); assert r['authority']=='AuthorityReceiptExtractionOnly' and r['raw_observation_output'] is False and r['execution_logs_output'] is False and r['scientific_observation_fields_parsed'] is False
-          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:f.write(f"predicate_receipt_sha256={r['predicate_receipt_sha256']}\nexecution_receipt_sha256={r['execution_receipt_sha256']}\nseal_receipt_sha256={r['seal_receipt_sha256']}\nextraction_receipt_sha256={hashlib.sha256(path.read_bytes()).hexdigest()}\n")
+          path=pathlib.Path(os.environ['EXTRACTION_RECEIPT']); r=json.loads(path.read_text())
+          assert r['authority']=='AuthorityReceiptExtractionOnly' and r['raw_observation_output'] is False and r['execution_logs_output'] is False and r['scientific_observation_fields_parsed'] is False
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"predicate_receipt_sha256={r['predicate_receipt_sha256']}\nexecution_receipt_sha256={r['execution_receipt_sha256']}\nseal_receipt_sha256={r['seal_receipt_sha256']}\nextraction_receipt_sha256={hashlib.sha256(path.read_bytes()).hexdigest()}\n")
           PY
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with: {name: "rel-005a-authority-receipts-${{ env.EXPECTED_HEAD }}", path: "${{ runner.temp }}/authority-receipts/*", retention-days: 90, if-no-files-found: error}
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with: {name: "rel-005a-authority-extraction-audit-${{ env.EXPECTED_HEAD }}", path: "${{ runner.temp }}/authority-receipt-extraction.json", retention-days: 90, if-no-files-found: error}
+      - name: Upload extraction audit evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-authority-extraction-audit-${{ env.EXPECTED_HEAD }}
+          path: |
+            ${{ runner.temp }}/authority-receipt-extraction.json
+            ${{ runner.temp }}/sealed-manifest-replay.json
+          retention-days: 90
+          if-no-files-found: error
 
   evidence_projection:
     name: Project detailed comparison into metric-free evidence
@@ -147,21 +218,45 @@ jobs:
         run: |
           set -euo pipefail
           api="https://api.github.com/repos/${GITHUB_REPOSITORY}"; auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
-          for label in comparison projection; do if [ "$label" = comparison ]; then run="${COMPARISON_RUN_ID}"; else run="${PROJECTION_RUN_ID}"; fi; curl -fsSL "${auth[@]}" "${api}/actions/runs/${run}" > "${RUNNER_TEMP}/${label}-run.json"; curl -fsSL "${auth[@]}" "${api}/actions/runs/${run}/jobs?per_page=100" > "${RUNNER_TEMP}/${label}-jobs.json"; curl -fsSL "${auth[@]}" "${api}/actions/runs/${run}/artifacts?per_page=100" > "${RUNNER_TEMP}/${label}-artifacts.json"; done
+          for label in comparison projection; do
+            if [ "$label" = comparison ]; then run="${COMPARISON_RUN_ID}"; else run="${PROJECTION_RUN_ID}"; fi
+            curl -fsSL "${auth[@]}" "${api}/actions/runs/${run}" > "${RUNNER_TEMP}/${label}-run.json"
+            curl -fsSL "${auth[@]}" "${api}/actions/runs/${run}/jobs?per_page=100" > "${RUNNER_TEMP}/${label}-jobs.json"
+            curl -fsSL "${auth[@]}" "${api}/actions/runs/${run}/artifacts?per_page=100" > "${RUNNER_TEMP}/${label}-artifacts.json"
+          done
           python3 - <<'PY'
           import json,os,pathlib
           root=pathlib.Path(os.environ['RUNNER_TEMP'])
           def resolve(label,run_id,head,workflow,job,artifact):
-              r=json.loads((root/f'{label}-run.json').read_text()); assert r['id']==run_id and r['head_sha']==head and r['name']==workflow and r['status']=='completed' and r['conclusion']=='success'; js=json.loads((root/f'{label}-jobs.json').read_text())['jobs']; jj=[x for x in js if x['name']==job]; assert len(jj)==1 and jj[0]['conclusion']=='success'; x=json.loads((root/f'{label}-artifacts.json').read_text()); assert x['total_count']<=100; aa=[a for a in x['artifacts'] if a['name']==artifact and a['expired'] is False]; assert len(aa)==1; a=aa[0]; assert a['workflow_run']['id']==run_id and a['workflow_run']['head_sha']==head and a['digest'].startswith('sha256:'); return jj[0]['id'],a
-          cj,ca=resolve('comparison',int(os.environ['COMPARISON_RUN_ID']),os.environ['COMPARISON_HEAD'],os.environ['COMPARISON_WORKFLOW'],os.environ['COMPARISON_JOB'],os.environ['COMPARISON_ARTIFACT_NAME']); pj,pa=resolve('projection',int(os.environ['PROJECTION_RUN_ID']),os.environ['PROJECTION_HEAD'],os.environ['PROJECTION_WORKFLOW'],os.environ['PROJECTION_JOB'],os.environ['PROJECTION_ARTIFACT_NAME'])
-          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:f.write(f"comparison_source_job_id={cj}\ncomparison_artifact_id={ca['id']}\ncomparison_artifact_digest={ca['digest']}\nprojection_contract_source_job_id={pj}\nprojection_contract_artifact_id={pa['id']}\nprojection_contract_artifact_digest={pa['digest']}\n")
+              r=json.loads((root/f'{label}-run.json').read_text()); assert r['id']==run_id and r['head_sha']==head and r['name']==workflow and r['status']=='completed' and r['conclusion']=='success'
+              js=json.loads((root/f'{label}-jobs.json').read_text())['jobs']; jj=[x for x in js if x['name']==job]; assert len(jj)==1 and jj[0]['conclusion']=='success'
+              x=json.loads((root/f'{label}-artifacts.json').read_text()); assert x['total_count']<=100; aa=[a for a in x['artifacts'] if a['name']==artifact and a['expired'] is False]; assert len(aa)==1
+              a=aa[0]; assert a['workflow_run']['id']==run_id and a['workflow_run']['head_sha']==head and a['digest'].startswith('sha256:'); return jj[0]['id'],a
+          cj,ca=resolve('comparison',int(os.environ['COMPARISON_RUN_ID']),os.environ['COMPARISON_HEAD'],os.environ['COMPARISON_WORKFLOW'],os.environ['COMPARISON_JOB'],os.environ['COMPARISON_ARTIFACT_NAME'])
+          pj,pa=resolve('projection',int(os.environ['PROJECTION_RUN_ID']),os.environ['PROJECTION_HEAD'],os.environ['PROJECTION_WORKFLOW'],os.environ['PROJECTION_JOB'],os.environ['PROJECTION_ARTIFACT_NAME'])
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"comparison_source_job_id={cj}\ncomparison_artifact_id={ca['id']}\ncomparison_artifact_digest={ca['digest']}\nprojection_contract_source_job_id={pj}\nprojection_contract_artifact_id={pa['id']}\nprojection_contract_artifact_digest={pa['digest']}\n")
           PY
+
       - name: Download and verify upstream ZIPs
         shell: bash
-        env: {GH_TOKEN: "${{ github.token }}", COMPARISON_ARTIFACT_ID: "${{ steps.upstream_meta.outputs.comparison_artifact_id }}", COMPARISON_ARTIFACT_DIGEST: "${{ steps.upstream_meta.outputs.comparison_artifact_digest }}", PROJECTION_ARTIFACT_ID: "${{ steps.upstream_meta.outputs.projection_contract_artifact_id }}", PROJECTION_ARTIFACT_DIGEST: "${{ steps.upstream_meta.outputs.projection_contract_artifact_digest }}"}
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          COMPARISON_ARTIFACT_ID: "${{ steps.upstream_meta.outputs.comparison_artifact_id }}"
+          COMPARISON_ARTIFACT_DIGEST: "${{ steps.upstream_meta.outputs.comparison_artifact_digest }}"
+          PROJECTION_ARTIFACT_ID: "${{ steps.upstream_meta.outputs.projection_contract_artifact_id }}"
+          PROJECTION_ARTIFACT_DIGEST: "${{ steps.upstream_meta.outputs.projection_contract_artifact_digest }}"
         run: |
           set -euo pipefail
-          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"; auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"); mkdir -p "${RUNNER_TEMP}/comparison-source" "${RUNNER_TEMP}/projection-source"; curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${COMPARISON_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/comparison.zip"; curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${PROJECTION_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/projection.zip"; test "$(sha256sum "${RUNNER_TEMP}/comparison.zip"|cut -d' ' -f1)" = "${COMPARISON_ARTIFACT_DIGEST#sha256:}"; test "$(sha256sum "${RUNNER_TEMP}/projection.zip"|cut -d' ' -f1)" = "${PROJECTION_ARTIFACT_DIGEST#sha256:}"; unzip -q "${RUNNER_TEMP}/comparison.zip" -d "${RUNNER_TEMP}/comparison-source"; unzip -q "${RUNNER_TEMP}/projection.zip" -d "${RUNNER_TEMP}/projection-source"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"; auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          mkdir -p "${RUNNER_TEMP}/comparison-source" "${RUNNER_TEMP}/projection-source"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${COMPARISON_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/comparison.zip"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${PROJECTION_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/projection.zip"
+          test "$(sha256sum "${RUNNER_TEMP}/comparison.zip" | cut -d' ' -f1)" = "${COMPARISON_ARTIFACT_DIGEST#sha256:}"
+          test "$(sha256sum "${RUNNER_TEMP}/projection.zip" | cut -d' ' -f1)" = "${PROJECTION_ARTIFACT_DIGEST#sha256:}"
+          unzip -q "${RUNNER_TEMP}/comparison.zip" -d "${RUNNER_TEMP}/comparison-source"
+          unzip -q "${RUNNER_TEMP}/projection.zip" -d "${RUNNER_TEMP}/projection-source"
+
       - name: Validate upstream receipts and run frozen projection
         id: project
         shell: bash
@@ -172,11 +267,20 @@ jobs:
           root=pathlib.Path(os.environ['RUNNER_TEMP'])
           def unique(b,n):
               x=[p for p in b.rglob(n) if p.is_file()]; assert len(x)==1,(n,len(x)); return x[0]
-          sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest(); comp=unique(root/'comparison-source','comparison-only-v1.json'); orch=unique(root/'comparison-source','comparison-v3-orchestration-receipt.json'); proj=unique(root/'projection-source','qualification-projection-contract-receipt.json'); c=json.loads(comp.read_text()); o=json.loads(orch.read_text()); p=json.loads(proj.read_text())
-          assert c['schema']=='symthaea.rel.comparison-only.v1' and c['authority']=='ComparisonOnly' and c['comparison_result'] in {'ALL_PREDICATES_PASS','PREDICATE_FAILURES'} and c['predicate_count']==41 and c['passed_count']+c['failed_count']==41; assert c['claims']=={'comparison_only_adjudicated':True,'rel_005a_qualified':False,'scientific_pass':False,'scientific_fail':False}; assert o['schema']=='symthaea.rel.comparison-orchestration-receipt.v2' and o['authority']=='ComparisonInfrastructureOnly' and o['subject_head']==os.environ['COMPARISON_HEAD'] and o['comparison_output_sha256']==sha(comp) and o['comparison_result']==c['comparison_result'] and o['transport_identity_is_scientific_authority'] is False and o['seal_chain_commitment_sha256']==os.environ['SEAL_CHAIN_SHA256']; assert p['schema']=='symthaea.rel.qualification-projection-contract-static-receipt.v1' and p['authority']=='EvidenceProjectionContractOnly' and p['subject_head']==os.environ['PROJECTION_HEAD'] and p['self_tests_passed'] is True and p['raw_observation_output'] is False and p['raw_execution_logs_output'] is False and p['detailed_predicate_values_output'] is False and p['failed_predicate_identity_preserved'] is True and p['comparison_result_preserved'] is True and not any(p['claims'].values())
-          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:f.write(f"full_comparison_sha256={sha(comp)}\nprojection_contract_receipt_sha256={sha(proj)}\n"); (root/'comparison-path.txt').write_text(str(comp))
+          sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+          comp=unique(root/'comparison-source','comparison-only-v1.json'); orch=unique(root/'comparison-source','comparison-v3-orchestration-receipt.json'); proj=unique(root/'projection-source','qualification-projection-contract-receipt.json')
+          c=json.loads(comp.read_text()); o=json.loads(orch.read_text()); p=json.loads(proj.read_text())
+          assert c['schema']=='symthaea.rel.comparison-only.v1' and c['authority']=='ComparisonOnly' and c['comparison_result'] in {'ALL_PREDICATES_PASS','PREDICATE_FAILURES'} and c['predicate_count']==41 and c['passed_count']+c['failed_count']==41
+          assert c['claims']=={'comparison_only_adjudicated':True,'rel_005a_qualified':False,'scientific_pass':False,'scientific_fail':False}
+          assert o['schema']=='symthaea.rel.comparison-orchestration-receipt.v2' and o['authority']=='ComparisonInfrastructureOnly' and o['subject_head']==os.environ['COMPARISON_HEAD'] and o['comparison_output_sha256']==sha(comp) and o['comparison_result']==c['comparison_result'] and o['transport_identity_is_scientific_authority'] is False and o['seal_chain_commitment_sha256']==os.environ['SEAL_CHAIN_SHA256']
+          assert p['schema']=='symthaea.rel.qualification-projection-contract-static-receipt.v1' and p['authority']=='EvidenceProjectionContractOnly' and p['subject_head']==os.environ['PROJECTION_HEAD'] and p['self_tests_passed'] is True and p['raw_observation_output'] is False and p['raw_execution_logs_output'] is False and p['detailed_predicate_values_output'] is False and p['failed_predicate_identity_preserved'] is True and p['comparison_result_preserved'] is True and not any(p['claims'].values())
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"full_comparison_sha256={sha(comp)}\nprojection_contract_receipt_sha256={sha(proj)}\n")
+          (root/'comparison-path.txt').write_text(str(comp))
           PY
-          python3 .github/rel/rel-005a-qualification-projection.py --contract .github/rel/rel-005a-qualification-projection-contract.json --predicate-receipt "${RUNNER_TEMP}/authority-receipts/predicate-contract-receipt.json" --execution-receipt "${RUNNER_TEMP}/authority-receipts/execution-v3-receipt.json" --seal "${RUNNER_TEMP}/authority-receipts/observation-seal-v3.json" --comparison "$(cat "${RUNNER_TEMP}/comparison-path.txt")" --output-dir "${RUNNER_TEMP}/projected"; test "$(find "${RUNNER_TEMP}/projected" -maxdepth 1 -type f | wc -l)" -eq 5
+          python3 .github/rel/rel-005a-qualification-projection.py --contract .github/rel/rel-005a-qualification-projection-contract.json --predicate-receipt "${RUNNER_TEMP}/authority-receipts/predicate-contract-receipt.json" --execution-receipt "${RUNNER_TEMP}/authority-receipts/execution-v3-receipt.json" --seal "${RUNNER_TEMP}/authority-receipts/observation-seal-v3.json" --comparison "$(cat "${RUNNER_TEMP}/comparison-path.txt")" --output-dir "${RUNNER_TEMP}/projected"
+          test "$(find "${RUNNER_TEMP}/projected" -maxdepth 1 -type f | wc -l)" -eq 5
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with: {name: "rel-005a-projected-qualification-${{ env.EXPECTED_HEAD }}", path: "${{ runner.temp }}/projected/*", retention-days: 90, if-no-files-found: error}
 
@@ -197,6 +301,7 @@ jobs:
           PREDICATE_ARTIFACT_DIGEST: ${{ needs.authority_receipt_extraction.outputs.predicate_artifact_digest }}
           SEAL_ARTIFACT_ID: ${{ needs.authority_receipt_extraction.outputs.seal_artifact_id }}
           SEAL_ARTIFACT_DIGEST: ${{ needs.authority_receipt_extraction.outputs.seal_artifact_digest }}
+          MANIFEST_REPLAY_RECEIPT_SHA256: ${{ needs.authority_receipt_extraction.outputs.manifest_replay_receipt_sha256 }}
           PREDICATE_RECEIPT_SHA256: ${{ needs.authority_receipt_extraction.outputs.predicate_receipt_sha256 }}
           EXECUTION_RECEIPT_SHA256: ${{ needs.authority_receipt_extraction.outputs.execution_receipt_sha256 }}
           SEAL_RECEIPT_SHA256: ${{ needs.authority_receipt_extraction.outputs.seal_receipt_sha256 }}
@@ -213,9 +318,11 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import json,os,pathlib
-          p={'schema':'symthaea.rel.qualification-pipeline-provenance.v2','assembly_contract_head':os.environ['ASSEMBLY_HEAD'],'comparison_subject_head':os.environ['COMPARISON_HEAD'],'comparison_source_run_id':int(os.environ['COMPARISON_RUN_ID']),'comparison_source_job_id':int(os.environ['COMPARISON_SOURCE_JOB_ID']),'comparison_artifact_id':int(os.environ['COMPARISON_ARTIFACT_ID']),'comparison_artifact_name':os.environ['COMPARISON_ARTIFACT_NAME'],'comparison_artifact_digest':os.environ['COMPARISON_ARTIFACT_DIGEST'],'full_comparison_sha256':os.environ['FULL_COMPARISON_SHA256'],'projection_contract_head':os.environ['PROJECTION_HEAD'],'projection_contract_run_id':int(os.environ['PROJECTION_RUN_ID']),'projection_contract_source_job_id':int(os.environ['PROJECTION_SOURCE_JOB_ID']),'projection_contract_artifact_id':int(os.environ['PROJECTION_ARTIFACT_ID']),'projection_contract_artifact_name':os.environ['PROJECTION_ARTIFACT_NAME'],'projection_contract_artifact_digest':os.environ['PROJECTION_ARTIFACT_DIGEST'],'projection_contract_receipt_sha256':os.environ['PROJECTION_RECEIPT_SHA256'],'predicate_source_run_id':int(os.environ['PREDICATE_RUN_ID']),'predicate_artifact_id':int(os.environ['PREDICATE_ARTIFACT_ID']),'predicate_artifact_digest':os.environ['PREDICATE_ARTIFACT_DIGEST'],'seal_source_run_id':int(os.environ['SEAL_RUN_ID']),'seal_source_job_id':int(os.environ['SEAL_JOB_ID']),'seal_artifact_id':int(os.environ['SEAL_ARTIFACT_ID']),'seal_artifact_digest':os.environ['SEAL_ARTIFACT_DIGEST'],'predicate_receipt_sha256':os.environ['PREDICATE_RECEIPT_SHA256'],'execution_receipt_sha256':os.environ['EXECUTION_RECEIPT_SHA256'],'seal_receipt_sha256':os.environ['SEAL_RECEIPT_SHA256'],'authority_extraction_receipt_sha256':os.environ['EXTRACTION_RECEIPT_SHA256'],'transport_identity_scientific_authority':False,'inner_content_commitments_verified':True,'receipt_extraction_performed':True,'projection_raw_observation_visibility':False,'projection_execution_log_visibility':False,'source_extraction_raw_observation_output':False,'source_extraction_execution_log_output':False}; pathlib.Path(os.environ['RUNNER_TEMP'],'pipeline-provenance.json').write_text(json.dumps(p,indent=2,sort_keys=True)+'\n')
+          p={'schema':'symthaea.rel.qualification-pipeline-provenance.v2','assembly_contract_head':os.environ['ASSEMBLY_HEAD'],'comparison_subject_head':os.environ['COMPARISON_HEAD'],'comparison_source_run_id':int(os.environ['COMPARISON_RUN_ID']),'comparison_source_job_id':int(os.environ['COMPARISON_SOURCE_JOB_ID']),'comparison_artifact_id':int(os.environ['COMPARISON_ARTIFACT_ID']),'comparison_artifact_name':os.environ['COMPARISON_ARTIFACT_NAME'],'comparison_artifact_digest':os.environ['COMPARISON_ARTIFACT_DIGEST'],'full_comparison_sha256':os.environ['FULL_COMPARISON_SHA256'],'projection_contract_head':os.environ['PROJECTION_HEAD'],'projection_contract_run_id':int(os.environ['PROJECTION_RUN_ID']),'projection_contract_source_job_id':int(os.environ['PROJECTION_SOURCE_JOB_ID']),'projection_contract_artifact_id':int(os.environ['PROJECTION_ARTIFACT_ID']),'projection_contract_artifact_name':os.environ['PROJECTION_ARTIFACT_NAME'],'projection_contract_artifact_digest':os.environ['PROJECTION_ARTIFACT_DIGEST'],'projection_contract_receipt_sha256':os.environ['PROJECTION_RECEIPT_SHA256'],'predicate_source_run_id':int(os.environ['PREDICATE_RUN_ID']),'predicate_artifact_id':int(os.environ['PREDICATE_ARTIFACT_ID']),'predicate_artifact_digest':os.environ['PREDICATE_ARTIFACT_DIGEST'],'seal_source_run_id':int(os.environ['SEAL_RUN_ID']),'seal_source_job_id':int(os.environ['SEAL_JOB_ID']),'seal_artifact_id':int(os.environ['SEAL_ARTIFACT_ID']),'seal_artifact_digest':os.environ['SEAL_ARTIFACT_DIGEST'],'predicate_receipt_sha256':os.environ['PREDICATE_RECEIPT_SHA256'],'execution_receipt_sha256':os.environ['EXECUTION_RECEIPT_SHA256'],'seal_receipt_sha256':os.environ['SEAL_RECEIPT_SHA256'],'authority_extraction_receipt_sha256':os.environ['EXTRACTION_RECEIPT_SHA256'],'sealed_manifest_replay_receipt_sha256':os.environ['MANIFEST_REPLAY_RECEIPT_SHA256'],'transport_identity_scientific_authority':False,'inner_content_commitments_verified':True,'receipt_extraction_performed':True,'projection_raw_observation_visibility':False,'projection_execution_log_visibility':False,'source_extraction_raw_observation_output':False,'source_extraction_execution_log_output':False}
+          pathlib.Path(os.environ['RUNNER_TEMP'],'pipeline-provenance.json').write_text(json.dumps(p,indent=2,sort_keys=True)+'\n')
           PY
           python3 .github/rel/rel-005a-qualification-assemble.py --source .github/rel/rel-005a-qualification-pipeline-source.json --projected-dir "${RUNNER_TEMP}/projected" --provenance "${RUNNER_TEMP}/pipeline-provenance.json" --output-dir "${RUNNER_TEMP}/sanitized"
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with: {name: "rel-005a-sanitized-qualification-${{ env.EXPECTED_HEAD }}", path: "${{ runner.temp }}/sanitized/*", retention-days: 90, if-no-files-found: error}
 
@@ -256,7 +363,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${RUNNER_TEMP}/capsule-input"; cp "${RUNNER_TEMP}/sanitized/"*.json "${RUNNER_TEMP}/capsule-input/"; cp "${RUNNER_TEMP}/qualification-only.json" "${RUNNER_TEMP}/capsule-input/qualification-only.json"; python3 .github/rel/rel-005a-qualification-capsule.py --input-dir "${RUNNER_TEMP}/capsule-input" --output "${RUNNER_TEMP}/${CAPSULE_NAME}" > "${RUNNER_TEMP}/attestation-input-receipt.json"
+          mkdir -p "${RUNNER_TEMP}/capsule-input"
+          cp "${RUNNER_TEMP}/sanitized/"*.json "${RUNNER_TEMP}/capsule-input/"
+          cp "${RUNNER_TEMP}/qualification-only.json" "${RUNNER_TEMP}/capsule-input/qualification-only.json"
+          python3 .github/rel/rel-005a-qualification-capsule.py --input-dir "${RUNNER_TEMP}/capsule-input" --output "${RUNNER_TEMP}/${CAPSULE_NAME}" > "${RUNNER_TEMP}/attestation-input-receipt.json"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with: {name: "rel-005a-qualification-evidence-${{ env.EXPECTED_HEAD }}", path: "${{ runner.temp }}/capsule-input/*", retention-days: 90, if-no-files-found: error}
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
