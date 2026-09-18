@@ -65,6 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           rustc --version | grep -E '^rustc 1\.96\.0 '
+          nix --version | grep -Fx 'nix (Nix) 2.34.7'
           cargo fmt -p symthaea-cosmology-research -- --check
           cargo check -p symthaea-cosmology-research --all-targets --locked
           cargo test -p symthaea-cosmology-research --all-targets --locked
