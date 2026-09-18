@@ -9,7 +9,8 @@
 
 use super::experience_tree::ExperienceNodeId;
 use super::sym_rsi_candidate_family::{
-    canonical_candidate_family_digest, FrozenReplayCorpus, SYM_RSI_001_REPLAY_CORPUS_SCHEMA,
+    canonical_candidate_family_digest, canonical_fixed_hash_candidate_family, FrozenReplayCorpus,
+    SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA, SYM_RSI_001_REPLAY_CORPUS_SCHEMA,
 };
 use super::sym_rsi_experiment::{EvaluationSplit, SymRsiExperimentManifest};
 use super::sym_rsi_fixtures::{
@@ -187,13 +188,19 @@ fn validate_training_corpus(
     corpus: &FrozenReplayCorpus,
 ) -> Result<(), StructuralSupportError> {
     let receipt = &corpus.receipt;
+    let canonical_ids = canonical_fixed_hash_candidate_family()
+        .into_iter()
+        .map(|candidate| candidate.policy_id)
+        .collect::<Vec<_>>();
     if receipt.schema != SYM_RSI_001_REPLAY_CORPUS_SCHEMA
+        || receipt.candidate_family_schema != SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA
         || receipt.split != EvaluationSplit::TrainingReplay
         || receipt.experiment_id != manifest.experiment_id
         || receipt.preregistration_digest != manifest.preregistration_digest
         || receipt.subject_digest != manifest.subject_digest
         || receipt.environment_digest != manifest.environment_digest
         || receipt.candidate_family_digest != canonical_candidate_family_digest()
+        || receipt.collector_policy_ids != canonical_ids
         || receipt.evidence_digest.trim().is_empty()
         || corpus
             .worlds()
@@ -204,7 +211,15 @@ fn validate_training_corpus(
     }
 
     let mut expected = BTreeSet::new();
+    let mut expected_seed_count_per_domain = None;
     for domain in &manifest.domains {
+        match expected_seed_count_per_domain {
+            None => expected_seed_count_per_domain = Some(domain.seeds.training_replay.len()),
+            Some(expected_count) if expected_count != domain.seeds.training_replay.len() => {
+                return Err(StructuralSupportError::TrainingCorpusIncomplete);
+            }
+            Some(_) => {}
+        }
         for &seed in &domain.seeds.training_replay {
             expected.insert((domain.domain_id.clone(), seed));
         }
@@ -216,9 +231,15 @@ fn validate_training_corpus(
             return Err(StructuralSupportError::DuplicateTrainingWorld);
         }
     }
+
+    let expected_seed_count_per_domain = expected_seed_count_per_domain.unwrap_or(0);
+    let expected_trajectory_count = expected.len() * canonical_ids.len();
     if observed != expected
+        || receipt.domain_count != manifest.domains.len()
+        || receipt.seed_count_per_domain != expected_seed_count_per_domain
         || receipt.world_count != expected.len()
         || receipt.world_count != corpus.worlds().len()
+        || receipt.trajectory_count != expected_trajectory_count
     {
         return Err(StructuralSupportError::TrainingCorpusIncomplete);
     }
