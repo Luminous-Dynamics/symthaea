@@ -1,0 +1,153 @@
+name: HUM-WRENCH-001D2 Support Normal Evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/contact_patch.rs"
+      - "crates/domains/symthaea-humanoid/src/contact_wrench.rs"
+      - "crates/domains/symthaea-humanoid/src/mujoco_contact_patch.rs"
+      - "crates/domains/symthaea-humanoid/src/mujoco_contact_interaction.rs"
+      - "crates/domains/symthaea-humanoid/src/mujoco_support_normal.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/hum-wrench-001d2-support-normal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001d2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 901208250c69f03f55d96422c06af8b75884472d
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-support-normal-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact head, parent, and workflow-only qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001d2-support-normal.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source, manifest, and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Verify pinned MuJoCo dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'mujoco-rs = { version = "4.0.1"' crates/domains/symthaea-humanoid/Cargo.toml
+
+      - name: Verify support-normal policy stays explicit
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_file="crates/domains/symthaea-humanoid/src/mujoco_support_normal.rs"
+          grep -F 'pub struct SupportNormalPolicyV1' "$source_file"
+          grep -F 'pub minimum_abs_alignment: f64' "$source_file"
+          grep -F 'support-normal-v1:min-abs-dot:' "$source_file"
+          if grep -F 'impl Default for SupportNormalPolicyV1' "$source_file"; then
+            echo "SupportNormalPolicyV1 must not gain an implicit default threshold" >&2
+            exit 1
+          fi
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked MuJoCo compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Focused support-normal tests
+        run: cargo test -p symthaea-humanoid --features mujoco mujoco_support_normal --locked -- --nocapture
+
+      - name: Predecessor semantic regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-humanoid --features mujoco mujoco_contact_interaction --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_contact_patch --locked -- --nocapture
+          cargo test -p symthaea-humanoid contact_wrench --locked -- --nocapture
+
+      - name: Strict MuJoCo Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --features mujoco --locked -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001d2-evidence
+          {
+            echo "program=HUM-WRENCH-001D2"
+            echo "authority=support-normal-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "source_contact_region=LIVE_CONTACT_HULL"
+            echo "normal_admissibility=EXPLICIT_POLICY"
+            echo "policy_identity=threshold-bound"
+            echo "policy_default=NONE"
+            echo "policy_threshold_qualified=NONE"
+            echo "surface_support_requires_nondegenerate_normal_qualified_hull=TRUE"
+            echo "qp_authority=NONE"
+            echo "hardware_surface_normal_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_mujoco=PASS"
+            echo "focused_tests=PASS"
+            echo "predecessor_semantic_regressions=PASS"
+            echo "clippy_mujoco=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001d2-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001d2-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001d2-evidence/
+          if-no-files-found: error
