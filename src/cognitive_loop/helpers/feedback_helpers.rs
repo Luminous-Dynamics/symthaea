@@ -14,6 +14,21 @@
 
 use super::super::feedback_state::FeedbackProposal;
 
+/// Legacy source label used by the dream phase when generated Φ improvements
+/// propose a waking-confidence increase. Generated evidence is non-authorizing:
+/// it may reduce confidence, but a positive promotion must come through an
+/// empirical validation gate instead of this generic feedback path.
+const DREAM_GENERATED_CONFIDENCE_SOURCE: &str = "dream_phi_insight";
+
+#[inline]
+fn authorize_additive_confidence_delta(source: &'static str, delta: f32) -> f32 {
+    if source == DREAM_GENERATED_CONFIDENCE_SOURCE && delta > 0.0 {
+        0.0
+    } else {
+        delta
+    }
+}
+
 impl super::super::CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
     // CONFIDENCE HELPERS (f64)
@@ -26,6 +41,7 @@ impl super::super::CognitiveLoopService {
         source: &'static str,
         delta: f32,
     ) {
+        let delta = authorize_additive_confidence_delta(source, delta);
         self.feedback_state
             .confidence
             .propose(source, FeedbackProposal::Add(delta as f64));
@@ -179,6 +195,7 @@ impl super::super::CognitiveLoopService {
         priority: super::super::feedback_state::Priority,
         confidence: f32,
     ) {
+        let delta = authorize_additive_confidence_delta(source, delta);
         self.feedback_state.confidence.propose_weighted(
             source,
             FeedbackProposal::Add(delta as f64),
@@ -265,6 +282,7 @@ impl super::super::CognitiveLoopService {
         delta: f32,
         priority: super::super::feedback_state::Priority,
     ) {
+        let delta = authorize_additive_confidence_delta(source, delta);
         self.feedback_state.confidence.propose_with_priority(
             source,
             FeedbackProposal::Add(delta as f64),
@@ -370,5 +388,28 @@ impl super::super::CognitiveLoopService {
         );
         self.behavior.curiosity_drive.exploration_urge =
             self.feedback_state.effective_exploration();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recursive_improvement_dream_confidence_source_cannot_promote() {
+        assert_eq!(
+            authorize_additive_confidence_delta(DREAM_GENERATED_CONFIDENCE_SOURCE, 0.05),
+            0.0
+        );
+        assert_eq!(
+            authorize_additive_confidence_delta(DREAM_GENERATED_CONFIDENCE_SOURCE, -0.05),
+            -0.05
+        );
+    }
+
+    #[test]
+    fn ordinary_empirical_confidence_sources_are_unchanged() {
+        assert_eq!(authorize_additive_confidence_delta("calibration", 0.05), 0.05);
+        assert_eq!(authorize_additive_confidence_delta("observation", -0.05), -0.05);
     }
 }
