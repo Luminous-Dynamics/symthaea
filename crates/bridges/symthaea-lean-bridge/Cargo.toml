@@ -15,7 +15,9 @@ categories = ["science", "mathematics"]
 default = []
 
 [dependencies]
+sha2 = { workspace = true }
 symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-math-research = { path = "../../core/symthaea-math-research" }
 symthaea-proof-audit = { path = "../symthaea-proof-audit" }
 
 [dev-dependencies]
