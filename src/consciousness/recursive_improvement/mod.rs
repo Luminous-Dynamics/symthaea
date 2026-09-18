@@ -83,6 +83,7 @@ pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
 pub mod sym_rsi_runner;
+pub mod sym_rsi_structural_support;
 
 // Re-export key types from core infrastructure
 pub use types::{
@@ -118,13 +119,11 @@ pub use magi_integration::{
     CalibratedEfe,
     CalibrationQuality,
     CausalAttribution,
-    // EFE Integration (Phase 3)
     EfeContribution,
     EfeWeights,
     MagiLoopState,
     ModelUpdate,
     RollbackCondition,
-    // Safe Update Protocol (Phase 6)
     SafeUpdate,
     SafeUpdateManager,
     SystemSnapshot,
@@ -143,7 +142,6 @@ pub use active_inference_bridge::{
 // Persistence exports (Epistemic Save File)
 pub use persistence::{
     GlobalCalibrationStats,
-    // High-level integration
     MagiPersistentModel,
     MagiStateSnapshot,
     PersistedCausalAttribution,
@@ -197,10 +195,9 @@ pub use sym_rsi_fresh_evaluation::{
 pub use sym_rsi_grounded_dream::{
     DreamActionPrediction, DreamActionSupport, DreamDecisionRecord, DreamFixtureAction,
     GroundedDreamError, GroundedDreamModel, GroundedDreamPolicy,
-    DREAM_ACTION_FINGERPRINT_SEMANTICS,
-    DREAM_OVERRIDE_MARGIN, DREAM_RISK_PENALTY, DREAM_STATE_DIM,
-    SYM_RSI_001_GROUNDED_DREAM_POLICY_ID, SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE,
-    SYM_RSI_001_GROUNDED_DREAM_SCHEMA,
+    DREAM_ACTION_FINGERPRINT_SEMANTICS, DREAM_OVERRIDE_MARGIN, DREAM_RISK_PENALTY,
+    DREAM_STATE_DIM, SYM_RSI_001_GROUNDED_DREAM_POLICY_ID,
+    SYM_RSI_001_GROUNDED_DREAM_SCORING_RULE, SYM_RSI_001_GROUNDED_DREAM_SCHEMA,
     build_grounded_dream_policy, train_grounded_dream_model,
 };
 pub use sym_rsi_dream_protocol::{
@@ -228,8 +225,7 @@ pub use sym_rsi_dream_fresh_evaluation::{
 };
 pub use sym_rsi_dream_ood_evaluation::{
     DreamOodDisposition, DreamOodDomainSummary, DreamOodEvaluationError,
-    DreamOodEvaluationReceipt, DreamOodPairReceipt,
-    SYM_RSI_001D_OOD_EVALUATION_SCHEMA,
+    DreamOodEvaluationReceipt, DreamOodPairReceipt, SYM_RSI_001D_OOD_EVALUATION_SCHEMA,
 };
 pub use sym_rsi_dream_verification::{
     DreamVerificationCorpus, DreamVerificationCorpusReceipt, DreamVerificationDecision,
@@ -255,13 +251,16 @@ pub use sym_rsi_runner::{
     ReceiptDiagnostics, build_fixture_receipt, fixture_action_digest, fixture_state_digest,
     run_fixture_policy,
 };
+pub use sym_rsi_structural_support::{
+    StructuralStateVector, StructuralSupportEntry, StructuralSupportError, StructuralSupportIndex,
+    STRUCTURAL_SUPPORT_DIM, SYM_RSI_STRUCTURAL_SUPPORT_SCHEMA,
+    build_structural_support_index, structural_state_vector,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // World Model — gated behind full_consciousness feature flag
 // ═══════════════════════════════════════════════════════════════════════════
 
-// world_model: Consciousness latent space model.
-// Required by brain/affective_bridge.rs (ConsciousnessWorldModel, WorldModelStats).
 #[cfg(feature = "full_consciousness")]
 pub mod world_model;
 
