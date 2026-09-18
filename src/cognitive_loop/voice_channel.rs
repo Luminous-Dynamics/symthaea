@@ -5,15 +5,23 @@
 //!
 //! CRITICAL: Voice synthesis (especially Kokoro ONNX) takes 50-500ms.
 //! It MUST NOT block the cognitive cycle (4.3ms / 234Hz target).
-//! This module sends text + consciousness snapshot over a channel;
-//! the cycle continues immediately. Completed audio is retrieved
-//! from a return channel in subsequent cycles.
+//! This module sends text + consciousness snapshot to a bounded latest-wins
+//! mailbox; the cycle continues immediately. Completed audio is retained in a
+//! bounded drop-oldest buffer and retrieved in subsequent cycles.
+//!
+//! A newer request invalidates completed output from every older generation.
+//! This does not yet interrupt an in-progress `VoiceOrchestrator` call, but it
+//! prevents superseded speech from leaking back into playback after synthesis
+//! eventually returns. INT-008A will add renderer-level cooperative cancellation.
 
-use std::sync::mpsc;
+use std::collections::VecDeque;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 /// Maximum completed-audio responses the loop buffers for `drain_voice_audio()`.
-/// Bounded so an unconsumed buffer can't grow without limit (oldest dropped).
+/// Bounded so an unconsumed buffer cannot grow without limit; oldest entries are
+/// dropped first.
 pub const VOICE_AUDIO_BUFFER_CAP: usize = 8;
 
 /// Linear resample (self-hearing: 24kHz vocoder output → 16kHz ear input).
@@ -81,65 +89,213 @@ pub struct VoiceResponse {
     pub cycle_num: u64,
 }
 
-/// Handle for sending voice requests from the cognitive loop (non-blocking).
+#[derive(Debug)]
+struct QueuedVoiceRequest {
+    generation: u64,
+    request: VoiceRequest,
+}
+
+#[derive(Debug)]
+struct QueuedVoiceResponse {
+    generation: u64,
+    response: VoiceResponse,
+}
+
+#[derive(Debug, Default)]
+struct RequestState {
+    latest: Option<QueuedVoiceRequest>,
+    shutdown: bool,
+}
+
+/// Single-slot mailbox for synthesis requests.
+///
+/// Producers overwrite the pending request instead of accumulating work. A
+/// currently-running synthesis may finish, but generation checks ensure its
+/// result is discarded if a newer request arrived in the meantime.
+#[derive(Debug)]
+struct RequestMailbox {
+    state: Mutex<RequestState>,
+    ready: Condvar,
+    latest_generation: AtomicU64,
+}
+
+impl RequestMailbox {
+    fn new() -> Self {
+        Self {
+            state: Mutex::new(RequestState::default()),
+            ready: Condvar::new(),
+            latest_generation: AtomicU64::new(0),
+        }
+    }
+
+    fn submit(&self, request: VoiceRequest) -> bool {
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
+            Err(_) => return false,
+        };
+        if state.shutdown {
+            return false;
+        }
+
+        let generation = match self.latest_generation.fetch_update(
+            Ordering::AcqRel,
+            Ordering::Acquire,
+            |current| current.checked_add(1),
+        ) {
+            Ok(previous) => previous + 1,
+            Err(_) => return false,
+        };
+
+        state.latest = Some(QueuedVoiceRequest {
+            generation,
+            request,
+        });
+        drop(state);
+        self.ready.notify_one();
+        true
+    }
+
+    fn take_blocking(&self) -> Option<QueuedVoiceRequest> {
+        let mut state = self.state.lock().ok()?;
+        loop {
+            if state.shutdown {
+                return None;
+            }
+            if let Some(request) = state.latest.take() {
+                return Some(request);
+            }
+            state = self.ready.wait(state).ok()?;
+        }
+    }
+
+    fn current_generation(&self) -> u64 {
+        self.latest_generation.load(Ordering::Acquire)
+    }
+
+    fn is_current(&self, generation: u64) -> bool {
+        generation != 0 && self.current_generation() == generation
+    }
+
+    fn shutdown(&self) {
+        if let Ok(mut state) = self.state.lock() {
+            state.shutdown = true;
+            state.latest = None;
+        }
+        self.ready.notify_all();
+    }
+
+    #[cfg(test)]
+    fn try_take(&self) -> Option<QueuedVoiceRequest> {
+        self.state.lock().ok()?.latest.take()
+    }
+}
+
+/// Small bounded FIFO that explicitly drops the oldest entry on overflow.
+#[derive(Debug)]
+struct BoundedDropOldest<T> {
+    capacity: usize,
+    items: Mutex<VecDeque<T>>,
+}
+
+impl<T> BoundedDropOldest<T> {
+    fn new(capacity: usize) -> Self {
+        assert!(capacity > 0, "bounded buffer capacity must be non-zero");
+        Self {
+            capacity,
+            items: Mutex::new(VecDeque::with_capacity(capacity)),
+        }
+    }
+
+    fn push(&self, item: T) -> bool {
+        let mut items = match self.items.lock() {
+            Ok(items) => items,
+            Err(_) => return false,
+        };
+        if items.len() == self.capacity {
+            items.pop_front();
+        }
+        items.push_back(item);
+        true
+    }
+
+    fn drain(&self) -> Vec<T> {
+        match self.items.lock() {
+            Ok(mut items) => items.drain(..).collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.items.lock().map(|items| items.len()).unwrap_or(0)
+    }
+}
+
+/// Handle for sending voice requests from the cognitive loop.
+///
+/// Submission never waits for TTS or queue capacity: at most one pending request
+/// exists and a newer request replaces it. The tiny mailbox mutex is held only
+/// long enough to swap that slot.
 pub struct VoiceSynthesisChannel {
-    /// Send voice requests to the background thread.
-    tx: mpsc::Sender<VoiceRequest>,
-    /// Receive completed audio from the background thread.
-    /// Wrapped in Mutex because mpsc::Receiver is !Sync, and
-    /// CognitiveLoopService may need to be Sync in some contexts.
-    rx: std::sync::Mutex<mpsc::Receiver<VoiceResponse>>,
-    /// Handle to the background thread (kept for cleanup).
+    mailbox: Arc<RequestMailbox>,
+    responses: Arc<BoundedDropOldest<QueuedVoiceResponse>>,
+    /// Handle to the background thread (kept so it remains attached to this
+    /// channel's lifetime; drop signals shutdown without waiting for synthesis).
     _thread: thread::JoinHandle<()>,
 }
 
 impl VoiceSynthesisChannel {
     /// Spawn a background voice synthesis thread.
     ///
-    /// The thread owns a `VoiceOrchestrator` and processes requests sequentially.
-    /// If requests queue up, older ones are dropped (latest-wins).
+    /// Pending work is latest-wins and bounded to one request. Completed audio is
+    /// bounded to [`VOICE_AUDIO_BUFFER_CAP`] with oldest-drop overflow semantics.
     pub fn spawn() -> Self {
-        let (request_tx, request_rx) = mpsc::channel::<VoiceRequest>();
-        let (response_tx, response_rx) = mpsc::channel::<VoiceResponse>();
+        let mailbox = Arc::new(RequestMailbox::new());
+        let responses = Arc::new(BoundedDropOldest::new(VOICE_AUDIO_BUFFER_CAP));
 
+        let worker_mailbox = Arc::clone(&mailbox);
+        let worker_responses = Arc::clone(&responses);
         let handle = thread::Builder::new()
             .name("voice-synthesis".into())
             .spawn(move || {
-                Self::synthesis_loop(request_rx, response_tx);
+                Self::synthesis_loop(worker_mailbox, worker_responses);
             })
             .expect("Failed to spawn voice synthesis thread");
 
         Self {
-            tx: request_tx,
-            rx: std::sync::Mutex::new(response_rx),
+            mailbox,
+            responses,
             _thread: handle,
         }
     }
 
-    /// Send a voice request to the background thread (non-blocking).
+    /// Submit a voice request without waiting for synthesis or queue capacity.
     ///
-    /// Returns `false` if the channel is disconnected (thread crashed).
+    /// A newer pending request replaces the older pending request. Returns `false`
+    /// only if the mailbox is shutting down, poisoned, or its generation counter
+    /// has exhausted `u64`.
     pub fn send(&self, request: VoiceRequest) -> bool {
-        self.tx.send(request).is_ok()
+        self.mailbox.submit(request)
     }
 
-    /// Drain any completed audio responses (non-blocking).
+    /// Drain completed audio responses without blocking on synthesis.
     ///
-    /// Returns all responses that have been completed since the last drain.
+    /// Responses from superseded generations are discarded here as a second
+    /// race-safe guard in addition to the worker's pre-enqueue generation check.
     pub fn drain_responses(&self) -> Vec<VoiceResponse> {
-        let mut responses = Vec::new();
-        if let Ok(rx) = self.rx.lock() {
-            while let Ok(response) = rx.try_recv() {
-                responses.push(response);
-            }
-        }
-        responses
+        let current_generation = self.mailbox.current_generation();
+        self.responses
+            .drain()
+            .into_iter()
+            .filter(|queued| queued.generation == current_generation)
+            .map(|queued| queued.response)
+            .collect()
     }
 
     /// Background thread main loop.
     fn synthesis_loop(
-        request_rx: mpsc::Receiver<VoiceRequest>,
-        response_tx: mpsc::Sender<VoiceResponse>,
+        mailbox: Arc<RequestMailbox>,
+        responses: Arc<BoundedDropOldest<QueuedVoiceResponse>>,
     ) {
         use crate::voice::orchestrator::VoiceOrchestrator;
 
@@ -152,56 +308,69 @@ impl VoiceSynthesisChannel {
         let mut self_ear =
             symthaea_stt::StreamProcessor::new(symthaea_stt::StreamConfig::low_latency());
 
-        // Block waiting for next request
-        while let Ok(request) = request_rx.recv() {
-            // If multiple requests queued, skip to the latest (latest-wins)
-            let mut latest = request;
-            while let Ok(newer) = request_rx.try_recv() {
-                latest = newer;
-            }
+        while let Some(queued) = mailbox.take_blocking() {
+            let generation = queued.generation;
+            let request = queued.request;
 
             // Real formant synthesis via the low-level pipeline. The previous
             // routing (synthesize_from_cycle_result on an uninitialized
             // VoiceOutput) fell through to simulate_tts — a placeholder sine
             // wave — so the loop's "voice" was never speech.
             let (audio, metrics) = orchestrator.thought_to_speech_paced(
-                &latest.text,
-                &latest.cfc_output,
-                latest.tau,
-                latest.prediction_error,
-                latest.detected_primitives.clone(),
-                latest.speech_rate_multiplier,
-                latest.pause_multiplier,
+                &request.text,
+                &request.cfc_output,
+                request.tau,
+                request.prediction_error,
+                request.detected_primitives.clone(),
+                request.speech_rate_multiplier,
+                request.pause_multiplier,
             );
 
-            if !audio.is_empty() {
-                // Self-hearing: encode the produced audio through the native
-                // acoustic ear (24kHz vocoder output → 16kHz ear input).
-                #[cfg(feature = "voice-stt")]
-                let self_hv = {
-                    let resampled = resample_linear(&audio, 24_000, 16_000);
-                    self_ear.push_audio(&resampled);
-                    let frames: Vec<symthaea_stt::HV16> =
-                        self_ear.process().into_iter().map(|f| f.hv).collect();
-                    if frames.is_empty() {
-                        None
-                    } else {
-                        let bundled = symthaea_stt::bundle(&frames);
-                        Some(symthaea_core::hdc::ContinuousHV::from_vec(
-                            bundled.to_core_continuous(),
-                        ))
-                    }
-                };
+            if audio.is_empty() || !mailbox.is_current(generation) {
+                continue;
+            }
 
-                let _ = response_tx.send(VoiceResponse {
+            // Self-hearing: encode the produced audio through the native
+            // acoustic ear (24kHz vocoder output → 16kHz ear input).
+            #[cfg(feature = "voice-stt")]
+            let self_hv = {
+                let resampled = resample_linear(&audio, 24_000, 16_000);
+                self_ear.push_audio(&resampled);
+                let frames: Vec<symthaea_stt::HV16> =
+                    self_ear.process().into_iter().map(|f| f.hv).collect();
+                if frames.is_empty() {
+                    None
+                } else {
+                    let bundled = symthaea_stt::bundle(&frames);
+                    Some(symthaea_core::hdc::ContinuousHV::from_vec(
+                        bundled.to_core_continuous(),
+                    ))
+                }
+            };
+
+            // A newer request can arrive while self-hearing is being encoded.
+            // Re-check immediately before exposing the completed audio.
+            if !mailbox.is_current(generation) {
+                continue;
+            }
+
+            let _ = responses.push(QueuedVoiceResponse {
+                generation,
+                response: VoiceResponse {
                     audio,
                     metrics,
                     #[cfg(feature = "voice-stt")]
                     self_hv,
-                    cycle_num: latest.cycle_num,
-                });
-            }
+                    cycle_num: request.cycle_num,
+                },
+            });
         }
+    }
+}
+
+impl Drop for VoiceSynthesisChannel {
+    fn drop(&mut self) {
+        self.mailbox.shutdown();
     }
 }
 
@@ -209,23 +378,65 @@ impl VoiceSynthesisChannel {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_channel_spawn_and_send() {
-        let channel = VoiceSynthesisChannel::spawn();
-        let request = VoiceRequest {
-            text: "hello world".into(),
+    fn request(cycle_num: u64, text: &str) -> VoiceRequest {
+        VoiceRequest {
+            text: text.into(),
             cfc_output: vec![0.0; 16],
             tau: 1.0,
             prediction_error: 0.1,
             detected_primitives: vec![],
             speech_rate_multiplier: 1.0,
             pause_multiplier: 1.0,
-            cycle_num: 1,
-        };
-        assert!(channel.send(request), "should send without blocking");
-        // Give the thread a moment to process
+            cycle_num,
+        }
+    }
+
+    #[test]
+    fn request_mailbox_is_single_slot_latest_wins() {
+        let mailbox = RequestMailbox::new();
+        assert!(mailbox.submit(request(1, "old")));
+        assert!(mailbox.submit(request(2, "new")));
+
+        let queued = mailbox.try_take().expect("latest request should be queued");
+        assert_eq!(queued.request.cycle_num, 2);
+        assert_eq!(queued.request.text, "new");
+        assert_eq!(queued.generation, mailbox.current_generation());
+        assert!(mailbox.try_take().is_none());
+    }
+
+    #[test]
+    fn newer_request_invalidates_older_generation() {
+        let mailbox = RequestMailbox::new();
+        assert!(mailbox.submit(request(1, "first")));
+        let first = mailbox.try_take().expect("first request should be queued");
+        assert!(mailbox.is_current(first.generation));
+
+        assert!(mailbox.submit(request(2, "second")));
+        assert!(!mailbox.is_current(first.generation));
+        let second = mailbox.try_take().expect("second request should be queued");
+        assert!(mailbox.is_current(second.generation));
+    }
+
+    #[test]
+    fn bounded_buffer_drops_oldest() {
+        let buffer = BoundedDropOldest::new(2);
+        assert!(buffer.push(1));
+        assert!(buffer.push(2));
+        assert!(buffer.push(3));
+        assert_eq!(buffer.len(), 2);
+        assert_eq!(buffer.drain(), vec![2, 3]);
+    }
+
+    #[test]
+    fn test_channel_spawn_and_send() {
+        let channel = VoiceSynthesisChannel::spawn();
+        assert!(
+            channel.send(request(1, "hello world")),
+            "should submit without waiting for synthesis"
+        );
+        // Give the thread a moment to process.
         std::thread::sleep(std::time::Duration::from_millis(50));
-        // Drain — may or may not have a response depending on synthesis speed
+        // Drain — may or may not have a response depending on synthesis speed.
         let _responses = channel.drain_responses();
     }
 
@@ -236,17 +447,9 @@ mod tests {
         // sinusoid — check that the spectrum-shaping produces sign-structure
         // richer than a fixed-period tone.
         let channel = VoiceSynthesisChannel::spawn();
-        let request = VoiceRequest {
-            text: "hello world".into(),
-            cfc_output: vec![0.2; 16],
-            tau: 1.0,
-            prediction_error: 0.1,
-            detected_primitives: vec![],
-            speech_rate_multiplier: 1.0,
-            pause_multiplier: 1.0,
-            cycle_num: 1,
-        };
-        assert!(channel.send(request));
+        let mut req = request(1, "hello world");
+        req.cfc_output = vec![0.2; 16];
+        assert!(channel.send(req));
 
         // Formant synthesis of two words takes noticeably longer than the old
         // placeholder; poll up to 5s.
