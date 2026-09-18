@@ -1,0 +1,110 @@
+{
+  "schema": "symthaea.rel.qualification-input-firewall-contract.v2",
+  "authority": "QualificationInputFirewallContractOnly",
+  "relation": "REL-005A",
+  "assembly_contract_head": "3dc01663ff8b2f9f6eb0568f8649ccdd999ddf29",
+  "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+  "authoritative_provenance": {
+    "comparison_subject_head": "a47efccf80fa66bacbdfa9930f59c8439be7ee38",
+    "comparison_source_run_id": 35349750595,
+    "projection_contract_head": "07af7c4bdfdda377aa8175efe7a3233ce90e889e",
+    "projection_contract_run_id": 35324485955
+  },
+  "transport_policy": {
+    "validated_by": "QualificationAssemblyOnly",
+    "artifact_id_is_scientific_authority": false,
+    "artifact_digest_is_scientific_authority": false,
+    "firewall_requires_transport_record_presence": true,
+    "firewall_must_not_rebind_transport_identity": true
+  },
+  "required_schemas": {
+    "predicate": "symthaea.rel.predicate-contract-static-receipt.v1",
+    "execution": "symthaea.rel.execution-only-receipt.v3",
+    "seal": "symthaea.rel.observation-seal.v3",
+    "comparison": "symthaea.rel.comparison-only-qualification-receipt.v1",
+    "manifest": "symthaea.rel.qualification-input-manifest.v2",
+    "assembly": "symthaea.rel.qualification-assembly-receipt.v3",
+    "qualification": "symthaea.rel.qualification-only.v1"
+  },
+  "required_claims": {
+    "predicate": {
+      "observation_sealed": false,
+      "comparison_only_adjudicated": false,
+      "rel_005a_qualified": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    },
+    "execution": {
+      "observation_sealed": false,
+      "comparison_only_adjudicated": false,
+      "rel_005a_qualified": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    },
+    "seal": {
+      "observation_sealed": true,
+      "comparison_only_adjudicated": false,
+      "rel_005a_qualified": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    },
+    "comparison": {
+      "comparison_only_adjudicated": true,
+      "rel_005a_qualified": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    },
+    "assembly": {
+      "receipt_extraction_performed": true,
+      "projection_performed": true,
+      "projection_raw_observation_visibility": false,
+      "projection_execution_log_visibility": false,
+      "source_extraction_raw_observation_output": false,
+      "source_extraction_execution_log_output": false,
+      "qualification_completed": false,
+      "rel_005a_qualified": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    }
+  },
+  "required_predicate_count": 41,
+  "allowed_failed_predicate_ids": [
+    "REL005A-P001", "REL005A-P002", "REL005A-P003", "REL005A-P004", "REL005A-P005",
+    "REL005A-P006", "REL005A-P007", "REL005A-P008", "REL005A-P009", "REL005A-P010",
+    "REL005A-P011", "REL005A-P012", "REL005A-P013", "REL005A-P014", "REL005A-P015",
+    "REL005A-P016", "REL005A-P017", "REL005A-P018", "REL005A-P019", "REL005A-P020",
+    "REL005A-P021", "REL005A-P022", "REL005A-P023", "REL005A-P024", "REL005A-P025",
+    "REL005A-P026", "REL005A-P027", "REL005A-P028", "REL005A-P029", "REL005A-P030",
+    "REL005A-P031", "REL005A-P032", "REL005A-P033", "REL005A-P034", "REL005A-P035",
+    "REL005A-P036", "REL005A-P037", "REL005A-P038", "REL005A-P039", "REL005A-P040",
+    "REL005A-P041"
+  ],
+  "format_rules": {
+    "sha256": "64 lowercase hexadecimal characters",
+    "git_head": "40 lowercase hexadecimal characters",
+    "artifact_digest": "sha256: followed by 64 lowercase hexadecimal characters",
+    "failed_predicate_ids_unique": true,
+    "failed_predicate_ids_ordered": true,
+    "manifest_file_hashes_must_match_bytes": true,
+    "manifest_file_census_exact": true
+  },
+  "forbidden_keys_anywhere_in_sanitized_bundle": [
+    "predicates",
+    "threshold_table",
+    "observed",
+    "expected"
+  ],
+  "final_claim_invariants": {
+    "qualification_completed": true,
+    "scientific_pass_xor_scientific_fail": true,
+    "pass_requires_rel_005a_qualified": true,
+    "fail_requires_rel_005a_unqualified": true
+  },
+  "claims": {
+    "firewall_executed": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
