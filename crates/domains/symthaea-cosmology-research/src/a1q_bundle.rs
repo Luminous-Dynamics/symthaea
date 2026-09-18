@@ -3,9 +3,10 @@
 //! DE-001A1Q evidence-bundle integrity qualifier.
 //!
 //! This program performs no cosmology. It proves that the fixed-point evidence
-//! artifacts produced by A0/A1P/A1R/A1N and the exact software subject belong
-//! to one coherent execution DAG. Bundle integrity is orthogonal to whether
-//! the frozen reproduction verdict is PASS or NEGATIVE.
+//! artifacts produced by A0/A1P/A1R/A1N, their frozen configuration files, and
+//! the exact software subject belong to one coherent execution DAG. Bundle
+//! integrity is orthogonal to whether the frozen reproduction verdict is PASS
+//! or NEGATIVE.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -25,6 +26,10 @@ const CHECKOUT_COMMIT: &str = "11bd71901bbe5b1630ceea73d27597364c9af683";
 const RUST_TOOLCHAIN_COMMIT: &str = "ebb3d1676050bfd0971c36c1e215b5751473994d";
 const INSTALL_NIX_COMMIT: &str = "8aa03977d8d733052d78f4e008a241fd1dbf36b3";
 const UPLOAD_ARTIFACT_COMMIT: &str = "ea165f8d65b6e75b540449e92b4886f43607fa02";
+const A0_MANIFEST_RELATIVE: &str =
+    "crates/domains/symthaea-cosmology-research/references/de001a_a0_artifacts_v1.json";
+const A1N_SPEC_RELATIVE: &str =
+    "crates/domains/symthaea-cosmology-research/references/de001a_a1n_convergence_v1.json";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -125,6 +130,8 @@ struct Receipt {
     cargo_lock_sha256: String,
     binary_sha256: BinaryHashes,
     a0_nar_hash: String,
+    a0_manifest_sha256: String,
+    a1n_spec_sha256: String,
     a0_receipt_sha256: String,
     a1p_receipt_sha256: String,
     a1r_primary_receipt_sha256: String,
@@ -276,6 +283,25 @@ fn require_protocol(
     Ok(())
 }
 
+fn require_config_identity(
+    value: &Value,
+    protocol: &str,
+    authority: Option<&str>,
+) -> Result<(), String> {
+    if value.get("schema_version").and_then(Value::as_u64) != Some(1)
+        || require_str(value, "protocol")? != protocol
+        || require_str(value, "scientific_claim")? != "NONE"
+    {
+        return Err(format!("unexpected configuration identity for protocol {protocol}"));
+    }
+    if let Some(expected) = authority {
+        if require_str(value, "authority")? != expected {
+            return Err(format!("unexpected configuration authority for protocol {protocol}"));
+        }
+    }
+    Ok(())
+}
+
 fn run_text(program: &str, args: &[&str]) -> Result<String, String> {
     let output = Command::new(program)
         .args(args)
@@ -339,12 +365,30 @@ fn validate_bundle_identity(bundle: &Bundle) -> Result<(), String> {
     if !bundle.a0_artifact_store.path.starts_with("/nix/store/")
         || !bundle.a0_artifact_store.nar_hash.starts_with("sha256-")
         || bundle.a0_artifact_store.nar_hash.len() <= "sha256-".len()
-        || bundle.a0_artifact_store.closure_size.parse::<u64>().ok().filter(|size| *size > 0).is_none()
+        || bundle
+            .a0_artifact_store
+            .closure_size
+            .parse::<u64>()
+            .ok()
+            .filter(|size| *size > 0)
+            .is_none()
     {
         return Err("invalid A0 Nix store identity".into());
     }
-    if bundle.workflow.run_id.parse::<u64>().ok().filter(|value| *value > 0).is_none()
-        || bundle.workflow.attempt.parse::<u64>().ok().filter(|value| *value > 0).is_none()
+    if bundle
+        .workflow
+        .run_id
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0)
+        .is_none()
+        || bundle
+            .workflow
+            .attempt
+            .parse::<u64>()
+            .ok()
+            .filter(|value| *value > 0)
+            .is_none()
         || bundle.workflow.software_outcome != "success"
         || bundle.workflow.artifact_outcome != "success"
         || !matches!(bundle.workflow.chain_exit_code.as_str(), "0" | "1")
@@ -362,7 +406,7 @@ fn validate_hash(expected: &str, path: &Path, max_bytes: u64, label: &str) -> Re
     Ok(())
 }
 
-fn validate_git_subject(bundle: &Bundle) -> Result<(), String> {
+fn repository_root_and_subject(bundle: &Bundle) -> Result<PathBuf, String> {
     let head = run_text("git", &["rev-parse", "HEAD"])?;
     let tree = run_text("git", &["rev-parse", "HEAD^{tree}"])?;
     if head != bundle.subject_head || tree != bundle.subject_tree {
@@ -370,7 +414,11 @@ fn validate_git_subject(bundle: &Bundle) -> Result<(), String> {
             "bundle subject does not match live checkout: head={head} tree={tree}"
         ));
     }
-    Ok(())
+    let root = run_text("git", &["rev-parse", "--show-toplevel"])?;
+    if root.is_empty() {
+        return Err("git returned an empty repository root".into());
+    }
+    Ok(PathBuf::from(root))
 }
 
 fn validate_nix_store(bundle: &Bundle) -> Result<(), String> {
@@ -421,7 +469,9 @@ fn validate_a0(a0: &Value) -> Result<String, String> {
     let artifacts = require_array(a0, "artifacts")?;
     let matching: Vec<_> = artifacts
         .iter()
-        .filter(|artifact| artifact.get("role").and_then(Value::as_str) == Some("reference-bestfit-text"))
+        .filter(|artifact| {
+            artifact.get("role").and_then(Value::as_str) == Some("reference-bestfit-text")
+        })
         .collect();
     if matching.len() != 1 {
         return Err("A0 receipt must contain exactly one reference-bestfit-text artifact".into());
@@ -455,15 +505,44 @@ fn validate_chain_outcome(reproduction_verdict: &str, workflow: &WorkflowState) 
     }
 }
 
+fn load_bound_configs(root: &Path) -> Result<(String, String), String> {
+    let a0_manifest_path = root.join(A0_MANIFEST_RELATIVE);
+    let a1n_spec_path = root.join(A1N_SPEC_RELATIVE);
+    let a0_manifest_bytes = read_regular_file(&a0_manifest_path, MAX_JSON_BYTES)?;
+    let a1n_spec_bytes = read_regular_file(&a1n_spec_path, MAX_JSON_BYTES)?;
+
+    let a0_manifest = parse_json(&a0_manifest_bytes, "A0 manifest")?;
+    require_config_identity(&a0_manifest, "DE-001A0-BYTE-INTEGRITY-v1", None)?;
+    if require_str(&a0_manifest, "mirror_policy")?.trim().is_empty()
+        || require_array(&a0_manifest, "artifacts")?.is_empty()
+    {
+        return Err("A0 manifest is missing its frozen mirror/artifact contract".into());
+    }
+
+    let a1n_spec = parse_json(&a1n_spec_bytes, "A1N convergence spec")?;
+    require_config_identity(
+        &a1n_spec,
+        "DE-001A1N-NUMERICAL-CONVERGENCE-v1",
+        Some("numerical-convergence-qualification-only"),
+    )?;
+
+    Ok((sha256_hex(&a0_manifest_bytes), sha256_hex(&a1n_spec_bytes)))
+}
+
 fn execute(inputs: &Inputs) -> Result<Receipt, String> {
     let bundle_bytes = read_regular_file(&inputs.bundle, MAX_JSON_BYTES)?;
     let bundle_sha256 = sha256_hex(&bundle_bytes);
     let bundle: Bundle = serde_json::from_slice(&bundle_bytes)
         .map_err(|error| format!("invalid prequalification bundle JSON: {error}"))?;
     validate_bundle_identity(&bundle)?;
-    validate_git_subject(&bundle)?;
+    let repository_root = repository_root_and_subject(&bundle)?;
 
-    validate_hash(&bundle.cargo_lock_sha256, &inputs.cargo_lock, MAX_JSON_BYTES, "Cargo.lock")?;
+    validate_hash(
+        &bundle.cargo_lock_sha256,
+        &inputs.cargo_lock,
+        MAX_JSON_BYTES,
+        "Cargo.lock",
+    )?;
     for (expected, path, label) in [
         (&bundle.binary_sha256.a0, &inputs.a0_binary, "A0 binary"),
         (&bundle.binary_sha256.a1p, &inputs.a1p_binary, "A1P binary"),
@@ -474,6 +553,8 @@ fn execute(inputs: &Inputs) -> Result<Receipt, String> {
         validate_hash(expected, path, MAX_BINARY_BYTES, label)?;
     }
     validate_nix_store(&bundle)?;
+
+    let (a0_manifest_hash, a1n_spec_hash) = load_bound_configs(&repository_root)?;
 
     let a0_bytes = read_regular_file(&inputs.a0, MAX_JSON_BYTES)?;
     let a1p_bytes = read_regular_file(&inputs.a1p, MAX_JSON_BYTES)?;
@@ -527,6 +608,9 @@ fn execute(inputs: &Inputs) -> Result<Receipt, String> {
     let refined = parse_json(&refined_receipt_bytes, "refined A1R receipt")?;
     let a1n = parse_json(&a1n_bytes, "A1N receipt")?;
 
+    if require_str(&a0, "manifest_sha256")? != a0_manifest_hash {
+        return Err("A0 receipt is not bound to the exact A0 manifest in the qualified checkout".into());
+    }
     let bestfit_sha256 = validate_a0(&a0)?;
 
     require_protocol(
@@ -559,7 +643,9 @@ fn execute(inputs: &Inputs) -> Result<Receipt, String> {
         if require_str(receipt, "point_manifest_sha256")? != manifest_hash
             || require_str(receipt, "a0_receipt_sha256")? != a0_hash
         {
-            return Err(format!("{label} A1R receipt is not bound to the supplied manifest/A0 receipt"));
+            return Err(format!(
+                "{label} A1R receipt is not bound to the supplied manifest/A0 receipt"
+            ));
         }
     }
     let reproduction_verdict = require_str(&primary, "verdict")?.to_owned();
@@ -574,6 +660,9 @@ fn execute(inputs: &Inputs) -> Result<Receipt, String> {
         &["PASS"],
         Some("numerical-convergence-qualification-only"),
     )?;
+    if require_str(&a1n, "spec_sha256")? != a1n_spec_hash {
+        return Err("A1N receipt is not bound to the exact convergence spec in the qualified checkout".into());
+    }
     if require_str(&a1n, "primary_manifest_sha256")? != primary_manifest_hash
         || require_str(&a1n, "refined_manifest_sha256")? != refined_manifest_hash
         || require_str(&a1n, "primary_receipt_sha256")? != primary_receipt_hash
@@ -600,6 +689,8 @@ fn execute(inputs: &Inputs) -> Result<Receipt, String> {
         cargo_lock_sha256: bundle.cargo_lock_sha256,
         binary_sha256: bundle.binary_sha256,
         a0_nar_hash: bundle.a0_artifact_store.nar_hash,
+        a0_manifest_sha256: a0_manifest_hash,
+        a1n_spec_sha256: a1n_spec_hash,
         a0_receipt_sha256: a0_hash,
         a1p_receipt_sha256: a1p_hash,
         a1r_primary_receipt_sha256: primary_receipt_hash,
@@ -687,5 +778,21 @@ mod tests {
         assert!(validate_chain_outcome("NEGATIVE", &workflow("failure", "1")).is_ok());
         assert!(validate_chain_outcome("PASS", &workflow("failure", "1")).is_err());
         assert!(validate_chain_outcome("NEGATIVE", &workflow("success", "0")).is_err());
+    }
+
+    #[test]
+    fn config_identity_rejects_authority_drift() {
+        let value = serde_json::json!({
+            "schema_version": 1,
+            "protocol": "DE-001A1N-NUMERICAL-CONVERGENCE-v1",
+            "scientific_claim": "NONE",
+            "authority": "wrong"
+        });
+        assert!(require_config_identity(
+            &value,
+            "DE-001A1N-NUMERICAL-CONVERGENCE-v1",
+            Some("numerical-convergence-qualification-only")
+        )
+        .is_err());
     }
 }
