@@ -37,6 +37,12 @@ impl RestartTrustContextDigestV1 {
     pub fn to_hex(self) -> String {
         hex32(self.0)
     }
+
+    /// Internal-only constructor for canonical decoders and qualification tests.
+    /// Public callers cannot mint a trust-context handle from digest bytes alone.
+    pub(crate) fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
