@@ -8,8 +8,12 @@
 //! for both fresh stages, so serialized receipts alone cannot manufacture a
 //! two-stage recursive-improvement claim.
 
-use super::sym_rsi_c_fresh_gate::QualifiedReplayFresh;
-use super::sym_rsi_dream_parent_gate::QualifiedDreamFresh;
+use super::sym_rsi_c_fresh_gate::{
+    QualifiedReplayFresh, SYM_RSI_001_QUALIFIED_FRESH_SCHEMA,
+};
+use super::sym_rsi_dream_parent_gate::{
+    QualifiedDreamFresh, SYM_RSI_001D_QUALIFIED_FRESH_SCHEMA,
+};
 use super::sym_rsi_fresh_chain_claim::{
     build_fresh_improvement_chain_receipt, FreshImprovementChainError,
     FreshImprovementChainReceipt,
@@ -17,7 +21,7 @@ use super::sym_rsi_fresh_chain_claim::{
 use serde::{Deserialize, Serialize};
 
 pub const SYM_RSI_QUALIFIED_FRESH_CHAIN_SCHEMA: &str =
-    "symthaea.sym-rsi.qualified-fresh-improvement-chain.v1";
+    "symthaea.sym-rsi.qualified-fresh-improvement-chain.v2";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QualifiedFreshImprovementChainReceipt {
@@ -33,8 +37,9 @@ pub struct QualifiedFreshImprovementChainReceipt {
 /// Build the only public two-stage fresh-improvement synthesis receipt.
 ///
 /// This function consumes no seeds, executes no fixture, and performs no policy
-/// selection. Both fresh results must already exist behind their respective
-/// private-constructor qualification tokens.
+/// selection. Both fresh results must already exist behind their respective v2
+/// private-constructor qualification tokens and must represent actual consumed
+/// fresh measurements rather than bound no-run receipts.
 pub fn build_qualified_fresh_improvement_chain(
     qualified_c_vs_a: &QualifiedReplayFresh,
     qualified_d_vs_c: &QualifiedDreamFresh,
@@ -73,7 +78,15 @@ fn validate_shared_parent_lineage(
     let c_fresh = qualified_c_vs_a.fresh();
     let d_fresh = qualified_d_vs_c.fresh();
 
-    if c.parent_c_qualification_evidence_digest.trim().is_empty()
+    if c.schema != SYM_RSI_001_QUALIFIED_FRESH_SCHEMA
+        || d.schema != SYM_RSI_001D_QUALIFIED_FRESH_SCHEMA
+        || !c_fresh.fresh_seeds_consumed
+        || !d_fresh.fresh_seeds_consumed
+        || c_fresh.pair_count == 0
+        || d_fresh.pair_count == 0
+        || c_fresh.pair_count != c_fresh.pairs.len()
+        || d_fresh.pair_count != d_fresh.pairs.len()
+        || c.parent_c_qualification_evidence_digest.trim().is_empty()
         || c.parent_holdout_gate_evidence_digest.trim().is_empty()
         || c.training_selection_evidence_digest.trim().is_empty()
         || c.evidence_digest.trim().is_empty()
@@ -102,12 +115,14 @@ fn qualified_chain_digest(
     chain: &FreshImprovementChainReceipt,
 ) -> String {
     let mut hasher = blake3::Hasher::new();
-    hasher.update(b"symthaea.sym-rsi.qualified-fresh-improvement-chain.v1\0");
+    hasher.update(b"symthaea.sym-rsi.qualified-fresh-improvement-chain.v2\0");
     for value in [
+        c.schema.as_str(),
         c.parent_c_qualification_evidence_digest.as_str(),
         c.parent_holdout_gate_evidence_digest.as_str(),
         c.training_selection_evidence_digest.as_str(),
         c.evidence_digest.as_str(),
+        d.schema.as_str(),
         d.parent_c_qualification_evidence_digest.as_str(),
         d.parent_holdout_gate_evidence_digest.as_str(),
         d.qualified_verification_evidence_digest.as_str(),
@@ -131,14 +146,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn outer_chain_digest_binds_both_qualified_stages() {
+    fn qualified_chain_schema_pins_v2_capabilities() {
+        assert_eq!(
+            SYM_RSI_QUALIFIED_FRESH_CHAIN_SCHEMA,
+            "symthaea.sym-rsi.qualified-fresh-improvement-chain.v2"
+        );
+        assert!(SYM_RSI_001_QUALIFIED_FRESH_SCHEMA.ends_with(".v2"));
+        assert!(SYM_RSI_001D_QUALIFIED_FRESH_SCHEMA.ends_with(".v2"));
+    }
+
+    #[test]
+    fn outer_chain_digest_namespace_is_v2() {
         let mut hasher = blake3::Hasher::new();
-        hasher.update(b"symthaea.sym-rsi.qualified-fresh-improvement-chain.v1\0");
+        hasher.update(b"symthaea.sym-rsi.qualified-fresh-improvement-chain.v2\0");
         for value in [
+            "c-schema",
             "parent",
             "holdout",
             "selection",
             "qualified-c",
+            "d-schema",
             "parent",
             "holdout",
             "verification",
