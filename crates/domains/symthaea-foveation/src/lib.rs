@@ -3,9 +3,44 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Foveation bridge: dual-stream vision architecture for Symthaea.
 //!
-//! Connects the fast dorsal stream (VisionManifold surprise/saliency) to a detailed
-//! asynchronous ventral stream while preserving capture provenance and recording what
-//! semantic backend/operation actually executed.
+//! Connects the fast dorsal stream (VisionManifold surprise/saliency) to
+//! the detailed ventral stream (SigLIP, OCR, VQA) via a background thread.
+//! The result: Symthaea keeps her high-rate cognitive loop intact while gaining
+//! the ability to "read" and "recognize" objects on demand.
+//!
+//! VIS-001R additionally carries capture-owned visual provenance through the asynchronous
+//! boundary and records requested routing separately from the semantic operation/backend that
+//! actually executed.
+//!
+//! # Architecture
+//!
+//! ```text
+//! observed frame + provenance
+//!             ↓
+//! SurpriseMap → FoveationManager → FoveationChannel (background)
+//!                  ↑ priority queue         ↓ crop + dispatch
+//!              on_saliency()         VentralPipeline
+//!                                         ↓
+//!                                   FoveationResult
+//!                           (HV + content + execution receipt)
+//!                                         ↓
+//!                         StructuredFoveationEvidence
+//!                                         ↓
+//!                                   drain_results() → GWT
+//! ```
+//!
+//! # Usage
+//!
+//! ```rust,ignore
+//! use symthaea_foveation::{FoveationManager, FoveationConfig, FrameBuffer};
+//!
+//! let mut mgr = FoveationManager::new(FoveationConfig::default(), 8);
+//! // Compatibility path: no typed observation provenance is invented.
+//! mgr.on_frame(frame_buffer);
+//! mgr.on_saliency(&salient_patches);
+//! mgr.tick(now_us);
+//! let results = mgr.drain_results();
+//! ```
 
 #![deny(unsafe_code)]
 
