@@ -3,9 +3,9 @@
 //! Explicit contact-patch geometry and world placement.
 //!
 //! A planted foot or hand is a surface, not a single point. This module keeps
-//! contact-patch geometry separate from contact activation so support-area and
-//! future wrench/COP constraints cannot silently infer physical area from a
-//! contact centre.
+//! geometry separate from contact activation, friction, and material interaction
+//! so support-area and future wrench/COP constraints cannot silently infer one
+//! physical proposition from another.
 
 use serde::{Deserialize, Serialize};
 
@@ -25,16 +25,15 @@ pub enum ContactPatchGeometrySource {
     HardwareCalibration,
 }
 
+/// Immutable local support-surface geometry.
+///
+/// Friction is deliberately absent: interaction limits depend on the pair of
+/// contacting materials/surfaces and must be supplied as separate evidence.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ContactPatchGeometryV1 {
     pub site: ContactSite,
     /// Counter-clockwise convex polygon in the contact-local tangent plane.
     pub vertices_local_xy_m: Vec<[f64; 2]>,
-    /// Dimensionless tangential friction coefficient used by later wrench constraints.
-    pub friction_coefficient: f64,
-    /// Effective torsional-friction radius in metres. A later wrench constraint
-    /// may use `|tau_z| <= torsional_friction_radius_m * f_n`.
-    pub torsional_friction_radius_m: f64,
     pub source: ContactPatchGeometrySource,
     pub geometry_id: String,
 }
@@ -44,10 +43,6 @@ impl ContactPatchGeometryV1 {
         let vertices = &self.vertices_local_xy_m;
         if !(3..=MAX_PATCH_VERTICES).contains(&vertices.len())
             || self.geometry_id.trim().is_empty()
-            || !self.friction_coefficient.is_finite()
-            || self.friction_coefficient < 0.0
-            || !self.torsional_friction_radius_m.is_finite()
-            || self.torsional_friction_radius_m < 0.0
             || vertices
                 .iter()
                 .flat_map(|vertex| vertex.iter())
@@ -295,8 +290,6 @@ mod tests {
                 [half_x, half_y],
                 [-half_x, half_y],
             ],
-            friction_coefficient: 1.0,
-            torsional_friction_radius_m: 0.05,
             source: ContactPatchGeometrySource::MorphologyDeclaration,
             geometry_id: format!("synthetic-{site:?}"),
         }
@@ -333,6 +326,13 @@ mod tests {
             right: foot(right_active, 0.0, -0.10),
             left: foot(left_active, 0.0, 0.10),
         })
+    }
+
+    #[test]
+    fn geometry_identity_does_not_embed_interaction_friction() {
+        let geometry = rectangle(ContactSite::RightFoot, 0.10, 0.04);
+        assert!(geometry.validate());
+        assert_eq!(geometry.area_m2(), Some(0.016));
     }
 
     #[test]
