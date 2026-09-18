@@ -12,6 +12,8 @@
 pub mod live_epoch_fence;
 #[path = "epistemic_restart_activation_preflight.rs"]
 pub mod activation_preflight;
+#[path = "epistemic_restart_trust_checkpoint_currentness.rs"]
+pub mod trust_checkpoint_currentness;
 
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
