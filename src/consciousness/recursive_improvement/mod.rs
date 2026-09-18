@@ -60,8 +60,8 @@ pub mod resolution;
 pub mod runtime;
 pub mod world_prediction;
 
-// Replay-grounded recursive improvement. These modules keep exact historical
-// replay distinct from model-generated counterfactuals and predictions.
+// Replay-grounded recursive improvement. Measurement functions are sealed behind
+// qualification tokens; serializable receipts alone must not unlock fresh seeds.
 pub mod dream_confidence_gate;
 pub mod epistemic_world;
 pub mod exact_replay;
@@ -70,8 +70,10 @@ pub mod replay_policy;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
-pub mod sym_rsi_fresh_evaluation;
-pub mod sym_rsi_fresh_chain_claim;
+mod sym_rsi_fresh_evaluation;
+mod sym_rsi_c_fresh_gate;
+mod sym_rsi_fresh_chain_claim;
+mod sym_rsi_fresh_chain_gate;
 pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_dream_protocol;
 mod sym_rsi_dream_parent_gate;
@@ -162,11 +164,18 @@ pub use sym_rsi_fixtures::{
 pub use sym_rsi_fresh_evaluation::{
     FreshCvsADisposition, FreshCvsAReceipt, FreshDomainSummary, FreshEvaluationError,
     FreshPairReceipt, SYM_RSI_001_C_VS_A_ANALYSIS_RULE, SYM_RSI_001_FRESH_EVALUATION_SCHEMA,
-    run_fresh_c_vs_a,
+};
+pub use sym_rsi_c_fresh_gate::{
+    ParentQualifiedReplayFreshReceipt, QualifiedReplayFresh, QualifiedReplayFreshError,
+    SYM_RSI_001_QUALIFIED_FRESH_SCHEMA, run_fresh_c_vs_a_after_parent_c,
 };
 pub use sym_rsi_fresh_chain_claim::{
     FreshImprovementChainDisposition, FreshImprovementChainError, FreshImprovementChainReceipt,
-    SYM_RSI_FRESH_CHAIN_CLAIM_SCHEMA, build_fresh_improvement_chain_receipt,
+    SYM_RSI_FRESH_CHAIN_CLAIM_SCHEMA,
+};
+pub use sym_rsi_fresh_chain_gate::{
+    QualifiedFreshChainError, QualifiedFreshImprovementChainReceipt,
+    SYM_RSI_QUALIFIED_FRESH_CHAIN_SCHEMA, build_qualified_fresh_improvement_chain,
 };
 pub use sym_rsi_grounded_dream::{
     DreamActionPrediction, DreamActionSupport, DreamDecisionRecord, DreamFixtureAction,

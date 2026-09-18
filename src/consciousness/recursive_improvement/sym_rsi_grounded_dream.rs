@@ -658,11 +658,10 @@ fn signed_unit(value: i32) -> f32 {
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct TaskPredictionSummary {
     mean_quality: f32,
+    support_adjusted_mean_quality: f32,
+    mean_support_similarity: f32,
     failure_probability: f32,
     confidence: f32,
-    training_support_count: usize,
-    actionable: bool,
-    model_simulation_count: usize,
     simulations_run: usize,
 }
 
