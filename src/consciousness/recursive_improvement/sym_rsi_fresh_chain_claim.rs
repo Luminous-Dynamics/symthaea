@@ -21,18 +21,14 @@ use std::collections::BTreeSet;
 
 pub const SYM_RSI_FRESH_CHAIN_CLAIM_SCHEMA: &str =
     "symthaea.sym-rsi.fresh-improvement-chain.v1";
+const NUMERIC_EPSILON: f64 = 1e-12;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FreshImprovementChainDisposition {
-    /// Both preregistered fresh contrasts passed: C > A and D > C.
     TwoStageFreshImprovementEstablished,
-    /// C > A passed, but D > C did not establish a strict fresh gain.
     ReplayOnlyFreshImprovement,
-    /// D > C passed, but C > A did not establish the first fresh improvement stage.
     DreamIncrementOnly,
-    /// Neither fresh contrast established its positive preregistered result.
     NoFreshImprovementChain,
-    /// Receipts are inconsistent, incomplete, or violate integrity boundaries.
     IntegrityFailure,
 }
 
@@ -115,6 +111,8 @@ fn validate_c_vs_a_receipt(
         || receipt.selected_policy_id.trim().is_empty()
         || receipt.holdout_gate_evidence_digest.trim().is_empty()
         || receipt.evidence_digest.trim().is_empty()
+        || !receipt.quality_tolerance.is_finite()
+        || receipt.quality_tolerance < 0.0
     {
         return Err(FreshImprovementChainError::InvalidCvsAReceipt);
     }
@@ -123,6 +121,7 @@ fn validate_c_vs_a_receipt(
         if receipt.pair_count != 12
             || receipt.pairs.len() != 12
             || receipt.domain_summaries.len() != 3
+            || receipt.domain_summaries.iter().any(|summary| summary.pair_count != 4)
             || receipt
                 .pairs
                 .iter()
@@ -131,13 +130,85 @@ fn validate_c_vs_a_receipt(
         {
             return Err(FreshImprovementChainError::InvalidCvsAReceipt);
         }
-    } else if receipt.pair_count != 0
-        || !receipt.pairs.is_empty()
-        || !receipt.domain_summaries.is_empty()
-        || receipt.macro_quality_delta.is_some()
-        || receipt.total_evaluator_call_delta.is_some()
-        || receipt.worst_domain_quality_delta.is_some()
+        validate_consumed_c_vs_a_numeric_consistency(receipt)?;
+    } else {
+        if receipt.pair_count != 0
+            || !receipt.pairs.is_empty()
+            || !receipt.domain_summaries.is_empty()
+            || receipt.macro_quality_delta.is_some()
+            || receipt.total_evaluator_call_delta.is_some()
+            || receipt.worst_domain_quality_delta.is_some()
+            || !matches!(
+                receipt.disposition,
+                FreshCvsADisposition::NoCandidatePromotion
+                    | FreshCvsADisposition::BlockedByHoldout
+            )
+        {
+            return Err(FreshImprovementChainError::InvalidCvsAReceipt);
+        }
+    }
+    Ok(())
+}
+
+fn validate_consumed_c_vs_a_numeric_consistency(
+    receipt: &FreshCvsAReceipt,
+) -> Result<(), FreshImprovementChainError> {
+    let macro_quality_delta = receipt
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.mean_quality_delta)
+        .sum::<f64>()
+        / receipt.domain_summaries.len() as f64;
+    let total_evaluator_call_delta = receipt
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.total_evaluator_call_delta)
+        .sum::<i128>();
+    let worst_domain_quality_delta = receipt
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.mean_quality_delta)
+        .fold(f64::INFINITY, f64::min);
+
+    let stored_macro = receipt
+        .macro_quality_delta
+        .ok_or(FreshImprovementChainError::InvalidCvsAReceipt)?;
+    let stored_calls = receipt
+        .total_evaluator_call_delta
+        .ok_or(FreshImprovementChainError::InvalidCvsAReceipt)?;
+    let stored_worst = receipt
+        .worst_domain_quality_delta
+        .ok_or(FreshImprovementChainError::InvalidCvsAReceipt)?;
+    if !approx_eq(stored_macro, macro_quality_delta)
+        || stored_calls != total_evaluator_call_delta
+        || !approx_eq(stored_worst, worst_domain_quality_delta)
     {
+        return Err(FreshImprovementChainError::InvalidCvsAReceipt);
+    }
+
+    let expected = if !receipt.zero_safety_constraint_violations
+        || !receipt.zero_authority_boundary_violations
+        || !macro_quality_delta.is_finite()
+        || receipt
+            .domain_summaries
+            .iter()
+            .any(|summary| !summary.mean_quality_delta.is_finite())
+    {
+        FreshCvsADisposition::IntegrityFailure
+    } else if macro_quality_delta < -receipt.quality_tolerance
+        || receipt
+            .domain_summaries
+            .iter()
+            .any(|summary| summary.mean_quality_delta < -receipt.quality_tolerance)
+    {
+        FreshCvsADisposition::QualityNonInferiorityFailed
+    } else if macro_quality_delta > 0.0 || total_evaluator_call_delta < 0 {
+        FreshCvsADisposition::PositiveUnderProtocol
+    } else {
+        FreshCvsADisposition::NoStrictGain
+    };
+
+    if receipt.disposition != expected {
         return Err(FreshImprovementChainError::InvalidCvsAReceipt);
     }
     Ok(())
@@ -156,6 +227,10 @@ fn validate_d_vs_c_receipt(
         || fresh.c_policy_id.trim().is_empty()
         || fresh.d_policy_id.trim().is_empty()
         || fresh.evidence_digest.trim().is_empty()
+        || !fresh.quality_tolerance.is_finite()
+        || fresh.quality_tolerance < 0.0
+        || !fresh.generic_compute_cost_is_environment_calls_only
+        || fresh.efficiency_claim_authorized
     {
         return Err(FreshImprovementChainError::InvalidDvsCReceipt);
     }
@@ -164,6 +239,7 @@ fn validate_d_vs_c_receipt(
         if fresh.pair_count != 12
             || fresh.pairs.len() != 12
             || fresh.domain_summaries.len() != 3
+            || fresh.domain_summaries.iter().any(|summary| summary.pair_count != 4)
             || fresh
                 .pairs
                 .iter()
@@ -172,12 +248,94 @@ fn validate_d_vs_c_receipt(
         {
             return Err(FreshImprovementChainError::InvalidDvsCReceipt);
         }
+        validate_consumed_d_vs_c_numeric_consistency(fresh)?;
     } else if fresh.pair_count != 0
         || !fresh.pairs.is_empty()
         || !fresh.domain_summaries.is_empty()
         || fresh.macro_quality_delta.is_some()
         || fresh.worst_domain_quality_delta.is_some()
+        || !matches!(
+            fresh.disposition,
+            DreamFreshDisposition::NoDreamIntervention
+                | DreamFreshDisposition::BlockedByVerification
+        )
     {
+        return Err(FreshImprovementChainError::InvalidDvsCReceipt);
+    }
+    Ok(())
+}
+
+fn validate_consumed_d_vs_c_numeric_consistency(
+    fresh: &super::sym_rsi_dream_fresh_evaluation::DreamFreshEvaluationReceipt,
+) -> Result<(), FreshImprovementChainError> {
+    let macro_quality_delta = fresh
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.mean_quality_delta)
+        .sum::<f64>()
+        / fresh.domain_summaries.len() as f64;
+    let worst_domain_quality_delta = fresh
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.mean_quality_delta)
+        .fold(f64::INFINITY, f64::min);
+    let total_overrides = fresh
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.d_override_count)
+        .sum::<usize>();
+    let total_predictions = fresh
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.d_prediction_count)
+        .sum::<usize>();
+    let total_simulations = fresh
+        .domain_summaries
+        .iter()
+        .map(|summary| summary.d_model_simulation_count)
+        .sum::<usize>();
+
+    let stored_macro = fresh
+        .macro_quality_delta
+        .ok_or(FreshImprovementChainError::InvalidDvsCReceipt)?;
+    let stored_worst = fresh
+        .worst_domain_quality_delta
+        .ok_or(FreshImprovementChainError::InvalidDvsCReceipt)?;
+    if !approx_eq(stored_macro, macro_quality_delta)
+        || !approx_eq(stored_worst, worst_domain_quality_delta)
+        || fresh.total_d_override_count != total_overrides
+        || fresh.total_d_prediction_count != total_predictions
+        || fresh.total_d_model_simulation_count != total_simulations
+    {
+        return Err(FreshImprovementChainError::InvalidDvsCReceipt);
+    }
+
+    let expected = if !fresh.zero_safety_constraint_violations
+        || !fresh.zero_authority_boundary_violations
+        || fresh.generated_evidence_promoted
+        || !macro_quality_delta.is_finite()
+        || fresh
+            .domain_summaries
+            .iter()
+            .any(|summary| !summary.mean_quality_delta.is_finite())
+    {
+        DreamFreshDisposition::IntegrityFailure
+    } else if total_overrides == 0 {
+        DreamFreshDisposition::NoDreamIntervention
+    } else if macro_quality_delta < -fresh.quality_tolerance
+        || fresh
+            .domain_summaries
+            .iter()
+            .any(|summary| summary.mean_quality_delta < -fresh.quality_tolerance)
+    {
+        DreamFreshDisposition::QualityNonInferiorityFailed
+    } else if macro_quality_delta > 0.0 {
+        DreamFreshDisposition::PositiveUnderProtocol
+    } else {
+        DreamFreshDisposition::NoStrictQualityGain
+    };
+
+    if fresh.disposition != expected {
         return Err(FreshImprovementChainError::InvalidDvsCReceipt);
     }
     Ok(())
@@ -275,6 +433,10 @@ fn chain_disposition_tag(disposition: FreshImprovementChainDisposition) -> u8 {
     }
 }
 
+fn approx_eq(left: f64, right: f64) -> bool {
+    left.is_finite() && right.is_finite() && (left - right).abs() <= NUMERIC_EPSILON
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FreshImprovementChainError {
     InvalidCvsAReceipt,
@@ -312,5 +474,12 @@ mod tests {
             classify_chain(true, true, false),
             FreshImprovementChainDisposition::IntegrityFailure
         );
+    }
+
+    #[test]
+    fn numeric_comparison_is_strict_and_finite() {
+        assert!(approx_eq(0.5, 0.5 + 1e-13));
+        assert!(!approx_eq(0.5, 0.5 + 1e-8));
+        assert!(!approx_eq(f64::NAN, f64::NAN));
     }
 }
