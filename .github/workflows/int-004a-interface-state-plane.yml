@@ -1,0 +1,146 @@
+name: INT-004A Interface State Plane Bootstrap
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-interface-runtime/**"
+      - ".github/workflows/int-004a-interface-state-plane.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: int-004a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_PARENT: 573eedc15f7233808d6668fd417ff2a95d697775
+  EXPECTED_INTERFACE_TYPES_PARENT: 51d89aeeb4d02115566d90974ecd40563b4cc232
+  EXPECTED_MANIFEST_BLOB: 4df08bf281b27a29dfc5ba20d932928ae3c3e24b
+  EXPECTED_LIB_BLOB: d0f341086ac154eba13ba8d18974e7e243c1ca8a
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-bootstrap:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Bind exact qualifier and stacked source lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_SOURCE_PARENT"
+          test "$(git rev-parse "$EXPECTED_SOURCE_PARENT^")" = "$EXPECTED_INTERFACE_TYPES_PARENT"
+          test "$(git hash-object crates/core/symthaea-interface-runtime/Cargo.toml)" = "$EXPECTED_MANIFEST_BLOB"
+          test "$(git hash-object crates/core/symthaea-interface-runtime/src/lib.rs)" = "$EXPECTED_LIB_BLOB"
+          test -z "$(git status --porcelain=v1)"
+
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_SOURCE_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/int-004a-interface-state-plane.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Materialize additive Cargo lock delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo check -p symthaea-interface-runtime
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.generated"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.patch"
+
+          test -s "$RUNNER_TEMP/Cargo.lock.patch"
+          grep -F 'name = "symthaea-interface-runtime"' Cargo.lock
+          grep -F 'name = "symthaea-interface-types"' Cargo.lock
+
+          # Bootstrap qualification may only add lockfile entries. Any removal is
+          # a wider dependency mutation and requires a separately reviewed subject.
+          if grep -E '^-[^-]' "$RUNNER_TEMP/Cargo.lock.patch"; then
+            echo "INT-004A lock materialization is not additive-only"
+            cat "$RUNNER_TEMP/Cargo.lock.patch"
+            exit 1
+          fi
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-interface-runtime
+
+      - name: State-plane unit and contract tests
+        run: cargo test -p symthaea-interface-runtime
+
+      - name: Strict Clippy
+        run: cargo clippy -p symthaea-interface-runtime --all-targets -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object crates/core/symthaea-interface-runtime/Cargo.toml)" = "$EXPECTED_MANIFEST_BLOB"
+          test "$(git hash-object crates/core/symthaea-interface-runtime/src/lib.rs)" = "$EXPECTED_LIB_BLOB"
+          unexpected="$({ git status --porcelain=v1 || true; } | grep -v '^ M Cargo.lock$' || true)"
+          if test -n "$unexpected"; then
+            echo "unexpected tracked/untracked mutation after qualification:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Write bootstrap receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p int-004a-evidence
+          cp "$RUNNER_TEMP/Cargo.lock.generated" int-004a-evidence/Cargo.lock.generated
+          cp "$RUNNER_TEMP/Cargo.lock.patch" int-004a-evidence/Cargo.lock.patch
+          {
+            echo "program=INT-004A"
+            echo "authority=bootstrap-engineering-source-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "qualifier_head=$(git rev-parse HEAD)"
+            echo "source_parent=$EXPECTED_SOURCE_PARENT"
+            echo "interface_types_parent=$EXPECTED_INTERFACE_TYPES_PARENT"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "manifest_blob=$EXPECTED_MANIFEST_BLOB"
+            echo "lib_blob=$EXPECTED_LIB_BLOB"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "generated_lock_sha256=$(sha256sum int-004a-evidence/Cargo.lock.generated | cut -d' ' -f1)"
+            echo "lock_patch_sha256=$(sha256sum int-004a-evidence/Cargo.lock.patch | cut -d' ' -f1)"
+            echo "format=PASS"
+            echo "compile=PASS"
+            echo "tests=PASS"
+            echo "clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > int-004a-evidence/receipt.txt
+          cat int-004a-evidence/receipt.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bootstrap evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: int-004a-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}
+          path: int-004a-evidence/
+          if-no-files-found: error
