@@ -1,0 +1,85 @@
+{
+  "schema": "symthaea.rel.reproduction-recipe.v3",
+  "authority": "ReproductionRecipeOnly",
+  "relation": "REL-005A",
+  "harness_base_head": "1e445d072c269d189145c98118b60e8d174a5495",
+  "harness_allowed_diff": [
+    ".github/rel/rel-005a-reproduce.py",
+    ".github/rel/rel-005a-reproduction-recipe.json"
+  ],
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "expected_git_blobs": {
+    "crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs": "680821c53c09f6ea894039f07367d7fdcddee6cd",
+    "crates/core/symthaea-fep/tests/rel_graft_frame.rs": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+    ".github/rel/rel-005a-full-predicate-contract.json": "3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a",
+    ".github/rel/rel-005a-comparison-only-contract.json": "827ca80d3f8897e6de0caf867415553ff9d951bb",
+    ".github/rel/rel-005a-comparison-only.py": "ab9e68b48989db9dfec48181a052ed58f937a692"
+  },
+  "toolchain": {
+    "rust": "1.96.0",
+    "edition": "2024",
+    "cargo_locked": true,
+    "clippy_warnings_denied": true,
+    "rustup_required": true,
+    "ambient_toolchain_override_allowed": false,
+    "explicit_toolchain_invocation_required": true
+  },
+  "workspace_isolation": {
+    "require_clean_harness_worktree_before": true,
+    "require_clean_harness_worktree_after": true,
+    "execution_must_use_detached_exact_subject_worktree": true,
+    "temporary_execution_worktree_outside_harness_worktree": true,
+    "output_directory_must_be_outside_worktrees": true,
+    "cargo_target_must_be_outside_worktrees": true,
+    "temporary_execution_worktree_must_be_removed": true
+  },
+  "commands": {
+    "install_toolchain": "rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy",
+    "rustc_version": "rustup run 1.96.0 rustc -Vv",
+    "cargo_version": "rustup run 1.96.0 cargo -V",
+    "rustfmt_version": "rustup run 1.96.0 rustfmt -V",
+    "clippy_version": "rustup run 1.96.0 cargo clippy -V",
+    "format_check": "rustup run 1.96.0 rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs",
+    "execute": "rustup run 1.96.0 cargo test --locked -p symthaea-fep --test rel_graft_frame_execution_v3 -- --nocapture",
+    "clippy": "rustup run 1.96.0 cargo clippy --locked -p symthaea-fep --test rel_graft_frame_execution_v3 -- -D warnings"
+  },
+  "observation": {
+    "schema": "symthaea.rel.graft-frame-execution-observation.v3",
+    "authority": "ExecutionOnly",
+    "original_qualified_lineage_observation_sha256": "e271a5c2e6b51fda15cd6c3209e52859296f44ecd790b9c5e72f769d4aec1c4d",
+    "byte_identity_with_original_required": false
+  },
+  "adjudication": {
+    "evaluator": ".github/rel/rel-005a-comparison-only.py",
+    "predicate_contract": ".github/rel/rel-005a-full-predicate-contract.json",
+    "comparison_contract": ".github/rel/rel-005a-comparison-only-contract.json",
+    "valid_results": ["ALL_PREDICATES_PASS", "PREDICATE_FAILURES"],
+    "predicate_count": 41
+  },
+  "reproduction_semantics": {
+    "reuses_original_observation_bytes": false,
+    "reuses_original_observation_seal": false,
+    "constructs_fresh_local_execution_receipt": true,
+    "constructs_fresh_local_manifest": true,
+    "constructs_fresh_local_observation_seal": true,
+    "uses_frozen_predicate_contract": true,
+    "uses_frozen_generic_comparison_evaluator": true,
+    "scientific_negative_result_is_not_infrastructure_failure": true,
+    "may_assert_original_qualification_status": false,
+    "fresh_seal_execution_subject_is_literal_detached_git_head": true
+  },
+  "does_not_change": [
+    "the original REL-005A qualification result",
+    "the original ObservationSeal",
+    "the original ComparisonOnly receipt",
+    "any frozen predicate or threshold"
+  ],
+  "claims": {
+    "independent_reproduction_completed": false,
+    "original_rel_005a_qualification_changed": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
