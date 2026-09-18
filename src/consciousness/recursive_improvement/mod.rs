@@ -75,9 +75,10 @@ pub mod sym_rsi_fixtures;
 pub mod sym_rsi_fresh_evaluation;
 pub mod sym_rsi_grounded_dream;
 pub mod sym_rsi_dream_protocol;
-pub mod sym_rsi_dream_fresh_evaluation;
-pub mod sym_rsi_dream_ood_evaluation;
-pub mod sym_rsi_dream_verification;
+mod sym_rsi_dream_parent_gate;
+mod sym_rsi_dream_fresh_evaluation;
+mod sym_rsi_dream_ood_evaluation;
+mod sym_rsi_dream_verification;
 pub mod sym_rsi_holdout_gate;
 pub mod sym_rsi_replay_corpus;
 pub mod sym_rsi_replay_selection;
@@ -210,21 +211,30 @@ pub use sym_rsi_dream_protocol::{
     canonical_sym_rsi_001d_manifest, validate_canonical_sym_rsi_001d_manifest,
     validate_dream_extension_seed_independence,
 };
+pub use sym_rsi_dream_parent_gate::{
+    ParentCQualification, ParentCQualificationReceipt, ParentDreamGateError,
+    ParentQualifiedDreamFreshReceipt, ParentQualifiedDreamOodReceipt,
+    ParentQualifiedDreamVerificationReceipt, QualifiedDreamFresh, QualifiedDreamVerification,
+    SYM_RSI_001D_PARENT_C_QUALIFICATION_SCHEMA, SYM_RSI_001D_QUALIFIED_FRESH_SCHEMA,
+    SYM_RSI_001D_QUALIFIED_OOD_SCHEMA, SYM_RSI_001D_QUALIFIED_VERIFICATION_SCHEMA,
+    acquire_dream_verification_corpus_after_parent_c, qualify_parent_c_for_dream,
+    run_fresh_d_vs_c_after_parent_c, run_ood_d_vs_c_after_parent_c,
+    validate_grounded_dream_after_parent_c,
+};
 pub use sym_rsi_dream_fresh_evaluation::{
     DreamFreshDisposition, DreamFreshDomainSummary, DreamFreshEvaluationError,
     DreamFreshEvaluationReceipt, DreamFreshPairReceipt,
-    SYM_RSI_001D_FRESH_EVALUATION_SCHEMA, run_fresh_d_vs_c,
+    SYM_RSI_001D_FRESH_EVALUATION_SCHEMA,
 };
 pub use sym_rsi_dream_ood_evaluation::{
     DreamOodDisposition, DreamOodDomainSummary, DreamOodEvaluationError,
     DreamOodEvaluationReceipt, DreamOodPairReceipt,
-    SYM_RSI_001D_OOD_EVALUATION_SCHEMA, run_ood_d_vs_c,
+    SYM_RSI_001D_OOD_EVALUATION_SCHEMA,
 };
 pub use sym_rsi_dream_verification::{
     DreamVerificationCorpus, DreamVerificationCorpusReceipt, DreamVerificationDecision,
     DreamVerificationDomainSummary, DreamVerificationError, DreamVerificationGateReceipt,
     SYM_RSI_001D_VERIFICATION_CORPUS_SCHEMA, SYM_RSI_001D_VERIFICATION_GATE_SCHEMA,
-    acquire_dream_verification_corpus, validate_grounded_dream_on_verification,
 };
 pub use sym_rsi_holdout_gate::{
     HeldOutReplayGateReceipt, HoldoutGateDecision, HoldoutGateError,
