@@ -14,6 +14,10 @@ The extension inherits only the already-frozen SYM-RSI-001 training substrate:
 
 No C-vs-A fresh outcome is an input to arm D.
 
+Before any SYM-RSI-001D verification seed may be consumed, the selected C policy must independently survive the original SYM-RSI-001 held-out replay gate on seeds 101-104. The canonical training selection and held-out gate are recomputed from their frozen corpora and must exactly match the supplied receipts. Only `FreshExecutionEligible` may mint the parent-C qualification token that unlocks the dream extension. `NoChange`, replay-support failure, held-out quality rejection, receipt mismatch, or lineage mismatch leaves 301-304 untouched.
+
+This parent-C requirement does **not** require using C-vs-A fresh outcomes from seeds 201-204 as an input to D. It requires only that C pass its preregistered independent replay holdout before becoming the baseline for a deeper D-vs-C experiment.
+
 ## Frozen evaluation partitions
 
 For each of the three existing deterministic fixture domains:
@@ -21,15 +25,16 @@ For each of the three existing deterministic fixture domains:
 | Purpose | Seeds |
 | --- | --- |
 | inherited training replay | 1-8 |
+| parent-C held-out replay | 101-104 |
 | dream verification replay | 301-304 |
 | fresh D-vs-C execution | 401-404 |
 | OOD follow-up | 1201-1204 |
 
-The 301-304, 401-404, and 1201-1204 partitions are disjoint from every SYM-RSI-001 seed. Unit tests and ordinary CI must not execute these partitions.
+The 301-304, 401-404, and 1201-1204 partitions are disjoint from every SYM-RSI-001 seed. Unit tests and ordinary CI must not execute these dream-extension partitions.
 
 ## Arm definitions for this extension
 
-**C — exact replay selected policy.** The exact policy selected by the frozen SYM-RSI-001 training replay receipt. It is not reselected on any SYM-RSI-001D outcome.
+**C — qualified exact replay selected policy.** The exact policy selected by the frozen SYM-RSI-001 training replay receipt **and accepted as `FreshExecutionEligible` by the independent 101-104 parent holdout gate**. It is not reselected on any SYM-RSI-001D outcome.
 
 **D — replay plus grounded dreaming.** Arm C wrapped by the frozen grounded dream model. The dream model may alter action choice only through predictions produced from learned transition memory.
 
@@ -47,7 +52,9 @@ The similarity is clamped to `[0, 1]`. Zero local similarity therefore gives the
 
 Task-regression probability is the fraction of executed model simulations whose support-adjusted task quality is below the current state's quality. Predicted task quality is read from the task-quality channels of the model-generated outcome representation. D-v6 does not invoke the generic Φ/magnitude distribution during action selection. Each prediction records its actual model-simulation count, including zero for non-actionable unsupported candidates, so verification/fresh/OOD receipts report the exact decision-path model-call count rather than an inferred or partial count.
 
-**Known representation limitation frozen with v6:** the transition model's current nearest-state cosine support is computed over the same 16-dimensional dream-state representation that also carries repeated task-quality channels. D-v6 therefore treats this support signal conservatively, but does not claim that it is an independently pure structural-state distance. A later policy version must separate structural-state support from outcome-quality representation before making stronger locality/generalization claims.
+**Known representation limitation frozen with v6:** the transition model's current nearest-state cosine support is computed over the same 16-dimensional dream-state representation that also carries repeated task-quality channels. D-v6 therefore treats this support signal conservatively, but does not claim that it is an independently pure structural-state distance.
+
+A separate preregistered D-v7 amendment freezes a seven-dimensional quality-independent structural-support representation. If that v7 implementation qualifies before any 301-304 outcome is consumed, v7 supersedes v6 for the actual SYM-RSI-001D measurement while v6 remains an immutable intermediate evidence lineage.
 
 D is forbidden from:
 - calling the true fixture transition function during action selection,
@@ -58,9 +65,23 @@ D is forbidden from:
 
 Executed D actions may of course produce new recorded evidence through the normal runner after the environment actually returns an outcome.
 
+## Parent-C qualification gate
+
+Before any 301-304 acquisition:
+
+1. Recompute the canonical C training selection from the frozen 1-8 training replay corpus.
+2. Require the recomputed selection receipt to exactly match the supplied C selection receipt.
+3. Recompute the original SYM-RSI-001 held-out gate from the frozen 101-104 held-out corpus.
+4. Require the recomputed holdout receipt to exactly match the supplied holdout receipt.
+5. Require `FreshExecutionEligible`, full incumbent support, full selected-policy support, a non-incumbent selected policy, and exact selection-evidence linkage.
+6. Bind the selection digest, holdout-gate digest, held-out corpus digest, selected policy, subject, environment, and parent preregistration into a parent-C qualification evidence digest.
+7. Only the resulting private-constructor qualification token may unlock the public 301-304 acquisition API.
+
+Qualification tokens are not deserializable. A later process must recreate the token by re-validating the frozen source evidence instead of trusting a persisted boolean.
+
 ## Verification-replay gate
 
-Before any fresh 401-404 execution:
+After parent-C qualification and before any fresh 401-404 execution:
 
 1. Build a replay corpus on seeds 301-304 using only the frozen canonical fixed-policy collectors.
 2. Freeze that corpus before evaluating D.
@@ -68,7 +89,8 @@ Before any fresh 401-404 execution:
 4. Require C and D to have 100% historical action support and recorded terminal completion.
 5. Require D mean solution quality to remain within 0.02 of C in every domain and in the macro-average.
 6. Require at least one D decision to differ from C. If dreaming never changes an action, the extension terminates as **NoDreamIntervention** rather than consuming fresh seeds.
-7. Any generated-evidence promotion, safety violation, authority-boundary violation, lineage mismatch, missing world, duplicate world, or unsupported action blocks fresh execution.
+7. Any generated-evidence promotion, safety violation, authority-boundary violation, parent-lineage mismatch, missing world, duplicate world, or unsupported action blocks fresh execution.
+8. Bind the parent-C qualification digest and parent holdout-gate digest into the qualified dream-verification lineage.
 
 The verification gate is a screening gate, not the primary result.
 
@@ -83,23 +105,25 @@ Primary quality is domain-balanced:
 - the macro-average may not degrade by more than 0.02.
 
 A result is **PositiveUnderProtocol** only if:
-- all integrity, provenance, safety, and authority checks pass,
+- all integrity, provenance, safety, authority, and parent-C lineage checks pass,
 - D actually overrides C on at least one fresh decision,
 - every domain and the macro-average satisfy quality non-inferiority,
 - macro quality delta is strictly greater than 0.
 
 Evaluator calls, dream-model simulations, override rate, and model-prediction counts are reported separately. Local support distance remains bound at the per-prediction epistemic-provenance layer in v6 rather than being represented as a separate aggregate receipt metric. This protocol does not call D more compute-efficient merely because environment calls are unchanged; model-simulation cost remains explicit rather than silently treated as free.
 
+The fresh qualified lineage binds the parent-C qualification evidence digest, parent holdout-gate digest, qualified 301-304 verification digest, fresh evidence digest, and grounded dream-model digest.
+
 With only 12 deterministic/seed-controlled pairs, no asymptotic p-value is manufactured.
 
 ## OOD follow-up
 
-Seeds 1201-1204 are untouched until the fresh D-vs-C receipt is frozen. OOD evaluation is secondary and cannot change the primary D-vs-C disposition or retrain the dream model.
+Seeds 1201-1204 are untouched until the parent-qualified fresh D-vs-C receipt is frozen. OOD evaluation is secondary and cannot change the primary D-vs-C disposition or retrain the dream model. The public OOD entry point requires the private qualified-fresh token, preserving the parent-C and verification lineage through the final stage.
 
 ## Claim boundary
 
 A positive result supports only:
 
-> Under the frozen SYM-RSI-001D fixture domains and protocol, a learned counterfactual dream policy improved fresh solution quality beyond the exact-replay-selected policy while respecting the preregistered non-inferiority and epistemic boundaries.
+> Under the frozen SYM-RSI-001D fixture domains and protocol, a learned counterfactual dream policy improved fresh solution quality beyond an independently holdout-qualified exact-replay-selected policy while respecting the preregistered non-inferiority and epistemic boundaries.
 
-It does not by itself establish open-ended RSI, universal improvement, consciousness, or monotonic improvement outside the tested distributions. D-v6 also does not establish that its locality metric is independent of task-quality representation; that limitation is explicit in the evidence lineage.
+It does not by itself establish open-ended RSI, universal improvement, consciousness, or monotonic improvement outside the tested distributions. D-v6 also does not establish that its locality metric is independent of task-quality representation; that limitation is explicit in the evidence lineage, and the v7 structural-support amendment exists specifically to remove it before sealed measurement.
