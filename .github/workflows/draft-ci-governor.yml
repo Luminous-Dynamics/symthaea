@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   pull_request_target:
-    types: [ready_for_review]
+    types: [opened, synchronize, reopened, converted_to_draft, ready_for_review]
   workflow_dispatch:
     inputs:
       apply:
@@ -21,15 +21,115 @@ on:
 permissions: {}
 
 concurrency:
-  # Ready transitions are isolated per PR. Scheduled/manual reconciliations share
-  # one group so two cancellation batches cannot race each other.
+  # PR events are isolated per PR and latest-event-wins. A ready transition must
+  # supersede stale draft-cancellation work, while a converted_to_draft event
+  # must supersede stale ready-dispatch work. Scheduled/manual reconciliations
+  # share one non-cancelling group so destructive batches cannot race.
   group: draft-ci-governor-${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || 'reconcile' }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 jobs:
+  cancel-current-draft-full-ci:
+    name: Cancel current draft full CI
+    if: >-
+      github.event_name == 'pull_request_target' &&
+      github.event.action != 'ready_for_review' &&
+      github.event.pull_request.draft == true
+    permissions:
+      actions: write
+      pull-requests: read
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Cancel matching current-head draft full CI
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const eventPr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const fullName = `${owner}/${repo}`;
+
+            if (eventPr.head.repo.full_name !== fullName) {
+              core.notice(`PR #${eventPr.number} is from a fork; leaving normal pull-request CI untouched.`);
+              return;
+            }
+
+            // The event payload is discovery only. Re-read immediately before
+            // any destructive operation so ready/closed/head-moved transitions
+            // cannot be acted on from stale state.
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: eventPr.number,
+            });
+            if (pr.state !== 'open' || !pr.draft || pr.head.repo.full_name !== fullName) {
+              core.notice(`PR #${eventPr.number} is no longer an open same-repo draft; no CI cancellation.`);
+              return;
+            }
+
+            const liveStatuses = new Set(['queued', 'requested', 'waiting', 'pending', 'in_progress']);
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner,
+              repo,
+              workflow_id: 'ci.yml',
+              event: 'pull_request',
+              branch: pr.head.ref,
+              per_page: 100,
+            });
+
+            const matching = runs
+              .filter(run => run.head_sha === pr.head.sha)
+              .filter(run => liveStatuses.has(run.status))
+              .filter(run => {
+                const number = run.pull_requests?.[0]?.number;
+                return number === undefined || number === pr.number;
+              })
+              .sort((a, b) => a.id - b.id);
+
+            core.notice(`Draft PR #${pr.number} current head ${pr.head.sha}: ${matching.length} matching live full-CI run(s).`);
+
+            let cancelled = 0;
+            let alreadyGone = 0;
+            for (const run of matching.slice(0, 10)) {
+              // Re-read the PR before each cancellation. This is deliberately
+              // redundant: a ready transition during a multi-run cleanup must
+              // stop destructive work immediately.
+              const { data: livePr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: pr.number,
+              });
+              if (
+                livePr.state !== 'open' ||
+                !livePr.draft ||
+                livePr.head.repo.full_name !== fullName ||
+                livePr.head.sha !== pr.head.sha
+              ) {
+                core.notice(`Stopping cancellation: PR #${pr.number} state/head changed.`);
+                break;
+              }
+
+              try {
+                core.notice(`Cancelling ${run.status} full-CI run ${run.id} for draft PR #${pr.number}.`);
+                await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id: run.id });
+                cancelled += 1;
+              } catch (error) {
+                if (error.status === 409) {
+                  alreadyGone += 1;
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            if (matching.length > 10) {
+              core.warning(`Only the first 10 matching current-head runs were considered; ${matching.length - 10} remain for scheduled reconciliation.`);
+            }
+            core.notice(`Current-head draft cancellation accepted=${cancelled}; already_non_cancellable=${alreadyGone}.`);
+
   dispatch-ready-full-ci:
     name: Dispatch full matrix when draft becomes ready
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request_target' && github.event.action == 'ready_for_review'
     permissions:
       actions: write
       pull-requests: read
