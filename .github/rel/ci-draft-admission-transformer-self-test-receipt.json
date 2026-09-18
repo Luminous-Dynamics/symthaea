@@ -1,0 +1,26 @@
+{
+  "schema": "symthaea.ci.draft-admission-transformer-self-test-receipt.v2",
+  "authority": "RunnerPlaneCandidateOnly",
+  "parent_contract_head": "b7f1456c613bf378e5d206df4248fc77082265c7",
+  "structural_cases": 3,
+  "truth_table_cases": 10,
+  "covers": [
+    "job with no if",
+    "job with scalar if",
+    "job with block-scalar if",
+    "draft pull request forces false",
+    "ready pull request preserves original condition",
+    "push preserves original condition",
+    "schedule preserves original condition",
+    "workflow_dispatch preserves original condition"
+  ],
+  "reverse_byte_exact": true,
+  "operator_precedence_guarded": true,
+  "pass": true,
+  "claims": {
+    "real_ci_transformed": false,
+    "ci_qualified": false,
+    "queue_repaired": false,
+    "scientific_authority": false
+  }
+}

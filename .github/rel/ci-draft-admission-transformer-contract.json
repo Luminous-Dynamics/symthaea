@@ -1,0 +1,31 @@
+{
+  "schema": "symthaea.ci.draft-admission-transformer-contract.v1",
+  "authority": "RunnerPlaneCandidateOnly",
+  "parent_contract_head": "b7f1456c613bf378e5d206df4248fc77082265c7",
+  "source_main_head": "a4168072a9cd29fafbb99928c33005ee4ba8d924",
+  "source_ci_blob": "a48366076b30eb8e12d22c927a3b8bf333181409",
+  "source_workflow": ".github/workflows/ci.yml",
+  "admission_predicate": "github.event_name != 'pull_request' || github.event.pull_request.draft == false",
+  "expected_block_if_jobs": ["psych-bench"],
+  "expected_block_marker": "|",
+  "required_properties": [
+    "transform only top-level job-level if surfaces",
+    "preserve top-level job keys and order",
+    "for every pre-existing condition C, transformed condition is exactly (admission) AND (C)",
+    "parenthesize the complete admission predicate before conjoining so OR precedence cannot change semantics",
+    "preserve all pre-existing scalar if expressions as parenthesized conjuncts",
+    "preserve the exact original psych-bench block payload bytes inside the wrapper",
+    "every transformed top-level job contains the admission predicate exactly once",
+    "draft pull requests force every transformed top-level job false",
+    "ready pull requests and non-PR events preserve every pre-existing job condition exactly",
+    "reverse only transformer edits to reconstruct the source ci.yml bytes exactly",
+    "bind source ci.yml by Git blob before transformation"
+  ],
+  "claims": {
+    "ci_qualified": false,
+    "ci_modified_on_main": false,
+    "queue_repaired": false,
+    "runner_capacity_increased": false,
+    "scientific_authority": false
+  }
+}
