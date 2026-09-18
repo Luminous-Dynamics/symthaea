@@ -58,6 +58,7 @@ pub mod claim_priority;
 pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_restart_admission_review;
+pub mod epistemic_restart_historical_firewall_replay;
 pub mod epistemic_restart_historical_projection;
 pub mod epistemic_restart_historical_replay_eligibility;
 pub mod epistemic_restart_isolated_hydration;
