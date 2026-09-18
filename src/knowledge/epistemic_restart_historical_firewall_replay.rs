@@ -17,6 +17,7 @@ use super::belief_mutation_firewall::{
     BeliefMutationAuthorization, BeliefMutationAuthorizationDecision, BeliefMutationFirewall,
     BeliefMutationOutcome, EpistemicSupportStore,
 };
+use super::belief_mutation_seal_wire::BeliefMutationSealWireSnapshotV1;
 use super::belief_revision_gate::{
     BeliefRevisionPolicy, CalibrationSnapshot, EpistemicRevisionProposal,
 };
@@ -37,8 +38,7 @@ use super::epistemic_restart_wire::{
 };
 use super::epistemic_restart_wire_v2::EpistemicRestartWireSnapshotV2;
 use super::epistemic_vector::{ClaimUncertaintyAssessment, EpistemicVector, UncertaintyDimension};
-use super::belief_mutation_seal_wire::BeliefMutationSealWireSnapshotV1;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
@@ -334,8 +334,9 @@ impl HistoricalFirewallReplayReportV1 {
         }
 
         compare_final_support_states(&store, &restart.base.support_states)?;
-        let consumed_equivalent = store.consumed_authorization_count() as u64
-            == restart.base.consumed_authorization_count;
+        let replayed_authorizations = u64::try_from(store.consumed_authorization_count())
+            .map_err(|_| HistoricalFirewallReplayError::LengthOverflow)?;
+        let consumed_equivalent = replayed_authorizations == restart.base.consumed_authorization_count;
         if !consumed_equivalent {
             return Err(HistoricalFirewallReplayError::ConsumedAuthorizationCountMismatch {
                 replayed: store.consumed_authorization_count(),
@@ -507,17 +508,24 @@ fn rebuild_historical_ledger(
         .iter()
         .map(|record| record.evidence_id.0)
         .max();
-    let max_claim_id = Some(projection.claim_id().0);
-    let max_provenance_id = match max_evidence_id {
-        Some(max_id) => base
-            .evidence
-            .iter()
-            .take_while(|record| record.id.0 <= max_id)
-            .map(|record| record.provenance_id.0)
-            .max(),
-        None => None,
-    };
-    let mut ledger = rebuild_ledger_prefix(
+    let evidence_prefix = max_evidence_id
+        .map(|maximum| {
+            base.evidence
+                .iter()
+                .take_while(move |record| record.id.0 <= maximum)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let max_claim_id = evidence_prefix
+        .iter()
+        .map(|record| record.claim_id.0)
+        .chain(std::iter::once(projection.claim_id().0))
+        .max();
+    let max_provenance_id = evidence_prefix
+        .iter()
+        .map(|record| record.provenance_id.0)
+        .max();
+    let ledger = rebuild_ledger_prefix(
         base,
         max_provenance_id,
         max_claim_id,
@@ -561,9 +569,6 @@ fn rebuild_historical_ledger(
             ));
         }
     }
-
-    // Keep the local variable mutable only during construction. No handle escapes.
-    let _ = &mut ledger;
     Ok(ledger)
 }
 
