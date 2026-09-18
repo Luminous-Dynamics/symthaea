@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A1N-NUMERICAL-CONVERGENCE-v1",
+  "scientific_claim": "NONE",
+  "authority": "numerical-convergence-qualification-only",
+  "primary_simpson_subdivisions": 1024,
+  "refined_simpson_subdivisions": 2048,
+  "max_absolute_prediction_delta": 1e-8,
+  "max_relative_prediction_delta": 1e-10,
+  "max_absolute_chi2_delta": 1e-8,
+  "development_history": "Engineering convergence thresholds were frozen after a non-authoritative feasibility calculation. They do not carry scientific authority and are intentionally far tighter than the separately frozen 0.01 DESI reproduction tolerance."
+}

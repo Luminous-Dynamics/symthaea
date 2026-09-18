@@ -25,3 +25,7 @@ path = "src/a1r_oracle.rs"
 [[bin]]
 name = "de001a-a1p-point-bind"
 path = "src/a1p_point_bind.rs"
+
+[[bin]]
+name = "de001a-a1n-convergence"
+path = "src/a1n_convergence.rs"
