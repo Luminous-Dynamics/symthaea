@@ -1,0 +1,120 @@
+{
+  "schema": "symthaea.rel.qualification-assembly-contract.v3",
+  "authority": "QualificationAssemblyContractOnly",
+  "relation": "REL-005A",
+  "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+  "projection_contract": {
+    "subject_head": "07af7c4bdfdda377aa8175efe7a3233ce90e889e",
+    "source_run_id": 35324485955,
+    "workflow_name": "REL-005A Qualification Projection Contract",
+    "artifact_name": "rel-005a-qualification-projection-contract-07af7c4bdfdda377aa8175efe7a3233ce90e889e"
+  },
+  "comparison": {
+    "subject_head": "a47efccf80fa66bacbdfa9930f59c8439be7ee38",
+    "source_run_id": 35349750595,
+    "workflow_name": "REL-005A ComparisonOnly V3 R2",
+    "artifact_name": "rel-005a-comparison-v3-a47efccf80fa66bacbdfa9930f59c8439be7ee38"
+  },
+  "predicate_source": {
+    "subject_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+    "source_run_id": 35278498517,
+    "artifact_name": "rel-005a-full-predicate-contract-43bf1d588447f602ce0f1549986bb558a839762c"
+  },
+  "seal_source": {
+    "subject_head": "0a94ed976926fbdcd6b752f94e174df21f915fc8",
+    "source_run_id": 35284772522,
+    "source_job_id": 105414583527,
+    "artifact_name": "rel-005a-observation-seal-v3-6931639e53060809f9d459196a329c4fe983be7b",
+    "observation_sha256": "e271a5c2e6b51fda15cd6c3209e52859296f44ecd790b9c5e72f769d4aec1c4d",
+    "chain_commitment_sha256": "a3a288caa9221ec5859b5ac81fcc55f61b4ff43d5e52ad096021c99ea6bf31ab"
+  },
+  "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+  "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
+  "frozen_test_blob": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
+  "required_predicate_count": 41,
+  "allowed_comparison_results": [
+    "ALL_PREDICATES_PASS",
+    "PREDICATE_FAILURES"
+  ],
+  "selected_comparison_result": null,
+  "transport_resolution": {
+    "policy": "resolve_current_unique_unexpired_exact_name_artifact_within_frozen_run",
+    "artifact_id_is_scientific_authority": false,
+    "artifact_zip_digest_is_scientific_authority": false,
+    "resolved_transport_identity_must_be_recorded": true,
+    "inner_content_commitments_are_authoritative": true
+  },
+  "assembly_topology": [
+    {
+      "stage": "AuthorityReceiptExtractionOnly",
+      "may_download_predicate_artifact": true,
+      "may_download_sealed_execution_artifact": true,
+      "may_receive_detailed_comparison": false,
+      "may_issue_adjudication": false,
+      "may_issue_qualification": false,
+      "source_capsule_contains_raw_scientific_payload": true,
+      "scientific_interpretation_permitted": false,
+      "must_validate_inner_content_commitments": true,
+      "output_files": [
+        "predicate-contract-receipt.json",
+        "execution-v3-receipt.json",
+        "observation-seal-v3.json"
+      ],
+      "raw_observation_output": false,
+      "execution_logs_output": false
+    },
+    {
+      "stage": "EvidenceProjectionOnly",
+      "may_read_authority_receipts": true,
+      "may_read_detailed_comparison": true,
+      "may_read_raw_observation": false,
+      "may_read_execution_logs": false,
+      "may_issue_qualification": false,
+      "must_validate_exact_source_metadata_before_projection": true,
+      "must_validate_inner_content_commitments": true
+    },
+    {
+      "stage": "QualificationAssemblyOnly",
+      "may_read_detailed_comparison": false,
+      "may_read_raw_observation": false,
+      "adds_only_provenance_receipt": true
+    },
+    {
+      "stage": "artifact_boundary",
+      "required_files": [
+        "predicate-contract-receipt.json",
+        "execution-v3-receipt.json",
+        "observation-seal-v3.json",
+        "comparison-only-qualification-receipt.json",
+        "qualification-input-manifest.json",
+        "qualification-assembly-receipt.json"
+      ],
+      "forbidden_content_classes": [
+        "raw observation JSON",
+        "execution stdout/stderr",
+        "detailed predicate array",
+        "individual observed values",
+        "individual expected values",
+        "scientific threshold table"
+      ]
+    },
+    {
+      "stage": "QualificationOnly",
+      "fresh_job_required": true,
+      "may_download_detailed_comparison_artifact": false,
+      "may_download_execution_artifact": false,
+      "may_download_projection_contract_artifact": false,
+      "may_read_only_sanitized_assembly_artifact": true
+    }
+  ],
+  "qualification_mapping_source": "rel-005a-qualification-only-contract.json",
+  "claims": {
+    "receipt_extraction_performed": false,
+    "projection_performed": false,
+    "comparison_only_adjudicated": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}

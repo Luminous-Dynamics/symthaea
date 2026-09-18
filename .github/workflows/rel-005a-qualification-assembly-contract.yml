@@ -1,0 +1,134 @@
+name: REL-005A Qualification Assembly Contract R3
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-qualification-assembly-contract.json"
+      - ".github/rel/verify-rel-005a-qualification-assembly-contract.py"
+      - ".github/workflows/rel-005a-qualification-assembly-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-qualification-assembly-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: 07af7c4bdfdda377aa8175efe7a3233ce90e889e
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+  COMPARISON_HEAD: a47efccf80fa66bacbdfa9930f59c8439be7ee38
+  COMPARISON_RUN_ID: "35349750595"
+  COMPARISON_WORKFLOW: REL-005A ComparisonOnly V3 R2
+  PROJECTION_HEAD: 07af7c4bdfdda377aa8175efe7a3233ce90e889e
+  PROJECTION_RUN_ID: "35324485955"
+  PROJECTION_WORKFLOW: REL-005A Qualification Projection Contract
+  PREDICATE_HEAD: 43bf1d588447f602ce0f1549986bb558a839762c
+  PREDICATE_RUN_ID: "35278498517"
+  SEAL_HEAD: 0a94ed976926fbdcd6b752f94e174df21f915fc8
+  SEAL_RUN_ID: "35284772522"
+  SEAL_JOB_ID: "105414583527"
+
+jobs:
+  assembly-contract:
+    name: Verify isolated-source QualificationAssemblyOnly preregistration
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact assembly-contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-qualification-assembly-contract.json"
+            ".github/rel/verify-rel-005a-qualification-assembly-contract.py"
+            ".github/workflows/rel-005a-qualification-assembly-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify preregistered source identities without reading outcomes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          for spec in \
+            "comparison:${COMPARISON_RUN_ID}:${COMPARISON_HEAD}:${COMPARISON_WORKFLOW}" \
+            "projection:${PROJECTION_RUN_ID}:${PROJECTION_HEAD}:${PROJECTION_WORKFLOW}" \
+            "predicate:${PREDICATE_RUN_ID}:${PREDICATE_HEAD}:REL-005A Full Predicate Contract" \
+            "seal:${SEAL_RUN_ID}:${SEAL_HEAD}:REL-005A ObservationSeal V3"; do
+              IFS=: read -r label run_id head workflow <<<"${spec}"
+              curl -fsSL "${auth[@]}" "${api}/actions/runs/${run_id}" > "${RUNNER_TEMP}/${label}-run.json"
+            done
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          expected = {
+              'comparison': (int(os.environ['COMPARISON_RUN_ID']), os.environ['COMPARISON_HEAD'], os.environ['COMPARISON_WORKFLOW']),
+              'projection': (int(os.environ['PROJECTION_RUN_ID']), os.environ['PROJECTION_HEAD'], os.environ['PROJECTION_WORKFLOW']),
+              'predicate': (int(os.environ['PREDICATE_RUN_ID']), os.environ['PREDICATE_HEAD'], 'REL-005A Full Predicate Contract'),
+              'seal': (int(os.environ['SEAL_RUN_ID']), os.environ['SEAL_HEAD'], 'REL-005A ObservationSeal V3'),
+          }
+          for label, (run_id, head, workflow) in expected.items():
+              run = json.loads((root / f'{label}-run.json').read_text())
+              assert run['id'] == run_id
+              assert run['head_sha'] == head
+              assert run['name'] == workflow
+          # Deliberately do not inspect status, conclusion, artifact identities,
+          # comparison result, counts, or any scientific value.
+          PY
+
+      - name: Verify QualificationAssemblyContractOnly v3 boundary
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/qualification-assembly-contract-receipt.json
+        run: |
+          set -euo pipefail
+          python3 .github/rel/verify-rel-005a-qualification-assembly-contract.py | tee "${RECEIPT}"
+          python3 -m json.tool "${RECEIPT}" >/dev/null
+          python3 - <<'PY'
+          import json, os, pathlib
+          r = json.loads(pathlib.Path(os.environ['RECEIPT']).read_text())
+          assert r['authority'] == 'QualificationAssemblyContractOnly'
+          assert r['authority_receipt_extraction_isolated'] is True
+          assert r['projection_raw_observation_visibility'] is False
+          assert r['comparison_run_preregistered'] is True
+          assert r['projection_run_preregistered'] is True
+          assert r['outcome_preselected'] is False
+          assert r['transport_identity_scientific_authority'] is False
+          assert r['inner_content_commitments_authoritative'] is True
+          assert r['fresh_qualification_job_required'] is True
+          assert not any(r['claims'].values())
+          PY
+
+      - name: Upload static assembly-contract evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-qualification-assembly-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/rel-005a-qualification-assembly-contract.json
+            ${{ runner.temp }}/qualification-assembly-contract-receipt.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
