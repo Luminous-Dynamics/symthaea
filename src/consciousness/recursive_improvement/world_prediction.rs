@@ -86,9 +86,12 @@ impl PredictionDomain {
         }
     }
 
-    /// Infer prediction domain from action type string
+    /// Infer prediction domain from an untyped action string.
     ///
-    /// This allows automatic domain classification for EFE integration.
+    /// This is a compatibility/modeling heuristic only. CAL-002A deliberately
+    /// forbids the autonomy gate from treating this inference as an authority
+    /// boundary; autonomous execution requires an explicitly declared typed
+    /// domain on [`WorldActionContext`].
     pub fn from_action_type(action_type: &str) -> Self {
         let action_lower = action_type.to_lowercase();
 
@@ -308,6 +311,16 @@ pub struct WorldActionContext {
     /// Risk tier of this action
     pub risk_tier: RiskTier,
 
+    /// Explicit typed prediction/calibration domain.
+    ///
+    /// `None` preserves the historical heuristic inference path for modeling
+    /// and backward compatibility. It is intentionally insufficient for
+    /// autonomous execution: the constraint gate requires `Some(domain)` so a
+    /// free-form action string cannot choose the calibration cohort that grants
+    /// autonomy.
+    #[serde(default)]
+    pub prediction_domain: Option<PredictionDomain>,
+
     /// Constraints on the action
     pub constraints: Vec<String>,
 
@@ -332,6 +345,7 @@ impl WorldActionContext {
             intended_effect: intended_effect.into(),
             goal: None,
             risk_tier: RiskTier::Reversible,
+            prediction_domain: None,
             constraints: Vec::new(),
             preconditions: Vec::new(),
             postconditions: Vec::new(),
@@ -350,6 +364,27 @@ impl WorldActionContext {
     pub fn with_risk_tier(mut self, risk_tier: RiskTier) -> Self {
         self.risk_tier = risk_tier;
         self
+    }
+
+    /// Bind this action to an explicit typed prediction/calibration domain.
+    pub fn with_prediction_domain(mut self, domain: PredictionDomain) -> Self {
+        self.prediction_domain = Some(domain);
+        self
+    }
+
+    /// Return the explicitly declared domain, if one exists.
+    pub const fn declared_prediction_domain(&self) -> Option<PredictionDomain> {
+        self.prediction_domain
+    }
+
+    /// Return a domain for non-authorizing modeling/prediction compatibility.
+    ///
+    /// Callers making authorization decisions must use
+    /// [`Self::declared_prediction_domain`] instead; the fallback is a heuristic
+    /// derived from free-form action text.
+    pub fn prediction_domain_for_modeling(&self) -> PredictionDomain {
+        self.prediction_domain
+            .unwrap_or_else(|| PredictionDomain::from_action_type(&self.action_type))
     }
 
     /// Builder pattern for adding precondition
@@ -617,7 +652,10 @@ pub struct WorldPrediction {
     /// Confidence in the prediction (0.0 - 1.0)
     pub confidence: f64,
 
-    /// Domain of the prediction
+    /// Domain of the prediction. This may be explicitly declared by the action
+    /// or heuristically inferred for compatibility/modeling. Consumers making
+    /// authorization decisions must inspect `action_context.prediction_domain`
+    /// rather than assuming this field was explicitly bound.
     pub domain: PredictionDomain,
 
     /// Action context that led to this prediction
@@ -650,7 +688,7 @@ impl WorldPrediction {
         resolution_contract: ResolutionContract,
     ) -> Self {
         let deadline = resolution_contract.timeout;
-        let domain = Self::infer_domain(&action_context.action_type);
+        let domain = action_context.prediction_domain_for_modeling();
 
         Self {
             id: Self::generate_id(),
@@ -675,34 +713,6 @@ impl WorldPrediction {
             .unwrap_or_default()
             .as_nanos();
         format!("wp_{:x}", timestamp)
-    }
-
-    /// Infer prediction domain from action type
-    fn infer_domain(action_type: &str) -> PredictionDomain {
-        let action_lower = action_type.to_lowercase();
-        if action_lower.contains("test")
-            || action_lower.contains("compile")
-            || action_lower.contains("build")
-        {
-            PredictionDomain::CodeExecution
-        } else if action_lower.contains("command")
-            || action_lower.contains("shell")
-            || action_lower.contains("exec")
-        {
-            PredictionDomain::ToolUse
-        } else if action_lower.contains("user")
-            || action_lower.contains("confirm")
-            || action_lower.contains("approve")
-        {
-            PredictionDomain::UserBehavior
-        } else if action_lower.contains("file")
-            || action_lower.contains("state")
-            || action_lower.contains("resource")
-        {
-            PredictionDomain::SystemState
-        } else {
-            PredictionDomain::Factual
-        }
     }
 
     /// Add a tag
@@ -862,6 +872,45 @@ mod tests {
         assert_eq!(prediction.confidence, 0.85);
         assert_eq!(prediction.domain, PredictionDomain::CodeExecution);
         assert!(prediction.is_pending());
+    }
+
+    #[test]
+    fn explicit_prediction_domain_overrides_heuristic() {
+        let action = WorldActionContext::new("compile", "Invoke a tool")
+            .with_prediction_domain(PredictionDomain::ToolUse);
+        let prediction = WorldPrediction::new(
+            "Tool call succeeds",
+            OutcomeCategory::Success,
+            0.7,
+            action,
+            ResolutionContract::shell_command(),
+        );
+        assert_eq!(prediction.domain, PredictionDomain::ToolUse);
+        assert_eq!(
+            prediction.action_context.declared_prediction_domain(),
+            Some(PredictionDomain::ToolUse)
+        );
+    }
+
+    #[test]
+    fn legacy_action_wire_defaults_to_unbound_domain() {
+        let value = serde_json::json!({
+            "action_type": "compile",
+            "intended_effect": "compile",
+            "goal": null,
+            "risk_tier": "Reversible",
+            "constraints": [],
+            "preconditions": [],
+            "postconditions": [],
+            "urgency": 0.5,
+            "metadata": {}
+        });
+        let action: WorldActionContext = serde_json::from_value(value).unwrap();
+        assert_eq!(action.declared_prediction_domain(), None);
+        assert_eq!(
+            action.prediction_domain_for_modeling(),
+            PredictionDomain::CodeExecution
+        );
     }
 
     #[test]
