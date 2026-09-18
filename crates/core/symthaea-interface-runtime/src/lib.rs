@@ -6,17 +6,18 @@
 //! phone client, or remote observer must not accumulate an unbounded queue of old
 //! cognitive snapshots and then render stale history while claiming to be live.
 //!
-//! This crate therefore provides a single shared latest-state slot with independent
-//! receivers. Publication is O(1) memory: each publish replaces the prior shared
-//! value, while receivers retain only an `Arc` to a snapshot they are actively
-//! inspecting. Per-receiver transport revisions make skipped publications explicit.
+//! The current state is stored as one immutable, atomically replaceable `Arc`.
+//! Readers take atomic snapshots and therefore never hold a state-slot mutex that
+//! can delay a cognition-side publisher. Per-receiver revisions still make
+//! coalesced publications explicit.
 //!
 //! Transport revision is not semantic runtime ordering. Semantic order remains the
 //! `RuntimeCursor`/`EventSeq` carried by `symthaea-interface-types`.
 
 use std::fmt;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use symthaea_interface_types::{RuntimeCursor, RuntimeState};
 
 /// Non-zero transport-local revision for the latest-wins state slot.
@@ -47,7 +48,8 @@ impl fmt::Display for StateRevision {
 pub enum StatePlaneError {
     /// The publication revision counter reached `u64::MAX`.
     RevisionExhausted,
-    /// Another thread panicked while holding the state-slot mutex.
+    /// Retained for source compatibility with the earlier mutex-backed state plane.
+    /// The atomic implementation does not emit this variant.
     Poisoned,
 }
 
@@ -55,7 +57,7 @@ impl fmt::Display for StatePlaneError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::RevisionExhausted => write!(f, "state-plane revision counter exhausted"),
-            Self::Poisoned => write!(f, "state-plane slot mutex poisoned"),
+            Self::Poisoned => write!(f, "state-plane storage poisoned"),
         }
     }
 }
@@ -77,33 +79,53 @@ impl<T> Default for StateSlot<T> {
     }
 }
 
-fn lock_slot<T>(
-    shared: &Arc<Mutex<StateSlot<T>>>,
-) -> Result<MutexGuard<'_, StateSlot<T>>, StatePlaneError> {
-    shared.lock().map_err(|_| StatePlaneError::Poisoned)
+/// Atomically replace latest state while preserving a contiguous transport revision
+/// even when several publisher handles race.
+fn publish_latest<T>(
+    shared: &ArcSwap<StateSlot<T>>,
+    value: T,
+) -> Result<StateRevision, StatePlaneError> {
+    let value = Arc::new(value);
+    let mut current = shared.load_full();
+
+    loop {
+        let revision = current
+            .revision
+            .checked_add(1)
+            .ok_or(StatePlaneError::RevisionExhausted)?;
+        let next = Arc::new(StateSlot {
+            revision,
+            current: Some(Arc::clone(&value)),
+        });
+        let previous = shared.compare_and_swap(&current, next);
+
+        if Arc::ptr_eq(&current, &*previous) {
+            return StateRevision::new(revision).ok_or(StatePlaneError::RevisionExhausted);
+        }
+
+        // Another publisher won the CAS. Retry from that newer immutable slot so
+        // publication revisions remain contiguous and a late writer cannot replace
+        // a newer state with a lower revision.
+        current = Arc::clone(&*previous);
+    }
 }
 
 /// Producer half of a bounded latest-wins state plane.
 ///
-/// Cloning the publisher does not allocate another queue; all publishers replace
-/// the same single shared slot.
+/// Cloning the publisher does not allocate another queue; all publishers atomically
+/// replace the same single shared snapshot.
 #[derive(Debug, Clone)]
 pub struct LatestStatePublisher<T> {
-    shared: Arc<Mutex<StateSlot<T>>>,
+    shared: Arc<ArcSwap<StateSlot<T>>>,
 }
 
 impl<T> LatestStatePublisher<T> {
-    /// Replace the current state value and advance the transport-local revision.
+    /// Atomically replace current state and advance the transport-local revision.
+    ///
+    /// Readers never hold a state-slot mutex, so a slow/preempted UI reader cannot
+    /// block this publication path.
     pub fn publish(&self, value: T) -> Result<StateRevision, StatePlaneError> {
-        let mut slot = lock_slot(&self.shared)?;
-        let revision = slot
-            .revision
-            .checked_add(1)
-            .ok_or(StatePlaneError::RevisionExhausted)?;
-        let revision = StateRevision::new(revision).ok_or(StatePlaneError::RevisionExhausted)?;
-        slot.revision = revision.get();
-        slot.current = Some(Arc::new(value));
-        Ok(revision)
+        publish_latest(&self.shared, value)
     }
 
     /// Create another independent observer.
@@ -112,7 +134,7 @@ impl<T> LatestStatePublisher<T> {
     /// with `skipped_revisions == 0`; publications that predate subscription are
     /// not reported as lag.
     pub fn subscribe(&self) -> Result<LatestStateReceiver<T>, StatePlaneError> {
-        let slot = lock_slot(&self.shared)?;
+        let slot = self.shared.load_full();
         let last_seen_revision = if slot.current.is_some() {
             slot.revision.saturating_sub(1)
         } else {
@@ -126,14 +148,13 @@ impl<T> LatestStatePublisher<T> {
 
     /// Current publication revision, or `None` before the first publish.
     pub fn current_revision(&self) -> Result<Option<StateRevision>, StatePlaneError> {
-        let slot = lock_slot(&self.shared)?;
+        let slot = self.shared.load_full();
         Ok(StateRevision::new(slot.revision))
     }
 
     /// Whether any state has ever been published into this slot.
     pub fn is_initialized(&self) -> Result<bool, StatePlaneError> {
-        let slot = lock_slot(&self.shared)?;
-        Ok(slot.current.is_some())
+        Ok(self.shared.load_full().current.is_some())
     }
 }
 
@@ -156,7 +177,7 @@ pub struct LatestStateSample<T> {
 /// and neither causes the publisher to retain an unbounded history.
 #[derive(Debug, Clone)]
 pub struct LatestStateReceiver<T> {
-    shared: Arc<Mutex<StateSlot<T>>>,
+    shared: Arc<ArcSwap<StateSlot<T>>>,
     last_seen_revision: u64,
 }
 
@@ -168,20 +189,16 @@ impl<T> LatestStateReceiver<T> {
     pub fn latest_if_changed(
         &mut self,
     ) -> Result<Option<LatestStateSample<T>>, StatePlaneError> {
-        let (revision, value) = {
-            let slot = lock_slot(&self.shared)?;
-            if slot.revision == 0
-                || slot.revision == self.last_seen_revision
-                || slot.current.is_none()
-            {
-                return Ok(None);
-            }
-            (
-                slot.revision,
-                Arc::clone(slot.current.as_ref().expect("checked current state")),
-            )
-        };
+        let slot = self.shared.load_full();
+        if slot.revision == 0
+            || slot.revision == self.last_seen_revision
+            || slot.current.is_none()
+        {
+            return Ok(None);
+        }
 
+        let revision = slot.revision;
+        let value = Arc::clone(slot.current.as_ref().expect("checked current state"));
         let skipped_revisions = revision
             .saturating_sub(self.last_seen_revision)
             .saturating_sub(1);
@@ -196,7 +213,7 @@ impl<T> LatestStateReceiver<T> {
 
     /// Peek at the newest state without advancing this receiver's observation point.
     pub fn peek_latest(&self) -> Result<Option<LatestStateSample<T>>, StatePlaneError> {
-        let slot = lock_slot(&self.shared)?;
+        let slot = self.shared.load_full();
         let Some(value) = slot.current.as_ref() else {
             return Ok(None);
         };
@@ -222,7 +239,7 @@ impl<T> LatestStateReceiver<T> {
     /// Because the slot stores only the newest value, this is useful for telemetry
     /// about client lag without allocating historical snapshots.
     pub fn pending_revision_distance(&self) -> Result<u64, StatePlaneError> {
-        let slot = lock_slot(&self.shared)?;
+        let slot = self.shared.load_full();
         Ok(slot.revision.saturating_sub(self.last_seen_revision))
     }
 }
@@ -232,7 +249,7 @@ impl<T> LatestStateReceiver<T> {
 /// The channel starts empty. The initial receiver treats publications that happen
 /// before its first read as real lag and reports the overwritten count.
 pub fn latest_state_channel<T>() -> (LatestStatePublisher<T>, LatestStateReceiver<T>) {
-    let shared = Arc::new(Mutex::new(StateSlot::default()));
+    let shared = Arc::new(ArcSwap::from_pointee(StateSlot::default()));
     (
         LatestStatePublisher {
             shared: Arc::clone(&shared),
@@ -384,6 +401,8 @@ pub fn latest_runtime_state_observer_channel<T>() -> (
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::thread;
+
     use symthaea_interface_types::{EventSeq, RuntimeId, RuntimeState, StateProvenance};
 
     fn cursor(runtime: &str, seq: u64) -> RuntimeCursor {
@@ -421,6 +440,29 @@ mod tests {
         assert_eq!(sample.revision.get(), 10_000);
         assert_eq!(sample.skipped_revisions, 9_999);
         assert!(receiver.latest_if_changed().unwrap().is_none());
+    }
+
+    #[test]
+    fn concurrent_publishers_preserve_contiguous_transport_revisions() {
+        let (publisher, mut receiver) = latest_state_channel();
+        let mut workers = Vec::new();
+
+        for worker in 0_u8..4 {
+            let publisher = publisher.clone();
+            workers.push(thread::spawn(move || {
+                for value in 0_u16..1_000 {
+                    publisher.publish((worker, value)).unwrap();
+                }
+            }));
+        }
+        for worker in workers {
+            worker.join().unwrap();
+        }
+
+        assert_eq!(publisher.current_revision().unwrap().unwrap().get(), 4_000);
+        let sample = receiver.latest_if_changed().unwrap().unwrap();
+        assert_eq!(sample.revision.get(), 4_000);
+        assert_eq!(sample.skipped_revisions, 3_999);
     }
 
     #[test]
@@ -538,8 +580,6 @@ mod tests {
             Some(CursorContinuity::FirstObservation)
         );
 
-        // Two state publications are coalesced into one UI observation, but the
-        // semantic cursor jumps from 1 to 5. These are different quantities.
         publisher.publish(live("runtime-a", 2, 20)).unwrap();
         publisher.publish(live("runtime-a", 5, 50)).unwrap();
         let observed = observer.latest_if_changed().unwrap().unwrap();
