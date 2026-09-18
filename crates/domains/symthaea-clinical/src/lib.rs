@@ -9,7 +9,8 @@
 //! Standalone knowledge crate encoding clinical taxonomies as HDC hypervectors.
 //! Covers DSM-5/ICD-11 diagnostic categories, NIMH RDoC dimensional framework,
 //! therapeutic modalities (CBT/ACT/DBT/Narrative/Somatic/MI/EMDR/IFS/Psychodynamic),
-//! individual symptom encoding, and a conservative vocabulary for clinical claims.
+//! individual symptom encoding, a conservative vocabulary for clinical claims,
+//! and evidence-bound clinical inference envelopes.
 //!
 //! No dependency on main symthaea crate — uses only `symthaea-core` for HDC types.
 //!
@@ -17,6 +18,7 @@
 //! Barlow (2014) unified protocol, Linehan (1993) DBT, Hayes (2006) ACT.
 
 pub mod claims;
+pub mod inference;
 pub mod nosology;
 pub mod rdoc;
 pub mod symptom_encoding;
@@ -26,6 +28,15 @@ pub use claims::{
     CLINICAL_CLAIM_VOCABULARY_VERSION, ClinicalApplicability, ClinicalClaimKind,
     ClinicalClaimSemanticsV1, ClinicalClaimVocabularyError, ClinicalEvidenceStage,
     ClinicalIntendedUseClass,
+};
+pub use inference::{
+    AlternativeClinicalHypothesisV1, CLINICAL_INFERENCE_ENVELOPE_VERSION,
+    ClinicalArtifactIdentityV1, ClinicalCalibrationStatusV1, ClinicalDigestAlgorithmV1,
+    ClinicalDigestV1, ClinicalDistributionAssessmentV1, ClinicalDistributionStatusV1,
+    ClinicalEvidenceRefV1, ClinicalEvidenceRoleV1, ClinicalExecutionIdentityV1,
+    ClinicalInferenceEnvelopeError, ClinicalInferenceEnvelopeV1, ClinicalModelIdentityV1,
+    ClinicalSubjectBindingV1, ClinicalUncertaintyV1, MissingClinicalEvidenceV1,
+    MissingEvidenceCriticalityV1,
 };
 pub use nosology::{DiagnosticCategory, DiagnosticProfile, Severity, Specifier};
 pub use rdoc::{RDocDomain, RDocProfile};
