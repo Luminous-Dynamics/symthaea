@@ -1,0 +1,119 @@
+name: ASSURE Policy Manifest Rust 1.96 Product Materialization
+
+on:
+  push:
+    branches:
+      - evidence/policy-manifest-rust196-product-materializer-v1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: assure-policy-manifest-rust196-product-materializer-v1
+  cancel-in-progress: false
+
+env:
+  MATERIALIZER_PARENT: 6de8ddb67b491c30e2147728d2db52f39e7bdf9b
+  PRODUCT_BASE: 6de8ddb67b491c30e2147728d2db52f39e7bdf9b
+  PRODUCT_PATH: crates/domains/symthaea-assurance-policy-manifest/src/lib.rs
+  SOURCE_BLOB: 19f5be1d600f9dcd9bad106264fa41721ab501a8
+  SOURCE_SHA256: eb85b1778d7df6df6fdbbe21968bbe0ca4187735e09cfa9a3e921618e7a2d180
+  EXPECTED_BLOB: d7df11f2c00381989d4fc57c9926dbef11d92884
+  EXPECTED_SHA256: 9f145f86df3d81163c6e5ccb3bf1701955fb5374124b20565ea51df05283db91
+  EXPECTED_BYTES: '18767'
+  TARGET_BRANCH: fix/assure-policy-manifest-rust196-match-arm-product
+
+jobs:
+  materialize:
+    name: Exact Rust 1.96 policy-manifest product materialization
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact materializer head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove materializer control-plane topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$MATERIALIZER_PARENT"
+          test "$(git rev-list --count "$MATERIALIZER_PARENT"..HEAD)" = "1"
+          test "$(git diff --name-status "$MATERIALIZER_PARENT" HEAD)" = $'A\t.github/workflows/assure-policy-manifest-rust196-product-materialize.yml'
+
+      - name: Construct exact one-file product over qualified prerequisite
+        id: product
+        shell: bash
+        run: |
+          set -euo pipefail
+          product="$RUNNER_TEMP/product"
+          git worktree add --detach "$product" "$PRODUCT_BASE"
+          cd "$product"
+          test "$(git rev-parse "HEAD:$PRODUCT_PATH")" = "$SOURCE_BLOB"
+          test "$(sha256sum "$PRODUCT_PATH" | awk '{print $1}')" = "$SOURCE_SHA256"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          path = Path(os.environ["PRODUCT_PATH"])
+          data = path.read_bytes()
+          old = b'        None => hasher.update(b"none\\0"),\n'
+          new = b'        None => {\n            hasher.update(b"none\\0");\n        }\n'
+          if data.count(old) != 1:
+              raise SystemExit(f"expected exactly one Rust-1.96 repair site, found {data.count(old)}")
+          path.write_bytes(data.replace(old, new, 1))
+          PY
+          test "$(wc -c < "$PRODUCT_PATH" | tr -d ' ')" = "$EXPECTED_BYTES"
+          test "$(sha256sum "$PRODUCT_PATH" | awk '{print $1}')" = "$EXPECTED_SHA256"
+          test "$(git hash-object "$PRODUCT_PATH")" = "$EXPECTED_BLOB"
+          git add -- "$PRODUCT_PATH"
+          test "$(git diff --cached --name-status)" = $'M\tcrates/domains/symthaea-assurance-policy-manifest/src/lib.rs'
+          git config user.name 'Luminous Dynamics Evidence Materializer'
+          git config user.email 'evidence-materializer@users.noreply.github.com'
+          git commit -m 'fix(assurance): repair policy manifest Rust 1.96 match arm'
+          commit="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_BASE"
+          test "$(git rev-list --count "$PRODUCT_BASE"..HEAD)" = "1"
+          test "$(git diff --name-status "$PRODUCT_BASE" HEAD)" = $'M\tcrates/domains/symthaea-assurance-policy-manifest/src/lib.rs'
+          test "$(git rev-parse "HEAD:$PRODUCT_PATH")" = "$EXPECTED_BLOB"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+          echo "tree=$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse target overwrite and publish exact product branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          existing="$(git ls-remote --heads origin "refs/heads/$TARGET_BRANCH")"
+          test -z "$existing"
+          git -C "$RUNNER_TEMP/product" push origin "${{ steps.product.outputs.commit }}:refs/heads/$TARGET_BRANCH"
+
+      - name: Write materialization receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/materialization-receipt.txt" <<EOF_RECEIPT
+          authority=MaterializationOnly
+          qualification_result=NOT_ESTABLISHED
+          materializer_head=${GITHUB_SHA}
+          product_base=$PRODUCT_BASE
+          product_commit=${{ steps.product.outputs.commit }}
+          product_tree=${{ steps.product.outputs.tree }}
+          product_path=$PRODUCT_PATH
+          source_blob=$SOURCE_BLOB
+          source_sha256=$SOURCE_SHA256
+          product_blob=$EXPECTED_BLOB
+          product_sha256=$EXPECTED_SHA256
+          product_bytes=$EXPECTED_BYTES
+          changed_paths=1
+          EOF_RECEIPT
+          cat "$RUNNER_TEMP/materialization-receipt.txt"
+
+      - name: Upload materialization evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: assure-policy-manifest-rust196-product-${{ github.sha }}
+          path: ${{ runner.temp }}/materialization-receipt.txt
+          if-no-files-found: error
+          retention-days: 90
