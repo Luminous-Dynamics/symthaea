@@ -1,0 +1,87 @@
+{
+  "schema_version": 2,
+  "closure_id": "DE-001A-EXECUTION-CLOSURE-v2",
+  "status": "closure-implementation-frozen-unqualified",
+  "execution_authority": false,
+  "claim_policy": "reproduction-only",
+  "parent_closure": "DE-001A-EXECUTION-CLOSURE-v1",
+  "parent_reference": "DE-001A-DESI-DR2-BAO-FLAT-LCDM-v1",
+  "implementation": {
+    "flake_path": "crates/domains/symthaea-cosmology-research/nix",
+    "platform": "x86_64-linux",
+    "python_attribute": "python311",
+    "environment_check": "checks.x86_64-linux.environment",
+    "authoritative_environment_execution": "nix-build-sandbox"
+  },
+  "nix": {
+    "nixpkgs_revision": "9ae611a455b90cf061d8f332b977e387bda8e1ca",
+    "nixpkgs_nar_hash": "sha256-md8WlXOlfnIeHeOScMTTHFyf2d6iaTwPl2apR5EQ3P4="
+  },
+  "external_sources": [
+    {
+      "name": "cobaya",
+      "version": "3.6.2",
+      "git_commit": "899f30a49f85de610dac321e91a1af50018e56aa",
+      "pypi_sdist": "cobaya-3.6.2.tar.gz",
+      "sha256": "8f1061d6347427f08380e1e0c0b766d695d3978b5439fb0b1cc1a7002152d9c8",
+      "nix_sri": "sha256-jxBh1jR0J/CDgOHgwLdm1pXTl4tUOfsLHMGnACFS2cg=",
+      "provenance": "pypi-trusted-publishing-links-to-frozen-git-commit"
+    },
+    {
+      "name": "camb",
+      "version": "1.6.6",
+      "git_commit": "3ef0272d6f7ba1231128872e56e6d4c12af8267b",
+      "pypi_sdist": "camb-1.6.6.tar.gz",
+      "sha256": "9856202a5c05570256e52377b20431891c7b08b2e9c334e141fd08d2a085516f",
+      "nix_sri": "sha256-mFYgKlwFVwJW5SN3sgQxiRx7CLLpwzThQf0I0qCFUW8=",
+      "provenance": "pypi-trusted-publishing-links-to-frozen-git-commit"
+    },
+    {
+      "name": "getdist",
+      "version": "1.7.4",
+      "git_commit": "f8d5fb7f39927c199dbfa1bf87eb4fac6fe7c206",
+      "pypi_sdist": "getdist-1.7.4.tar.gz",
+      "sha256": "1bd69c9748891fa1dc516e2474b30b3afa083d2975531c09c4377ae30e8636ac",
+      "nix_sri": "sha256-G9acl0iJH6HcUW4kdLMLOvoIPSl1UxwJxDd64w6GNqw=",
+      "provenance": "pypi-published-sha256-plus-frozen-git-tag"
+    },
+    {
+      "name": "py-bobyqa",
+      "version": "1.4.1",
+      "git_commit": "3a3bd50732a5695a0a434cba4c1fde01c0204e08",
+      "pypi_sdist": "Py-BOBYQA-1.4.1.tar.gz",
+      "sha256": "f698848e372fa0625fb9fd3a7a8b4f557804d7858b23a45d8187ffaea6341e33",
+      "nix_sri": "sha256-9piEjjcvoGJfuf06eotPVXgE14WLI6RdgYf/rqY0HjM=",
+      "provenance": "pypi-published-sha256-plus-frozen-git-tag"
+    }
+  ],
+  "nixpkgs_component": {
+    "name": "iminuit",
+    "version": "2.32.0",
+    "source_hash": "sha256-oys00YZllZvnWta9sd2ARZu5RGbGK0VWMcAFaKzN99I="
+  },
+  "network_policy": {
+    "source_realization": "declared-fixed-output-sources-only",
+    "environment_qualification": "nix-build-sandbox",
+    "runtime_package_installation": "forbidden",
+    "dev_shell_authority": "inspection-only"
+  },
+  "qualification_workflow": {
+    "path": ".github/workflows/de001a-cosmology-nix.yml",
+    "checkout_commit": "11bd71901bbe5b1630ceea73d27597364c9af683",
+    "nix_installer_commit": "8aa03977d8d733052d78f4e008a241fd1dbf36b3",
+    "artifact_upload_commit": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+  },
+  "blockers": [
+    "nix-environment-check-not-yet-qualified",
+    "realized-closure-identity-not-yet-recorded"
+  ],
+  "promotion_rule": {
+    "required_status": "closure-realized-qualified",
+    "required_execution_authority": true,
+    "requires_environment_check_pass": true,
+    "requires_realized_store_path": true,
+    "requires_realized_nar_hash": true,
+    "requires_zero_blockers": true
+  }
+}
