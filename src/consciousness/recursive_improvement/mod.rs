@@ -69,6 +69,7 @@ pub mod dream_wisdom_provenance;
 pub mod epistemic_world;
 pub mod exact_replay;
 pub mod experience_tree;
+pub mod mce_narrative_boundary;
 pub mod narrative_evidence;
 pub mod replay_policy;
 pub mod semantic_context;

@@ -1,20 +1,22 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Canonical provenance identities for generated dream wisdom.
+//! Canonical identities for generated dream wisdom.
 //!
-//! `DreamResult` carries aggregate counters and best-score summaries; it does not
-//! identify the concrete counterfactual records that caused downstream effects.
-//! This module binds each generated `Wisdom<Vec<f32>>` value to a deterministic,
-//! collision-resistant BLAKE3 identity and can bind an ordered batch produced by
-//! one dream cycle to a second digest.
+//! Two identities are deliberately distinct:
 //!
-//! These identities are provenance only. They do not make generated wisdom
-//! empirical, validated, or eligible to promote confidence.
+//! - [`DreamWisdomIdentity`] commits the complete generated record, including
+//!   scores/confidence, for provenance;
+//! - [`DreamWisdomProposalIdentity`] commits only context + proposed action, so
+//!   score jitter cannot manufacture additional independent proposal support.
+//!
+//! Neither identity makes generated wisdom empirical, validated, or eligible to
+//! promote confidence.
 
 use symthaea_dream::Wisdom;
 
 const WISDOM_DOMAIN: &[u8] = b"symthaea/dream-wisdom/v1\0";
+const PROPOSAL_DOMAIN: &[u8] = b"symthaea/dream-wisdom-proposal/v1\0";
 const BATCH_DOMAIN: &[u8] = b"symthaea/dream-wisdom-batch/v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -23,6 +25,17 @@ pub struct DreamWisdomIdentity {
 }
 
 impl DreamWisdomIdentity {
+    pub fn to_hex(self) -> String {
+        hex::encode(self.digest)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DreamWisdomProposalIdentity {
+    pub digest: [u8; 32],
+}
+
+impl DreamWisdomProposalIdentity {
     pub fn to_hex(self) -> String {
         hex::encode(self.digest)
     }
@@ -53,12 +66,7 @@ pub enum DreamWisdomProvenanceError {
     ConfidenceOutOfRange,
 }
 
-/// Compute a deterministic content identity for one generated wisdom record.
-///
-/// Canonicalization is deliberately explicit and architecture-independent:
-/// vector lengths are encoded as little-endian `u64`, every `f32` contributes
-/// its IEEE-754 little-endian bytes, and a versioned domain separator prevents
-/// accidental cross-protocol reuse of the digest.
+/// Compute a deterministic content identity for one complete generated record.
 pub fn dream_wisdom_identity(
     wisdom: &Wisdom<Vec<f32>>,
 ) -> Result<DreamWisdomIdentity, DreamWisdomProvenanceError> {
@@ -77,11 +85,26 @@ pub fn dream_wisdom_identity(
     })
 }
 
-/// Bind an ordered set of newly generated wisdom records to one cycle identity.
+/// Compute the identity of the underlying generated proposal.
 ///
-/// Ordering is significant because the dream engine's output order is part of the
-/// produced artifact. The batch commits the validated per-record identities rather
-/// than reimplementing record serialization a second time.
+/// Only context and proposed action are committed. Two dream records that differ
+/// solely in generated Φ/EI/confidence therefore remain distinct provenance records
+/// but are the same proposal for support-count purposes.
+pub fn dream_wisdom_proposal_identity(
+    wisdom: &Wisdom<Vec<f32>>,
+) -> Result<DreamWisdomProposalIdentity, DreamWisdomProvenanceError> {
+    validate_proposal(wisdom)?;
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(PROPOSAL_DOMAIN);
+    hash_f32_slice(&mut hasher, &wisdom.context_state);
+    hash_f32_slice(&mut hasher, &wisdom.better_action);
+    Ok(DreamWisdomProposalIdentity {
+        digest: *hasher.finalize().as_bytes(),
+    })
+}
+
+/// Bind an ordered set of generated wisdom records to one batch identity.
 pub fn dream_wisdom_batch_identity(
     wisdom: &[Wisdom<Vec<f32>>],
 ) -> Result<DreamWisdomBatchIdentity, DreamWisdomProvenanceError> {
@@ -102,7 +125,7 @@ pub fn dream_wisdom_batch_identity(
     })
 }
 
-fn validate_wisdom(
+fn validate_proposal(
     wisdom: &Wisdom<Vec<f32>>,
 ) -> Result<(), DreamWisdomProvenanceError> {
     if wisdom.context_state.is_empty() {
@@ -121,6 +144,13 @@ fn validate_wisdom(
             return Err(DreamWisdomProvenanceError::NonFiniteAction { index });
         }
     }
+    Ok(())
+}
+
+fn validate_wisdom(
+    wisdom: &Wisdom<Vec<f32>>,
+) -> Result<(), DreamWisdomProvenanceError> {
+    validate_proposal(wisdom)?;
     if !wisdom.phi_improvement.is_finite() {
         return Err(DreamWisdomProvenanceError::NonFinitePhiImprovement);
     }
@@ -158,26 +188,20 @@ mod tests {
     }
 
     #[test]
-    fn identity_is_deterministic_and_hex_is_complete() {
+    fn identities_are_deterministic_and_hex_is_complete() {
         let item = wisdom();
-        let first = dream_wisdom_identity(&item).unwrap();
-        let second = dream_wisdom_identity(&item).unwrap();
-        assert_eq!(first, second);
-        assert_eq!(first.to_hex().len(), 64);
+        let record = dream_wisdom_identity(&item).unwrap();
+        let proposal = dream_wisdom_proposal_identity(&item).unwrap();
+        assert_eq!(record, dream_wisdom_identity(&item).unwrap());
+        assert_eq!(proposal, dream_wisdom_proposal_identity(&item).unwrap());
+        assert_eq!(record.to_hex().len(), 64);
+        assert_eq!(proposal.to_hex().len(), 64);
     }
 
     #[test]
-    fn every_semantic_field_is_committed() {
+    fn complete_record_identity_commits_scores() {
         let baseline = wisdom();
         let baseline_id = dream_wisdom_identity(&baseline).unwrap();
-
-        let mut changed_context = baseline.clone();
-        changed_context.context_state[0] += 0.01;
-        assert_ne!(baseline_id, dream_wisdom_identity(&changed_context).unwrap());
-
-        let mut changed_action = baseline.clone();
-        changed_action.better_action[0] += 0.01;
-        assert_ne!(baseline_id, dream_wisdom_identity(&changed_action).unwrap());
 
         let mut changed_phi = baseline.clone();
         changed_phi.phi_improvement += 0.01;
@@ -193,6 +217,27 @@ mod tests {
             baseline_id,
             dream_wisdom_identity(&changed_confidence).unwrap()
         );
+    }
+
+    #[test]
+    fn proposal_identity_ignores_score_jitter_but_commits_context_and_action() {
+        let baseline = wisdom();
+        let proposal = dream_wisdom_proposal_identity(&baseline).unwrap();
+
+        let mut rescored = baseline.clone();
+        rescored.phi_improvement += 0.1;
+        rescored.effective_information -= 0.05;
+        rescored.confidence -= 0.2;
+        assert_eq!(proposal, dream_wisdom_proposal_identity(&rescored).unwrap());
+        assert_ne!(dream_wisdom_identity(&baseline).unwrap(), dream_wisdom_identity(&rescored).unwrap());
+
+        let mut changed_context = baseline.clone();
+        changed_context.context_state[0] += 0.01;
+        assert_ne!(proposal, dream_wisdom_proposal_identity(&changed_context).unwrap());
+
+        let mut changed_action = baseline;
+        changed_action.better_action[0] += 0.01;
+        assert_ne!(proposal, dream_wisdom_proposal_identity(&changed_action).unwrap());
     }
 
     #[test]

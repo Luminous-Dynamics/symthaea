@@ -112,6 +112,18 @@ pub struct NarrativeDerivedRecord {
     pub significance: f64,
 }
 
+/// Receipt for the direct non-lived retention path.
+///
+/// This receipt deliberately has no autobiographical episode fields because the
+/// API is structurally incapable of touching `NarrativeSelfModel`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NarrativeDerivedRetention {
+    pub memory_class: NarrativeMemoryClass,
+    pub evidence_kind: WorldEvidenceKind,
+    pub source_digest: String,
+    pub inserted: bool,
+}
+
 #[derive(Debug, Clone)]
 pub struct NarrativeDerivedMemory {
     entries: VecDeque<NarrativeDerivedRecord>,
@@ -150,14 +162,15 @@ impl NarrativeDerivedMemory {
             .any(|entry| entry.source_digest == source_digest)
     }
 
-    fn push(&mut self, record: NarrativeDerivedRecord) {
+    fn push(&mut self, record: NarrativeDerivedRecord) -> bool {
         if self.max_entries == 0 || self.contains_source_digest(&record.source_digest) {
-            return;
+            return false;
         }
         while self.entries.len() >= self.max_entries {
             self.entries.pop_front();
         }
         self.entries.push_back(record);
+        true
     }
 }
 
@@ -166,6 +179,41 @@ pub enum NarrativeEvidenceError {
     EmptySourceDigest,
     NonFiniteEffort,
     NonFiniteSignificance,
+    LivedRequiresAutobiographicalPath,
+}
+
+/// Retain recollection/imagination without accepting an autobiographical model.
+///
+/// This is the preferred API for generated dream/replay pipelines because it is
+/// structurally incapable of mutating lived self-history. `Recorded` material is
+/// rejected and must use the explicit autobiographical ingestion path instead.
+pub fn retain_derived_narrative(
+    derived_memory: &mut NarrativeDerivedMemory,
+    input: NarrativeEvidenceInput<'_>,
+) -> Result<NarrativeDerivedRetention, NarrativeEvidenceError> {
+    let (effort, significance) = validate_and_normalize(input)?;
+    let memory_class = NarrativeMemoryClass::from_evidence_kind(input.evidence_kind);
+    if memory_class == NarrativeMemoryClass::Lived {
+        return Err(NarrativeEvidenceError::LivedRequiresAutobiographicalPath);
+    }
+
+    let inserted = derived_memory.push(NarrativeDerivedRecord {
+        memory_class,
+        evidence_kind: input.evidence_kind,
+        source_digest: input.source_digest.to_string(),
+        description: input.description.to_string(),
+        representation: *input.representation,
+        appraisal_positive: input.appraisal_positive,
+        effort,
+        significance,
+    });
+
+    Ok(NarrativeDerivedRetention {
+        memory_class,
+        evidence_kind: input.evidence_kind,
+        source_digest: input.source_digest.to_string(),
+        inserted,
+    })
 }
 
 /// Ingest narrative material with the conservative default boundary.
@@ -200,18 +248,7 @@ fn ingest_narrative_evidence_impl(
     derived_memory: Option<&mut NarrativeDerivedMemory>,
     input: NarrativeEvidenceInput<'_>,
 ) -> Result<NarrativeEvidenceReceipt, NarrativeEvidenceError> {
-    if input.source_digest.trim().is_empty() {
-        return Err(NarrativeEvidenceError::EmptySourceDigest);
-    }
-    if !input.effort.is_finite() {
-        return Err(NarrativeEvidenceError::NonFiniteEffort);
-    }
-    if !input.significance.is_finite() {
-        return Err(NarrativeEvidenceError::NonFiniteSignificance);
-    }
-
-    let effort = input.effort.clamp(0.0, 1.0);
-    let significance = input.significance.clamp(0.0, 1.0);
+    let (effort, significance) = validate_and_normalize(input)?;
     let episodes_before = model.autobio.life_story.len();
     let memory_class = NarrativeMemoryClass::from_evidence_kind(input.evidence_kind);
 
@@ -248,6 +285,21 @@ fn ingest_narrative_evidence_impl(
         episodes_before,
         episodes_after: model.autobio.life_story.len(),
     })
+}
+
+fn validate_and_normalize(
+    input: NarrativeEvidenceInput<'_>,
+) -> Result<(f64, f64), NarrativeEvidenceError> {
+    if input.source_digest.trim().is_empty() {
+        return Err(NarrativeEvidenceError::EmptySourceDigest);
+    }
+    if !input.effort.is_finite() {
+        return Err(NarrativeEvidenceError::NonFiniteEffort);
+    }
+    if !input.significance.is_finite() {
+        return Err(NarrativeEvidenceError::NonFiniteSignificance);
+    }
+    Ok((input.effort.clamp(0.0, 1.0), input.significance.clamp(0.0, 1.0)))
 }
 
 #[cfg(test)]
@@ -295,6 +347,60 @@ mod tests {
         assert!(!receipt.recorded_episode());
         assert!(!receipt.is_direct_empirical());
         assert_eq!(model.autobio.life_story.len(), 0);
+    }
+
+    #[test]
+    fn direct_derived_retention_has_no_autobiographical_handle() {
+        let mut derived = NarrativeDerivedMemory::default();
+        let representation = BinaryHV::random(770);
+        let retention = retain_derived_narrative(
+            &mut derived,
+            input(
+                &representation,
+                "dream alternative",
+                WorldEvidenceKind::Counterfactual,
+                "blake3:direct-dream",
+            ),
+        )
+        .unwrap();
+
+        assert!(retention.inserted);
+        assert_eq!(retention.memory_class, NarrativeMemoryClass::Imagination);
+        assert_eq!(derived.len(), 1);
+    }
+
+    #[test]
+    fn direct_derived_retention_rejects_lived_evidence() {
+        let mut derived = NarrativeDerivedMemory::default();
+        let representation = BinaryHV::random(771);
+        assert_eq!(
+            retain_derived_narrative(
+                &mut derived,
+                input(
+                    &representation,
+                    "observed outcome",
+                    WorldEvidenceKind::Recorded,
+                    "blake3:lived",
+                ),
+            ),
+            Err(NarrativeEvidenceError::LivedRequiresAutobiographicalPath)
+        );
+        assert!(derived.is_empty());
+    }
+
+    #[test]
+    fn duplicate_direct_derived_digest_reports_not_inserted() {
+        let mut derived = NarrativeDerivedMemory::default();
+        let representation = BinaryHV::random(772);
+        let item = input(
+            &representation,
+            "same dream",
+            WorldEvidenceKind::Counterfactual,
+            "blake3:same-direct-dream",
+        );
+        assert!(retain_derived_narrative(&mut derived, item).unwrap().inserted);
+        assert!(!retain_derived_narrative(&mut derived, item).unwrap().inserted);
+        assert_eq!(derived.len(), 1);
     }
 
     #[test]
