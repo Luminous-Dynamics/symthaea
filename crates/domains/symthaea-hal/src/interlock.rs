@@ -6,6 +6,11 @@
 //! [`SafetyInterlock`] runs between the cognitive loop and [`ServoOutput`](crate::servo::ServoOutput),
 //! enforcing hardware safety regardless of what the brain does.
 //!
+//! Cognitive readiness, Phi, free energy, novelty, or generic prediction-error
+//! signals are intentionally not hardware-safety inputs. Those signals may
+//! restrict goal-directed authority above this layer, but they do not establish
+//! or increase physical admissibility here.
+//!
 //! ```text
 //! CognitiveLoop → HumanoidCommand → SafetyInterlock::filter_command() → ServoOutput::apply()
 //! ```
@@ -29,17 +34,16 @@ pub struct SafetyConfig {
     /// Watchdog timeout in milliseconds. If no command arrives within this
     /// window, the interlock trips.
     pub watchdog_timeout_ms: u64,
-    /// Per-joint maximum torque magnitude (0.0–1.0). Commands are clamped to this.
+    /// Per-joint maximum command magnitude (0.0–1.0). Commands are clamped to this.
+    ///
+    /// The current legacy carrier is named `HumanoidCommand::torques`, but the
+    /// PCA9685 physical profile is position-actuated. This is therefore a
+    /// backend command envelope, not evidence of measured joint torque.
     pub max_torque: [f32; NUM_ACTUATORS],
     /// Per-joint maximum angle in degrees (symmetric: ±limit).
     pub max_angle_deg: [f32; NUM_ACTUATORS],
     /// Per-joint current limit in amps (for overcurrent detection).
     pub max_current_a: [f32; NUM_ACTUATORS],
-    /// Prediction error gain reduction factor (0.0–1.0). When prediction
-    /// error exceeds threshold, torques are scaled by this factor.
-    pub prediction_error_gain: f32,
-    /// Prediction error threshold (above this, gain reduction kicks in).
-    pub prediction_error_threshold: f32,
 }
 
 impl SafetyConfig {
@@ -54,7 +58,7 @@ impl SafetyConfig {
             let torque = self.max_torque[i];
             if !torque.is_finite() || !(0.0..=1.0).contains(&torque) {
                 return Err(HalError::Safety(format!(
-                    "invalid max torque for joint {i}: {torque}"
+                    "invalid max command magnitude for joint {i}: {torque}"
                 )));
             }
             let angle = self.max_angle_deg[i];
@@ -70,20 +74,6 @@ impl SafetyConfig {
                 )));
             }
         }
-        if !self.prediction_error_gain.is_finite()
-            || !(0.0..=1.0).contains(&self.prediction_error_gain)
-        {
-            return Err(HalError::Safety(format!(
-                "invalid prediction error gain: {}",
-                self.prediction_error_gain
-            )));
-        }
-        if !self.prediction_error_threshold.is_finite() || self.prediction_error_threshold < 0.0 {
-            return Err(HalError::Safety(format!(
-                "invalid prediction error threshold: {}",
-                self.prediction_error_threshold
-            )));
-        }
         Ok(())
     }
 }
@@ -95,8 +85,6 @@ impl Default for SafetyConfig {
             max_torque: [0.9; NUM_ACTUATORS],
             max_angle_deg: [90.0; NUM_ACTUATORS],
             max_current_a: [2.0; NUM_ACTUATORS],
-            prediction_error_gain: 0.3,
-            prediction_error_threshold: 0.5,
         }
     }
 }
@@ -112,8 +100,6 @@ pub struct SafetyInterlock {
     estop: Arc<Mutex<bool>>,
     /// Timestamp of last accepted command.
     last_command_time: Instant,
-    /// Current prediction error (set externally by cognitive loop).
-    prediction_error: f32,
     /// Whether the interlock has tripped (requires explicit reset).
     tripped: bool,
     /// Reason for last trip.
@@ -132,7 +118,6 @@ impl SafetyInterlock {
             config,
             estop: Arc::new(Mutex::new(false)),
             last_command_time: Instant::now(),
-            prediction_error: 0.0,
             tripped: false,
             trip_reason: None,
         }
@@ -160,15 +145,10 @@ impl SafetyInterlock {
         *self.estop.lock()
     }
 
-    /// Update the prediction error from the cognitive loop.
-    pub fn set_prediction_error(&mut self, error: f32) {
-        self.prediction_error = error;
-    }
-
     /// Latch an externally detected safety fault.
     ///
     /// Runtime monitor layers use this when sensor shape, freshness, or other
-    /// evidence is insufficient to continue actuation safely.
+    /// physical evidence is insufficient to continue actuation safely.
     pub fn trip_safety(&mut self, reason: impl Into<String>) -> HalError {
         let reason = reason.into();
         self.trip(&reason);
@@ -199,10 +179,11 @@ impl SafetyInterlock {
         Ok(())
     }
 
-    /// Filter a command through all safety checks.
+    /// Filter a command through physical/runtime safety checks.
     ///
-    /// On success, returns a (possibly modified) command that's safe to
-    /// send to servos. On failure, returns an error and trips the interlock.
+    /// On success, returns a (possibly modified) command eligible to continue
+    /// to the servo backend. Cognitive readiness is deliberately not consumed
+    /// here; it belongs in the higher-level authority decision.
     pub fn filter_command(&mut self, command: &HumanoidCommand) -> HalResult<HumanoidCommand> {
         // 1. E-stop check
         if self.is_estopped() {
@@ -223,16 +204,10 @@ impl SafetyInterlock {
             self.trip("invalid safety configuration");
             return Err(e);
         }
-        if !self.prediction_error.is_finite() {
-            self.trip("non-finite prediction error");
-            return Err(HalError::Safety(
-                "prediction error must be finite".to_string(),
-            ));
-        }
         if command.torques.len() != NUM_ACTUATORS {
             self.trip("command actuator count does not match this interlock");
             return Err(HalError::Safety(format!(
-                "command has {} torques but this interlock requires exactly {}",
+                "command has {} values but this interlock requires exactly {}",
                 command.torques.len(),
                 NUM_ACTUATORS
             )));
@@ -244,9 +219,9 @@ impl SafetyInterlock {
             .enumerate()
             .find(|(_, value)| !value.is_finite())
         {
-            self.trip("command contains non-finite torque");
+            self.trip("command contains non-finite value");
             return Err(HalError::Safety(format!(
-                "non-finite torque for joint {index}: {value}"
+                "non-finite command value for joint {index}: {value}"
             )));
         }
 
@@ -260,18 +235,12 @@ impl SafetyInterlock {
             });
         }
 
-        // 5. Apply torque limits and prediction error gain reduction
-        let gain = if self.prediction_error > self.config.prediction_error_threshold {
-            self.config.prediction_error_gain
-        } else {
-            1.0
-        };
-
+        // 5. Apply the backend command envelope. No cognitive or model-quality
+        // scalar is permitted to increase or decrease hardware safety authority.
         let mut safe = command.clone();
         for i in 0..NUM_ACTUATORS {
             safe.torques[i] =
                 safe.torques[i].clamp(-self.config.max_torque[i], self.config.max_torque[i]);
-            safe.torques[i] *= gain;
         }
 
         // 6. Update watchdog timestamp
@@ -397,14 +366,14 @@ mod tests {
     }
 
     #[test]
-    fn test_filter_command_clamps_torque() {
+    fn test_filter_command_clamps_command_magnitude() {
         let mut interlock = SafetyInterlock::new();
         let mut cmd = HumanoidCommand::zero();
-        cmd.torques[0] = 1.0; // max_torque default is 0.9
+        cmd.torques[0] = 1.0; // max command magnitude default is 0.9
         let safe = interlock.filter_command(&cmd).unwrap();
         assert!(
             (safe.torques[0] - 0.9).abs() < 0.001,
-            "torque should be clamped to 0.9, got {}",
+            "command should be clamped to 0.9, got {}",
             safe.torques[0]
         );
     }
@@ -433,11 +402,8 @@ mod tests {
     #[test]
     fn test_watchdog_timeout() {
         let mut config = SafetyConfig::default();
-        config.watchdog_timeout_ms = 0; // instant timeout
+        config.watchdog_timeout_ms = 0; // invalid configuration fails closed
         let mut interlock = SafetyInterlock::with_config(config);
-
-        // Force time to elapse
-        std::thread::sleep(std::time::Duration::from_millis(1));
 
         let cmd = HumanoidCommand::zero();
         let result = interlock.filter_command(&cmd);
@@ -462,39 +428,6 @@ mod tests {
         // Commands work again
         let result = interlock.filter_command(&HumanoidCommand::zero());
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_prediction_error_gain_reduction() {
-        let mut interlock = SafetyInterlock::new();
-        interlock.set_prediction_error(1.0); // above 0.5 threshold
-
-        let mut cmd = HumanoidCommand::zero();
-        cmd.torques[0] = 0.9;
-        let safe = interlock.filter_command(&cmd).unwrap();
-
-        // Torque should be reduced by gain factor (0.3)
-        assert!(
-            (safe.torques[0] - 0.27).abs() < 0.01,
-            "expected ~0.27, got {}",
-            safe.torques[0]
-        );
-    }
-
-    #[test]
-    fn test_prediction_error_below_threshold_no_reduction() {
-        let mut interlock = SafetyInterlock::new();
-        interlock.set_prediction_error(0.3); // below 0.5 threshold
-
-        let mut cmd = HumanoidCommand::zero();
-        cmd.torques[0] = 0.5;
-        let safe = interlock.filter_command(&cmd).unwrap();
-
-        assert!(
-            (safe.torques[0] - 0.5).abs() < 0.001,
-            "expected 0.5, got {}",
-            safe.torques[0]
-        );
     }
 
     #[test]
@@ -616,7 +549,7 @@ mod proptests {
                     let max = interlock.config().max_torque[i];
                     prop_assert!(
                         safe.torques[i].abs() <= max + f32::EPSILON,
-                        "joint {} torque {} exceeds max {}",
+                        "joint {} command {} exceeds max {}",
                         i, safe.torques[i], max
                     );
                 }
@@ -631,7 +564,7 @@ mod proptests {
 
             if let Ok(safe) = interlock.filter_command(&cmd) {
                 for (i, &t) in safe.torques.iter().enumerate() {
-                    prop_assert!(t.is_finite(), "joint {} torque {} not finite", i, t);
+                    prop_assert!(t.is_finite(), "joint {} command {} not finite", i, t);
                 }
             }
         }
