@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-science-research"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Evidence-bearing scientific research identities and authority boundaries for Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+sha2 = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
