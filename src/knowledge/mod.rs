@@ -59,6 +59,7 @@ pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_restart_admission_review;
 pub mod epistemic_restart_isolated_hydration;
+pub mod epistemic_restart_mutation_seal_checkpoint;
 pub mod epistemic_restart_quarantine_facade;
 pub mod epistemic_restart_trust_checkpoint;
 #[allow(
