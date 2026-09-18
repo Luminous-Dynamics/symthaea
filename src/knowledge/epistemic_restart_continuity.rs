@@ -28,6 +28,8 @@ pub mod epoch_bound_receipt_schema;
 pub mod epoch_bound_receipt_data;
 #[path = "epistemic_restart_epoch_bound_receipt_status.rs"]
 pub mod epoch_bound_receipt_status;
+#[path = "epistemic_restart_epoch_bound_receipt_segment.rs"]
+pub mod epoch_bound_receipt_segment;
 
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
