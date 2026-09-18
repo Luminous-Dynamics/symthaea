@@ -17,3 +17,7 @@ path = "src/execution.rs"
 [[bin]]
 name = "de001a-a0-verify"
 path = "src/a0_verify.rs"
+
+[[bin]]
+name = "de001a-a1r-oracle"
+path = "src/a1r_oracle.rs"
