@@ -8,8 +8,9 @@
 //!
 //! # Modes
 //!
-//! - **`speak()`** — synchronous, blocks caller until utterance is buffered
-//! - **`speak_async()`** — spawns a background thread, returns a [`SpeakHandle`]
+//! - **`speak()`** — synchronous synthesis + playback buffering
+//! - **`speak_async()`** — legacy API: synthesis still occurs on the caller, then
+//!   ring-buffer pushing runs on a background thread and returns a [`SpeakHandle`]
 //! - **`speak_to_file()`** — writes WAV to disk (no audio device needed)
 //!
 //! # Prosody
@@ -43,7 +44,7 @@ const DT: f32 = 1.0 / FRAME_RATE as f32;
 /// Base phoneme duration (seconds) for G2P timing.
 const BASE_PHONEME_DURATION: f32 = 0.06;
 
-/// Handle to a background `speak_async()` call.
+/// Handle to a background playback push started by `speak_async()`.
 ///
 /// Dropping the handle does NOT stop playback — call [`SpeakHandle::stop()`] explicitly,
 /// or use [`SpeakHandle::join()`] to wait for completion.
@@ -65,7 +66,7 @@ impl SpeakHandle {
         self.flush_requested.store(true, Ordering::Release);
     }
 
-    /// Whether the background thread is still synthesizing/pushing this utterance.
+    /// Whether the background thread is still pushing this utterance.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
     }
@@ -210,19 +211,16 @@ impl LiveVoice {
         self.modulate_tau(1.0 / prosody.speaking_rate);
     }
 
-    /// Speak text on a background thread. Returns a [`SpeakHandle`] for control.
+    /// Pre-render text, then push the rendered audio on a background thread.
     ///
-    /// The cognitive loop can continue running while speech plays. Use
-    /// [`cognitive_state_handle()`](Self::cognitive_state_handle) to modulate prosody mid-utterance.
+    /// This legacy method is asynchronous only for playback pushing: G2P and vocal
+    /// tract synthesis still run on the caller before the returned [`SpeakHandle`]
+    /// exists. The cognitive-loop voice worker uses a separate persistent worker.
     ///
-    /// # Note
-    /// This takes `&mut self` to ensure exclusive synthesis access, then moves
-    /// the necessary state into the thread. Only one `speak_async` at a time.
-    ///
-    /// The current implementation still pre-synthesizes the utterance before the
-    /// push thread starts. INT-008A3 will move synthesis itself behind a cancellable
-    /// phrase/chunk boundary. This tranche only guarantees stale queued playback is
-    /// invalidated when the stop state becomes observable.
+    /// Sequential calls are repeatable after the prior handle has completed or
+    /// been stopped: producer ownership is shared rather than destructively moved
+    /// out of `AudioOutput`. Overlapping calls are not yet generation-safe and are
+    /// intentionally not claimed as supported.
     pub fn speak_async(&mut self, text: &str) -> SpeakHandle {
         self.speaking.store(true, Ordering::SeqCst);
 
@@ -259,30 +257,39 @@ impl LiveVoice {
             }
         }
 
-        // Push synthesized audio to the ring buffer on a background thread
-        // (backpressure may block, so we do not want to block the caller further).
+        // Keep a cloneable producer-side handle instead of taking the producer
+        // out of AudioOutput. This makes later sequential async utterances usable.
         let speaking_bg = Arc::clone(&self.speaking);
         let flush_requested = self.audio.flush_handle();
         let flush_bg = Arc::clone(&flush_requested);
-        let mut audio = self.audio.take_producer();
+        let audio = self.audio.producer_handle();
 
         let thread = std::thread::Builder::new()
             .name("live-voice-push".into())
             .spawn(move || {
+                if !audio.is_attached() {
+                    speaking_bg.store(false, Ordering::SeqCst);
+                    return Ok(());
+                }
+
                 let mut offset = 0;
                 while offset < all_samples.len() {
                     if !speaking_bg.load(Ordering::SeqCst) {
                         flush_bg.store(true, Ordering::Release);
                         break;
                     }
-                    if let Some(ref mut producer) = audio {
-                        let written = push_samples_to_producer(producer, &all_samples[offset..]);
-                        offset += written;
-                        if offset < all_samples.len() {
-                            std::thread::sleep(std::time::Duration::from_millis(1));
+
+                    let written = audio.push_samples(&all_samples[offset..]);
+                    offset += written;
+
+                    if offset < all_samples.len() {
+                        // Zero can mean ordinary ring backpressure. If producer
+                        // ownership has actually been detached, however, there is
+                        // nothing left to wait for.
+                        if written == 0 && !audio.is_attached() {
+                            break;
                         }
-                    } else {
-                        break;
+                        std::thread::sleep(std::time::Duration::from_millis(1));
                     }
                 }
                 speaking_bg.store(false, Ordering::SeqCst);
@@ -430,20 +437,6 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
     }
     writer.finalize()?;
     Ok(())
-}
-
-/// Push samples to a ring buffer producer (used by background thread).
-fn push_samples_to_producer(producer: &mut ringbuf::HeapProd<f32>, samples: &[f32]) -> usize {
-    use ringbuf::traits::Producer;
-    let mut written = 0;
-    for &s in samples {
-        if producer.try_push(s).is_ok() {
-            written += 1;
-        } else {
-            break;
-        }
-    }
-    written
 }
 
 #[cfg(test)]
@@ -598,6 +591,19 @@ mod tests {
             excited_rms > 1e-6,
             "Excited audio should have content: rms={excited_rms}"
         );
+    }
+
+    #[test]
+    #[ignore] // Requires audio device
+    fn sequential_speak_async_reuses_live_producer() {
+        let genesis = GenesisSeed::from_phrase("test-live-voice-async-repeat");
+        let mut voice = LiveVoice::new(&genesis).expect("Should create LiveVoice");
+
+        let first = voice.speak_async("hello");
+        first.join().expect("first async push should complete");
+
+        let second = voice.speak_async("again");
+        second.join().expect("second async push should reuse producer");
     }
 
     #[test]

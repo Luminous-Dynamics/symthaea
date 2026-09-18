@@ -11,11 +11,13 @@
 //!
 //! A lock-free flush flag lets interruption/control paths invalidate already
 //! buffered speech without taking a mutex or waiting in the real-time callback.
+//! Producer-side sharing is serialized independently; the CPAL consumer callback
+//! remains lock-free.
 //!
 //! Feature-gated under `live-voice`.
 
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -24,13 +26,71 @@ use ringbuf::{
     traits::{Observer, Producer, Split},
 };
 
+/// Cloneable handle to the non-real-time side of the audio ring buffer.
+///
+/// Multiple control/background owners may retain this handle across utterances.
+/// Only producer access is serialized; the device callback owns the consumer
+/// directly and never acquires this mutex.
+#[derive(Clone)]
+pub struct AudioProducerHandle {
+    inner: Arc<Mutex<Option<ringbuf::HeapProd<f32>>>>,
+}
+
+impl AudioProducerHandle {
+    fn new(producer: Option<ringbuf::HeapProd<f32>>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(producer)),
+        }
+    }
+
+    /// Push samples without blocking on ring capacity.
+    ///
+    /// The producer-side mutex is held only while attempting this batch. A full
+    /// ring returns a short write (possibly zero); callers decide their own
+    /// backpressure policy.
+    pub fn push_samples(&self, samples: &[f32]) -> usize {
+        let Ok(mut guard) = self.inner.lock() else {
+            return 0;
+        };
+        let Some(producer) = guard.as_mut() else {
+            return 0;
+        };
+
+        let mut written = 0;
+        for &sample in samples {
+            if producer.try_push(sample).is_ok() {
+                written += 1;
+            } else {
+                break;
+            }
+        }
+        written
+    }
+
+    /// Approximate vacant capacity on the producer side.
+    pub fn available_space(&self) -> usize {
+        let Ok(guard) = self.inner.lock() else {
+            return 0;
+        };
+        guard.as_ref().map(|p| p.vacant_len()).unwrap_or(0)
+    }
+
+    /// Whether a real ring-buffer producer is still attached.
+    pub fn is_attached(&self) -> bool {
+        self.inner
+            .lock()
+            .map(|guard| guard.is_some())
+            .unwrap_or(false)
+    }
+}
+
 /// Real-time audio output via cpal + ring buffer.
 ///
 /// Can be in either `Live` mode (real audio device) or `Dummy` mode
 /// (for headless/CI use with `speak_to_file()`).
 pub struct AudioOutput {
     _stream: Option<cpal::Stream>,
-    producer: Option<ringbuf::HeapProd<f32>>,
+    producer: AudioProducerHandle,
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
@@ -75,7 +135,7 @@ impl AudioOutput {
     pub fn new_dummy(sample_rate: u32) -> Self {
         Self {
             _stream: None,
-            producer: None,
+            producer: AudioProducerHandle::new(None),
             sample_rate,
             channels: 1,
             buffer_capacity: 0,
@@ -135,7 +195,7 @@ impl AudioOutput {
 
         Ok(Self {
             _stream: Some(stream),
-            producer: Some(producer),
+            producer: AudioProducerHandle::new(Some(producer)),
             sample_rate,
             channels,
             buffer_capacity,
@@ -143,32 +203,32 @@ impl AudioOutput {
         })
     }
 
-    /// Push audio samples into the ring buffer (non-blocking).
+    /// Push audio samples into the ring buffer (non-blocking on ring capacity).
     ///
     /// Returns the number of samples actually written. If the buffer is full,
-    /// remaining samples are dropped. Returns 0 on dummy output.
-    pub fn push_samples(&mut self, samples: &[f32]) -> usize {
-        let producer = match &mut self.producer {
-            Some(p) => p,
-            None => return 0,
-        };
-        let mut written = 0;
-        for &s in samples {
-            if producer.try_push(s).is_ok() {
-                written += 1;
-            } else {
-                break;
-            }
-        }
-        written
+    /// remaining samples are not written. Returns 0 on dummy output.
+    pub fn push_samples(&self, samples: &[f32]) -> usize {
+        self.producer.push_samples(samples)
     }
 
-    /// Take the ring buffer producer for use on a background thread.
+    /// Clone a repeatable producer-side handle for background playback.
     ///
-    /// After calling this, `push_samples()` becomes a no-op until a new
-    /// AudioOutput is created. Returns `None` if already taken or dummy.
+    /// Cloning this handle does not detach the producer from `AudioOutput`, so a
+    /// later sequential utterance can obtain another handle and use the same ring.
+    /// The handle is not a claim that overlapping utterances are semantically safe;
+    /// higher layers still need utterance/playback generation control.
+    pub fn producer_handle(&self) -> AudioProducerHandle {
+        self.producer.clone()
+    }
+
+    /// Destructively detach the ring producer.
+    ///
+    /// This legacy one-shot API is retained for compatibility. New background
+    /// playback code should use [`Self::producer_handle`] so repeated utterances do
+    /// not permanently remove the producer from this `AudioOutput`.
+    #[deprecated(note = "one-shot ownership transfer; use producer_handle() instead")]
     pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
-        self.producer.take()
+        self.producer.inner.lock().ok()?.take()
     }
 
     /// Request that the real-time audio callback discard every currently queued
@@ -205,10 +265,7 @@ impl AudioOutput {
 
     /// Approximate space remaining in the ring buffer. Returns 0 on dummy output.
     pub fn available_space(&self) -> usize {
-        match &self.producer {
-            Some(p) => p.vacant_len(),
-            None => 0,
-        }
+        self.producer.available_space()
     }
 
     /// Whether this is a live audio device (not dummy).
@@ -220,6 +277,7 @@ impl AudioOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ringbuf::traits::{Consumer, Split};
 
     #[test]
     fn test_buffer_capacity_calculation() {
@@ -230,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_dummy_output() {
-        let mut dummy = AudioOutput::new_dummy(24000);
+        let dummy = AudioOutput::new_dummy(24000);
         assert_eq!(dummy.sample_rate(), 24000);
         assert_eq!(dummy.channels(), 1);
         assert_eq!(dummy.available_space(), 0);
@@ -239,6 +297,40 @@ mod tests {
         // push_samples on dummy returns 0
         let samples = vec![0.5f32; 100];
         assert_eq!(dummy.push_samples(&samples), 0);
+    }
+
+    #[test]
+    fn cloned_producer_handles_reuse_one_ring_without_detaching() {
+        let rb = HeapRb::<f32>::new(8);
+        let (producer, mut consumer) = rb.split();
+        let owner = AudioProducerHandle::new(Some(producer));
+        let first = owner.clone();
+        let second = owner.clone();
+
+        assert!(owner.is_attached());
+        assert_eq!(first.push_samples(&[0.1, 0.2]), 2);
+        assert_eq!(consumer.try_pop(), Some(0.1));
+        assert_eq!(consumer.try_pop(), Some(0.2));
+
+        // The first write did not consume producer ownership; another cloned
+        // handle can write through the exact same producer/ring.
+        assert_eq!(second.push_samples(&[0.3, 0.4]), 2);
+        assert_eq!(consumer.try_pop(), Some(0.3));
+        assert_eq!(consumer.try_pop(), Some(0.4));
+        assert!(owner.is_attached());
+    }
+
+    #[test]
+    fn producer_handles_are_repeatable_and_non_destructive_on_dummy() {
+        let dummy = AudioOutput::new_dummy(24000);
+        let first = dummy.producer_handle();
+        let second = dummy.producer_handle();
+
+        assert!(!first.is_attached());
+        assert!(!second.is_attached());
+        assert_eq!(first.push_samples(&[0.1, 0.2]), 0);
+        assert_eq!(second.push_samples(&[0.3, 0.4]), 0);
+        assert_eq!(dummy.available_space(), 0);
     }
 
     #[test]
@@ -280,6 +372,7 @@ mod tests {
         assert!(output.sample_rate() > 0);
         assert!(output.channels() > 0);
         assert!(output.available_space() > 0);
+        assert!(output.producer_handle().is_attached());
         assert!(output.is_live());
     }
 }
