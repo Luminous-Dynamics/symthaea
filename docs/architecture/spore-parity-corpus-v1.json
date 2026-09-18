@@ -1,0 +1,372 @@
+{
+  "schema": "spore-parity-corpus-v1",
+  "source_manifest": "docs/architecture/spore-migration-manifest-v1.json",
+  "qualification_transfer_policy": "never-inherit",
+  "purpose": "Behavioral parity catalog for extracting Spore recovery semantics without inheriting qualification.",
+  "required_domains": [
+    "availability",
+    "boot-identity",
+    "qualification",
+    "lkg",
+    "helper-expendability",
+    "lifecycle",
+    "firmware-recovery",
+    "systemd-authority"
+  ],
+  "behaviors": [
+    {
+      "id": "SPORE-PARITY-001",
+      "name": "healthy-physical-boot-may-promote-exact-booted-generation",
+      "artifact_id": "fail-open-vm",
+      "selector": "healthy renderer relinquishes DRM path and stable boot advances LKG",
+      "domains": [
+        "boot-identity",
+        "qualification",
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-003",
+        "SPORE-004",
+        "SPORE-005"
+      ],
+      "must_hold": [
+        "graphical.target remains reachable",
+        "current semantic root resolves to /run/booted-system",
+        "last-known-good resolves to the exact physically booted generation after qualification",
+        "promotion receipt binds booted_generation and resulting_lkg_target"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-002",
+      "name": "stale-semantic-root-scratch-is-reconciled",
+      "artifact_id": "fail-open-vm",
+      "selector": "stale semantic-root scratch is reconciled before state preparation",
+      "domains": [
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-007"
+      ],
+      "must_hold": [
+        "stale temporary semantic-root links are removed before state preparation completes"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-003",
+      "name": "renderer-failure-is-fail-open",
+      "artifact_id": "fail-open-vm",
+      "selector": "renderer process failure remains fail-open and does not poison system health",
+      "domains": [
+        "availability",
+        "qualification"
+      ],
+      "invariants": [
+        "SPORE-001",
+        "SPORE-006",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "renderer failure cannot prevent graphical.target",
+        "presentation failure alone does not poison independently qualified machine health"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-004",
+      "name": "renderer-timeout-is-bounded",
+      "artifact_id": "fail-open-vm",
+      "selector": "stubborn renderer is forcibly bounded before desktop",
+      "domains": [
+        "availability",
+        "helper-expendability"
+      ],
+      "invariants": [
+        "SPORE-001",
+        "SPORE-008",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "stubborn renderer is terminated or otherwise bounded",
+        "desktop availability does not depend on renderer completion"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-005",
+      "name": "failed-state-preparation-cannot-promote",
+      "artifact_id": "fail-open-vm",
+      "selector": "failed preparation scrubs partial receipt, skips renderer, and never advances LKG",
+      "domains": [
+        "qualification",
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-003",
+        "SPORE-005",
+        "SPORE-006",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "partial state receipts are scrubbed",
+        "renderer is skipped when authoritative preparation fails",
+        "last-known-good is not advanced",
+        "decision receipt reports state-preparation-failed"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-006",
+      "name": "custom-runtime-paths-do-not-create-hidden-authority",
+      "artifact_id": "fail-open-vm",
+      "selector": "custom state/runtime paths do not create hidden default directories",
+      "domains": [
+        "qualification"
+      ],
+      "invariants": [
+        "SPORE-007"
+      ],
+      "must_hold": [
+        "configured runtime/state paths are honored",
+        "default runtime/state paths are not silently created"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-007",
+      "name": "state-blessing-failure-preserves-recovery",
+      "artifact_id": "fail-open-vm",
+      "selector": "state blessing failure leaves old LKG untouched",
+      "domains": [
+        "qualification",
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-006",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "qualification/blessing failure does not create or advance LKG",
+        "temporary promotion state is not stranded",
+        "decision receipt records failed state-bless result"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-008",
+      "name": "health-window-requires-stable-display",
+      "artifact_id": "fail-open-vm",
+      "selector": "display manager must remain stable across health window",
+      "domains": [
+        "availability",
+        "qualification",
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-003",
+        "SPORE-005",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "graphical availability remains independent of promotion",
+        "unstable display does not become LKG",
+        "qualification deadline terminates without converting unknown health into success"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-009",
+      "name": "live-activation-never-blesses-unbooted-candidate",
+      "artifact_id": "fail-open-vm",
+      "selector": "live activation can never bless an unbooted candidate",
+      "domains": [
+        "boot-identity",
+        "qualification",
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-004",
+        "SPORE-005"
+      ],
+      "must_hold": [
+        "/run/current-system differing from /run/booted-system cannot advance LKG",
+        "existing LKG remains unchanged",
+        "decision receipt reports live-activation",
+        "non-authoritative evidence write failure cannot mutate LKG"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-010",
+      "name": "hung-prepare-helper-cannot-hold-boot",
+      "artifact_id": "helper-expendability-vm",
+      "selector": "hung state preparation is bounded and cannot hold graphical boot",
+      "domains": [
+        "availability",
+        "helper-expendability"
+      ],
+      "invariants": [
+        "SPORE-001",
+        "SPORE-008",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "graphical.target and display-manager remain reachable",
+        "hung preparation is bounded by timeout",
+        "no LKG promotion occurs"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-011",
+      "name": "hung-qualification-helper-is-terminal",
+      "artifact_id": "helper-expendability-vm",
+      "selector": "hung LKG qualification is bounded and terminal",
+      "domains": [
+        "qualification",
+        "helper-expendability",
+        "lkg"
+      ],
+      "invariants": [
+        "SPORE-005",
+        "SPORE-008",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "hung qualification is bounded",
+        "promotion timer becomes terminal rather than retrying forever",
+        "last-known-good is not advanced",
+        "decision receipt reports state-qualification-timeout"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-012",
+      "name": "hung-lifecycle-evidence-cannot-block-power-transitions",
+      "artifact_id": "helper-expendability-vm",
+      "selector": "hung lifecycle evidence cannot hold reboot service or sleep hook indefinitely",
+      "domains": [
+        "helper-expendability",
+        "lifecycle"
+      ],
+      "invariants": [
+        "SPORE-008"
+      ],
+      "must_hold": [
+        "reboot marker helper is bounded",
+        "sleep hook is bounded",
+        "real shutdown remains possible"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-013",
+      "name": "privileged-helper-is-confined",
+      "artifact_id": "helper-expendability-vm",
+      "selector": "privileged state helper is confined to declared writable Spore paths",
+      "domains": [
+        "helper-expendability",
+        "qualification"
+      ],
+      "invariants": [
+        "SPORE-006",
+        "SPORE-008"
+      ],
+      "must_hold": [
+        "sandbox-denied writes outside declared Spore paths do not succeed",
+        "failed helper cannot produce qualifying receipt",
+        "failed helper cannot advance LKG"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-014",
+      "name": "firmware-exhausts-bad-generation-and-recovers-known-good",
+      "artifact_id": "ovmf-recovery-vm",
+      "selector": "whole-fixture",
+      "domains": [
+        "boot-identity",
+        "qualification",
+        "lkg",
+        "firmware-recovery"
+      ],
+      "invariants": [
+        "SPORE-004",
+        "SPORE-005",
+        "SPORE-006",
+        "SPORE-007",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "generation A physically boots and qualifies",
+        "generation B physically boots but never becomes LKG when graphical health is unstable",
+        "bootloader attempt budget for B is exhausted",
+        "after abrupt loss firmware returns to A",
+        "receipt records attempted B and restored A as rollback",
+        "three physical boots carry distinct kernel boot IDs"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-015",
+      "name": "systemd-hard-authority-from-spore-is-forbidden",
+      "artifact_id": "systemd-authority-tests",
+      "selector": "HARD_AUTHORITY adversarial cases",
+      "domains": [
+        "systemd-authority",
+        "availability"
+      ],
+      "invariants": [
+        "SPORE-001"
+      ],
+      "must_hold": [
+        "critical graphical/runtime units cannot Require, Requisite, or BindsTo Spore presentation services directly or transitively"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-016",
+      "name": "systemd-temporal-authority-from-spore-is-forbidden",
+      "artifact_id": "systemd-authority-tests",
+      "selector": "TEMPORAL_AUTHORITY adversarial cases",
+      "domains": [
+        "systemd-authority",
+        "availability"
+      ],
+      "invariants": [
+        "SPORE-001"
+      ],
+      "must_hold": [
+        "activation plus ordering cannot make a critical graphical/runtime path wait on Spore"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-017",
+      "name": "systemd-stop-and-conflict-authority-from-spore-is-forbidden",
+      "artifact_id": "systemd-authority-tests",
+      "selector": "STOP_AUTHORITY and CONFLICT_AUTHORITY adversarial cases",
+      "domains": [
+        "systemd-authority",
+        "availability"
+      ],
+      "invariants": [
+        "SPORE-001"
+      ],
+      "must_hold": [
+        "Spore cannot own stop propagation of critical runtime units",
+        "Spore cannot conflict with critical runtime units",
+        "normal shutdown conflicts remain allowed"
+      ]
+    },
+    {
+      "id": "SPORE-PARITY-018",
+      "name": "systemd-authority-proof-fails-closed-on-incomplete-snapshot",
+      "artifact_id": "systemd-authority-tests",
+      "selector": "malformed/incomplete snapshot adversarial cases",
+      "domains": [
+        "systemd-authority",
+        "qualification"
+      ],
+      "invariants": [
+        "SPORE-003",
+        "SPORE-009"
+      ],
+      "must_hold": [
+        "missing referenced units invalidate the proof input",
+        "malformed unit snapshots cannot yield a green authority proof"
+      ]
+    }
+  ],
+  "required_artifacts": [
+    "fail-open-vm",
+    "helper-expendability-vm",
+    "ovmf-recovery-vm",
+    "systemd-authority-tests"
+  ]
+}
