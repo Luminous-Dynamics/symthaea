@@ -1,0 +1,110 @@
+name: MATH-BUILD-001 Lock Qualification
+
+on:
+  push:
+    branches:
+      - qualify/math-build-001-lock-v1
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: math-build-001-lock-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-and-compare-lock:
+    name: Generate and compare Cargo.lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Record frozen inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p math-lock-evidence
+          git rev-parse HEAD | tee math-lock-evidence/head-sha.txt
+          git rev-parse HEAD^ | tee math-lock-evidence/parent-sha.txt
+          sha256sum Cargo.lock rust-toolchain.toml flake.nix flake.lock | tee math-lock-evidence/input-sha256.txt
+          rustc --version --verbose | tee math-lock-evidence/rustc-version.txt
+          cargo --version --verbose | tee math-lock-evidence/cargo-version.txt
+          nix --version | tee math-lock-evidence/nix-version.txt
+          nix flake metadata --no-write-lock-file --json > math-lock-evidence/flake-metadata.json
+          cp Cargo.lock math-lock-evidence/Cargo.lock.before
+
+      - name: Generate with pinned Rust 1.96.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          cargo metadata --format-version 1 --locked > math-lock-evidence/metadata.rustup.json
+          cp Cargo.lock math-lock-evidence/Cargo.lock.rustup
+          git diff -- Cargo.lock > math-lock-evidence/Cargo.lock.rustup.patch
+          sha256sum Cargo.lock | tee math-lock-evidence/Cargo.lock.rustup.sha256
+
+      - name: Regenerate independently inside Nix dev shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- Cargo.lock
+          nix develop --command bash -lc '
+            set -euo pipefail
+            rustc --version --verbose > math-lock-evidence/rustc-version.nix.txt
+            cargo --version --verbose > math-lock-evidence/cargo-version.nix.txt
+            cargo generate-lockfile
+            cargo metadata --format-version 1 --locked > math-lock-evidence/metadata.nix.json
+          '
+          cp Cargo.lock math-lock-evidence/Cargo.lock.nix
+          git diff -- Cargo.lock > math-lock-evidence/Cargo.lock.nix.patch
+          sha256sum Cargo.lock | tee math-lock-evidence/Cargo.lock.nix.sha256
+
+      - name: Require deterministic lock and expected workspace package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmp math-lock-evidence/Cargo.lock.rustup math-lock-evidence/Cargo.lock.nix
+          cmp math-lock-evidence/metadata.rustup.json math-lock-evidence/metadata.nix.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          metadata = json.loads(Path('math-lock-evidence/metadata.nix.json').read_text())
+          packages = {pkg['name']: pkg for pkg in metadata['packages']}
+          required = 'symthaea-math-research'
+          if required not in packages:
+              raise SystemExit(f'missing workspace package: {required}')
+          deps = {dep['name'] for dep in packages[required]['dependencies']}
+          expected = {'serde', 'serde_json', 'sha2'}
+          missing = sorted(expected - deps)
+          if missing:
+              raise SystemExit(f'{required} missing dependencies: {missing}')
+          print(f'{required}: FOUND')
+          print('dependencies:', ','.join(sorted(deps)))
+          PY
+          git diff --name-only | tee math-lock-evidence/generated-diff-files.txt
+          test "$(cat math-lock-evidence/generated-diff-files.txt)" = "Cargo.lock"
+
+      - name: Upload lock qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-build-001-lock-${{ github.sha }}
+          path: math-lock-evidence/
+          if-no-files-found: error
+          retention-days: 30
