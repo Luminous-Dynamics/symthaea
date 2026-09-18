@@ -20,6 +20,8 @@ pub mod activation_review_eligibility;
 pub mod activation_transaction_contract;
 #[path = "epistemic_restart_revision_authority_contract.rs"]
 pub mod revision_authority_contract;
+#[path = "epistemic_restart_authority_epoch_contract.rs"]
+pub mod authority_epoch_contract;
 
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
