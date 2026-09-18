@@ -60,6 +60,11 @@ pub mod epistemic_restart_admission_review;
     reason = "EKM-051 keeps two parent-layer type imports explicit while the quarantine API remains module-scoped"
 )]
 pub mod epistemic_restart_quarantine_admission;
+#[allow(
+    unused_imports,
+    reason = "EKM-052 keeps the quarantine admission digest type explicit for the joint-context boundary"
+)]
+pub mod epistemic_restart_trusted_context;
 pub mod epistemic_restart_capsule;
 pub mod epistemic_restart_capsule_v2;
 pub mod epistemic_restart_continuity;
