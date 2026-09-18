@@ -1,0 +1,59 @@
+{
+  "claim_boundary": "census_and_design_only_not_active_gating_or_qualification",
+  "classes": {
+    "cheap_static_candidate": [
+      "governance",
+      "cls-field-count",
+      "embodiment-safety-composition",
+      "orphan-modules"
+    ],
+    "event_special": [
+      "sbom",
+      "stress-tests"
+    ],
+    "heavy_admitted": [
+      "audit",
+      "clippy",
+      "compliance-consciousness",
+      "compliance-robustness",
+      "compliance-safety-ethics",
+      "deny",
+      "doc-tests",
+      "feature-interactions",
+      "fmt",
+      "genesis-benchmarks",
+      "muse",
+      "secrets-scan",
+      "test-all-features",
+      "test-cognitive-hardening",
+      "test-feature-matrix",
+      "test-feature-matrix-critical",
+      "test-hardened-api",
+      "test-hardened-daemon",
+      "test-hardened-lib",
+      "test-hardened-nix",
+      "test-integration",
+      "test-nextest",
+      "test-spark-engine",
+      "test-subcrates",
+      "wasm-compat",
+      "workspace-targets"
+    ],
+    "heavy_or_maintenance": [
+      "test",
+      "psych-bench"
+    ]
+  },
+  "event_special_invariants": {
+    "sbom": "github.ref == 'refs/heads/main' && github.event_name == 'push'",
+    "stress-tests": "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+  },
+  "maintenance_event_invariants": {
+    "psych-bench": "github.event_name == 'schedule'"
+  },
+  "expected_total_jobs": 34,
+  "schema": "symthaea.ci-admission.job-census.v2",
+  "source_commit": "4bad8af72ff775e7c869b6df83faba718a339a36",
+  "workflow_git_blob_sha1": "a48366076b30eb8e12d22c927a3b8bf333181409",
+  "workflow_path": ".github/workflows/ci.yml"
+}

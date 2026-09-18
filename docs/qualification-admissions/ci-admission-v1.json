@@ -1,0 +1,120 @@
+{
+  "authority_mode": "RoutingOnly",
+  "control_plane": {
+    "prefixes": [
+      ".github/workflows/"
+    ],
+    "exact_paths": [
+      "docs/qualification-admissions/ci-admission-v1.json",
+      "docs/qualification-admissions/ci-admission-v1-job-census.json",
+      "scripts/ci-admission-v1.py",
+      "scripts/render-ci-admission-v1.py",
+      "scripts/verify-ci-admission-v1-census.py"
+    ],
+    "modified_disposition": "ControlPlaneReviewRequired",
+    "self_admission_allowed": false
+  },
+  "dispositions": {
+    "ControlPlaneReviewRequired": {
+      "heavy_eligible": false,
+      "maintenance_eligible": false,
+      "exact_subject_required": true
+    },
+    "DraftNotQualificationEligible": {
+      "heavy_eligible": false,
+      "maintenance_eligible": false,
+      "exact_subject_required": false
+    },
+    "QualificationNotRequested": {
+      "heavy_eligible": false,
+      "maintenance_eligible": false,
+      "exact_subject_required": false
+    },
+    "QualificationPending": {
+      "heavy_eligible": true,
+      "maintenance_eligible": false,
+      "exact_subject_required": true
+    },
+    "ScheduledMaintenanceOnly": {
+      "heavy_eligible": false,
+      "maintenance_eligible": true,
+      "exact_subject_required": true
+    },
+    "UnsupportedEvent": {
+      "heavy_eligible": false,
+      "maintenance_eligible": false,
+      "exact_subject_required": false
+    }
+  },
+  "merge_authority": false,
+  "qualification_label": "qualification-requested",
+  "required_claim_boundaries": [
+    "CI Admission is routing-only and MUST NOT be the sole required merge check.",
+    "QualificationPending is not QualificationPassed.",
+    "ScheduledMaintenanceOnly is not QualificationPending or QualificationPassed.",
+    "ControlPlaneReviewRequired cannot self-admit heavyweight CI.",
+    "Skipped heavyweight CI is not QualificationPassed.",
+    "InfrastructureUnavailable is not QualificationFailed.",
+    "Only an exact-head integration qualification receipt may satisfy integration merge authority."
+  ],
+  "rules": [
+    {
+      "event": "pull_request",
+      "when": "action unsupported",
+      "disposition": "UnsupportedEvent"
+    },
+    {
+      "event": "pull_request",
+      "when": "action == closed",
+      "disposition": "QualificationNotRequested"
+    },
+    {
+      "event": "pull_request",
+      "when": "control plane modified",
+      "disposition": "ControlPlaneReviewRequired"
+    },
+    {
+      "event": "pull_request",
+      "when": "draft == true and qualification-requested label absent",
+      "disposition": "DraftNotQualificationEligible"
+    },
+    {
+      "event": "pull_request",
+      "when": "otherwise",
+      "disposition": "QualificationPending"
+    },
+    {
+      "event": "merge_group",
+      "when": "control plane modified",
+      "disposition": "ControlPlaneReviewRequired"
+    },
+    {
+      "event": "merge_group",
+      "when": "otherwise",
+      "disposition": "QualificationPending"
+    },
+    {
+      "event": "workflow_dispatch",
+      "when": "always",
+      "disposition": "QualificationPending"
+    },
+    {
+      "event": "push",
+      "when": "ref == refs/heads/main",
+      "disposition": "QualificationPending"
+    },
+    {
+      "event": "schedule",
+      "when": "always",
+      "disposition": "ScheduledMaintenanceOnly"
+    },
+    {
+      "event": "other",
+      "when": "always",
+      "disposition": "QualificationNotRequested"
+    }
+  ],
+  "schema": "symthaea.ci-admission.v1",
+  "scientific_authority": false,
+  "version": 2
+}
