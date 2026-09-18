@@ -69,6 +69,7 @@ pub mod experience_tree;
 pub mod narrative_evidence;
 pub mod replay_policy;
 pub mod semantic_context;
+pub mod semantic_prior;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
 pub mod sym_rsi_fixtures;
@@ -153,9 +154,10 @@ pub use narrative_evidence::{
 };
 pub use replay_policy::{PolicySelectionError, ReplayPolicyScore, select_replay_policy};
 pub use semantic_context::{
-    DEFAULT_CONTEXT_CLAMP_ABS, DEFAULT_SEMANTIC_LEVELS, SemanticContextEncoder,
-    SemanticContextError, SemanticContextIndex, SemanticContextMatch,
+    ContextIdentity, DEFAULT_CONTEXT_CLAMP_ABS, DEFAULT_SEMANTIC_LEVELS, HDC_CHANCE_SIMILARITY,
+    SemanticContextEncoder, SemanticContextError, SemanticContextIndex, SemanticContextMatch,
 };
+pub use semantic_prior::{SemanticPriorCandidate, SemanticPriorError, SemanticPriorMemory};
 pub use sym_rsi_candidate_family::{
     FrozenReplayCorpus, ReplayAcquisitionError, ReplayCorpusAcquisitionReceipt,
     SYM_RSI_001_CANDIDATE_FAMILY_SCHEMA, SYM_RSI_001_INCUMBENT_POLICY_ID,
