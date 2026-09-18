@@ -168,8 +168,7 @@ pub use sym_rsi_fresh_evaluation::{
 };
 pub use sym_rsi_c_fresh_gate::{
     ParentQualifiedReplayFreshReceipt, QualifiedReplayFresh, QualifiedReplayFreshError,
-    SYM_RSI_001_QUALIFIED_FRESH_SCHEMA, requalify_fresh_c_vs_a_from_receipt,
-    run_fresh_c_vs_a_after_parent_c,
+    SYM_RSI_001_QUALIFIED_FRESH_SCHEMA, run_fresh_c_vs_a_after_parent_c,
 };
 pub use sym_rsi_fresh_chain_claim::{
     FreshImprovementChainDisposition, FreshImprovementChainError, FreshImprovementChainReceipt,
@@ -207,8 +206,8 @@ pub use sym_rsi_dream_parent_gate::{
     SYM_RSI_001D_PARENT_C_QUALIFICATION_SCHEMA, SYM_RSI_001D_QUALIFIED_FRESH_SCHEMA,
     SYM_RSI_001D_QUALIFIED_OOD_SCHEMA, SYM_RSI_001D_QUALIFIED_VERIFICATION_SCHEMA,
     acquire_dream_verification_corpus_after_parent_c, qualify_parent_c_for_dream,
-    requalify_fresh_d_vs_c_from_receipt, run_fresh_d_vs_c_after_parent_c,
-    run_ood_d_vs_c_after_parent_c, validate_grounded_dream_after_parent_c,
+    run_fresh_d_vs_c_after_parent_c, run_ood_d_vs_c_after_parent_c,
+    validate_grounded_dream_after_parent_c,
 };
 pub use sym_rsi_dream_fresh_evaluation::{
     DreamFreshDisposition, DreamFreshDomainSummary, DreamFreshEvaluationError,
