@@ -27,7 +27,7 @@ use std::error::Error;
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RestartTrustContextDigestV1([u8; 32]);
+pub struct RestartTrustContextDigestV1(pub(crate) [u8; 32]);
 
 impl RestartTrustContextDigestV1 {
     pub fn as_bytes(self) -> [u8; 32] {

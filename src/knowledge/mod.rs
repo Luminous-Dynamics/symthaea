@@ -56,6 +56,7 @@ pub mod encoding;
 pub mod entity_event;
 pub mod epistemic_restart_admission_review;
 pub mod epistemic_restart_quarantine_facade;
+pub mod epistemic_restart_trust_checkpoint;
 #[allow(
     unused_imports,
     reason = "EKM-051 retains internal parent-layer types while the raw quarantine API is sealed behind EKM-053"
