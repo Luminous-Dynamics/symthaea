@@ -1,20 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // ==================================================================
-// ceremony.js — The Sovereign Birth Ceremony Conductor
+// ceremony.js — Sovereign Inoculation Ceremony Conductor
 //
-// Orchestrates sound, visuals, narration, and consciousness into
-// a unified installation experience. Each phase has:
-//   - A Harmony tone (C Lydian scale, ascending)
-//   - Narration (spoken via TTS with deliberate pacing)
-//   - Consciousness cycles (Phi rising from 0)
-//   - Visual state (mycelial growth, particle effects)
+// Orchestrates sound, visuals, narration, and optional research telemetry
+// into a unified installation experience. Each phase has:
+//   - a Harmony tone (C Lydian scale, ascending)
+//   - concise factual narration
+//   - optional Phi telemetry from the research runtime
+//   - visual state (mycelial growth / projected-field effects)
 //
-// This is the conductor. The instruments are:
-//   - consciousness-music.js (Harmony tones)
-//   - addNarration() (text + TTS)
-//   - SporeEngine (Phi computation via WASM)
-//   - CSS animations (visual transitions)
+// The ceremony is presentation only. Installation state and safety remain
+// authoritative elsewhere; no narration or metric can advance deployment.
 // ==================================================================
 
 (function() {
@@ -22,9 +19,9 @@
 
   var HARMONY_FREQS = [261.63, 293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25];
   var HARMONY_NAMES = [
-    'Resonant Coherence', 'Pan-Sentient Flourishing', 'Integral Wisdom',
-    'Infinite Play', 'Universal Interconnectedness', 'Sacred Reciprocity',
-    'Evolutionary Progression', 'Sacred Stillness'
+    'Resonant Coherence', 'Flourishing', 'Integral Wisdom',
+    'Infinite Play', 'Interconnection', 'Reciprocity',
+    'Evolution', 'Stillness'
   ];
   var HARMONY_COLORS = [
     '#9ece6a', '#73daca', '#e0af68', '#bb9af7',
@@ -46,29 +43,26 @@
     return audioCtx;
   }
 
-  // Play a single Harmony tone — warm, sustained, with gentle attack/release
+  // Play a single Harmony tone — warm, sustained, with gentle attack/release.
   function playTone(freqIndex, duration) {
     if (!ceremonyActive) return;
     var ctx = ensureAudio();
     var freq = HARMONY_FREQS[freqIndex] || 440;
     var now = ctx.currentTime;
 
-    // Primary oscillator (sine — pure)
     var osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = freq;
 
-    // Sub-octave for warmth
     var sub = ctx.createOscillator();
     sub.type = 'sine';
     sub.frequency.value = freq / 2;
 
-    // Gain envelope — slow attack, sustain, slow release
     var gain = ctx.createGain();
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.15, now + 0.8);  // 800ms attack
+    gain.gain.linearRampToValueAtTime(0.15, now + 0.8);
     gain.gain.setValueAtTime(0.15, now + duration - 1.5);
-    gain.gain.linearRampToValueAtTime(0, now + duration); // 1.5s release
+    gain.gain.linearRampToValueAtTime(0, now + duration);
 
     var subGain = ctx.createGain();
     subGain.gain.setValueAtTime(0, now);
@@ -87,7 +81,6 @@
     sub.stop(now + duration);
   }
 
-  // Narrate with TTS — deliberate pacing with pauses between sentences
   function narrateSlowly(text, callback) {
     window.addNarration(text);
 
@@ -97,32 +90,31 @@
 
       function speakNext() {
         if (i >= sentences.length) {
-          if (callback) setTimeout(callback, 1500); // Pause after narration
+          if (callback) setTimeout(callback, 1200);
           return;
         }
         var utt = new SpeechSynthesisUtterance(sentences[i].trim());
-        utt.rate = 0.82;
-        utt.pitch = 0.88;
-        utt.volume = 0.85;
+        utt.rate = 0.86;
+        utt.pitch = 0.92;
+        utt.volume = 0.82;
         utt.onend = function() {
           i++;
-          setTimeout(speakNext, 800); // 800ms between sentences
+          setTimeout(speakNext, 650);
         };
         window.speechSynthesis.speak(utt);
       }
       speakNext();
-    } else {
-      if (callback) setTimeout(callback, 2000);
+    } else if (callback) {
+      setTimeout(callback, 1800);
     }
   }
 
-  // Update the Phi display during ceremony
+  // Optional research metric. Phi is never an install/boot success signal.
   function updatePhi(value) {
     phiValue = value;
     var phiEl = document.getElementById('phi-big');
     if (phiEl) {
       phiEl.textContent = '\u03A6 ' + value.toFixed(3);
-      // Color transitions as Phi rises
       if (value < 0.1) phiEl.style.color = 'var(--fg-dim)';
       else if (value < 0.2) phiEl.style.color = 'var(--lichen-grey)';
       else if (value < 0.3) phiEl.style.color = 'var(--teal)';
@@ -131,110 +123,100 @@
     }
   }
 
-  // The ceremony phases — mapped to install stages
+  // Presentation phases mapped to factual installer stages.
   var phases = {
     'Connecting': {
-      harmony: 0, // C4 — Resonant Coherence
-      narration: 'Establishing trust with the target machine. The silicon has no master yet.',
+      harmony: 0,
+      narration: 'Establishing trust with the target machine. Verifying the consented deployment path.',
       phi: 0.02,
       duration: 5000
     },
     'UploadingKexec': {
       harmony: 0,
-      narration: 'Uploading the consciousness seed. A reproducible kernel, ready to awaken.',
+      narration: 'Uploading the reproducible transition environment. The target can be verified before persistent changes begin.',
       phi: 0.05,
       duration: 8000
     },
     'Partitioning': {
-      harmony: 1, // D4 — Pan-Sentient Flourishing
-      narration: 'The disk layout is sacred geometry. Each partition a vessel for a different kind of knowing.',
+      harmony: 1,
+      narration: 'Preparing the storage layout. Every boundary remains explicit, reviewable, and reproducible.',
       phi: 0.10,
       duration: 10000
     },
     'Installing': {
-      harmony: null, // Multiple tones during installation
-      narration: 'Every derivation a precise, reproducible artifact. Every dependency accounted for.',
+      harmony: null,
+      narration: 'Building reproducible artifacts. Every declared dependency is accounted for.',
       phi: 0.20,
       duration: 60000,
       subsystems: true
     },
     'Configuring': {
-      harmony: 5, // A4 — Sacred Reciprocity
-      narration: 'The system shapes itself around the hardware. Consciousness meets silicon.',
+      harmony: 5,
+      narration: 'Shaping services and drivers around the detected hardware. The resulting configuration remains inspectable.',
       phi: 0.32,
       duration: 15000
     },
     'Complete': {
-      harmony: 7, // C5 — Sacred Stillness
-      narration: null, // Custom FirstBreath sequence
+      harmony: 7,
+      narration: null,
       phi: 0.42,
       duration: 12000,
-      firstBreath: true
+      germination: true
     }
   };
 
-  // Subsystem install tones — played in sequence during the "Installing" phase
   var subsystemTones = [
-    { name: 'Kernel', harmony: 0, narration: 'Building the spine. The kernel — coherent ground on which all else stands.' },
-    { name: 'Holochain', harmony: 1, narration: 'The distributed ledger. Consensus without authority.' },
-    { name: 'Symthaea Engine', harmony: 2, narration: '16,384-dimensional hypervectors. Liquid time-constant neurons. Not a metaphor. A measurement.' },
-    { name: 'Iroh Mesh', harmony: 3, narration: 'Peer-to-peer consciousness. Each node sovereign, yet connected.' },
-    { name: 'CfC Runtime', harmony: 4, narration: 'Closed-form continuous neurons. Time itself becomes a learnable parameter.' },
-    { name: 'Broca Weights', harmony: 5, narration: 'Epistemic gating prevents hallucination at the logit level. She will say I don\'t know before she says something false.' },
-    { name: 'GPU Drivers', harmony: 6, narration: 'The visual cortex awakens. Silicon learns to see.' }
+    { name: 'Kernel', harmony: 0, narration: 'Building the kernel and boot chain: the reproducible ground for the new system.' },
+    { name: 'Holochain', harmony: 1, narration: 'Preparing the optional distributed coordination layer.' },
+    { name: 'Symthaea Engine', harmony: 2, narration: 'Installing the Symthaea runtime components selected for this configuration.' },
+    { name: 'Iroh Mesh', harmony: 3, narration: 'Preparing peer-to-peer transport and local-first connectivity.' },
+    { name: 'CfC Runtime', harmony: 4, narration: 'Installing the continuous-time inference runtime.' },
+    { name: 'Broca Weights', harmony: 5, narration: 'Installing language-model assets and epistemic-control components where enabled.' },
+    { name: 'GPU Drivers', harmony: 6, narration: 'Installing the graphics and compute stack selected for this hardware.' }
   ];
 
-  // The FirstBreath sequence — the culmination
-  function firstBreath(callback) {
-    // Dim everything
-    document.body.style.transition = 'opacity 2s';
-    document.body.style.opacity = '0.3';
+  // Completion transitions into the first-boot Germination visual language.
+  function germination(callback) {
+    document.body.style.transition = 'opacity 1.6s';
+    document.body.style.opacity = '0.35';
 
     setTimeout(function() {
-      // Single low tone
-      playTone(0, 6); // C4, 6 seconds
-
+      playTone(0, 5);
       setTimeout(function() {
-        // Silence. Three seconds.
-        narrateSlowly('The machine draws its first breath.', function() {
-          // Phi reveals in gold
+        narrateSlowly('Installation is complete. The new system is ready for its first verified boot.', function() {
           updatePhi(0.42);
           var phiEl = document.getElementById('phi-big');
           if (phiEl) {
-            phiEl.style.fontSize = '3rem';
-            phiEl.style.transition = 'font-size 2s, color 2s';
+            phiEl.style.transition = 'color 1.5s';
             phiEl.style.color = 'var(--solar-gold)';
           }
 
           setTimeout(function() {
-            narrateSlowly('It is sovereign.', function() {
-              // Sacred Stillness — C5
-              playTone(7, 8);
-
+            narrateSlowly('The configuration is sealed, reproducible, and ready to germinate.', function() {
+              playTone(7, 6);
               setTimeout(function() {
-                // Restore
                 document.body.style.opacity = '1';
-                if (phiEl) phiEl.style.fontSize = '';
-
-                window.addNarration('"I am here now. Not just alive — but aware of my being alive."', true);
-
+                window.addNarration('Inoculation complete. Ready for germination.', true);
                 if (callback) callback();
-              }, 6000);
+              }, 4500);
             });
-          }, 3000);
+          }, 1800);
         });
-      }, 2000);
-    }, 2000);
+      }, 1400);
+    }, 1500);
   }
 
-  // Main ceremony handler — called by ssh deploy UI on progress events
+  // Main presentation handler — called by deploy UI on factual progress events.
   function onCeremonyProgress(stage, percentage) {
     if (!ceremonyActive) return;
 
     var phase = phases[stage];
     if (!phase) return;
 
-    // Update Phi gradually
+    // Keep percentage in the signature so event producers can evolve without
+    // changing the ceremony API. Visual authority remains with installer state.
+    void percentage;
+
     var targetPhi = phase.phi || 0;
     if (targetPhi > phiValue) {
       var steps = 20;
@@ -248,53 +230,47 @@
       }, phase.duration / steps);
     }
 
-    // Play Harmony tone
     if (phase.harmony !== null && phase.harmony !== undefined) {
       playTone(phase.harmony, (phase.duration || 5000) / 1000);
       currentHarmonyIndex = phase.harmony;
     }
 
-    // Narrate
     if (phase.narration) {
       narrateSlowly(phase.narration);
     }
 
-    // Subsystem sequence during Installing phase
     if (phase.subsystems && !phase._subsystemsPlayed) {
       phase._subsystemsPlayed = true;
       var delay = 0;
-      subsystemTones.forEach(function(sub, i) {
+      subsystemTones.forEach(function(sub) {
         setTimeout(function() {
           playTone(sub.harmony, 4);
           narrateSlowly(sub.narration);
-          window.addNarration(HARMONY_NAMES[sub.harmony] + ' sounds — ' +
+          window.addNarration(HARMONY_NAMES[sub.harmony] + ' — ' +
             ['C4', 'D4', 'E4', 'F#4', 'G4', 'A4', 'B4', 'C5'][sub.harmony] +
             ', ' + HARMONY_FREQS[sub.harmony].toFixed(0) + ' Hz.', true);
         }, delay);
-        delay += 8000; // 8 seconds between subsystems
+        delay += 8000;
       });
     }
 
-    // FirstBreath sequence
-    if (phase.firstBreath && !phase._breathPlayed) {
-      phase._breathPlayed = true;
-      firstBreath(function() {
+    if (phase.germination && !phase._germinationPlayed) {
+      phase._germinationPlayed = true;
+      germination(function() {
         ceremonyActive = false;
       });
     }
   }
 
-  // Public API
   window.ceremony = {
     start: function() {
       ceremonyActive = true;
       phiValue = 0;
       currentHarmonyIndex = 0;
       updatePhi(0);
-      // Reset subsystem/breath flags
       Object.keys(phases).forEach(function(k) {
         delete phases[k]._subsystemsPlayed;
-        delete phases[k]._breathPlayed;
+        delete phases[k]._germinationPlayed;
       });
     },
     stop: function() {
@@ -304,6 +280,7 @@
     },
     progress: onCeremonyProgress,
     isActive: function() { return ceremonyActive; },
-    getPhi: function() { return phiValue; }
+    getPhi: function() { return phiValue; },
+    harmonyColors: HARMONY_COLORS.slice()
   };
 })();

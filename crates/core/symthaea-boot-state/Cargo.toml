@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-boot-state"
+version = "0.1.0"
+edition = "2024"
+description = "Persistent state receipts and health-gated lineage for Spore boot ecology"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-boot-ecology = { path = "../symthaea-boot-ecology" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
+
+[[bin]]
+name = "spore-boot-state"
+path = "src/main.rs"
