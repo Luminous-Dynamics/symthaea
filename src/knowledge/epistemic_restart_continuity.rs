@@ -10,6 +10,8 @@
 
 #[path = "epistemic_restart_live_epoch_fence.rs"]
 pub mod live_epoch_fence;
+#[path = "epistemic_restart_activation_preflight.rs"]
+pub mod activation_preflight;
 
 use super::epistemic_restart_validation_receipt::{
     EpistemicRestartValidationReceiptDigest, EpistemicRestartValidationReceiptV1,
