@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-interface-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Bounded real-time runtime-plane primitives for Symthaea interfaces"
+
+[dependencies]
+symthaea-interface-types = { path = "../symthaea-interface-types" }

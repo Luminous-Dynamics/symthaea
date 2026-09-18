@@ -6,6 +6,7 @@ license = "AGPL-3.0-or-later"
 description = "Typed service command, activity, and snapshot contracts for the Symthaea runtime owner"
 
 [dependencies]
+symthaea-interface-runtime = { path = "../symthaea-interface-runtime" }
 symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
 
 [dev-dependencies]

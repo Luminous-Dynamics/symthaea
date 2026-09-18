@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use symthaea_runtime_owner::{OwnerCommandContext, OwnerCommandSeq};
 
 pub mod observed;
+pub mod state_plane;
 
 /// Why text entered the cognitive processing path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
