@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'crates/domains/symthaea-vision-manifold/src/spatial_evidence.rs'
+      - 'crates/domains/symthaea-vision-manifold/src/stereo_disparity_evidence.rs'
       - 'crates/domains/symthaea-vision-manifold/src/lib.rs'
       - 'docs/architecture/VISUAL_SPATIAL_EVIDENCE_V1.md'
       - '.github/workflows/vis-004e-spatial-evidence.yml'
@@ -25,7 +26,9 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Check visual spatial evidence
         run: cargo check -p symthaea-vision-manifold --all-targets
-      - name: Test visual spatial evidence
+      - name: Test spatial frame contract
         run: cargo test -p symthaea-vision-manifold spatial_evidence
+      - name: Test stereo disparity contract
+        run: cargo test -p symthaea-vision-manifold stereo_disparity_evidence
       - name: Clippy visual spatial evidence
         run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings
