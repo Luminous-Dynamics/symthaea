@@ -3,8 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Active grounded-dream implementation for SYM-RSI-001.
 //!
-//! v6 is preserved separately as `sym_rsi_grounded_dream_v6.rs`. The active public
-//! surface re-exports the preregistered v7 structural-support implementation.
+//! The corrected v6 source is preserved byte-for-byte as an evidence artifact at
+//! `docs/experiments/archive/SYM_RSI_001_GROUNDED_DREAM_V6.rs.txt`. The active
+//! public surface re-exports the preregistered v7 structural-support implementation.
 
 #[path = "sym_rsi_grounded_dream_v7.rs"]
 mod v7;
