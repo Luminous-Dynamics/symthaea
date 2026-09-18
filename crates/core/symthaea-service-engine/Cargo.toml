@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-service-engine"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Concrete Symthaea facade adapter for the single-owner service runtime"
+
+[dependencies]
+anyhow = { workspace = true }
+symthaea = { path = "../../.." }
+symthaea-interface-runtime = { path = "../symthaea-interface-runtime" }
+symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
+symthaea-service-runtime = { path = "../symthaea-service-runtime" }
+tokio = { workspace = true }
