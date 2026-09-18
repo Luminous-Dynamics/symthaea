@@ -30,10 +30,11 @@ pub struct ContactPatchGeometryV1 {
     pub site: ContactSite,
     /// Counter-clockwise convex polygon in the contact-local tangent plane.
     pub vertices_local_xy_m: Vec<[f64; 2]>,
-    /// Tangential force coefficient used by later friction/wrench constraints.
+    /// Dimensionless tangential friction coefficient used by later wrench constraints.
     pub friction_coefficient: f64,
-    /// Torsional-friction coefficient retained separately from tangential friction.
-    pub torsional_friction_coefficient: f64,
+    /// Effective torsional-friction radius in metres. A later wrench constraint
+    /// may use `|tau_z| <= torsional_friction_radius_m * f_n`.
+    pub torsional_friction_radius_m: f64,
     pub source: ContactPatchGeometrySource,
     pub geometry_id: String,
 }
@@ -45,8 +46,8 @@ impl ContactPatchGeometryV1 {
             || self.geometry_id.trim().is_empty()
             || !self.friction_coefficient.is_finite()
             || self.friction_coefficient < 0.0
-            || !self.torsional_friction_coefficient.is_finite()
-            || self.torsional_friction_coefficient < 0.0
+            || !self.torsional_friction_radius_m.is_finite()
+            || self.torsional_friction_radius_m < 0.0
             || vertices
                 .iter()
                 .flat_map(|vertex| vertex.iter())
@@ -295,7 +296,7 @@ mod tests {
                 [-half_x, half_y],
             ],
             friction_coefficient: 1.0,
-            torsional_friction_coefficient: 0.05,
+            torsional_friction_radius_m: 0.05,
             source: ContactPatchGeometrySource::MorphologyDeclaration,
             geometry_id: format!("synthetic-{site:?}"),
         }
