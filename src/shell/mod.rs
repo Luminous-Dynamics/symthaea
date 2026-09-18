@@ -34,6 +34,7 @@ pub mod keybindings;
 pub mod notifications;
 pub mod service_state;
 pub mod syntax_highlight;
+pub mod telemetry_state;
 pub mod theming;
 pub mod undo;
 pub mod whatif;
@@ -91,6 +92,7 @@ pub use ipc_server::{
     StubCommandExecutor, StubMetricsProvider, ValidationResult,
 };
 pub use service_state::StateManager;
+pub use telemetry_state::{ShellTelemetryProvenance, ShellTelemetryState};
 pub use undo::{ActionData, ActionType, UndoAction};
 pub use whatif::{WhatIfResult, WhatIfSimulator};
 
