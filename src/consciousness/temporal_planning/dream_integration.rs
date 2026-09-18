@@ -3,9 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Dream Integration
 //!
-//! Converts DreamInsights from the dream feedback bridge into
-//! ActionPriors for MCTS. This enables "retroactive self-improvement":
-//! learning from pasts that never happened.
+//! Converts DreamInsights from the dream feedback bridge into ActionPriors for
+//! MCTS. Dream-derived priors may influence what to try, but generated evidence
+//! does not by itself authorize stronger epistemic confidence.
 
 use super::types::PlannedAction;
 
@@ -14,8 +14,9 @@ use crate::consciousness::recursive_improvement::dream_feedback::DreamFeedbackBr
 
 /// Convert a dream feedback bridge's priors into MCTS action priors.
 ///
-/// For each available action, checks if the dream bridge has a
-/// prior for a matching context. If so, boosts that action's prior.
+/// For each available action, checks if the dream bridge has a prior for a
+/// matching context. If so, boosts that action's search prior. This is an
+/// exploration/search bias, not a prediction-confidence claim.
 #[cfg(feature = "magi_loop")]
 pub fn apply_dream_priors(
     actions: &mut [PlannedAction],
@@ -24,17 +25,19 @@ pub fn apply_dream_priors(
 ) {
     if let Some(prior) = bridge.get_prior(context_hash) {
         for action in actions.iter_mut() {
-            // Compute similarity between action embedding and dream prior direction
             let similarity = cosine_similarity(&action.embedding, &prior.preferred_direction);
             if similarity > 0.5 {
-                // Boost prior proportional to similarity and dream strength
                 action.prior = (action.prior + similarity as f64 * prior.strength).min(1.0);
             }
         }
     }
 }
 
-/// Apply dream confidence adjustments to a plan confidence.
+/// Apply non-authorizing dream confidence adjustments to a plan confidence.
+///
+/// The public bridge API can preserve or reduce confidence, but it cannot promote
+/// confidence above the base value. Empirical promotion belongs to
+/// `DreamConfidenceGate`, not temporal planning's generic dream integration path.
 #[cfg(feature = "magi_loop")]
 pub fn adjust_plan_confidence(
     confidence: f64,
@@ -109,12 +112,17 @@ mod tests {
     }
 
     #[cfg(feature = "magi_loop")]
-    #[test]
-    fn test_dream_priors_applied() {
+    fn bridge_with_dream_prior() -> DreamFeedbackBridge {
         let mut bridge = DreamFeedbackBridge::new();
         let insight = DreamInsight::new(12345, vec![0.0, 0.0], vec![1.0, 0.0], 0.2);
         bridge.process_insight(insight);
+        bridge
+    }
 
+    #[cfg(feature = "magi_loop")]
+    #[test]
+    fn test_dream_priors_applied() {
+        let bridge = bridge_with_dream_prior();
         let mut actions = vec![
             PlannedAction {
                 id: "match".into(),
@@ -133,7 +141,15 @@ mod tests {
         ];
 
         apply_dream_priors(&mut actions, &bridge, 12345);
-        // The matching action should have higher prior
         assert!(actions[0].prior > actions[1].prior);
+    }
+
+    #[cfg(feature = "magi_loop")]
+    #[test]
+    fn recursive_improvement_dream_plan_confidence_cannot_increase_without_validation() {
+        let bridge = bridge_with_dream_prior();
+        let base = 0.6;
+        let adjusted = adjust_plan_confidence(base, &bridge, 12345);
+        assert!(adjusted <= base);
     }
 }
