@@ -32,6 +32,7 @@ pub mod attention;
 pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
+pub mod competing_beliefs;
 pub mod encoder;
 pub mod entity_identity;
 pub mod epistemic;
@@ -90,6 +91,10 @@ pub use checkpoint::{
     save_checkpoint_file_report, save_checkpoint_file_with_retention,
     save_checkpoint_file_with_retention_locked_report, save_checkpoint_file_with_retention_report,
     with_checkpoint_writer_lock, write_checkpoint_atomic, write_checkpoint_atomic_report,
+};
+pub use competing_beliefs::{
+    BeliefMass, CompetingBeliefError, IdentityCandidate, IdentityCandidateValue,
+    SemanticClassBeliefSet, SemanticClassCandidate, TrackIdentityBeliefSet,
 };
 pub use encoder::{MotionField, MultiScaleEncoder, PatchHdcEncoder, StereoDepthEstimate};
 pub use entity_identity::{
