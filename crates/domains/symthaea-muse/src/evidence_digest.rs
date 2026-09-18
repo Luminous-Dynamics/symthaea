@@ -14,6 +14,8 @@ pub mod rendered_attack_gate;
 pub mod rendered_attack_panel;
 #[path = "rendered_attack_provenance.rs"]
 pub mod rendered_attack_provenance;
+#[path = "rendered_attack_contrast.rs"]
+pub mod rendered_attack_contrast;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
