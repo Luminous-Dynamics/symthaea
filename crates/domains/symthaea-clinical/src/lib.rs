@@ -10,7 +10,7 @@
 //! Covers DSM-5/ICD-11 diagnostic categories, NIMH RDoC dimensional framework,
 //! therapeutic modalities (CBT/ACT/DBT/Narrative/Somatic/MI/EMDR/IFS/Psychodynamic),
 //! individual symptom encoding, a conservative vocabulary for clinical claims,
-//! and evidence-bound clinical inference envelopes.
+//! evidence-bound clinical inference envelopes, and explicit wire identity.
 //!
 //! No dependency on main symthaea crate — uses only `symthaea-core` for HDC types.
 //!
@@ -19,6 +19,7 @@
 
 pub mod claims;
 pub mod inference;
+pub mod inference_wire;
 pub mod nosology;
 pub mod rdoc;
 pub mod symptom_encoding;
@@ -37,6 +38,10 @@ pub use inference::{
     ClinicalInferenceEnvelopeError, ClinicalInferenceEnvelopeV1, ClinicalModelIdentityV1,
     ClinicalSubjectBindingV1, ClinicalUncertaintyV1, MissingClinicalEvidenceV1,
     MissingEvidenceCriticalityV1,
+};
+pub use inference_wire::{
+    CLINICAL_INFERENCE_WIRE_IDENTITY_VERSION, ClinicalInferenceWireError,
+    clinical_inference_wire_bytes, clinical_inference_wire_digest,
 };
 pub use nosology::{DiagnosticCategory, DiagnosticProfile, Severity, Specifier};
 pub use rdoc::{RDocDomain, RDocProfile};
