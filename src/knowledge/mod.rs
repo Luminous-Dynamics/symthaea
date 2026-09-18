@@ -63,6 +63,7 @@ pub mod epistemic_restart_continuity;
 )]
 pub mod epistemic_restart_manifest;
 pub mod epistemic_restart_anchor;
+pub mod epistemic_restart_anchor_policy;
 pub mod epistemic_restart_validation_receipt;
 #[allow(
     unused_imports,
