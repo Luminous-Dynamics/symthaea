@@ -1,0 +1,149 @@
+name: INT-008A Voice Control Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/int-008a-voice-control.yml'
+      - 'src/voice/audio_out.rs'
+      - 'src/voice/live_voice.rs'
+      - 'src/cognitive_loop/voice_channel.rs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: int-008a-voice-control-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_SUBJECT: a74799a939ea525567b49a1968f667c1a807b419
+  AUDIO_OUT_BLOB: c9c4457042fe2f38bbbc3c1e439e54a7ed7f5df6
+  LIVE_VOICE_BLOB: 9f07f273a55d823965393472ac8235d6eee50827
+  VOICE_CHANNEL_BLOB: db2bcfb60a9484653d52f6fa8a11aa3a144cfaa6
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  qualify:
+    name: exact-head voice control
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Bind qualifier to exact source subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SUBJECT"
+          test "$(git diff --name-only "$SOURCE_SUBJECT" HEAD)" = ".github/workflows/int-008a-voice-control.yml"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/voice/audio_out.rs")" = "$AUDIO_OUT_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/voice/live_voice.rs")" = "$LIVE_VOICE_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/cognitive_loop/voice_channel.rs")" = "$VOICE_CHANNEL_BLOB"
+          test -z "$(git status --porcelain)"
+
+      - name: Install ALSA build prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config
+
+      - name: Install Rust 1.96 with quality components
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+      - name: Check touched voice source formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            src/voice/audio_out.rs \
+            src/voice/live_voice.rs \
+            src/cognitive_loop/voice_channel.rs
+
+      - name: Locked live-voice compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea --lib --features live-voice
+
+      - name: Audio output control tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea --lib --features live-voice \
+            voice::audio_out::tests -- --nocapture
+
+      - name: LiveVoice generation and stop tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea --lib --features live-voice \
+            voice::live_voice::tests -- --nocapture
+
+      - name: Cognitive voice mailbox and cancellation tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea --lib --features live-voice \
+            cognitive_loop::voice_channel::tests -- --nocapture
+
+      - name: Locked live-voice clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea --lib --features live-voice -- -D warnings
+
+      - name: Verify source immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/voice/audio_out.rs")" = "$AUDIO_OUT_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/voice/live_voice.rs")" = "$LIVE_VOICE_BLOB"
+          test "$(git rev-parse "$SOURCE_SUBJECT:src/cognitive_loop/voice_channel.rs")" = "$VOICE_CHANNEL_BLOB"
+
+      - name: Emit qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qualification
+          {
+            echo 'program=INT-008A'
+            echo 'authority=engineering-source-qualification-only'
+            echo 'scientific_claim=NONE'
+            echo "source_subject=$SOURCE_SUBJECT"
+            echo "qualifier_head=$(git rev-parse HEAD)"
+            echo "audio_out_blob=$AUDIO_OUT_BLOB"
+            echo "live_voice_blob=$LIVE_VOICE_BLOB"
+            echo "voice_channel_blob=$VOICE_CHANNEL_BLOB"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo 'feature=live-voice'
+            echo 'format=PASS'
+            echo 'compile=PASS'
+            echo 'focused_tests=PASS'
+            echo 'clippy=PASS'
+          } | tee qualification/int-008a-voice-control.txt
+
+      - name: Upload qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: int-008a-voice-control-${{ github.event.pull_request.head.sha || github.sha }}
+          path: qualification/int-008a-voice-control.txt
+          if-no-files-found: error
+          retention-days: 30
