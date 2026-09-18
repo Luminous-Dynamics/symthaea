@@ -9,7 +9,13 @@
 //! The ring buffer decouples synthesis timing from audio device timing.
 //! On underrun, the callback writes silence (no click/pop).
 //!
+//! A lock-free flush flag lets interruption/control paths invalidate already
+//! buffered speech without taking a mutex or waiting in the real-time callback.
+//!
 //! Feature-gated under `live-voice`.
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -28,6 +34,12 @@ pub struct AudioOutput {
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
+    /// Set by a control/interruption path and consumed by the audio callback.
+    ///
+    /// The callback clears the queued ring contents before rendering its next
+    /// device buffer. This is intentionally atomic-only: the audio callback must
+    /// never contend on a mutex while attempting to become silent.
+    flush_requested: Arc<AtomicBool>,
 }
 
 impl AudioOutput {
@@ -67,6 +79,7 @@ impl AudioOutput {
             sample_rate,
             channels: 1,
             buffer_capacity: 0,
+            flush_requested: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -80,6 +93,8 @@ impl AudioOutput {
         let buffer_capacity = sample_rate as usize * 2;
         let rb = HeapRb::<f32>::new(buffer_capacity);
         let (producer, mut consumer) = rb.split();
+        let flush_requested = Arc::new(AtomicBool::new(false));
+        let callback_flush = Arc::clone(&flush_requested);
 
         let ch = channels;
         let stream_config: cpal::StreamConfig = supported.into();
@@ -89,6 +104,16 @@ impl AudioOutput {
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     use ringbuf::traits::Consumer;
+
+                    // Interruption is generation/control state, not ordinary audio
+                    // backpressure. Drop every queued stale sample before producing
+                    // the next device buffer. `swap` coalesces repeated requests;
+                    // `clear` drops the occupied batch and advances the consumer read
+                    // index once instead of synchronizing it once per sample.
+                    if callback_flush.swap(false, Ordering::AcqRel) {
+                        let _ = consumer.clear();
+                    }
+
                     for sample in data.chunks_mut(ch as usize) {
                         if let Some(s) = consumer.try_pop() {
                             for out in sample.iter_mut() {
@@ -96,7 +121,7 @@ impl AudioOutput {
                             }
                         } else {
                             for out in sample.iter_mut() {
-                                *out = 0.0; // Underrun → silence
+                                *out = 0.0; // Underrun / flushed queue → silence
                             }
                         }
                     }
@@ -114,6 +139,7 @@ impl AudioOutput {
             sample_rate,
             channels,
             buffer_capacity,
+            flush_requested,
         })
     }
 
@@ -143,6 +169,23 @@ impl AudioOutput {
     /// AudioOutput is created. Returns `None` if already taken or dummy.
     pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
         self.producer.take()
+    }
+
+    /// Request that the real-time audio callback discard every currently queued
+    /// sample before filling its next device buffer.
+    ///
+    /// This call is lock-free and returns immediately. It is therefore suitable
+    /// for voice interruption/barge-in control paths. The actual silence latency
+    /// is bounded by the audio device callback cadence and still needs executable
+    /// measurement before any latency claim is made.
+    pub fn request_flush(&self) {
+        self.flush_requested.store(true, Ordering::Release);
+    }
+
+    /// Clone the lock-free flush flag for an independently-owned interruption
+    /// handle such as `SpeakHandle`.
+    pub fn flush_handle(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.flush_requested)
     }
 
     /// Audio sample rate negotiated with the device (or headless default).
@@ -196,6 +239,33 @@ mod tests {
         // push_samples on dummy returns 0
         let samples = vec![0.5f32; 100];
         assert_eq!(dummy.push_samples(&samples), 0);
+    }
+
+    #[test]
+    fn flush_request_is_lock_free_shared_state() {
+        let dummy = AudioOutput::new_dummy(24000);
+        let handle = dummy.flush_handle();
+        assert!(!handle.load(Ordering::Acquire));
+
+        dummy.request_flush();
+        assert!(handle.load(Ordering::Acquire));
+
+        // Model what the audio callback does: one consumer wins and clears the
+        // coalesced request atomically.
+        assert!(handle.swap(false, Ordering::AcqRel));
+        assert!(!handle.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn repeated_flush_requests_coalesce() {
+        let dummy = AudioOutput::new_dummy(24000);
+        let handle = dummy.flush_handle();
+        dummy.request_flush();
+        dummy.request_flush();
+        dummy.request_flush();
+
+        assert!(handle.swap(false, Ordering::AcqRel));
+        assert!(!handle.swap(false, Ordering::AcqRel));
     }
 
     #[test]
