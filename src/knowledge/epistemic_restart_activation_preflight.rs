@@ -1,14 +1,17 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Non-authorizing activation-preflight receipt for epistemic restart.
+//! Non-authorizing activation-preflight composition receipt for epistemic restart.
 //!
 //! EKM-067 provides a sealed split-state sandbox and EKM-068 fences the actual
-//! live EKM state. This module composes those with fresh protected/current-head
-//! evidence immediately before a later activation transaction may be reviewed.
+//! live EKM state. This module composes those with candidate current-head evidence
+//! and a protected joint trust-context checkpoint.
 //!
-//! A successful preflight means only that an atomic activation transaction is
-//! eligible for a *separate* review layer. It does not expose a swap operation,
-//! mutate live state, or advance any trusted checkpoint.
+//! Important: EKM-054 proves that the joint trust-context checkpoint is protected
+//! and unexpired, but its evidence taxonomy includes mechanisms (for example a
+//! generic signature) that do not independently prove that checkpoint is the
+//! deployment's current/latest head. EKM-069 therefore does **not** mark an
+//! activation transaction review eligible yet. A separate current-head attestation
+//! for the EKM-054 checkpoint is required by a later tranche.
 
 use crate::knowledge::belief_mutation_firewall::EpistemicSupportStore;
 use crate::knowledge::belief_mutation_seal_wire::BeliefMutationSealWireSnapshotV1;
@@ -64,7 +67,6 @@ impl ActivationPreflightDigestV1 {
     }
 }
 
-/// Read-only preflight receipt. Passing preflight is not activation authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActivationPreflightReceiptV1 {
     version: ActivationPreflightVersion,
@@ -81,6 +83,8 @@ pub struct ActivationPreflightReceiptV1 {
     live_epoch_unchanged: bool,
     candidate_current_head_proven: bool,
     protected_trust_checkpoint_valid: bool,
+    protected_trust_checkpoint_currentness_independently_proven: bool,
+    trust_context_current_head_attestation_required: bool,
     trusted_state_mutated: bool,
     activation_transaction_review_eligible: bool,
     live_state_swap_authorized: bool,
@@ -115,51 +119,27 @@ impl ActivationPreflightReceiptV1 {
         live_schema_history: &BeliefRevisionSchemaHistoryV1,
         preflight_at_cycle: u64,
     ) -> Result<Self, ActivationPreflightError> {
-        sandbox
-            .verify()
-            .map_err(ActivationPreflightError::SandboxRejected)?;
-        currentness
-            .verify_internal()
-            .map_err(ActivationPreflightError::CurrentnessRejected)?;
-        trust_checkpoint
-            .verify_internal()
-            .map_err(ActivationPreflightError::TrustCheckpointRejected)?;
+        sandbox.verify().map_err(ActivationPreflightError::SandboxRejected)?;
+        currentness.verify_internal().map_err(ActivationPreflightError::CurrentnessRejected)?;
+        trust_checkpoint.verify_internal().map_err(ActivationPreflightError::TrustCheckpointRejected)?;
 
         if preflight_at_cycle < sandbox.sandboxed_at_cycle() {
-            return Err(ActivationPreflightError::PreflightPredatesSandbox {
-                preflight_at_cycle,
-                sandboxed_at_cycle: sandbox.sandboxed_at_cycle(),
-            });
+            return Err(ActivationPreflightError::PreflightPredatesSandbox { preflight_at_cycle, sandboxed_at_cycle: sandbox.sandboxed_at_cycle() });
         }
         if preflight_at_cycle < live_fence.established_at_cycle() {
-            return Err(ActivationPreflightError::PreflightPredatesLiveFence {
-                preflight_at_cycle,
-                fence_cycle: live_fence.established_at_cycle(),
-            });
+            return Err(ActivationPreflightError::PreflightPredatesLiveFence { preflight_at_cycle, fence_cycle: live_fence.established_at_cycle() });
         }
         if preflight_at_cycle < currentness.verified_at_cycle() {
-            return Err(ActivationPreflightError::PreflightPredatesCurrentnessVerification {
-                preflight_at_cycle,
-                verified_at_cycle: currentness.verified_at_cycle(),
-            });
+            return Err(ActivationPreflightError::PreflightPredatesCurrentnessVerification { preflight_at_cycle, verified_at_cycle: currentness.verified_at_cycle() });
         }
         if preflight_at_cycle >= currentness.statement().expires_at_cycle() {
-            return Err(ActivationPreflightError::CandidateCurrentnessExpired {
-                preflight_at_cycle,
-                expires_at_cycle: currentness.statement().expires_at_cycle(),
-            });
+            return Err(ActivationPreflightError::CandidateCurrentnessExpired { preflight_at_cycle, expires_at_cycle: currentness.statement().expires_at_cycle() });
         }
         if preflight_at_cycle < trust_checkpoint.verified_at_cycle() {
-            return Err(ActivationPreflightError::PreflightPredatesTrustCheckpointVerification {
-                preflight_at_cycle,
-                verified_at_cycle: trust_checkpoint.verified_at_cycle(),
-            });
+            return Err(ActivationPreflightError::PreflightPredatesTrustCheckpointVerification { preflight_at_cycle, verified_at_cycle: trust_checkpoint.verified_at_cycle() });
         }
         if preflight_at_cycle >= trust_checkpoint.statement().expires_at_cycle() {
-            return Err(ActivationPreflightError::TrustCheckpointExpired {
-                preflight_at_cycle,
-                expires_at_cycle: trust_checkpoint.statement().expires_at_cycle(),
-            });
+            return Err(ActivationPreflightError::TrustCheckpointExpired { preflight_at_cycle, expires_at_cycle: trust_checkpoint.statement().expires_at_cycle() });
         }
         if !currentness.current_head_proven()
             || currentness.trusted_state_mutated()
@@ -180,46 +160,23 @@ impl ActivationPreflightReceiptV1 {
             return Err(ActivationPreflightError::UnexpectedSandboxAuthority);
         }
         if currentness.statement().restart_capture_cycle() != sandbox.restart_capture_cycle() {
-            return Err(ActivationPreflightError::CandidateCaptureCycleMismatch {
-                currentness: currentness.statement().restart_capture_cycle(),
-                sandbox: sandbox.restart_capture_cycle(),
-            });
+            return Err(ActivationPreflightError::CandidateCaptureCycleMismatch { currentness: currentness.statement().restart_capture_cycle(), sandbox: sandbox.restart_capture_cycle() });
         }
 
-        // Reconstruct the EKM-067 candidate again from the exact source chain.
-        // This prevents detached freshness/trust objects from being mixed with a
-        // sandbox that was produced from a different restart candidate.
         let rederived = SealedSplitStateHydrationSandboxV1::hydrate_sealed(
-            restart,
-            seals,
-            restart_receipt,
-            mutation_checkpoint,
-            admission,
-            currentness,
-            eligibility,
-            projection,
-            replay_report,
-            quarantine,
-            trust_checkpoint,
-            support_eligibility,
-            audit.clone(),
-            sandbox.sandboxed_at_cycle(),
+            restart, seals, restart_receipt, mutation_checkpoint, admission, currentness,
+            eligibility, projection, replay_report, quarantine, trust_checkpoint,
+            support_eligibility, audit.clone(), sandbox.sandboxed_at_cycle(),
         )
         .map_err(ActivationPreflightError::SandboxRederivationRejected)?;
         if rederived.sandbox_digest() != sandbox.sandbox_digest() {
             return Err(ActivationPreflightError::SandboxRederivationMismatch);
         }
 
-        // Recheck the running EKM objects at the same logical preflight cycle.
         let live_continuity = live_fence
             .recheck_live_unchanged(
-                sandbox,
-                live_ledger,
-                live_inventory,
-                live_store,
-                live_history,
-                live_schema_history,
-                preflight_at_cycle,
+                sandbox, live_ledger, live_inventory, live_store, live_history,
+                live_schema_history, preflight_at_cycle,
             )
             .map_err(ActivationPreflightError::LiveEpochRejected)?;
         if !live_continuity.live_state_unchanged()
@@ -245,8 +202,10 @@ impl ActivationPreflightReceiptV1 {
             live_epoch_unchanged: true,
             candidate_current_head_proven: true,
             protected_trust_checkpoint_valid: true,
+            protected_trust_checkpoint_currentness_independently_proven: false,
+            trust_context_current_head_attestation_required: true,
             trusted_state_mutated: false,
-            activation_transaction_review_eligible: true,
+            activation_transaction_review_eligible: false,
             live_state_swap_authorized: false,
             rollback_authorized: false,
             activation_authorized: false,
@@ -257,48 +216,22 @@ impl ActivationPreflightReceiptV1 {
         Ok(receipt)
     }
 
-    pub fn version(&self) -> ActivationPreflightVersion {
-        self.version
-    }
-    pub fn preflight_at_cycle(&self) -> u64 {
-        self.preflight_at_cycle
-    }
-    pub fn restart_capture_cycle(&self) -> u64 {
-        self.restart_capture_cycle
-    }
-    pub fn source_sandbox_rederived(&self) -> bool {
-        self.source_sandbox_rederived
-    }
-    pub fn live_epoch_unchanged(&self) -> bool {
-        self.live_epoch_unchanged
-    }
-    pub fn candidate_current_head_proven(&self) -> bool {
-        self.candidate_current_head_proven
-    }
-    pub fn protected_trust_checkpoint_valid(&self) -> bool {
-        self.protected_trust_checkpoint_valid
-    }
-    pub fn trusted_state_mutated(&self) -> bool {
-        self.trusted_state_mutated
-    }
-    pub fn activation_transaction_review_eligible(&self) -> bool {
-        self.activation_transaction_review_eligible
-    }
-    pub fn live_state_swap_authorized(&self) -> bool {
-        self.live_state_swap_authorized
-    }
-    pub fn rollback_authorized(&self) -> bool {
-        self.rollback_authorized
-    }
-    pub fn activation_authorized(&self) -> bool {
-        self.activation_authorized
-    }
-    pub fn trusted_checkpoint_commit_authorized(&self) -> bool {
-        self.trusted_checkpoint_commit_authorized
-    }
-    pub fn receipt_digest(&self) -> ActivationPreflightDigestV1 {
-        self.receipt_digest
-    }
+    pub fn version(&self) -> ActivationPreflightVersion { self.version }
+    pub fn preflight_at_cycle(&self) -> u64 { self.preflight_at_cycle }
+    pub fn restart_capture_cycle(&self) -> u64 { self.restart_capture_cycle }
+    pub fn source_sandbox_rederived(&self) -> bool { self.source_sandbox_rederived }
+    pub fn live_epoch_unchanged(&self) -> bool { self.live_epoch_unchanged }
+    pub fn candidate_current_head_proven(&self) -> bool { self.candidate_current_head_proven }
+    pub fn protected_trust_checkpoint_valid(&self) -> bool { self.protected_trust_checkpoint_valid }
+    pub fn protected_trust_checkpoint_currentness_independently_proven(&self) -> bool { self.protected_trust_checkpoint_currentness_independently_proven }
+    pub fn trust_context_current_head_attestation_required(&self) -> bool { self.trust_context_current_head_attestation_required }
+    pub fn trusted_state_mutated(&self) -> bool { self.trusted_state_mutated }
+    pub fn activation_transaction_review_eligible(&self) -> bool { self.activation_transaction_review_eligible }
+    pub fn live_state_swap_authorized(&self) -> bool { self.live_state_swap_authorized }
+    pub fn rollback_authorized(&self) -> bool { self.rollback_authorized }
+    pub fn activation_authorized(&self) -> bool { self.activation_authorized }
+    pub fn trusted_checkpoint_commit_authorized(&self) -> bool { self.trusted_checkpoint_commit_authorized }
+    pub fn receipt_digest(&self) -> ActivationPreflightDigestV1 { self.receipt_digest }
 
     #[allow(clippy::too_many_arguments)]
     pub fn verify_against(
@@ -326,41 +259,18 @@ impl ActivationPreflightReceiptV1 {
         preflight_at_cycle: u64,
     ) -> Result<(), ActivationPreflightError> {
         let live = Self::evaluate(
-            restart,
-            seals,
-            restart_receipt,
-            mutation_checkpoint,
-            admission,
-            currentness,
-            eligibility,
-            projection,
-            replay_report,
-            quarantine,
-            trust_checkpoint,
-            support_eligibility,
-            audit,
-            sandbox,
-            live_fence,
-            live_ledger,
-            live_inventory,
-            live_store,
-            live_history,
-            live_schema_history,
-            preflight_at_cycle,
+            restart, seals, restart_receipt, mutation_checkpoint, admission, currentness,
+            eligibility, projection, replay_report, quarantine, trust_checkpoint,
+            support_eligibility, audit, sandbox, live_fence, live_ledger, live_inventory,
+            live_store, live_history, live_schema_history, preflight_at_cycle,
         )?;
-        if &live != self {
-            return Err(ActivationPreflightError::ReceiptMismatch);
-        }
-        if digest_preflight(self)? != self.receipt_digest {
-            return Err(ActivationPreflightError::ReceiptDigestMismatch);
-        }
+        if &live != self { return Err(ActivationPreflightError::ReceiptMismatch); }
+        if digest_preflight(self)? != self.receipt_digest { return Err(ActivationPreflightError::ReceiptDigestMismatch); }
         Ok(())
     }
 }
 
-fn digest_preflight(
-    receipt: &ActivationPreflightReceiptV1,
-) -> Result<ActivationPreflightDigestV1, ActivationPreflightError> {
+fn digest_preflight(receipt: &ActivationPreflightReceiptV1) -> Result<ActivationPreflightDigestV1, ActivationPreflightError> {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-ekm-activation-preflight-v1");
     hasher.update(&[1]);
@@ -377,6 +287,8 @@ fn digest_preflight(
     hasher.update(&[u8::from(receipt.live_epoch_unchanged)]);
     hasher.update(&[u8::from(receipt.candidate_current_head_proven)]);
     hasher.update(&[u8::from(receipt.protected_trust_checkpoint_valid)]);
+    hasher.update(&[u8::from(receipt.protected_trust_checkpoint_currentness_independently_proven)]);
+    hasher.update(&[u8::from(receipt.trust_context_current_head_attestation_required)]);
     hasher.update(&[u8::from(receipt.trusted_state_mutated)]);
     hasher.update(&[u8::from(receipt.activation_transaction_review_eligible)]);
     hasher.update(&[u8::from(receipt.live_state_swap_authorized)]);
@@ -393,49 +305,25 @@ pub enum ActivationPreflightError {
     CurrentnessRejected(RestartMutationSealCurrentnessError),
     TrustCheckpointRejected(RestartTrustContextCheckpointError),
     LiveEpochRejected(LiveEpistemicEpochFenceError),
-    PreflightPredatesSandbox {
-        preflight_at_cycle: u64,
-        sandboxed_at_cycle: u64,
-    },
-    PreflightPredatesLiveFence {
-        preflight_at_cycle: u64,
-        fence_cycle: u64,
-    },
-    PreflightPredatesCurrentnessVerification {
-        preflight_at_cycle: u64,
-        verified_at_cycle: u64,
-    },
-    CandidateCurrentnessExpired {
-        preflight_at_cycle: u64,
-        expires_at_cycle: u64,
-    },
-    PreflightPredatesTrustCheckpointVerification {
-        preflight_at_cycle: u64,
-        verified_at_cycle: u64,
-    },
-    TrustCheckpointExpired {
-        preflight_at_cycle: u64,
-        expires_at_cycle: u64,
-    },
+    PreflightPredatesSandbox { preflight_at_cycle: u64, sandboxed_at_cycle: u64 },
+    PreflightPredatesLiveFence { preflight_at_cycle: u64, fence_cycle: u64 },
+    PreflightPredatesCurrentnessVerification { preflight_at_cycle: u64, verified_at_cycle: u64 },
+    CandidateCurrentnessExpired { preflight_at_cycle: u64, expires_at_cycle: u64 },
+    PreflightPredatesTrustCheckpointVerification { preflight_at_cycle: u64, verified_at_cycle: u64 },
+    TrustCheckpointExpired { preflight_at_cycle: u64, expires_at_cycle: u64 },
     UnexpectedCurrentnessAuthority,
     UnexpectedTrustCheckpointAuthority,
     UnexpectedSandboxAuthority,
     UnexpectedLiveContinuityAuthority,
-    CandidateCaptureCycleMismatch {
-        currentness: u64,
-        sandbox: u64,
-    },
+    CandidateCaptureCycleMismatch { currentness: u64, sandbox: u64 },
     SandboxRederivationMismatch,
     ReceiptMismatch,
     ReceiptDigestMismatch,
 }
 
 impl fmt::Display for ActivationPreflightError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "activation preflight rejected: {self:?}")
-    }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "activation preflight rejected: {self:?}") }
 }
-
 impl Error for ActivationPreflightError {}
 
 #[cfg(test)]
@@ -443,7 +331,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn receipt_digest_binds_review_cycle_and_non_authority_flags() {
+    fn receipt_digest_binds_missing_trust_currentness_and_non_authority() {
         let mut receipt = ActivationPreflightReceiptV1 {
             version: ActivationPreflightVersion::V1,
             preflight_at_cycle: 10,
@@ -459,8 +347,10 @@ mod tests {
             live_epoch_unchanged: true,
             candidate_current_head_proven: true,
             protected_trust_checkpoint_valid: true,
+            protected_trust_checkpoint_currentness_independently_proven: false,
+            trust_context_current_head_attestation_required: true,
             trusted_state_mutated: false,
-            activation_transaction_review_eligible: true,
+            activation_transaction_review_eligible: false,
             live_state_swap_authorized: false,
             rollback_authorized: false,
             activation_authorized: false,
@@ -468,11 +358,15 @@ mod tests {
             receipt_digest: ActivationPreflightDigestV1([0; 32]),
         };
         let first = digest_preflight(&receipt).unwrap();
-        assert!(receipt.activation_transaction_review_eligible());
+        assert!(receipt.source_sandbox_rederived());
+        assert!(receipt.candidate_current_head_proven());
+        assert!(receipt.protected_trust_checkpoint_valid());
+        assert!(!receipt.protected_trust_checkpoint_currentness_independently_proven());
+        assert!(receipt.trust_context_current_head_attestation_required());
+        assert!(!receipt.activation_transaction_review_eligible());
         assert!(!receipt.live_state_swap_authorized());
         assert!(!receipt.activation_authorized());
         assert!(!receipt.trusted_checkpoint_commit_authorized());
-
         receipt.preflight_at_cycle += 1;
         let second = digest_preflight(&receipt).unwrap();
         assert_ne!(first, second);
