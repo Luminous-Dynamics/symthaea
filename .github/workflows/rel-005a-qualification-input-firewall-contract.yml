@@ -1,0 +1,101 @@
+name: REL-005A Qualification Input Firewall Contract R2
+
+on:
+  pull_request:
+    paths:
+      - ".github/rel/rel-005a-qualification-input-firewall-contract.json"
+      - ".github/rel/rel-005a-qualification-input-firewall.py"
+      - ".github/workflows/rel-005a-qualification-input-firewall-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rel-005a-qualification-input-firewall-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_PARENT: a0f63fa463edfcca1228752f5117215f52f9311c
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  firewall-contract:
+    name: Verify QualificationInputFirewallOnly v2 contract
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact firewall-contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind exact parent and three-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-qualification-input-firewall-contract.json"
+            ".github/rel/rel-005a-qualification-input-firewall.py"
+            ".github/workflows/rel-005a-qualification-input-firewall-contract.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Verify authority isolation and run adversarial self-tests
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/qualification-input-firewall-self-test.json
+        run: |
+          set -euo pipefail
+          python3 -m py_compile .github/rel/rel-005a-qualification-input-firewall.py
+          python3 - <<'PY'
+          import pathlib
+          source = pathlib.Path('.github/rel/rel-005a-qualification-input-firewall.py').read_text()
+          for token in (
+              'import subprocess', 'from subprocess', 'import socket', 'from socket',
+              'import requests', 'from requests', 'import urllib', 'from urllib',
+              'compute_xenobot_graft_transform', 'translate_foreign_hypervector',
+          ):
+              assert token not in source, token
+          PY
+          python3 .github/rel/rel-005a-qualification-input-firewall.py \
+            --contract .github/rel/rel-005a-qualification-input-firewall-contract.json \
+            --self-test | tee "${RECEIPT}"
+          python3 -m json.tool "${RECEIPT}" >/dev/null
+          python3 - <<'PY'
+          import json, os, pathlib
+          r = json.loads(pathlib.Path(os.environ['RECEIPT']).read_text())
+          assert r['authority'] == 'QualificationInputFirewallContractOnly'
+          assert r['valid_pass_bundle'] is True
+          assert r['valid_failure_bundle'] is True
+          assert r['contradictory_claim_rejection'] is True
+          assert r['rehash_after_metric_leak_rejection'] is True
+          assert r['nested_file_rejection'] is True
+          assert r['duplicate_key_rejection'] is True
+          assert r['transport_identity_scientific_authority'] is False
+          PY
+
+      - name: Upload static firewall-contract evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-qualification-input-firewall-contract-${{ env.EXPECTED_HEAD }}
+          path: |
+            .github/rel/rel-005a-qualification-input-firewall-contract.json
+            ${{ runner.temp }}/qualification-input-firewall-self-test.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact subject and checkout immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          rm -rf .github/rel/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
