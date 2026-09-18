@@ -10,6 +10,8 @@ use std::path::PathBuf;
 
 use symthaea_runtime_owner::{OwnerCommandContext, OwnerCommandSeq};
 
+pub mod observed;
+
 /// Why text entered the cognitive processing path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessOrigin {
