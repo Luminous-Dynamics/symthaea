@@ -1,0 +1,30 @@
+name: VIS-000 Visual Epistemic Provenance
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-vision-manifold/**'
+      - 'docs/architecture/VISUAL_EPISTEMIC_PROVENANCE_V1.md'
+      - '.github/workflows/vis-000-epistemic-provenance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        run: |
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Check vision manifold
+        run: cargo check -p symthaea-vision-manifold --all-targets
+      - name: Test vision manifold
+        run: cargo test -p symthaea-vision-manifold
+      - name: Clippy vision manifold
+        run: cargo clippy -p symthaea-vision-manifold --all-targets -- -D warnings
