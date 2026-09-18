@@ -1,0 +1,150 @@
+name: HUM-WRENCH-001D3 Support Normal Verifier
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/mujoco_support_normal.rs"
+      - "crates/domains/symthaea-humanoid/src/mujoco_support_normal_verifier.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/hum-wrench-001d3-support-normal-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001d3-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 2d8334fd67ff0af1ec1a0b63b5e9c8a90b4887ad
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-support-normal-verifier-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact head, parent, and workflow-only qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001d3-support-normal-verifier.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source, manifest, and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Verify independent-verifier boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          verifier="crates/domains/symthaea-humanoid/src/mujoco_support_normal_verifier.rs"
+          grep -F 'verify_support_normal_evidence_v1' "$verifier"
+          grep -F 'independent_absolute_alignment' "$verifier"
+          grep -F 'independent_convex_hull' "$verifier"
+          grep -F 'independent_polygon_area' "$verifier"
+          if grep -E 'use[[:space:]]+mujoco_rs|MjModel|MjData|qualify_support_normals' "$verifier"; then
+            echo "001D3 verifier must remain independent from MuJoCo runtime and producer qualification" >&2
+            exit 1
+          fi
+
+      - name: Verify pinned MuJoCo dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'mujoco-rs = { version = "4.0.1"' crates/domains/symthaea-humanoid/Cargo.toml
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked MuJoCo compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Focused independent-verifier tests
+        run: cargo test -p symthaea-humanoid --features mujoco mujoco_support_normal_verifier --locked -- --nocapture
+
+      - name: Producer semantic regression
+        run: cargo test -p symthaea-humanoid --features mujoco mujoco_support_normal --locked -- --nocapture
+
+      - name: Strict MuJoCo Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --features mujoco --locked -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001d3-evidence
+          {
+            echo "program=HUM-WRENCH-001D3"
+            echo "authority=support-normal-evidence-integrity-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "verifier_runtime_dependency=NONE"
+            echo "policy_identity_rederived=TRUE"
+            echo "normal_alignment_rederived=TRUE"
+            echo "admissibility_rederived=TRUE"
+            echo "index_sets_rederived=TRUE"
+            echo "contact_hull_rederived=TRUE"
+            echo "contact_area_rederived=TRUE"
+            echo "surface_support_eligibility_rederived=TRUE"
+            echo "policy_threshold_qualified=NONE"
+            echo "simulator_normal_truth_claim=NONE"
+            echo "qp_authority=NONE"
+            echo "hardware_surface_normal_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_mujoco=PASS"
+            echo "focused_tests=PASS"
+            echo "producer_regression=PASS"
+            echo "clippy_mujoco=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001d3-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001d3-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001d3-evidence/
+          if-no-files-found: error
