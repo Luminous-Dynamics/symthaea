@@ -356,18 +356,25 @@ fn hash_usize(
     hasher: &mut blake3::Hasher,
     value: usize,
 ) -> Result<(), ProtectedMutationSealAdmissionError> {
-    let value = u64::try_from(value).map_err(|_| ProtectedMutationSealAdmissionError::LengthOverflow)?;
+    let value = u64::try_from(value)
+        .map_err(|_| ProtectedMutationSealAdmissionError::LengthOverflow)?;
     hasher.update(&value.to_le_bytes());
     Ok(())
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum ProtectedMutationSealAdmissionError {
     RestartReceiptRejected(EpistemicRestartValidationReceiptError),
     ProtectedCheckpointRejected(RestartMutationSealCheckpointError),
     SealValidationRejected(BeliefMutationSealValidationError),
-    ObservationPredatesProtection { observed_at_cycle: u64, protected_at_cycle: u64 },
-    ProtectedCheckpointExpired { observed_at_cycle: u64, expires_at_cycle: u64 },
+    ObservationPredatesProtection {
+        observed_at_cycle: u64,
+        protected_at_cycle: u64,
+    },
+    ProtectedCheckpointExpired {
+        observed_at_cycle: u64,
+        expires_at_cycle: u64,
+    },
     CrossComponentConsistencyMissing,
     UnexpectedIndependentCompletenessClaim,
     UnexpectedAuthority,
