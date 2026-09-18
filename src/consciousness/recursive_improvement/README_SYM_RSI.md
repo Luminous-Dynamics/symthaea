@@ -16,4 +16,10 @@ Exact replay is different: it may only traverse transitions already present in a
 4. Validation produces a recorded evidence digest.
 5. Only then may the candidate affect confidence/calibration claims.
 
+## Post-CI-bridge qualification lineage
+
+The continuation line after merge commit `514691f446bc2717247e3c1ad3c930aaa63b9b6c` inherits current-main draft-safe CI without rewriting any earlier RSI subject. Because that merge changes the execution/qualification environment, pre-bridge qualification evidence is not promoted across it automatically.
+
+A descendant exact head must therefore re-run the focused RSI qualification before making compile, lint, unit-test, or protected-measurement-boundary claims for the bridged lineage. This README-only marker intentionally changes no Rust source; it exists to trigger and document that new qualification root.
+
 This boundary is intentionally narrower than Symthaea's broader recursive-improvement ambitions. It exists so later policy evolution and architectural self-modification have a trusted empirical substrate.
