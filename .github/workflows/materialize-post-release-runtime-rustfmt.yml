@@ -1,0 +1,141 @@
+name: Materialize post-release runtime Rust 1.96 formatting repair
+
+on:
+  push:
+    branches:
+      - qualify/materialize-post-release-runtime-rustfmt-r1
+    paths:
+      - .github/workflows/materialize-post-release-runtime-rustfmt.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: materialize-post-release-runtime-rustfmt-r1
+  cancel-in-progress: false
+
+env:
+  SUBJECT_SHA: 3c9ca0e3eaa477baad0bd49c0887f2181bff2812
+  TARGET_BRANCH: assure/post-release-runtime-lineage-rustfmt
+
+jobs:
+  materialize:
+    name: Materialize exact terminal rustfmt repair
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact formatting target branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TARGET_BRANCH }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Bind exact pre-format subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          sha256sum Cargo.lock > "$RUNNER_TEMP/Cargo.lock.before.sha256"
+          printf 'subject=%s\ntree=%s\ntarget_branch=%s\n' \
+            "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})" "$TARGET_BRANCH" \
+            > "$RUNNER_TEMP/pre-format-subject.txt"
+
+      - name: Install pinned Rust 1.96 rustfmt
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Materialize only terminal formatting bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          packages=(
+            symthaea-assurance-post-release-runtime-handoff
+            symthaea-assurance-post-release-checkpoint-two-observation
+            symthaea-assurance-authenticated-post-release-checkpoint-two
+            symthaea-assurance-signed-post-release-checkpoint-two
+            symthaea-assurance-post-release-continuous-runtime-lineage
+          )
+          expected=(
+            crates/bridges/symthaea-assurance-authenticated-post-release-checkpoint-two/src/lib.rs
+            crates/bridges/symthaea-assurance-post-release-checkpoint-two-observation/src/lib.rs
+            crates/bridges/symthaea-assurance-post-release-continuous-runtime-lineage/src/lib.rs
+            crates/bridges/symthaea-assurance-post-release-runtime-handoff/src/lib.rs
+            crates/bridges/symthaea-assurance-signed-post-release-checkpoint-two/src/lib.rs
+          )
+
+          args=()
+          for package in "${packages[@]}"; do
+            args+=( -p "$package" )
+          done
+          cargo fmt "${args[@]}"
+
+          mapfile -t changed < <(git diff --name-only | sort)
+          mapfile -t wanted < <(printf '%s\n' "${expected[@]}" | sort)
+          printf '%s\n' "${changed[@]}" > "$RUNNER_TEMP/changed-paths.txt"
+          diff -u \
+            <(printf '%s\n' "${wanted[@]}") \
+            <(printf '%s\n' "${changed[@]}")
+
+          test "$(sha256sum Cargo.lock | awk '{print $1}')" = \
+            "$(awk '{print $1}' "$RUNNER_TEMP/Cargo.lock.before.sha256")"
+          git diff --check
+          git diff --stat > "$RUNNER_TEMP/rustfmt.stat.txt"
+          git diff > "$RUNNER_TEMP/rustfmt.patch"
+          test -s "$RUNNER_TEMP/rustfmt.patch"
+
+          cargo fmt "${args[@]}" -- --check
+          mapfile -t changed_after_check < <(git diff --name-only | sort)
+          test "${changed_after_check[*]}" = "${changed[*]}"
+
+      - name: Commit exactly five terminal source files
+        id: commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            crates/bridges/symthaea-assurance-authenticated-post-release-checkpoint-two/src/lib.rs
+            crates/bridges/symthaea-assurance-post-release-checkpoint-two-observation/src/lib.rs
+            crates/bridges/symthaea-assurance-post-release-continuous-runtime-lineage/src/lib.rs
+            crates/bridges/symthaea-assurance-post-release-runtime-handoff/src/lib.rs
+            crates/bridges/symthaea-assurance-signed-post-release-checkpoint-two/src/lib.rs
+          )
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "${files[@]}"
+          mapfile -t staged < <(git diff --cached --name-only | sort)
+          mapfile -t wanted < <(printf '%s\n' "${files[@]}" | sort)
+          diff -u \
+            <(printf '%s\n' "${wanted[@]}") \
+            <(printf '%s\n' "${staged[@]}")
+          test -z "$(git status --porcelain=v1 --untracked-files=all | awk '$1 != "M" && $1 != "M " {print}')" || true
+          git commit -m 'style(assurance): format post-release runtime lineage'
+          new_head="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$SUBJECT_SHA"
+          echo "new_head=$new_head" >> "$GITHUB_OUTPUT"
+          printf 'new_head=%s\nparent=%s\nfiles=5\n' \
+            "$new_head" "$(git rev-parse HEAD^)" \
+            > "$RUNNER_TEMP/materialized-commit.txt"
+
+      - name: Push exact formatting-only remediation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:refs/heads/$TARGET_BRANCH
+
+      - name: Retain formatting materialization evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: post-release-runtime-rustfmt-materialization
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/pre-format-subject.txt
+            ${{ runner.temp }}/Cargo.lock.before.sha256
+            ${{ runner.temp }}/changed-paths.txt
+            ${{ runner.temp }}/rustfmt.stat.txt
+            ${{ runner.temp }}/rustfmt.patch
+            ${{ runner.temp }}/materialized-commit.txt
