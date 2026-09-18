@@ -46,7 +46,7 @@
       "id": "systemd-authority-checker",
       "lineage_id": "nixos-config-runtime-expendability-v1.3.2",
       "source_path": "scripts/check_spore_systemd_authority.py",
-      "source_blob_sha1": "7b587682011939d202f0d44d719fa1d242186ad1",
+      "source_blob_sha1": "7b587682011939d6db6d903d62f3187d6fedd",
       "source_role": "qualification-tool",
       "authority_class": "qualification",
       "target_owner": "spore",
