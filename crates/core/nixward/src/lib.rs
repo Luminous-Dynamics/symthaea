@@ -14,7 +14,7 @@
 //! 2. **Encoding** — Perception: structured data → HDC hypervectors
 //! 3. **Mind** — Cognition: world model, active inference, causal graph
 //! 4. **Observe** — Sensory input: system state observation
-//! 5. **Action** — Motor output: Φ-gated command execution
+//! 5. **Action** — Explicit authority + cognitive telemetry + rollback-capable execution
 //! 6. **Plugin** — Integration with full Symthaea brain
 //! 7. **CLI** — Command-line interface
 //! 8. **TUI** — Terminal UI with consciousness visualization
@@ -56,7 +56,7 @@ pub mod parser;
 #[cfg(feature = "native")]
 pub mod observe;
 
-/// Layer 5: Motor output — Φ-gated command execution
+/// Layer 5: Motor output — explicit authority separated from cognition
 #[cfg(feature = "native")]
 pub mod action;
 
@@ -86,6 +86,11 @@ pub mod observability;
 // Re-export key types (native only — these depend on parser/action/plugin)
 #[cfg(feature = "native")]
 pub use action::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
+#[cfg(feature = "native")]
+pub use action::execution_context::{
+    AuthorityContext, AuthoritySource, CognitiveContext, ExecutionContext, PhiMeasurement,
+    EXECUTION_CONTEXT_SCHEMA_VERSION,
+};
 #[cfg(feature = "native")]
 pub use parser::nix_code_parser::NixCodeParser;
 #[cfg(feature = "native")]
