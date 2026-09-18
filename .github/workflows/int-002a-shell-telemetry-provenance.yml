@@ -1,0 +1,103 @@
+name: INT-002A Shell Telemetry Provenance Qualification
+
+on:
+  pull_request:
+    paths:
+      - src/shell/telemetry_state.rs
+      - src/shell/mod.rs
+      - .github/workflows/int-002a-shell-telemetry-provenance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: int-002a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_SOURCE_PARENT: dac5928eb4e1b781d5b34ea69e548e5206f512c0
+  EXPECTED_STATE_BLOB: 13aa99e68e5edf6e8e80b979d97e4668289133bc
+  EXPECTED_MOD_BLOB: ac866f752a95f01e6f2ac8b2605f7e2cb12caf12
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  exact-head-provenance:
+    runs-on: ubuntu-slim
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind exact qualifier and source subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_SOURCE_PARENT"
+          test "$(git hash-object src/shell/telemetry_state.rs)" = "$EXPECTED_STATE_BLOB"
+          test "$(git hash-object src/shell/mod.rs)" = "$EXPECTED_MOD_BLOB"
+          mapfile -t changed < <(git diff --name-only "$EXPECTED_SOURCE_PARENT" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/int-002a-shell-telemetry-provenance.yml"
+          test -z "$(git status --porcelain)"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc --version
+          cargo --version
+
+      - name: Check touched-file formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/shell/telemetry_state.rs src/shell/mod.rs
+
+      - name: Locked root-library compile
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked --lib
+
+      - name: Run provenance contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked --lib shell::telemetry_state::tests
+
+      - name: Locked root-library Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked --lib -- -D warnings
+
+      - name: Verify source immutability and emit receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git hash-object src/shell/telemetry_state.rs)" = "$EXPECTED_STATE_BLOB"
+          test "$(git hash-object src/shell/mod.rs)" = "$EXPECTED_MOD_BLOB"
+          test -z "$(git status --porcelain)"
+          {
+            echo "program=INT-002A"
+            echo "authority=engineering-source-qualification-only"
+            echo "scientific_claim=NONE"
+            echo "qualifier_head=$(git rev-parse HEAD)"
+            echo "source_parent=$EXPECTED_SOURCE_PARENT"
+            echo "source_tree=$(git rev-parse HEAD^{tree})"
+            echo "telemetry_state_blob=$EXPECTED_STATE_BLOB"
+            echo "mod_blob=$EXPECTED_MOD_BLOB"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile=PASS"
+            echo "tests=PASS"
+            echo "clippy=PASS"
+          } | tee int-002a-receipt.txt
+          cat int-002a-receipt.txt >> "$GITHUB_STEP_SUMMARY"
