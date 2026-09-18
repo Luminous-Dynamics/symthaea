@@ -6,6 +6,7 @@ on:
       - "crates/domains/symthaea-cosmology-research/**"
       - "docs/research/DE_001_PREREGISTRATION_2026-09-18.md"
       - ".github/workflows/de001-cosmology.yml"
+      - ".github/workflows/de001a-a1r-qualification.yml"
   workflow_dispatch:
 
 permissions:
@@ -26,7 +27,7 @@ jobs:
 
     steps:
       - name: Check out exact subject
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ env.EXPECTED_HEAD }}
           fetch-depth: 0
@@ -48,7 +49,7 @@ jobs:
           fi
 
       - name: Install Rust 1.96.0
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
         with:
           components: rustfmt, clippy
 
@@ -56,10 +57,10 @@ jobs:
         run: cargo fmt -p symthaea-cosmology-research -- --check
 
       - name: Locked compile
-        run: cargo check -p symthaea-cosmology-research --locked
+        run: cargo check -p symthaea-cosmology-research --all-targets --locked
 
       - name: Unit invariants
-        run: cargo test -p symthaea-cosmology-research --locked
+        run: cargo test -p symthaea-cosmology-research --all-targets --locked
 
       - name: Strict Clippy
         run: cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
@@ -72,6 +73,7 @@ jobs:
           test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.tree }}"
           git diff --exit-code
           git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
 
       - name: Write qualification receipt
         if: always()
@@ -93,9 +95,15 @@ jobs:
 
       - name: Upload qualification receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: de001-kernel-receipt-${{ github.run_id }}-${{ github.run_attempt }}
           path: de001-kernel-receipt.txt
           if-no-files-found: error
           retention-days: 30
+
+  a1r-qualification:
+    name: DE-001A1 fixed-point qualification
+    uses: ./.github/workflows/de001a-a1r-qualification.yml
+    permissions:
+      contents: read
