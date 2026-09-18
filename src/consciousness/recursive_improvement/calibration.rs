@@ -475,7 +475,12 @@ pub struct BrierScoreTracker {
     /// Global calibration (across all domains)
     global_calibration: DomainCalibration,
 
-    /// History of all predictions (for detailed analysis)
+    /// History of all predictions (for detailed analysis). This history is also
+    /// the session-local source for authority-sensitive calibration cohorts:
+    /// only records whose domain was explicitly declared may contribute to an
+    /// autonomy decision. The history is deliberately not restored from legacy
+    /// persistence, so a restart fails closed until declared-domain evidence is
+    /// accumulated again; persistent authority cohorts are a later tranche.
     prediction_history: VecDeque<ResolvedPredictionRecord>,
 
     /// When this tracker was created
@@ -490,6 +495,11 @@ pub struct ResolvedPredictionRecord {
 
     /// Domain of prediction
     pub domain: PredictionDomain,
+
+    /// Whether the action explicitly declared this exact domain rather than
+    /// receiving it from the compatibility string heuristic.
+    #[serde(default)]
+    pub domain_declared: bool,
 
     /// Stated confidence
     pub confidence: f64,
@@ -508,6 +518,17 @@ pub struct ResolvedPredictionRecord {
 
     /// Timestamp
     pub timestamp: u64,
+}
+
+/// Session-local calibration evidence eligible for autonomy decisions in one
+/// explicitly declared prediction domain.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeclaredDomainCalibration {
+    pub sample_count: usize,
+    pub accuracy: f64,
+    /// `None` means the declared-domain sample has not reached the calibration
+    /// tracker's minimum sample threshold; zero is a valid measured ECE.
+    pub ece: Option<f64>,
 }
 
 impl BrierScoreTracker {
@@ -548,6 +569,8 @@ impl BrierScoreTracker {
 
         let confidence = prediction.confidence;
         let brier_component = (confidence - if was_correct { 1.0 } else { 0.0 }).powi(2);
+        let domain_declared =
+            prediction.action_context.declared_prediction_domain() == Some(prediction.domain);
 
         // Update domain calibration
         if let Some(domain_cal) = self.domain_calibration.get_mut(&prediction.domain) {
@@ -562,6 +585,7 @@ impl BrierScoreTracker {
         let record = ResolvedPredictionRecord {
             prediction_id: prediction.id.clone(),
             domain: prediction.domain,
+            domain_declared,
             confidence,
             was_correct,
             brier_component,
@@ -598,6 +622,43 @@ impl BrierScoreTracker {
     /// Get calibration for a specific domain
     pub fn domain_calibration(&self, domain: PredictionDomain) -> Option<&DomainCalibration> {
         self.domain_calibration.get(&domain)
+    }
+
+    /// Return session-local calibration evidence that is eligible to influence
+    /// autonomy for `domain`.
+    ///
+    /// Only predictions whose `WorldActionContext` explicitly declared this
+    /// exact domain are included. Heuristically inferred legacy/action-string
+    /// domains remain useful for descriptive calibration but cannot grant
+    /// autonomy. Because detailed history is not persisted, a warm start
+    /// conservatively returns zero eligible samples until fresh declared-domain
+    /// outcomes accumulate.
+    pub fn declared_domain_calibration(&self, domain: PredictionDomain) -> DeclaredDomainCalibration {
+        let pairs: Vec<(f64, bool)> = self
+            .prediction_history
+            .iter()
+            .filter(|record| record.domain == domain && record.domain_declared)
+            .map(|record| (record.confidence, record.was_correct))
+            .collect();
+
+        let sample_count = pairs.len();
+        let accuracy = if sample_count == 0 {
+            0.0
+        } else {
+            pairs.iter().filter(|(_, correct)| *correct).count() as f64 / sample_count as f64
+        };
+        let ece = if sample_count >= self.config.min_predictions_for_ece {
+            super::calibration_analytics::analyze_pairs(&pairs, self.config.ece_bins)
+                .map(|report| report.ece)
+        } else {
+            None
+        };
+
+        DeclaredDomainCalibration {
+            sample_count,
+            accuracy,
+            ece,
+        }
     }
 
     /// Internal exact global calibration state for persistence. Global state is
@@ -756,7 +817,7 @@ impl BrierScoreTracker {
             config,
             domain_calibration,
             global_calibration,
-            prediction_history: VecDeque::new(), // Detailed category history is not persisted
+            prediction_history: VecDeque::new(), // authority history intentionally fails closed on restart
             _created_at: Instant::now(),
         }
     }
@@ -847,6 +908,50 @@ mod tests {
         // Average: 2.1/10 = 0.21
         assert!(tracker.brier_score() > 0.0);
         assert!(tracker.brier_score() < 0.3);
+    }
+
+    #[test]
+    fn inferred_domain_history_is_not_autonomy_evidence() {
+        let config = CalibrationConfig {
+            min_predictions_for_ece: 5,
+            ..Default::default()
+        };
+        let mut tracker = BrierScoreTracker::new(config);
+
+        for _ in 0..10 {
+            let mut inferred = WorldPrediction::new(
+                "inferred code result",
+                OutcomeCategory::Success,
+                0.8,
+                WorldActionContext::new("compile", "compile"),
+                ResolutionContract::shell_command(),
+            );
+            inferred.resolve_true(OutcomeCategory::Success, 1.0);
+            tracker.record_prediction(&inferred);
+        }
+        assert_eq!(
+            tracker
+                .declared_domain_calibration(PredictionDomain::CodeExecution)
+                .sample_count,
+            0
+        );
+
+        for _ in 0..5 {
+            let mut declared = WorldPrediction::new(
+                "declared code result",
+                OutcomeCategory::Success,
+                0.8,
+                WorldActionContext::new("anything", "compile")
+                    .with_prediction_domain(PredictionDomain::CodeExecution),
+                ResolutionContract::shell_command(),
+            );
+            declared.resolve_true(OutcomeCategory::Success, 1.0);
+            tracker.record_prediction(&declared);
+        }
+        let authority = tracker.declared_domain_calibration(PredictionDomain::CodeExecution);
+        assert_eq!(authority.sample_count, 5);
+        assert_eq!(authority.accuracy, 1.0);
+        assert!(authority.ece.is_some());
     }
 
     #[test]
