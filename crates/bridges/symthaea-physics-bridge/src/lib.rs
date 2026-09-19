@@ -46,6 +46,7 @@ pub mod case_studies;
 pub mod catalog;
 pub mod dimensional;
 pub mod dimensional_inference;
+pub mod discrepancy_localization;
 pub mod discovery;
 pub mod equation_ast;
 pub mod integrated_discovery;
@@ -72,6 +73,14 @@ pub use bridge::PhysicsBridge;
 pub use catalog::PhysicsCatalog;
 pub use dimensional::DimensionalEncoder;
 pub use dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
+pub use discrepancy_localization::{
+    DISCREPANCY_LOCALIZATION_SCHEMA, DisagreeingCellRef, DiscrepancyAxisKind,
+    DiscrepancyCell, DiscrepancyExtent, DiscrepancyLocalizationFinding,
+    DiscrepancyLocalizationPlan, DiscrepancyLocalizationPlanIssue,
+    DiscrepancyLocalizationReport, FrozenDiscrepancyLocalizationPlan, LocalizationAxisSpec,
+    LocalizationClosure, LocalizationPartitionSpec, SolverPairTarget,
+    evaluate_discrepancy_localization,
+};
 pub use equation_ast::EquationEncoder;
 pub use model_contract::{
     ContractClosure, ContractFinding, DimensionAssessment, ObligationEvaluation,
