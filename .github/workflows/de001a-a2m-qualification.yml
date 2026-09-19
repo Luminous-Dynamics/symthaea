@@ -1,0 +1,513 @@
+name: DE-001A2M Optimizer Method Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      a2g_run_id:
+        description: Exact successful DE-001A2G qualification run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      a2g_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a2m-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: A2M exact optimizer-method qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BINDER_HEAD: ${{ github.sha }}
+      A2G_RUN_ID: ${{ inputs.a2g_run_id }}
+
+    steps:
+      - name: Check out exact A2M binder
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.BINDER_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind binder identity and paths
+        id: binder
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$BINDER_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a2m-evidence" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A2G=$RUNNER_TEMP/de001a-upstream-a2g" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A2R=$RUNNER_TEMP/de001a-upstream-a2r" >> "$GITHUB_ENV"
+          echo "UPSTREAM_ENV=$RUNNER_TEMP/de001a-upstream-environment" >> "$GITHUB_ENV"
+          echo "A0_LINK=$RUNNER_TEMP/de001a-a2m-a0-artifacts" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a2m-evidence" \
+            "$RUNNER_TEMP/de001a-upstream-a2g" \
+            "$RUNNER_TEMP/de001a-upstream-a2r" \
+            "$RUNNER_TEMP/de001a-upstream-environment"
+
+      - name: Download exact A2G qualification evidence
+        id: download_a2g
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a2g-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a2g
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a2g_run_id }}
+
+      - name: Verify exact A2G run and recover A2R lineage
+        id: a2g_upstream
+        if: steps.download_a2g.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$A2G_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A2G_RUN_ID" > "$EVIDENCE_DIR/a2g-run.json"
+          test -f "$UPSTREAM_A2G/a2g.json"
+          test -f "$UPSTREAM_A2G/qualification-capsule.json"
+
+          python3 - \
+            "$EVIDENCE_DIR/a2g-run.json" \
+            "$UPSTREAM_A2G/qualification-capsule.json" \
+            "$UPSTREAM_A2G/a2g.json" \
+            "$A2G_RUN_ID" \
+            crates/domains/symthaea-cosmology-research/scripts/de001a_a2g_config_guard.py \
+            crates/domains/symthaea-cosmology-research/references/de001a_a2g_config_guard_v1.json \
+            "$EVIDENCE_DIR/a2r-run-id.txt" \
+            "$EVIDENCE_DIR/a2r-subject-head.txt" <<'PY'
+          import hashlib, json, pathlib, sys
+          run_path, capsule_path, a2g_path, expected_run, guard_script, guard_spec, run_out, head_out = sys.argv[1:]
+          run = json.load(open(run_path, encoding="utf-8"))
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+          assert str(run["id"]) == expected_run
+          assert run["status"] == "completed" and run["conclusion"] == "success"
+          assert capsule["protocol"] == "DE-001A2G-QUALIFICATION-CAPSULE-v1"
+          assert capsule["scientific_claim"] == "NONE"
+          assert capsule["authority"] == "configuration-resolution-determinism-only"
+          assert capsule["a2m_execution_authorized"] is False
+          assert capsule["a2_execution_authorized"] is False
+          assert capsule["guard_head"] == run["head_sha"]
+          assert capsule["workflow"]["run_id"] == expected_run
+          for key in ("download_a2r_outcome", "upstream_outcome", "software_outcome", "a0_artifacts_outcome", "a2g_outcome", "postflight_outcome"):
+              assert capsule["workflow"][key] == "success"
+          assert capsule["receipt_sha256"]["a2g"] == hashlib.sha256(open(a2g_path, "rb").read()).hexdigest()
+          for key, path in (("a2g_script", guard_script), ("a2g_spec", guard_spec)):
+              assert capsule["implementation_sha256"][key] == hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          a2r_run = str(capsule["a2r_run_id"])
+          a2r_head = capsule["a2r_subject_head"]
+          assert a2r_run.isdigit()
+          assert isinstance(a2r_head, str) and len(a2r_head) == 40
+          pathlib.Path(run_out).write_text(a2r_run + "\n", encoding="utf-8")
+          pathlib.Path(head_out).write_text(a2r_head + "\n", encoding="utf-8")
+          PY
+          echo "a2r_run_id=$(tr -d '\n' < "$EVIDENCE_DIR/a2r-run-id.txt")" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact transitive A2R qualification evidence
+        id: download_a2r
+        if: steps.a2g_upstream.outcome == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a2r-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a2r
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.a2g_upstream.outputs.a2r_run_id }}
+
+      - name: Verify exact transitive A2R run and recover environment lineage
+        id: a2r_upstream
+        if: steps.download_a2r.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          A2R_RUN_ID="${{ steps.a2g_upstream.outputs.a2r_run_id }}"
+          case "$A2R_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A2R_RUN_ID" > "$EVIDENCE_DIR/a2r-run.json"
+          for required in "$UPSTREAM_A2R/a0.json" "$UPSTREAM_A2R/a2r.json" "$UPSTREAM_A2R/qualification-capsule.json"; do test -f "$required"; done
+
+          python3 - \
+            "$EVIDENCE_DIR/a2r-run.json" \
+            "$UPSTREAM_A2R/qualification-capsule.json" \
+            "$UPSTREAM_A2R/a0.json" \
+            "$UPSTREAM_A2R/a2r.json" \
+            "$UPSTREAM_A2G/qualification-capsule.json" \
+            "$A2R_RUN_ID" \
+            "$EVIDENCE_DIR/a2r-subject-head.txt" \
+            crates/domains/symthaea-cosmology-research/scripts/de001a_a2r_parameter_roles.py \
+            crates/domains/symthaea-cosmology-research/references/de001a_a2r_parameter_roles_v1.json \
+            "$EVIDENCE_DIR/environment-run-id.txt" <<'PY'
+          import hashlib, json, pathlib, sys
+          run_path, capsule_path, a0_path, a2r_path, a2g_capsule_path, expected_run, subject_path, role_script, role_spec, env_out = sys.argv[1:]
+          run = json.load(open(run_path, encoding="utf-8"))
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+          a2g = json.load(open(a2g_capsule_path, encoding="utf-8"))
+          expected_subject = pathlib.Path(subject_path).read_text(encoding="utf-8").strip()
+          assert str(run["id"]) == expected_run
+          assert run["status"] == "completed" and run["conclusion"] == "success"
+          assert run["head_sha"] == expected_subject
+          assert capsule["protocol"] == "DE-001A2R-QUALIFICATION-CAPSULE-v1"
+          assert capsule["subject_head"] == expected_subject
+          assert capsule["workflow"]["run_id"] == expected_run
+          for key in ("software_outcome", "a1e_outcome", "a0_artifacts_outcome", "a0_outcome", "a2r_outcome", "postflight_outcome"):
+              assert capsule["workflow"][key] == "success"
+          a0_sha = hashlib.sha256(open(a0_path, "rb").read()).hexdigest()
+          a2r_sha = hashlib.sha256(open(a2r_path, "rb").read()).hexdigest()
+          assert capsule["receipt_sha256"]["a0"] == a0_sha
+          assert capsule["receipt_sha256"]["a2r"] == a2r_sha
+          assert a2g["receipt_sha256"]["a0"] == a0_sha
+          assert a2g["receipt_sha256"]["a2r"] == a2r_sha
+          for key, path in (("a2r_script", role_script), ("a2r_spec", role_spec)):
+              assert capsule["implementation_sha256"][key] == hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          env_run = str(capsule["environment_run_id"])
+          assert env_run.isdigit()
+          pathlib.Path(env_out).write_text(env_run + "\n", encoding="utf-8")
+          PY
+          echo "environment_run_id=$(tr -d '\n' < "$EVIDENCE_DIR/environment-run-id.txt")" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact transitive environment-v3 evidence
+        id: download_environment
+        if: steps.a2r_upstream.outcome == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-environment-receipt-*
+          path: ${{ runner.temp }}/de001a-upstream-environment
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.a2r_upstream.outputs.environment_run_id }}
+
+      - name: Verify exact transitive environment-v3 evidence
+        id: environment_upstream
+        if: steps.download_environment.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENVIRONMENT_RUN_ID="${{ steps.a2r_upstream.outputs.environment_run_id }}"
+          case "$ENVIRONMENT_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$ENVIRONMENT_RUN_ID" > "$EVIDENCE_DIR/environment-run.json"
+          test -f "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+          test -f "$UPSTREAM_ENV/de001a-environment-versions.json"
+          python3 - "$EVIDENCE_DIR/environment-run.json" "$ENVIRONMENT_RUN_ID" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert str(value["id"]) == sys.argv[2]
+          assert value["status"] == "completed" and value["conclusion"] == "success"
+          PY
+          grep -Fx "workflow_run_id=$ENVIRONMENT_RUN_ID" "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+          grep -Fx "verdict=PASS" "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3
+        with:
+          enable_kvm: false
+          extra_nix_config: |
+            sandbox = true
+            experimental-features = nix-command flakes
+
+      - name: Qualify A2M software subject
+        id: software
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          nix --version | grep -Fx 'nix (Nix) 2.34.7'
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bin de001a-a1e-environment --release --locked
+          test -x target/release/de001a-a1e-environment
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/domains/symthaea-cosmology-research/scripts/de001a_a2m_method_binding.py")
+          compile(path.read_text(encoding="utf-8"), str(path), "exec")
+          PY
+          sha256sum target/release/de001a-a1e-environment > "$EVIDENCE_DIR/de001a-a1e-environment.sha256"
+          sha256sum crates/domains/symthaea-cosmology-research/scripts/de001a_a2m_method_binding.py > "$EVIDENCE_DIR/de001a_a2m_method_binding.py.sha256"
+          sha256sum crates/domains/symthaea-cosmology-research/references/de001a_a2m_method_binding_v1.json > "$EVIDENCE_DIR/de001a_a2m_method_binding_v1.json.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+
+      - name: Requalify reusable numerical environment
+        id: a1e
+        if: steps.environment_upstream.outcome == 'success' && steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a1e-environment \
+            "$UPSTREAM_ENV/de001a-environment-receipt.txt" \
+            "$UPSTREAM_ENV/de001a-environment-versions.json" \
+            > "$EVIDENCE_DIR/a1e.json"
+          python3 - "$EVIDENCE_DIR/a1e.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A1E-ENVIRONMENT-EVIDENCE-v1"
+          assert value["verdict"] == "PASS"
+          assert value["environment_reuse_authorized"] is True
+          assert value["a1c_execution_authorized"] is False
+          PY
+
+      - name: Independently realize exact A0 fixed-output artifacts
+        id: a0_artifacts
+        if: steps.a1e.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAKE=./crates/domains/symthaea-cosmology-research/nix
+          nix build "$FLAKE#checks.x86_64-linux.a0-artifacts" --no-update-lock-file --no-link
+          nix build "$FLAKE#a0-artifacts" --no-update-lock-file --out-link "$A0_LINK"
+          store_path="$(realpath "$A0_LINK")"
+          printf '%s\n' "$store_path" > "$EVIDENCE_DIR/a0-store-path.txt"
+          nix hash path "$store_path" > "$EVIDENCE_DIR/a0-nar-hash.txt"
+          nix path-info -S "$store_path" | awk '{print $2}' > "$EVIDENCE_DIR/a0-closure-size.txt"
+
+      - name: Assemble self-contained qualified optimizer provenance
+        id: assemble
+        if: steps.a0_artifacts.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$UPSTREAM_A2R/a0.json" "$EVIDENCE_DIR/a0.json"
+          cp "$UPSTREAM_A2R/a2r.json" "$EVIDENCE_DIR/a2r.json"
+          cp "$UPSTREAM_A2R/qualification-capsule.json" "$EVIDENCE_DIR/a2r-qualification-capsule.json"
+          cp "$UPSTREAM_A2G/a2g.json" "$EVIDENCE_DIR/a2g.json"
+          cp "$UPSTREAM_A2G/qualification-capsule.json" "$EVIDENCE_DIR/a2g-qualification-capsule.json"
+          cp "$UPSTREAM_ENV/de001a-environment-receipt.txt" "$EVIDENCE_DIR/environment-v3-receipt.txt"
+          cp "$UPSTREAM_ENV/de001a-environment-versions.json" "$EVIDENCE_DIR/environment-v3-versions.json"
+          cp "$A0_LINK/reference-input-configuration" "$EVIDENCE_DIR/reference-input-configuration"
+          cp "$A0_LINK/reference-expanded-configuration" "$EVIDENCE_DIR/reference-expanded-configuration"
+          cp "$A0_LINK/reference-minimizer-configuration" "$EVIDENCE_DIR/reference-minimizer-configuration"
+
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib, json, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          capsule = json.loads((root / "a2g-qualification-capsule.json").read_text(encoding="utf-8"))
+          for key, filename in (("a0", "a0.json"), ("a2r", "a2r.json"), ("a2g", "a2g.json")):
+              actual = hashlib.sha256((root / filename).read_bytes()).hexdigest()
+              assert capsule["receipt_sha256"][key] == actual
+          PY
+
+      - name: Bind exact optimizer method and option block
+        id: a2m
+        if: steps.assemble.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_path="$(python3 - "$EVIDENCE_DIR/a1e.json" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["realized_environment_store_path"])
+          PY
+          )"
+          test -x "$env_path/bin/python"
+          "$env_path/bin/python" \
+            crates/domains/symthaea-cosmology-research/scripts/de001a_a2m_method_binding.py \
+            "$EVIDENCE_DIR/a0.json" \
+            "$EVIDENCE_DIR/a2r.json" \
+            "$EVIDENCE_DIR/a2g.json" \
+            "$EVIDENCE_DIR/reference-input-configuration" \
+            "$EVIDENCE_DIR/reference-expanded-configuration" \
+            "$EVIDENCE_DIR/reference-minimizer-configuration" \
+            > "$EVIDENCE_DIR/a2m.json"
+
+          python3 - "$EVIDENCE_DIR/a2m.json" <<'PY'
+          import hashlib, json, re, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A2M-OPTIMIZER-METHOD-BINDING-v1"
+          assert value["verdict"] == "PASS"
+          assert value["scientific_claim"] == "NONE"
+          assert value["authority"] == "optimizer-method-options-binding-only"
+          assert value["optimizer_execution_authorized"] is False
+          assert value["a2_execution_authorized"] is False
+          effective = value["effective_sampler"]
+          assert isinstance(effective, dict)
+          assert isinstance(effective["sampler_name"], str) and effective["sampler_name"]
+          assert isinstance(effective["sampler_options"], dict)
+          canonical = json.dumps(effective, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode()
+          assert hashlib.sha256(canonical).hexdigest() == value["effective_sampler_sha256"]
+          assert re.fullmatch(r"[0-9a-f]{64}", value["effective_sampler_sha256"])
+          sampled = value["sampled_coordinate_order"]
+          assert isinstance(sampled, list) and sampled and len(sampled) == len(set(sampled))
+          PY
+
+      - name: Postflight binder immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.binder.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.binder.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write A2M qualification capsule
+        if: always()
+        env:
+          BINDER_HEAD_OUT: ${{ steps.binder.outputs.head }}
+          BINDER_TREE_OUT: ${{ steps.binder.outputs.tree }}
+          A2R_RUN_ID_OUT: ${{ steps.a2g_upstream.outputs.a2r_run_id }}
+          ENVIRONMENT_RUN_ID_OUT: ${{ steps.a2r_upstream.outputs.environment_run_id }}
+          DOWNLOAD_A2G_OUTCOME: ${{ steps.download_a2g.outcome }}
+          A2G_UPSTREAM_OUTCOME: ${{ steps.a2g_upstream.outcome }}
+          DOWNLOAD_A2R_OUTCOME: ${{ steps.download_a2r.outcome }}
+          A2R_UPSTREAM_OUTCOME: ${{ steps.a2r_upstream.outcome }}
+          DOWNLOAD_ENVIRONMENT_OUTCOME: ${{ steps.download_environment.outcome }}
+          ENVIRONMENT_UPSTREAM_OUTCOME: ${{ steps.environment_upstream.outcome }}
+          SOFTWARE_OUTCOME: ${{ steps.software.outcome }}
+          A1E_OUTCOME: ${{ steps.a1e.outcome }}
+          A0_ARTIFACTS_OUTCOME: ${{ steps.a0_artifacts.outcome }}
+          ASSEMBLE_OUTCOME: ${{ steps.assemble.outcome }}
+          A2M_OUTCOME: ${{ steps.a2m.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib, json, os, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          def digest(name):
+              path = root / name
+              return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "UNAVAILABLE"
+          def repo_digest(path):
+              p = pathlib.Path(path)
+              return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "UNAVAILABLE"
+          def text(name):
+              path = root / name
+              return path.read_text(encoding="utf-8").strip() if path.is_file() else "UNAVAILABLE"
+          a2m = {}
+          if (root / "a2m.json").is_file():
+              try:
+                  a2m = json.loads((root / "a2m.json").read_text(encoding="utf-8"))
+              except Exception:
+                  a2m = {}
+          effective = a2m.get("effective_sampler", {}) if isinstance(a2m, dict) else {}
+          sampler_name = effective.get("sampler_name", "UNAVAILABLE") if isinstance(effective, dict) else "UNAVAILABLE"
+          sampler_hash = a2m.get("effective_sampler_sha256", "UNAVAILABLE") if isinstance(a2m, dict) else "UNAVAILABLE"
+          if not isinstance(sampler_name, str): sampler_name = "UNAVAILABLE"
+          if not isinstance(sampler_hash, str): sampler_hash = "UNAVAILABLE"
+          value = {
+              "protocol": "DE-001A2M-QUALIFICATION-CAPSULE-v1",
+              "scientific_claim": "NONE",
+              "authority": "optimizer-method-options-binding-only",
+              "optimizer_execution_authorized": False,
+              "a2_execution_authorized": False,
+              "binder_head": os.environ.get("BINDER_HEAD_OUT") or "UNAVAILABLE",
+              "binder_tree": os.environ.get("BINDER_TREE_OUT") or "UNAVAILABLE",
+              "a2g_run_id": os.environ.get("A2G_RUN_ID") or "UNAVAILABLE",
+              "a2r_run_id": os.environ.get("A2R_RUN_ID_OUT") or "UNAVAILABLE",
+              "environment_run_id": os.environ.get("ENVIRONMENT_RUN_ID_OUT") or "UNAVAILABLE",
+              "a2r_subject_head": text("a2r-subject-head.txt"),
+              "effective_sampler_sha256": sampler_hash,
+              "sampler_name": sampler_name,
+              "workflow": {
+                  "run_id": os.environ.get("GITHUB_RUN_ID", "UNAVAILABLE"),
+                  "attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "UNAVAILABLE"),
+                  "download_a2g_outcome": os.environ.get("DOWNLOAD_A2G_OUTCOME") or "UNAVAILABLE",
+                  "a2g_upstream_outcome": os.environ.get("A2G_UPSTREAM_OUTCOME") or "UNAVAILABLE",
+                  "download_a2r_outcome": os.environ.get("DOWNLOAD_A2R_OUTCOME") or "UNAVAILABLE",
+                  "a2r_upstream_outcome": os.environ.get("A2R_UPSTREAM_OUTCOME") or "UNAVAILABLE",
+                  "download_environment_outcome": os.environ.get("DOWNLOAD_ENVIRONMENT_OUTCOME") or "UNAVAILABLE",
+                  "environment_upstream_outcome": os.environ.get("ENVIRONMENT_UPSTREAM_OUTCOME") or "UNAVAILABLE",
+                  "software_outcome": os.environ.get("SOFTWARE_OUTCOME") or "UNAVAILABLE",
+                  "a1e_outcome": os.environ.get("A1E_OUTCOME") or "UNAVAILABLE",
+                  "a0_artifacts_outcome": os.environ.get("A0_ARTIFACTS_OUTCOME") or "UNAVAILABLE",
+                  "assemble_outcome": os.environ.get("ASSEMBLE_OUTCOME") or "UNAVAILABLE",
+                  "a2m_outcome": os.environ.get("A2M_OUTCOME") or "UNAVAILABLE",
+                  "postflight_outcome": os.environ.get("POSTFLIGHT_OUTCOME") or "UNAVAILABLE",
+              },
+              "receipt_sha256": {
+                  "environment_v3": digest("environment-v3-receipt.txt"),
+                  "environment_versions": digest("environment-v3-versions.json"),
+                  "a1e": digest("a1e.json"),
+                  "a0": digest("a0.json"),
+                  "a2r": digest("a2r.json"),
+                  "a2g": digest("a2g.json"),
+                  "a2m": digest("a2m.json"),
+              },
+              "configuration_sha256": {
+                  "reference_input": digest("reference-input-configuration"),
+                  "reference_expanded": digest("reference-expanded-configuration"),
+                  "reference_minimizer": digest("reference-minimizer-configuration"),
+              },
+              "implementation_sha256": {
+                  "a2m_script": repo_digest("crates/domains/symthaea-cosmology-research/scripts/de001a_a2m_method_binding.py"),
+                  "a2m_spec": repo_digest("crates/domains/symthaea-cosmology-research/references/de001a_a2m_method_binding_v1.json"),
+                  "cargo_lock": repo_digest("Cargo.lock"),
+              },
+              "a0_artifact_store": {
+                  "path": text("a0-store-path.txt"),
+                  "nar_hash": text("a0-nar-hash.txt"),
+                  "closure_size": text("a0-closure-size.txt"),
+              },
+          }
+          (root / "qualification-capsule.json").write_text(
+              json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(value, sort_keys=True, separators=(",", ":")))
+          PY
+
+      - name: Upload A2M qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a2m-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a2m-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce valid A2M qualification
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_a2g.outcome }}" = "success"
+          test "${{ steps.a2g_upstream.outcome }}" = "success"
+          test "${{ steps.download_a2r.outcome }}" = "success"
+          test "${{ steps.a2r_upstream.outcome }}" = "success"
+          test "${{ steps.download_environment.outcome }}" = "success"
+          test "${{ steps.environment_upstream.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.a1e.outcome }}" = "success"
+          test "${{ steps.a0_artifacts.outcome }}" = "success"
+          test "${{ steps.assemble.outcome }}" = "success"
+          test "${{ steps.a2m.outcome }}" = "success"
+          test "${{ steps.postflight.outcome }}" = "success"
