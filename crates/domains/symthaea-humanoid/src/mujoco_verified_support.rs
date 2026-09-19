@@ -167,6 +167,7 @@ pub enum VerifiedSurfaceSupportError {
 ///
 /// This is crate-internal on purpose. The token is an intermediate capability
 /// for a later D5B adapter; it is not contact-establishment or QP authority.
+#[allow(dead_code, reason = "HUM-WRENCH-001D5B will become the first non-test consumer")]
 pub(crate) fn bind_verified_mujoco_surface_support_v1(
     patches: &MuJoCoFootPatchSetV1,
     interaction: &MuJoCoContactInteractionRecordV1,
@@ -491,10 +492,10 @@ mod tests {
     }
 
     #[test]
-    fn lineage_binds_exact_hull_shape_not_only_area() {
+    fn lineage_binds_exact_hull_shape() {
+        // Both rectangles have area 2 m²; the lineage still differs by exact vertices.
         let first = vec![[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [0.0, 1.0]];
         let second = vec![[0.0, 0.0], [1.0, 0.0], [1.0, 2.0], [0.0, 2.0]];
-        assert_eq!(2.0, 2.0);
         assert_ne!(xy_bits_list(&first), xy_bits_list(&second));
     }
 
