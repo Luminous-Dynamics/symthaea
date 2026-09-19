@@ -48,6 +48,8 @@ pub mod perceptual_collection_evidence;
 pub mod perceptual_collection_authenticity;
 #[path = "perceptual_enrollment_witness.rs"]
 pub mod perceptual_enrollment_witness;
+#[path = "perceptual_enrollment_reconciliation.rs"]
+pub mod perceptual_enrollment_reconciliation;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
