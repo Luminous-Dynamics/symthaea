@@ -64,6 +64,9 @@
 /// Security-assurance primitives whose validity does not derive from cognition.
 #[allow(missing_docs)]
 pub mod assurance;
+/// Policy-defined completeness checks for material effects before presentation.
+#[allow(missing_docs)]
+pub mod assurance_materiality;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
