@@ -1,0 +1,68 @@
+{
+  "authority": "configuration-resolution-determinism-only",
+  "forbidden_ambient_resolution_markers": {
+    "defaults_directive": "!defaults",
+    "environment_placeholder": "${",
+    "path_directive": "!path"
+  },
+  "forbidden_operations": {
+    "configuration_mutation": true,
+    "defaults_resolution": true,
+    "environment_expansion": true,
+    "likelihood_evaluation": true,
+    "network": true,
+    "optimization": true,
+    "path_expansion": true,
+    "sampler_execution": true,
+    "yaml_parsing": true
+  },
+  "policy": {
+    "a2m_requires_a2g_pass": true,
+    "a2r_must_bind_same_a0_receipt": true,
+    "a2r_sampled_coordinate_order_must_be_nonempty_unique": true,
+    "all_forbidden_markers_must_be_absent": true,
+    "all_three_configurations_must_be_exact_a0_bytes": true,
+    "raw_a2r_alone_must_not_authorize_a2m": true
+  },
+  "promotion": {
+    "a2_execution_authorized": false,
+    "a2m_execution_authorized": false,
+    "does_not_establish": [
+      "optimizer method binding",
+      "optimizer execution",
+      "optimizer reproduction",
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "physical mechanism"
+    ],
+    "pass_authority": "configuration-resolution determinism only"
+  },
+  "protocol": "DE-001A2G-CONFIG-RESOLUTION-GUARD-v1",
+  "required_configurations": {
+    "reference-expanded-configuration": {
+      "sha256": "c4c23032d1695635aaea6eb47fabd909006ff32df0a27eadbf64b36c89f31ba1",
+      "size": 3969
+    },
+    "reference-input-configuration": {
+      "sha256": "34499cb78ecaec78db44da9f06f61cd9c9ee497dc5c541b72b48cda54091c6ef",
+      "size": 2381
+    },
+    "reference-minimizer-configuration": {
+      "sha256": "6b51048b359e4b9d646de09379ca273a8d6a1bc1b5a88f585a09d8f2e61f290c",
+      "size": 2484
+    }
+  },
+  "required_upstream": {
+    "a0_protocol": "DE-001A0-BYTE-INTEGRITY-v1",
+    "a0_verdict": "PASS",
+    "a2r_authority": "optimizer-parameter-role-binding-only",
+    "a2r_protocol": "DE-001A2R-PARAMETER-ROLE-BINDING-v1",
+    "a2r_verdict": "PASS"
+  },
+  "schema_version": 1,
+  "scientific_claim": "NONE",
+  "script_path": "crates/domains/symthaea-cosmology-research/scripts/de001a_a2g_config_guard.py",
+  "script_sha256": "7d1c4ffed632ad3407df6b9369333e770d8d390875c306b1bec59561fc40cdf4",
+  "status": "implementation-frozen-unqualified"
+}
