@@ -138,7 +138,7 @@ pub fn read_persisted_semantic_bundle(
         ));
     }
 
-    let path = keeper_dir.join(KEEPER_SEMANTIC_FILENAME);
+    let path = semantic_bundle_path(root, audio_key);
     let metadata = match std::fs::symlink_metadata(&path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
