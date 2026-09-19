@@ -1,0 +1,315 @@
+name: DE-001A1X Cross-Implementation Comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      a1r_run_id:
+        description: Exact successful A1R/A1Q qualification run ID
+        required: true
+        type: string
+      a1c_run_id:
+        description: Exact successful A1C result-qualification run ID for the same subject
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      a1r_run_id:
+        required: true
+        type: string
+      a1c_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a1x-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    name: A1X qualified Rust-Cobaya comparison
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      COMPARATOR_HEAD: ${{ github.sha }}
+      A1R_RUN_ID: ${{ inputs.a1r_run_id }}
+      A1C_RUN_ID: ${{ inputs.a1c_run_id }}
+
+    steps:
+      - name: Check out exact comparator subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.COMPARATOR_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind comparator identity and paths
+        id: comparator
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$COMPARATOR_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a1x-evidence" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A1R=$RUNNER_TEMP/de001a-upstream-a1r" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A1C=$RUNNER_TEMP/de001a-upstream-a1c" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a1x-evidence" \
+            "$RUNNER_TEMP/de001a-upstream-a1r" \
+            "$RUNNER_TEMP/de001a-upstream-a1c"
+
+      - name: Download exact A1R/A1Q evidence run
+        id: download_a1r
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a1r-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a1r
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a1r_run_id }}
+
+      - name: Download exact A1C qualification evidence run
+        id: download_a1c
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a1c-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a1c
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a1c_run_id }}
+
+      - name: Verify explicit upstream run identities and one subject
+        id: upstream
+        if: steps.download_a1r.outcome == 'success' && steps.download_a1c.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$A1R_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+          case "$A1C_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A1R_RUN_ID" > "$EVIDENCE_DIR/a1r-run.json"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A1C_RUN_ID" > "$EVIDENCE_DIR/a1c-run.json"
+
+          python3 - \
+            "$EVIDENCE_DIR/a1r-run.json" \
+            "$EVIDENCE_DIR/a1c-run.json" \
+            "$A1R_RUN_ID" \
+            "$A1C_RUN_ID" \
+            "$EVIDENCE_DIR/subject-head.txt" <<'PY'
+          import json, sys
+          a1r_path, a1c_path, expected_a1r, expected_a1c, subject_out = sys.argv[1:]
+          a1r = json.load(open(a1r_path, encoding="utf-8"))
+          a1c = json.load(open(a1c_path, encoding="utf-8"))
+          assert str(a1r["id"]) == expected_a1r
+          assert str(a1c["id"]) == expected_a1c
+          assert a1r["status"] == a1c["status"] == "completed"
+          assert a1r["conclusion"] == a1c["conclusion"] == "success"
+          assert a1r["head_sha"] == a1c["head_sha"]
+          open(subject_out, "w", encoding="utf-8").write(a1r["head_sha"] + "\n")
+          PY
+
+          for required in \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$UPSTREAM_A1R/a1r-primary.json" \
+            "$UPSTREAM_A1R/qualification-capsule.json" \
+            "$UPSTREAM_A1C/a1c-result.json" \
+            "$UPSTREAM_A1C/a1c-qualification.json" \
+            "$UPSTREAM_A1C/qualification-capsule.json"
+          do
+            test -f "$required"
+          done
+
+          python3 - \
+            "$UPSTREAM_A1R/qualification-capsule.json" \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$A1R_RUN_ID" \
+            "$EVIDENCE_DIR/subject-head.txt" <<'PY'
+          import hashlib, json, sys
+          capsule_path, a1q_path, expected_run, subject_path = sys.argv[1:]
+          subject = open(subject_path, encoding="utf-8").read().strip()
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+          assert capsule["protocol"] == "DE-001A1R-QUALIFICATION-CAPSULE-v2"
+          assert capsule["subject_head"] == subject
+          assert capsule["workflow"]["run_id"] == expected_run
+          assert capsule["workflow"]["a1q_exit_code"] == "0"
+          assert capsule["workflow"]["postflight_outcome"] == "success"
+          actual = hashlib.sha256(open(a1q_path, "rb").read()).hexdigest()
+          assert capsule["receipt_sha256"]["a1q"] == actual
+          PY
+
+          python3 - \
+            "$UPSTREAM_A1C/qualification-capsule.json" \
+            "$UPSTREAM_A1C/a1c-result.json" \
+            "$UPSTREAM_A1C/a1c-qualification.json" \
+            "$A1C_RUN_ID" \
+            "$EVIDENCE_DIR/subject-head.txt" <<'PY'
+          import hashlib, json, sys
+          capsule_path, result_path, qualification_path, expected_run, subject_path = sys.argv[1:]
+          subject = open(subject_path, encoding="utf-8").read().strip()
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+          assert capsule["protocol"] == "DE-001A1C-QUALIFICATION-CAPSULE-v1"
+          assert capsule["subject_head"] == subject
+          assert capsule["workflow"]["run_id"] == expected_run
+          assert capsule["workflow"]["result_qualification_outcome"] == "success"
+          assert capsule["workflow"]["postflight_outcome"] == "success"
+          result_sha = hashlib.sha256(open(result_path, "rb").read()).hexdigest()
+          qualification_sha = hashlib.sha256(open(qualification_path, "rb").read()).hexdigest()
+          assert capsule["receipt_sha256"]["a1c_result"] == result_sha
+          assert capsule["receipt_sha256"]["a1c_qualification"] == qualification_sha
+          PY
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Qualify comparator software
+        id: software
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bin de001a-a1x-compare --release --locked
+          test -x target/release/de001a-a1x-compare
+          sha256sum target/release/de001a-a1x-compare > "$EVIDENCE_DIR/de001a-a1x-compare.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+
+      - name: Compare qualified A1R and A1C implementations
+        id: comparison
+        if: steps.upstream.outcome == 'success' && steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          target/release/de001a-a1x-compare \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$UPSTREAM_A1R/a1r-primary.json" \
+            "$UPSTREAM_A1C/a1c-result.json" \
+            "$UPSTREAM_A1C/a1c-qualification.json" \
+            > "$EVIDENCE_DIR/a1x.json" \
+            2> "$EVIDENCE_DIR/a1x.stderr"
+          code=$?
+          set -e
+          echo "comparison_exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat "$EVIDENCE_DIR/a1x.json"
+          if [[ "$code" != "0" && "$code" != "1" ]]; then
+            exit "$code"
+          fi
+
+      - name: Postflight comparator immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.comparator.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.comparator.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write A1X comparison capsule
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+
+          hash_or_unavailable() {
+            if [[ -f "$1" ]]; then
+              sha256sum "$1" | awk '{print $1}'
+            else
+              printf '%s' 'UNAVAILABLE'
+            fi
+          }
+          value_or_unavailable() {
+            local file="$1" key="$2"
+            if [[ -f "$file" ]]; then
+              python3 - "$file" "$key" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          print(value.get(sys.argv[2], "UNAVAILABLE"))
+          PY
+            else
+              printf '%s\n' 'UNAVAILABLE'
+            fi
+          }
+
+          subject_head="$(tr -d '\n' < "$EVIDENCE_DIR/subject-head.txt" 2>/dev/null || true)"
+          if [[ -z "$subject_head" ]]; then subject_head="UNAVAILABLE"; fi
+
+          cat > "$EVIDENCE_DIR/comparison-capsule.json" <<EOF
+          {
+            "protocol": "DE-001A1X-COMPARISON-CAPSULE-v1",
+            "scientific_claim": "NONE",
+            "authority": "cross-implementation-fixed-point-agreement-only",
+            "comparator_head": "${{ steps.comparator.outputs.head }}",
+            "comparator_tree": "${{ steps.comparator.outputs.tree }}",
+            "subject_head": "$subject_head",
+            "upstream_runs": {
+              "a1r_a1q": "$A1R_RUN_ID",
+              "a1c_qualification": "$A1C_RUN_ID"
+            },
+            "workflow": {
+              "run_id": "${GITHUB_RUN_ID}",
+              "attempt": "${GITHUB_RUN_ATTEMPT}",
+              "download_a1r_outcome": "${{ steps.download_a1r.outcome }}",
+              "download_a1c_outcome": "${{ steps.download_a1c.outcome }}",
+              "upstream_outcome": "${{ steps.upstream.outcome }}",
+              "software_outcome": "${{ steps.software.outcome }}",
+              "comparison_outcome": "${{ steps.comparison.outcome }}",
+              "comparison_exit_code": "${{ steps.comparison.outputs.comparison_exit_code }}",
+              "postflight_outcome": "${{ steps.postflight.outcome }}"
+            },
+            "comparison_verdict": "$(value_or_unavailable "$EVIDENCE_DIR/a1x.json" verdict)",
+            "receipt_sha256": {
+              "a1q": "$(hash_or_unavailable "$UPSTREAM_A1R/a1q.json")",
+              "a1r_primary": "$(hash_or_unavailable "$UPSTREAM_A1R/a1r-primary.json")",
+              "a1c_result": "$(hash_or_unavailable "$UPSTREAM_A1C/a1c-result.json")",
+              "a1c_qualification": "$(hash_or_unavailable "$UPSTREAM_A1C/a1c-qualification.json")",
+              "a1x": "$(hash_or_unavailable "$EVIDENCE_DIR/a1x.json")"
+            }
+          }
+          EOF
+          cat "$EVIDENCE_DIR/comparison-capsule.json"
+
+      - name: Upload A1X comparison evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a1x-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a1x-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce valid comparison evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_a1r.outcome }}" = "success"
+          test "${{ steps.download_a1c.outcome }}" = "success"
+          test "${{ steps.upstream.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.comparison.outcome }}" = "success"
+          case "${{ steps.comparison.outputs.comparison_exit_code }}" in 0|1) ;; *) exit 1 ;; esac
+          test "${{ steps.postflight.outcome }}" = "success"
