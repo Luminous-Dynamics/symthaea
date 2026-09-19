@@ -61,3 +61,7 @@ path = "src/a2_authorize.rs"
 [[bin]]
 name = "de001a-a2e-contract"
 path = "src/a2e_contract.rs"
+
+[[bin]]
+name = "de001a-a2q-qualify"
+path = "src/a2q_qualify.rs"

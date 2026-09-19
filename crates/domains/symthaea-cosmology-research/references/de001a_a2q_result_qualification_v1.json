@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A2Q-RESULT-QUALIFICATION-v1",
+  "status": "preregistered-before-optimizer-output",
+  "scientific_claim": "NONE",
+  "authority": "optimizer-reproduction-qualification-only",
+  "required_raw_execution": {
+    "protocol": "DE-001A2E-RAW-OPTIMIZER-EXECUTION-v1",
+    "scientific_claim": "NONE",
+    "authority": "exact-optimizer-raw-execution-only",
+    "reproduction_verdict": "UNASSESSED",
+    "allowed_execution_states": ["EXECUTED", "EXECUTION_ERROR", "INVALID"],
+    "executed_requires_process_exit_code": 0,
+    "executed_requires_optimizer_invocation_count": 1,
+    "execution_error_requires_optimizer_invocation_count": 1,
+    "invalid_raw_execution_is_invalid_qualification": true
+  },
+  "required_execution_contract": {
+    "protocol": "DE-001A2E-EXECUTION-CONTRACT-v1",
+    "verdict": "PASS",
+    "authority": "raw-optimizer-execution-contract-only",
+    "optimizer_execution_contract_valid": true,
+    "executor_implementation_authorized": false,
+    "reproduction_verdict": "UNASSESSED",
+    "a2q_execution_authorized": false
+  },
+  "required_authorization": {
+    "protocol": "DE-001A2-EXECUTION-AUTHORIZATION-v1",
+    "verdict": "PASS",
+    "authority": "exact-optimizer-execution-authorization-only",
+    "optimizer_execution_authorized": true,
+    "a2_execution_authorized": true,
+    "normalization_or_migration_authorized": false,
+    "optimizer_invocation_budget": 1
+  },
+  "target": {
+    "manifest_path": "crates/domains/symthaea-cosmology-research/references/de001a_desi_dr2_bao_flat_lcdm_v1.json",
+    "target_id": "DE-001A-DESI-DR2-BAO-FLAT-LCDM-v1",
+    "reference_bestfit_role": "reference-bestfit-text",
+    "reference_bestfit_sha256": "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358",
+    "candidate_bestfit_role": "optimizer-bestfit-text"
+  },
+  "frozen_reproduction_criteria": [
+    {
+      "statistic": "chi2__BAO",
+      "reference_value": 10.282299,
+      "max_absolute_delta": 0.01
+    },
+    {
+      "statistic": "omegam",
+      "reference_value": 0.29717936,
+      "max_absolute_delta": 0.001
+    },
+    {
+      "statistic": "hrdrag",
+      "reference_value": 101.54786,
+      "max_absolute_delta": 0.1
+    }
+  ],
+  "role_semantics": {
+    "criterion_membership_does_not_imply_sampled_parameter": true,
+    "sampled_vs_derived_roles_come_from_qualified_A2R": true,
+    "A2Q_compares_historical_output_fields_without_reclassifying_roles": true
+  },
+  "result_file_manifest": {
+    "entries_must_have_unique_roles_and_paths": true,
+    "entries_require_role_path_sha256_size": true,
+    "executed_result_requires_exactly_one_candidate_bestfit_role": true,
+    "candidate_bestfit_bytes_must_match_manifest_sha256_and_size": true,
+    "reference_bestfit_bytes_must_match_frozen_sha256": true
+  },
+  "classification": {
+    "valid_executed_all_criteria_within_tolerance": {
+      "qualification_verdict": "PASS",
+      "reproduction_verdict": "PASS"
+    },
+    "valid_executed_any_criterion_outside_tolerance": {
+      "qualification_verdict": "PASS",
+      "reproduction_verdict": "NEGATIVE"
+    },
+    "valid_execution_error": {
+      "qualification_verdict": "PASS",
+      "reproduction_verdict": "UNASSESSED"
+    },
+    "lineage_schema_hash_or_invocation_failure": {
+      "qualification_verdict": "INVALID",
+      "reproduction_verdict": "UNASSESSED"
+    }
+  },
+  "promotion_boundary": {
+    "a2_reproduction_pass_does_not_establish_scientific_model_validity": true,
+    "a3_execution_authorized": false,
+    "scientific_claim": "NONE",
+    "does_not_establish": [
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "phenomenological dark-energy dynamics",
+      "physical mechanism"
+    ]
+  }
+}
