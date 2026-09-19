@@ -112,6 +112,11 @@ pub mod assurance_android_motion_event;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_motion_policy;
 
+// Join policy-admitted Android MotionEvent evidence to the exact policy-admitted
+// native touch ingress evidence before any platform adapter claims one touch.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_touch_join;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
