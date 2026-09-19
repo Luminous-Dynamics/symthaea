@@ -69,7 +69,7 @@ impl Error for EgressSubjectError {}
 pub struct EgressDecisionSubjectId(Digest32);
 
 impl EgressDecisionSubjectId {
-    pub const fn as_digest(self) -> Digest32 {
+    pub const fn digest(self) -> Digest32 {
         self.0
     }
 }
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn subject_vector_is_stable() {
         assert_eq!(
-            subject().id().as_digest().to_hex(),
+            subject().id().digest().to_hex(),
             "8a6bfabf18ce5696ce0b394cc6ee9b7bb7ae10494d5a68e5b5e47cc257883cde"
         );
     }
