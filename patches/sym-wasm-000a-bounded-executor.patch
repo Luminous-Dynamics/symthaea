@@ -1,7 +1,7 @@
 diff --git a/src/action/mod.rs b/src/action/mod.rs
 --- a/src/action/mod.rs
 +++ b/src/action/mod.rs
-@@ -1,39 +1,68 @@
+@@ -1,39 +1,81 @@
              ActionIR::WasmSandbox {
                  module_path,
                  function_name,
@@ -20,32 +20,51 @@ diff --git a/src/action/mod.rs b/src/action/mod.rs
                  ExecutionMode::Real => {
                      #[cfg(feature = "wasm-sandbox")]
                      {
++                        use std::io::Read as _;
                          use wasmtime::*;
 -                        let engine = Engine::default();
 -                        let module = Module::from_file(&engine, module_path)
 +
 +                        const WASM_FUEL_BUDGET: u64 = 50_000_000;
++                        const WASM_MODULE_MAX_BYTES: u64 = 16 * 1024 * 1024;
 +                        const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
++                        const WASM_TABLE_ELEMENT_LIMIT: usize = 65_536;
 +
 +                        // Module paths are capabilities too. Resolve the requested module through
-+                        // the caller-owned SandboxRoot before reading any bytes from the host.
++                        // the caller-owned SandboxRoot before opening any host file.
 +                        let canonical_module = sandbox
 +                            .validate(module_path)
 +                            .map_err(ExecutionError::Policy)?;
-+                        let module_bytes = std::fs::read(&canonical_module)?;
++
++                        // Bound host-side input before Wasmtime validation/compilation. Reading
++                        // through `take(max + 1)` avoids allocating an arbitrarily large file even
++                        // if it grows after it is opened; the sentinel byte distinguishes exactly-
++                        // max-size modules from oversize input.
++                        let file = std::fs::File::open(&canonical_module)?;
++                        let mut module_bytes = Vec::new();
++                        file.take(WASM_MODULE_MAX_BYTES + 1)
++                            .read_to_end(&mut module_bytes)?;
++                        if module_bytes.len() as u64 > WASM_MODULE_MAX_BYTES {
++                            return Err(ExecutionError::Unsupported(format!(
++                                "WASM module exceeds {} byte admission limit",
++                                WASM_MODULE_MAX_BYTES
++                            )));
++                        }
 +
 +                        // Keep this raw-Wasm executor ambient-capability-free. Fuel is mandatory so
-+                        // an infinite loop cannot monopolize the host thread indefinitely.
++                        // an infinite loop cannot monopolize the host thread indefinitely. Accept
++                        // binary WebAssembly only: this action is for pre-compiled `.wasm`, not WAT.
 +                        let mut config = Config::new();
 +                        config.consume_fuel(true);
 +                        let engine = Engine::new(&config)
 +                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
-+                        let module = Module::new(&engine, &module_bytes)
++                        let module = Module::from_binary(&engine, &module_bytes)
                              .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
 -                        let mut store = Store::new(&engine, ());
 +
 +                        let limits = StoreLimitsBuilder::new()
 +                            .memory_size(WASM_MEMORY_LIMIT_BYTES)
++                            .table_elements(WASM_TABLE_ELEMENT_LIMIT)
 +                            .instances(1)
 +                            .tables(4)
 +                            .memories(1)
