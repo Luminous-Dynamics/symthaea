@@ -4,6 +4,7 @@
 pub mod actuation;
 pub mod centroidal;
 pub mod contact;
+pub mod contact_authority;
 pub mod contact_patch;
 pub mod contact_wrench;
 pub mod contact_inverse_dynamics;
@@ -68,6 +69,7 @@ pub mod vision_terrain;
 pub mod whole_body;
 pub use actuation::*;
 pub use centroidal::*;
+pub use contact_authority::*;
 pub use contact_patch::*;
 pub use contact_wrench::*;
 pub use contact_inverse_dynamics::*;
