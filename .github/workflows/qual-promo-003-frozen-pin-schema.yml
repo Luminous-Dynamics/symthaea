@@ -1,0 +1,189 @@
+name: QUAL-PROMO-003 Frozen D5C Promotion Pin Schema R1
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/qualification_promotion_pin.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/qual-promo-003-frozen-pin-schema.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-promo-003-r1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 1f1a6164f7b78e9d090b392782428776d30c3b03
+  PROMO002_SOURCE: 9fe82026c2dfa5827e843ae0ea68a38497cc1004
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-frozen-promotion-pin-schema-r1:
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 4
+          persist-credentials: false
+
+      - name: Bind exact source and workflow-only qualifier delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test "$(git rev-parse "$EXPECTED_PARENT^")" = "$PROMO002_SOURCE"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/qual-promo-003-frozen-pin-schema.yml")
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid Cargo.toml Cargo.lock
+
+      - name: Verify schema remains sealed and uninstantiated
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('crates/domains/symthaea-humanoid/src/qualification_promotion_pin.rs')
+          text = p.read_text()
+          production = text.split('#[cfg(test)]', 1)[0]
+          code = '\n'.join(
+              line for line in production.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+          assert 'pub struct FrozenAuthorityPromotionPinV1 {' in production
+          body = production.split('pub struct FrozenAuthorityPromotionPinV1 {', 1)[1].split('\n}', 1)[0]
+          for line in body.splitlines():
+              assert not line.strip().startswith('pub '), line
+          assert 'Deserialize' not in code
+          assert 'Default' not in code
+          assert 'pub fn new' not in code
+          assert 'pub const fn new' not in code
+          assert 'pub fn from_' not in code
+          assert 'pub const fn from_' not in code
+          assert 'D5C_PROMOTION_PIN' not in code
+          assert 'static FrozenAuthorityPromotionPinV1' not in code
+          assert 'const FrozenAuthorityPromotionPinV1' not in code
+          forbidden = (
+              'reqwest', 'octocrab', 'github.rest',
+              'ContactAuthorityStateMachineV1', 'EstablishedContactEvidenceV1',
+              'floating_base_inverse_dynamics', 'csc_qp', 'osqp_backend',
+          )
+          for needle in forbidden:
+              assert needle not in code, needle
+          PY
+
+      - name: Verify exact hardened promotion identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/qualification_promotion_pin.rs
+          for needle in \
+            '58c299cce926aa66dad319e6856e595eff11cdc6' \
+            '9c1be8bd08fc801a342fa0eafd3e43c03dd1a15e' \
+            'QUAL_PROMO_001_QUALIFIER_PR_V1: u64 = 4_337' \
+            '35_447_128_828' \
+            'qual-promo-001-r1-9c1be8bd08fc801a342fa0eafd3e43c03dd1a15e' \
+            '9fe82026c2dfa5827e843ae0ea68a38497cc1004' \
+            '7cd99aa252239e840972dea5a8aa30c59ab39a98' \
+            'QUAL_PROMO_002_QUALIFIER_PR_V1: u64 = 4_351' \
+            '35_447_295_718' \
+            'qual-promo-002q-r2-7cd99aa252239e840972dea5a8aa30c59ab39a98'; do
+            grep -F "$needle" "$src"
+          done
+          grep -F 'promo001_qualification_artifact_id' "$src"
+          grep -F 'promo001_qualification_artifact_sha256' "$src"
+          grep -F 'promo002_qualification_artifact_id' "$src"
+          grep -F 'promo002_qualification_artifact_sha256' "$src"
+          grep -F 'source_qualification_artifacts_bound' "$src"
+          grep -F 'promo001_run_attempt != 1' "$src"
+          grep -F 'promo002_qualifier_run_attempt != 1' "$src"
+          grep -F 'attestor_run_attempt != 1' "$src"
+          grep -F 'establishes_runtime_authority(self) -> bool' "$src"
+          grep -F 'verifies_live_d4_state(self) -> bool' "$src"
+          grep -F 'performs_external_reverification(self) -> bool' "$src"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked default all-target compile
+        run: cargo check -p symthaea-humanoid --all-targets --locked
+
+      - name: Execute focused frozen-pin schema regressions
+        run: cargo test -p symthaea-humanoid qualification_promotion_pin --locked -- --nocapture
+
+      - name: Strict default Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid Cargo.toml Cargo.lock
+
+      - name: Write schema qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qual-promo-003q-r1-evidence
+          {
+            echo "program=QUAL-PROMO-003Q-R1"
+            echo "authority=frozen-promotion-pin-schema-source-qualification-only"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "promo002_source=$PROMO002_SOURCE"
+            echo "promotion_pin_instance_present=FALSE"
+            echo "promotion_pin_deserializable=FALSE"
+            echo "promotion_pin_default_constructible=FALSE"
+            echo "promo001_qualifier_pr_bound=TRUE"
+            echo "promo002_qualifier_pr_bound=TRUE"
+            echo "promo001_source_qualification_artifact_required=TRUE"
+            echo "promo002_source_qualification_artifact_required=TRUE"
+            echo "run_attempt_policy=EXACTLY_1"
+            echo "external_reverification_performed=FALSE"
+            echo "d4_established_authority=NONE"
+            echo "live_epoch_freshness_binding=NONE"
+            echo "qp_authority=NONE"
+            echo "physical_claim=NONE"
+            echo "format=PASS"
+            echo "compile_default=PASS"
+            echo "focused_tests=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > qual-promo-003q-r1-evidence/receipt.txt
+
+      - name: Upload schema qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qual-promo-003q-r1-${{ github.event.pull_request.head.sha || github.sha }}
+          path: qual-promo-003q-r1-evidence/
+          if-no-files-found: error
