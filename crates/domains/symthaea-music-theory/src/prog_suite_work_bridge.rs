@@ -12,6 +12,11 @@
 //! beats per bar, while FORM-000 `TimeSignature` also requires grouping. The
 //! bridge therefore uses the compatibility quarter-note grouping and records
 //! that the grouping itself was not source-authored.
+//!
+//! FORM-002 V1 likewise stores an unordered canonical set of transformation
+//! classes, so it cannot faithfully encode the ordered native composition
+//! `invert().retrograde()`. That composite remains one explicit `Other` class
+//! rather than being misrepresented as two independent source->target claims.
 
 use crate::prog_suite::{
     ProgSuitePlanErrorV1, ProgSuitePlanV1, ProgSuiteRealizationV1, ProgSuiteTransformV1,
@@ -48,6 +53,7 @@ const IDENTITY_RETURN: &str = "prog-suite:P-return";
 const DERIVE_B: &str = "prog-suite:derive-B";
 const DERIVE_C: &str = "prog-suite:derive-C";
 const RETURN_A: &str = "prog-suite:return-A";
+const RETROGRADE_INVERSION_LABEL: &str = "prog-suite:retrograde-inversion-v1";
 
 const OBLIGATION_ESTABLISH: &str = "prog-suite:establish-primary";
 const OBLIGATION_TRANSFORM_B: &str = "prog-suite:transform-b";
@@ -317,8 +323,7 @@ fn transformation_classes(
         ProgSuiteTransformV1::Inversion => vec![ThematicTransformationClassV1::Inversion],
         ProgSuiteTransformV1::Retrograde => vec![ThematicTransformationClassV1::Retrograde],
         ProgSuiteTransformV1::RetrogradeInversion => vec![
-            ThematicTransformationClassV1::Inversion,
-            ThematicTransformationClassV1::Retrograde,
+            ThematicTransformationClassV1::Other(RETROGRADE_INVERSION_LABEL.into()),
         ],
     }
 }
@@ -569,10 +574,9 @@ mod tests {
         let binding = bridge_prog_suite_plan(&plan()).unwrap();
         assert_eq!(
             binding.thematic_graph.derivations[DERIVE_B].transformations,
-            vec![
-                ThematicTransformationClassV1::Inversion,
-                ThematicTransformationClassV1::Retrograde,
-            ]
+            vec![ThematicTransformationClassV1::Other(
+                RETROGRADE_INVERSION_LABEL.into()
+            )]
         );
         assert_eq!(
             binding.thematic_graph.derivations[DERIVE_C].transformations,
@@ -590,6 +594,28 @@ mod tests {
     }
 
     #[test]
+    fn ordered_composite_is_not_misrepresented_as_two_independent_classes() {
+        let mut edited = plan();
+        edited.sections[1].transformation = ProgSuiteTransformV1::RetrogradeInversion;
+        edited.sections[2].transformation = ProgSuiteTransformV1::Retrograde;
+        edited.validate().unwrap();
+        let binding = bridge_prog_suite_plan(&edited).unwrap();
+        assert_eq!(
+            binding.thematic_graph.derivations[DERIVE_B].transformations,
+            vec![ThematicTransformationClassV1::Other(
+                RETROGRADE_INVERSION_LABEL.into()
+            )]
+        );
+        assert_ne!(
+            binding.thematic_graph.derivations[DERIVE_B].transformations,
+            vec![
+                ThematicTransformationClassV1::Inversion,
+                ThematicTransformationClassV1::Retrograde,
+            ]
+        );
+    }
+
+    #[test]
     fn edited_frozen_transforms_drive_genealogy_without_reconsulting_seed() {
         let mut edited = plan();
         let original_seed = edited.source_seed;
@@ -604,10 +630,9 @@ mod tests {
         );
         assert_eq!(
             binding.thematic_graph.derivations[DERIVE_C].transformations,
-            vec![
-                ThematicTransformationClassV1::Inversion,
-                ThematicTransformationClassV1::Retrograde,
-            ]
+            vec![ThematicTransformationClassV1::Other(
+                RETROGRADE_INVERSION_LABEL.into()
+            )]
         );
     }
 
