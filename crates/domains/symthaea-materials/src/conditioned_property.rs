@@ -41,7 +41,7 @@ pub struct PropertyConditionTag {
 /// Environmental, loading, temporal, and geometric state for a property observation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct PropertyConditions {
-    /// Temperature in kelvin.
+    /// Absolute temperature in kelvin. Zero kelvin is valid for ground-state calculations.
     pub temperature_k: Option<f64>,
     /// Pressure in pascals.
     pub pressure_pa: Option<f64>,
@@ -73,7 +73,7 @@ impl PropertyConditions {
     /// Validate all supplied state variables and extra tags.
     pub fn validate(&self) -> Result<(), ConditionedPropertyError> {
         if let Some(value) = self.temperature_k {
-            validate_positive_finite("temperature_k", value)?;
+            validate_nonnegative_finite("temperature_k", value)?;
         }
         if let Some(value) = self.pressure_pa {
             validate_nonnegative_finite("pressure_pa", value)?;
@@ -581,6 +581,31 @@ mod tests {
     #[test]
     fn valid_observation_accepts_explicit_conditions() {
         observation().validate().unwrap();
+    }
+
+    #[test]
+    fn zero_kelvin_is_valid_for_ground_state_conditions() {
+        let mut ground_state = observation();
+        ground_state.conditions.temperature_k = Some(0.0);
+        ground_state.validate().unwrap();
+        assert!(ground_state
+            .conditions
+            .canonical_signature()
+            .unwrap()
+            .contains("T=0x0000000000000000"));
+    }
+
+    #[test]
+    fn negative_absolute_temperature_is_rejected_by_generic_material_condition() {
+        let mut invalid = observation();
+        invalid.conditions.temperature_k = Some(-1.0);
+        assert!(matches!(
+            invalid.validate(),
+            Err(ConditionedPropertyError::NegativeValue {
+                field: "temperature_k",
+                ..
+            })
+        ));
     }
 
     #[test]
