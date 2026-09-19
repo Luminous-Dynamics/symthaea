@@ -14,6 +14,8 @@ pub mod rendered_attack_gate;
 pub mod rendered_attack_panel;
 #[path = "rendered_transient_contrast.rs"]
 pub mod rendered_transient_contrast;
+#[path = "rendered_attack_crosscheck.rs"]
+pub mod rendered_attack_crosscheck;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
