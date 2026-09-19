@@ -1,0 +1,87 @@
+diff --git a/src/action/mod.rs b/src/action/mod.rs
+--- a/src/action/mod.rs
++++ b/src/action/mod.rs
+@@ -1,39 +1,68 @@
+             ActionIR::WasmSandbox {
+                 module_path,
+                 function_name,
+                 input_data: _,
+             } => match self.mode {
+                 ExecutionMode::Simulated => {
+                     println!(
+                         "🧪 WASM Sandbox: Simulating verification of module {:?}::{}()",
+                         module_path, function_name
+                     );
+                     ActionOutcome::WasmResult {
+                         output: vec![1], // 1 = success in our protocol
+                         logs: vec!["Simulation: Verification successful.".to_string()],
+                     }
+                 }
+                 ExecutionMode::Real => {
+                     #[cfg(feature = "wasm-sandbox")]
+                     {
+                         use wasmtime::*;
+-                        let engine = Engine::default();
+-                        let module = Module::from_file(&engine, module_path)
++
++                        const WASM_FUEL_BUDGET: u64 = 50_000_000;
++                        const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
++
++                        // Module paths are capabilities too. Resolve the requested module through
++                        // the caller-owned SandboxRoot before reading any bytes from the host.
++                        let canonical_module = sandbox
++                            .validate(module_path)
++                            .map_err(ExecutionError::Policy)?;
++                        let module_bytes = std::fs::read(&canonical_module)?;
++
++                        // Keep this raw-Wasm executor ambient-capability-free. Fuel is mandatory so
++                        // an infinite loop cannot monopolize the host thread indefinitely.
++                        let mut config = Config::new();
++                        config.consume_fuel(true);
++                        let engine = Engine::new(&config)
++                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
++                        let module = Module::new(&engine, &module_bytes)
+                             .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+-                        let mut store = Store::new(&engine, ());
++
++                        let limits = StoreLimitsBuilder::new()
++                            .memory_size(WASM_MEMORY_LIMIT_BYTES)
++                            .instances(1)
++                            .tables(4)
++                            .memories(1)
++                            .trap_on_grow_failure(true)
++                            .build();
++                        let mut store = Store::new(&engine, limits);
++                        store.limiter(|limits| limits);
++                        store
++                            .set_fuel(WASM_FUEL_BUDGET)
++                            .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
++
+                         let instance = Instance::new(&mut store, &module, &[])
+                             .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                         let func = instance
+                             .get_typed_func::<(), i32>(&mut store, function_name)
+                             .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+                         let res = func
+                             .call(&mut store, ())
+                             .map_err(|e| ExecutionError::Unsupported(e.to_string()))?;
+ 
+                         ActionOutcome::WasmResult {
+                             output: vec![res as u8],
+                             logs: vec![format!(
+-                                "Wasmtime: Function {} returned {}",
+-                                function_name, res
++                                "Wasmtime bounded sandbox: Function {} returned {}",
++                                function_name, res,
+                             )],
+                         }
+                     }
+                     #[cfg(not(feature = "wasm-sandbox"))]
+                     {
+                         ActionOutcome::WasmResult {
+                             output: vec![0],
+                             logs: vec!["Error: wasm-sandbox feature not enabled.".to_string()],
+                         }
+                     }
+                 }
+             },
