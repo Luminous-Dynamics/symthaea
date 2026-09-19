@@ -5,6 +5,7 @@ pub mod actuation;
 pub mod centroidal;
 pub mod contact;
 pub mod contact_authority;
+pub mod contact_kinematics;
 pub mod contact_patch;
 pub mod contact_wrench;
 pub mod contact_inverse_dynamics;
@@ -37,6 +38,8 @@ pub mod inverse_dynamics;
 pub mod morphology;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_contact_interaction;
+#[cfg(feature = "mujoco")]
+pub mod mujoco_contact_kinematics;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_contact_patch;
 #[cfg(feature = "mujoco")]
@@ -72,6 +75,7 @@ pub mod whole_body;
 pub use actuation::*;
 pub use centroidal::*;
 pub use contact_authority::*;
+pub use contact_kinematics::*;
 pub use contact_patch::*;
 pub use contact_wrench::*;
 pub use contact_inverse_dynamics::*;
@@ -98,6 +102,8 @@ pub use inprocess_sparse_qp::*;
 pub use inverse_dynamics::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_contact_interaction::*;
+#[cfg(feature = "mujoco")]
+pub use mujoco_contact_kinematics::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_contact_patch::*;
 #[cfg(feature = "mujoco")]
