@@ -1,0 +1,318 @@
+name: DE-001A2E Raw Execution Contract Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      authorization_run_id:
+        description: Exact successful DE-001A2 authorization run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      authorization_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a2e-contract-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: A2E raw execution contract qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CONTRACT_HEAD: ${{ github.sha }}
+      AUTHORIZATION_RUN_ID: ${{ inputs.authorization_run_id }}
+
+    steps:
+      - name: Check out exact contract subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.CONTRACT_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind contract identity and paths
+        id: contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$CONTRACT_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a2e-contract" >> "$GITHUB_ENV"
+          echo "UPSTREAM_AUTH=$RUNNER_TEMP/de001a-upstream-a2-authorization" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a2e-contract" \
+            "$RUNNER_TEMP/de001a-upstream-a2-authorization"
+
+      - name: Download exact A2 authorization evidence
+        id: download_authorization
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a2-authorization-*
+          path: ${{ runner.temp }}/de001a-upstream-a2-authorization
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.authorization_run_id }}
+
+      - name: Verify exact authorization run and evidence
+        id: upstream
+        if: steps.download_authorization.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$AUTHORIZATION_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$AUTHORIZATION_RUN_ID" > "$EVIDENCE_DIR/authorization-run.json"
+          test -f "$UPSTREAM_AUTH/a2-authorization.json"
+          test -f "$UPSTREAM_AUTH/authorization-capsule.json"
+
+          python3 - \
+            "$EVIDENCE_DIR/authorization-run.json" \
+            "$UPSTREAM_AUTH/a2-authorization.json" \
+            "$UPSTREAM_AUTH/authorization-capsule.json" \
+            "$AUTHORIZATION_RUN_ID" \
+            crates/domains/symthaea-cosmology-research/references/de001a_a2_authorization_v1.json <<'PY'
+          import hashlib, json, re, sys
+          run_path, auth_path, capsule_path, expected_run, auth_spec_path = sys.argv[1:]
+          run = json.load(open(run_path, encoding="utf-8"))
+          auth = json.load(open(auth_path, encoding="utf-8"))
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+
+          assert str(run["id"]) == expected_run
+          assert run["status"] == "completed"
+          assert run["conclusion"] == "success"
+
+          assert auth["protocol"] == "DE-001A2-EXECUTION-AUTHORIZATION-v1"
+          assert auth["verdict"] == "PASS"
+          assert auth["scientific_claim"] == "NONE"
+          assert auth["authority"] == "exact-optimizer-execution-authorization-only"
+          assert auth["optimizer_execution_authorized"] is True
+          assert auth["a2_execution_authorized"] is True
+          assert auth["normalization_or_migration_authorized"] is False
+          assert auth["optimizer_invocation_budget"] == 1
+          assert auth["exact_effective_sampler_required"] is True
+          assert auth["exact_sampled_coordinate_order_required"] is True
+          assert auth["backend_substitution_allowed"] is False
+          assert auth["method_substitution_allowed"] is False
+          assert auth["option_rewrite_allowed"] is False
+          assert auth["network_allowed"] is False
+          assert auth["runtime_package_installation_allowed"] is False
+          assert re.fullmatch(r"[0-9a-f]{64}", auth["effective_sampler_sha256"])
+          sampled = auth["sampled_coordinate_order"]
+          assert isinstance(sampled, list) and sampled and len(sampled) == len(set(sampled))
+
+          current_auth_spec_sha = hashlib.sha256(open(auth_spec_path, "rb").read()).hexdigest()
+          assert auth["authorization_spec_sha256"] == current_auth_spec_sha
+
+          assert capsule["protocol"] == "DE-001A2-AUTHORIZATION-CAPSULE-v1"
+          assert capsule["scientific_claim"] == "NONE"
+          assert capsule["authority"] == "exact-optimizer-execution-authorization-only"
+          assert capsule["optimizer_execution_authorized"] is True
+          assert capsule["a2_execution_authorized"] is True
+          assert capsule["normalization_or_migration_authorized"] is False
+          assert capsule["authorizer_head"] == run["head_sha"]
+          assert capsule["scientific_subject_head"] == auth["scientific_subject_head"]
+          assert capsule["scientific_subject_tree"] == auth["scientific_subject_tree"]
+          assert capsule["effective_sampler_sha256"] == auth["effective_sampler_sha256"]
+          assert capsule["workflow"]["run_id"] == expected_run
+          assert capsule["workflow"]["authorization_outcome"] == "success"
+          assert capsule["workflow"]["postflight_outcome"] == "success"
+          assert capsule["receipt_sha256"]["authorization"] == hashlib.sha256(open(auth_path, "rb").read()).hexdigest()
+          assert capsule["implementation_sha256"]["authorization_spec"] == current_auth_spec_sha
+          PY
+
+      - name: Assemble self-contained A2E contract evidence
+        id: assemble
+        if: steps.upstream.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR/upstream-authorization"
+          cp -a "$UPSTREAM_AUTH/." "$EVIDENCE_DIR/upstream-authorization/"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Qualify A2E contract software
+        id: software
+        if: steps.assemble.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bin de001a-a2e-contract --release --locked
+          test -x target/release/de001a-a2e-contract
+          sha256sum target/release/de001a-a2e-contract > "$EVIDENCE_DIR/de001a-a2e-contract.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+          sha256sum crates/domains/symthaea-cosmology-research/references/de001a_a2e_execution_contract_v1.json > "$EVIDENCE_DIR/de001a_a2e_execution_contract_v1.json.sha256"
+
+      - name: Qualify dormant raw execution contract
+        id: a2e
+        if: steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a2e-contract \
+            "$EVIDENCE_DIR/upstream-authorization/a2-authorization.json" \
+            > "$EVIDENCE_DIR/a2e-contract.json"
+
+          python3 - "$EVIDENCE_DIR/a2e-contract.json" <<'PY'
+          import json, re, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A2E-EXECUTION-CONTRACT-v1"
+          assert value["verdict"] == "PASS"
+          assert value["scientific_claim"] == "NONE"
+          assert value["authority"] == "raw-optimizer-execution-contract-only"
+          assert value["optimizer_execution_contract_valid"] is True
+          assert value["optimizer_execution_authorized_from_upstream"] is True
+          assert value["executor_implementation_authorized"] is False
+          assert value["reproduction_verdict"] == "UNASSESSED"
+          assert value["a2q_execution_authorized"] is False
+          assert value["optimizer_invocation_budget"] == 1
+          assert value["required_raw_result_protocol"] == "DE-001A2E-RAW-OPTIMIZER-EXECUTION-v1"
+          assert value["automatic_retry_allowed"] is False
+          assert value["normalization_or_migration_allowed"] is False
+          assert value["network_allowed"] is False
+          assert value["runtime_package_installation_allowed"] is False
+          assert re.fullmatch(r"[0-9a-f]{64}", value["effective_sampler_sha256"])
+          sampled = value["sampled_coordinate_order"]
+          assert isinstance(sampled, list) and sampled and len(sampled) == len(set(sampled))
+          PY
+
+      - name: Postflight contract immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.contract.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.contract.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write A2E contract qualification capsule
+        if: always()
+        env:
+          CONTRACT_HEAD_OUT: ${{ steps.contract.outputs.head }}
+          CONTRACT_TREE_OUT: ${{ steps.contract.outputs.tree }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_authorization.outcome }}
+          UPSTREAM_OUTCOME: ${{ steps.upstream.outcome }}
+          ASSEMBLE_OUTCOME: ${{ steps.assemble.outcome }}
+          SOFTWARE_OUTCOME: ${{ steps.software.outcome }}
+          A2E_OUTCOME: ${{ steps.a2e.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib, json, os, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          upstream = root / "upstream-authorization"
+
+          def digest(path):
+              p = pathlib.Path(path)
+              return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "UNAVAILABLE"
+
+          contract = {}
+          if (root / "a2e-contract.json").is_file():
+              try:
+                  contract = json.loads((root / "a2e-contract.json").read_text(encoding="utf-8"))
+              except Exception:
+                  contract = {}
+
+          run = {}
+          if (root / "authorization-run.json").is_file():
+              try:
+                  run = json.loads((root / "authorization-run.json").read_text(encoding="utf-8"))
+              except Exception:
+                  run = {}
+
+          capsule = {
+              "protocol": "DE-001A2E-CONTRACT-QUALIFICATION-CAPSULE-v1",
+              "scientific_claim": "NONE",
+              "authority": "raw-optimizer-execution-contract-only",
+              "executor_implementation_authorized": False,
+              "reproduction_verdict": "UNASSESSED",
+              "a2q_execution_authorized": False,
+              "contract_head": os.environ.get("CONTRACT_HEAD_OUT", "UNAVAILABLE"),
+              "contract_tree": os.environ.get("CONTRACT_TREE_OUT", "UNAVAILABLE"),
+              "authorization_run_id": os.environ["AUTHORIZATION_RUN_ID"],
+              "authorization_head": run.get("head_sha", "UNAVAILABLE"),
+              "scientific_subject_head": contract.get("scientific_subject_head", "UNAVAILABLE"),
+              "scientific_subject_tree": contract.get("scientific_subject_tree", "UNAVAILABLE"),
+              "effective_sampler_sha256": contract.get("effective_sampler_sha256", "UNAVAILABLE"),
+              "workflow": {
+                  "run_id": os.environ["GITHUB_RUN_ID"],
+                  "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "download_authorization_outcome": os.environ.get("DOWNLOAD_OUTCOME", "UNAVAILABLE"),
+                  "upstream_outcome": os.environ.get("UPSTREAM_OUTCOME", "UNAVAILABLE"),
+                  "assemble_outcome": os.environ.get("ASSEMBLE_OUTCOME", "UNAVAILABLE"),
+                  "software_outcome": os.environ.get("SOFTWARE_OUTCOME", "UNAVAILABLE"),
+                  "a2e_outcome": os.environ.get("A2E_OUTCOME", "UNAVAILABLE"),
+                  "postflight_outcome": os.environ.get("POSTFLIGHT_OUTCOME", "UNAVAILABLE"),
+              },
+              "receipt_sha256": {
+                  "authorization": digest(upstream / "a2-authorization.json"),
+                  "authorization_capsule": digest(upstream / "authorization-capsule.json"),
+                  "a2e_contract": digest(root / "a2e-contract.json"),
+              },
+              "implementation_sha256": {
+                  "a2e_contract_spec": digest(pathlib.Path("crates/domains/symthaea-cosmology-research/references/de001a_a2e_execution_contract_v1.json")),
+                  "a2_authorization_spec": digest(pathlib.Path("crates/domains/symthaea-cosmology-research/references/de001a_a2_authorization_v1.json")),
+                  "cargo_lock": digest(pathlib.Path("Cargo.lock")),
+                  "contract_binary_record": digest(root / "de001a-a2e-contract.sha256"),
+              },
+          }
+          (root / "qualification-capsule.json").write_text(
+              json.dumps(capsule, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(capsule, sort_keys=True, indent=2))
+          PY
+
+      - name: Upload A2E contract evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a2e-contract-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a2e-contract
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce valid A2E contract qualification
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_authorization.outcome }}" = "success"
+          test "${{ steps.upstream.outcome }}" = "success"
+          test "${{ steps.assemble.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.a2e.outcome }}" = "success"
+          test "${{ steps.postflight.outcome }}" = "success"
