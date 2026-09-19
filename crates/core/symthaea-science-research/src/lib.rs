@@ -14,10 +14,11 @@
 //! qualification ratifications and lifecycle events, append-only authenticated
 //! qualification lifecycle records, observed-view currentness assessments,
 //! complete-tail lifecycle publication freshness assessments, authenticated
-//! frozen-protocol evidence freshness assessments, typed provenance graphs,
-//! frozen study protocols, immutable execution/conformance records, adversarial
-//! falsification campaigns, explicit scientific uncertainty budgets, and
-//! provenance-checked replication lineage assessments. It does not run
+//! frozen-protocol evidence freshness assessments, aligned validity-readiness
+//! assessments over one exact authenticated evaluation horizon, typed provenance
+//! graphs, frozen study protocols, immutable execution/conformance records,
+//! adversarial falsification campaigns, explicit scientific uncertainty budgets,
+//! and provenance-checked replication lineage assessments. It does not run
 //! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
 //! operations.
 //!
@@ -56,6 +57,7 @@ pub mod qualification_profile_authority;
 pub mod qualification_publication;
 pub mod qualification_review;
 pub mod qualification_root_ratification;
+pub mod qualification_validity_readiness;
 pub mod qualified_claim;
 pub mod replication;
 pub mod subject;
@@ -99,6 +101,7 @@ pub use qualification_profile_authority::*;
 pub use qualification_publication::*;
 pub use qualification_review::*;
 pub use qualification_root_ratification::*;
+pub use qualification_validity_readiness::*;
 pub use qualified_claim::*;
 pub use replication::*;
 pub use subject::*;
