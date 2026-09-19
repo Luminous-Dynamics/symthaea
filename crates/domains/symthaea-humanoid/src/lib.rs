@@ -33,6 +33,8 @@ pub mod inprocess_solver_certification;
 pub mod inprocess_sparse_qp;
 pub mod inverse_dynamics;
 pub mod morphology;
+#[cfg(feature = "mujoco")]
+pub mod mujoco_contact_kinematics;
 pub mod mujoco_oracle_protocol;
 pub mod multi_contact;
 pub mod oracle_dataset;
@@ -82,6 +84,8 @@ pub use hierarchical::*;
 pub use inprocess_solver_certification::*;
 pub use inprocess_sparse_qp::*;
 pub use inverse_dynamics::*;
+#[cfg(feature = "mujoco")]
+pub use mujoco_contact_kinematics::*;
 pub use mujoco_oracle_protocol::*;
 pub use multi_contact::*;
 pub use oracle_dataset::*;
