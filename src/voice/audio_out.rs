@@ -23,12 +23,6 @@ use ringbuf::{
     traits::{Consumer, Observer, Producer, Split},
 };
 
-/// Default maximum amount of synthesized speech allowed to sit ahead of device
-/// playback in the live ring buffer.
-///
-/// This is an engineering default, not a measured optimum. It replaces the historical
-/// ~2 second queue with a conversationally bounded horizon while remaining configurable
-/// for devices that need more underrun tolerance.
 pub const DEFAULT_BUFFER_AHEAD_MS: u32 = 250;
 
 fn buffer_capacity_samples(sample_rate: u32, buffer_ahead_ms: u32) -> usize {
@@ -47,16 +41,12 @@ pub struct AudioProducerHandle {
 }
 
 impl AudioProducerHandle {
-    fn new(producer: ringbuf::HeapProd<f32>) -> Self {
+    pub(crate) fn new(producer: ringbuf::HeapProd<f32>) -> Self {
         Self {
             producer: Arc::new(Mutex::new(producer)),
         }
     }
 
-    /// Push as many samples as fit while `keep_going` remains true.
-    ///
-    /// The producer lock is acquired once for the slice, avoiding per-sample mutex
-    /// traffic while still letting callers observe interruption between samples.
     pub fn push_samples_while<F>(&self, samples: &[f32], mut keep_going: F) -> usize
     where
         F: FnMut() -> bool,
@@ -78,12 +68,10 @@ impl AudioProducerHandle {
         written
     }
 
-    /// Push as many samples as currently fit.
     pub fn push_samples(&self, samples: &[f32]) -> usize {
         self.push_samples_while(samples, || true)
     }
 
-    /// Approximate remaining ring space. Returns 0 if the producer mutex is poisoned.
     pub fn available_space(&self) -> usize {
         self.producer
             .lock()
@@ -102,12 +90,6 @@ impl AudioProducerHandle {
     }
 }
 
-/// Cloneable, capability-narrow request to discard queued live audio.
-///
-/// Calling [`AudioFlushHandle::request_flush`] never touches the ring-buffer
-/// consumer directly. It only raises an atomic flag that the real-time CPAL
-/// callback consumes at its next callback boundary, keeping consumer ownership
-/// single-threaded and avoiding locks on the audio thread.
 #[derive(Debug, Clone)]
 pub struct AudioFlushHandle {
     requested: Arc<AtomicBool>,
@@ -118,18 +100,15 @@ impl AudioFlushHandle {
         Self { requested }
     }
 
-    /// Request that all audio currently queued in the ring buffer be discarded.
     pub fn request_flush(&self) {
         self.requested.store(true, Ordering::Release);
     }
 
-    /// Whether a flush request has not yet been consumed by the audio callback.
     pub fn is_pending(&self) -> bool {
         self.requested.load(Ordering::Acquire)
     }
 }
 
-/// Apply one pending flush request on the consumer-owning thread.
 fn flush_consumer_if_requested<C>(consumer: &mut C, requested: &AtomicBool) -> usize
 where
     C: Consumer<Item = f32>,
@@ -141,7 +120,6 @@ where
     }
 }
 
-/// Real-time audio output via cpal + ring buffer.
 pub struct AudioOutput {
     _stream: Option<cpal::Stream>,
     producer: Option<AudioProducerHandle>,
@@ -153,12 +131,10 @@ pub struct AudioOutput {
 }
 
 impl AudioOutput {
-    /// Open the default audio output device with the default conversational budget.
     pub fn new() -> Result<Self> {
         Self::with_buffer_ahead_ms(DEFAULT_BUFFER_AHEAD_MS)
     }
 
-    /// Open the default audio device with an explicit ring-buffer horizon.
     pub fn with_buffer_ahead_ms(buffer_ahead_ms: u32) -> Result<Self> {
         if buffer_ahead_ms == 0 {
             anyhow::bail!("audio buffer ahead budget must be greater than zero");
@@ -170,12 +146,10 @@ impl AudioOutput {
         Self::from_device(device, buffer_ahead_ms)
     }
 
-    /// Open a specific audio output device by name using the default buffer horizon.
     pub fn with_device(device_name: &str) -> Result<Self> {
         Self::with_device_buffer_ahead_ms(device_name, DEFAULT_BUFFER_AHEAD_MS)
     }
 
-    /// Open a specific output device with an explicit ahead-of-playback budget.
     pub fn with_device_buffer_ahead_ms(device_name: &str, buffer_ahead_ms: u32) -> Result<Self> {
         if buffer_ahead_ms == 0 {
             anyhow::bail!("audio buffer ahead budget must be greater than zero");
@@ -193,7 +167,6 @@ impl AudioOutput {
         Self::from_device(device, buffer_ahead_ms)
     }
 
-    /// Create a dummy output (no device). `push_samples()` discards all data.
     pub fn new_dummy(sample_rate: u32) -> Self {
         Self {
             _stream: None,
@@ -259,7 +232,6 @@ impl AudioOutput {
         })
     }
 
-    /// Push audio samples into the ring buffer (non-blocking).
     pub fn push_samples(&mut self, samples: &[f32]) -> usize {
         self.producer
             .as_ref()
@@ -267,15 +239,10 @@ impl AudioOutput {
             .unwrap_or(0)
     }
 
-    /// Return a cloneable producer-side capability without consuming `AudioOutput`.
     pub fn producer_handle(&self) -> Option<AudioProducerHandle> {
         self.producer.clone()
     }
 
-    /// Take the raw producer when no cloneable producer capability has been shared.
-    ///
-    /// New code should prefer [`Self::producer_handle`]. This compatibility method
-    /// returns `None` rather than invalidating existing producer handles.
     #[deprecated(note = "prefer producer_handle(); raw producer ownership is one-shot")]
     pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
         let handle = self.producer.take()?;
@@ -288,12 +255,10 @@ impl AudioOutput {
         }
     }
 
-    /// Return a cloneable request-only handle for queued-audio invalidation.
     pub fn flush_handle(&self) -> AudioFlushHandle {
         AudioFlushHandle::new(Arc::clone(&self.flush_requested))
     }
 
-    /// Request queued-audio invalidation at the next audio callback boundary.
     pub fn request_flush(&self) {
         self.flush_requested.store(true, Ordering::Release);
     }
@@ -314,7 +279,6 @@ impl AudioOutput {
         self.buffer_ahead_ms
     }
 
-    /// Approximate space remaining in the ring buffer. Returns 0 on dummy output.
     pub fn available_space(&self) -> usize {
         self.producer
             .as_ref()
@@ -355,7 +319,6 @@ mod tests {
         assert_eq!(first.push_samples(&[0.1, 0.2]), 2);
         assert_eq!(consumer.try_pop(), Some(0.1));
         assert_eq!(consumer.try_pop(), Some(0.2));
-
         assert_eq!(second.push_samples(&[0.3, 0.4]), 2);
         assert_eq!(consumer.try_pop(), Some(0.3));
         assert_eq!(consumer.try_pop(), Some(0.4));
