@@ -1,0 +1,112 @@
+name: Math Structural Q0 Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/math-structural-q0-qualification.yml"
+      - "docs/research/MATH_STRUCTURAL_Q0_QUAL_001A.md"
+      - "crates/core/symthaea-core/examples/math_structural_hdc_q0.rs"
+      - "crates/core/symthaea-core/examples/math_structural_retrieval_q0.rs"
+      - "crates/core/symthaea-core/examples/support/math_structural_q0_holdout_v1.rs"
+      - "data/benchmarks/math_structural_q0_v1.json"
+      - "crates/core/symthaea-core/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-frozen-development-lineage:
+    name: Qualify frozen Q0 development lineage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Install frozen Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify inherited Git objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:${path}")"
+            printf '%s  %s\n' "$actual" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_blob \
+            crates/core/symthaea-core/examples/math_structural_hdc_q0.rs \
+            35ab3f0d51dc7298d80836f5efec2878a73bb75d
+          check_blob \
+            crates/core/symthaea-core/examples/math_structural_retrieval_q0.rs \
+            1b1253b976a0a918d149b0acbb0a85e65f9f1f39
+          check_blob \
+            data/benchmarks/math_structural_q0_v1.json \
+            491ffb02d0540974345534f266b9976a6597e548
+
+          # Holdout integrity only. This path MUST NOT appear in any cargo command
+          # in this workflow.
+          check_blob \
+            crates/core/symthaea-core/examples/support/math_structural_q0_holdout_v1.rs \
+            ccd0715b1030b88b7ed1d82f52bfbb8ffd70eaac
+
+      - name: Prepare evidence directory
+        shell: bash
+        run: mkdir -p target/math-structural-q0-qualification
+
+      - name: Test frozen structural HDC development harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-core --example math_structural_hdc_q0 2>&1 \
+            | tee target/math-structural-q0-qualification/hdc-test.log
+
+      - name: Execute frozen structural HDC development harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-core --example math_structural_hdc_q0 2>&1 \
+            | tee target/math-structural-q0-qualification/hdc-run.log
+
+      - name: Test frozen canonical AST development harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea-core --example math_structural_retrieval_q0 2>&1 \
+            | tee target/math-structural-q0-qualification/ast-test.log
+
+      - name: Execute frozen canonical AST development harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --locked -p symthaea-core --example math_structural_retrieval_q0 2>&1 \
+            | tee target/math-structural-q0-qualification/ast-run.log
+
+      - name: Record exact qualification subject
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p target/math-structural-q0-qualification
+          {
+            echo "subject_commit=${GITHUB_SHA}"
+            echo "rustc=$(rustc --version 2>/dev/null || true)"
+            echo "cargo=$(cargo --version 2>/dev/null || true)"
+            echo "holdout_execution=FORBIDDEN_NOT_RUN"
+          } > target/math-structural-q0-qualification/subject.txt
+
+      - name: Upload qualification logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-structural-q0-qualification-${{ github.sha }}
+          path: target/math-structural-q0-qualification/
+          if-no-files-found: warn
+          retention-days: 30
