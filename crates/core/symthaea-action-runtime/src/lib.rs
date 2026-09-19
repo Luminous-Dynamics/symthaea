@@ -166,6 +166,14 @@ impl GrantAccount {
         if self.snapshot.reservations.contains_key(&reservation_id) {
             return Err(RuntimeAccountingError::DuplicateReservation);
         }
+        if self
+            .snapshot
+            .reservations
+            .values()
+            .any(|reservation| reservation.execution_id == execution_id)
+        {
+            return Err(RuntimeAccountingError::DuplicateExecutionId);
+        }
         self.ensure_capacity(1, risk_charge)?;
         self.snapshot.reservations.insert(
             reservation_id.clone(),
@@ -230,12 +238,21 @@ impl GrantAccount {
         if self.snapshot.escrows.contains_key(&escrow_id) {
             return Err(RuntimeAccountingError::DuplicateEscrow);
         }
+        let child_grant_digest = child.digest();
+        if self
+            .snapshot
+            .escrows
+            .values()
+            .any(|escrow| escrow.child_grant_digest == child_grant_digest)
+        {
+            return Err(RuntimeAccountingError::DuplicateChildEscrow);
+        }
         self.ensure_capacity(child.max_uses, child.risk_budget)?;
         self.snapshot.escrows.insert(
             escrow_id.clone(),
             DelegationEscrow {
                 escrow_id,
-                child_grant_digest: child.digest(),
+                child_grant_digest,
                 allocated_uses: child.max_uses,
                 allocated_risk: child.risk_budget,
                 state: EscrowState::Open,
@@ -302,18 +319,23 @@ impl GrantAccount {
         reservation_id: &ReservationId,
         required_state: ReservationState,
     ) -> Result<(), RuntimeAccountingError> {
+        self.validate_internal_invariants()?;
         let (risk_charge, state) = {
             let reservation = self.reservation_mut(reservation_id)?;
             (reservation.risk_charge, reservation.state)
         };
         require_reservation_state(state, required_state)?;
-        self.snapshot.committed_uses = self
+
+        let new_committed_uses = self
             .snapshot
             .committed_uses
             .checked_add(1)
             .ok_or(RuntimeAccountingError::ArithmeticOverflow)?;
-        self.snapshot.committed_risk = risk_checked_add(self.snapshot.committed_risk, risk_charge)
+        let new_committed_risk = risk_checked_add(self.snapshot.committed_risk, risk_charge)
             .ok_or(RuntimeAccountingError::ArithmeticOverflow)?;
+
+        self.snapshot.committed_uses = new_committed_uses;
+        self.snapshot.committed_risk = new_committed_risk;
         self.reservation_mut(reservation_id)?.state = ReservationState::Committed;
         self.validate_internal_invariants()
     }
@@ -324,6 +346,7 @@ impl GrantAccount {
         child: &CapabilityGrant,
         required_state: EscrowState,
     ) -> Result<(), RuntimeAccountingError> {
+        self.validate_internal_invariants()?;
         child.validate()?;
         let (child_digest, allocated_uses, allocated_risk, state) = {
             let escrow = self.escrow_mut(escrow_id)?;
@@ -341,14 +364,17 @@ impl GrantAccount {
         {
             return Err(RuntimeAccountingError::ChildGrantMismatch);
         }
-        self.snapshot.committed_uses = self
+
+        let new_committed_uses = self
             .snapshot
             .committed_uses
             .checked_add(allocated_uses)
             .ok_or(RuntimeAccountingError::ArithmeticOverflow)?;
-        self.snapshot.committed_risk =
-            risk_checked_add(self.snapshot.committed_risk, allocated_risk)
-                .ok_or(RuntimeAccountingError::ArithmeticOverflow)?;
+        let new_committed_risk = risk_checked_add(self.snapshot.committed_risk, allocated_risk)
+            .ok_or(RuntimeAccountingError::ArithmeticOverflow)?;
+
+        self.snapshot.committed_uses = new_committed_uses;
+        self.snapshot.committed_risk = new_committed_risk;
         let escrow = self.escrow_mut(escrow_id)?;
         escrow.committed_uses = allocated_uses;
         escrow.committed_risk = allocated_risk;
@@ -455,6 +481,8 @@ impl GrantAccount {
 
         let mut derived_uses = 0u32;
         let mut derived_risk = RiskBudget::default();
+        let mut execution_ids = std::collections::BTreeSet::new();
+        let mut child_grant_digests = std::collections::BTreeSet::new();
 
         for (key, reservation) in &self.snapshot.reservations {
             if key != &reservation.reservation_id {
@@ -462,6 +490,9 @@ impl GrantAccount {
             }
             validate_id(&reservation.reservation_id.0)?;
             validate_id(&reservation.execution_id.0)?;
+            if !execution_ids.insert(reservation.execution_id.clone()) {
+                return Err(RuntimeAccountingError::DuplicateExecutionId);
+            }
             if reservation.effect_digest.0 == [0; 32] {
                 return Err(RuntimeAccountingError::ZeroEffectDigest);
             }
@@ -481,6 +512,9 @@ impl GrantAccount {
             validate_id(&escrow.escrow_id.0)?;
             if escrow.child_grant_digest.0 == [0; 32] || escrow.allocated_uses == 0 {
                 return Err(RuntimeAccountingError::InvariantViolation);
+            }
+            if !child_grant_digests.insert(escrow.child_grant_digest) {
+                return Err(RuntimeAccountingError::DuplicateChildEscrow);
             }
             match escrow.state {
                 EscrowState::Open | EscrowState::OutcomeUnknown => {
@@ -588,12 +622,16 @@ pub enum RuntimeAccountingError {
     ZeroEffectDigest,
     #[error("reservation id already exists")]
     DuplicateReservation,
+    #[error("execution id already exists in this grant account")]
+    DuplicateExecutionId,
     #[error("reservation id was not found")]
     ReservationNotFound,
     #[error("reservation transition is not allowed from the current state")]
     InvalidReservationTransition,
     #[error("delegation escrow id already exists")]
     DuplicateEscrow,
+    #[error("this exact child grant already has delegation escrow in this parent account")]
+    DuplicateChildEscrow,
     #[error("delegation escrow id was not found")]
     EscrowNotFound,
     #[error("delegation escrow transition is not allowed from the current state")]
@@ -695,6 +733,29 @@ mod tests {
     }
 
     #[test]
+    fn execution_ids_are_unique_within_a_grant_account() {
+        let grant = parent_grant();
+        let mut account = GrantAccount::new(&grant).unwrap();
+        account
+            .reserve_execution(
+                ReservationId("r1".into()),
+                ExecutionId("e1".into()),
+                digest(1),
+                risk(1),
+            )
+            .unwrap();
+        assert!(matches!(
+            account.reserve_execution(
+                ReservationId("r2".into()),
+                ExecutionId("e1".into()),
+                digest(2),
+                risk(1),
+            ),
+            Err(RuntimeAccountingError::DuplicateExecutionId)
+        ));
+    }
+
+    #[test]
     fn delegation_escrow_binds_exact_child_digest() {
         let parent = parent_grant();
         let child_a = child_grant(&parent, "child-a");
@@ -715,6 +776,20 @@ mod tests {
         account
             .close_escrow_fully_charged(&escrow, &child_a)
             .unwrap();
+    }
+
+    #[test]
+    fn exact_child_grant_can_only_have_one_escrow() {
+        let parent = parent_grant();
+        let child = child_grant(&parent, "child");
+        let mut account = GrantAccount::new(&parent).unwrap();
+        account
+            .reserve_delegation_escrow(&parent, &child, EscrowId("e1".into()))
+            .unwrap();
+        assert!(matches!(
+            account.reserve_delegation_escrow(&parent, &child, EscrowId("e2".into())),
+            Err(RuntimeAccountingError::DuplicateChildEscrow)
+        ));
     }
 
     #[test]
@@ -767,6 +842,28 @@ mod tests {
             GrantAccount::from_snapshot(&grant, snapshot),
             Err(RuntimeAccountingError::CommittedAccountingMismatch)
         ));
+    }
+
+    #[test]
+    fn failed_commit_does_not_partially_mutate_account() {
+        let grant = parent_grant();
+        let mut account = GrantAccount::new(&grant).unwrap();
+        let id = ReservationId("r1".into());
+        account
+            .reserve_execution(id.clone(), ExecutionId("e1".into()), digest(1), risk(1))
+            .unwrap();
+
+        // Corrupt the private in-memory state to force the checked-add failure
+        // path and prove that the transition performs no partial successor write.
+        account.snapshot.committed_risk.mutation_units = u64::MAX;
+        let before = account.snapshot.clone();
+        assert!(matches!(
+            account.commit_observed(&id),
+            Err(RuntimeAccountingError::ArithmeticOverflow)
+                | Err(RuntimeAccountingError::CommittedAccountingMismatch)
+                | Err(RuntimeAccountingError::InvariantViolation)
+        ));
+        assert_eq!(account.snapshot, before);
     }
 
     #[test]
