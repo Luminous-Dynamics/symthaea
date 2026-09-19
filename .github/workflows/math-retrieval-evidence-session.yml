@@ -1,0 +1,68 @@
+name: Math Retrieval Evidence Session
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/math-retrieval-evidence-session.yml"
+      - "docs/research/MATH_RET_RUNTIME_002E.md"
+      - "tools/math-retrieval-evidence-session/**"
+      - "tools/math-retrieval-production-runtime/**"
+      - "tools/math-retrieval-candidate-loader/**"
+      - "tools/math-retrieval-materializer-identity/**"
+      - "tools/math-retrieval-runtime-seam/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-evidence-session:
+    name: Qualify transaction-scoped production evidence session
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Install frozen Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify frozen predecessor objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:${path}")"
+            printf '%s  %s\n' "$actual" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_blob tools/math-retrieval-runtime-seam/src/lib.rs \
+            29c949a9331fbe8e912cd0d03a048595bc354d7b
+          check_blob tools/math-retrieval-candidate-loader/src/lib.rs \
+            00716bee4333d32ff3ebfabdb0908acb95ff8bba
+          check_blob tools/math-retrieval-materializer-identity/src/lib.rs \
+            ccd7c5faa4d3ee4a3fceb7f65a0fa5a8dd68fb5f
+          check_blob tools/math-retrieval-production-runtime/src/lib.rs \
+            ee8085dbdb701567e408e592c1e35b92fff3fff5
+          check_blob tools/math-retrieval-production-runtime/tests/production_candidate_fixture.json \
+            b958bb22d3f9730089cba0ba18b6eb0f8959be62
+
+      - name: Check standalone lock
+        shell: bash
+        run: cargo metadata --manifest-path tools/math-retrieval-evidence-session/Cargo.toml --locked --format-version 1 >/dev/null
+
+      - name: Format evidence session
+        shell: bash
+        run: cargo fmt --manifest-path tools/math-retrieval-evidence-session/Cargo.toml -- --check
+
+      - name: Check evidence session
+        shell: bash
+        run: cargo check --manifest-path tools/math-retrieval-evidence-session/Cargo.toml --locked
+
+      - name: Test evidence session
+        shell: bash
+        run: cargo test --manifest-path tools/math-retrieval-evidence-session/Cargo.toml --locked
