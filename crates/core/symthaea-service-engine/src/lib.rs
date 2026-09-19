@@ -6,6 +6,7 @@
 //! capability rather than a raw `ServiceMutationCommand` handle, while the owner
 //! still rejects unsupported mutation variants defensively.
 
+pub mod cognitive_gate;
 pub mod host;
 pub mod protocol;
 pub mod protocol_error;

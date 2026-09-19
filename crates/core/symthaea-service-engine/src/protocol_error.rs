@@ -35,6 +35,15 @@ pub struct ServiceProtocolFailure {
 }
 
 impl ServiceProtocolFailure {
+    pub const fn cognitive_gate_not_idle() -> Self {
+        Self {
+            code: "cognitive_gate_not_idle",
+            class: ServiceProtocolFailureClass::Observation,
+            message: "Cognitive action gate is unavailable while Symthaea is not idle",
+            retryable: true,
+        }
+    }
+
     pub fn legacy_response(self) -> ServiceWireResponse {
         ServiceWireResponse::Error {
             message: self.message.to_string(),
@@ -195,5 +204,13 @@ mod tests {
         assert_eq!(failure.class, ServiceProtocolFailureClass::Observation);
         assert!(failure.retryable);
         assert_eq!(failure.to_string(), "Symthaea runtime state is temporarily unavailable");
+    }
+
+    #[test]
+    fn non_idle_cognitive_gate_is_retryable_observation_failure() {
+        let failure = ServiceProtocolFailure::cognitive_gate_not_idle();
+        assert_eq!(failure.code, "cognitive_gate_not_idle");
+        assert_eq!(failure.class, ServiceProtocolFailureClass::Observation);
+        assert!(failure.retryable);
     }
 }

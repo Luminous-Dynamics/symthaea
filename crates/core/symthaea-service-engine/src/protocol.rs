@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use symthaea_service_runtime::{ProcessOrigin, ServiceCounters};
 
+use crate::cognitive_gate::MeasuredCognitiveGate;
 use crate::host::ServiceRuntimeHost;
 use crate::protocol_error::ServiceProtocolFailure;
 use crate::read_wire::MeasuredIntrospectionV2;
@@ -94,6 +95,16 @@ impl ServiceProtocolCore {
         host: &ServiceRuntimeHost,
     ) -> Result<MeasuredIntrospectionV2, ServiceProtocolFailure> {
         Ok(MeasuredIntrospectionV2::from(host.introspection()?))
+    }
+
+    /// Return a measured cognition signal for conservative action policy only when
+    /// the runtime is explicitly idle. This value may inhibit execution or request
+    /// stronger review; it does not grant command capability or authority.
+    pub fn measured_action_gate(
+        &self,
+        host: &ServiceRuntimeHost,
+    ) -> Result<MeasuredCognitiveGate, ServiceProtocolFailure> {
+        MeasuredCognitiveGate::try_from_read(host.introspection()?)
     }
 
     /// Explicit daemon-v1 compatibility projection. The heuristics remain a
