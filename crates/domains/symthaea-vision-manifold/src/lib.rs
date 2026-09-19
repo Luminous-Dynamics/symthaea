@@ -36,6 +36,7 @@ pub mod encoder;
 pub mod manifold;
 pub mod predictive;
 pub mod spectrum;
+pub mod tracker_export;
 pub mod training;
 pub mod types;
 
@@ -95,6 +96,11 @@ pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{
     BandProbeEvidence, BandProbeScore, MultiSpectralEncoder, MultiSpectralEncoderState,
     MultiSpectralFrame, SpectralBandEncoderState, SpectralLayer, SpectrumBand,
+};
+pub use tracker_export::{
+    VISUAL_TRACKER_STATE_EXPORT_SCHEMA_ID, VISUAL_TRACKER_STATE_EXPORT_SCHEMA_VERSION,
+    VisualTrackPresenceV1, VisualTrackStateV1, VisualTrackerCoordinateFrameV1,
+    VisualTrackerKinematicsV1, VisualTrackerStateExportError, VisualTrackerStateExportV1,
 };
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
