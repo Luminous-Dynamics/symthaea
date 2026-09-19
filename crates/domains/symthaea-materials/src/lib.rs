@@ -24,6 +24,7 @@ pub mod irradiation_evidence;
 pub mod material_subject;
 pub mod mining;
 pub mod properties;
+pub mod search_memory;
 pub mod strategic;
 pub mod technoeconomics;
 pub mod thermodynamic_evidence;
@@ -68,6 +69,10 @@ pub use mining::{
     MiningPredictor, MiningReading,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
+pub use search_memory::{
+    MaterialSearchAttempt, MaterialsSearchMemory, SearchAttemptCost, SearchAttemptOutcome,
+    SearchEvaluatorRef, SearchMemoryError, SearchNeighborhoodFingerprint,
+};
 pub use strategic::{
     STRATEGIC_HORIZON_LABELS, STRATEGIC_HORIZONS, StrategicFepAction, StrategicFepAgent,
     StrategicHdcEncoder, StrategicPredictor, StrategicReading,
