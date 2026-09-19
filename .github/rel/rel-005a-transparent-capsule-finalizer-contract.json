@@ -1,29 +1,80 @@
 {
-  "schema": "symthaea.rel.transparent-capsule-finalizer-contract.v6",
-  "authority": "TransparentCapsuleFinalizerContractOnly",
-  "relation": "REL-005A",
-  "source_workflow": {
-    "name": "REL-005A Qualification Pipeline V3",
-    "head_sha": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
-    "required_conclusion": "success",
-    "qualification_evidence_artifact": "rel-005a-qualification-evidence-460b4c8a8f457f4bbf22820716ed6057d260d4fd",
-    "authority_audit_artifact": "rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd"
+  "attestation": {
+    "action_commit": "1e69f48acb82d1966a394da916b4c1698aa569d6",
+    "bundle_must_be_archived": true,
+    "bundle_sha256_must_be_recorded": true,
+    "mode": "provenance",
+    "offline_verification_must_precede_attestation": true,
+    "subject_digest_algorithm": "sha256",
+    "subject_digest_must_equal_offline_verified_capsule_digest": true,
+    "subject_input": "subject-digest",
+    "subject_name": "rel-005a-qualification-capsule.tar"
   },
   "attestation_contract": {
-    "schema": "symthaea.rel.attestation-contract.v6",
     "blob": "5f009027eb7ed1fa791df87d472a4cfe800a2a90",
+    "must_match_source_workflow_head": true,
     "parent_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
-    "must_match_source_workflow_head": true
+    "schema": "symthaea.rel.attestation-contract.v6"
+  },
+  "audit_normalization": {
+    "byte_preserving_required": true,
+    "canonical_census": [
+      "authority-receipt-extraction.json",
+      "sealed-manifest-replay-receipt.json"
+    ],
+    "contract_blob": "481be171bd38dd945e40b060f199373c7ca17278",
+    "contract_schema": "symthaea.rel.publication-audit-normalization-contract.v1",
+    "json_payload_mutation_forbidden": true,
+    "normalizer_blob": "87283ffe7075c0ce424efee97d32efeca5f28eee",
+    "self_test_required_before_source_resolution": true,
+    "source_census": [
+      "authority-receipt-extraction.json",
+      "sealed-manifest-replay.json"
+    ]
+  },
+  "authority": "TransparentCapsuleFinalizerContractOnly",
+  "authority_boundary": {
+    "may_apply_scientific_thresholds": false,
+    "may_attest_capsule_provenance": true,
+    "may_change_qualification_result": false,
+    "may_package_verified_metric_free_authority_receipts": true,
+    "may_read_raw_scientific_observation": false
+  },
+  "capsule": {
+    "input_member_count": 9,
+    "manifest_schema": "symthaea.rel.qualification-capsule-manifest.v2",
+    "name": "rel-005a-qualification-capsule.tar",
+    "outcome_neutral": true,
+    "total_member_count_with_manifest": 10
+  },
+  "claims": {
+    "attestation_created": false,
+    "capsule_built": false,
+    "offline_verified": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_fail": false,
+    "scientific_pass": false
   },
   "dispatch_architecture": {
-    "execution_surface": "reusable_workflow",
-    "workflow_call_required": true,
+    "called_workflow_self_identity": "job.workflow_sha",
     "default_branch_dispatcher_required": true,
     "dispatcher_must_pin_called_workflow_by_exact_sha": true,
-    "called_workflow_self_identity": "job.workflow_sha",
-    "github_sha_is_not_called_workflow_authority": true
+    "execution_surface": "reusable_workflow",
+    "github_sha_is_not_called_workflow_authority": true,
+    "workflow_call_required": true
   },
+  "forbidden_inputs": [
+    "raw ExecutionOnly observation",
+    "execution stdout/stderr",
+    "detailed ComparisonOnly predicate array",
+    "scientific threshold table"
+  ],
   "input_files": {
+    "audit_evidence_canonical": [
+      "sealed-manifest-replay-receipt.json",
+      "authority-receipt-extraction.json"
+    ],
     "qualification_evidence": [
       "predicate-contract-receipt.json",
       "execution-v3-receipt.json",
@@ -32,73 +83,39 @@
       "qualification-input-manifest.json",
       "qualification-assembly-receipt.json",
       "qualification-only.json"
-    ],
-    "audit_evidence": [
-      "sealed-manifest-replay-receipt.json",
-      "authority-receipt-extraction.json"
     ]
   },
-  "forbidden_inputs": [
-    "raw ExecutionOnly observation",
-    "execution stdout/stderr",
-    "detailed ComparisonOnly predicate array",
-    "scientific threshold table"
-  ],
-  "capsule": {
-    "name": "rel-005a-qualification-capsule.tar",
-    "input_member_count": 9,
-    "total_member_count_with_manifest": 10,
-    "manifest_schema": "symthaea.rel.qualification-capsule-manifest.v2",
-    "outcome_neutral": true
-  },
-  "verification": {
-    "offline_verifier_required_before_attestation": true,
-    "offline_verifier_schema": "symthaea.rel.offline-qualification-capsule-verification.v3",
-    "offline_verifier_blob": "e03b1871ccc8eac7958c2b4fc1aa8f96964c058d",
-    "offline_verifier_self_test_required_before_source_resolution": true,
-    "offline_verifier_self_test_schema": "symthaea.rel.offline-qualification-capsule-verification-self-test.v3",
-    "offline_verifier_adversarial_mutations_required": 7,
-    "canonical_ustar_bytes_must_verify": true,
-    "manifest_canonicalization_must_verify": true,
-    "projected_manifest_hashes_must_verify": true,
-    "upstream_authority_claims_must_verify": true,
-    "assembly_provenance_bindings_must_verify": true,
-    "failed_predicate_namespace_must_verify": true,
-    "network_required_for_internal_capsule_verification": false,
-    "audit_receipt_hash_links_must_recompute": true,
-    "metric_leakage_must_be_absent": true
+  "relation": "REL-005A",
+  "schema": "symthaea.rel.transparent-capsule-finalizer-contract.v7",
+  "source_workflow": {
+    "authority_audit_artifact": "rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "head_sha": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "name": "REL-005A Qualification Pipeline V3",
+    "qualification_evidence_artifact": "rel-005a-qualification-evidence-460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "required_conclusion": "success",
+    "run_id": 35439414230
   },
   "transport_semantics": {
-    "resolve_source_artifacts_at_runtime": true,
+    "artifact_transport_identity_is_scientific_authority": false,
     "require_unique_unexpired_exact_name_artifacts": true,
-    "verify_zip_digest_before_extraction": true,
-    "artifact_transport_identity_is_scientific_authority": false
+    "resolve_source_artifacts_at_runtime": true,
+    "verify_zip_digest_before_extraction": true
   },
-  "attestation": {
-    "action_commit": "1e69f48acb82d1966a394da916b4c1698aa569d6",
-    "mode": "provenance",
-    "subject_name": "rel-005a-qualification-capsule.tar",
-    "subject_input": "subject-digest",
-    "subject_digest_algorithm": "sha256",
-    "subject_digest_must_equal_offline_verified_capsule_digest": true,
-    "bundle_must_be_archived": true,
-    "bundle_sha256_must_be_recorded": true,
-    "offline_verification_must_precede_attestation": true
-  },
-  "authority_boundary": {
-    "may_change_qualification_result": false,
-    "may_apply_scientific_thresholds": false,
-    "may_read_raw_scientific_observation": false,
-    "may_package_verified_metric_free_authority_receipts": true,
-    "may_attest_capsule_provenance": true
-  },
-  "claims": {
-    "capsule_built": false,
-    "offline_verified": false,
-    "attestation_created": false,
-    "qualification_completed": false,
-    "rel_005a_qualified": false,
-    "scientific_pass": false,
-    "scientific_fail": false
+  "verification": {
+    "assembly_provenance_bindings_must_verify": true,
+    "audit_receipt_hash_links_must_recompute": true,
+    "canonical_ustar_bytes_must_verify": true,
+    "failed_predicate_namespace_must_verify": true,
+    "manifest_canonicalization_must_verify": true,
+    "metric_leakage_must_be_absent": true,
+    "network_required_for_internal_capsule_verification": false,
+    "offline_verifier_adversarial_mutations_required": 7,
+    "offline_verifier_blob": "e03b1871ccc8eac7958c2b4fc1aa8f96964c058d",
+    "offline_verifier_required_before_attestation": true,
+    "offline_verifier_schema": "symthaea.rel.offline-qualification-capsule-verification.v3",
+    "offline_verifier_self_test_required_before_source_resolution": true,
+    "offline_verifier_self_test_schema": "symthaea.rel.offline-qualification-capsule-verification-self-test.v3",
+    "projected_manifest_hashes_must_verify": true,
+    "upstream_authority_claims_must_verify": true
   }
 }
