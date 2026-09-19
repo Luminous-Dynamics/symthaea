@@ -1,0 +1,122 @@
+name: Action Runtime V2 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-runtime-v2-qualification.yml'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-runtime-v2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  action-runtime-v2:
+    name: Exact-head action runtime v2
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          git status --porcelain=v1
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Static authority-surface ratchets
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib
+          import re
+
+          source = pathlib.Path('crates/core/symthaea-action-runtime/src/lib.rs').read_text()
+          required = [
+              'pub struct GrantAccountV2',
+              'pub fn restore(',
+              'DelegatedGrantRequiresVerifiedChain',
+              'ReservationState::OutcomeUnknown',
+          ]
+          for needle in required:
+              if needle not in source:
+                  raise SystemExit(f'missing required runtime authority ratchet: {needle}')
+
+          if 'pub fn from_snapshot' in source:
+              raise SystemExit('forbidden snapshot-only live-account restoration API')
+
+          match = re.search(
+              r'#\[derive\((.*?)\)\]\s*pub struct GrantAccountV2',
+              source,
+              re.DOTALL,
+          )
+          if not match:
+              raise SystemExit('could not locate GrantAccountV2 derive surface')
+          derives = {item.strip() for item in match.group(1).split(',')}
+          forbidden = {'Clone', 'Serialize', 'Deserialize'} & derives
+          if forbidden:
+              raise SystemExit(
+                  'GrantAccountV2 must remain non-Clone and non-Serde: '
+                  + ', '.join(sorted(forbidden))
+              )
+          PY
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-runtime -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-action-runtime --all-targets
+          cargo test -p symthaea-action-runtime
+          cargo clippy -p symthaea-action-runtime --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-runtime --all-targets
+          cargo test --locked -p symthaea-action-runtime
+          cargo clippy --locked -p symthaea-action-runtime --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
