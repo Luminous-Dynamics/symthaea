@@ -7,29 +7,81 @@ This document defines the fail-closed trust transition from the queue-neutral re
 The complete v1 recovery sequence is:
 
 ```text
-explicit operator authorization
+external content-addressed bootstrap authorization
         ↓
-Stage A: bootstrap.v8 PASS
+Stage A: bootstrap.v9 PASS
         ↓
 Stage B: provision hardened persistent host / ephemeral runner process
         ↓
-Stage C: exact promotion + promotion.v4 PASS
+Stage C: exact promotion + promotion.v5 PASS
         ↓
 Stage D: main-only GitHub smoke + smoke.v1 PASS
         ↓
-Stage E: promotion/smoke join + recovery-eligibility.v3 PASS
+Stage E: promotion/smoke join + recovery-eligibility.v4 PASS
         ↓
-Stage F: one explicitly operator-authorized exact correctness recovery target
+separate explicit Stage-F target authorization
+        ↓
+Stage F: one exact correctness recovery target
 ```
 
 Each arrow is a separate evidence transition. None may be inferred from the previous stage.
 
+## External bootstrap authorization capsule
+
+The recovery branch must never authorize itself. Before Stage A, an operator creates and retains an authorization capsule **outside the repository checkout** and independently records the SHA-256 of its exact bytes.
+
+The capsule is deliberately bootstrap-only. It does not authorize a Stage-F workload, scientific qualification, or repair.
+
+Exact v1 format:
+
+```text
+schema=symthaea.trusted-runner.bootstrap-authorization.v1
+decision=AUTHORIZE_BOOTSTRAP
+repository=https://github.com/Luminous-Dynamics/symthaea.git
+recovery_branch=ci/nixos-ephemeral-runner-v1
+authorized_recovery_head=<reviewed 40-hex recovery commit>
+authorized_recovery_tree=<reviewed 40-hex recovery tree>
+authorized_main_head=<reviewed 40-hex current main commit>
+authorized_main_tree=<reviewed 40-hex current main tree>
+recovery_diff_paths_sha256=<sha256 of sorted recovery-only path list plus final newline>
+authorization_scope=trusted-runner-bootstrap-only
+stage_f_authority=NONE
+qualification_claim=NONE
+repair_authority_claim=NONE
+```
+
+Every key must occur exactly once with a non-empty value. Do not add a favorable timestamp, target name, qualification result, or repair permission to this object.
+
+A reproducible way to obtain the identities before making the human authorization decision is:
+
+```bash
+git fetch origin main ci/nixos-ephemeral-runner-v1
+MAIN_HEAD="$(git rev-parse origin/main)"
+MAIN_TREE="$(git rev-parse origin/main^{tree})"
+RECOVERY_HEAD="$(git rev-parse origin/ci/nixos-ephemeral-runner-v1)"
+RECOVERY_TREE="$(git rev-parse origin/ci/nixos-ephemeral-runner-v1^{tree})"
+RECOVERY_DIFF_PATHS_SHA256="$(git diff --name-only "$MAIN_HEAD" "$RECOVERY_HEAD" | LC_ALL=C sort | sha256sum | awk '{print $1}')"
+
+printf 'main=%s tree=%s\nrecovery=%s tree=%s\npaths=%s\n' \
+  "$MAIN_HEAD" "$MAIN_TREE" "$RECOVERY_HEAD" "$RECOVERY_TREE" "$RECOVERY_DIFF_PATHS_SHA256"
+```
+
+Review those identities and the exact diff before creating the external capsule. Then independently record:
+
+```bash
+sha256sum /secure/path/bootstrap-authorization.v1
+```
+
+The authorization capsule is an auditable human decision record, not a cryptographic signature. Its independently recorded SHA-256 prevents later byte substitution within this bootstrap procedure; organizational signer/authentication policy, if required, remains a separate trust layer.
+
 ## Stage A — host-side bootstrap validation
 
-Run on the isolated NixOS host that will become the trusted CPU runner. Obtain the exact reviewed recovery SHA from issue #75 or another out-of-band authorization record. Do not infer authorization from the branch head.
+Run on the isolated NixOS host that will become the trusted CPU runner. Do not infer authorization from the branch head, an issue comment alone, or successful static review.
 
 ```bash
 export SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD='<reviewed 40-hex recovery commit>'
+export SYMTHAEA_TRUSTED_RECOVERY_AUTHORIZATION_PATH='/secure/path/bootstrap-authorization.v1'
+export SYMTHAEA_TRUSTED_RECOVERY_AUTHORIZATION_SHA256='<independently recorded 64-hex SHA-256>'
 
 git clone https://github.com/Luminous-Dynamics/symthaea.git
 cd symthaea
@@ -42,13 +94,20 @@ bash nix/ci/validate-trusted-runner-bootstrap.sh
 
 The validator independently requires:
 
-- explicit 40-hex operator authorization;
+- explicit 40-hex expected recovery head;
+- exact external authorization-capsule byte hash equals the independently recorded SHA-256;
+- authorization capsule resolves outside the repository checkout;
+- authorization schema/decision/repository/branch/scope are exact;
+- authorization says `stage_f_authority=NONE`, `qualification_claim=NONE`, and `repair_authority_claim=NONE`;
+- authorization recovery head/tree equal the checked-out and freshly fetched recovery generation;
+- authorization current-`main` head/tree equal freshly fetched public `main`;
+- authorization recovery path digest equals the exact reviewed path allowlist digest;
 - canonical public HTTPS origin;
 - pristine tracked/untracked/ignored source tree;
-- authorized head = checked-out head = freshly fetched recovery head;
 - current public `main` is an ancestor of recovery;
 - exact reviewed recovery path allowlist;
 - exact runner/routing/smoke/ARC3-qualifier/SE-001Q-recovery/SE-001Q-helper/CI-shell/bootstrap/promotion/recovery-eligibility/lifecycle artifact identities;
+- shell syntax validation of bootstrap/promotion/recovery-eligibility verifiers;
 - runner-policy and routing-policy Nix evaluation;
 - pinned minimal Rust environment with locked Cargo metadata and compilation;
 - parse-compilation of the trusted SE-001Q replay helper under the pinned Python environment;
@@ -58,13 +117,14 @@ The validator independently requires:
 A successful run emits:
 
 ```text
-schema=symthaea.trusted-runner.bootstrap.v8
+schema=symthaea.trusted-runner.bootstrap.v9
 ```
 
 and a SHA-256 of the exact manifest bytes. Retain **both** the manifest and printed hash outside the repository.
 
-`bootstrap.v8` binds:
+`bootstrap.v9` binds:
 
+- SHA-256, schema, scope, and explicit no-Stage-F-authority state of the external authorization capsule;
 - operator-authorized recovery head and exact source tree;
 - exact pre-promotion `main` head/tree;
 - exact promoted-tree requirement and required recovery ancestor;
@@ -74,13 +134,13 @@ and a SHA-256 of the exact manifest bytes. Retain **both** the manifest and prin
 - host-lifecycle contract blob;
 - nixpkgs/Rust/lock/toolchain provenance;
 - host Nix system/version;
-- PASS states for authorization, policy evaluation, locked Rust validation, SE-001Q helper syntax validation and ref stability.
+- PASS states for external authorization, policy evaluation, locked Rust validation, helper/verifier syntax validation and ref stability.
 
-If either public ref moves or any reviewed artifact changes, Stage A is stale. Review/authorize the new recovery generation and rerun.
+If either public ref moves or any reviewed artifact changes, Stage A is stale. Review and create a fresh external authorization capsule for the new recovery generation before rerunning.
 
 ## Stage B — provision the host
 
-Only after `bootstrap.v8 PASS`:
+Only after `bootstrap.v9 PASS`:
 
 1. Read `TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md`.
 2. Treat v1 as a **persistent hardened host with an ephemeral runner registration/process**, not a fresh host per job.
@@ -96,12 +156,12 @@ An online runner is not a qualified runner. Do not dispatch correctness recovery
 
 The manual GitHub smoke is dispatchable only after its workflow exists on the default branch.
 
-Before landing, current public `main` must still equal the `main_head` recorded by Stage A. Promotion must preserve the operator-authorized recovery commit in ancestry. **Do not squash or cherry-pick.** The resulting `main` tree must be byte-identical to `promotion_expected_main_tree` from `bootstrap.v8`.
+Before landing, current public `main` must still equal the `main_head` recorded by Stage A. Promotion must preserve the operator-authorized recovery commit in ancestry. **Do not squash or cherry-pick.** The resulting `main` tree must be byte-identical to `promotion_expected_main_tree` from `bootstrap.v9`.
 
 After landing, detach a pristine checkout at current public `main` and verify promotion using the exact retained Stage-A evidence:
 
 ```bash
-export SYMTHAEA_TRUSTED_BOOTSTRAP_MANIFEST_PATH='/path/to/bootstrap.v8'
+export SYMTHAEA_TRUSTED_BOOTSTRAP_MANIFEST_PATH='/path/to/bootstrap.v9'
 export SYMTHAEA_TRUSTED_BOOTSTRAP_MANIFEST_SHA256='<recorded Stage-A SHA-256>'
 
 bash nix/ci/validate-trusted-runner-promotion.sh
@@ -109,6 +169,8 @@ bash nix/ci/validate-trusted-runner-promotion.sh
 
 The verifier first authenticates the exact bootstrap-manifest bytes. It then requires:
 
+- `bootstrap.v9 PASS`;
+- external authorization SHA-256/schema/scope are present and `stage_f_authority=NONE`;
 - local pristine checkout = current public `main` head/tree;
 - local promotion-verifier blob = Stage-A-bound verifier blob;
 - recovery branch still equals the authorized recovery head;
@@ -123,12 +185,12 @@ The verifier first authenticates the exact bootstrap-manifest bytes. It then req
 Success emits:
 
 ```text
-schema=symthaea.trusted-runner.promotion.v4
+schema=symthaea.trusted-runner.promotion.v5
 ```
 
-plus its SHA-256. Retain both exact bytes and hash.
+plus its SHA-256. `promotion.v5` carries the same external bootstrap-authorization digest and explicit bootstrap-only/no-Stage-F scope forward. Retain both exact bytes and hash.
 
-`promotion.v4 PASS` means only **Stage-D smoke is eligible**. It does not qualify the runner.
+`promotion.v5 PASS` means only **Stage-D smoke is eligible**. It does not qualify the runner or authorize a recovery target.
 
 ## Stage D — main-only GitHub smoke
 
@@ -156,14 +218,14 @@ and its SHA-256. Retain the exact manifest bytes and hash from the successful Gi
 
 `smoke.v1` binds the exact GitHub `main` head/tree, run identity, runner identity, smoke workflow, runner/routing blobs, Nix/Rust provenance and PASS states. It is correctness/reproducibility smoke evidence only.
 
-If the smoke fails, do not route recovery workloads. Repair the observed substrate defect; if trusted infrastructure changes, restart at Stage A.
+If the smoke fails, do not route recovery workloads. Repair the observed substrate defect; if trusted infrastructure changes, restart at Stage A with a fresh external authorization capsule.
 
 ## Stage E — exact promotion/smoke join
 
 Before any recovery workflow is dispatched, detach a pristine checkout at **current public `main`** and provide the exact retained promotion and smoke manifests plus their independently recorded hashes:
 
 ```bash
-export SYMTHAEA_TRUSTED_PROMOTION_MANIFEST_PATH='/path/to/promotion.v4'
+export SYMTHAEA_TRUSTED_PROMOTION_MANIFEST_PATH='/path/to/promotion.v5'
 export SYMTHAEA_TRUSTED_PROMOTION_MANIFEST_SHA256='<recorded promotion SHA-256>'
 export SYMTHAEA_TRUSTED_SMOKE_MANIFEST_PATH='/path/to/smoke.v1'
 export SYMTHAEA_TRUSTED_SMOKE_MANIFEST_SHA256='<recorded smoke SHA-256>'
@@ -174,7 +236,9 @@ bash nix/ci/validate-trusted-runner-recovery-eligibility.sh
 The Stage-E verifier requires:
 
 - exact SHA-256 match for both evidence files before parsing;
-- `promotion.v4 PASS` and `smoke.v1 PASS` schemas;
+- `promotion.v5 PASS` and `smoke.v1 PASS` schemas;
+- same external bootstrap-authorization SHA-256/schema/scope carried from Stage A through Stage C;
+- `operator_authorization_stage_f_authority=NONE` still holds;
 - same promoted/smoked `main` head and tree;
 - same smoke-workflow, runner-module and routing-policy blobs;
 - Stage-A/Stage-C-bound ARC3 protocol qualifier workflow, SE-001Q recovery workflow, SE-001Q replay helper and CI-shell blobs still match current `main`;
@@ -187,7 +251,7 @@ The Stage-E verifier requires:
 Success emits:
 
 ```text
-schema=symthaea.trusted-runner.recovery-eligibility.v3
+schema=symthaea.trusted-runner.recovery-eligibility.v4
 ```
 
 and a SHA-256. Retain both.
@@ -195,22 +259,27 @@ and a SHA-256. Retain both.
 This creates the final bootstrap theorem:
 
 ```text
-bootstrap.v8 PASS
-    + promotion.v4 PASS
+external bootstrap authorization exact bytes/hash
+    + authorization scope == bootstrap-only
+    + stage_f_authority == NONE
+    + bootstrap.v9 PASS
+    + promotion.v5 PASS
     + smoke.v1 PASS
     + exact promotion/smoke identity join
     + explicit SE-001Q recovery workflow/helper identity join
     + current main/recovery ref stability
-    = recovery-eligibility.v3 PASS
+    = recovery-eligibility.v4 PASS
 ```
 
-Even this is **not scientific evidence**. It only authorizes attempting a reviewed trusted-CPU correctness recovery workload.
+Even this is **not scientific evidence and does not authorize Stage F**. It proves that an eligible trusted-runner substrate descended from one exact external bootstrap decision.
 
-Any movement of public `main` after the smoke invalidates v1 recovery eligibility and requires a new smoke and Stage-E join. This is intentionally conservative.
+Any movement of public `main` after the smoke invalidates v1 recovery eligibility and requires a new smoke and Stage-E join. Movement of the recovery branch invalidates the external bootstrap authorization and requires a fresh Stage-A authorization capsule.
 
 ## Stage F — one exact correctness recovery target
 
-Only after `recovery-eligibility.v3 PASS` may reviewed manual recovery workflows use `symthaea-trusted-cpu-v1`.
+Only after `recovery-eligibility.v4 PASS` may an operator separately authorize one reviewed manual recovery workflow to use `symthaea-trusted-cpu-v1`.
+
+The Stage-A authorization capsule is deliberately insufficient for this decision. `stage_f_authority=NONE` is carried all the way through eligibility to make that non-transfer machine-visible.
 
 Recovery harnesses must:
 
@@ -246,18 +315,21 @@ At every stage:
 ```text
 queued or unexecuted != PASS
 cancelled for supersession != PASS or FAIL
+branch head != operator authorization
+bootstrap authorization != Stage-F authorization
 bootstrap PASS != promotion PASS
 promotion PASS != smoke PASS
 smoke PASS != recovery eligibility
+recovery eligibility != Stage-F authorization
 recovery eligibility != scientific qualification
 trusted CPU correctness PASS != performance equivalence
 trusted CPU SE-001Q observation != hosted EV2.4 observation
 trusted CPU SE-001Q observation != RepairGrant
-current branch head != operator authorization
 runner process ephemeral != host ephemeral
 content-similar landing != exact qualified tree
 squash/cherry-pick != preserved qualified ancestry
 changed main after smoke => smoke/recovery eligibility stale
+changed recovery generation => bootstrap authorization stale
 ```
 
 The fallback exists to restore executable evidence, never to weaken what counts as evidence.
