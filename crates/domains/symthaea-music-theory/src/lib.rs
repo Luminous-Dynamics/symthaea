@@ -82,6 +82,7 @@ pub mod style;
 pub mod temporal_map;
 pub mod temporal_midi_projection;
 pub mod temporal_score;
+pub mod thematic_identity;
 pub mod voicing;
 pub mod work_plan;
 
@@ -153,6 +154,11 @@ pub use temporal_midi_projection::{
     TempoMidiProjectionReceiptV1, project_temporal_score_to_midi,
 };
 pub use temporal_score::{TEMPORAL_SCORE_VERSION, TemporalScoreErrorV1, TemporalScoreV1};
+pub use thematic_identity::{
+    THEMATIC_IDENTITY_GRAPH_VERSION, ThematicDerivationV1, ThematicGraphErrorV1,
+    ThematicIdentityGraphV1, ThematicIdentityV1, ThematicOriginV1,
+    ThematicTransformationClassV1,
+};
 pub use voicing::{lead_bass, lead_upper};
 pub use work_plan::{
     FormalFunctionV1, HIERARCHICAL_WORK_PLAN_VERSION, HierarchicalWorkPlanV1,
