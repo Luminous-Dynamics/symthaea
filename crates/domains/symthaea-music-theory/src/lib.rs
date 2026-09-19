@@ -77,6 +77,7 @@ pub mod score;
 pub mod score_validation;
 pub mod sonata;
 pub mod sonata_work_bridge;
+pub mod sonata_work_evidence;
 pub mod spec;
 pub mod spelling;
 pub mod style;
@@ -146,6 +147,12 @@ pub use sonata::{
 pub use sonata_work_bridge::{
     SONATA_WORK_BRIDGE_VERSION, SonataSectionWorkBindingV1, SonataWorkBindingV1,
     SonataWorkBridgeErrorV1, bridge_native_sonata_plan, validate_native_sonata_plan,
+};
+pub use sonata_work_evidence::{
+    NativeEvidencePreservationV1, SONATA_WORK_EVIDENCE_VERSION,
+    SonataEvidenceCacheReceiptV1, SonataEvidenceProjectionLossV1, SonataWorkEvidenceErrorV1,
+    SonataWorkEvidenceV1, WorkEvidenceStatusV1, WorkObligationEvidenceRecordV1,
+    derive_sonata_work_evidence,
 };
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
