@@ -1,0 +1,43 @@
+{
+  "version": "math-structural-q0-v1",
+  "authority": "MeasurementOnly",
+  "purpose": "Frozen synthetic structural-neighbor sanity set for comparing mathematical retrieval representations before proof-search evaluation.",
+  "nonclaims": [
+    "No case establishes theorem truth.",
+    "No case establishes proof validity.",
+    "Top-1 retrieval on this set does not establish HDC search advantage.",
+    "The set is a manipulation check, not a research benchmark."
+  ],
+  "cases": [
+    {
+      "id": "linear-additive-alpha-literal",
+      "positive_id": "linear-additive-positive",
+      "structural_law": "Preserve forall/Real/equality/addition shape while ignoring bound-variable spelling and exact ordinary small-positive literal magnitude.",
+      "negative_axes": ["operator", "quantifier-type", "relation"]
+    },
+    {
+      "id": "implication-direction",
+      "positive_id": "implication-positive",
+      "structural_law": "Alpha renaming must preserve the neighborhood while premise/conclusion reversal and conjunction must not be treated as the same structure.",
+      "negative_axes": ["direction", "connective"]
+    },
+    {
+      "id": "variable-coreference",
+      "positive_id": "coreference-positive",
+      "structural_law": "Repeated use of one canonical variable must remain distinguishable from two distinct variables and from an operator change.",
+      "negative_axes": ["co-reference", "operator"]
+    },
+    {
+      "id": "quantifier-nesting-type",
+      "positive_id": "quantifier-positive",
+      "structural_law": "Alpha renaming must preserve forall-exists nesting while reversed quantifier order and changed inner numeric type remain distinguishable.",
+      "negative_axes": ["quantifier-order", "numeric-type"]
+    },
+    {
+      "id": "commutative-child-order",
+      "positive_id": "commutative-positive",
+      "structural_law": "Addition child order should not change the structural neighborhood, while subtraction and relation changes should.",
+      "negative_axes": ["ordered-operator", "relation"]
+    }
+  ]
+}
