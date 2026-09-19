@@ -83,6 +83,7 @@ pub mod temporal_map;
 pub mod temporal_midi_projection;
 pub mod temporal_score;
 pub mod voicing;
+pub mod work_plan;
 
 pub use accompaniment::Accompaniment;
 pub use cadence::Cadence;
@@ -153,3 +154,7 @@ pub use temporal_midi_projection::{
 };
 pub use temporal_score::{TEMPORAL_SCORE_VERSION, TemporalScoreErrorV1, TemporalScoreV1};
 pub use voicing::{lead_bass, lead_upper};
+pub use work_plan::{
+    FormalFunctionV1, HIERARCHICAL_WORK_PLAN_VERSION, HierarchicalWorkPlanV1,
+    WorkNodeKindV1, WorkNodeV1, WorkPlanErrorV1,
+};
