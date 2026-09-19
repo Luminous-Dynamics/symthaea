@@ -82,6 +82,9 @@ pub mod assurance_confirmation_use;
 /// Causal interaction-lineage binding from trusted presentation delivery to confirmation input.
 #[allow(missing_docs)]
 pub mod assurance_interaction_continuity;
+/// Crypto-agile authentication for presentation surface and input attesters.
+#[allow(missing_docs)]
+pub mod assurance_attester_auth;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
