@@ -113,12 +113,7 @@ jobs:
             echo "runner_arch=$RUNNER_ARCH"
             rustc -Vv
             cargo -V
-            python3 - <<'PY'
-          import numpy, platform
-          print(f'python_implementation={platform.python_implementation()}')
-          print(f'python_version={platform.python_version()}')
-          print(f'numpy_version={numpy.__version__}')
-          PY
+            python3 -c "import numpy,platform; print('python_implementation='+platform.python_implementation()); print('python_version='+platform.python_version()); print('numpy_version='+numpy.__version__)"
           } > "$out/environment.txt"
           cp /tmp/mel_bench_002b_changed "$out/changed-files.txt"
 
@@ -128,13 +123,20 @@ jobs:
 
       - name: Native parity-contract regressions
         working-directory: subject
-        run: cargo test -p symthaea-muse --features theory benchmark_symbolic_parity
+        run: cargo test -p symthaea-muse --lib --features theory benchmark_symbolic_parity
 
-      - name: Execute external-reference parity regression
+      - name: Execute exactly one external-reference parity regression
+        shell: bash
         working-directory: subject
         env:
           MEL_BENCH_002B_REFERENCE: ${{ runner.temp }}/mel-bench-002b/muspy-reference.json
-        run: cargo test -p symthaea-muse --features theory benchmark_symbolic_parity::tests::external_reference_bundle_is_executed_when_qualification_requests_it -- --exact
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-002b/external-parity-test.txt"
+          cargo test -p symthaea-muse --lib --features theory \
+            external_reference_bundle_is_executed_when_qualification_requests_it \
+            -- --nocapture 2>&1 | tee "$out"
+          grep -F 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured;' "$out" >/dev/null
 
       - name: Theory all-targets compile gate
         working-directory: subject
@@ -156,6 +158,8 @@ jobs:
             echo "subject_sha=$(git rev-parse HEAD)"
             echo "subject_tree=$(git rev-parse HEAD^{tree})"
             echo "reference_bundle_sha256=$(sha256sum "$out/muspy-reference.json" | awk '{print $1}')"
+            echo "external_test_log_sha256=$(sha256sum "$out/external-parity-test.txt" | awk '{print $1}')"
+            echo 'external_parity_tests_executed=1'
             echo 'fixture_population_claimed=true'
             echo 'all_scores_parity_claimed=false'
             echo 'mgeval_parity_claimed=false'
@@ -166,6 +170,7 @@ jobs:
           } > "$out/receipt.txt"
           sha256sum \
             "$out/muspy-reference.json" \
+            "$out/external-parity-test.txt" \
             "$out/environment.txt" \
             "$out/changed-files.txt" \
             "$out/receipt.txt" \
