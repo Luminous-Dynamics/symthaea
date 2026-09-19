@@ -43,6 +43,13 @@ const DT: f32 = 1.0 / FRAME_RATE as f32;
 /// Base phoneme duration (seconds) for G2P timing.
 const BASE_PHONEME_DURATION: f32 = 0.06;
 
+/// Outcome of a cancellation-aware synchronous live utterance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LiveVoiceSpeakOutcome {
+    Completed,
+    Cancelled,
+}
+
 /// Cloneable, capability-narrow stop control for the current live utterance.
 ///
 /// This intentionally exposes only interruption state. It cannot synthesize audio,
@@ -177,16 +184,47 @@ impl LiveVoice {
         }
     }
 
-    /// Speak text in real time with enhanced prosody control
+    /// Speak text in real time with enhanced prosody control.
+    ///
+    /// Compatibility wrapper over [`Self::speak_cancellable`] with a probe that
+    /// never cancels.
     pub fn speak(&mut self, text: &str) -> Result<()> {
-        self.speaking.store(true, Ordering::SeqCst);
+        let _ = self.speak_cancellable(text, || false)?;
+        Ok(())
+    }
 
-        // Enhanced text analysis
+    /// Speak while consulting a monotonic cancellation probe.
+    ///
+    /// The probe should remain `true` once cancellation is observed. It is checked
+    /// before activation, immediately after activation (closing stop-before-start),
+    /// and throughout phoneme/frame generation. The existing stop handle remains a
+    /// second fast-path signal and is checked alongside the probe.
+    pub fn speak_cancellable<F>(
+        &mut self,
+        text: &str,
+        cancelled: F,
+    ) -> Result<LiveVoiceSpeakOutcome>
+    where
+        F: Fn() -> bool,
+    {
+        if cancelled() {
+            self.speaking.store(false, Ordering::SeqCst);
+            return Ok(LiveVoiceSpeakOutcome::Cancelled);
+        }
+
+        self.speaking.store(true, Ordering::SeqCst);
+        if cancelled() {
+            self.speaking.store(false, Ordering::SeqCst);
+            return Ok(LiveVoiceSpeakOutcome::Cancelled);
+        }
+
         let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
         let prosody = self.analyze_prosody(text);
+        let mut was_cancelled = false;
 
-        for timed in &phonemes {
-            if !self.speaking.load(Ordering::SeqCst) {
+        'phonemes: for timed in &phonemes {
+            if cancelled() || !self.speaking.load(Ordering::SeqCst) {
+                was_cancelled = true;
                 break;
             }
 
@@ -202,8 +240,9 @@ impl LiveVoice {
             self.apply_prosody(&mut state, &prosody);
 
             for _ in 0..n_frames {
-                if !self.speaking.load(Ordering::SeqCst) {
-                    break;
+                if cancelled() || !self.speaking.load(Ordering::SeqCst) {
+                    was_cancelled = true;
+                    break 'phonemes;
                 }
 
                 let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
@@ -211,8 +250,16 @@ impl LiveVoice {
             }
         }
 
+        if cancelled() || !self.speaking.load(Ordering::SeqCst) {
+            was_cancelled = true;
+        }
         self.speaking.store(false, Ordering::SeqCst);
-        Ok(())
+
+        Ok(if was_cancelled {
+            LiveVoiceSpeakOutcome::Cancelled
+        } else {
+            LiveVoiceSpeakOutcome::Completed
+        })
     }
 
     fn analyze_prosody(&self, text: &str) -> ProsodyAnalysis {
@@ -240,7 +287,7 @@ impl LiveVoice {
     pub fn speak_async(&mut self, text: &str) -> SpeakHandle {
         self.speaking.store(true, Ordering::SeqCst);
 
-        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEM_DURATION);
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
         let speaking = Arc::clone(&self.speaking);
         let cog_state = Arc::clone(&self.cognitive_state);
 
@@ -309,7 +356,7 @@ impl LiveVoice {
     /// Uses the same G2P → frame-by-frame synthesis pipeline as `speak()`,
     /// but collects all samples and writes them to disk via `hound`.
     pub fn speak_to_file(&mut self, text: &str, path: &Path) -> Result<usize> {
-        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEM_DURATION);
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
         let mut all_samples = Vec::new();
 
         for timed in &phonemes {
@@ -486,6 +533,19 @@ mod tests {
         second.stop();
         assert!(!first.is_speaking());
         assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn cancellable_speak_honors_pre_start_cancellation_without_audio() {
+        let genesis = GenesisSeed::from_phrase("test-pre-cancel");
+        let mut voice = LiveVoice::new_headless(&genesis);
+
+        let outcome = voice
+            .speak_cancellable("this must never begin", || true)
+            .unwrap();
+
+        assert_eq!(outcome, LiveVoiceSpeakOutcome::Cancelled);
+        assert!(!voice.is_speaking());
     }
 
     #[test]
