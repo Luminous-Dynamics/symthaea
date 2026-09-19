@@ -5,21 +5,23 @@
 //! `studio/index.html`'s Liked tab: fetches `/api/keepers` once on mount
 //! (plus a manual Refresh, since a keep made from Listen while this page
 //! isn't mounted wouldn't otherwise show up), then renders one card per
-//! entry with its own saved `/api/keeper-audio/{audio_key}` artifact plus
-//! MIDI/WAV/Recipe downloads.
+//! saved artifact with MIDI/WAV/Recipe downloads.
 //!
-//! Kept artifacts remain independent of `MuseState::current`. A later
-//! audition-foundation tranche will move keeper playback onto the shared
-//! persistent transport without changing that identity boundary.
+//! Kept artifacts remain independent of `MuseState::current`. Audition now uses
+//! the one persistent shared transport, so opening a keeper cannot create a
+//! second concurrent `<audio>` universe and can return to the exact source/time
+//! that was audible before the Library audition.
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_router::components::A;
 
 use crate::api::{self, KeeperEntry};
+use crate::state::MuseState;
 
 #[component]
 pub fn LikedPage() -> impl IntoView {
+    let muse = use_context::<MuseState>().expect("MuseState provided by App");
     let entries = RwSignal::new(Vec::<KeeperEntry>::new());
     let status = RwSignal::new(String::new());
     let loaded = RwSignal::new(false);
@@ -54,7 +56,7 @@ pub fn LikedPage() -> impl IntoView {
             <div class="liked-header">
                 <h2>"Library"</h2>
                 <p class="muted small">
-                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Private symbolic import is available separately while unified library indexing remains a later tranche."
+                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Auditions use the persistent player, so Return restores whatever you were hearing before. Private symbolic import remains a separate surface while unified indexing is a later tranche."
                 </p>
                 <A href="/library/import" attr:class="link-btn">"Import music"</A>
                 <button type="button" on:click=move |_| reload()>"Refresh"</button>
@@ -79,6 +81,9 @@ pub fn LikedPage() -> impl IntoView {
                                     String::new()
                                 };
                                 let heading = e.title.clone().unwrap_or_else(|| e.spec.clone());
+                                let audition_title = heading.clone();
+                                let audition_url =
+                                    api::keeper_audio_url(api::DEFAULT_BACKEND, &e.audio_key);
                                 let meta = format!(
                                     "{}{} · seed {}",
                                     e.spec,
@@ -97,10 +102,19 @@ pub fn LikedPage() -> impl IntoView {
                                         <p class="muted">{meta}</p>
                                         <p class="muted">{grammar_line}</p>
                                         {(!when.is_empty()).then(|| view! { <p class="muted small">{when}</p> })}
-                                        <audio controls preload="none"
-                                            src=api::keeper_audio_url(api::DEFAULT_BACKEND, &e.audio_key)>
-                                        </audio>
                                         <div class="candidate-actions">
+                                            <button
+                                                type="button"
+                                                aria-label=format!("Audition {audition_title}")
+                                                on:click=move |_| {
+                                                    muse.play_review_audio(
+                                                        audition_url.clone(),
+                                                        audition_title.clone(),
+                                                    );
+                                                }
+                                            >
+                                                "Audition"
+                                            </button>
                                             {e.midi_available.then(|| view! {
                                                 <a class="link-btn"
                                                     href=api::keeper_midi_url(api::DEFAULT_BACKEND, &e.audio_key)
