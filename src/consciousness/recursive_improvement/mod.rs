@@ -81,6 +81,7 @@ pub mod semantic_support;
 pub mod semantic_supported_retrieval;
 pub mod sym_rsi_candidate_family;
 pub mod sym_rsi_experiment;
+pub mod sym_rsi_semantic_ambiguity_experiment;
 pub mod sym_rsi_fixtures;
 mod sym_rsi_fresh_evaluation;
 mod sym_rsi_c_fresh_gate;
