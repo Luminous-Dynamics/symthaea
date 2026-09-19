@@ -96,6 +96,21 @@ const MEMORY_GROW_WASM: &[u8] = &[
     0x0a, 0x0c, 0x01, 0x0a, 0x00, 0x41, 0x80, 0x10, 0x40, 0x00, 0x1a, 0x41, 0x01, 0x0b,
 ];
 
+// (module
+//   (import "env" "host" (func $host))
+//   (func (export "verify") (result i32)
+//     call $host
+//     i32.const 1))
+#[cfg(feature = "wasm-sandbox")]
+const REQUIRES_HOST_IMPORT_WASM: &[u8] = &[
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // magic + version
+    0x01, 0x08, 0x02, 0x60, 0x00, 0x00, 0x60, 0x00, 0x01, 0x7f, // two types
+    0x02, 0x0c, 0x01, 0x03, b'e', b'n', b'v', 0x04, b'h', b'o', b's', b't', 0x00, 0x00,
+    0x03, 0x02, 0x01, 0x01, // one defined function of type 1
+    0x07, 0x0a, 0x01, 0x06, b'v', b'e', b'r', b'i', b'f', b'y', 0x00, 0x01, // export fn 1
+    0x0a, 0x08, 0x01, 0x06, 0x00, 0x10, 0x00, 0x41, 0x01, 0x0b, // call import 0
+];
+
 #[cfg(feature = "wasm-sandbox")]
 fn write_fixture(sandbox: &SandboxRoot, name: &str, bytes: &[u8]) -> PathBuf {
     let path = sandbox.root().join(name);
@@ -156,6 +171,24 @@ fn bounded_wasm_traps_memory_growth_beyond_store_limit() {
     assert!(
         err.to_string().contains("wasm guest trapped"),
         "unexpected memory-limit error: {err}"
+    );
+}
+
+#[cfg(feature = "wasm-sandbox")]
+#[test]
+fn bounded_wasm_rejects_unprovided_host_import() {
+    let policy = PolicyBundle::restrictive();
+    let sandbox = SandboxRoot::new("test_wasm_no_imports").unwrap();
+    let module_path = write_fixture(&sandbox, "requires-host.wasm", REQUIRES_HOST_IMPORT_WASM);
+    let action = wasm_action(module_path, "verify");
+    let mut executor = SimpleExecutor::with_real_commands();
+
+    let err = executor
+        .execute(&action, &policy, &sandbox, 1.0)
+        .expect_err("raw ActionIR sandbox must not provide ambient host imports");
+    assert!(
+        err.to_string().contains("failed to instantiate wasm module"),
+        "unexpected import-refusal error: {err}"
     );
 }
 
