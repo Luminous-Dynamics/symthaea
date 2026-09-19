@@ -97,6 +97,11 @@ pub mod assurance_ingress_policy;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_attention;
 
+// Bind each Android MotionEvent's obscuration/pointer facts to the current
+// attention theorem and the exact measured touch observation.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_motion_event;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
