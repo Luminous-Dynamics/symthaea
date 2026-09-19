@@ -169,6 +169,11 @@ impl From<assurance_android_policy_session::AndroidTouchPolicySessionError>
     }
 }
 
+// Two-plane durability: canonical journal bytes must be durably/atomically
+// published and the resulting checkpoint must advance in a distinct anchor domain.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_durability;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
