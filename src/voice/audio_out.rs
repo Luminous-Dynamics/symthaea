@@ -11,12 +11,58 @@
 //!
 //! Feature-gated under `live-voice`.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{
     HeapRb,
-    traits::{Observer, Producer, Split},
+    traits::{Consumer, Observer, Producer, Split},
 };
+
+/// Cloneable, capability-narrow request to discard queued live audio.
+///
+/// Calling [`AudioFlushHandle::request_flush`] never touches the ring-buffer
+/// consumer directly. It only raises an atomic flag that the real-time CPAL
+/// callback consumes at its next callback boundary, keeping consumer ownership
+/// single-threaded and avoiding locks on the audio thread.
+#[derive(Debug, Clone)]
+pub struct AudioFlushHandle {
+    requested: Arc<AtomicBool>,
+}
+
+impl AudioFlushHandle {
+    fn new(requested: Arc<AtomicBool>) -> Self {
+        Self { requested }
+    }
+
+    /// Request that all audio currently queued in the ring buffer be discarded.
+    pub fn request_flush(&self) {
+        self.requested.store(true, Ordering::Release);
+    }
+
+    /// Whether a flush request has not yet been consumed by the audio callback.
+    pub fn is_pending(&self) -> bool {
+        self.requested.load(Ordering::Acquire)
+    }
+}
+
+/// Apply one pending flush request on the consumer-owning thread.
+///
+/// `Consumer::clear()` removes the complete occupied region while advancing the
+/// consumer read index once. The atomic is consumed only after the callback has
+/// exclusive access to the consumer, so control threads never touch ring state.
+fn flush_consumer_if_requested<C>(consumer: &mut C, requested: &AtomicBool) -> usize
+where
+    C: Consumer<Item = f32>,
+{
+    if requested.swap(false, Ordering::AcqRel) {
+        consumer.clear()
+    } else {
+        0
+    }
+}
 
 /// Real-time audio output via cpal + ring buffer.
 ///
@@ -28,6 +74,7 @@ pub struct AudioOutput {
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
+    flush_requested: Arc<AtomicBool>,
 }
 
 impl AudioOutput {
@@ -67,6 +114,7 @@ impl AudioOutput {
             sample_rate,
             channels: 1,
             buffer_capacity: 0,
+            flush_requested: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -80,6 +128,8 @@ impl AudioOutput {
         let buffer_capacity = sample_rate as usize * 2;
         let rb = HeapRb::<f32>::new(buffer_capacity);
         let (producer, mut consumer) = rb.split();
+        let flush_requested = Arc::new(AtomicBool::new(false));
+        let callback_flush = Arc::clone(&flush_requested);
 
         let ch = channels;
         let stream_config: cpal::StreamConfig = supported.into();
@@ -88,7 +138,10 @@ impl AudioOutput {
             .build_output_stream(
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    use ringbuf::traits::Consumer;
+                    // Barge-in invalidation runs on the consumer-owning callback.
+                    // No mutex is acquired and control threads never touch `consumer`.
+                    let _ = flush_consumer_if_requested(&mut consumer, &callback_flush);
+
                     for sample in data.chunks_mut(ch as usize) {
                         if let Some(s) = consumer.try_pop() {
                             for out in sample.iter_mut() {
@@ -114,6 +167,7 @@ impl AudioOutput {
             sample_rate,
             channels,
             buffer_capacity,
+            flush_requested,
         })
     }
 
@@ -143,6 +197,16 @@ impl AudioOutput {
     /// AudioOutput is created. Returns `None` if already taken or dummy.
     pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
         self.producer.take()
+    }
+
+    /// Return a cloneable request-only handle for queued-audio invalidation.
+    pub fn flush_handle(&self) -> AudioFlushHandle {
+        AudioFlushHandle::new(Arc::clone(&self.flush_requested))
+    }
+
+    /// Request queued-audio invalidation at the next audio callback boundary.
+    pub fn request_flush(&self) {
+        self.flush_requested.store(true, Ordering::Release);
     }
 
     /// Audio sample rate negotiated with the device (or headless default).
@@ -196,6 +260,26 @@ mod tests {
         // push_samples on dummy returns 0
         let samples = vec![0.5f32; 100];
         assert_eq!(dummy.push_samples(&samples), 0);
+
+        let flush = dummy.flush_handle();
+        assert!(!flush.is_pending());
+        flush.request_flush();
+        assert!(flush.is_pending());
+    }
+
+    #[test]
+    fn pending_flush_bulk_clears_consumer_and_is_consumed_once() {
+        let rb = HeapRb::<f32>::new(8);
+        let (mut producer, mut consumer) = rb.split();
+        for sample in [0.1, 0.2, 0.3, 0.4] {
+            producer.try_push(sample).unwrap();
+        }
+
+        let requested = AtomicBool::new(true);
+        assert_eq!(flush_consumer_if_requested(&mut consumer, &requested), 4);
+        assert!(!requested.load(Ordering::Acquire));
+        assert!(consumer.try_pop().is_none());
+        assert_eq!(flush_consumer_if_requested(&mut consumer, &requested), 0);
     }
 
     #[test]
