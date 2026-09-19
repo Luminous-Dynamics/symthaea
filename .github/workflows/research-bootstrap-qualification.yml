@@ -1,0 +1,119 @@
+name: Research Bootstrap Qualification
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    paths:
+      - ".github/research-qualifiers/*.json"
+  workflow_dispatch:
+    inputs:
+      manifest:
+        description: "Canonical .github/research-qualifiers/<PROGRAM>.json path"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-bootstrap-qualification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Research bootstrap qualification
+    if: >-
+      github.event_name != 'pull_request_target' ||
+      (github.event.pull_request.state == 'open' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      EVENT_BASE: ${{ github.event.pull_request.base.sha || '' }}
+      DISPATCH_MANIFEST: ${{ inputs.manifest || '' }}
+      EVIDENCE_DIR: ${{ runner.temp }}/research-bootstrap-qualification
+
+    steps:
+      - name: Checkout exact qualifier subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Freeze qualifier-only subject before repository helper execution
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          test "$actual_head" = "$EXPECTED_HEAD"
+
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+            base="$EVENT_BASE"
+            [[ "$base" =~ ^[0-9a-f]{40}$ ]]
+          else
+            base="$(git rev-parse HEAD^)"
+          fi
+
+          actual_parent="$(git rev-parse HEAD^)"
+          test "$actual_parent" = "$base"
+
+          mapfile -t changed < <(git diff --name-only "$base" "$actual_head")
+          if (( ${#changed[@]} != 1 )); then
+            printf 'qualifier subject must change exactly one path; observed %d:\n' "${#changed[@]}" >&2
+            printf '  %s\n' "${changed[@]}" >&2
+            exit 1
+          fi
+
+          manifest="${changed[0]}"
+          if [[ ! "$manifest" =~ ^\.github/research-qualifiers/[A-Za-z0-9][A-Za-z0-9._-]{0,95}\.json$ ]]; then
+            echo "sole changed path is not a canonical qualifier manifest: $manifest" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$manifest" != "$DISPATCH_MANIFEST" ]]; then
+            echo "dispatch manifest does not equal the sole qualifier diff path" >&2
+            exit 1
+          fi
+
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "manifest=$manifest" >> "$GITHUB_OUTPUT"
+          echo "head=$actual_head" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve and validate qualification manifest
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run-research-qualification-manifest.py resolve \
+            --manifest "${{ steps.subject.outputs.manifest }}" \
+            --expected-head "${{ steps.subject.outputs.head }}" \
+            --expected-base "${{ steps.subject.outputs.base }}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: ${{ steps.manifest.outputs.expected_rust }}
+          components: rustfmt, clippy
+
+      - name: Execute manifest-bound portable qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/run-research-qualification-manifest.py run \
+            --manifest "${{ steps.subject.outputs.manifest }}" \
+            --expected-head "${{ steps.subject.outputs.head }}" \
+            --expected-base "${{ steps.subject.outputs.base }}" \
+            --output-dir "$EVIDENCE_DIR"
+
+      - name: Upload bootstrap qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: research-bootstrap-qualification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: warn
+          retention-days: 30
