@@ -174,10 +174,62 @@ impl From<assurance_android_policy_session::AndroidTouchPolicySessionError>
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_policy_durability;
 
+// Test-only exact reconstruction of 534's journal commit identity. Keeping this
+// helper outside the production 534 module avoids widening its internal certifier
+// solely to build successor fixtures in higher-level recovery tests.
+#[cfg(all(test, feature = "screen-vision"))]
+impl assurance_android_policy_durability::AndroidTouchPolicyJournalDurabilityObservation {
+    pub(crate) fn certify_for_test(
+        &self,
+        expected_digest: assurance_android_policy_durability::AndroidTouchPolicyJournalBytesDigest,
+        checkpoint_id: assurance_android_policy_journal::AndroidTouchPolicyCheckpointId,
+        _previous: Option<&assurance_android_policy_durability::AndroidTouchPolicyDurableState>,
+    ) -> Result<
+        assurance_android_policy_durability::AndroidTouchPolicyJournalDurableCommitId,
+        assurance_android_policy_durability::AndroidTouchPolicyDurabilityError,
+    > {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(b"symthaea.soma.presentation.v1/android-policy-journal-durable-commit\0");
+        hasher.update(self.storage_domain_id.as_bytes());
+        hasher.update(self.transaction_id.as_bytes());
+        hasher.update(&self.previous_storage_generation.to_le_bytes());
+        hasher.update(&self.next_storage_generation.to_le_bytes());
+        hasher.update(expected_digest.as_bytes());
+        hasher.update(checkpoint_id.as_bytes());
+        hasher.update(self.durable_prepare_evidence_id.as_bytes());
+        hasher.update(self.atomic_publish_evidence_id.as_bytes());
+        hasher.update(self.metadata_durability_evidence_id.as_bytes());
+        hasher.update(self.exact_readback_evidence_id.as_bytes());
+        Ok(
+            assurance_android_policy_durability::AndroidTouchPolicyJournalDurableCommitId(
+                *hasher.finalize().as_bytes(),
+            ),
+        )
+    }
+}
+
 // Android-specific capability admission for 534. AtomicFile, Keystore, StrongBox,
 // and external monotonic anchors keep their actual guarantees distinct.
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_storage_capabilities;
+
+// Bind restart recovery to the exact 534 durable state before event-time policy
+// currentness can be re-established. Revoked state recovers but stays revoked.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_recovery;
+
+// Test-only equality is exact recovery receipt + exact recovered snapshot. This
+// exists only so negative Result assertions can remain precise in recovery tests.
+#[cfg(all(test, feature = "screen-vision"))]
+impl PartialEq for assurance_android_policy_recovery::AndroidTouchPolicyRecoveredStore {
+    fn eq(&self, other: &Self) -> bool {
+        self.recovery_receipt() == other.recovery_receipt()
+            && self.snapshot().ok() == other.snapshot().ok()
+    }
+}
+
+#[cfg(all(test, feature = "screen-vision"))]
+impl Eq for assurance_android_policy_recovery::AndroidTouchPolicyRecoveredStore {}
 
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
