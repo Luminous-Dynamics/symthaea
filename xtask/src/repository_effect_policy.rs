@@ -83,7 +83,7 @@ pub fn run(
     Ok(())
 }
 
-fn validate_and_identify_policy(policy: &mut EffectPolicySpec) -> anyhow::Result<String> {
+pub(crate) fn validate_and_identify_policy(policy: &mut EffectPolicySpec) -> anyhow::Result<String> {
     if policy.schema != POLICY_SCHEMA {
         bail!("unsupported repository effect policy schema: {}", policy.schema);
     }
@@ -113,7 +113,7 @@ fn validate_and_identify_policy(policy: &mut EffectPolicySpec) -> anyhow::Result
     Ok(domain_sha256(POLICY_HASH_DOMAIN, &bytes))
 }
 
-fn evaluate(
+pub(crate) fn evaluate(
     policy_id: String,
     policy: &EffectPolicySpec,
     diff: &RepositorySourceDiff,
