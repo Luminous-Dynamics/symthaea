@@ -19418,6 +19418,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-neuroarch-adapters"
+version = "0.1.0"
+dependencies = [
+ "symthaea-core",
+ "symthaea-neuroarch-types",
+]
+
+[[package]]
+name = "symthaea-neuroarch-types"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+]
+
+[[package]]
 name = "symthaea-neuroevolution"
 version = "0.1.0"
 dependencies = [
