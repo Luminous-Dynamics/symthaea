@@ -1,5 +1,5 @@
 {
-  "schema": "symthaea.rel.qualification-durability-contract.v1",
+  "schema": "symthaea.rel.qualification-durability-contract.v2",
   "authority": "QualificationDurabilityContractOnly",
   "relation": "REL-005A",
   "source_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
@@ -32,7 +32,7 @@
   "durable_qualification_evidence": {
     "artifact_name_prefix": "rel-005a-qualification-evidence-",
     "exact_file_census": true,
-    "required_files": [
+    "payload_files": [
       "predicate-contract-receipt.json",
       "execution-v3-receipt.json",
       "observation-seal-v3.json",
@@ -42,12 +42,17 @@
       "qualification-only.json",
       "post-qualification-firewall-receipt.json"
     ],
+    "persistence_receipt": "qualification-evidence-persistence-receipt.json",
+    "artifact_file_count": 9,
     "raw_observation_allowed": false,
     "execution_logs_allowed": false,
     "detailed_predicate_values_allowed": false,
     "scientific_thresholds_allowed": false,
     "transport_identity_is_scientific_authority": false,
     "inner_content_commitments_are_authoritative": true,
+    "persistence_receipt_must_hash_every_payload_file": true,
+    "persistence_receipt_must_record_every_payload_byte_length": true,
+    "persistence_receipt_must_not_interpret_scientific_result": true,
     "upload_must_complete_before_capsule_packaging": true
   },
   "failure_semantics": {
