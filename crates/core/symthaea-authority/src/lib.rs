@@ -1,15 +1,23 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Deterministic bounded-authority and runtime-admission primitives.
+//! Deterministic bounded-authority reference semantics for Symthaea agency.
 //!
-//! The crate is intentionally cognition-free, I/O-free, transport-free, and
-//! crypto-key-free. It defines small reference semantics that higher layers can
-//! sign, transport, persist, or map onto domain policy systems.
+//! This crate is intentionally cognition-free, I/O-free, transport-free, and
+//! crypto-key-free. It defines what a bounded positive authority record means
+//! and how such a record evaluates against a supplied authority snapshot.
 //!
-//! Core rule:
+//! It deliberately does **not** authenticate that snapshot and does not mint
+//! runtime/live authority. Fresh trusted time, current verified negative facts,
+//! admission, reservation, and effect execution belong in separate verifier-owned
+//! layers.
+//!
+//! Core separation:
 //!
 //! ```text
-//! grant record != runtime admission != live authority != effect
+//! capability record
+//!     != verified current authority state
+//!     != execution admission
+//!     != effect
 //! ```
 //!
 //! In particular, Phi, confidence, posterior probability, scientific support,
@@ -34,9 +42,8 @@ pub struct PrincipalId(pub String);
 
 /// Stable semantic purpose of a grant.
 ///
-/// Purpose is deliberately separate from task identity: two tasks may share one
-/// purpose, while delegation is never allowed to silently move authority into a
-/// different purpose class.
+/// Purpose is deliberately separate from task identity. Delegation is never
+/// allowed to silently move authority into another purpose class.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct PurposeId(pub String);
 
@@ -59,22 +66,19 @@ pub struct Operation(pub String);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AuthorityNamespace(pub String);
 
-/// Fixed-size cryptographic commitment carried by security objects.
+/// Fixed-size cryptographic commitment carried by authority objects.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Digest32(pub [u8; 32]);
 
-/// Monotonic grant generation for a protected domain.
+/// Monotonic grant generation for a protected authority domain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AuthorityEpoch(pub u64);
 
-/// Process/session generation used to fence live authority across restart.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct RuntimeEpoch(pub u64);
-
-/// Exact domain-defined authority context against which a grant is evaluated.
+/// Exact domain-defined authority context against which a grant was issued.
 ///
-/// The shared core does not interpret the digest. Swarm, fabrication, browser,
-/// HAL, or other domains may commit different native authority-state models.
+/// The shared core does not interpret the digest. A swarm adapter may bind a
+/// controller-lease context; fabrication may bind its richer monotonic authority
+/// vector; another domain may bind a different exact qualified context root.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AuthorityContextRef {
     pub namespace: AuthorityNamespace,
@@ -114,9 +118,8 @@ impl RiskBudget {
 
 /// Serializable positive-authority record.
 ///
-/// This type is deliberately **not** live authority. Deserializing, cloning, or
-/// replaying it does not authorize execution. Current admission must produce a
-/// non-serializable [`LiveGrant`].
+/// This type is authority **data**, not a live capability. Cloning,
+/// deserializing, caching, or replaying it cannot by itself authorize execution.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CapabilityGrant {
     pub schema_version: u16,
@@ -155,7 +158,7 @@ pub struct CapabilityGrant {
 
 impl CapabilityGrant {
     /// Construct a minimally initialized record. Callers must still populate at
-    /// least one resource and operation before admission can succeed.
+    /// least one resource and operation before evaluation can succeed.
     pub fn new(
         grant_id: impl Into<String>,
         issuer: PrincipalId,
@@ -186,7 +189,7 @@ impl CapabilityGrant {
         }
     }
 
-    /// Validate closed structural requirements before any authority evaluation.
+    /// Validate closed structural requirements before authority evaluation.
     pub fn validate(&self) -> Result<(), GrantValidationError> {
         if self.schema_version != CAPABILITY_GRANT_SCHEMA_VERSION {
             return Err(GrantValidationError::UnsupportedSchema);
@@ -220,36 +223,36 @@ impl CapabilityGrant {
 
     /// Deterministic domain-separated commitment to every authority-relevant field.
     pub fn digest(&self) -> Digest32 {
-        let mut t = Transcript::new(CAPABILITY_GRANT_DOMAIN);
-        t.u16(self.schema_version);
-        t.string(&self.grant_id);
-        t.string(&self.issuer.0);
-        t.string(&self.subject.0);
-        t.optional_string(self.audience.as_ref().map(|value| value.0.as_str()));
-        t.string(&self.purpose.0);
-        t.optional_string(self.task.as_ref().map(|value| value.0.as_str()));
-        t.u64(self.authority_epoch.0);
-        t.string(&self.authority_context.namespace.0);
-        t.digest(self.authority_context.digest);
-        t.u32(self.resources.len() as u32);
+        let mut transcript = Transcript::new(CAPABILITY_GRANT_DOMAIN);
+        transcript.u16(self.schema_version);
+        transcript.string(&self.grant_id);
+        transcript.string(&self.issuer.0);
+        transcript.string(&self.subject.0);
+        transcript.optional_string(self.audience.as_ref().map(|value| value.0.as_str()));
+        transcript.string(&self.purpose.0);
+        transcript.optional_string(self.task.as_ref().map(|value| value.0.as_str()));
+        transcript.u64(self.authority_epoch.0);
+        transcript.string(&self.authority_context.namespace.0);
+        transcript.digest(self.authority_context.digest);
+        transcript.u32(self.resources.len() as u32);
         for resource in &self.resources {
-            t.string(&resource.0);
+            transcript.string(&resource.0);
         }
-        t.u32(self.operations.len() as u32);
+        transcript.u32(self.operations.len() as u32);
         for operation in &self.operations {
-            t.string(&operation.0);
+            transcript.string(&operation.0);
         }
-        t.optional_digest(self.plan_digest);
-        t.optional_digest(self.world_digest);
-        t.optional_u64(self.expires_at_unix_s);
-        t.u32(self.max_uses);
-        t.byte(self.delegation_depth_remaining);
-        t.u64(self.risk_budget.mutation_units);
-        t.u64(self.risk_budget.irreversible_units);
-        t.u64(self.risk_budget.external_disclosure_bytes);
-        t.u64(self.risk_budget.monetary_microunits);
-        t.optional_digest(self.parent_digest);
-        Digest32(*t.finish().as_bytes())
+        transcript.optional_digest(self.plan_digest);
+        transcript.optional_digest(self.world_digest);
+        transcript.optional_u64(self.expires_at_unix_s);
+        transcript.u32(self.max_uses);
+        transcript.byte(self.delegation_depth_remaining);
+        transcript.u64(self.risk_budget.mutation_units);
+        transcript.u64(self.risk_budget.irreversible_units);
+        transcript.u64(self.risk_budget.external_disclosure_bytes);
+        transcript.u64(self.risk_budget.monetary_microunits);
+        transcript.optional_digest(self.parent_digest);
+        Digest32(*transcript.finish().as_bytes())
     }
 
     /// Verify that a delegated record is no broader than `parent`.
@@ -386,23 +389,27 @@ pub enum AttenuationError {
     RiskBroadened,
 }
 
-/// Crash-safe accounting state supplied by the runtime when evaluating a record.
+/// Crash-conservative accounting supplied to the pure evaluator.
+///
+/// Higher layers are responsible for proving that these counters came from the
+/// correct durable grant account. The pure core only applies their semantics.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GrantUseState {
-    /// Uses durably committed as having taken effect.
     pub committed: u32,
-    /// Uses durably reserved for in-flight executions.
     pub reserved: u32,
 }
 
 impl GrantUseState {
-    /// Conservative consumed-or-potentially-consumed count.
     pub fn charged(self) -> u32 {
         self.committed.saturating_add(self.reserved)
     }
 }
 
-/// Durable negative authority fact. Applicable facts dominate positive records.
+/// Negative authority fact. Applicable facts dominate positive grants.
+///
+/// Authenticity, completeness, freshness, and frontier provenance of this set
+/// are deliberately outside this crate. The existing verified-authority-state
+/// lineage supplies a stronger challenge/witness boundary for that job.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NegativeAuthorityFact {
     RevokeGrant { grant_digest: Digest32 },
@@ -415,9 +422,13 @@ pub enum NegativeAuthorityFact {
     },
 }
 
-/// Current authority state used for deterministic record evaluation.
+/// Inputs to the pure authority evaluator.
+///
+/// **Security boundary:** constructing this value does not prove that the time,
+/// epoch, context, use state, or negative facts are current/authentic. It is a
+/// deterministic input object, not a verified authority-state capability.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct AuthorityEvaluationContext {
+pub struct AuthorityEvaluationInput {
     pub now_unix_s: u64,
     pub current_epoch: AuthorityEpoch,
     pub current_authority_context: AuthorityContextRef,
@@ -433,40 +444,48 @@ pub enum DenyReason {
     UseBudgetExhausted,
     ExplicitlyRevoked,
     ContextRevoked,
-    SubjectTombstoned,
+    PrincipalTombstoned,
     ResourceFrozen,
     ResourceEpochStale,
 }
 
+/// Pure semantic result only.
+///
+/// `Allow` means the supplied record is eligible under the supplied evaluator
+/// inputs. It does **not** mean those inputs were authenticated, that a current
+/// verified authority state exists, or that execution is admitted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuthorityDecision {
     Allow,
     Deny(DenyReason),
 }
 
-/// Evaluate a positive record against current epoch/context, durable use state,
-/// expiry, and negative facts.
+/// Evaluate one positive authority record against supplied current-state facts.
+///
+/// The function is deliberately pure and deterministic. Security-sensitive
+/// callers must first obtain trusted/current authority inputs from a verifier-
+/// owned layer, and must perform execution admission separately after `Allow`.
 pub fn evaluate_authority(
     grant: &CapabilityGrant,
-    context: &AuthorityEvaluationContext,
+    input: &AuthorityEvaluationInput,
     negative_facts: &[NegativeAuthorityFact],
 ) -> AuthorityDecision {
     if let Err(error) = grant.validate() {
         return AuthorityDecision::Deny(DenyReason::InvalidGrant(error));
     }
-    if grant.authority_epoch != context.current_epoch {
+    if grant.authority_epoch != input.current_epoch {
         return AuthorityDecision::Deny(DenyReason::EpochStale);
     }
-    if grant.authority_context != context.current_authority_context {
+    if grant.authority_context != input.current_authority_context {
         return AuthorityDecision::Deny(DenyReason::ContextMismatch);
     }
     if grant
         .expires_at_unix_s
-        .is_some_and(|expiry| context.now_unix_s > expiry)
+        .is_some_and(|expiry| input.now_unix_s > expiry)
     {
         return AuthorityDecision::Deny(DenyReason::Expired);
     }
-    if context.use_state.charged() >= grant.max_uses {
+    if input.use_state.charged() >= grant.max_uses {
         return AuthorityDecision::Deny(DenyReason::UseBudgetExhausted);
     }
 
@@ -478,8 +497,8 @@ pub fn evaluate_authority(
             {
                 return AuthorityDecision::Deny(DenyReason::ExplicitlyRevoked);
             }
-            NegativeAuthorityFact::RevokeContext { context: revoked }
-                if revoked == &grant.authority_context =>
+            NegativeAuthorityFact::RevokeContext { context }
+                if context == &grant.authority_context =>
             {
                 return AuthorityDecision::Deny(DenyReason::ContextRevoked);
             }
@@ -488,7 +507,7 @@ pub fn evaluate_authority(
                     || principal == &grant.issuer
                     || grant.audience.as_ref() == Some(principal) =>
             {
-                return AuthorityDecision::Deny(DenyReason::SubjectTombstoned);
+                return AuthorityDecision::Deny(DenyReason::PrincipalTombstoned);
             }
             NegativeAuthorityFact::FreezeResource { resource }
                 if grant.resources.contains(resource) =>
@@ -506,117 +525,6 @@ pub fn evaluate_authority(
     }
 
     AuthorityDecision::Allow
-}
-
-/// Runtime facts that fence a successful authority evaluation to one process/session.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuntimeAdmissionContext {
-    pub runtime_epoch: RuntimeEpoch,
-    pub admitted_at_tick: u64,
-    pub authority: AuthorityEvaluationContext,
-}
-
-/// Serializable evidence that a grant record passed admission at one exact runtime state.
-///
-/// This receipt is audit data only. It is **not** a live capability and cannot be
-/// converted back into [`LiveGrant`] through a public constructor.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AdmissionReceipt {
-    pub grant_digest: Digest32,
-    pub runtime_epoch: RuntimeEpoch,
-    pub admitted_at_tick: u64,
-    pub authority_epoch: AuthorityEpoch,
-    pub authority_context: AuthorityContextRef,
-}
-
-/// Currently admitted positive authority.
-///
-/// `LiveGrant` is intentionally neither `Clone` nor serializable. Its fields are
-/// private so persisted grant/receipt bytes cannot reconstruct live authority.
-#[derive(Debug)]
-pub struct LiveGrant {
-    grant: CapabilityGrant,
-    receipt: AdmissionReceipt,
-}
-
-impl LiveGrant {
-    pub fn grant(&self) -> &CapabilityGrant {
-        &self.grant
-    }
-
-    pub fn receipt(&self) -> &AdmissionReceipt {
-        &self.receipt
-    }
-
-    /// Revalidate this in-memory authority against fresh current authority state.
-    ///
-    /// This intentionally re-runs expiry, use-budget, context, epoch, and negative
-    /// fact checks so a once-admitted handle cannot survive revocation or other
-    /// authority changes merely because it remains in memory.
-    pub fn validate_current(
-        &self,
-        runtime_epoch: RuntimeEpoch,
-        authority: &AuthorityEvaluationContext,
-        negative_facts: &[NegativeAuthorityFact],
-    ) -> Result<(), LiveGrantInvalidReason> {
-        if runtime_epoch != self.receipt.runtime_epoch {
-            return Err(LiveGrantInvalidReason::RuntimeEpochChanged);
-        }
-        if self.grant.digest() != self.receipt.grant_digest {
-            return Err(LiveGrantInvalidReason::GrantCommitmentChanged);
-        }
-        match evaluate_authority(&self.grant, authority, negative_facts) {
-            AuthorityDecision::Allow => Ok(()),
-            AuthorityDecision::Deny(reason) => {
-                Err(LiveGrantInvalidReason::AuthorityDenied(reason))
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum LiveGrantInvalidReason {
-    #[error("runtime epoch changed")]
-    RuntimeEpochChanged,
-    #[error("grant commitment no longer matches admission receipt")]
-    GrantCommitmentChanged,
-    #[error("current authority no longer admits this live grant: {0:?}")]
-    AuthorityDenied(DenyReason),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum AdmissionError {
-    #[error("runtime epoch zero is reserved")]
-    ZeroRuntimeEpoch,
-    #[error("grant denied during runtime admission: {0:?}")]
-    Denied(DenyReason),
-}
-
-/// Admit one serialized grant record into runtime-local live authority.
-///
-/// This does not execute an effect and does not reserve a use. Consequential
-/// consumers remain responsible for durable reservation and domain safety gates.
-pub fn admit_live_grant(
-    grant: CapabilityGrant,
-    context: &RuntimeAdmissionContext,
-    negative_facts: &[NegativeAuthorityFact],
-) -> Result<LiveGrant, AdmissionError> {
-    if context.runtime_epoch.0 == 0 {
-        return Err(AdmissionError::ZeroRuntimeEpoch);
-    }
-    match evaluate_authority(&grant, &context.authority, negative_facts) {
-        AuthorityDecision::Allow => {
-            let receipt = AdmissionReceipt {
-                grant_digest: grant.digest(),
-                runtime_epoch: context.runtime_epoch,
-                admitted_at_tick: context.admitted_at_tick,
-                authority_epoch: context.authority.current_epoch,
-                authority_context: context.authority.current_authority_context.clone(),
-            };
-            Ok(LiveGrant { grant, receipt })
-        }
-        AuthorityDecision::Deny(reason) => Err(AdmissionError::Denied(reason)),
-    }
 }
 
 struct Transcript(blake3::Hasher);
@@ -728,8 +636,8 @@ mod tests {
         grant
     }
 
-    fn authority_evaluation_context() -> AuthorityEvaluationContext {
-        AuthorityEvaluationContext {
+    fn evaluation_input() -> AuthorityEvaluationInput {
+        AuthorityEvaluationInput {
             now_unix_s: 100,
             current_epoch: AuthorityEpoch(5),
             current_authority_context: authority_context(1),
@@ -737,108 +645,68 @@ mod tests {
         }
     }
 
-    fn admission_context() -> RuntimeAdmissionContext {
-        RuntimeAdmissionContext {
-            runtime_epoch: RuntimeEpoch(7),
-            admitted_at_tick: 150,
-            authority: authority_evaluation_context(),
-        }
-    }
-
     #[test]
-    fn auth_tiny_001_exact_grant_admits() {
-        let grant = robot_grant();
-        let live = admit_live_grant(grant.clone(), &admission_context(), &[]).unwrap();
-        assert_eq!(live.grant(), &grant);
-        assert_eq!(live.receipt().runtime_epoch, RuntimeEpoch(7));
-        assert_eq!(live.receipt().grant_digest, grant.digest());
-    }
-
-    #[test]
-    fn context_mismatch_fails_closed() {
-        let grant = robot_grant();
-        let mut context = admission_context();
-        context.authority.current_authority_context = authority_context(2);
+    fn auth_tiny_001_exact_record_is_eligible_under_matching_inputs() {
         assert_eq!(
-            admit_live_grant(grant, &context, &[]).unwrap_err(),
-            AdmissionError::Denied(DenyReason::ContextMismatch)
+            evaluate_authority(&robot_grant(), &evaluation_input(), &[]),
+            AuthorityDecision::Allow
         );
     }
 
     #[test]
-    fn live_authority_is_runtime_epoch_bound() {
-        let context = admission_context();
-        let live = admit_live_grant(robot_grant(), &context, &[]).unwrap();
+    fn exact_context_binding_fails_closed() {
+        let mut input = evaluation_input();
+        input.current_authority_context = authority_context(2);
         assert_eq!(
-            live.validate_current(RuntimeEpoch(8), &context.authority, &[]),
-            Err(LiveGrantInvalidReason::RuntimeEpochChanged)
-        );
-        assert!(
-            live.validate_current(RuntimeEpoch(7), &context.authority, &[])
-                .is_ok()
+            evaluate_authority(&robot_grant(), &input, &[]),
+            AuthorityDecision::Deny(DenyReason::ContextMismatch)
         );
     }
 
     #[test]
-    fn revocation_after_admission_invalidates_live_authority() {
-        let context = admission_context();
-        let live = admit_live_grant(robot_grant(), &context, &[]).unwrap();
-        let negative = NegativeAuthorityFact::RevokeGrant {
-            grant_digest: live.grant().digest(),
-        };
-        assert_eq!(
-            live.validate_current(RuntimeEpoch(7), &context.authority, &[negative]),
-            Err(LiveGrantInvalidReason::AuthorityDenied(
-                DenyReason::ExplicitlyRevoked
-            ))
-        );
-    }
-
-    #[test]
-    fn revocation_dominates_otherwise_valid_grant() {
+    fn revocation_dominates_otherwise_eligible_record() {
         let grant = robot_grant();
         let negative = NegativeAuthorityFact::RevokeGrant {
             grant_digest: grant.digest(),
         };
         assert_eq!(
-            admit_live_grant(grant, &admission_context(), &[negative]).unwrap_err(),
-            AdmissionError::Denied(DenyReason::ExplicitlyRevoked)
+            evaluate_authority(&grant, &evaluation_input(), &[negative]),
+            AuthorityDecision::Deny(DenyReason::ExplicitlyRevoked)
+        );
+    }
+
+    #[test]
+    fn context_revocation_dominates_matching_context() {
+        let grant = robot_grant();
+        let negative = NegativeAuthorityFact::RevokeContext {
+            context: grant.authority_context.clone(),
+        };
+        assert_eq!(
+            evaluate_authority(&grant, &evaluation_input(), &[negative]),
+            AuthorityDecision::Deny(DenyReason::ContextRevoked)
         );
     }
 
     #[test]
     fn reserved_uses_are_charged_before_dispatch() {
-        let grant = robot_grant();
-        let mut context = admission_context();
-        context.authority.use_state = GrantUseState {
+        let mut input = evaluation_input();
+        input.use_state = GrantUseState {
             committed: 1,
             reserved: 1,
         };
         assert_eq!(
-            admit_live_grant(grant, &context, &[]).unwrap_err(),
-            AdmissionError::Denied(DenyReason::UseBudgetExhausted)
+            evaluate_authority(&robot_grant(), &input, &[]),
+            AuthorityDecision::Deny(DenyReason::UseBudgetExhausted)
         );
     }
 
     #[test]
     fn stale_authority_epoch_is_denied() {
-        let grant = robot_grant();
-        let mut context = admission_context();
-        context.authority.current_epoch = AuthorityEpoch(6);
+        let mut input = evaluation_input();
+        input.current_epoch = AuthorityEpoch(6);
         assert_eq!(
-            admit_live_grant(grant, &context, &[]).unwrap_err(),
-            AdmissionError::Denied(DenyReason::EpochStale)
-        );
-    }
-
-    #[test]
-    fn zero_runtime_epoch_cannot_create_live_authority() {
-        let grant = robot_grant();
-        let mut context = admission_context();
-        context.runtime_epoch = RuntimeEpoch(0);
-        assert_eq!(
-            admit_live_grant(grant, &context, &[]).unwrap_err(),
-            AdmissionError::ZeroRuntimeEpoch
+            evaluate_authority(&robot_grant(), &input, &[]),
+            AuthorityDecision::Deny(DenyReason::EpochStale)
         );
     }
 
@@ -885,14 +753,26 @@ mod tests {
     }
 
     #[test]
-    fn structural_invalidity_fails_before_positive_authority() {
+    fn structural_invalidity_fails_before_positive_decision() {
         let mut grant = robot_grant();
         grant.operations.clear();
         assert_eq!(
-            admit_live_grant(grant, &admission_context(), &[]).unwrap_err(),
-            AdmissionError::Denied(DenyReason::InvalidGrant(
+            evaluate_authority(&grant, &evaluation_input(), &[]),
+            AuthorityDecision::Deny(DenyReason::InvalidGrant(
                 GrantValidationError::EmptyOperations
             ))
+        );
+    }
+
+    #[test]
+    fn issuer_tombstone_is_negative_authority() {
+        let grant = robot_grant();
+        let negative = NegativeAuthorityFact::TombstonePrincipal {
+            principal: grant.issuer.clone(),
+        };
+        assert_eq!(
+            evaluate_authority(&grant, &evaluation_input(), &[negative]),
+            AuthorityDecision::Deny(DenyReason::PrincipalTombstoned)
         );
     }
 
