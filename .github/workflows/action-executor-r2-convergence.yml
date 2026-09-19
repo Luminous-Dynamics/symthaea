@@ -1,0 +1,159 @@
+name: Action Executor R2 Convergence
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-executor-r2-convergence.yml'
+      - '.github/workflows/action-admission-v2-r1-qualification.yml'
+      - '.github/workflows/executor-identity-v1-qualification.yml'
+      - '.github/workflows/interaction-core-v1-qualification.yml'
+      - 'crates/bridges/symthaea-action-admission/**'
+      - 'crates/core/symthaea-executor-identity/**'
+      - 'crates/core/symthaea-interaction-core/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-executor-r2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  convergence:
+    name: Exact repaired V2D plus executor identity
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact two-parent convergence
+        env:
+          MERGE: e8d6a11e70623701fe8b28877ccb291bd6375389
+          V2D: 838059342fb8389fbeb13a227d3ddc0014ee10c2
+          EXEC_ID: 817194fd4a5a9bf8989c6fe1041c0fe6877fa612
+        run: |
+          set -euo pipefail
+          for commit in "${MERGE}" "${V2D}" "${EXEC_ID}"; do
+            git cat-file -e "${commit}^{commit}"
+          done
+          test "$(git rev-parse "${MERGE}^1")" = "${V2D}"
+          test "$(git rev-parse "${MERGE}^2")" = "${EXEC_ID}"
+          test "$(git rev-list --parents -n 1 "${MERGE}" | wc -w)" -eq 3
+          git merge-base --is-ancestor "${MERGE}" HEAD
+
+      - name: Verify convergence-only child scope
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          merge = 'e8d6a11e70623701fe8b28877ccb291bd6375389'
+          allowed = {'.github/workflows/action-executor-r2-convergence.yml'}
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{merge}..HEAD'], text=True
+          ).splitlines())
+          unexpected = sorted(changed - allowed)
+          if unexpected:
+              raise SystemExit('unexpected post-convergence paths: ' + ', '.join(unexpected))
+          if allowed - changed:
+              raise SystemExit('missing action-executor convergence canary')
+          PY
+
+      - name: Pin repaired V2D objects
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .github/workflows/action-admission-v2-r1-qualification.yml)" = '41c21d2afc61ee300532bbf4b3b9d503652b63b4'
+          test "$(git hash-object crates/bridges/symthaea-action-admission/Cargo.toml)" = '5eeee5817dd22d6b00e0e26b97330ad983e57d79'
+          test "$(git hash-object crates/bridges/symthaea-action-admission/src/lib.rs)" = 'ca0cd2f9a7d85b58e43ba42f42ec6abbc393da9c'
+          test "$(git hash-object crates/bridges/symthaea-action-admission/src/tests.rs)" = '83d1c794347dc1a4318eb5a46684735eccc2dd1d'
+
+      - name: Pin executor identity and interaction-core objects
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .github/workflows/executor-identity-v1-qualification.yml)" = 'a2be4de380ba271df93e8eecec84f46d37377859'
+          test "$(git hash-object .github/workflows/interaction-core-v1-qualification.yml)" = 'e1d60f66ffe43aa43a8a795e603486faee67d497'
+          test "$(git hash-object crates/core/symthaea-executor-identity/Cargo.toml)" = 'd4c16f3a910f1ecd1b3aabf03994579c5ddce2ec'
+          test "$(git hash-object crates/core/symthaea-executor-identity/src/lib.rs)" = 'af1b47b980544fe6e466faff3b8fe4002fa02690'
+          test "$(git hash-object crates/core/symthaea-executor-identity/scripts/executor_identity_oracle.py)" = '66677080f71a8a85e65fb03d1500a097e27b2294'
+          test "$(git hash-object crates/core/symthaea-interaction-core/Cargo.toml)" = '57dc8f85eaa1b4aea652c58f2e71327b36b4ec46'
+          test "$(git hash-object crates/core/symthaea-interaction-core/src/lib.rs)" = 'ef665d4e3dfd99303620e6762b0867e4b6d78031'
+          test "$(git hash-object crates/core/symthaea-interaction-core/scripts/interaction_oracle.py)" = '43fb4c585ab32b579a066ba7c828fe00fc62f1be'
+
+      - name: Enforce identity and permit non-equivalence
+        run: |
+          set -euo pipefail
+          EXEC=crates/core/symthaea-executor-identity/src/lib.rs
+          ADMISSION=crates/bridges/symthaea-action-admission/src/lib.rs
+          grep -Fq 'pub struct VerifiedExecutorBinding' "${EXEC}"
+          grep -Fq 'pub struct DispatchPermitV2' "${ADMISSION}"
+          if grep -Eq 'pub[[:space:]]+fn[[:space:]]+(new|from_[A-Za-z0-9_]*)[^\n]*VerifiedExecutorBinding' "${EXEC}"; then
+            echo 'public executor-binding constructor regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'serde' crates/core/symthaea-executor-identity/Cargo.toml; then
+            echo 'executor identity ABI unexpectedly gained serde dependency' >&2
+            exit 1
+          fi
+          if grep -Fq 'symthaea-authority' crates/core/symthaea-executor-identity/Cargo.toml; then
+            echo 'executor identity ABI unexpectedly gained authority dependency' >&2
+            exit 1
+          fi
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Run independent identity oracles
+        run: |
+          set -euo pipefail
+          python3 crates/core/symthaea-interaction-core/scripts/interaction_oracle.py
+          python3 crates/core/symthaea-executor-identity/scripts/executor_identity_oracle.py
+
+      - name: Format focused convergence surface
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission -- --check
+
+      - name: Focused compile test and strict Clippy
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission --all-targets
+          cargo test -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission
+          cargo clippy -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission --all-targets
+          cargo test --locked -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission
+          cargo clippy --locked -p symthaea-interaction-core -p symthaea-executor-identity -p symthaea-action-admission --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
