@@ -1,0 +1,446 @@
+name: QUAL-INFRA-002 Exact Subject Executor
+
+on:
+  workflow_dispatch:
+    inputs:
+      qualification_id:
+        description: Closed qualification registry profile
+        required: true
+        type: choice
+        options:
+          - symthaea-humanoid-default-v1
+          - symthaea-humanoid-mujoco-v1
+      subject_sha:
+        description: Exact lowercase 40-hex source subject
+        required: true
+        type: string
+      subject_pr:
+        description: Open pull request whose current head must equal subject_sha
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: qual-infra-002-${{ inputs.qualification_id }}-${{ inputs.subject_sha }}
+  cancel-in-progress: false
+
+jobs:
+  exact-subject-qualification:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Admit default-branch control plane and exact inputs
+        shell: bash
+        env:
+          QUALIFICATION_ID: ${{ inputs.qualification_id }}
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          SUBJECT_PR: ${{ inputs.subject_pr }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_EVENT_NAME" = "workflow_dispatch"
+          test "$GITHUB_REF" = "refs/heads/$DEFAULT_BRANCH"
+          test "$GITHUB_RUN_ATTEMPT" = "1"
+          test "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA"
+          [[ "$SUBJECT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$SUBJECT_PR" =~ ^[1-9][0-9]*$ ]]
+          case "$QUALIFICATION_ID" in
+            symthaea-humanoid-default-v1|symthaea-humanoid-mujoco-v1) ;;
+            *) echo "unregistered qualification ID: $QUALIFICATION_ID" >&2; exit 1 ;;
+          esac
+          mkdir -p "$GITHUB_WORKSPACE/qualification-executor-evidence"
+
+      - name: Check out exact control plane
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: control-plane
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Bind control-plane identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C control-plane rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git -C control-plane status --porcelain=v1 --untracked-files=all)"
+          git -C control-plane rev-parse HEAD > qualification-executor-evidence/control-plane-commit.txt
+          git -C control-plane rev-parse HEAD^{tree} > qualification-executor-evidence/control-plane-tree.txt
+          sha256sum control-plane/.github/qualification/executor-v1.json \
+            > qualification-executor-evidence/registry.sha256
+          sha256sum control-plane/.github/scripts/run-qualification-executor.py \
+            > qualification-executor-evidence/executor.sha256
+
+      - name: Bind source pull request to exact subject
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          SUBJECT_PR: ${{ inputs.subject_pr }}
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = Number(process.env.SUBJECT_PR);
+            if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+              throw new Error('subject_pr must be a positive integer');
+            }
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            if (pr.state !== 'open' || pr.merged) {
+              throw new Error(`subject PR must be open and unmerged: state=${pr.state} merged=${pr.merged}`);
+            }
+            if (pr.head?.sha !== process.env.SUBJECT_SHA) {
+              throw new Error(`subject PR head mismatch: expected ${process.env.SUBJECT_SHA}, got ${pr.head?.sha}`);
+            }
+            if (pr.head?.repo?.id !== context.payload.repository.id) {
+              throw new Error('subject PR head repository mismatch');
+            }
+            if (pr.base?.repo?.id !== context.payload.repository.id) {
+              throw new Error('subject PR base repository mismatch');
+            }
+            const snapshot = {
+              phase: 'pre-execution',
+              number: pr.number,
+              state: pr.state,
+              draft: pr.draft,
+              merged: pr.merged,
+              head_sha: pr.head?.sha,
+              head_ref: pr.head?.ref,
+              head_repository_id: pr.head?.repo?.id,
+              base_sha: pr.base?.sha,
+              base_ref: pr.base?.ref,
+              base_repository_id: pr.base?.repo?.id,
+              updated_at: pr.updated_at,
+            };
+            fs.writeFileSync(
+              'qualification-executor-evidence/subject-pr-preflight.json',
+              JSON.stringify(snapshot, null, 2) + '\n'
+            );
+
+      - name: Check out exact qualification subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.subject_sha }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Bind exact subject checkout
+        shell: bash
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git -C subject status --porcelain=v1 --untracked-files=all)"
+          git -C subject rev-parse HEAD > qualification-executor-evidence/subject-commit.txt
+          git -C subject rev-parse HEAD^{tree} > qualification-executor-evidence/subject-tree.txt
+
+      - name: Enforce subject symlink confinement
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('subject').resolve()
+          violations = []
+          for path in root.rglob('*'):
+              if '.git' in path.parts:
+                  continue
+              if not path.is_symlink():
+                  continue
+              try:
+                  resolved = path.resolve(strict=True)
+              except FileNotFoundError:
+                  violations.append(f'dangling symlink: {path.relative_to(root)}')
+                  continue
+              try:
+                  resolved.relative_to(root)
+              except ValueError:
+                  violations.append(
+                      f'escaping symlink: {path.relative_to(root)} -> {resolved}'
+                  )
+          if violations:
+              raise SystemExit('\n'.join(violations))
+          PY
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+          command -v sudo
+          test -x /usr/bin/setpriv
+
+      - name: Bind hosted runner and toolchain facts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${ImageOS:-}"
+          test -n "${ImageVersion:-}"
+          test -n "${RUNNER_OS:-}"
+          test -n "${RUNNER_ARCH:-}"
+          toolchain_bin="$(rustc --print sysroot)/bin"
+          {
+            echo "runner_label=ubuntu-24.04"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            echo "image_os=$ImageOS"
+            echo "image_version=$ImageVersion"
+            echo "uname=$(uname -a)"
+          } > qualification-executor-evidence/runner-image.txt
+          cp /etc/os-release qualification-executor-evidence/os-release.txt
+          sha256sum qualification-executor-evidence/os-release.txt \
+            > qualification-executor-evidence/os-release.sha256
+          sha256sum "$(command -v sudo)" /usr/bin/setpriv \
+            > qualification-executor-evidence/isolation-tools.sha256
+          sha256sum \
+            "$toolchain_bin/rustc" \
+            "$toolchain_bin/cargo" \
+            "$toolchain_bin/rustfmt" \
+            "$toolchain_bin/clippy-driver" \
+            > qualification-executor-evidence/rust-toolchain-binaries.sha256
+          {
+            rustc -vV
+            cargo -Vv
+            rustfmt --version
+            clippy-driver --version
+          } > qualification-executor-evidence/rust-toolchain-versions.txt
+
+      - name: Prepare unprivileged subject execution boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo useradd --system --user-group --no-create-home --shell /usr/sbin/nologin qual-subject
+          sandbox="$RUNNER_TEMP/qual-infra-002-sandbox"
+          host_rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
+          sudo install -d -o qual-subject -g qual-subject -m 0700 \
+            "$sandbox" "$sandbox/home" "$sandbox/cargo-home" "$sandbox/target" "$sandbox/tmp"
+
+          # Preserve runner ownership while removing group/other write access.
+          # The dedicated subject uid may read exact source but cannot mutate it.
+          chmod -R go-w subject
+
+          # Subject commands cannot read or mutate control-plane/evidence bytes.
+          chmod -R go-rwx control-plane qualification-executor-evidence
+
+          sudo -u qual-subject test -r "$GITHUB_WORKSPACE/subject/Cargo.toml"
+          sudo -u qual-subject test ! -w "$GITHUB_WORKSPACE/subject/Cargo.toml"
+          sudo -u qual-subject test ! -r "$GITHUB_WORKSPACE/control-plane/.github/qualification/executor-v1.json"
+          sudo -u qual-subject test ! -w "$GITHUB_WORKSPACE/qualification-executor-evidence"
+
+          # Every executable search path inherited into the minimal subject
+          # environment must itself be non-writable by the subject uid.
+          IFS=':' read -r -a path_entries <<< "$PATH"
+          for entry in "${path_entries[@]}"; do
+            test -n "$entry"
+            test -d "$entry"
+            sudo -u qual-subject test ! -w "$entry"
+          done
+
+          # Prove the exact sandbox identity can execute the pinned toolchain
+          # before running any subject-owned build scripts or tests.
+          sudo -u qual-subject /usr/bin/env -i \
+            PATH="$PATH" \
+            HOME="$sandbox/home" \
+            CARGO_HOME="$sandbox/cargo-home" \
+            RUSTUP_HOME="$host_rustup_home" \
+            RUSTUP_TOOLCHAIN=1.96.0 \
+            TMPDIR="$sandbox/tmp" \
+            rustc --version | tee qualification-executor-evidence/sandbox-rustc-version.txt | grep -F 'rustc 1.96.0'
+          sudo -u qual-subject /usr/bin/env -i \
+            PATH="$PATH" \
+            HOME="$sandbox/home" \
+            CARGO_HOME="$sandbox/cargo-home" \
+            RUSTUP_HOME="$host_rustup_home" \
+            RUSTUP_TOOLCHAIN=1.96.0 \
+            TMPDIR="$sandbox/tmp" \
+            cargo --version | tee qualification-executor-evidence/sandbox-cargo-version.txt | grep -F 'cargo 1.96.0'
+
+          # Mirror the executor's privilege transition and prove that the
+          # subject process begins with no inheritable/permitted/effective/
+          # ambient capabilities. Bounding-set contents are retained below as
+          # evidence but do not constitute active authority with no-new-privs.
+          uid="$(id -u qual-subject)"
+          gid="$(id -g qual-subject)"
+          sudo -n /usr/bin/setpriv \
+            --reuid="$uid" \
+            --regid="$gid" \
+            --clear-groups \
+            --no-new-privs \
+            /usr/bin/env -i PATH="$PATH" /bin/sh -c \
+              "grep -E '^Cap(Inh|Prm|Eff|Bnd|Amb):' /proc/self/status" \
+            > qualification-executor-evidence/sandbox-capabilities.txt
+          grep -Eq '^CapInh:[[:space:]]+0{16}$' qualification-executor-evidence/sandbox-capabilities.txt
+          grep -Eq '^CapPrm:[[:space:]]+0{16}$' qualification-executor-evidence/sandbox-capabilities.txt
+          grep -Eq '^CapEff:[[:space:]]+0{16}$' qualification-executor-evidence/sandbox-capabilities.txt
+          grep -Eq '^CapAmb:[[:space:]]+0{16}$' qualification-executor-evidence/sandbox-capabilities.txt
+
+      - name: Execute closed-registry qualification
+        shell: bash
+        env:
+          QUALIFICATION_ID: ${{ inputs.qualification_id }}
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          SANDBOX_ROOT: ${{ runner.temp }}/qual-infra-002-sandbox
+        run: |
+          set -euo pipefail
+          python3 control-plane/.github/scripts/run-qualification-executor.py \
+            --registry control-plane/.github/qualification/executor-v1.json \
+            --qualification-id "$QUALIFICATION_ID" \
+            --subject-dir subject \
+            --expected-sha "$SUBJECT_SHA" \
+            --control-plane-sha "$GITHUB_SHA" \
+            --evidence-dir qualification-executor-evidence \
+            --sandbox-user qual-subject \
+            --sandbox-root "$SANDBOX_ROOT"
+
+      - name: Kill residual subject processes
+        if: always()
+        shell: bash
+        run: sudo pkill -KILL -u qual-subject || true
+
+      - name: Rebind source pull request after execution
+        if: always()
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+          SUBJECT_PR: ${{ inputs.subject_pr }}
+        with:
+          script: |
+            const fs = require('fs');
+            const prNumber = Number(process.env.SUBJECT_PR);
+            if (!Number.isSafeInteger(prNumber) || prNumber <= 0) {
+              throw new Error('subject_pr must be a positive integer');
+            }
+            const before = JSON.parse(
+              fs.readFileSync('qualification-executor-evidence/subject-pr-preflight.json', 'utf8')
+            );
+            const { owner, repo } = context.repo;
+            const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: prNumber });
+            if (pr.state !== 'open' || pr.merged) {
+              throw new Error(`subject PR changed state during execution: state=${pr.state} merged=${pr.merged}`);
+            }
+            if (pr.head?.sha !== process.env.SUBJECT_SHA) {
+              throw new Error(`subject PR head moved during execution: expected ${process.env.SUBJECT_SHA}, got ${pr.head?.sha}`);
+            }
+            if (pr.head?.repo?.id !== before.head_repository_id || pr.base?.repo?.id !== before.base_repository_id) {
+              throw new Error('subject PR repository identity changed during execution');
+            }
+            if (pr.head?.ref !== before.head_ref) {
+              throw new Error(`subject PR head ref changed during execution: ${before.head_ref} -> ${pr.head?.ref}`);
+            }
+            if (pr.base?.ref !== before.base_ref) {
+              throw new Error(`subject PR base ref changed during execution: ${before.base_ref} -> ${pr.base?.ref}`);
+            }
+            const snapshot = {
+              phase: 'post-execution',
+              number: pr.number,
+              state: pr.state,
+              draft: pr.draft,
+              merged: pr.merged,
+              head_sha: pr.head?.sha,
+              head_ref: pr.head?.ref,
+              head_repository_id: pr.head?.repo?.id,
+              base_sha: pr.base?.sha,
+              base_ref: pr.base?.ref,
+              base_repository_id: pr.base?.repo?.id,
+              updated_at: pr.updated_at,
+            };
+            fs.writeFileSync(
+              'qualification-executor-evidence/subject-pr-postflight.json',
+              JSON.stringify(snapshot, null, 2) + '\n'
+            );
+
+      - name: Verify control-plane and subject postflight immutability
+        if: always()
+        shell: bash
+        env:
+          SUBJECT_SHA: ${{ inputs.subject_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C control-plane rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git -C control-plane status --porcelain=v1 --untracked-files=all)"
+          sha256sum -c qualification-executor-evidence/registry.sha256
+          sha256sum -c qualification-executor-evidence/executor.sha256
+          test "$(git -C subject rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git -C subject status --porcelain=v1 --untracked-files=all)"
+
+      - name: Record workflow nonclaim
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "program=QUAL-INFRA-002"
+            echo "authority=exact-subject-source-qualification-evidence-only"
+            echo "runtime_authority=NONE"
+            echo "hardware_observation_claim=NONE"
+            echo "physical_safety_claim=NONE"
+            echo "workflow_dispatch_only=TRUE"
+            echo "default_branch_control_plane_required=TRUE"
+            echo "workflow_sha=$GITHUB_WORKFLOW_SHA"
+            echo "workflow_ref=$GITHUB_WORKFLOW_REF"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "workflow_run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "run_attempt_policy=EXACTLY_1"
+            echo "arbitrary_shell_input=FALSE"
+            echo "runner=ubuntu-24.04"
+            echo "job_timeout_minutes=75"
+            echo "profile_timeout_max_minutes=55"
+            echo "runner_image_os=$ImageOS"
+            echo "runner_image_version=$ImageVersion"
+            echo "control_plane_subject_separated=TRUE"
+            echo "subject_exec_uid=qual-subject"
+            echo "subject_minimal_environment=TRUE"
+            echo "subject_symlink_policy=INTERNAL_RESOLVED_TARGETS_ONLY"
+            echo "subject_active_capabilities=NONE"
+            echo "subject_control_plane_write=DENIED"
+            echo "subject_evidence_write=DENIED"
+            echo "subject_pr_pre_and_post_bound=TRUE"
+            echo "subject_network_policy=GITHUB_HOSTED_EGRESS_UNRESTRICTED_V1"
+            echo "subject_host_filesystem_policy=GITHUB_HOSTED_VM_WORLD_READABLE_V1"
+          } > qualification-executor-evidence/workflow-receipt.txt
+          sha256sum qualification-executor-evidence/workflow-receipt.txt \
+            > qualification-executor-evidence/workflow-receipt.sha256
+
+      - name: Finalize complete evidence checksums
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd qualification-executor-evidence
+          rm -f sha256sums.txt
+          while IFS= read -r file; do
+            sha256sum "$file"
+          done < <(
+            find . -maxdepth 1 -type f ! -name sha256sums.txt -printf '%f\n' \
+              | LC_ALL=C sort
+          ) > sha256sums.txt
+
+      - name: Upload exact-subject qualification evidence
+        if: always()
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qual-infra-002-${{ inputs.qualification_id }}-${{ inputs.subject_sha }}
+          path: qualification-executor-evidence/
+          if-no-files-found: error
+
+      - name: Record uploaded artifact digest
+        if: always()
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [ -n "$ARTIFACT_DIGEST" ]; then
+            echo "QUAL-INFRA-002 evidence digest: $ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
+          fi
