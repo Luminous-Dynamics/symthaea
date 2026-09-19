@@ -14,7 +14,7 @@
 //! qualification ratifications, lifecycle events, currentness observations, and
 //! currentness-cadence policy, append-only authenticated qualification lifecycle
 //! records, observed-view currentness assessments, complete-tail lifecycle/
-//! currentness publication freshness assessments, cross-stream currentness/
+//! currentness/cadence publication freshness assessments, cross-stream currentness/
 //! lifecycle rollback guards, authenticated per-qualification currentness cadence
 //! policy, authenticated frozen-protocol evidence freshness assessments, aligned
 //! validity-readiness assessments over one exact authenticated evaluation horizon,
@@ -50,6 +50,7 @@ pub mod independence;
 pub mod protocol;
 pub mod provenance;
 pub mod qualification_currentness_cadence;
+pub mod qualification_currentness_cadence_head;
 pub mod qualification_currentness_cadence_publication;
 pub mod qualification_currentness_guard_head;
 pub mod qualification_currentness_head;
@@ -96,6 +97,7 @@ pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
 pub use qualification_currentness_cadence::*;
+pub use qualification_currentness_cadence_head::*;
 pub use qualification_currentness_cadence_publication::*;
 pub use qualification_currentness_guard_head::*;
 pub use qualification_currentness_head::*;
