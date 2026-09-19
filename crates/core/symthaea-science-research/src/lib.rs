@@ -12,11 +12,12 @@
 //! non-forgeable qualified-claim capabilities, delegated-root ratification of
 //! historical qualification, witnessed transparency publication of exact
 //! qualification ratifications and lifecycle events, append-only authenticated
-//! qualification lifecycle records, typed provenance graphs, frozen study
-//! protocols, immutable execution/conformance records, adversarial falsification
-//! campaigns, explicit scientific uncertainty budgets, and provenance-checked
-//! replication lineage assessments. It does not run experiments, solvers, LLMs,
-//! HDC, statistics, formal provers, or network operations.
+//! qualification lifecycle records, observed-view currentness assessments, typed
+//! provenance graphs, frozen study protocols, immutable execution/conformance
+//! records, adversarial falsification campaigns, explicit scientific uncertainty
+//! budgets, and provenance-checked replication lineage assessments. It does not
+//! run experiments, solvers, LLMs, HDC, statistics, formal provers, or network
+//! operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Scientific qualification exists only as a private capability after the exact
@@ -24,7 +25,7 @@
 //! separate append-only authority and never rewrites historical qualification.
 //! Delegated-root ratification is also distinct from claiming that an older
 //! qualification was originally issued under the newer root architecture, and
-//! public anchoring is distinct from current validity or scientific truth.
+//! public/observed currentness is distinct from global current validity or truth.
 
 pub mod authority;
 pub mod claim;
@@ -45,6 +46,7 @@ mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
 pub mod qualification_lifecycle;
 pub mod qualification_lifecycle_publication;
+pub mod qualification_observed_currentness;
 pub mod qualification_profile_authority;
 pub mod qualification_publication;
 pub mod qualification_review;
@@ -85,6 +87,7 @@ pub use qualification_eligibility::{
 pub use qualification_eligibility_gate::*;
 pub use qualification_lifecycle::*;
 pub use qualification_lifecycle_publication::*;
+pub use qualification_observed_currentness::*;
 pub use qualification_profile_authority::*;
 pub use qualification_publication::*;
 pub use qualification_review::*;
