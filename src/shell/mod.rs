@@ -25,6 +25,7 @@ pub mod epistemic_overlay;
 pub mod error_explainer;
 pub mod flake_context;
 pub mod ipc_client;
+pub mod ipc_duplex;
 pub mod ipc_server;
 pub mod keybindings;
 pub mod notifications;
@@ -78,6 +79,7 @@ pub use ipc_client::{
     WireProtocol,
     discover_socket,
 };
+pub use ipc_duplex::LegacyDuplexPump;
 pub use ipc_server::{
     CommandExecutor, ExecutionResult, IpcServer, IpcServerConfig, MetricsProvider,
     StubCommandExecutor, StubMetricsProvider, ValidationResult,
