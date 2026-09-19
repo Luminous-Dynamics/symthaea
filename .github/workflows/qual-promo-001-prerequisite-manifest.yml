@@ -1,0 +1,255 @@
+name: QUAL-PROMO-001 Typed Promotion Prerequisites
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/**"
+      - ".github/workflows/qual-promo-001-prerequisite-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-promo-001-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 148a4d6088657d941a07ee32e04d8de3a67de548
+  D5B5_SOURCE: 792ead8e08565995b0bfc5e3f6ab5ebbde6aa8df
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-typed-promotion-prerequisites:
+    runs-on: ubuntu-slim
+    timeout-minutes: 55
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 32
+          persist-credentials: false
+
+      - name: Bind exact qualifier parent and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/qual-promo-001-prerequisite-manifest.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source and D5B5 ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+          git merge-base --is-ancestor "$D5B5_SOURCE" "$EXPECTED_PARENT"
+          test "$(git rev-list --count "$D5B5_SOURCE".."$EXPECTED_PARENT")" = "1"
+
+      - name: Verify typed promotion prerequisite boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/qualification_promotion.rs
+          test -f "$src"
+          grep -F 'pub enum QualificationExecutionStateV1' "$src"
+          grep -F 'pub enum QualificationPredecessorRoleV1' "$src"
+          grep -F 'pub struct QualificationExecutionRecordV1' "$src"
+          grep -F 'pub struct AuthorityPromotionPrerequisiteManifestV1' "$src"
+          grep -F 'pub fn verify_authority_promotion_prerequisites_v1' "$src"
+          grep -F 'pub const fn verifies_external_execution_truth(&self) -> bool' "$src"
+          grep -F 'pub const fn establishes_runtime_authority(&self) -> bool' "$src"
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('crates/domains/symthaea-humanoid/src/qualification_promotion.rs')
+          text = path.read_text()
+          production = text.split('#[cfg(test)]', 1)[0]
+          code = '\n'.join(
+              line for line in production.splitlines()
+              if not line.lstrip().startswith('//')
+          )
+
+          for variant in (
+              'QueuedInfrastructure', 'Executing', 'ExecutablePassed',
+              'ExecutableFailed', 'CancelledInfrastructure', 'Superseded',
+          ):
+              assert variant in production, variant
+
+          roles = (
+              'ContactAuthorityD4', 'VerifiedSurfaceSupportD5A',
+              'MujocoContactBiasDyn002C', 'CompleteContactEvidenceD5B',
+              'IndependentCompleteVerifierD5B2', 'PreparedAuthorityMappingD5B3',
+              'IndependentPreparedVerifierD5B4', 'SealedPreAuthorityCandidateD5B5',
+          )
+          for role in roles:
+              assert role in production, role
+
+          required_fields = (
+              'source_sha', 'qualifier_sha', 'workflow_name', 'workflow_id',
+              'run_id', 'run_attempt', 'execution_state', 'evidence_artifact_id',
+              'evidence_artifact_name', 'evidence_artifact_sha256',
+          )
+          record = production.split('pub struct QualificationExecutionRecordV1 {', 1)[1].split('\n}', 1)[0]
+          for field in required_fields:
+              assert f'pub {field}:' in record, field
+
+          expected = {
+              'ContactAuthorityD4': (
+                  'c00fedffffd9d0240f5a5be44cac293bac6cef44',
+                  '4210a5e51127f6c8a6c663766dc6d130bf4224df',
+                  'HUM-WRENCH-001D4 Contact Authority', '361_892_536', '35_426_272_913'),
+              'VerifiedSurfaceSupportD5A': (
+                  'b64e62287cfb49797d280369545672cff87b48dd',
+                  '32b49ed10987e7b3a48ed54dd8dd7b551d1731e8',
+                  'HUM-WRENCH-001D5A Verified Surface Support', '361_896_937', '35_431_016_942'),
+              'MujocoContactBiasDyn002C': (
+                  '67107f337ee454d4d9da859b7fd4dea8628cedf2',
+                  '0b222328a6123a87716c8a535cb21179dc8e6774',
+                  'HUM-DYN-002C MuJoCo Contact Bias', '361_532_488', '35_431_329_409'),
+              'CompleteContactEvidenceD5B': (
+                  '156ed01855b2c6fd89118b5ac4063282added0cb',
+                  '3d69c5f7006fc300ae538effde87ebec9b43486e',
+                  'HUM-WRENCH-001D5B Complete Contact Evidence', '361_945_663', '35_431_653_533'),
+              'IndependentCompleteVerifierD5B2': (
+                  '47f6e0339a36ddfcef025e6277adbab1b91b6163',
+                  '75e91066db405daf49d1b78f9630d68e4ff72eeb',
+                  'HUM-WRENCH-001D5B2 Independent Complete Contact Verifier', '361_971_294', '35_434_249_956'),
+              'PreparedAuthorityMappingD5B3': (
+                  '44a0cdf8b3c939d02b8dad89a531d18b50d4979a',
+                  '66343eb1f9d57fb9d22458bb22252c2059cbe469',
+                  'HUM-WRENCH-001D5B3 Prepared Contact Authority Evidence', '361_973_645', '35_434_645_590'),
+              'IndependentPreparedVerifierD5B4': (
+                  '9e8248fbdc92af1179ff3a29fed9f84d8d52fa99',
+                  'bb4f2029e13308067660e4f0f0b59bdb6c77a984',
+                  'HUM-WRENCH-001D5B4 Independent Prepared Authority Verifier', '361_999_685', '35_437_190_217'),
+              'SealedPreAuthorityCandidateD5B5': (
+                  '792ead8e08565995b0bfc5e3f6ab5ebbde6aa8df',
+                  '015f82ff0df8746a0c0c06f14a00ba6b25e70ed6',
+                  'HUM-WRENCH-001D5B5 Sealed Pre-Authority Surface Candidate', '362_002_235', '35_437_475_927'),
+          }
+          expected_fn = production.split('fn expected_qualification(', 1)[1]
+          for role, values in expected.items():
+              assert role in expected_fn, role
+              for value in values:
+                  assert value in expected_fn, (role, value)
+
+          assert 'record.execution_state != QualificationExecutionStateV1::ExecutablePassed' in production
+          assert 'record.run_attempt == 0' in production
+          assert 'record.evidence_artifact_id == 0' in production
+          assert 'is_lower_hex(&record.evidence_artifact_sha256, 64)' in production
+          assert 'ordered.sort_by_key(|record| record.role)' in production
+          lineage = production.split('fn record_lineage_component', 1)[1]
+          assert 'record.run_attempt' in lineage
+          assert 'record.evidence_artifact_id' in lineage
+
+          external = production.split('pub const fn verifies_external_execution_truth(&self) -> bool', 1)[1].split('}', 1)[0]
+          authority = production.split('pub const fn establishes_runtime_authority(&self) -> bool', 1)[1].split('}', 1)[0]
+          assert 'false' in external
+          assert 'false' in authority
+
+          forbidden = (
+              'use crate::contact_authority',
+              'ContactAuthorityStateMachineV1',
+              'EstablishedContactEvidenceV1',
+              'floating_base_inverse_dynamics',
+              'csc_qp',
+              'osqp_backend',
+          )
+          for needle in forbidden:
+              assert needle not in code, needle
+          PY
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo tree -p symthaea-humanoid --locked | tee "$RUNNER_TEMP/cargo-tree-default.txt"
+          cargo tree -p symthaea-humanoid --features mujoco --locked | tee "$RUNNER_TEMP/cargo-tree-mujoco.txt"
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked default all-target compile
+        run: cargo check -p symthaea-humanoid --all-targets --locked
+
+      - name: Locked MuJoCo integration compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Execute focused promotion prerequisite regressions
+        run: cargo test -p symthaea-humanoid qualification_promotion --locked -- --nocapture
+
+      - name: Strict default Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qual-promo-001-evidence
+          cp "$RUNNER_TEMP/cargo-tree-default.txt" qual-promo-001-evidence/cargo-tree-default.txt
+          cp "$RUNNER_TEMP/cargo-tree-mujoco.txt" qual-promo-001-evidence/cargo-tree-mujoco.txt
+          {
+            echo "program=QUAL-PROMO-001"
+            echo "authority=qualification-prerequisite-checker-source-qualification-only"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "d5b5_source=$D5B5_SOURCE"
+            echo "predecessor_executable_pass_inherited=NONE"
+            echo "external_execution_truth_attested=FALSE"
+            echo "manifest_is_runtime_capability=FALSE"
+            echo "verification_is_runtime_capability=FALSE"
+            echo "d4_established_authority=NONE"
+            echo "qp_authority=NONE"
+            echo "hardware_contact_truth_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "exact_source_qualifier_workflow_run_contract=TRUE"
+            echo "run_attempt_bound=TRUE"
+            echo "evidence_artifact_identity_bound=TRUE"
+            echo "evidence_artifact_sha256_bound=TRUE"
+            echo "queued_infrastructure_promotable=FALSE"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_default=PASS"
+            echo "compile_mujoco_integration=PASS"
+            echo "focused_tests=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > qual-promo-001-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qual-promo-001-${{ github.event.pull_request.head.sha || github.sha }}
+          path: qual-promo-001-evidence/
+          if-no-files-found: error
