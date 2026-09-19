@@ -1,4 +1,4 @@
-name: Systems Engineering SE-001Q Evidence Replay v2.2
+name: Systems Engineering SE-001Q Evidence Replay v2.3
 
 on:
   pull_request:
@@ -8,6 +8,7 @@ on:
       - '.github/qualification/se001q-classifier-v1.json'
       - '.github/scripts/se001q_capture.py'
       - '.github/scripts/se001q_verify.py'
+      - '.github/scripts/se001q_attest.py'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +25,7 @@ env:
 
 jobs:
   frozen-subject-evidence-replay:
-    name: Frozen SE-001 evidence replay v2.2
+    name: Frozen SE-001 evidence replay v2.3
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -61,27 +62,29 @@ jobs:
             --workflow verifier/.github/workflows/systems-engineering-se001q-evidence-v2.yml \
             --output evidence
 
-      - name: Independently verify the complete replay artifact
+      - name: Independently verify and durably attest the replay artifact
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          python3 verifier/.github/scripts/se001q_verify.py \
+          python3 verifier/.github/scripts/se001q_attest.py \
             --evidence evidence \
             --subject subject \
             --verifier verifier \
             --experiment verifier/.github/qualification/se001q-experiment-v1.json \
             --classifier verifier/.github/qualification/se001q-classifier-v1.json \
             --workflow verifier/.github/workflows/systems-engineering-se001q-evidence-v2.yml \
-            --capture-runner verifier/.github/scripts/se001q_capture.py
+            --capture-runner verifier/.github/scripts/se001q_capture.py \
+            --verifier-script verifier/.github/scripts/se001q_verify.py \
+            --output attestation
 
-      - name: Publish concise replay summary
+      - name: Publish concise replay and verification summary
         if: always()
         shell: bash
         run: |
           if [[ -f evidence/summary.json ]]; then
             {
-              echo '### SE-001Q evidence replay v2.2'
+              echo '### SE-001Q evidence replay v2.3'
               echo
               echo '```json'
               cat evidence/summary.json
@@ -90,14 +93,28 @@ jobs:
           else
             echo 'SE-001Q evidence replay did not produce summary.json' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [[ -f attestation/verification.json ]]; then
+            {
+              echo
+              echo '### Independent verification attestation'
+              echo
+              echo '```json'
+              cat attestation/verification.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'SE-001Q verification did not produce verification.json' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-      - name: Upload durable replay evidence
+      - name: Upload durable replay and verification capsules
         id: upload-evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: se001q-evidence-v2_2-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
-          path: evidence/
+          name: se001q-evidence-v2_3-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            evidence/
+            attestation/
           if-no-files-found: error
           retention-days: 90
 
