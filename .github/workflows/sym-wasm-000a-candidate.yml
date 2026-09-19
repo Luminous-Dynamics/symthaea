@@ -44,10 +44,14 @@ jobs:
       - name: Run static bounded-executor qualification over patched tree
         run: python3 scripts/qualify-sym-wasm-000a.py
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
-        with:
-          components: rustfmt,clippy
+      - name: Install exact Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
 
       - name: Check patched root crate with wasm sandbox enabled
         shell: bash
