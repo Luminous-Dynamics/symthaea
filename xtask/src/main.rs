@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod cargo_context;
 mod cargo_graph;
 mod cargo_impact;
 mod crate_status;
@@ -55,6 +56,15 @@ enum Commands {
         /// Workspace package name, stable ID, or workspace-relative manifest path.
         #[arg(long = "package", required = true)]
         packages: Vec<String>,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Canonicalize a declared Cargo build-context spec and emit stable context/invocation IDs.
+    CargoContext {
+        /// Strict JSON build-context specification.
+        #[arg(long)]
+        spec: PathBuf,
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
@@ -185,6 +195,9 @@ fn main() -> anyhow::Result<()> {
             output,
         } => {
             cargo_impact::run(&base, &head, packages, output)?;
+        }
+        Commands::CargoContext { spec, output } => {
+            cargo_context::run(&spec, output)?;
         }
     }
     Ok(())
