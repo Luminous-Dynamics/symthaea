@@ -14,9 +14,7 @@ use crate::contact_authority::ContactEvidenceClassV1;
 use crate::contact_patch::{
     ContactPatchGeometrySource, ContactPatchPlacementSource, PlacedContactPatchV1,
 };
-use crate::contact_wrench::{
-    ContactInteractionLimitSource, ContactInteractionLimitsV1,
-};
+use crate::contact_wrench::{ContactInteractionLimitSource, ContactInteractionLimitsV1};
 use crate::mujoco_contact_interaction::{
     MuJoCoContactDimensionalityV1, MuJoCoContactInteractionRecordV1,
 };
@@ -128,6 +126,7 @@ impl VerifiedSurfaceSupportEvidenceV1 {
             && same_sample_time(self.interaction_limits.sampled_at_s, self.sampled_at_s)
             && !self.model_id.trim().is_empty()
             && !self.support_normal_policy_id.trim().is_empty()
+            && self.support_normal_policy_id == self.verification.policy_id
             && !self.support_normal_evidence_lineage_id.trim().is_empty()
             && !self.support_normal_verification_lineage_id.trim().is_empty()
             && !self.support_lineage_id.trim().is_empty()
@@ -273,7 +272,7 @@ pub(crate) fn bind_verified_mujoco_surface_support_v1(
 
 fn normal_evidence_lineage_id(region: &NormalQualifiedSupportRegionV1) -> String {
     format!(
-        "support-normal-evidence-v1:model:{}:sig:{:016x}:site:{:?}:time-bits:{:016x}:geometry:{}:interaction:{}:policy:{}:source-contacts:{}:admitted:{}:rejected:{}:area-bits:{:016x}",
+        "support-normal-evidence-v1:model:{}:sig:{:016x}:site:{:?}:time-bits:{:016x}:geometry:{}:interaction:{}:policy:{}:source-contacts:{}:admitted:{}:rejected:{}:hull:{}:area-bits:{:016x}",
         component(&region.model_id),
         region.model_signature,
         region.site,
@@ -284,6 +283,7 @@ fn normal_evidence_lineage_id(region: &NormalQualifiedSupportRegionV1) -> String
         usize_list(&region.source_contact_indices),
         usize_list(&region.admitted_contact_indices),
         usize_list(&region.rejected_contact_indices),
+        xy_bits_list(&region.hull_vertices_local_xy_m),
         region.area_m2.to_bits(),
     )
 }
@@ -293,12 +293,13 @@ fn verification_lineage_id(
     verification: &SupportNormalEvidenceVerificationV1,
 ) -> String {
     format!(
-        "support-normal-verification-v1:source:{}:policy:{}:contacts:{}:admitted:{}:rejected:{}:area-bits:{:016x}:surface:{}",
+        "support-normal-verification-v1:source:{}:policy:{}:contacts:{}:admitted:{}:rejected:{}:hull:{}:area-bits:{:016x}:surface:{}",
         component(&normal_evidence_lineage_id(region)),
         component(&verification.policy_id),
         verification.source_contact_count,
         verification.admitted_contact_count,
         verification.rejected_contact_count,
+        xy_bits_list(&verification.recomputed_hull_vertices_local_xy_m),
         verification.recomputed_area_m2.to_bits(),
         verification.surface_support_eligible,
     )
@@ -329,6 +330,14 @@ fn usize_list(values: &[usize]) -> String {
     values
         .iter()
         .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn xy_bits_list(values: &[[f64; 2]]) -> String {
+    values
+        .iter()
+        .map(|[x, y]| format!("{:016x}.{:016x}", x.to_bits(), y.to_bits()))
         .collect::<Vec<_>>()
         .join(",")
 }
@@ -418,6 +427,7 @@ mod tests {
             token.placed_patch().geometry.geometry_id,
             region.source_geometry_id
         );
+        assert_eq!(token.support_normal_policy_id(), token.verification().policy_id);
     }
 
     #[test]
@@ -478,6 +488,14 @@ mod tests {
         };
         assert!(!verification.surface_support_eligible);
         assert!(verification.recomputed_hull_vertices_local_xy_m.len() < 3);
+    }
+
+    #[test]
+    fn lineage_binds_exact_hull_shape_not_only_area() {
+        let first = vec![[0.0, 0.0], [2.0, 0.0], [2.0, 1.0], [0.0, 1.0]];
+        let second = vec![[0.0, 0.0], [1.0, 0.0], [1.0, 2.0], [0.0, 2.0]];
+        assert_eq!(2.0, 2.0);
+        assert_ne!(xy_bits_list(&first), xy_bits_list(&second));
     }
 
     #[test]
