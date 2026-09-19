@@ -11,34 +11,14 @@
 use std::fmt;
 
 use gloo_net::http::Request;
-use serde::Deserialize;
 use symthaea_muse_protocol::{
-    ArtifactIdentity, BundleWarning, LISTEN_COMPOSITION_BUNDLE_VERSION, ListenCompositionBundle,
+    ArtifactIdentity, LISTEN_COMPOSITION_BUNDLE_VERSION,
+    keeper_semantic::{KEEPER_SEMANTIC_BUNDLE_SCHEMA_VERSION, KeeperSemanticBundleV1},
 };
 
 use crate::comparison::MusicalComparisonAnchor;
 use crate::comparison_capability::ComparisonTimelineAuthority;
 use crate::comparison_timeline::{ComparisonAnchorResolutionError, resolve_musical_anchor};
-
-/// First durable keeper semantic-sidecar schema.
-///
-/// This wrapper deliberately does not reuse the live `BundleEnvelope`'s numeric
-/// `piece_id`: candidate ids are process/session scoped, while `audio_key` and
-/// the three content hashes are durable keeper identity.
-pub const KEEPER_SEMANTIC_BUNDLE_SCHEMA_VERSION: u32 = 1;
-
-#[derive(Clone, Debug, PartialEq, Deserialize)]
-pub struct KeeperSemanticBundleV1 {
-    pub schema_version: u32,
-    pub audio_key: String,
-    pub listen_bundle_version: u32,
-    pub score_sha256: String,
-    pub recipe_sha256: String,
-    pub audio_sha256: String,
-    #[serde(default)]
-    pub warnings: Vec<BundleWarning>,
-    pub payload: ListenCompositionBundle,
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct VerifiedKeeperSemanticBundle {
