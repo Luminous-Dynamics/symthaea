@@ -16,12 +16,12 @@
 //! complete-tail lifecycle publication freshness assessments, authenticated
 //! frozen-protocol evidence freshness assessments, aligned validity-readiness
 //! assessments over one exact authenticated evaluation horizon, institution-
-//! scoped currentness-at-evaluation capabilities, typed provenance graphs,
-//! frozen study protocols, immutable execution/conformance records, adversarial
-//! falsification campaigns, explicit scientific uncertainty budgets, and
-//! provenance-checked replication lineage assessments. It does not run
-//! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
-//! operations.
+//! scoped currentness-at-evaluation capabilities, monotonic currentness-observation
+//! tracking, typed provenance graphs, frozen study protocols, immutable
+//! execution/conformance records, adversarial falsification campaigns, explicit
+//! scientific uncertainty budgets, and provenance-checked replication lineage
+//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
+//! formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Scientific qualification exists only as a private capability after the exact
@@ -47,6 +47,7 @@ pub mod identity;
 pub mod independence;
 pub mod protocol;
 pub mod provenance;
+pub mod qualification_currentness_tracker;
 pub mod qualification_decision_authority;
 mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
@@ -87,6 +88,7 @@ pub use identity::*;
 pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
+pub use qualification_currentness_tracker::*;
 pub use qualification_decision_authority::*;
 pub use qualification_eligibility::{
     QUALIFICATION_ELIGIBILITY_SCHEMA, EligibilityGateKind, EligibilityGateState,
