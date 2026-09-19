@@ -8,13 +8,88 @@
 
 use symthaea_muse_protocol::RenditionArtifactId;
 
+/// What kind of musical subject the shared transport is currently auditioning.
+/// This is deliberately transport/presentation authority, not canonical piece
+/// identity: a review artifact can be audible without becoming `MuseState::current`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PlaybackSubjectKind {
+    JourneyCandidate,
+    CreatedCandidate,
+    Review,
+}
+
+/// Human-facing metadata and action capabilities for the exact audible source.
+/// Keeping this inside `PlaybackSource` makes the player/header change atomically
+/// with the load-epoch-protected audio source instead of following stale
+/// `MuseState::current` state.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlaybackPresentation {
+    pub kind: PlaybackSubjectKind,
+    pub title: String,
+    pub subtitle: Option<String>,
+    pub style_hint: Option<String>,
+}
+
+impl PlaybackPresentation {
+    pub fn journey_candidate(title: String, subtitle: String, style: String) -> Self {
+        Self {
+            kind: PlaybackSubjectKind::JourneyCandidate,
+            title,
+            subtitle: Some(subtitle),
+            style_hint: Some(style),
+        }
+    }
+
+    pub fn created_candidate(title: String, subtitle: String, style: String) -> Self {
+        Self {
+            kind: PlaybackSubjectKind::CreatedCandidate,
+            title,
+            subtitle: Some(subtitle),
+            style_hint: Some(style),
+        }
+    }
+
+    pub fn review(title: String) -> Self {
+        Self {
+            kind: PlaybackSubjectKind::Review,
+            title,
+            subtitle: Some("Review audition · canonical piece unchanged".to_string()),
+            style_hint: None,
+        }
+    }
+
+    pub fn can_keep(&self) -> bool {
+        matches!(
+            self.kind,
+            PlaybackSubjectKind::JourneyCandidate | PlaybackSubjectKind::CreatedCandidate
+        )
+    }
+
+    pub fn can_advance_journey(&self) -> bool {
+        self.kind == PlaybackSubjectKind::JourneyCandidate
+    }
+
+    pub fn can_change_renderer(&self) -> bool {
+        matches!(
+            self.kind,
+            PlaybackSubjectKind::JourneyCandidate | PlaybackSubjectKind::CreatedCandidate
+        )
+    }
+
+    pub fn palette_style(&self) -> &str {
+        self.style_hint.as_deref().unwrap_or("Review")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlaybackSource {
     pub rendition_id: Option<RenditionArtifactId>,
     pub audio_url: String,
     pub duration_hint_seconds: Option<f64>,
-    /// Listen journeys advance on completion. Review auditions do not.
+    /// Listen journeys advance on completion. Review and authored-candidate
+    /// auditions do not implicitly enter/advance the Listen journey.
     pub advance_on_end: bool,
+    pub presentation: PlaybackPresentation,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -265,7 +340,39 @@ mod tests {
             audio_url: format!("/audio/{id}"),
             duration_hint_seconds: None,
             advance_on_end: true,
+            presentation: PlaybackPresentation::journey_candidate(
+                format!("Piece {id}"),
+                "Classical · 4/4".into(),
+                "Classical".into(),
+            ),
         }
+    }
+
+    #[test]
+    fn playback_capabilities_follow_audible_subject_kind() {
+        let journey = PlaybackPresentation::journey_candidate(
+            "Journey".into(),
+            "Classical".into(),
+            "Classical".into(),
+        );
+        assert!(journey.can_keep());
+        assert!(journey.can_advance_journey());
+        assert!(journey.can_change_renderer());
+
+        let created = PlaybackPresentation::created_candidate(
+            "Created".into(),
+            "Sonata".into(),
+            "Sonata".into(),
+        );
+        assert!(created.can_keep());
+        assert!(!created.can_advance_journey());
+        assert!(created.can_change_renderer());
+
+        let review = PlaybackPresentation::review("Imported work".into());
+        assert!(!review.can_keep());
+        assert!(!review.can_advance_journey());
+        assert!(!review.can_change_renderer());
+        assert_eq!(review.palette_style(), "Review");
     }
 
     #[test]
@@ -330,6 +437,7 @@ mod tests {
     fn review_audition_ends_without_advancing_the_listen_journey() {
         let mut review = source("review");
         review.advance_on_end = false;
+        review.presentation = PlaybackPresentation::review("Review".into());
         let mut state = PlaybackState::default();
         state.reduce(PlaybackEvent::LoadRequested {
             source: review,

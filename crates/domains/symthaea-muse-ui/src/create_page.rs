@@ -20,7 +20,7 @@ use symthaea_muse_protocol::catalog::{self, CanonicalStyle, Constellation};
 use crate::api::{self, Candidate, ComposeRequest};
 use crate::icons::HeartIcon;
 use crate::palette;
-use crate::state::MuseState;
+use crate::state::{CandidateOrigin, MuseState};
 
 const NOTE_NAMES: [&str; 12] = [
     "C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B",
@@ -245,7 +245,7 @@ pub fn CreatePage() -> impl IntoView {
     // the Listen journey. Runtime candidate ids may select `/api/audio/{id}`;
     // only server-supplied ArtifactIdentity may populate rendition identity.
     let listen_to = move |c: Candidate| {
-        muse.activate_candidate(c, true);
+        muse.activate_candidate(c, true, CandidateOrigin::Create);
         navigate("/", Default::default());
     };
 
