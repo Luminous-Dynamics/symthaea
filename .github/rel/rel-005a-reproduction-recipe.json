@@ -4,6 +4,7 @@
   "relation": "REL-005A",
   "harness_base_head": "1e445d072c269d189145c98118b60e8d174a5495",
   "harness_allowed_diff": [
+    ".github/rel/rel-005a-reproduce-ancestor-guard.py",
     ".github/rel/rel-005a-reproduce-hermetic.py",
     ".github/rel/rel-005a-reproduce-locked-offline.py",
     ".github/rel/rel-005a-reproduce.py",
@@ -149,6 +150,27 @@
       "scientific_fail": false
     }
   },
+  "ancestor_cargo_config_guard": {
+    "authority": "IndependentReproductionEnvironmentGuardOnly",
+    "wrapper_path": ".github/rel/rel-005a-reproduce-ancestor-guard.py",
+    "wrapper_blob": "59c609d3ee35deb388fa148b38242cce9332c21a",
+    "v5_wrapper_path": ".github/rel/rel-005a-reproduce-locked-offline.py",
+    "v5_wrapper_blob": "931b7a9a0eafefb68ff11e6f5c48545e34fb380a",
+    "dedicated_temp_root_required": true,
+    "pre_scan_required": true,
+    "post_scan_required": true,
+    "receipt_schema": "symthaea.rel.reproduction-ancestor-cargo-config-guard-receipt.v1",
+    "may_parse_scientific_payload": false,
+    "may_interpret_scientific_result": false,
+    "may_change_original_qualification": false,
+    "claims": {
+      "environment_guard_applied": false,
+      "independent_reproduction_completed": false,
+      "original_rel_005a_qualification_changed": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    }
+  },
   "commands": {
     "install_toolchain": "rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy",
     "rustc_version": "rustup run 1.96.0 rustc -Vv",
@@ -193,7 +215,8 @@
     "locked_dependency_prefetch_required_for_v5_assurance": true,
     "offline_dependency_probe_required_for_v5_assurance": true,
     "actual_cargo_measurement_offline_required_for_v5_assurance": true,
-    "cargo_offline_does_not_claim_os_network_sandbox": true
+    "cargo_offline_does_not_claim_os_network_sandbox": true,
+    "ancestor_cargo_config_guard_required_for_v6_assurance": true
   },
   "does_not_change": [
     "the original REL-005A qualification result",
