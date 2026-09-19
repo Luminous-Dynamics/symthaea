@@ -5,6 +5,7 @@
   "harness_base_head": "1e445d072c269d189145c98118b60e8d174a5495",
   "harness_allowed_diff": [
     ".github/rel/rel-005a-reproduce-hermetic.py",
+    ".github/rel/rel-005a-reproduce-locked-offline.py",
     ".github/rel/rel-005a-reproduce.py",
     ".github/rel/rel-005a-reproduction-recipe.json"
   ],
@@ -12,6 +13,7 @@
   "predicate_contract_head": "43bf1d588447f602ce0f1549986bb558a839762c",
   "frozen_scientific_subject": "7f5826675b44dd0d3f702f62bc9818f7990e4a01",
   "expected_git_blobs": {
+    "Cargo.lock": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62",
     "crates/core/symthaea-fep/tests/rel_graft_frame_execution_v3.rs": "680821c53c09f6ea894039f07367d7fdcddee6cd",
     "crates/core/symthaea-fep/tests/rel_graft_frame.rs": "787ea051ae0bf8e5667b6925481afd46c15d0bc4",
     ".github/rel/rel-005a-full-predicate-contract.json": "3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a",
@@ -105,19 +107,47 @@
       "CPPFLAGS",
       "LDFLAGS"
     ],
-    "receipt_schema": "symthaea.rel.reproduction-environment-envelope-receipt.v1",
-    "manifest_schema": "symthaea.rel.reproduction-environment-envelope-manifest.v1",
+    "receipt_schema": "symthaea.rel.reproduction-environment-envelope-receipt.v2",
+    "manifest_schema": "symthaea.rel.reproduction-environment-envelope-manifest.v2",
     "may_parse_scientific_payload": false,
     "may_interpret_scientific_result": false,
     "may_change_original_qualification": false,
     "known_limits": [
       "PATH, HOME, RUSTUP_HOME, platform loader variables, proxy variables, and certificate variables may be inherited",
-      "the wrapper does not isolate the host filesystem, network, kernel, CPU, or system libraries",
+      "the wrapper does not isolate the host filesystem, kernel, CPU, system libraries, or arbitrary process-level networking",
       "the wrapper directly proves fresh CARGO_HOME is outside the harness worktree; it does not independently compare that path against the harness-created temporary execution worktree",
-      "repository-local Cargo configuration remains allowed because it is part of the exact Git subject"
+      "CARGO_NET_OFFLINE constrains Cargo dependency access during measurement but is not an OS network sandbox"
     ],
     "cargo_home_outside_harness_worktree": true,
     "sensitive_inherited_values_must_not_be_recorded": true
+  },
+  "dependency_preparation": {
+    "authority": "IndependentReproductionDependencyPreparationOnly",
+    "wrapper_path": ".github/rel/rel-005a-reproduce-locked-offline.py",
+    "wrapper_blob": "931b7a9a0eafefb68ff11e6f5c48545e34fb380a",
+    "execution_subject_head": "6931639e53060809f9d459196a329c4fe983be7b",
+    "cargo_lock_path": "Cargo.lock",
+    "cargo_lock_blob": "1d5b6c3dffb474fabef0f8237c6741b4f252bc62",
+    "repository_local_cargo_config_expected": false,
+    "online_prefetch_allowed": true,
+    "prefetch_command": "rustup run 1.96.0 cargo fetch --locked",
+    "offline_probe_required": true,
+    "offline_probe_command": "rustup run 1.96.0 cargo fetch --locked --offline",
+    "actual_measurement_cargo_offline_required": true,
+    "cargo_net_offline_value": "true",
+    "cargo_level_offline_only": true,
+    "os_network_sandbox": false,
+    "receipt_schema": "symthaea.rel.reproduction-dependency-preparation-receipt.v1",
+    "may_parse_scientific_payload": false,
+    "may_interpret_scientific_result": false,
+    "may_change_original_qualification": false,
+    "claims": {
+      "dependency_preparation_completed": false,
+      "independent_reproduction_completed": false,
+      "original_rel_005a_qualification_changed": false,
+      "scientific_pass": false,
+      "scientific_fail": false
+    }
   },
   "commands": {
     "install_toolchain": "rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy",
@@ -158,7 +188,12 @@
     "fresh_seal_execution_subject_is_literal_detached_git_head": true,
     "environment_envelope_required_for_v4_assurance": true,
     "fresh_cargo_home_required_for_v4_assurance": true,
-    "ambient_build_control_environment_must_be_sanitized_for_v4_assurance": true
+    "ambient_build_control_environment_must_be_sanitized_for_v4_assurance": true,
+    "exact_cargo_lock_bound_for_v5_assurance": true,
+    "locked_dependency_prefetch_required_for_v5_assurance": true,
+    "offline_dependency_probe_required_for_v5_assurance": true,
+    "actual_cargo_measurement_offline_required_for_v5_assurance": true,
+    "cargo_offline_does_not_claim_os_network_sandbox": true
   },
   "does_not_change": [
     "the original REL-005A qualification result",
