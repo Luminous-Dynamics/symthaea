@@ -1,0 +1,78 @@
+name: Systems Engineering SE-001Q Evidence Replay v2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/systems-engineering-se001q-evidence-v2.yml'
+      - '.github/qualification/se001q-experiment-v1.json'
+      - '.github/scripts/se001q_capture.py'
+  workflow_dispatch:
+
+concurrency:
+  group: se001q-evidence-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SE001_SUBJECT: 47de7f2a306cffb66b5505786220590aa5f42e90
+
+jobs:
+  frozen-subject-evidence-replay:
+    name: Frozen SE-001 evidence replay v2
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout verifier lineage
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: verifier
+          fetch-depth: 1
+
+      - name: Checkout frozen SE-001 subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SE001_SUBJECT }}
+          path: subject
+          fetch-depth: 1
+
+      - name: Install pinned Rust, rustfmt, and Clippy
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Replay every gate with durable observation envelopes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 verifier/.github/scripts/se001q_capture.py \
+            --subject subject \
+            --verifier verifier \
+            --experiment verifier/.github/qualification/se001q-experiment-v1.json \
+            --workflow verifier/.github/workflows/systems-engineering-se001q-evidence-v2.yml \
+            --output evidence
+
+      - name: Publish concise replay summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f evidence/summary.json ]]; then
+            {
+              echo '### SE-001Q evidence replay v2'
+              echo
+              echo '```json'
+              cat evidence/summary.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'SE-001Q evidence replay did not produce summary.json' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload durable replay evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: se001q-evidence-v2-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
