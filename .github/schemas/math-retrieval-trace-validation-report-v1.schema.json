@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-trace-validation-report-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Trace Validation Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "authority",
+    "trace_id",
+    "trace_sha256",
+    "graph_report_sha256",
+    "experiment_sha256",
+    "arm_id",
+    "experiment_seed",
+    "packed_output_items",
+    "packed_output_bytes",
+    "all_checks_passed"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-trace-validation-report-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "trace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "trace_sha256": {"$ref": "#/$defs/sha256"},
+    "graph_report_sha256": {"$ref": "#/$defs/sha256"},
+    "experiment_sha256": {"$ref": "#/$defs/sha256"},
+    "arm_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$"},
+    "experiment_seed": {"type": "integer", "minimum": 0},
+    "packed_output_items": {"type": "integer", "minimum": 0},
+    "packed_output_bytes": {"type": "integer", "minimum": 0},
+    "all_checks_passed": {"const": true}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
