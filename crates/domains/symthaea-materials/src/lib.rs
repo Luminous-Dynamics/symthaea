@@ -24,6 +24,8 @@ pub mod irradiation_evidence;
 pub mod material_subject;
 pub mod mining;
 pub mod multi_fidelity;
+pub mod novelty_synthesis;
+mod novelty_synthesis_hash;
 pub mod properties;
 pub mod search_memory;
 pub mod strategic;
@@ -74,6 +76,11 @@ pub use multi_fidelity::{
     CrossFidelityCalibration, EvaluationAgreement, EvaluationMethodClass, EvaluationOrigin,
     EvaluationResourceCost, EvaluatorRef, MultiFidelityError, MultiFidelityEvaluation,
     assess_evaluation_agreement, calibrate_against_reference,
+};
+pub use novelty_synthesis::{
+    MetastableProcessWindow, NoveltyAssessment, NoveltyAssessmentState, NoveltySynthesisError,
+    PriorArtHitClass, PriorArtNeighborhood, PriorArtSearchOutcome, PriorArtSearchRecord,
+    PriorArtSourceKind, ProcessWindowVariable, SynthesisRouteAssessment, SynthesizabilityState,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
 pub use search_memory::{
