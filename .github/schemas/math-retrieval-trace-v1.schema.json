@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-trace-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Runtime Trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version", "trace_id", "authority", "graph", "experiment_seed",
+    "query", "retrieval", "packing", "resources", "control_bindings"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-trace-v1"},
+    "trace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority": {"const": "MeasurementOnly"},
+    "graph": {"$ref": "#/$defs/graph"},
+    "experiment_seed": {"type": "integer", "minimum": 0},
+    "query": {"$ref": "#/$defs/query"},
+    "retrieval": {"$ref": "#/$defs/retrieval"},
+    "packing": {"$ref": "#/$defs/packing"},
+    "resources": {"$ref": "#/$defs/resources"},
+    "control_bindings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/controlBinding"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "digestList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/sha256"}
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_sha256", "graph_report_sha256", "experiment_sha256", "arm_id",
+        "retrieval_binding_sha256", "candidate_set_sha256", "candidate_count",
+        "context_packer_sha256"
+      ],
+      "properties": {
+        "bundle_sha256": {"$ref": "#/$defs/sha256"},
+        "graph_report_sha256": {"$ref": "#/$defs/sha256"},
+        "experiment_sha256": {"$ref": "#/$defs/sha256"},
+        "arm_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$"},
+        "retrieval_binding_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_count": {"type": "integer", "minimum": 1},
+        "context_packer_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query_id", "query_source_object_sha256"],
+      "properties": {
+        "query_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "query_source_object_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "single": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index_manifest_sha256", "index_artifact_sha256", "requested_k", "ranked_source_object_digests"],
+      "properties": {
+        "index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "index_artifact_sha256": {"$ref": "#/$defs/sha256"},
+        "requested_k": {"type": "integer", "minimum": 1},
+        "ranked_source_object_digests": {"$ref": "#/$defs/digestList"}
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel", "index_manifest_sha256", "index_artifact_sha256",
+        "requested_k", "input_bytes_used", "ranked_source_object_digests"
+      ],
+      "properties": {
+        "channel": {"enum": ["Syntax", "ExactNormalForm"]},
+        "index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "index_artifact_sha256": {"$ref": "#/$defs/sha256"},
+        "requested_k": {"type": "integer", "minimum": 1},
+        "input_bytes_used": {"type": "integer", "minimum": 0},
+        "ranked_source_object_digests": {"$ref": "#/$defs/digestList"}
+      }
+    },
+    "fusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fusion_policy_sha256", "channels", "fused_ranked_source_object_digests"],
+      "properties": {
+        "fusion_policy_sha256": {"$ref": "#/$defs/sha256"},
+        "channels": {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": {"$ref": "#/$defs/channel"}
+        },
+        "fused_ranked_source_object_digests": {"$ref": "#/$defs/digestList"}
+      }
+    },
+    "retrieval": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "single"],
+          "properties": {"mode": {"const": "SingleIndex"}, "single": {"$ref": "#/$defs/single"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["mode", "fusion"],
+          "properties": {"mode": {"const": "Fusion"}, "fusion": {"$ref": "#/$defs/fusion"}}
+        }
+      ]
+    },
+    "packedItem": {
+      "type": "object", "additionalProperties": false,
+      "required": ["rank", "source_object_sha256", "canonical_payload_bytes"],
+      "properties": {
+        "rank": {"type": "integer", "minimum": 1},
+        "source_object_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_payload_bytes": {"type": "integer", "minimum": 1}
+      }
+    },
+    "packing": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "context_packer_sha256", "input_ranked_source_object_digests", "output",
+        "output_items_used", "output_bytes_used", "stop_reason"
+      ],
+      "properties": {
+        "context_packer_sha256": {"$ref": "#/$defs/sha256"},
+        "input_ranked_source_object_digests": {"$ref": "#/$defs/digestList"},
+        "output": {"type": "array", "items": {"$ref": "#/$defs/packedItem"}},
+        "output_items_used": {"type": "integer", "minimum": 0},
+        "output_bytes_used": {"type": "integer", "minimum": 0},
+        "stop_reason": {"enum": ["Empty", "RankedCandidatesExhausted", "ItemLimitReached", "FirstNonFittingItem"]},
+        "first_nonfitting": {"$ref": "#/$defs/packedItem"}
+      }
+    },
+    "resources": {
+      "type": "object", "additionalProperties": false,
+      "required": ["retrieval_queries_used", "wall_time_ms_used", "normalized_compute_units_used_decimal"],
+      "properties": {
+        "retrieval_queries_used": {"type": "integer", "minimum": 1},
+        "wall_time_ms_used": {"type": "integer", "minimum": 0},
+        "normalized_compute_units_used_decimal": {
+          "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+        }
+      }
+    },
+    "controlBinding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["index_manifest_sha256", "control_transform"],
+      "properties": {
+        "index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "control_transform": {"enum": ["None", "RandomRetrieval", "ShuffledHdcVectors", "PermutedChallengeAssociations"]},
+        "control_seed": {"type": "integer", "minimum": 0},
+        "control_artifact_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
