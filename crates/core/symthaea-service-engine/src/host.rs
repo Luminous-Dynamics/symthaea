@@ -11,6 +11,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use symthaea::Symthaea;
+use symthaea::symthaea::SleepReport;
 use symthaea_interface_events::{EventPlaneError, SemanticEventSubscriber, SubscribeFrom};
 use symthaea_interface_runtime::StatePlaneError;
 use symthaea_interface_types::RuntimeId;
@@ -19,13 +20,16 @@ use symthaea_service_read_model::{
     CognitiveStatusRead, IntrospectionRead, PartnershipRead, ServiceReadModel,
     ServiceReadModelError,
 };
-use symthaea_service_runtime::{ProcessOrigin, ServiceMutationCommand};
+use symthaea_service_runtime::observed::ObservationIssue;
+use symthaea_service_runtime::{ProcessOrigin, ServiceMutationCommand, ServiceRuntimeSnapshot};
 use tokio::task::JoinHandle;
 
+use crate::semantic::SemanticQueryExecution;
 use crate::service::{
-    SymthaeaObservedServiceReply, SymthaeaServiceHandle, SymthaeaServiceRuntime,
-    SymthaeaServiceRuntimeSpawnError, spawn_service_runtime,
+    SymthaeaObservedServiceReply, SymthaeaServiceExecution, SymthaeaServiceHandle,
+    SymthaeaServiceRuntime, SymthaeaServiceRuntimeSpawnError, spawn_service_runtime,
 };
+use crate::telemetry::BridgeTelemetrySnapshot;
 
 /// Cloneable daemon capability surface.
 ///
@@ -46,6 +50,39 @@ pub struct HostedServiceRuntime {
     pub task: JoinHandle<RuntimeOwnerExit>,
 }
 
+/// Query-specific owner reply. The transport never needs to inspect the generic
+/// service mutation enum to find these fields.
+#[derive(Debug)]
+pub struct ServiceQueryReply {
+    pub execution: SemanticQueryExecution,
+    pub snapshot: ServiceRuntimeSnapshot,
+    pub telemetry: Option<BridgeTelemetrySnapshot>,
+    pub observation_issues: Vec<ObservationIssue<StatePlaneError>>,
+}
+
+#[derive(Debug)]
+pub struct ServiceSleepReply {
+    pub result: Result<SleepReport, anyhow::Error>,
+    pub snapshot: ServiceRuntimeSnapshot,
+    pub observation_issues: Vec<ObservationIssue<StatePlaneError>>,
+}
+
+#[derive(Debug)]
+pub struct ServiceSaveReply {
+    pub path: PathBuf,
+    pub result: Result<(), anyhow::Error>,
+    pub snapshot: ServiceRuntimeSnapshot,
+    pub observation_issues: Vec<ObservationIssue<StatePlaneError>>,
+}
+
+#[derive(Debug)]
+pub struct ServiceShutdownReply {
+    pub path: Option<PathBuf>,
+    pub result: Result<(), anyhow::Error>,
+    pub snapshot: ServiceRuntimeSnapshot,
+    pub observation_issues: Vec<ObservationIssue<StatePlaneError>>,
+}
+
 /// Admission/completion failure at the daemon edge.
 ///
 /// The rejected command payload is intentionally not exposed through this API. A
@@ -57,6 +94,7 @@ pub enum ServiceHostCommandError {
     Closed,
     SequenceExhausted,
     OwnerStopped,
+    UnexpectedReply,
 }
 
 impl fmt::Display for ServiceHostCommandError {
@@ -66,6 +104,9 @@ impl fmt::Display for ServiceHostCommandError {
             Self::Closed => write!(f, "Symthaea runtime command mailbox is closed"),
             Self::SequenceExhausted => write!(f, "Symthaea runtime command sequence exhausted"),
             Self::OwnerStopped => write!(f, "Symthaea runtime owner stopped before replying"),
+            Self::UnexpectedReply => {
+                write!(f, "Symthaea runtime returned an unexpected command reply")
+            }
         }
     }
 }
@@ -112,6 +153,76 @@ impl std::error::Error for ServiceHostReadError {
     }
 }
 
+fn resolve_query_reply(
+    reply: SymthaeaObservedServiceReply,
+) -> Result<ServiceQueryReply, ServiceHostCommandError> {
+    let execution = reply.execution;
+    let snapshot = reply.snapshot;
+    let observation_issues = reply.observation_issues;
+    match execution {
+        SymthaeaServiceExecution::Query {
+            execution,
+            telemetry,
+        } => Ok(ServiceQueryReply {
+            execution,
+            snapshot,
+            telemetry,
+            observation_issues,
+        }),
+        _ => Err(ServiceHostCommandError::UnexpectedReply),
+    }
+}
+
+fn resolve_sleep_reply(
+    reply: SymthaeaObservedServiceReply,
+) -> Result<ServiceSleepReply, ServiceHostCommandError> {
+    let execution = reply.execution;
+    let snapshot = reply.snapshot;
+    let observation_issues = reply.observation_issues;
+    match execution {
+        SymthaeaServiceExecution::Sleep(result) => Ok(ServiceSleepReply {
+            result,
+            snapshot,
+            observation_issues,
+        }),
+        _ => Err(ServiceHostCommandError::UnexpectedReply),
+    }
+}
+
+fn resolve_save_reply(
+    reply: SymthaeaObservedServiceReply,
+) -> Result<ServiceSaveReply, ServiceHostCommandError> {
+    let execution = reply.execution;
+    let snapshot = reply.snapshot;
+    let observation_issues = reply.observation_issues;
+    match execution {
+        SymthaeaServiceExecution::Save { path, result } => Ok(ServiceSaveReply {
+            path,
+            result,
+            snapshot,
+            observation_issues,
+        }),
+        _ => Err(ServiceHostCommandError::UnexpectedReply),
+    }
+}
+
+fn resolve_shutdown_reply(
+    reply: SymthaeaObservedServiceReply,
+) -> Result<ServiceShutdownReply, ServiceHostCommandError> {
+    let execution = reply.execution;
+    let snapshot = reply.snapshot;
+    let observation_issues = reply.observation_issues;
+    match execution {
+        SymthaeaServiceExecution::ShutdownPersist { path, result } => Ok(ServiceShutdownReply {
+            path,
+            result,
+            snapshot,
+            observation_issues,
+        }),
+        _ => Err(ServiceHostCommandError::UnexpectedReply),
+    }
+}
+
 impl ServiceRuntimeHost {
     /// Stable identity of the running semantic runtime represented by this host.
     pub fn runtime_id(&self) -> &RuntimeId {
@@ -124,54 +235,58 @@ impl ServiceRuntimeHost {
         &self,
         content: impl Into<String>,
         origin: ProcessOrigin,
-    ) -> Result<SymthaeaObservedServiceReply, ServiceHostCommandError> {
+    ) -> Result<ServiceQueryReply, ServiceHostCommandError> {
         let ticket = self
             .commands
             .try_query(content, origin)
             .map_err(ServiceHostCommandError::from_submit)?;
-        ticket
+        let reply = ticket
             .resolve()
             .await
-            .map_err(ServiceHostCommandError::from_completion)
+            .map_err(ServiceHostCommandError::from_completion)?;
+        resolve_query_reply(reply)
     }
 
-    pub async fn sleep(&self) -> Result<SymthaeaObservedServiceReply, ServiceHostCommandError> {
+    pub async fn sleep(&self) -> Result<ServiceSleepReply, ServiceHostCommandError> {
         let ticket = self
             .commands
             .try_sleep()
             .map_err(ServiceHostCommandError::from_submit)?;
-        ticket
+        let reply = ticket
             .resolve()
             .await
-            .map_err(ServiceHostCommandError::from_completion)
+            .map_err(ServiceHostCommandError::from_completion)?;
+        resolve_sleep_reply(reply)
     }
 
     pub async fn save(
         &self,
         path: PathBuf,
-    ) -> Result<SymthaeaObservedServiceReply, ServiceHostCommandError> {
+    ) -> Result<ServiceSaveReply, ServiceHostCommandError> {
         let ticket = self
             .commands
             .try_save(path)
             .map_err(ServiceHostCommandError::from_submit)?;
-        ticket
+        let reply = ticket
             .resolve()
             .await
-            .map_err(ServiceHostCommandError::from_completion)
+            .map_err(ServiceHostCommandError::from_completion)?;
+        resolve_save_reply(reply)
     }
 
     pub async fn shutdown_persist(
         &self,
         path: Option<PathBuf>,
-    ) -> Result<SymthaeaObservedServiceReply, ServiceHostCommandError> {
+    ) -> Result<ServiceShutdownReply, ServiceHostCommandError> {
         let ticket = self
             .commands
             .try_shutdown_persist(path)
             .map_err(ServiceHostCommandError::from_submit)?;
-        ticket
+        let reply = ticket
             .resolve()
             .await
-            .map_err(ServiceHostCommandError::from_completion)
+            .map_err(ServiceHostCommandError::from_completion)?;
+        resolve_shutdown_reply(reply)
     }
 
     /// Read the latest runtime activity and last completed cognitive snapshot.
@@ -257,6 +372,30 @@ pub fn spawn_service_runtime_host(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use symthaea_service_runtime::observed::ObservedServiceReply;
+    use symthaea_service_runtime::{CognitiveSummary, PartnershipSummary};
+
+    fn initialized_snapshot() -> ServiceRuntimeSnapshot {
+        ServiceRuntimeSnapshot::initialized(
+            CognitiveSummary {
+                consciousness_level: 0.2,
+                self_loops: 0,
+                graph_size: 0,
+                complexity: 0.0,
+                short_term_memories: 0,
+                long_term_memories: 0,
+            },
+            PartnershipSummary {
+                stage: "test".into(),
+                trust: 0.0,
+                vulnerability: 0.0,
+                reciprocity: 0.0,
+                phi_dyad: 0.0,
+                interactions: 0,
+                trajectory_points: 0,
+            },
+        )
+    }
 
     #[test]
     fn bounded_submit_failures_map_to_stable_daemon_conditions() {
@@ -282,5 +421,24 @@ mod tests {
             ServiceHostCommandError::from_completion(OwnerCompletionError::OwnerStopped),
             ServiceHostCommandError::OwnerStopped
         );
+    }
+
+    #[test]
+    fn operation_specific_reply_adapter_fails_closed_on_wrong_variant() {
+        let reply = ObservedServiceReply {
+            execution: SymthaeaServiceExecution::Sleep(Ok(SleepReport {
+                scaled: 0,
+                consolidated: 0,
+                pruned: 0,
+                patterns_extracted: 0,
+            })),
+            snapshot: initialized_snapshot(),
+            observation_issues: Vec::new(),
+        };
+
+        assert!(matches!(
+            resolve_query_reply(reply),
+            Err(ServiceHostCommandError::UnexpectedReply)
+        ));
     }
 }
