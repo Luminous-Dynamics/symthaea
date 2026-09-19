@@ -36,6 +36,8 @@ pub mod perceptual_stimulus_pack;
 pub mod perceptual_participant_schedule;
 #[path = "perceptual_schedule_reveal.rs"]
 pub mod perceptual_schedule_reveal;
+#[path = "perceptual_blinded_delivery.rs"]
+pub mod perceptual_blinded_delivery;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
