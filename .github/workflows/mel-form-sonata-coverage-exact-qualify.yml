@@ -1,0 +1,123 @@
+name: MEL-FORM Sonata evidence coverage exact qualification
+
+on:
+  push:
+    branches:
+      - qualify/mel-form-sonata-coverage-a372c6e
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-form-sonata-coverage-exact-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  MEL_FORM_COVERAGE_SUBJECT: a372c6e045c570401d0f84762c3e2cc424f59813
+  MEL_FORM_COVERAGE_BASE: ce9e4465400cbb875678847172b3457d380d9346
+
+jobs:
+  qualify:
+    name: Execute frozen thematic + Sonata coverage subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEL_FORM_COVERAGE_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Bind exact subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_FORM_COVERAGE_SUBJECT"
+          test "$(git merge-base "$MEL_FORM_COVERAGE_BASE" HEAD)" = "$MEL_FORM_COVERAGE_BASE"
+          git diff --name-only "$MEL_FORM_COVERAGE_BASE"..HEAD | sort > /tmp/mel_form_coverage_changed
+          cat > /tmp/mel_form_coverage_allowed <<'EOF'
+          crates/domains/symthaea-music-theory/src/lib.rs
+          crates/domains/symthaea-music-theory/src/sonata_work_evidence_coverage.rs
+          crates/domains/symthaea-music-theory/src/thematic_score_evidence.rs
+          EOF
+          sort -o /tmp/mel_form_coverage_allowed /tmp/mel_form_coverage_allowed
+          diff -u /tmp/mel_form_coverage_allowed /tmp/mel_form_coverage_changed
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Capture preflight identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mel-form-sonata-coverage"
+          {
+            echo 'schema=melothaea.mel-form-sonata-coverage.qualification.v1'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "base_sha=$MEL_FORM_COVERAGE_BASE"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            rustc -Vv
+            cargo -V
+          } > "$RUNNER_TEMP/mel-form-sonata-coverage/environment.txt"
+          cp /tmp/mel_form_coverage_changed "$RUNNER_TEMP/mel-form-sonata-coverage/changed-files.txt"
+
+      - name: Formatting gate
+        run: cargo fmt --check -p symthaea-music-theory
+
+      - name: Thematic score evidence regressions
+        run: cargo test -p symthaea-music-theory thematic_score_evidence
+
+      - name: Sonata evidence coverage regressions
+        run: cargo test -p symthaea-music-theory sonata_work_evidence_coverage
+
+      - name: All-targets compile gate
+        run: cargo check -p symthaea-music-theory --all-targets
+
+      - name: All-targets Clippy gate
+        run: cargo clippy -p symthaea-music-theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal bounded qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-form-sonata-coverage"
+          {
+            echo 'status=MEL_FORM_SONATA_COVERAGE_ENGINEERING_PASS'
+            echo 'authority=completed-score-evidence-coverage-only'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo 'planner_authority_claimed=false'
+            echo 'listener_recognition_claimed=false'
+            echo 'artistic_quality_claimed=false'
+            echo 'unsupported_transformations_promoted=false'
+            echo 'evidence_provenance_preserved=true'
+          } > "$out/receipt.txt"
+          sha256sum \
+            "$out/environment.txt" \
+            "$out/changed-files.txt" \
+            "$out/receipt.txt" \
+            > "$out/SHA256SUMS"
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_FORM_COVERAGE_SUBJECT"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload exact qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-form-sonata-coverage-${{ env.MEL_FORM_COVERAGE_SUBJECT }}
+          path: ${{ runner.temp }}/mel-form-sonata-coverage/
+          retention-days: 90
