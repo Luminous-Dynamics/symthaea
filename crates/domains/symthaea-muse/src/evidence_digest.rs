@@ -4,6 +4,8 @@
 
 #[path = "benchmark_manifest.rs"]
 pub mod benchmark_manifest;
+#[path = "benchmark_mirex.rs"]
+pub mod benchmark_mirex;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
