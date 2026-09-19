@@ -180,6 +180,7 @@ nix develop --no-write-lock-file \
     rustfmt --version
     cargo clippy --version
     python3 --version
+    PYTHONPYCACHEPREFIX="$CARGO_TARGET_DIR/python-cache" python3 -m py_compile nix/ci/se001q-trusted-replay.py
     cargo metadata --locked --format-version 1 > /dev/null
     cargo check --locked -p symthaea-psych-bench --lib
   '
