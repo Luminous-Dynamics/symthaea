@@ -6,6 +6,7 @@ on:
       - 'patches/sym-wasm-000a-bounded-executor.patch'
       - '.github/workflows/sym-wasm-000a-candidate.yml'
       - 'scripts/qualify-sym-wasm-000a.py'
+      - 'scripts/qualify-sym-wasm-000a-candidate.py'
   workflow_dispatch:
 
 permissions:
@@ -41,8 +42,11 @@ jobs:
           git diff --check
           git diff -- src/action/mod.rs
 
-      - name: Run static bounded-executor qualification over patched tree
+      - name: Run frozen parent qualification over patched tree
         run: python3 scripts/qualify-sym-wasm-000a.py
+
+      - name: Run stricter candidate admission qualification
+        run: python3 scripts/qualify-sym-wasm-000a-candidate.py
 
       - name: Install exact Rust toolchain
         shell: bash
