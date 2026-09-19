@@ -1,0 +1,101 @@
+name: Materials Core Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/materials-core-qualification.yml'
+      - 'crates/domains/symthaea-materials/**'
+      - 'crates/domains/symthaea-epistemic-types/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: materials-core-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  materials-core:
+    name: Exact-head MAT-001..006 focused qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact subject identity
+        env:
+          EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          printf 'HEAD=%s\nTREE=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record immutable source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          sha256sum Cargo.lock | tee /tmp/materials-cargo-lock.sha256
+          cp Cargo.lock /tmp/materials-Cargo.lock.before
+
+      - name: Focused rustfmt
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-materials -- --check
+
+      - name: Compile all materials targets
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-materials --all-targets
+
+      - name: Run materials tests
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-materials -- --nocapture
+
+      - name: Strict materials Clippy
+        run: |
+          set -euo pipefail
+          cargo clippy -p symthaea-materials --all-targets -- -D warnings
+
+      - name: Reject implicit Cargo.lock reconciliation
+        run: |
+          set -euo pipefail
+          if ! cmp -s /tmp/materials-Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock changed during focused materials qualification.' >&2
+            echo 'Commit Cargo-produced reconciliation as a separate exact subject.' >&2
+            diff -u /tmp/materials-Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-materials --all-targets
+          cargo test --locked -p symthaea-materials
+          cargo clippy --locked -p symthaea-materials --all-targets -- -D warnings
+
+      - name: Prove source immutability postflight
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          sha256sum -c /tmp/materials-cargo-lock.sha256
+          printf 'POST_HEAD=%s\nPOST_TREE=%s\n' "$(git rev-parse HEAD)" "$(git rev-parse HEAD^{tree})"
