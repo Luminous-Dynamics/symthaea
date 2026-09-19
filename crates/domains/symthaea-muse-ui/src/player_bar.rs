@@ -1,18 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The persistent bottom playback bar — visible across every route
-//! (Listen/Create/Research/Liked/Atlas), matching the design mockups'
-//! layout: piece identity, restart/play-pause/next transport, volume, and
-//! a meter/duration readout.
+//! The persistent bottom playback bar — visible across every route.
 //!
-//! Everything shown here is real data already on `Candidate` (`style`,
-//! `meter`, `duration_secs`) or the shared playback reducer's state
-//! (`MuseState::playback`, `volume`) — deliberately does NOT show BPM or
-//! key, since
-//! neither is fetched anywhere client-side today (that data lives behind
-//! Research's Harmony/Overview endpoints, which aren't wired to the
-//! global player); adding a per-piece fetch just to fill this bar would be
-//! new scope beyond a visual pass, not reuse of existing data.
+//! Presentation and actions follow the exact `PlaybackSource` currently loaded
+//! in the shared reducer, not `MuseState::current`. This matters for review
+//! auditions: imported works, etudes, qualification artifacts, and future
+//! Studio alternatives can be audible without becoming the canonical candidate.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -30,11 +23,22 @@ use crate::palette::{self, Palette};
 use crate::playback::PlaybackPhase;
 use crate::state::{MuseState, TimelineMode, VizMode};
 
-/// `mm:ss`, matching the format the legacy studio page and the design
-/// spec's timeline both use for playback position.
 fn format_secs(s: f64) -> String {
     let s = s.max(0.0) as u64;
     format!("{}:{:02}", s / 60, s % 60)
+}
+
+/// Palette for the thing actually loaded into the transport. Review subjects
+/// intentionally use `palette_for`'s neutral/Classical fallback rather than the
+/// stale style of whatever canonical candidate happened to play previously.
+fn audible_palette(muse: MuseState) -> Palette {
+    let playback = muse.playback.get_untracked();
+    let style = playback
+        .source
+        .as_ref()
+        .map(|source| source.presentation.palette_style())
+        .unwrap_or("Review");
+    palette::palette_for(style)
 }
 
 #[component]
@@ -53,22 +57,18 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
         let Some(canvas_el) = mini_viz_ref.get() else {
             return;
         };
-        start_mini_viz(canvas_el.into(), muse.viz_mode, muse.current_style);
+        start_mini_viz(canvas_el.into(), muse.viz_mode, muse);
     });
 
     view! {
-        <footer class="player-bar" class:visible=move || muse.current.get().is_some()>
+        <footer
+            class="player-bar"
+            class:visible=move || muse.playback.get().source.is_some()
+        >
             <div class="player-viz-corner">
                 <canvas node_ref=mini_viz_ref class="player-mini-viz" />
             </div>
             <div class="player-progress">
-                // Timeline-display selector: Bar vs Wave — deliberately
-                // independent of the Listen hero's own mode selector (now
-                // in `pages.rs`'s canvas overlay). This one controls only
-                // how THIS timeline strip renders, not the hero map; the
-                // two used to be conflated under one shared toggle sitting
-                // confusingly next to the timeline while actually
-                // controlling the hero canvas instead.
                 <div class="timeline-mode-icons">
                     {TimelineMode::ALL
                         .into_iter()
@@ -93,15 +93,6 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
                         })
                         .collect_view()}
                 </div>
-                // The real seek control: a plain range input, kept fully
-                // keyboard/screen-reader operable (arrow keys, Home/End,
-                // announced value) exactly as before — it's visually
-                // transparent, with the decorative wave canvas layered on
-                // top purely for looks (`pointer-events: none`, so clicks
-                // and drags pass straight through to this input). Keeping
-                // scrubbing on the native control avoids reimplementing
-                // pointer capture, touch, and focus semantics a hand-rolled
-                // canvas drag handler would otherwise have to get right.
                 <div class="player-wave-track">
                     <canvas node_ref=canvas_ref class="player-wave" />
                     <input
@@ -125,7 +116,13 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
                 <span
                     class="player-time"
                     style=move || {
-                        let p = palette::palette_for(&muse.current_style.get());
+                        let playback = muse.playback.get();
+                        let style = playback
+                            .source
+                            .as_ref()
+                            .map(|source| source.presentation.palette_style())
+                            .unwrap_or("Review");
+                        let p = palette::palette_for(style);
                         format!("--time-a: rgb({}); --time-b: rgb({});", p.a, p.b)
                     }
                 >
@@ -139,62 +136,62 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
                 </span>
             </div>
             {move || {
-                muse.current
-                    .get()
-                    .map(|c| {
-                        let p = palette::palette_for(&c.style);
-                        let dot_style = format!(
-                            "background: rgb({}); box-shadow: 0 0 10px rgba({},0.6);",
-                            p.a,
-                            p.a,
-                        );
-                        // Tints the play button's slow "lava lamp" glow to
-                        // this piece's own palette rather than a fixed
-                        // color pair — consistent with every other
-                        // palette-driven surface (dot, waves, radial).
-                        let play_btn_style =
-                            format!("--lava-a: rgb({}); --lava-b: rgb({});", p.a, p.b);
-                        view! {
-                            <div class="player-identity">
-                                <span class="player-dot" style=dot_style></span>
-                                <div class="player-text">
-                                    <span class="player-title">{c.title.clone()}</span>
-                                    <span class="player-sub">
-                                        {format!("{} · {}/4 · {:.0}s", c.style, c.meter, c.duration_secs)}
-                                    </span>
-                                </div>
-                            </div>
+                muse.playback.get().source.map(|source| {
+                    let presentation = source.presentation;
+                    let can_keep = presentation.can_keep();
+                    let can_advance = presentation.can_advance_journey();
+                    let can_change_renderer = presentation.can_change_renderer();
+                    let p = palette::palette_for(presentation.palette_style());
+                    let dot_style = format!(
+                        "background: rgb({}); box-shadow: 0 0 10px rgba({},0.6);",
+                        p.a,
+                        p.a,
+                    );
+                    let play_btn_style =
+                        format!("--lava-a: rgb({}); --lava-b: rgb({});", p.a, p.b);
+                    let title = presentation.title;
+                    let subtitle = presentation.subtitle.unwrap_or_default();
 
-                            <div class="player-transport">
-                                <button
-                                    type="button"
-                                    class="icon-btn"
-                                    title="Restart"
-                                    on:click=move |_| muse.restart()
-                                >
-                                    <RestartIcon />
-                                </button>
-                                <button
-                                    type="button"
-                                    class="icon-btn play-btn"
-                                    style=play_btn_style
-                                    title=move || {
-                                        if muse.playback.get().phase == PlaybackPhase::Playing {
-                                            "Pause"
-                                        } else {
-                                            "Play"
-                                        }
+                    view! {
+                        <div class="player-identity">
+                            <span class="player-dot" style=dot_style></span>
+                            <div class="player-text">
+                                <span class="player-title">{title}</span>
+                                <span class="player-sub">{subtitle}</span>
+                            </div>
+                        </div>
+
+                        <div class="player-transport">
+                            <button
+                                type="button"
+                                class="icon-btn"
+                                title="Restart"
+                                on:click=move |_| muse.restart()
+                            >
+                                <RestartIcon />
+                            </button>
+                            <button
+                                type="button"
+                                class="icon-btn play-btn"
+                                style=play_btn_style
+                                title=move || {
+                                    if muse.playback.get().phase == PlaybackPhase::Playing {
+                                        "Pause"
+                                    } else {
+                                        "Play"
                                     }
-                                    on:click=move |_| muse.toggle_play()
-                                >
-                                    {move || {
-                                        if muse.playback.get().phase == PlaybackPhase::Playing {
-                                            view! { <PauseIcon /> }.into_any()
-                                        } else {
-                                            view! { <PlayIcon /> }.into_any()
-                                        }
-                                    }}
-                                </button>
+                                }
+                                on:click=move |_| muse.toggle_play()
+                            >
+                                {move || {
+                                    if muse.playback.get().phase == PlaybackPhase::Playing {
+                                        view! { <PauseIcon /> }.into_any()
+                                    } else {
+                                        view! { <PlayIcon /> }.into_any()
+                                    }
+                                }}
+                            </button>
+                            {can_advance.then(|| view! {
                                 <button
                                     type="button"
                                     class="icon-btn"
@@ -203,9 +200,11 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
                                 >
                                     <NextIcon />
                                 </button>
-                            </div>
+                            })}
+                        </div>
 
-                            <div class="player-secondary">
+                        <div class="player-secondary">
+                            {can_keep.then(|| view! {
                                 <button
                                     type="button"
                                     class="icon-btn heart-btn"
@@ -215,26 +214,28 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
                                 >
                                     <HeartIcon filled=muse.kept.get() />
                                 </button>
-                                <span class="volume-control">
-                                    <VolumeIcon />
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="1"
-                                        step="0.01"
-                                        prop:value=move || muse.volume.get().to_string()
-                                        on:input=move |ev| {
-                                            let target: HtmlInputElement = event_target(&ev);
-                                            if let Ok(v) = target.value().parse::<f64>() {
-                                                muse.volume.set(v);
-                                                if let Some(audio) = muse.audio_ref.get_untracked() {
-                                                    let audio: HtmlAudioElement = audio.into();
-                                                    audio.set_volume(v);
-                                                }
+                            })}
+                            <span class="volume-control">
+                                <VolumeIcon />
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    prop:value=move || muse.volume.get().to_string()
+                                    on:input=move |ev| {
+                                        let target: HtmlInputElement = event_target(&ev);
+                                        if let Ok(v) = target.value().parse::<f64>() {
+                                            muse.volume.set(v);
+                                            if let Some(audio) = muse.audio_ref.get_untracked() {
+                                                let audio: HtmlAudioElement = audio.into();
+                                                audio.set_volume(v);
                                             }
                                         }
-                                    />
-                                </span>
+                                    }
+                                />
+                            </span>
+                            {can_change_renderer.then(|| view! {
                                 <select
                                     class="renderer-select"
                                     title="Render backend"
@@ -253,26 +254,17 @@ pub fn PlayerBar(muse: MuseState) -> impl IntoView {
                                     <option value="fluidsynth">"FluidSynth"</option>
                                     <option value="native">"Native"</option>
                                 </select>
-                            </div>
-                        }
-                            .into_any()
-                    })
+                            })}
+                        </div>
+                    }
+                    .into_any()
+                })
             }}
         </footer>
     }
 }
 
-/// Self-scheduling `requestAnimationFrame` loop for the small corner
-/// preview — reuses `pages::draw_frame` (the exact same visual identity
-/// as the Listen hero canvas, just smaller) so switching modes anywhere
-/// looks consistent everywhere. `Still` mode still redraws every frame
-/// (cheap — one frozen scene) rather than special-casing the loop to
-/// stop, keeping this function as simple as `pages::start_visualizer`.
-fn start_mini_viz(
-    canvas: HtmlCanvasElement,
-    viz_mode: RwSignal<VizMode>,
-    current_style: RwSignal<String>,
-) {
+fn start_mini_viz(canvas: HtmlCanvasElement, viz_mode: RwSignal<VizMode>, muse: MuseState) {
     let ctx = match canvas.get_context("2d") {
         Ok(Some(ctx)) => match ctx.dyn_into::<CanvasRenderingContext2d>() {
             Ok(ctx) => ctx,
@@ -302,12 +294,7 @@ fn start_mini_viz(
             canvas.set_height(h);
         }
 
-        let palette = palette::palette_for(&current_style.get_untracked());
-        // Deliberately all `None` — this 40px corner preview stays a small
-        // decorative echo of the mode, not a second live-audio consumer;
-        // the main hero canvas is the one place playback progress, real
-        // analyser spectrum, and composition evidence actually drive the
-        // drawing.
+        let palette = audible_palette(muse);
         crate::pages::draw_frame(
             &ctx,
             w as f64,
@@ -345,12 +332,6 @@ fn start_mini_viz(
     on_cleanup(move || cleanup.take()());
 }
 
-/// Self-scheduling `requestAnimationFrame` loop for the wave scrub bar —
-/// same structure as `pages.rs`'s `start_visualizer` (read state via
-/// `get_untracked()` every frame rather than tracking it, so this loop
-/// itself is never a reactive dependency). Runs for the app's lifetime
-/// since `PlayerBar` is mounted once outside `<Routes>` alongside the
-/// shared `<audio>` element.
 fn start_progress_wave(canvas: HtmlCanvasElement, muse: MuseState) {
     let ctx = match canvas.get_context("2d") {
         Ok(Some(ctx)) => match ctx.dyn_into::<CanvasRenderingContext2d>() {
@@ -380,12 +361,6 @@ fn start_progress_wave(canvas: HtmlCanvasElement, muse: MuseState) {
             canvas.set_height(h);
         }
 
-        // `audio_reactivity::waveform()` reads the one shared analysis
-        // graph — `None` before anything has ever played, or if Web Audio
-        // construction failed; `draw_wave` reads that as "fall back to
-        // idle decoration." A PAUSED analyser reports near-silence — a
-        // dead flatline — so paused states get the calm-sea idle too,
-        // matching the Listen visualizer's paused behavior.
         let playing = muse.playback.get_untracked().phase == PlaybackPhase::Playing;
         let samples = if playing {
             audio_reactivity::waveform()
@@ -393,7 +368,7 @@ fn start_progress_wave(canvas: HtmlCanvasElement, muse: MuseState) {
             None
         };
 
-        let palette = palette::palette_for(&muse.current_style.get_untracked());
+        let palette = audible_palette(muse);
         let playback = muse.playback.get_untracked();
         draw_wave(
             &ctx,
@@ -432,9 +407,6 @@ fn start_progress_wave(canvas: HtmlCanvasElement, muse: MuseState) {
     on_cleanup(move || cleanup.take()());
 }
 
-/// A soft translucent glow behind the wave, tinted to the current piece's
-/// palette — the "calm background" the plain dark bar was missing. Cheap
-/// (one gradient fill) and drawn first so the wave lines sit on top of it.
 fn draw_glow(ctx: &CanvasRenderingContext2d, w: f64, h: f64, palette: &Palette) {
     let grad = ctx.create_linear_gradient(0.0, 0.0, w, 0.0);
     let _ = grad.add_color_stop(0.0, &format!("rgba({}, 0.02)", palette.b));
@@ -444,17 +416,6 @@ fn draw_glow(ctx: &CanvasRenderingContext2d, w: f64, h: f64, palette: &Palette) 
     ctx.fill_rect(0.0, 0.0, w, h);
 }
 
-/// Real waveform/bar display when a piece is actually playing (see
-/// `audio_reactivity::waveform`) — genuinely reactive to the music rather
-/// than decoration, in either of two layouts the user picks between via
-/// `TimelineMode`: a continuous line (`Wave`, this app's original look) or
-/// a compact amplitude-envelope bar strip (`Bar`). Falls back to
-/// `draw_calm_sea_wave`'s synthetic idle motion before anything has played
-/// yet or if Web Audio construction failed — that idle fallback is shared
-/// by both modes, since it represents "nothing to show yet", not a
-/// Bar-vs-Wave distinction. The actual seek control is the transparent
-/// range input layered on top of this canvas (see `PlayerBar`'s doc
-/// comment) — this is display only.
 fn draw_wave(
     ctx: &CanvasRenderingContext2d,
     w: f64,
@@ -497,10 +458,6 @@ fn draw_wave(
                 }
             }
             TimelineMode::Bar => {
-                // A compact amplitude-envelope strip: real samples bucketed
-                // into N columns, each bar's height the bucket's peak
-                // deviation from center — genuinely audio-reactive, not a
-                // plain decorative progress fill.
                 const N: usize = 64;
                 let bucket = (samples.len() / N).max(1);
                 ctx.set_line_cap("round");
@@ -540,13 +497,6 @@ fn draw_wave(
     }
 }
 
-/// The calm-sea idle — shown while paused, before anything has played yet
-/// (no analyser tap exists), or if Web Audio construction fails, so the
-/// bar is never blank and never a dead flatline. Three long-wavelength
-/// swells drifting an order of magnitude slower than the old idle motion
-/// (~20s per crossing, alternating directions), each with a translucent
-/// fill below its crest so the bar reads as water at rest, matching the
-/// Listen visualizer's paused scene (`pages.rs::draw_calm_sea`).
 fn draw_calm_sea_wave(ctx: &CanvasRenderingContext2d, w: f64, h: f64, palette: &Palette, t: f64) {
     let n = 96usize;
     for pass in 0..3usize {
@@ -572,7 +522,6 @@ fn draw_calm_sea_wave(ctx: &CanvasRenderingContext2d, w: f64, h: f64, palette: &
             }
         }
         let _ = ctx.stroke();
-        // Water body under the crest.
         ctx.line_to(w, h);
         ctx.line_to(0.0, h);
         ctx.close_path();

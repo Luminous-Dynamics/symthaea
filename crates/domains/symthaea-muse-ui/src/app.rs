@@ -145,7 +145,13 @@ fn GlobalHeader(muse: MuseState) -> impl IntoView {
             </div>
             <div class="header-now-playing">
                 <span>"Now playing"</span>
-                <strong>{move || muse.current.get().map(|piece| piece.title).unwrap_or_else(|| "Awaiting a piece".to_string())}</strong>
+                <strong>{move || {
+                    muse.playback
+                        .get()
+                        .source
+                        .map(|source| source.presentation.title)
+                        .unwrap_or_else(|| "Awaiting a piece".to_string())
+                }}</strong>
             </div>
             <nav class="mode-nav" aria-label="Muse modes">
                 <A href="/" attr:class=move || if is_active("/") { "active" } else { "" }>
