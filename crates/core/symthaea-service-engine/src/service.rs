@@ -20,7 +20,9 @@ use symthaea_runtime_owner::{
     HandlerFuture, OwnerCommandContext, OwnerSubmitError, RuntimeCommandTicket,
     RuntimeOwnerConfigError, RuntimeOwnerExit, RuntimeOwnerHandle, spawn_runtime_owner,
 };
-use symthaea_service_events::{ServiceEventHub, service_event_plane};
+use symthaea_service_events::{
+    ServiceEventHub, ServiceVoiceEventEmitter, service_event_plane_with_voice_control,
+};
 use symthaea_service_runtime::observed::{
     ObservedServiceHandler, ObservedServiceReply, ServiceMutationExecutor,
 };
@@ -190,6 +192,8 @@ pub struct SymthaeaServiceRuntime {
     pub commands: SymthaeaServiceHandle,
     pub state: ServiceStatePlaneHub,
     pub events: ServiceEventHub,
+    /// Narrow semantic write capability used only by fast voice interruption.
+    pub voice_events: ServiceVoiceEventEmitter,
     pub task: JoinHandle<RuntimeOwnerExit>,
 }
 
@@ -240,8 +244,9 @@ pub fn spawn_service_runtime(
 ) -> Result<SymthaeaServiceRuntime, SymthaeaServiceRuntimeSpawnError> {
     validate_mailbox_capacity(mailbox_capacity)?;
 
-    let (event_emitter, events) = service_event_plane(runtime_id, event_retention_capacity)
-        .map_err(SymthaeaServiceRuntimeSpawnError::EventPlane)?;
+    let (event_emitter, voice_events, events) =
+        service_event_plane_with_voice_control(runtime_id, event_retention_capacity)
+            .map_err(SymthaeaServiceRuntimeSpawnError::EventPlane)?;
 
     let initial_snapshot = startup_snapshot(&symthaea);
     let (state_publisher, state) = service_state_planes(initial_snapshot)
@@ -257,6 +262,7 @@ pub fn spawn_service_runtime(
         commands: SymthaeaServiceHandle { inner },
         state,
         events,
+        voice_events,
         task,
     })
 }

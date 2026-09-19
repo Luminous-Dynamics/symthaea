@@ -14,8 +14,9 @@ use symthaea::Symthaea;
 use symthaea::symthaea::SleepReport;
 use symthaea_interface_events::{EventPlaneError, SemanticEventSubscriber, SubscribeFrom};
 use symthaea_interface_runtime::StatePlaneError;
-use symthaea_interface_types::RuntimeId;
+use symthaea_interface_types::{RuntimeCursor, RuntimeId, SessionId, TurnId};
 use symthaea_runtime_owner::{OwnerCompletionError, OwnerSubmitError, RuntimeOwnerExit};
+use symthaea_service_events::{ServiceEventError, ServiceVoiceEventEmitter};
 use symthaea_service_read_model::{
     CognitiveStatusRead, IntrospectionRead, PartnershipRead, ServiceReadModel,
     ServiceReadModelError,
@@ -34,14 +35,15 @@ use crate::telemetry::BridgeTelemetrySnapshot;
 /// Cloneable daemon capability surface.
 ///
 /// Cloning this value clones only immutable runtime identity, bounded command
-/// handles, and read-plane hubs; it never clones or exposes the mutable
-/// `Symthaea` facade.
+/// handles, narrow control capabilities, and read-plane hubs; it never clones or
+/// exposes the mutable `Symthaea` facade or generic semantic event authority.
 #[derive(Clone)]
 pub struct ServiceRuntimeHost {
     runtime_id: RuntimeId,
     commands: SymthaeaServiceHandle,
     state: symthaea_service_runtime::state_plane::ServiceStatePlaneHub,
     events: symthaea_service_events::ServiceEventHub,
+    voice_events: ServiceVoiceEventEmitter,
 }
 
 /// Runtime host plus the owner task lifecycle handle.
@@ -289,6 +291,17 @@ impl ServiceRuntimeHost {
         resolve_shutdown_reply(reply)
     }
 
+    /// Publish one authoritative voice interruption through the narrow control
+    /// capability. This does not enter or wait on the cognition command mailbox, so
+    /// it can be used while a long query owns mutable Symthaea.
+    pub fn voice_interrupted(
+        &self,
+        session_id: Option<SessionId>,
+        turn_id: TurnId,
+    ) -> Result<RuntimeCursor, ServiceEventError> {
+        self.voice_events.voice_interrupted(session_id, turn_id)
+    }
+
     /// Read the latest runtime activity and last completed cognitive snapshot.
     ///
     /// This path is intentionally synchronous and never enters the mutation
@@ -336,6 +349,7 @@ impl HostedServiceRuntime {
             commands,
             state,
             events,
+            voice_events,
             task,
         } = runtime;
         Self {
@@ -344,6 +358,7 @@ impl HostedServiceRuntime {
                 commands,
                 state,
                 events,
+                voice_events,
             },
             task,
         }

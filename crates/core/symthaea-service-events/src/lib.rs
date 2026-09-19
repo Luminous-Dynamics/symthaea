@@ -4,10 +4,12 @@
 //!
 //! The bounded event plane validates ordered retention, but it deliberately does
 //! not decide who may mint semantic cursors. This crate supplies that missing
-//! capability boundary: one non-cloneable emitter owns `RuntimeId + next EventSeq`,
-//! while interfaces receive only a subscription hub.
+//! capability boundary: one shared sequencer owns `RuntimeId + next EventSeq`.
+//! The general emitter remains non-cloneable, while voice receives only a narrow
+//! cloneable capability that can publish `VoiceInterrupted`.
 
 use std::fmt;
+use std::sync::{Arc, Mutex};
 
 use symthaea_interface_events::{
     EventPlaneError, SemanticEventPublisher, SemanticEventSubscriber, SubscribeFrom,
@@ -26,6 +28,7 @@ pub enum ServiceEventError {
     Protocol(ProtocolError),
     Identity(IdError),
     SequenceExhausted,
+    SequencerPoisoned,
 }
 
 impl fmt::Display for ServiceEventError {
@@ -35,6 +38,7 @@ impl fmt::Display for ServiceEventError {
             Self::Protocol(error) => write!(f, "semantic event protocol rejected event: {error}"),
             Self::Identity(error) => write!(f, "semantic event identity is invalid: {error}"),
             Self::SequenceExhausted => write!(f, "semantic runtime event sequence exhausted"),
+            Self::SequencerPoisoned => write!(f, "semantic event sequencer is poisoned"),
         }
     }
 }
@@ -45,7 +49,7 @@ impl std::error::Error for ServiceEventError {
             Self::Plane(error) => Some(error),
             Self::Protocol(error) => Some(error),
             Self::Identity(error) => Some(error),
-            Self::SequenceExhausted => None,
+            Self::SequenceExhausted | Self::SequencerPoisoned => None,
         }
     }
 }
@@ -68,14 +72,41 @@ impl From<IdError> for ServiceEventError {
     }
 }
 
-/// Sole semantic-event write capability for one runtime identity.
-///
-/// This type intentionally does not implement `Clone`. Keep it inside the runtime
-/// owner or another single-authority wrapper; hand [`ServiceEventHub`] to clients.
-pub struct ServiceEventEmitter {
-    runtime_id: RuntimeId,
+#[derive(Debug)]
+struct EventSequencer {
     next_seq: Option<EventSeq>,
     publisher: SemanticEventPublisher,
+}
+
+type SharedEventSequencer = Arc<Mutex<EventSequencer>>;
+
+fn emit_shared(
+    runtime_id: &RuntimeId,
+    shared: &SharedEventSequencer,
+    session_id: Option<SessionId>,
+    kind: RuntimeEventKind,
+) -> Result<RuntimeCursor, ServiceEventError> {
+    let mut sequencer = shared
+        .lock()
+        .map_err(|_| ServiceEventError::SequencerPoisoned)?;
+    let seq = sequencer
+        .next_seq
+        .ok_or(ServiceEventError::SequenceExhausted)?;
+    let cursor = RuntimeCursor::new(runtime_id.clone(), seq);
+    let event = RuntimeEvent::new(cursor.clone(), session_id, kind)?;
+    sequencer.publisher.publish(event)?;
+    sequencer.next_seq = seq.checked_next();
+    Ok(cursor)
+}
+
+/// General semantic-event write capability for one runtime identity.
+///
+/// This type intentionally does not implement `Clone`. Keep it inside the runtime
+/// owner. Specialized cloneable capabilities below expose only narrowly typed event
+/// mutations while sharing the same contiguous sequencer.
+pub struct ServiceEventEmitter {
+    runtime_id: RuntimeId,
+    sequencer: SharedEventSequencer,
 }
 
 impl ServiceEventEmitter {
@@ -84,7 +115,7 @@ impl ServiceEventEmitter {
     }
 
     pub fn next_sequence(&self) -> Option<EventSeq> {
-        self.next_seq
+        self.sequencer.lock().ok().and_then(|sequencer| sequencer.next_seq)
     }
 
     /// Mint and publish one authoritative semantic event.
@@ -96,12 +127,7 @@ impl ServiceEventEmitter {
         session_id: Option<SessionId>,
         kind: RuntimeEventKind,
     ) -> Result<RuntimeCursor, ServiceEventError> {
-        let seq = self.next_seq.ok_or(ServiceEventError::SequenceExhausted)?;
-        let cursor = RuntimeCursor::new(self.runtime_id.clone(), seq);
-        let event = RuntimeEvent::new(cursor.clone(), session_id, kind)?;
-        self.publisher.publish(event)?;
-        self.next_seq = seq.checked_next();
-        Ok(cursor)
+        emit_shared(&self.runtime_id, &self.sequencer, session_id, kind)
     }
 
     pub fn response_started(
@@ -128,6 +154,36 @@ impl ServiceEventEmitter {
     }
 }
 
+/// Narrow fast-path semantic authority for voice barge-in.
+///
+/// Cloning this handle does not grant generic event minting. Its only mutation is
+/// one typed `VoiceInterrupted` event that shares the same runtime-local `EventSeq`
+/// source as query lifecycle events.
+#[derive(Clone)]
+pub struct ServiceVoiceEventEmitter {
+    runtime_id: RuntimeId,
+    sequencer: SharedEventSequencer,
+}
+
+impl ServiceVoiceEventEmitter {
+    pub fn runtime_id(&self) -> &RuntimeId {
+        &self.runtime_id
+    }
+
+    pub fn voice_interrupted(
+        &self,
+        session_id: Option<SessionId>,
+        turn_id: TurnId,
+    ) -> Result<RuntimeCursor, ServiceEventError> {
+        emit_shared(
+            &self.runtime_id,
+            &self.sequencer,
+            session_id,
+            RuntimeEventKind::VoiceInterrupted { turn_id },
+        )
+    }
+}
+
 /// Read-only subscription capability. The internal publisher clone is private and
 /// used only to construct independent retained-ring subscribers.
 #[derive(Clone)]
@@ -148,21 +204,42 @@ impl ServiceEventHub {
     }
 }
 
-/// Construct one semantic runtime lineage. Runtime identity is supplied explicitly;
-/// this layer never invents a process identity from wall-clock time or transport.
-pub fn service_event_plane(
+/// Construct one semantic runtime lineage with a narrow voice-control authority.
+/// Runtime identity is supplied explicitly; this layer never invents a process
+/// identity from wall-clock time or transport.
+pub fn service_event_plane_with_voice_control(
     runtime_id: RuntimeId,
     retention_capacity: usize,
-) -> Result<(ServiceEventEmitter, ServiceEventHub), EventPlaneError> {
+) -> Result<
+    (ServiceEventEmitter, ServiceVoiceEventEmitter, ServiceEventHub),
+    EventPlaneError,
+> {
     let (publisher, _initial_tail) = semantic_event_channel(retention_capacity)?;
     let hub = ServiceEventHub {
         publisher: publisher.clone(),
     };
-    let emitter = ServiceEventEmitter {
-        runtime_id,
+    let sequencer = Arc::new(Mutex::new(EventSequencer {
         next_seq: EventSeq::new(1),
         publisher,
+    }));
+    let emitter = ServiceEventEmitter {
+        runtime_id: runtime_id.clone(),
+        sequencer: Arc::clone(&sequencer),
     };
+    let voice = ServiceVoiceEventEmitter {
+        runtime_id,
+        sequencer,
+    };
+    Ok((emitter, voice, hub))
+}
+
+/// Backward-compatible constructor for runtimes that do not need voice control.
+pub fn service_event_plane(
+    runtime_id: RuntimeId,
+    retention_capacity: usize,
+) -> Result<(ServiceEventEmitter, ServiceEventHub), EventPlaneError> {
+    let (emitter, _voice, hub) =
+        service_event_plane_with_voice_control(runtime_id, retention_capacity)?;
     Ok((emitter, hub))
 }
 
@@ -214,6 +291,41 @@ mod tests {
         assert_eq!(batch.events.len(), 2);
         assert_eq!(batch.events[0].cursor().seq().get(), 1);
         assert_eq!(batch.events[1].cursor().seq().get(), 2);
+    }
+
+    #[test]
+    fn voice_interrupt_shares_query_event_sequence_without_generic_authority() {
+        let (mut emitter, voice, hub) =
+            service_event_plane_with_voice_control(runtime_id(), 8).unwrap();
+        let mut subscriber = hub.subscribe(SubscribeFrom::OldestRetained).unwrap();
+        let turn = TurnId::new("turn:7").unwrap();
+        let session = SessionId::new("voice-session:test").unwrap();
+
+        let started = emitter
+            .emit(
+                Some(session.clone()),
+                RuntimeEventKind::ResponseStarted {
+                    turn_id: turn.clone(),
+                },
+            )
+            .unwrap();
+        let interrupted = voice
+            .voice_interrupted(Some(session.clone()), turn.clone())
+            .unwrap();
+        let finished = emitter.response_finished(turn, Some(session)).unwrap();
+
+        assert_eq!(started.seq().get(), 1);
+        assert_eq!(interrupted.seq().get(), 2);
+        assert_eq!(finished.seq().get(), 3);
+
+        let read = subscriber.read_available(8).unwrap();
+        let EventRead::Events(batch) = read else {
+            panic!("expected retained semantic events");
+        };
+        assert!(matches!(
+            batch.events[1].kind(),
+            RuntimeEventKind::VoiceInterrupted { .. }
+        ));
     }
 
     #[test]
