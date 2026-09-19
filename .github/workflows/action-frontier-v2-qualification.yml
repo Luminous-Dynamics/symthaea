@@ -1,0 +1,105 @@
+name: Action Frontier V2 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-frontier-v2-qualification.yml'
+      - 'crates/bridges/symthaea-action-frontier/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-frontier-v2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  action-frontier-v2:
+    name: Exact-head action frontier v2
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce frontier authority ratchets
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-action-frontier/src/lib.rs
+          grep -Fq 'compare_and_swap' "${SRC}"
+          grep -Fq 'persist_new_reservation' "${SRC}"
+          grep -Fq 'arm_outcome_unknown' "${SRC}"
+          grep -Fq 'PersistedReservationHeadMismatch' "${SRC}"
+          grep -Fq 'AcknowledgedWrongHead' "${SRC}"
+          if grep -Eq '#\[derive\([^]]*(Clone|Serialize|Deserialize)[^]]*\)\][[:space:]]*pub struct (PersistedReservationV2|DurablyArmedReservationV2)' "${SRC}"; then
+            echo 'affine persistence tokens must not become Clone/Serde' >&2
+            exit 1
+          fi
+          if grep -Eq 'Phi|phi|conscious|simulation score|confidence score' "${SRC}"; then
+            echo 'cognition/simulation must not enter CAS authority substrate' >&2
+            exit 1
+          fi
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-frontier -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-action-frontier --all-targets
+          cargo test -p symthaea-action-frontier
+          cargo clippy -p symthaea-action-frontier --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-frontier --all-targets
+          cargo test --locked -p symthaea-action-frontier
+          cargo clippy --locked -p symthaea-action-frontier --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
