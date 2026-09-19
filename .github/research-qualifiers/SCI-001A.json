@@ -1,0 +1,12 @@
+{
+  "schema": "symthaea.research-qualifier-manifest.v1",
+  "program": "SCI-001A",
+  "source_parent": "aeeea202c89d0ab96166bec5674d95695df5f56c",
+  "expected_rust": "1.96.0",
+  "packages": [
+    "symthaea-science-research"
+  ],
+  "source_paths": [
+    "crates/core/symthaea-science-research"
+  ]
+}
