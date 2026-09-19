@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for Android 12+ Window.setHideOverlayWindows(true). -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
+
     <!-- Library permissions that consumers should declare -->
     <!-- android.permission.BLUETOOTH_SCAN, BLUETOOTH_ADVERTISE for BLE mesh -->
     <!-- android.permission.ACCESS_FINE_LOCATION for GPS novelty -->
