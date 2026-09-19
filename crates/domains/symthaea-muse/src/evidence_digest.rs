@@ -24,6 +24,8 @@ pub mod rendered_spectral_window_evidence;
 pub mod rendered_spectral_window_panel;
 #[path = "rendered_multimodal_attack_evidence.rs"]
 pub mod rendered_multimodal_attack_evidence;
+#[path = "rendered_multimodal_attack_panel.rs"]
+pub mod rendered_multimodal_attack_panel;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
