@@ -15,6 +15,7 @@ pub mod aging;
 pub mod compound_stability;
 pub mod conditioned_property;
 pub mod database;
+pub mod discovery_campaign;
 pub mod encoder;
 pub mod evidence;
 pub mod haptic_prober;
@@ -35,6 +36,12 @@ pub use conditioned_property::{
     PropertyUncertainty,
 };
 pub use database::{MaterialDatabase, MaterialSearchResult};
+pub use discovery_campaign::{
+    CampaignBudgets, CampaignEvaluationPoint, CampaignHardConstraint, CampaignMetricKind,
+    CampaignMetricRef, CampaignMetricValue, CampaignObjective, CampaignScale, CampaignStopRule,
+    DiscoveryCampaign, DiscoveryCampaignError, HardConstraintRelation, MonetaryBudget,
+    ObjectiveDirection, campaign_pareto_front, campaign_point_is_feasible,
+};
 pub use encoder::MaterialHdcEncoder;
 pub use evidence::{
     MaterialsClaimAuthority, MaterialsEvidenceChain, MaterialsEvidenceError, MaterialsEvidenceKind,
