@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-materials-qualification-profile"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Precommitted execution profiles for sealed-target materials qualification"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+
+[dependencies]
+symthaea-materials-benchmarks = { path = "../symthaea-materials-benchmarks" }
+symthaea-materials-qualification = { path = "../symthaea-materials-qualification" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
