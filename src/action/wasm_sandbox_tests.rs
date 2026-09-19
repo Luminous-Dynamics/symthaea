@@ -37,6 +37,23 @@ fn wasm_validation_rejects_module_path_outside_sandbox() {
     ));
 }
 
+#[cfg(unix)]
+#[test]
+fn wasm_validation_rejects_symlink_escape() {
+    use std::os::unix::fs::symlink;
+
+    let policy = PolicyBundle::restrictive();
+    let sandbox = SandboxRoot::new("test_wasm_symlink_escape").unwrap();
+    let module_path = sandbox.root().join("escape.wasm");
+    let _ = std::fs::remove_file(&module_path);
+    symlink("/etc/passwd", &module_path).unwrap();
+
+    let err = wasm_action(module_path, "verify")
+        .validate(&policy, &sandbox, 1.0)
+        .expect_err("symlink escaping SandboxRoot must be rejected after canonicalization");
+    assert!(matches!(err, PolicyViolation::SandboxEscape(_)));
+}
+
 // (module (func (export "verify") (result i32) i32.const 1))
 #[cfg(feature = "wasm-sandbox")]
 const RETURN_ONE_WASM: &[u8] = &[
@@ -58,6 +75,25 @@ const INFINITE_LOOP_WASM: &[u8] = &[
     0x03, 0x02, 0x01, 0x00, // function section
     0x07, 0x0a, 0x01, 0x06, b'v', b'e', b'r', b'i', b'f', b'y', 0x00, 0x00, // export
     0x0a, 0x0b, 0x01, 0x09, 0x00, 0x03, 0x40, 0x0c, 0x00, 0x0b, 0x41, 0x01, 0x0b,
+];
+
+// (module
+//   (memory 1)
+//   (func (export "verify") (result i32)
+//     i32.const 2048
+//     memory.grow
+//     drop
+//     i32.const 1))
+//
+// 2048 additional 64-KiB pages exceeds the 64-MiB StoreLimits ceiling.
+#[cfg(feature = "wasm-sandbox")]
+const MEMORY_GROW_WASM: &[u8] = &[
+    0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // magic + version
+    0x01, 0x05, 0x01, 0x60, 0x00, 0x01, 0x7f, // type: () -> i32
+    0x03, 0x02, 0x01, 0x00, // function section
+    0x05, 0x03, 0x01, 0x00, 0x01, // one memory, min 1 page, no declared max
+    0x07, 0x0a, 0x01, 0x06, b'v', b'e', b'r', b'i', b'f', b'y', 0x00, 0x00, // export
+    0x0a, 0x0c, 0x01, 0x0a, 0x00, 0x41, 0x80, 0x10, 0x40, 0x00, 0x1a, 0x41, 0x01, 0x0b,
 ];
 
 #[cfg(feature = "wasm-sandbox")]
@@ -102,6 +138,42 @@ fn bounded_wasm_exhausts_fuel_in_infinite_loop() {
     assert!(
         message.contains("wasm guest trapped") || message.contains("fuel"),
         "expected bounded guest trap/fuel error, got: {message}"
+    );
+}
+
+#[cfg(feature = "wasm-sandbox")]
+#[test]
+fn bounded_wasm_traps_memory_growth_beyond_store_limit() {
+    let policy = PolicyBundle::restrictive();
+    let sandbox = SandboxRoot::new("test_wasm_memory_limit").unwrap();
+    let module_path = write_fixture(&sandbox, "memory-grow.wasm", MEMORY_GROW_WASM);
+    let action = wasm_action(module_path, "verify");
+    let mut executor = SimpleExecutor::with_real_commands();
+
+    let err = executor
+        .execute(&action, &policy, &sandbox, 1.0)
+        .expect_err("guest memory growth above 64 MiB must trap");
+    assert!(
+        err.to_string().contains("wasm guest trapped"),
+        "unexpected memory-limit error: {err}"
+    );
+}
+
+#[cfg(feature = "wasm-sandbox")]
+#[test]
+fn bounded_wasm_rejects_malformed_module() {
+    let policy = PolicyBundle::restrictive();
+    let sandbox = SandboxRoot::new("test_wasm_malformed").unwrap();
+    let module_path = write_fixture(&sandbox, "malformed.wasm", b"not-webassembly");
+    let action = wasm_action(module_path, "verify");
+    let mut executor = SimpleExecutor::with_real_commands();
+
+    let err = executor
+        .execute(&action, &policy, &sandbox, 1.0)
+        .expect_err("malformed Wasm bytes must fail validation/compilation");
+    assert!(
+        err.to_string().contains("failed to load wasm module"),
+        "unexpected malformed-module error: {err}"
     );
 }
 
