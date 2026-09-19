@@ -61,9 +61,10 @@ pub struct QualificationEligibilityProfile {
     /// Relevant only when `ExecutionConformance` is required. AuthorityBlocked
     /// is forbidden here and can never be made acceptable by profile choice.
     pub accepted_execution_conformance: BTreeSet<ExecutionConformance>,
-    /// Relevant only when `ReplicationLineage` is required. This checks exact
-    /// declared dimensions in the graph-local replication receipt; it never
-    /// upgrades them into global independence.
+    /// Relevant only when `ReplicationLineage` is required. At least one
+    /// non-replay dimension is required when that gate is enabled. This checks
+    /// exact declared dimensions in the graph-local replication receipt; it
+    /// never upgrades them into global independence.
     pub required_replication_dimensions: BTreeSet<IndependenceDimension>,
     pub supersedes_profile_sha256: Option<Sha256Digest>,
 }
@@ -74,6 +75,8 @@ pub enum QualificationEligibilityProfileIssue {
     ExecutionPolicyMissing,
     AuthorityBlockedExecutionCannotBeAccepted,
     ExecutionPolicyWithoutGate,
+    ReplicationPolicyMissing,
+    ReplayCannotSatisfyReplication,
     ReplicationDimensionsWithoutGate,
 }
 
@@ -102,11 +105,20 @@ impl QualificationEligibilityProfile {
         if !execution_required && !self.accepted_execution_conformance.is_empty() {
             issues.push(QualificationEligibilityProfileIssue::ExecutionPolicyWithoutGate);
         }
-        if !self
+
+        let replication_required = self
             .required_gates
-            .contains(&EligibilityGateKind::ReplicationLineage)
-            && !self.required_replication_dimensions.is_empty()
+            .contains(&EligibilityGateKind::ReplicationLineage);
+        if replication_required && self.required_replication_dimensions.is_empty() {
+            issues.push(QualificationEligibilityProfileIssue::ReplicationPolicyMissing);
+        }
+        if self
+            .required_replication_dimensions
+            .contains(&IndependenceDimension::SameExecutionReplay)
         {
+            issues.push(QualificationEligibilityProfileIssue::ReplayCannotSatisfyReplication);
+        }
+        if !replication_required && !self.required_replication_dimensions.is_empty() {
             issues.push(QualificationEligibilityProfileIssue::ReplicationDimensionsWithoutGate);
         }
         issues
@@ -273,7 +285,7 @@ pub fn evaluate_qualification_eligibility(
     let mut blocked = false;
     let mut incomplete = false;
 
-    if profile.claim_id != *claim.claim_id() || profile.subject_sha256 != *claim.subject_sha256() {
+    if &profile.claim_id != claim.claim_id() || &profile.subject_sha256 != claim.subject_sha256() {
         findings.push(QualificationEligibilityFinding::ClaimIdentityMismatch);
         invalid = true;
     }
@@ -798,9 +810,8 @@ impl FramedDigest {
 mod tests {
     use super::*;
 
-    #[test]
-    fn authority_blocked_execution_can_never_be_profile_accepted() {
-        let profile = QualificationEligibilityProfile {
+    fn base_profile() -> QualificationEligibilityProfile {
+        QualificationEligibilityProfile {
             schema_version: QUALIFICATION_ELIGIBILITY_SCHEMA.into(),
             profile_id: ResearchId::parse("PROFILE-1").unwrap(),
             claim_id: ResearchId::parse("CLAIM-1").unwrap(),
@@ -808,19 +819,65 @@ mod tests {
             relation_binding_sha256: Sha256Digest::of_bytes(b"relation"),
             evidence_coverage_report_sha256: Sha256Digest::of_bytes(b"coverage"),
             evidence_decision_binding_sha256: Sha256Digest::of_bytes(b"decision"),
-            required_gates: [EligibilityGateKind::ExecutionConformance]
-                .into_iter()
-                .collect(),
-            accepted_execution_conformance: [ExecutionConformance::AuthorityBlocked]
-                .into_iter()
-                .collect(),
+            required_gates: BTreeSet::new(),
+            accepted_execution_conformance: BTreeSet::new(),
             required_replication_dimensions: BTreeSet::new(),
             supersedes_profile_sha256: None,
-        };
+        }
+    }
+
+    #[test]
+    fn authority_blocked_execution_can_never_be_profile_accepted() {
+        let mut profile = base_profile();
+        profile
+            .required_gates
+            .insert(EligibilityGateKind::ExecutionConformance);
+        profile
+            .accepted_execution_conformance
+            .insert(ExecutionConformance::AuthorityBlocked);
         assert!(profile.validate().iter().any(|issue| matches!(
             issue,
             QualificationEligibilityProfileIssue::AuthorityBlockedExecutionCannotBeAccepted
         )));
+    }
+
+    #[test]
+    fn required_replication_gate_requires_explicit_independence_dimension() {
+        let mut profile = base_profile();
+        profile
+            .required_gates
+            .insert(EligibilityGateKind::ReplicationLineage);
+        assert!(profile.validate().iter().any(|issue| matches!(
+            issue,
+            QualificationEligibilityProfileIssue::ReplicationPolicyMissing
+        )));
+    }
+
+    #[test]
+    fn same_execution_replay_can_never_be_required_as_replication() {
+        let mut profile = base_profile();
+        profile
+            .required_gates
+            .insert(EligibilityGateKind::ReplicationLineage);
+        profile
+            .required_replication_dimensions
+            .insert(IndependenceDimension::SameExecutionReplay);
+        assert!(profile.validate().iter().any(|issue| matches!(
+            issue,
+            QualificationEligibilityProfileIssue::ReplayCannotSatisfyReplication
+        )));
+    }
+
+    #[test]
+    fn independent_execution_is_valid_replication_policy() {
+        let mut profile = base_profile();
+        profile
+            .required_gates
+            .insert(EligibilityGateKind::ReplicationLineage);
+        profile
+            .required_replication_dimensions
+            .insert(IndependenceDimension::IndependentExecutionSameBinary);
+        assert!(profile.validate().is_empty());
     }
 
     #[test]
