@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminous-dynamics.org/schemas/math-structural-extraction-admission-v1.schema.json",
+  "title": "Math Structural Extraction Admission v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "authority",
+    "admission_kind",
+    "extraction_receipt",
+    "gates",
+    "reconstruction",
+    "holdout_firewall",
+    "evidence_refs"
+  ],
+  "properties": {
+    "version": {"const": "math-structural-extraction-admission-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "admission_kind": {"const": "AllPrerequisitesQualified"},
+    "extraction_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "sha256", "wire_profile"],
+      "properties": {
+        "version": {"const": "math-structural-extraction-receipt-v1"},
+        "sha256": {"$ref": "#/$defs/sha256"},
+        "wire_profile": {"const": "math-structural-compat-wire-v1"}
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation_execution",
+        "receipt_contract",
+        "compatibility_wire",
+        "rust_wire_canary"
+      ],
+      "properties": {
+        "representation_execution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["subject_commit", "workflow_run_id", "workflow_blob", "conclusion"],
+          "properties": {
+            "subject_commit": {"const": "694ef48e53296c2c6fe39a9c07927085b2f2754f"},
+            "workflow_run_id": {"const": 35459503395},
+            "workflow_blob": {"const": "f021a3f40164280d63e3467bb96c82ebe17ab9e1"},
+            "conclusion": {"const": "success"}
+          }
+        },
+        "receipt_contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["subject_commit", "workflow_run_id", "workflow_blob", "conclusion"],
+          "properties": {
+            "subject_commit": {"const": "9b8f6d911a693090db4c1079f97d45f5fda57dcf"},
+            "workflow_run_id": {"const": 35463362013},
+            "workflow_blob": {"const": "9532dac2f8e1bcde22cc17c4935d90e56b70b8ba"},
+            "conclusion": {"const": "success"}
+          }
+        },
+        "compatibility_wire": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject_commit",
+            "workflow_run_id",
+            "workflow_blob",
+            "conclusion",
+            "profile",
+            "vectors_blob",
+            "python_oracle_blob"
+          ],
+          "properties": {
+            "subject_commit": {"const": "bdcf7203f4d077eb8fc52f5a67b8d9aefb49fd77"},
+            "workflow_run_id": {"const": 35463731810},
+            "workflow_blob": {"const": "7d5815fca9ae8e0ec2bdcb2b4c6bff98ceb90224"},
+            "conclusion": {"const": "success"},
+            "profile": {"const": "math-structural-compat-wire-v1"},
+            "vectors_blob": {"const": "b44eef6240e977e94744ee94e2e538576a656881"},
+            "python_oracle_blob": {"const": "cb601ce5ec1ad0ea9fbd879a67bd1c1c9b95bdb7"}
+          }
+        },
+        "rust_wire_canary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "subject_commit",
+            "workflow_run_id",
+            "workflow_blob",
+            "conclusion",
+            "rust_source_blob"
+          ],
+          "properties": {
+            "subject_commit": {"const": "556b8e71c4c596484b6cf0d4b0b26f6f03a0291d"},
+            "workflow_run_id": {"const": 35463948360},
+            "workflow_blob": {"const": "01eb0010c76a9883b6d5692b32aa936e5d7e09df"},
+            "conclusion": {"const": "success"},
+            "rust_source_blob": {"const": "a9465e952eb537c26d7c352a8f0c1914a3ddae81"}
+          }
+        }
+      }
+    },
+    "reconstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_main_commit",
+        "source_objects_reverified",
+        "environment_rechecked",
+        "merge_frozen_draft_branches"
+      ],
+      "properties": {
+        "target_main_commit": {"$ref": "#/$defs/sha40"},
+        "source_objects_reverified": {"const": true},
+        "environment_rechecked": {"const": true},
+        "merge_frozen_draft_branches": {"const": false}
+      }
+    },
+    "holdout_firewall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ranking_evaluated", "scores_emitted", "labels_exposed_to_extraction"],
+      "properties": {
+        "ranking_evaluated": {"const": false},
+        "scores_emitted": {"const": false},
+        "labels_exposed_to_extraction": {"const": false}
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "sha40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

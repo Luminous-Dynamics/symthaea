@@ -1,0 +1,50 @@
+name: Math Structural Extraction Admission Contract
+
+on:
+  pull_request:
+    paths:
+      - ".github/schemas/math-structural-extraction-admission-v1.schema.json"
+      - ".github/scripts/validate-math-structural-extraction-admission.py"
+      - ".github/workflows/math-structural-extraction-admission.yml"
+      - "docs/research/MATH_STRUCTURAL_EXTRACTION_ADMISSION_V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-admission-contract:
+    name: Validate extraction admission contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Parse JSON Schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path('.github/schemas/math-structural-extraction-admission-v1.schema.json')
+          value = json.loads(path.read_text(encoding='utf-8'))
+          assert value['$schema'] == 'https://json-schema.org/draft/2020-12/schema'
+          assert value['properties']['authority']['const'] == 'MeasurementOnly'
+          print('PASS: extraction admission JSON schema parses')
+          PY
+
+      - name: Run semantic positive and negative controls
+        run: >-
+          python3 .github/scripts/validate-math-structural-extraction-admission.py
+          --self-test
+
+      - name: Verify admission contract does not fabricate live gate results
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=.github/scripts/validate-math-structural-extraction-admission.py
+          workflow=.github/workflows/math-structural-extraction-admission.yml
+          ! grep -E 'gh api|curl .*actions/runs|github\.com/.*/actions/runs' "$script" "$workflow"
+          echo 'PASS: this tranche freezes admission semantics only; live run evidence belongs to extraction execution'
