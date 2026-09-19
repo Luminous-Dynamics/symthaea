@@ -1,0 +1,66 @@
+{
+  "schema_id": "symthaea.qualification-hermetic-profiles.v2",
+  "profiles": {
+    "symthaea-humanoid-default-hermetic-v2": {
+      "description": "Hermetic default-feature source qualification plan for symthaea-humanoid.",
+      "network": "NONE",
+      "working_directory": "/src",
+      "allowed_executables": [
+        "/toolchain/bin/cargo"
+      ],
+      "environment": {
+        "CARGO_HOME": "/work/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_TARGET_DIR": "/work/target",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "HOME": "/home",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/toolchain/bin:/usr/bin:/bin",
+        "RUSTC": "/toolchain/bin/rustc",
+        "RUSTDOC": "/toolchain/bin/rustdoc",
+        "RUSTFMT": "/toolchain/bin/rustfmt",
+        "TMPDIR": "/tmp",
+        "TZ": "UTC"
+      },
+      "commands": [
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "fmt", "--check", "-p", "symthaea-humanoid"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "check", "-p", "symthaea-humanoid", "--all-targets", "--locked"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "test", "-p", "symthaea-humanoid", "--lib", "--locked"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "clippy", "-p", "symthaea-humanoid", "--all-targets", "--locked", "--", "-D", "warnings"]
+      ]
+    },
+    "symthaea-humanoid-mujoco-hermetic-v2": {
+      "description": "Hermetic MuJoCo-feature compile qualification plan for symthaea-humanoid; proposition-specific behavioral tests remain separate.",
+      "network": "NONE",
+      "working_directory": "/src",
+      "allowed_executables": [
+        "/toolchain/bin/cargo"
+      ],
+      "environment": {
+        "CARGO_HOME": "/work/cargo-home",
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_TARGET_DIR": "/work/target",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "HOME": "/home",
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+        "PATH": "/toolchain/bin:/usr/bin:/bin",
+        "RUSTC": "/toolchain/bin/rustc",
+        "RUSTDOC": "/toolchain/bin/rustdoc",
+        "RUSTFMT": "/toolchain/bin/rustfmt",
+        "TMPDIR": "/tmp",
+        "TZ": "UTC"
+      },
+      "commands": [
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "fmt", "--check", "-p", "symthaea-humanoid"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "check", "-p", "symthaea-humanoid", "--all-targets", "--features", "mujoco", "--locked"],
+        ["/toolchain/bin/cargo", "--offline", "--config", "/deps/cargo-config.toml", "clippy", "-p", "symthaea-humanoid", "--all-targets", "--features", "mujoco", "--locked", "--", "-D", "warnings"]
+      ]
+    }
+  }
+}
