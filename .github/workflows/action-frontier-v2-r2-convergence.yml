@@ -37,10 +37,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact lineage and reused R1 blobs
+      - name: Verify V2B ancestry and reused R1 blobs
+        env:
+          REQUIRED_BASE: c26691e1dfb5f57d4c997bc17758f9b93d9b4fb8
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = 'c26691e1dfb5f57d4c997bc17758f9b93d9b4fb8'
+          git cat-file -e "${REQUIRED_BASE}^{commit}"
+          test "$(git merge-base HEAD "${REQUIRED_BASE}")" = "${REQUIRED_BASE}"
+          git merge-base --is-ancestor "${REQUIRED_BASE}" HEAD
 
           test "$(git hash-object crates/core/symthaea-action-runtime/src/lib.rs)" = '07c53c73874b5ac30f9992133ce00bc13e269034'
           test "$(git hash-object crates/core/symthaea-action-checkpoint/src/strict.rs)" = '270fa8d7c32a23ab8c410abaf1bd3be47422d9d9'
@@ -49,6 +53,37 @@ jobs:
           test "$(git hash-object .github/workflows/action-runtime-v2-qualification.yml)" = '075887423f771e05dbc83ab5c2d47f8a7cad5eb2'
           test "$(git hash-object .github/workflows/action-frontier-v2-qualification.yml)" = '4ab7a8c147bb5d30cf10b4f25740cd831fe2550a'
           test "$(git hash-object docs/architecture/ACTION_FRONTIER_V02_CONVERGENCE.md)" = '09a9eb06d17063e1209cc3c8157575eaa615881d'
+
+      - name: Verify repair remains scoped to the V2C-R2 surface
+        env:
+          REQUIRED_BASE: c26691e1dfb5f57d4c997bc17758f9b93d9b4fb8
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+
+          base = 'c26691e1dfb5f57d4c997bc17758f9b93d9b4fb8'
+          allowed = {
+              '.github/workflows/action-runtime-v2-qualification.yml',
+              '.github/workflows/action-checkpoint-v2-qualification.yml',
+              '.github/workflows/action-frontier-v2-qualification.yml',
+              '.github/workflows/action-frontier-v2-r2-convergence.yml',
+              'crates/core/symthaea-action-runtime/src/lib.rs',
+              'crates/core/symthaea-action-checkpoint/src/strict.rs',
+              'crates/core/symthaea-action-checkpoint/src/hardened.rs',
+              'crates/bridges/symthaea-action-frontier/Cargo.toml',
+              'crates/bridges/symthaea-action-frontier/src/lib.rs',
+              'docs/architecture/ACTION_FRONTIER_V02_CONVERGENCE.md',
+          }
+          changed = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--name-only', f'{base}...HEAD'], text=True
+              ).splitlines()
+          )
+          unexpected = sorted(changed - allowed)
+          if unexpected:
+              raise SystemExit('unexpected V2C-R2 paths: ' + ', '.join(unexpected))
+          PY
 
       - name: Verify V2B hardened facade remains public
         run: |
