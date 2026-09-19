@@ -13,10 +13,16 @@
 //! strict checkpoint successor
 //!     != durable/linearizable persistence
 //!     != trusted store provisioning
+//!     != authenticated restart anchor
 //!     != fresh current authority
 //!     != dispatch permit
 //!     != effect
 //! ```
+//!
+//! V2D convergence deliberately exposes no production restart constructor. A
+//! serialized checkpoint/head cannot recreate a writable frontier after process
+//! loss. Restart activation belongs above this crate and must consume a future
+//! verifier-owned authenticated anchor/currentness proof.
 
 #![deny(unsafe_code)]
 
@@ -34,16 +40,19 @@ use thiserror::Error;
 
 /// Atomic external checkpoint frontier.
 ///
-/// An implementation satisfies this trait only if comparison with
-/// `expected_previous` and installation of `checkpoint` are one atomic /
-/// linearizable state transition. A read-then-write implementation without
-/// equivalent exclusion does not satisfy the contract.
+/// `current_head` must be a linearizable observation of the same durable state
+/// used by `compare_and_swap`. An implementation satisfies this trait only if
+/// comparison with `expected_previous` and installation of `checkpoint` are one
+/// atomic/linearizable state transition. A read-then-write implementation
+/// without equivalent exclusion does not satisfy the contract.
 ///
 /// The trait itself does not prove that a concrete provider is durable,
 /// provisioned by the deployment, rollback-resistant across machine loss, or
 /// otherwise trustworthy.
 pub trait CheckpointCasStoreV2 {
     type Error: StdError + 'static;
+
+    fn current_head(&mut self) -> Result<Option<CheckpointHeadV2>, Self::Error>;
 
     fn compare_and_swap(
         &mut self,
@@ -158,13 +167,20 @@ impl DurablyArmedReservationV2 {
 
 /// One in-process writer view of an external CAS frontier.
 ///
-/// The object is intentionally not Clone. A store failure, CAS conflict, or
-/// wrong acknowledgement latches the writer into containment because its local
-/// view can no longer prove which durable head won.
+/// The object is intentionally not Clone and owns the exact grant whose
+/// checkpoint lineage it may progress. A store failure, CAS conflict, malformed
+/// successor, unexpected store advancement, or wrong acknowledgement latches
+/// the writer into containment because its local view can no longer prove which
+/// durable head won.
+///
+/// There is intentionally no production constructor that resumes this object
+/// from caller-supplied persisted bytes/head and no method that extracts the
+/// underlying store after containment.
 pub struct CasFrontierV2<S> {
     store: S,
-    current_checkpoint: GrantAccountCheckpointV2,
-    current_head: CheckpointHeadV2,
+    grant: CapabilityGrant,
+    expected_checkpoint: GrantAccountCheckpointV2,
+    expected_head: CheckpointHeadV2,
     contained: bool,
 }
 
@@ -172,82 +188,57 @@ impl<S> CasFrontierV2<S>
 where
     S: CheckpointCasStoreV2,
 {
-    pub fn current_checkpoint(&self) -> &GrantAccountCheckpointV2 {
-        &self.current_checkpoint
+    /// Adapter-local expected checkpoint. This is not a fresh store read.
+    pub fn expected_checkpoint(&self) -> &GrantAccountCheckpointV2 {
+        &self.expected_checkpoint
     }
 
-    pub fn current_head(&self) -> CheckpointHeadV2 {
-        self.current_head
+    /// Adapter-local expected head. This is not a fresh store read.
+    pub fn expected_head(&self) -> CheckpointHeadV2 {
+        self.expected_head
+    }
+
+    pub fn grant_digest(&self) -> Digest32 {
+        self.grant.digest()
     }
 
     pub fn is_contained(&self) -> bool {
         self.contained
     }
 
-    pub fn into_inner(self) -> S {
-        self.store
-    }
-
-    /// Reconstruct an in-process writer from a caller-supplied checkpoint and
-    /// externally expected current head.
-    ///
-    /// This function verifies exact payload/head agreement but does not prove why
-    /// the supplied head should be trusted. Deployment recovery must establish
-    /// that separately.
-    pub fn resume_from_expected_current(
-        store: S,
-        grant: &CapabilityGrant,
-        checkpoint: GrantAccountCheckpointV2,
-        expected_current: CheckpointHeadV2,
-    ) -> Result<Self, FrontierV2Error<S::Error>> {
-        checkpoint
-            .verify_payload(grant)
-            .map_err(FrontierV2Error::Checkpoint)?;
-        let actual = checkpoint.head().map_err(FrontierV2Error::Checkpoint)?;
-        if actual != expected_current {
-            return Err(FrontierV2Error::ExpectedCurrentHeadMismatch);
-        }
-        Ok(Self {
-            store,
-            current_checkpoint: checkpoint,
-            current_head: actual,
-            contained: false,
-        })
-    }
-
     /// Persist any strict legal semantic successor.
     ///
-    /// This returns only the acknowledged head. Stronger typed transitions such
-    /// as reservation persistence and durable arming use dedicated methods below.
+    /// This returns only the acknowledged-and-reobserved head. Stronger typed
+    /// transitions such as reservation persistence and durable arming use
+    /// dedicated methods below.
     pub fn persist_successor(
         &mut self,
-        grant: &CapabilityGrant,
         successor: GrantAccountCheckpointV2,
     ) -> Result<CheckpointHeadV2, FrontierV2Error<S::Error>> {
-        self.cas_successor(grant, successor)
+        self.cas_successor(successor)
     }
 
     /// Persist exactly one newly allocated reservation while every previously
     /// persisted reservation remains byte-semantically unchanged.
     ///
     /// Only an exact one-record addition in `Reserved` state mints the affine
-    /// `PersistedReservationV2` token.
+    /// `PersistedReservationV2` token. The token is not returned unless the CAS
+    /// succeeded and a fresh store read still observes the exact installed head.
     pub fn persist_new_reservation(
         &mut self,
-        grant: &CapabilityGrant,
         successor: GrantAccountCheckpointV2,
     ) -> Result<PersistedReservationV2, FrontierV2Error<S::Error>> {
         self.ensure_not_contained()?;
         successor
-            .verify_successor_of(&self.current_checkpoint, grant)
+            .verify_successor_of(&self.expected_checkpoint, &self.grant)
             .map_err(FrontierV2Error::Checkpoint)?;
         let reservation = exact_single_new_reserved(
-            self.current_checkpoint.snapshot(),
+            self.expected_checkpoint.snapshot(),
             successor.snapshot(),
         )?;
-        let head = self.cas_successor(grant, successor)?;
+        let head = self.cas_successor(successor)?;
         Ok(PersistedReservationV2 {
-            grant_digest: grant.digest(),
+            grant_digest: self.grant.digest(),
             reservation_id: reservation.reservation_id,
             effect_intent_id: reservation.effect_intent_id,
             attempt_id: reservation.attempt_id,
@@ -262,23 +253,24 @@ where
     ///
     /// The token is consumed. The transition must change no other reservation
     /// and may introduce no new record. Success proves durable conservative
-    /// arming only; it still grants no dispatch authority.
+    /// arming only; it still grants no dispatch authority. The armed token is
+    /// not returned unless a fresh store read still observes the exact installed
+    /// head after CAS.
     pub fn arm_outcome_unknown(
         &mut self,
-        grant: &CapabilityGrant,
         persisted: PersistedReservationV2,
         successor: GrantAccountCheckpointV2,
     ) -> Result<DurablyArmedReservationV2, FrontierV2Error<S::Error>> {
         self.ensure_not_contained()?;
-        if persisted.grant_digest != grant.digest() {
+        if persisted.grant_digest != self.grant.digest() {
             return Err(FrontierV2Error::PersistedReservationGrantMismatch);
         }
-        if persisted.persisted_head != self.current_head {
+        if persisted.persisted_head != self.expected_head {
             return Err(FrontierV2Error::PersistedReservationHeadMismatch);
         }
 
         let current = self
-            .current_checkpoint
+            .expected_checkpoint
             .snapshot()
             .reservations
             .get(&persisted.reservation_id)
@@ -288,16 +280,16 @@ where
         }
 
         successor
-            .verify_successor_of(&self.current_checkpoint, grant)
+            .verify_successor_of(&self.expected_checkpoint, &self.grant)
             .map_err(FrontierV2Error::Checkpoint)?;
         exact_single_arm(
-            self.current_checkpoint.snapshot(),
+            self.expected_checkpoint.snapshot(),
             successor.snapshot(),
             persisted.reservation_id,
         )?;
 
-        let reserved_head = self.current_head;
-        let armed_head = self.cas_successor(grant, successor)?;
+        let reserved_head = self.expected_head;
+        let armed_head = self.cas_successor(successor)?;
         Ok(DurablyArmedReservationV2 {
             grant_digest: persisted.grant_digest,
             reservation_id: persisted.reservation_id,
@@ -312,18 +304,24 @@ where
 
     fn cas_successor(
         &mut self,
-        grant: &CapabilityGrant,
         successor: GrantAccountCheckpointV2,
     ) -> Result<CheckpointHeadV2, FrontierV2Error<S::Error>> {
         self.ensure_not_contained()?;
-        successor
-            .verify_successor_of(&self.current_checkpoint, grant)
-            .map_err(FrontierV2Error::Checkpoint)?;
-        let next_head = successor.head().map_err(FrontierV2Error::Checkpoint)?;
+        if let Err(error) = successor.verify_successor_of(&self.expected_checkpoint, &self.grant) {
+            self.contained = true;
+            return Err(FrontierV2Error::Checkpoint(error));
+        }
+        let next_head = match successor.head() {
+            Ok(head) => head,
+            Err(error) => {
+                self.contained = true;
+                return Err(FrontierV2Error::Checkpoint(error));
+            }
+        };
 
         let acknowledged = match self
             .store
-            .compare_and_swap(Some(self.current_head), &successor)
+            .compare_and_swap(Some(self.expected_head), &successor)
         {
             Ok(head) => head,
             Err(error) => {
@@ -336,8 +334,22 @@ where
             return Err(FrontierV2Error::AcknowledgedWrongHead);
         }
 
-        self.current_checkpoint = successor;
-        self.current_head = next_head;
+        // Do not mint/return a positive persistence fact when the durable store
+        // is already known to have advanced again before this operation returns.
+        let observed = match self.store.current_head() {
+            Ok(head) => head,
+            Err(error) => {
+                self.contained = true;
+                return Err(FrontierV2Error::Store(error));
+            }
+        };
+        if observed != Some(next_head) {
+            self.contained = true;
+            return Err(FrontierV2Error::StoreFrontierChanged);
+        }
+
+        self.expected_checkpoint = successor;
+        self.expected_head = next_head;
         Ok(next_head)
     }
 
@@ -353,6 +365,10 @@ where
 /// Atomically establish the empty generation-zero frontier before any use is
 /// allocated.
 ///
+/// This is the only production constructor for a writable frontier in this
+/// tranche. Existing durable state cannot be reactivated without a future
+/// verifier-owned authenticated restart anchor.
+///
 /// A store error is outcome-uncertain from this layer's perspective: no live
 /// frontier object is returned and callers must reconcile externally rather than
 /// assuming the genesis write did or did not occur.
@@ -364,6 +380,11 @@ pub fn establish_grant_frontier_v2<S>(
 where
     S: CheckpointCasStoreV2,
 {
+    let existing = store.current_head().map_err(FrontierV2Error::Store)?;
+    if existing.is_some() {
+        return Err(FrontierV2Error::StoreNotEmpty);
+    }
+
     let checkpoint =
         GrantAccountCheckpointV2::first(grant, account).map_err(FrontierV2Error::Checkpoint)?;
     let head = checkpoint.head().map_err(FrontierV2Error::Checkpoint)?;
@@ -374,14 +395,22 @@ where
         return Err(FrontierV2Error::AcknowledgedWrongHead);
     }
 
+    // If another writer advances the frontier before this function returns, do
+    // not hand out a writer already known to be stale.
+    let observed = store.current_head().map_err(FrontierV2Error::Store)?;
+    if observed != Some(head) {
+        return Err(FrontierV2Error::StoreFrontierChanged);
+    }
+
     let evidence = EstablishedGrantFrontierV2 {
         checkpoint: checkpoint.clone(),
         head,
     };
     let frontier = CasFrontierV2 {
         store,
-        current_checkpoint: checkpoint,
-        current_head: head,
+        grant: grant.clone(),
+        expected_checkpoint: checkpoint,
+        expected_head: head,
         contained: false,
     };
     Ok((evidence, frontier))
@@ -473,12 +502,14 @@ where
     Checkpoint(#[source] CheckpointV2Error),
     #[error("checkpoint CAS store failed or outcome is uncertain: {0}")]
     Store(#[source] E),
+    #[error("frontier store must be empty for generation-zero establishment")]
+    StoreNotEmpty,
+    #[error("durable store frontier changed outside this writer")]
+    StoreFrontierChanged,
     #[error("checkpoint store acknowledged a different head than the submitted successor")]
     AcknowledgedWrongHead,
     #[error("frontier writer is contained after persistence uncertainty/conflict")]
     Contained,
-    #[error("supplied checkpoint does not match the externally expected current head")]
-    ExpectedCurrentHeadMismatch,
     #[error("typed reservation persistence requires exactly one new Reserved record")]
     ReservationPersistenceNotSingleAddition,
     #[error("typed reservation persistence changed a previously persisted reservation")]
@@ -524,6 +555,10 @@ mod tests {
     impl CheckpointCasStoreV2 for SharedCasStore {
         type Error = CasConflict;
 
+        fn current_head(&mut self) -> Result<Option<CheckpointHeadV2>, Self::Error> {
+            self.state.lock().map(|state| *state).map_err(|_| CasConflict)
+        }
+
         fn compare_and_swap(
             &mut self,
             expected_previous: Option<CheckpointHeadV2>,
@@ -546,6 +581,10 @@ mod tests {
     impl CheckpointCasStoreV2 for WrongAckStore {
         type Error = CasConflict;
 
+        fn current_head(&mut self) -> Result<Option<CheckpointHeadV2>, Self::Error> {
+            Ok(self.state)
+        }
+
         fn compare_and_swap(
             &mut self,
             expected_previous: Option<CheckpointHeadV2>,
@@ -556,10 +595,46 @@ mod tests {
             }
             let actual = checkpoint.head().map_err(|_| CasConflict)?;
             self.state = Some(actual);
-            Ok(CheckpointHeadV2 {
-                sequence: actual.sequence,
-                digest: Digest32([0xee; 32]),
-            })
+            if actual.sequence == 0 {
+                Ok(actual)
+            } else {
+                Ok(CheckpointHeadV2 {
+                    sequence: actual.sequence,
+                    digest: Digest32([0xee; 32]),
+                })
+            }
+        }
+    }
+
+    struct AdvanceAfterCasStore {
+        state: Option<CheckpointHeadV2>,
+    }
+
+    impl CheckpointCasStoreV2 for AdvanceAfterCasStore {
+        type Error = CasConflict;
+
+        fn current_head(&mut self) -> Result<Option<CheckpointHeadV2>, Self::Error> {
+            Ok(self.state)
+        }
+
+        fn compare_and_swap(
+            &mut self,
+            expected_previous: Option<CheckpointHeadV2>,
+            checkpoint: &GrantAccountCheckpointV2,
+        ) -> Result<CheckpointHeadV2, Self::Error> {
+            if self.state != expected_previous {
+                return Err(CasConflict);
+            }
+            let actual = checkpoint.head().map_err(|_| CasConflict)?;
+            if actual.sequence == 0 {
+                self.state = Some(actual);
+            } else {
+                self.state = Some(CheckpointHeadV2 {
+                    sequence: actual.sequence.saturating_add(1),
+                    digest: Digest32([0xab; 32]),
+                });
+            }
+            Ok(actual)
         }
     }
 
@@ -590,6 +665,22 @@ mod tests {
         grant
     }
 
+    fn competing_writer_for_test(
+        store: SharedCasStore,
+        grant: CapabilityGrant,
+        checkpoint: GrantAccountCheckpointV2,
+        head: CheckpointHeadV2,
+    ) -> CasFrontierV2<SharedCasStore> {
+        assert_eq!(*store.state.lock().unwrap(), Some(head));
+        CasFrontierV2 {
+            store,
+            grant,
+            expected_checkpoint: checkpoint,
+            expected_head: head,
+            contained: false,
+        }
+    }
+
     #[test]
     fn establishes_empty_generation_zero_before_any_use() {
         let grant = grant();
@@ -598,7 +689,21 @@ mod tests {
             establish_grant_frontier_v2(&grant, &account, SharedCasStore::default()).unwrap();
         assert_eq!(established.head.sequence, 0);
         assert!(established.checkpoint.snapshot().reservations.is_empty());
-        assert_eq!(frontier.current_head(), established.head);
+        assert_eq!(frontier.expected_head(), established.head);
+        assert_eq!(frontier.grant_digest(), grant.digest());
+    }
+
+    #[test]
+    fn existing_store_cannot_be_reactivated_without_future_authenticator() {
+        let grant = grant();
+        let shared = SharedCasStore::default();
+        let account = GrantAccountV2::new_root(&grant).unwrap();
+        let (_established, _frontier) =
+            establish_grant_frontier_v2(&grant, &account, shared.clone()).unwrap();
+        assert!(matches!(
+            establish_grant_frontier_v2(&grant, &account, shared),
+            Err(FrontierV2Error::StoreNotEmpty)
+        ));
     }
 
     #[test]
@@ -608,13 +713,12 @@ mod tests {
         let account = GrantAccountV2::new_root(&grant).unwrap();
         let (established, mut writer_a) =
             establish_grant_frontier_v2(&grant, &account, shared.clone()).unwrap();
-        let mut writer_b = CasFrontierV2::resume_from_expected_current(
+        let mut writer_b = competing_writer_for_test(
             shared,
-            &grant,
+            grant.clone(),
             established.checkpoint.clone(),
             established.head,
-        )
-        .unwrap();
+        );
 
         let mut account_a = established.checkpoint.verify_payload(&grant).unwrap();
         account_a
@@ -648,9 +752,9 @@ mod tests {
         )
         .unwrap();
 
-        writer_a.persist_successor(&grant, successor_a).unwrap();
+        writer_a.persist_successor(successor_a).unwrap();
         assert!(matches!(
-            writer_b.persist_successor(&grant, successor_b),
+            writer_b.persist_successor(successor_b),
             Err(FrontierV2Error::Store(CasConflict))
         ));
         assert!(writer_b.is_contained());
@@ -672,29 +776,27 @@ mod tests {
             )
             .unwrap();
         let reserved_checkpoint = GrantAccountCheckpointV2::successor(
-            frontier.current_checkpoint(),
+            frontier.expected_checkpoint(),
             &grant,
             &account,
         )
         .unwrap();
-        let persisted = frontier
-            .persist_new_reservation(&grant, reserved_checkpoint)
-            .unwrap();
+        let persisted = frontier.persist_new_reservation(reserved_checkpoint).unwrap();
         assert_eq!(persisted.reservation_id(), reservation);
-        assert_eq!(persisted.persisted_head(), frontier.current_head());
+        assert_eq!(persisted.persisted_head(), frontier.expected_head());
 
         account.mark_outcome_unknown(reservation).unwrap();
         let unknown_checkpoint = GrantAccountCheckpointV2::successor(
-            frontier.current_checkpoint(),
+            frontier.expected_checkpoint(),
             &grant,
             &account,
         )
         .unwrap();
         let armed = frontier
-            .arm_outcome_unknown(&grant, persisted, unknown_checkpoint)
+            .arm_outcome_unknown(persisted, unknown_checkpoint)
             .unwrap();
         assert_eq!(armed.reservation_id(), reservation);
-        assert_eq!(armed.armed_head(), frontier.current_head());
+        assert_eq!(armed.armed_head(), frontier.expected_head());
         assert_ne!(armed.reserved_head(), armed.armed_head());
     }
 
@@ -713,32 +815,30 @@ mod tests {
             )
             .unwrap();
         let reserved_checkpoint = GrantAccountCheckpointV2::successor(
-            frontier.current_checkpoint(),
+            frontier.expected_checkpoint(),
             &grant,
             &account,
         )
         .unwrap();
-        let persisted = frontier
-            .persist_new_reservation(&grant, reserved_checkpoint)
-            .unwrap();
+        let persisted = frontier.persist_new_reservation(reserved_checkpoint).unwrap();
 
         let no_op = GrantAccountCheckpointV2::successor(
-            frontier.current_checkpoint(),
+            frontier.expected_checkpoint(),
             &grant,
             &account,
         )
         .unwrap();
-        frontier.persist_successor(&grant, no_op).unwrap();
+        frontier.persist_successor(no_op).unwrap();
 
         account.mark_outcome_unknown(reservation).unwrap();
         let unknown = GrantAccountCheckpointV2::successor(
-            frontier.current_checkpoint(),
+            frontier.expected_checkpoint(),
             &grant,
             &account,
         )
         .unwrap();
         assert!(matches!(
-            frontier.arm_outcome_unknown(&grant, persisted, unknown),
+            frontier.arm_outcome_unknown(persisted, unknown),
             Err(FrontierV2Error::PersistedReservationHeadMismatch)
         ));
     }
@@ -747,15 +847,10 @@ mod tests {
     fn wrong_acknowledgement_contains_writer() {
         let grant = grant();
         let account = GrantAccountV2::new_root(&grant).unwrap();
-        let checkpoint = GrantAccountCheckpointV2::first(&grant, &account).unwrap();
-        let expected = checkpoint.head().unwrap();
-        let mut frontier = CasFrontierV2::resume_from_expected_current(
-            WrongAckStore {
-                state: Some(expected),
-            },
+        let (_, mut frontier) = establish_grant_frontier_v2(
             &grant,
-            checkpoint,
-            expected,
+            &account,
+            WrongAckStore { state: None },
         )
         .unwrap();
 
@@ -769,14 +864,47 @@ mod tests {
             )
             .unwrap();
         let successor = GrantAccountCheckpointV2::successor(
-            frontier.current_checkpoint(),
+            frontier.expected_checkpoint(),
             &grant,
             &next_account,
         )
         .unwrap();
         assert!(matches!(
-            frontier.persist_successor(&grant, successor),
+            frontier.persist_successor(successor),
             Err(FrontierV2Error::AcknowledgedWrongHead)
+        ));
+        assert!(frontier.is_contained());
+    }
+
+    #[test]
+    fn post_cas_external_advance_prevents_positive_persistence_fact() {
+        let grant = grant();
+        let account = GrantAccountV2::new_root(&grant).unwrap();
+        let (_, mut frontier) = establish_grant_frontier_v2(
+            &grant,
+            &account,
+            AdvanceAfterCasStore { state: None },
+        )
+        .unwrap();
+
+        let mut next_account = GrantAccountV2::new_root(&grant).unwrap();
+        next_account
+            .reserve_execution(
+                EffectIntentId(digest(2)),
+                AttemptId(digest(3)),
+                EffectBindingDigest(digest(4)),
+                risk(1),
+            )
+            .unwrap();
+        let successor = GrantAccountCheckpointV2::successor(
+            frontier.expected_checkpoint(),
+            &grant,
+            &next_account,
+        )
+        .unwrap();
+        assert!(matches!(
+            frontier.persist_new_reservation(successor),
+            Err(FrontierV2Error::StoreFrontierChanged)
         ));
         assert!(frontier.is_contained());
     }
