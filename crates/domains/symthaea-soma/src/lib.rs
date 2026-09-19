@@ -97,6 +97,11 @@ pub mod assurance_ingress_policy;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_attention;
 
+// Current policy must admit the exact Android attention requirement rather than
+// merely sharing its policy context/generation/root.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_attention_policy;
+
 // Bind each Android MotionEvent's obscuration/pointer facts to the current
 // attention theorem and the exact measured touch observation.
 #[cfg(feature = "screen-vision")]
