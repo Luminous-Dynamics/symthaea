@@ -19,7 +19,7 @@ Stage D: main-only GitHub smoke + smoke.v1 PASS
         ↓
 Stage E: promotion/smoke join + recovery-eligibility.v4 PASS
         ↓
-separate explicit Stage-F target authorization
+separate exact Stage-F target authorization capsule
         ↓
 Stage F: one exact correctness recovery target
 ```
@@ -256,7 +256,7 @@ schema=symthaea.trusted-runner.recovery-eligibility.v4
 
 and a SHA-256. Retain both.
 
-This creates the final bootstrap theorem:
+This creates the bootstrap/eligibility theorem:
 
 ```text
 external bootstrap authorization exact bytes/hash
@@ -281,7 +281,80 @@ Only after `recovery-eligibility.v4 PASS` may an operator separately authorize o
 
 The Stage-A authorization capsule is deliberately insufficient for this decision. `stage_f_authority=NONE` is carried all the way through eligibility to make that non-transfer machine-visible.
 
-Recovery harnesses must:
+### SE-001Q Stage-F authorization capsule
+
+The SE-001Q workflow requires an exact second authorization object before it can execute any Rust gate. Create it only after retaining a valid `recovery-eligibility.v4` manifest and independently recording that manifest's SHA-256.
+
+Exact v1 format:
+
+```text
+schema=symthaea.trusted-runner.stage-f-authorization.v1
+decision=AUTHORIZE_SE001Q_REOBSERVATION
+repository=https://github.com/Luminous-Dynamics/symthaea.git
+provider=trusted-cpu-v1
+target_id=SE-001Q
+target_commit=47de7f2a306cffb66b5505786220590aa5f42e90
+target_tree=7abdf2ede579b2b729b057ca64470d11eb551031
+hosted_verifier_commit=3dd33625162ec7137ef06c8079794a8d2aecc95d
+recovery_eligibility_manifest_sha256=<exact retained recovery-eligibility.v4 SHA-256>
+qualified_main_head=<qualified_main_head from recovery-eligibility.v4>
+qualified_main_tree=<qualified_main_tree from recovery-eligibility.v4>
+authorized_recovery_head=<authorized_recovery_head from recovery-eligibility.v4>
+se001q_recovery_workflow_blob=<se001q_recovery_workflow_blob from recovery-eligibility.v4>
+se001q_replay_helper_blob=<se001q_replay_helper_blob from recovery-eligibility.v4>
+authorization_scope=se001q-independent-provider-reobservation-only
+qualification_claim=NONE
+repair_authority_claim=NONE
+```
+
+Independently record its SHA-256. The capsule is target-specific but not a qualification or repair-grant object.
+
+The workflow requires four explicit `workflow_dispatch` inputs:
+
+```text
+recovery_eligibility_manifest_base64
+recovery_eligibility_manifest_sha256
+stage_f_authorization_base64
+stage_f_authorization_sha256
+```
+
+Prepare the exact byte-preserving base64 strings with:
+
+```bash
+ELIGIBILITY_B64="$(base64 -w 0 /secure/path/recovery-eligibility.v4)"
+STAGE_F_AUTH_B64="$(base64 -w 0 /secure/path/se001q-stage-f-authorization.v1)"
+```
+
+The workflow fails closed before the replay unless it can prove:
+
+- exact byte hashes of both supplied capsules;
+- `recovery-eligibility.v4 PASS` and all required Stage-E PASS predicates;
+- bootstrap authorization remains bootstrap-only with `stage_f_authority=NONE`;
+- `GITHUB_SHA` still equals current public `main`, not merely the main commit at dispatch time;
+- current public `main` tree equals the eligibility-qualified tree;
+- current public recovery branch still equals the eligibility-authorized recovery head;
+- current workflow/helper blobs equal the Stage-E-bound blobs;
+- Stage-F capsule binds exactly the eligibility hash, main identity, recovery identity, workflow/helper identity, frozen SE-001 subject and EV2.4 reference verifier;
+- Stage-F scope is `se001q-independent-provider-reobservation-only`;
+- Stage-F qualification and repair-authority claims remain `NONE`.
+
+Only after those checks may the trusted helper execute the five frozen gates.
+
+A successful capture produces the provider observation as before, then emits a distinct content-addressed:
+
+```text
+symthaea.se001q.trusted-cpu-execution-binding.v1
+```
+
+that binds the observation manifest ID and evidence-bundle digest to the exact recovery-eligibility SHA-256, Stage-F authorization SHA-256, current main/recovery identities, workflow/helper blobs, run identity, frozen subject and hosted EV2.4 reference. This preserves:
+
+```text
+Observation != ExecutionAuthorizationBinding != Classification != RepairGrant
+```
+
+If capture rejects or is incomplete, the finalizer retains the eligibility/Stage-F authorization bytes when available and emits `partial-rejection.v2` / `partial-manifest.v2` diagnostics. A rejected run remains rejected.
+
+Recovery harnesses must additionally:
 
 - accept no arbitrary command/ref/SHA input;
 - hard-code or otherwise explicitly authorize the exact target commit/tree/base;
@@ -296,7 +369,7 @@ Recovery harnesses must:
 
 Proceed one prerequisite at a time. Recovery-target priority is an **operator authorization decision**, not something inferred from branch age or queue duration. The historical first RCA target remains exact PR #578 canonical-lineage generation; ARC3 protocol subject `6ea96737aff361920c181891a71f80a9f481ddef` is staged as a separately reviewed exact correctness target through `.github/workflows/arc3-protocol-trusted-cpu-qualify.yml`.
 
-SE-001Q is additionally staged through `.github/workflows/self-hosted-se001q-evidence-recovery.yml`, with trusted harness logic in `nix/ci/se001q-trusted-replay.py`. That target is deliberately narrower than qualification:
+SE-001Q is staged through `.github/workflows/self-hosted-se001q-evidence-recovery.yml`, with trusted harness logic in `nix/ci/se001q-trusted-replay.py`. That target is deliberately narrower than qualification:
 
 ```text
 trusted CPU SE-001Q observation != hosted EV2.4 observation
@@ -321,6 +394,8 @@ bootstrap PASS != promotion PASS
 promotion PASS != smoke PASS
 smoke PASS != recovery eligibility
 recovery eligibility != Stage-F authorization
+Stage-F authorization != successful provider observation
+provider observation != execution-authorization binding
 recovery eligibility != scientific qualification
 trusted CPU correctness PASS != performance equivalence
 trusted CPU SE-001Q observation != hosted EV2.4 observation
