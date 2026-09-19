@@ -19,6 +19,8 @@ if start < 0 or end < 0:
 arm = text[start:end]
 
 required = {
+    "NONEMPTY_INPUT_REFUSAL": "if !input_data.is_empty()",
+    "UNDEFINED_INPUT_ABI_REASON": "WasmSandbox input_data ABI is not defined; refusing non-empty input",
     "SANDBOX_ROOTED_PATH": "sandbox.validate(module_path)",
     "MODULE_SIZE_LIMIT": "WASM_MODULE_MAX_BYTES",
     "BOUNDED_READ": ".take(WASM_MODULE_MAX_BYTES + 1)",
@@ -41,6 +43,7 @@ for name, token in required.items():
         failures.append(f"MISSING_{name}")
 
 forbidden = {
+    "IGNORED_INPUT_BINDING": "input_data: _",
     "DEFAULT_ENGINE": "Engine::default()",
     "DIRECT_FILE_COMPILATION": "Module::from_file",
     "TEXT_WAT_ADMISSION": "Module::new",
@@ -60,6 +63,7 @@ if failures:
 print("SYM-WASM-000A CANDIDATE QUALIFICATION: PASS")
 print("claim=bounded raw-Wasm source/admission boundary only")
 print("module_max_bytes=16777216")
+print("input_data=must_be_empty_until_ABI_defined")
 print("fuel=50000000")
 print("memory_max_bytes=67108864")
 print("table_elements=65536")
