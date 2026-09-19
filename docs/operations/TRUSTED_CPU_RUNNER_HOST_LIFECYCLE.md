@@ -70,9 +70,21 @@ Job code cannot write this directory directly. A root-owned, socket-activated lo
 ```text
 BOOT_ID
 CONSUME <64-hex authorization nonce> <64-hex authorization-capsule SHA-256>
+STATUS  <64-hex authorization nonce> <64-hex authorization-capsule SHA-256>
 ```
 
-The socket is reachable only by the runner's fixed supplementary group. Successful `CONSUME` atomically creates a root-owned nonce marker and records the authorization SHA-256. A second attempt to consume the same nonce fails closed.
+The socket is reachable only by the runner's fixed supplementary group. Successful `CONSUME` atomically reserves a root-owned nonce directory, writes the authorization SHA-256 plus consumption boot ID to a temporary record, then publishes the complete record by same-directory atomic rename. A second attempt to consume the same nonce fails closed.
+
+`STATUS` is read-only. It can report only one of the following authority states:
+
+```text
+UNUSED
+CONSUMED_STATUS
+CONSUMED_DIFFERENT
+INCOMPLETE
+```
+
+`CONSUMED_STATUS` proves the exact nonce/authorization pair has a complete durable record and identifies the boot on which it was consumed. `UNUSED` proves no nonce marker currently exists. `CONSUMED_DIFFERENT` proves the nonce is already unavailable to the queried authorization without exposing another authorization digest. `INCOMPLETE` means the nonce directory was reserved but a complete record was not published; that nonce remains unavailable and must never be reused.
 
 The intended theorem is:
 
@@ -81,18 +93,34 @@ valid Stage-F authorization.v2
 + qualified host boot identity
 + unused 256-bit nonce
 + atomic root-owned CONSUME
-= exactly one eligible execution attempt
++ exact post-consume STATUS confirmation
+= exactly one auditable eligible execution attempt
 ```
 
-The ledger provides **authority replay prevention**, not scientific evidence. Its contents do not qualify SE-001, classify a failure, or grant repair authority.
+The ledger provides **authority replay prevention and authority-consumption observability**, not scientific evidence. Its contents do not qualify SE-001, classify a failure, or grant repair authority.
 
 A trusted job that can reach the socket can at worst consume a known authorization early, causing denial of service. It cannot delete a root-owned marker, mint an authorization capsule, make an old boot current, or turn a consumed authorization into additional authority. The recovery host remains an isolated trust appliance; do not add unrelated local users/services to the socket group.
+
+### Consumption uncertainty is fail-closed
+
+The nonce reservation is the authority-consuming event. A crash after reservation but before the complete record is atomically published can therefore yield `INCOMPLETE`.
+
+That state is deliberately treated as:
+
+```text
+INCOMPLETE
+=> consumption uncertain
+=> authorization unavailable
+=> new attempt requires new authorization + new nonce
+```
+
+The workflow's rejection finalizer may query `STATUS` after a failed consume/capture path. This allows it to distinguish confirmed unused authority from confirmed consumption and from genuinely uncertain partial consumption. Absence of a local job receipt is never treated as proof that an authorization remains unused.
 
 ### Boot binding
 
 Stage-D smoke v2 records the Linux kernel boot ID after successfully querying the root authorization consumer. `recovery-eligibility.v5` carries that exact boot ID, and every Stage-F authorization.v2 must bind it.
 
-Immediately before consuming a nonce, the Stage-F workflow asks the root consumer for the current boot ID and requires an exact match.
+Immediately before consuming a nonce, the Stage-F workflow asks the root consumer for the current boot ID and requires an exact match. Successful consumption then records that same boot in the root-owned ledger, and subsequent `STATUS` confirmation must return it unchanged.
 
 Therefore:
 
@@ -211,7 +239,7 @@ runner work directory began clean
 runner state was rebuilt from the external credential
 no unexpected service/sandbox policy drift
 host boot identity still equals the qualified smoke boot
-consumed Stage-F nonce marker remains present and root-owned
+consumed Stage-F nonce has CONSUMED_STATUS for the exact authorization hash
 host disk remained within declared bounds
 ```
 
@@ -232,10 +260,12 @@ new runner registration != new scientific observation
 Stage-F authorization != scientific authority
 Stage-F consumption != candidate PASS
 consumed authorization != reusable authorization
+INCOMPLETE consumption != reusable authorization
+STATUS evidence != scientific qualification
 host reboot != same recovery-eligibility epoch
 ```
 
-A recovered correctness result must continue to bind the exact source, harness, toolchain, runner/hardware context, host boot, authorization, authorization consumption, and command/gate identity.
+A recovered correctness result must continue to bind the exact source, harness, toolchain, runner/hardware context, host boot, authorization, authorization consumption, durable ledger status, and command/gate identity.
 
 ## Activation gate for current v1
 
@@ -243,16 +273,17 @@ The persistent-appliance recovery profile is eligible for activation only after 
 
 1. the exact recovery branch generation receives fresh external bootstrap authorization;
 2. Stage-A bootstrap validation succeeds on that exact generation;
-3. the eval-only runner and routing tests pass, including one-time authorization ledger isolation;
+3. the eval-only runner and routing tests pass, including one-time authorization ledger isolation and query semantics;
 4. the external access-token file satisfies the existing root ownership/mode/no-newline contract;
 5. the host contains no unrelated credentials, production mounts, privileged control sockets, or sensitive LAN reachability;
 6. external runner/system/authorization-consumer log retention is configured and tested;
 7. the runner appears with exactly `symthaea-trusted-cpu-v1` and no default labels;
 8. the main-only smoke.v2 succeeds and binds the current host boot;
 9. recovery-eligibility.v5 joins the exact promotion and smoke identities;
-10. each Stage-F execution receives its own exact one-use authorization.v2 and unique 256-bit nonce;
-11. only the exact reviewed recovery workflows are dispatched;
-12. the operator records that this is a **persistent hardened host** profile, not a disposable-VM profile.
+10. each Stage-F execution receives its own exact one-use authorization.v2 and unique 256-bit nonce with `consumption_mode=root-owned-host-ledger-v2`;
+11. successful consumption is independently re-confirmed by `STATUS` before scientific replay;
+12. only the exact reviewed recovery workflows are dispatched;
+13. the operator records that this is a **persistent hardened host** profile, not a disposable-VM profile.
 
 ## Future Tier-Q gate
 
