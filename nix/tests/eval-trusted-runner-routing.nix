@@ -126,22 +126,28 @@ EOF
   grep -F -- "test \"\$ELIGIBILITY_SCHEMA\" = 'symthaea.trusted-runner.recovery-eligibility.v5'" "$se001q" >/dev/null
   grep -F -- "test \"\$AUTH_SCHEMA\" = 'symthaea.trusted-runner.stage-f-authorization.v2'" "$se001q" >/dev/null
   grep -F -- "test \"\$AUTH_MAX_USES\" = '1'" "$se001q" >/dev/null
-  grep -F -- "test \"\$AUTH_CONSUMPTION_MODE\" = 'root-owned-host-ledger-v1'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_CONSUMPTION_MODE\" = 'root-owned-host-ledger-v2'" "$se001q" >/dev/null
   grep -F -- "test \"\$AUTH_SCOPE\" = 'se001q-independent-provider-reobservation-only'" "$se001q" >/dev/null
   grep -F -- "test \"\$AUTH_QUALIFICATION_CLAIM\" = 'NONE'" "$se001q" >/dev/null
   grep -F -- "test \"\$AUTH_REPAIR_CLAIM\" = 'NONE'" "$se001q" >/dev/null
 
-  # One-use authority and boot binding are mandatory before the Rust replay.
+  # One-use authority, boot binding, and durable ledger confirmation are
+  # mandatory before the Rust replay and before the final execution binding.
   grep -F -- 'socket=/run/symthaea-stage-f-authorization.sock' "$se001q" >/dev/null
   grep -F -- 'request("BOOT_ID\\n")' "$se001q" >/dev/null
   grep -F -- 'request(f"CONSUME {nonce} {authorization_sha256}\\n")' "$se001q" >/dev/null
+  grep -F -- 'request(f"STATUS {nonce} {authorization_sha256}\\n")' "$se001q" >/dev/null
+  grep -F -- 'CONSUMED_STATUS' "$se001q" >/dev/null
   grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED=PASS' "$se001q" >/dev/null
+  grep -F -- 'STAGE_F_LEDGER_STATUS=CONSUMED_CONFIRMED' "$se001q" >/dev/null
   grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED:-' "$se001q" >/dev/null
-  grep -F -- 'NOT_DEMONSTRATED' "$se001q" >/dev/null
-  grep -F -- 'symthaea.trusted-runner.stage-f-consumption.v1' "$se001q" >/dev/null
-  grep -F -- 'symthaea.se001q.trusted-cpu-execution-binding.v2' "$se001q" >/dev/null
-  grep -F -- 'symthaea.se001q.trusted-cpu-partial-rejection.v4' "$se001q" >/dev/null
-  grep -F -- 'symthaea.se001q.trusted-cpu-partial-manifest.v4' "$se001q" >/dev/null
+  grep -F -- 'UNUSED_CONFIRMED' "$se001q" >/dev/null
+  grep -F -- 'CONSUMPTION_UNCERTAIN' "$se001q" >/dev/null
+  grep -F -- 'NONCE_CONSUMED_DIFFERENT_AUTHORIZATION' "$se001q" >/dev/null
+  grep -F -- 'symthaea.trusted-runner.stage-f-consumption.v2' "$se001q" >/dev/null
+  grep -F -- 'symthaea.se001q.trusted-cpu-execution-binding.v3' "$se001q" >/dev/null
+  grep -F -- 'symthaea.se001q.trusted-cpu-partial-rejection.v5' "$se001q" >/dev/null
+  grep -F -- 'symthaea.se001q.trusted-cpu-partial-manifest.v5' "$se001q" >/dev/null
 
   # The trusted helper remains the only implementation of the frozen Rust gate
   # capture; unmerged EV2.4 Python is authenticated as reference data, not run.
