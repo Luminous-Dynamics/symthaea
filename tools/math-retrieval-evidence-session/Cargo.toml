@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-math-retrieval-evidence-session"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Transaction-scoped evidence session for Symthaea production mathematical retrieval"
+
+[dependencies]
+symthaea-math-retrieval-candidate-loader = { path = "../math-retrieval-candidate-loader" }
+symthaea-math-retrieval-materializer-identity = { path = "../math-retrieval-materializer-identity" }
+symthaea-math-retrieval-production-runtime = { path = "../math-retrieval-production-runtime" }
+symthaea-math-retrieval-runtime-seam = { path = "../math-retrieval-runtime-seam" }
+
+# Standalone while the production evidence transaction boundary is qualified.
+[workspace]
