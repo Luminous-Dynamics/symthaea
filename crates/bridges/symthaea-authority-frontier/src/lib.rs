@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Linearizable checkpoint-frontier binding for bounded authority accounting.
 //!
-//! This crate proves a deliberately narrow property:
+//! This crate proves a deliberately narrow property for a frontier established
+//! from an empty durable store:
 //!
 //! ```text
 //! exact CapabilityGrant
-//! + supplied bootstrap anchor bound to that grant
-//! + store currently equals that anchor
+//! + empty linearizable store
+//! + exact generation-zero checkpoint
 //! + every successor payload valid under the exact grant
 //! + every successor installed by full-head compare-and-swap
 //! + fresh store observation still equals adapter expected head
@@ -15,8 +16,11 @@
 //!     -> FrontierBoundGrantAccounting
 //! ```
 //!
-//! The bootstrap anchor is *not* authenticated here. A Xenia/TPM/append-only-log
-//! verifier must separately authenticate it before any stronger currentness claim.
+//! There is deliberately no production restart/reopen constructor in v0.2.
+//! Re-activating a persisted frontier after process loss requires a future
+//! externally authenticated checkpoint-anchor proof (Xenia/TPM/append-only log
+//! or equivalent). A caller-provided `CheckpointHead` cannot clear containment
+//! or recreate writable authority progression in this crate.
 
 #![deny(unsafe_code)]
 
@@ -55,16 +59,16 @@ pub struct EstablishedGrantFrontier {
     pub head: CheckpointHead,
 }
 
-/// Opaque accounting state bound to one freshly observed durable-store frontier
-/// derived from one supplied bootstrap anchor. Not Clone and not Serde.
+/// Opaque accounting state bound to one freshly observed durable-store frontier.
+/// Not Clone and not Serde.
 ///
 /// This remains a point-in-time fact. Another writer may advance the store after
-/// this object is created; any later admission layer must therefore consume it
-/// together with a fresh/atomic frontier transition rather than treating it as
-/// an indefinitely current capability.
+/// this object is created; any later admission layer must consume it together
+/// with a fresh/atomic frontier transition rather than treating it as an
+/// indefinitely current capability.
 #[derive(Debug)]
 pub struct FrontierBoundGrantAccounting {
-    bootstrap_anchor: CheckpointHead,
+    establishment_head: CheckpointHead,
     accounting: HeadBoundGrantAccounting,
 }
 
@@ -73,8 +77,8 @@ impl FrontierBoundGrantAccounting {
         self.accounting.grant_digest()
     }
 
-    pub fn bootstrap_anchor(&self) -> CheckpointHead {
-        self.bootstrap_anchor
+    pub fn establishment_head(&self) -> CheckpointHead {
+        self.establishment_head
     }
 
     /// Store frontier observed at the binding operation.
@@ -91,19 +95,20 @@ impl FrontierBoundGrantAccounting {
     }
 }
 
-/// In-process frontier state relative to one exact grant and one supplied
-/// bootstrap anchor.
+/// In-process writable frontier for one exact grant, created only by successful
+/// generation-zero establishment in this schema.
 ///
-/// The anchor is explicitly a claim, not an authenticated fact. After creation,
-/// stale-writer conflicts, observed external advancement, malformed successor
+/// Stale-writer conflicts, observed external advancement, malformed successor
 /// payloads, or persistence uncertainty latch the frontier into containment.
+/// The production API exposes no method that clears containment and no method
+/// that reopens a frontier from caller-provided persisted identity.
 pub struct CasCheckpointFrontier<S>
 where
     S: CheckpointCasStore,
 {
     inner: S,
     grant: CapabilityGrant,
-    bootstrap_anchor: CheckpointHead,
+    establishment_head: CheckpointHead,
     expected_head: CheckpointHead,
     contained: bool,
 }
@@ -112,42 +117,12 @@ impl<S> CasCheckpointFrontier<S>
 where
     S: CheckpointCasStore,
 {
-    /// Reopen at one supplied bootstrap anchor only when:
-    ///
-    /// - the exact grant is structurally valid;
-    /// - the anchor names that exact grant digest; and
-    /// - the durable store currently reports the exact same full head.
-    ///
-    /// This proves local equality/binding. It does not authenticate the anchor.
-    pub fn reopen_from_anchor_claim(
-        mut inner: S,
-        grant: CapabilityGrant,
-        bootstrap_anchor: CheckpointHead,
-    ) -> Result<Self, FrontierError<S::Error>> {
-        grant.validate().map_err(FrontierError::Grant)?;
-        validate_head(bootstrap_anchor)?;
-        if bootstrap_anchor.grant_digest != grant.digest() {
-            return Err(FrontierError::BootstrapGrantMismatch);
-        }
-        let actual = inner.current_head().map_err(FrontierError::Store)?;
-        if actual != Some(bootstrap_anchor) {
-            return Err(FrontierError::BootstrapAnchorMismatch);
-        }
-        Ok(Self {
-            inner,
-            grant,
-            bootstrap_anchor,
-            expected_head: bootstrap_anchor,
-            contained: false,
-        })
-    }
-
     pub fn grant_digest(&self) -> Digest32 {
         self.grant.digest()
     }
 
-    pub fn bootstrap_anchor(&self) -> CheckpointHead {
-        self.bootstrap_anchor
+    pub fn establishment_head(&self) -> CheckpointHead {
+        self.establishment_head
     }
 
     /// Adapter-local expected frontier. This is not a fresh store read.
@@ -157,10 +132,6 @@ where
 
     pub fn is_contained(&self) -> bool {
         self.contained
-    }
-
-    pub fn into_inner(self) -> S {
-        self.inner
     }
 
     /// Persist one exact, internally valid successor of the current expected
@@ -258,7 +229,7 @@ where
         }
 
         Ok(FrontierBoundGrantAccounting {
-            bootstrap_anchor: self.bootstrap_anchor,
+            establishment_head: self.establishment_head,
             accounting,
         })
     }
@@ -289,9 +260,9 @@ where
 
 /// Establish generation zero in an empty linearizable store for one exact grant.
 ///
-/// The returned head is current relative to this store at the final observation
-/// made by this function, but still requires external authentication before it
-/// can become a trusted restart anchor.
+/// This is the only production constructor for a writable frontier in v0.2.
+/// Restart/recovery activation is intentionally absent until an external anchor
+/// authenticator exists.
 pub fn establish_grant_frontier<S>(
     grant: &CapabilityGrant,
     mut store: S,
@@ -334,22 +305,11 @@ where
         CasCheckpointFrontier {
             inner: store,
             grant: grant.clone(),
-            bootstrap_anchor: head,
+            establishment_head: head,
             expected_head: head,
             contained: false,
         },
     ))
-}
-
-fn validate_head<E>(head: CheckpointHead) -> Result<(), FrontierError<E>>
-where
-    E: StdError + 'static,
-{
-    if head.grant_digest.0 == [0; 32] || head.digest.0 == [0; 32] {
-        Err(FrontierError::InvalidHead)
-    } else {
-        Ok(())
-    }
 }
 
 #[derive(Debug, Error)]
@@ -365,12 +325,6 @@ where
     Runtime(#[source] RuntimeAccountingError),
     #[error("frontier store failed: {0}")]
     Store(#[source] E),
-    #[error("bootstrap anchor is malformed")]
-    InvalidHead,
-    #[error("bootstrap anchor belongs to a different grant")]
-    BootstrapGrantMismatch,
-    #[error("store current head does not equal the supplied bootstrap anchor")]
-    BootstrapAnchorMismatch,
     #[error("frontier store is not empty during generation-zero establishment")]
     StoreNotEmpty,
     #[error("frontier is contained after prior persistence uncertainty or conflict")]
@@ -486,6 +440,23 @@ mod tests {
         .unwrap()
     }
 
+    /// Test-only constructor for competing-writer simulations. Production code
+    /// intentionally has no restart/reopen constructor in v0.2.
+    fn competing_frontier_for_test(
+        store: SharedCasStore,
+        grant: CapabilityGrant,
+        establishment_head: CheckpointHead,
+    ) -> CasCheckpointFrontier<SharedCasStore> {
+        assert_eq!(*store.state.lock().unwrap(), Some(establishment_head));
+        CasCheckpointFrontier {
+            inner: store,
+            grant,
+            establishment_head,
+            expected_head: establishment_head,
+            contained: false,
+        }
+    }
+
     #[test]
     fn bootstrap_establishes_exact_grant_bound_generation_zero() {
         let grant = grant("g1");
@@ -498,38 +469,15 @@ mod tests {
     }
 
     #[test]
-    fn reopen_requires_exact_grant_and_store_anchor() {
-        let grant_a = grant("a");
-        let grant_b = grant("b");
-        let (established, frontier) =
-            establish_grant_frontier(&grant_a, SharedCasStore::default()).unwrap();
-        let store = frontier.into_inner();
-
+    fn existing_store_cannot_be_reactivated_without_future_authenticator() {
+        let grant = grant("g1");
+        let shared = SharedCasStore::default();
+        let (_established, _frontier) =
+            establish_grant_frontier(&grant, shared.clone()).unwrap();
         assert!(matches!(
-            CasCheckpointFrontier::reopen_from_anchor_claim(
-                store.clone(),
-                grant_b,
-                established.head,
-            ),
-            Err(FrontierError::BootstrapGrantMismatch)
+            establish_grant_frontier(&grant, shared),
+            Err(FrontierError::StoreNotEmpty)
         ));
-
-        let mut wrong = established.head;
-        wrong.digest = digest(99);
-        assert!(matches!(
-            CasCheckpointFrontier::reopen_from_anchor_claim(
-                store.clone(),
-                grant_a.clone(),
-                wrong,
-            ),
-            Err(FrontierError::BootstrapAnchorMismatch)
-        ));
-        assert!(CasCheckpointFrontier::reopen_from_anchor_claim(
-            store,
-            grant_a,
-            established.head,
-        )
-        .is_ok());
     }
 
     #[test]
@@ -555,12 +503,11 @@ mod tests {
         let shared = SharedCasStore::default();
         let (established, mut frontier_a) =
             establish_grant_frontier(&grant, shared.clone()).unwrap();
-        let mut frontier_b = CasCheckpointFrontier::reopen_from_anchor_claim(
+        let mut frontier_b = competing_frontier_for_test(
             shared.clone(),
             grant.clone(),
             established.head,
-        )
-        .unwrap();
+        );
         let successor = reserved_successor(&established, &grant);
 
         let first = frontier_a.persist_successor(&successor).unwrap();
@@ -578,12 +525,11 @@ mod tests {
         let shared = SharedCasStore::default();
         let (established, mut frontier_a) =
             establish_grant_frontier(&grant, shared.clone()).unwrap();
-        let mut frontier_b = CasCheckpointFrontier::reopen_from_anchor_claim(
+        let mut frontier_b = competing_frontier_for_test(
             shared,
             grant.clone(),
             established.head,
-        )
-        .unwrap();
+        );
 
         let stale = bind_checkpoint_to_head(&grant, &established.checkpoint, established.head)
             .unwrap();
