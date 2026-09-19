@@ -34,6 +34,7 @@
 /// `MUSE_152_STYLE_CATALOG_2026-07-18.md` described the registry as
 /// shipped. Declaring it is step 4a of making that document true.
 pub mod catalog;
+pub mod keeper_semantic;
 
 use serde::{Deserialize, Serialize};
 
