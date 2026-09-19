@@ -11,12 +11,42 @@
 //!
 //! Feature-gated under `live-voice`.
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use ringbuf::{
     HeapRb,
     traits::{Observer, Producer, Split},
 };
+
+/// Cloneable, lock-free request capability for purging queued live PCM.
+///
+/// The audio callback consumes the request with `swap(false)` and drains the
+/// ring before producing the next device buffer. A second request arriving while
+/// a drain is in progress remains set for the following callback, so repeated
+/// interruptions cannot be lost.
+#[derive(Debug, Clone)]
+pub struct AudioOutputPurgeHandle {
+    requested: Arc<AtomicBool>,
+}
+
+impl AudioOutputPurgeHandle {
+    fn new(requested: Arc<AtomicBool>) -> Self {
+        Self { requested }
+    }
+
+    /// Request that the audio callback discard all PCM currently queued in the ring.
+    pub fn request_purge(&self) {
+        self.requested.store(true, Ordering::Release);
+    }
+
+    /// Whether a purge request is still waiting for an audio callback to consume it.
+    pub fn is_pending(&self) -> bool {
+        self.requested.load(Ordering::Acquire)
+    }
+}
 
 /// Real-time audio output via cpal + ring buffer.
 ///
@@ -28,6 +58,7 @@ pub struct AudioOutput {
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
+    purge_requested: Arc<AtomicBool>,
 }
 
 impl AudioOutput {
@@ -67,6 +98,7 @@ impl AudioOutput {
             sample_rate,
             channels: 1,
             buffer_capacity: 0,
+            purge_requested: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -80,6 +112,8 @@ impl AudioOutput {
         let buffer_capacity = sample_rate as usize * 2;
         let rb = HeapRb::<f32>::new(buffer_capacity);
         let (producer, mut consumer) = rb.split();
+        let purge_requested = Arc::new(AtomicBool::new(false));
+        let callback_purge = Arc::clone(&purge_requested);
 
         let ch = channels;
         let stream_config: cpal::StreamConfig = supported.into();
@@ -89,6 +123,11 @@ impl AudioOutput {
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
                     use ringbuf::traits::Consumer;
+
+                    if callback_purge.swap(false, Ordering::AcqRel) {
+                        while consumer.try_pop().is_some() {}
+                    }
+
                     for sample in data.chunks_mut(ch as usize) {
                         if let Some(s) = consumer.try_pop() {
                             for out in sample.iter_mut() {
@@ -114,6 +153,7 @@ impl AudioOutput {
             sample_rate,
             channels,
             buffer_capacity,
+            purge_requested,
         })
     }
 
@@ -143,6 +183,12 @@ impl AudioOutput {
     /// AudioOutput is created. Returns `None` if already taken or dummy.
     pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
         self.producer.take()
+    }
+
+    /// Return a cloneable request capability that can purge queued live PCM without
+    /// borrowing mutable audio state or touching the device callback directly.
+    pub fn purge_handle(&self) -> AudioOutputPurgeHandle {
+        AudioOutputPurgeHandle::new(Arc::clone(&self.purge_requested))
     }
 
     /// Audio sample rate negotiated with the device (or headless default).
@@ -196,6 +242,19 @@ mod tests {
         // push_samples on dummy returns 0
         let samples = vec![0.5f32; 100];
         assert_eq!(dummy.push_samples(&samples), 0);
+    }
+
+    #[test]
+    fn purge_requests_are_cloneable_and_not_lost_before_consumption() {
+        let output = AudioOutput::new_dummy(24000);
+        let first = output.purge_handle();
+        let second = first.clone();
+
+        assert!(!first.is_pending());
+        second.request_purge();
+        assert!(first.is_pending());
+        first.request_purge();
+        assert!(second.is_pending());
     }
 
     #[test]
