@@ -42,6 +42,12 @@ pub mod perceptual_enrollment_lifecycle;
 pub mod perceptual_enrollment_store;
 #[path = "perceptual_schedule_reveal.rs"]
 pub mod perceptual_schedule_reveal;
+#[path = "perceptual_collection_evidence.rs"]
+pub mod perceptual_collection_evidence;
+#[path = "perceptual_collection_authenticity.rs"]
+pub mod perceptual_collection_authenticity;
+#[path = "perceptual_enrollment_witness.rs"]
+pub mod perceptual_enrollment_witness;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
