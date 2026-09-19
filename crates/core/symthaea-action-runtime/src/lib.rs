@@ -10,9 +10,9 @@
 //! ```
 //!
 //! Unknown external outcomes remain charged. v0.2 deliberately exposes no
-//! transition that releases an `OutcomeUnknown` execution and no partial child
-//! escrow refund. Those authority-increasing transitions require separately
-//! verified reconciliation evidence in a later layer.
+//! transition that releases an execution reservation or partially refunds child
+//! escrow. Those authority-increasing transitions require separately verified
+//! reconciliation evidence in a later layer.
 
 #![deny(unsafe_code)]
 
@@ -41,7 +41,6 @@ pub enum ReservationState {
     Reserved,
     OutcomeUnknown,
     Committed,
-    ReleasedBeforeDispatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,17 +211,6 @@ impl GrantAccount {
         reservation_id: &ReservationId,
     ) -> Result<(), RuntimeAccountingError> {
         self.commit_reservation_from(reservation_id, ReservationState::OutcomeUnknown)
-    }
-
-    /// Release is permitted only before dispatch/uncertainty is recorded.
-    pub fn cancel_before_dispatch(
-        &mut self,
-        reservation_id: &ReservationId,
-    ) -> Result<(), RuntimeAccountingError> {
-        let reservation = self.reservation_mut(reservation_id)?;
-        require_reservation_state(reservation.state, ReservationState::Reserved)?;
-        reservation.state = ReservationState::ReleasedBeforeDispatch;
-        self.validate_internal_invariants()
     }
 
     /// Reserve the exact full ceiling of an attenuated child grant.
@@ -721,18 +709,6 @@ mod tests {
     }
 
     #[test]
-    fn cancellation_before_dispatch_releases_capacity() {
-        let grant = parent_grant();
-        let mut account = GrantAccount::new(&grant).unwrap();
-        let id = ReservationId("r1".into());
-        account
-            .reserve_execution(id.clone(), ExecutionId("e1".into()), digest(1), risk(1))
-            .unwrap();
-        account.cancel_before_dispatch(&id).unwrap();
-        assert_eq!(account.remaining_use_capacity().unwrap(), 4);
-    }
-
-    #[test]
     fn execution_ids_are_unique_within_a_grant_account() {
         let grant = parent_grant();
         let mut account = GrantAccount::new(&grant).unwrap();
@@ -853,8 +829,8 @@ mod tests {
             .reserve_execution(id.clone(), ExecutionId("e1".into()), digest(1), risk(1))
             .unwrap();
 
-        // Corrupt the private in-memory state to force the checked-add failure
-        // path and prove that the transition performs no partial successor write.
+        // Corrupt private in-memory state and prove the transition rejects it
+        // before writing any successor accounting state.
         account.snapshot.committed_risk.mutation_units = u64::MAX;
         let before = account.snapshot.clone();
         assert!(matches!(
