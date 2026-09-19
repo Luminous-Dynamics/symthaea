@@ -11,19 +11,19 @@
 //! lifecycle-authenticated qualification-profile and claim-decision authority,
 //! non-forgeable qualified-claim capabilities, delegated-root ratification of
 //! historical qualification, witnessed transparency publication of exact
-//! qualification ratifications, lifecycle events, and currentness observations,
-//! append-only authenticated qualification lifecycle records, observed-view
-//! currentness assessments, complete-tail lifecycle/currentness publication
-//! freshness assessments, cross-stream currentness/lifecycle rollback guards,
-//! authenticated per-qualification currentness cadence policy, authenticated
-//! frozen-protocol evidence freshness assessments, aligned validity-readiness
-//! assessments over one exact authenticated evaluation horizon, institution-
-//! scoped currentness-at-evaluation capabilities, monotonic currentness-observation
-//! tracking, typed provenance graphs, frozen study protocols, immutable
-//! execution/conformance records, adversarial falsification campaigns, explicit
-//! scientific uncertainty budgets, and provenance-checked replication lineage
-//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
-//! formal provers, or network operations.
+//! qualification ratifications, lifecycle events, currentness observations, and
+//! currentness-cadence policy, append-only authenticated qualification lifecycle
+//! records, observed-view currentness assessments, complete-tail lifecycle/
+//! currentness publication freshness assessments, cross-stream currentness/
+//! lifecycle rollback guards, authenticated per-qualification currentness cadence
+//! policy, authenticated frozen-protocol evidence freshness assessments, aligned
+//! validity-readiness assessments over one exact authenticated evaluation horizon,
+//! institution-scoped currentness-at-evaluation capabilities, monotonic
+//! currentness-observation tracking, typed provenance graphs, frozen study
+//! protocols, immutable execution/conformance records, adversarial falsification
+//! campaigns, explicit scientific uncertainty budgets, and provenance-checked
+//! replication lineage assessments. It does not run experiments, solvers, LLMs,
+//! HDC, statistics, formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Scientific qualification exists only as a private capability after the exact
@@ -50,6 +50,7 @@ pub mod independence;
 pub mod protocol;
 pub mod provenance;
 pub mod qualification_currentness_cadence;
+pub mod qualification_currentness_cadence_publication;
 pub mod qualification_currentness_guard_head;
 pub mod qualification_currentness_head;
 pub mod qualification_currentness_publication;
@@ -95,6 +96,7 @@ pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
 pub use qualification_currentness_cadence::*;
+pub use qualification_currentness_cadence_publication::*;
 pub use qualification_currentness_guard_head::*;
 pub use qualification_currentness_head::*;
 pub use qualification_currentness_publication::*;
