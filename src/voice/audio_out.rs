@@ -12,7 +12,7 @@
 //! Feature-gated under `live-voice`.
 
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use anyhow::{Context, Result};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -21,20 +21,61 @@ use ringbuf::{
     traits::{Observer, Producer, Split},
 };
 
-/// Cloneable, lock-free request capability for purging queued live PCM.
+fn try_push_accounted(
+    producer: &mut ringbuf::HeapProd<f32>,
+    queued_samples: &AtomicUsize,
+    sample: f32,
+) -> bool {
+    // Reserve accounting before publishing the sample into the lock-free ring so
+    // the consumer can never pop a sample whose queue count has not been recorded.
+    queued_samples.fetch_add(1, Ordering::AcqRel);
+    if producer.try_push(sample).is_ok() {
+        true
+    } else {
+        queued_samples.fetch_sub(1, Ordering::AcqRel);
+        false
+    }
+}
+
+/// Producer moved to a background thread while preserving exact queue accounting.
+pub struct TrackedAudioProducer {
+    inner: ringbuf::HeapProd<f32>,
+    queued_samples: Arc<AtomicUsize>,
+}
+
+impl TrackedAudioProducer {
+    /// Push as many samples as the ring currently accepts and return the count.
+    pub fn push_samples(&mut self, samples: &[f32]) -> usize {
+        let mut written = 0;
+        for &sample in samples {
+            if try_push_accounted(&mut self.inner, &self.queued_samples, sample) {
+                written += 1;
+            } else {
+                break;
+            }
+        }
+        written
+    }
+}
+
+/// Cloneable, lock-free request and observation capability for live PCM playback.
 ///
-/// The audio callback consumes the request with `swap(false)` and drains the
-/// ring before producing the next device buffer. A second request arriving while
-/// a drain is in progress remains set for the following callback, so repeated
-/// interruptions cannot be lost.
+/// The audio callback consumes purge requests with `swap(false)` and drains the
+/// ring before producing the next device buffer. Queue occupancy is accounted across
+/// both the foreground and detached-producer paths, so higher layers can distinguish
+/// "synthesis finished" from "software-buffered audio is still pending".
 #[derive(Debug, Clone)]
 pub struct AudioOutputPurgeHandle {
     requested: Arc<AtomicBool>,
+    queued_samples: Arc<AtomicUsize>,
 }
 
 impl AudioOutputPurgeHandle {
-    fn new(requested: Arc<AtomicBool>) -> Self {
-        Self { requested }
+    fn new(requested: Arc<AtomicBool>, queued_samples: Arc<AtomicUsize>) -> Self {
+        Self {
+            requested,
+            queued_samples,
+        }
     }
 
     /// Request that the audio callback discard all PCM currently queued in the ring.
@@ -45,6 +86,16 @@ impl AudioOutputPurgeHandle {
     /// Whether a purge request is still waiting for an audio callback to consume it.
     pub fn is_pending(&self) -> bool {
         self.requested.load(Ordering::Acquire)
+    }
+
+    /// Number of mono samples currently accounted as queued in the software ring.
+    pub fn queued_samples(&self) -> usize {
+        self.queued_samples.load(Ordering::Acquire)
+    }
+
+    /// Whether software-buffered PCM remains pending for the device callback.
+    pub fn has_queued_audio(&self) -> bool {
+        self.queued_samples() != 0
     }
 }
 
@@ -59,6 +110,7 @@ pub struct AudioOutput {
     channels: u16,
     buffer_capacity: usize,
     purge_requested: Arc<AtomicBool>,
+    queued_samples: Arc<AtomicUsize>,
 }
 
 impl AudioOutput {
@@ -99,6 +151,7 @@ impl AudioOutput {
             channels: 1,
             buffer_capacity: 0,
             purge_requested: Arc::new(AtomicBool::new(false)),
+            queued_samples: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -114,6 +167,8 @@ impl AudioOutput {
         let (producer, mut consumer) = rb.split();
         let purge_requested = Arc::new(AtomicBool::new(false));
         let callback_purge = Arc::clone(&purge_requested);
+        let queued_samples = Arc::new(AtomicUsize::new(0));
+        let callback_queued = Arc::clone(&queued_samples);
 
         let ch = channels;
         let stream_config: cpal::StreamConfig = supported.into();
@@ -125,11 +180,14 @@ impl AudioOutput {
                     use ringbuf::traits::Consumer;
 
                     if callback_purge.swap(false, Ordering::AcqRel) {
-                        while consumer.try_pop().is_some() {}
+                        while consumer.try_pop().is_some() {
+                            callback_queued.fetch_sub(1, Ordering::AcqRel);
+                        }
                     }
 
                     for sample in data.chunks_mut(ch as usize) {
                         if let Some(s) = consumer.try_pop() {
+                            callback_queued.fetch_sub(1, Ordering::AcqRel);
                             for out in sample.iter_mut() {
                                 *out = s; // Mono → all channels
                             }
@@ -154,6 +212,7 @@ impl AudioOutput {
             channels,
             buffer_capacity,
             purge_requested,
+            queued_samples,
         })
     }
 
@@ -167,8 +226,8 @@ impl AudioOutput {
             None => return 0,
         };
         let mut written = 0;
-        for &s in samples {
-            if producer.try_push(s).is_ok() {
+        for &sample in samples {
+            if try_push_accounted(producer, &self.queued_samples, sample) {
                 written += 1;
             } else {
                 break;
@@ -177,18 +236,23 @@ impl AudioOutput {
         written
     }
 
-    /// Take the ring buffer producer for use on a background thread.
+    /// Take a tracked ring-buffer producer for use on a background thread.
     ///
     /// After calling this, `push_samples()` becomes a no-op until a new
     /// AudioOutput is created. Returns `None` if already taken or dummy.
-    pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
-        self.producer.take()
+    pub fn take_producer(&mut self) -> Option<TrackedAudioProducer> {
+        self.producer.take().map(|inner| TrackedAudioProducer {
+            inner,
+            queued_samples: Arc::clone(&self.queued_samples),
+        })
     }
 
-    /// Return a cloneable request capability that can purge queued live PCM without
-    /// borrowing mutable audio state or touching the device callback directly.
+    /// Return a cloneable capability for purge requests and queue observation.
     pub fn purge_handle(&self) -> AudioOutputPurgeHandle {
-        AudioOutputPurgeHandle::new(Arc::clone(&self.purge_requested))
+        AudioOutputPurgeHandle::new(
+            Arc::clone(&self.purge_requested),
+            Arc::clone(&self.queued_samples),
+        )
     }
 
     /// Audio sample rate negotiated with the device (or headless default).
@@ -242,6 +306,7 @@ mod tests {
         // push_samples on dummy returns 0
         let samples = vec![0.5f32; 100];
         assert_eq!(dummy.push_samples(&samples), 0);
+        assert_eq!(dummy.purge_handle().queued_samples(), 0);
     }
 
     #[test]
@@ -251,10 +316,25 @@ mod tests {
         let second = first.clone();
 
         assert!(!first.is_pending());
+        assert!(!first.has_queued_audio());
         second.request_purge();
         assert!(first.is_pending());
         first.request_purge();
         assert!(second.is_pending());
+    }
+
+    #[test]
+    fn tracked_producer_accounting_reserves_before_publish() {
+        let rb = HeapRb::<f32>::new(2);
+        let (inner, _consumer) = rb.split();
+        let queued_samples = Arc::new(AtomicUsize::new(0));
+        let mut producer = TrackedAudioProducer {
+            inner,
+            queued_samples: Arc::clone(&queued_samples),
+        };
+
+        assert_eq!(producer.push_samples(&[0.1, 0.2, 0.3]), 2);
+        assert_eq!(queued_samples.load(Ordering::Acquire), 2);
     }
 
     #[test]
