@@ -16,15 +16,16 @@
 //! records, observed-view currentness assessments, complete-tail lifecycle/
 //! currentness/cadence publication freshness assessments, cross-stream currentness/
 //! lifecycle rollback guards, authenticated per-qualification currentness cadence
-//! policy, replay-bound policy provenance for validity readiness, authenticated
-//! frozen-protocol evidence freshness assessments, aligned validity-readiness
-//! assessments over one exact authenticated evaluation horizon, institution-
-//! scoped currentness-at-evaluation capabilities, monotonic currentness-observation
-//! tracking, typed provenance graphs, frozen study protocols, immutable
-//! execution/conformance records, adversarial falsification campaigns, explicit
-//! scientific uncertainty budgets, and provenance-checked replication lineage
-//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
-//! formal provers, or network operations.
+//! policy, non-weakening cadence-policy lineage proofs, replay-bound policy
+//! provenance for validity readiness, authenticated frozen-protocol evidence
+//! freshness assessments, aligned validity-readiness assessments over one exact
+//! authenticated evaluation horizon, institution-scoped currentness-at-evaluation
+//! capabilities, monotonic currentness-observation tracking, typed provenance
+//! graphs, frozen study protocols, immutable execution/conformance records,
+//! adversarial falsification campaigns, explicit scientific uncertainty budgets,
+//! and provenance-checked replication lineage assessments. It does not run
+//! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
+//! operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Scientific qualification exists only as a private capability after the exact
@@ -51,6 +52,7 @@ pub mod independence;
 pub mod protocol;
 pub mod provenance;
 pub mod qualification_currentness_cadence;
+pub mod qualification_currentness_cadence_change;
 pub mod qualification_currentness_cadence_head;
 pub mod qualification_currentness_cadence_publication;
 pub mod qualification_currentness_guard_head;
@@ -99,6 +101,7 @@ pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
 pub use qualification_currentness_cadence::*;
+pub use qualification_currentness_cadence_change::*;
 pub use qualification_currentness_cadence_head::*;
 pub use qualification_currentness_cadence_publication::*;
 pub use qualification_currentness_guard_head::*;
