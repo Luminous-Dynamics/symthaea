@@ -1,19 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! The "Liked Songs" view — every ♥ keeper, with the actual audio that was
-//! heard (not a recomposed guess). Ported from `loadLiked()` in the legacy
+//! Library view for every ♥ keeper, with the actual audio that was heard
+//! (not a recomposed guess). Ported from `loadLiked()` in the legacy
 //! `studio/index.html`'s Liked tab: fetches `/api/keepers` once on mount
 //! (plus a manual Refresh, since a keep made from Listen while this page
 //! isn't mounted wouldn't otherwise show up), then renders one card per
-//! entry with its own `<audio>` pointed straight at the saved
-//! `/api/keeper-audio/{audio_key}` artifact plus MIDI/WAV/Recipe downloads.
+//! entry with its own saved `/api/keeper-audio/{audio_key}` artifact plus
+//! MIDI/WAV/Recipe downloads.
 //!
-//! Deliberately not routed through the shared `MuseState`/`current` piece —
-//! a keeper is a saved artifact independent of whatever's currently
-//! playing, exactly like the legacy page's separate `likedGrid`.
+//! Kept artifacts remain independent of `MuseState::current`. A later
+//! audition-foundation tranche will move keeper playback onto the shared
+//! persistent transport without changing that identity boundary.
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
+use leptos_router::components::A;
 
 use crate::api::{self, KeeperEntry};
 
@@ -51,10 +52,11 @@ pub fn LikedPage() -> impl IntoView {
     view! {
         <div class="panel">
             <div class="liked-header">
-                <h2>"Liked Songs"</h2>
+                <h2>"Library"</h2>
                 <p class="muted small">
-                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess."
+                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Private symbolic import is available separately while unified library indexing remains a later tranche."
                 </p>
+                <A href="/library/import" attr:class="link-btn">"Import music"</A>
                 <button type="button" on:click=move |_| reload()>"Refresh"</button>
             </div>
 

@@ -3,12 +3,11 @@
 //! Root application shell: global header + Listen/Create/Research routing.
 //!
 //! Matches the three design specs' top-level nav exactly (`Listen · Discover`,
-//! `Create · Compose`, `Research · Understand` in the mockups) so the routes
-//! map 1:1 onto `UI_mocks/MUSE_{LISTEN,STUDIO,RESEARCH}_MODE_DESIGN_SPEC.md`.
-//! "Studio Mode" in those specs is the precision-editing surface reached
-//! *from* a piece, not a fourth top-level tab — it isn't routed here yet
-//! since it depends on backend capability (constrained alternative
-//! generation, version graph) that doesn't exist yet.
+//! `Create · Compose`, `Research · Understand` in the mockups) while the
+//! Library and Atlas expose persisted/private workspace material around those
+//! core modes. "Studio Mode" in those specs is the precision-editing surface
+//! reached *from* a piece, not a fourth top-level tab — it isn't routed here
+//! yet because its semantic authority/evidence program remains separate.
 
 use leptos::prelude::*;
 use leptos_router::components::{A, Route, Router, Routes};
@@ -16,6 +15,7 @@ use leptos_router::hooks::use_location;
 use leptos_router::path;
 use web_sys::HtmlAudioElement;
 
+use crate::add_music_page::AddMusicPage;
 use crate::atlas_page::AtlasPage;
 use crate::browser_playback::dispatch_browser_event;
 use crate::liked_page::LikedPage;
@@ -129,6 +129,10 @@ pub fn App() -> impl IntoView {
                         <Route path=path!("/") view=ListenPage />
                         <Route path=path!("/create") view=CreatePage />
                         <Route path=path!("/research") view=ResearchPage />
+                        <Route path=path!("/library/import") view=AddMusicPage />
+                        <Route path=path!("/library") view=LikedPage />
+                        // Compatibility alias for existing bookmarks and the
+                        // still-unmigrated links inside older UI surfaces.
                         <Route path=path!("/liked") view=LikedPage />
                         <Route path=path!("/atlas") view=AtlasPage />
                     </Routes>
@@ -201,6 +205,8 @@ fn GlobalHeader(muse: MuseState) -> impl IntoView {
         let current = location.pathname.get();
         if path == "/" {
             current == "/"
+        } else if path == "/library" {
+            current.starts_with("/library") || current.starts_with("/liked")
         } else {
             current.starts_with(path)
         }
@@ -269,8 +275,8 @@ fn GlobalHeader(muse: MuseState) -> impl IntoView {
                     <span>"Research"</span><small>"Understand"</small>
                 </A>
                 <A
-                    href="/liked"
-                    attr:class=move || if is_active("/liked") { "active" } else { "" }
+                    href="/library"
+                    attr:class=move || if is_active("/library") { "active" } else { "" }
                 >
                     <span>"Library"</span><small>"Keep"</small>
                 </A>
