@@ -25,6 +25,7 @@ use crate::floating_base::FloatingBaseDynamicsSnapshot;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MujocoContactBiasExtractionError {
     InvalidDynamicsSnapshot,
+    ModelMismatch,
     GeneralizedVelocityCountMismatch,
     SampleTimeMismatch,
     MissingSite(String),
@@ -49,6 +50,9 @@ pub fn extract_mujoco_contact_bias_qualified_dynamics(
     if !dynamics.validate() {
         return Err(MujocoContactBiasExtractionError::InvalidDynamicsSnapshot);
     }
+    if model.signature() != data.model().signature() {
+        return Err(MujocoContactBiasExtractionError::ModelMismatch);
+    }
 
     let nv = model.ffi().nv as usize;
     if nv != dynamics.generalized_velocity_count || data.qvel().len() != nv {
@@ -68,13 +72,9 @@ pub fn extract_mujoco_contact_bias_qualified_dynamics(
 
     let mut contact_biases = Vec::with_capacity(dynamics.contacts.len());
     for contact in &dynamics.contacts {
-        let raw_site_id = model.name_to_id(MjtObj::mjOBJ_SITE, &contact.site_id);
-        if raw_site_id < 0 {
-            return Err(MujocoContactBiasExtractionError::MissingSite(
-                contact.site_id.clone(),
-            ));
-        }
-        let site_id = raw_site_id as usize;
+        let site_id = model
+            .name_to_id(MjtObj::mjOBJ_SITE, &contact.site_id)
+            .ok_or_else(|| MujocoContactBiasExtractionError::MissingSite(contact.site_id.clone()))?;
         if site_id >= nsite {
             return Err(MujocoContactBiasExtractionError::InvalidSiteId(
                 contact.site_id.clone(),
@@ -240,5 +240,26 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error, MujocoContactBiasExtractionError::SampleTimeMismatch);
+    }
+
+    #[test]
+    fn missing_contact_site_fails_closed_under_pinned_lookup_api() {
+        let morphology = HumanoidMorphology::Dmc21;
+        let mut sim = MuJoCoHumanoidSimulator::for_morphology(morphology).unwrap();
+        let mut dynamics = sim.floating_base_dynamics_snapshot().unwrap();
+        dynamics.contacts[0].site_id = "__missing_contact_site__".to_string();
+        assert!(dynamics.validate());
+        let model = Arc::clone(sim.model_arc());
+
+        let error = extract_mujoco_contact_bias_qualified_dynamics(
+            model.as_ref(),
+            sim.data_mut(),
+            dynamics,
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            MujocoContactBiasExtractionError::MissingSite("__missing_contact_site__".to_string())
+        );
     }
 }
