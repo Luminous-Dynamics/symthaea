@@ -80,6 +80,10 @@ pub mod assurance_soma_interaction;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_soma_interaction_verify;
 
+// Crypto-agile authentication of measured framebuffer/touch observation identities.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_measured_attestation;
+
 // Decentralized positioning (GPS-independent)
 #[cfg(feature = "positioning")]
 pub mod positioning_bridge;
