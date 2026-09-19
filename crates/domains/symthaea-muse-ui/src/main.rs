@@ -23,6 +23,7 @@ mod icons;
 mod journey;
 mod keeper_api;
 pub mod keeper_semantic;
+pub mod keeper_semantic_capability;
 mod liked_page;
 mod motifs_view;
 mod orchestration_view;
