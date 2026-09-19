@@ -17,7 +17,7 @@ use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use symthaea_interface_types::{IdError, SessionId, TurnId, UtteranceId};
+use symthaea_interface_types::{IdError, RuntimeCursor, SessionId, TurnId, UtteranceId};
 use symthaea_service_runtime::ProcessOrigin;
 use uuid::Uuid;
 
@@ -215,10 +215,6 @@ impl VoiceCognitionTicket {
     }
 
     /// Fast presentation-only barge-in available immediately after admission.
-    ///
-    /// Semantic interruption is intentionally not emitted here yet: admission can
-    /// precede owner-side `ResponseStarted` publication. The next lifecycle-aware
-    /// tranche will emit `VoiceInterrupted` only after that turn is proven active.
     pub fn interrupt_presentation(&self) -> VoiceInterruptionReceipt {
         let through = self.presentation.interrupt_started();
         VoiceInterruptionReceipt {
@@ -226,8 +222,36 @@ impl VoiceCognitionTicket {
             cancelled_through_generation: through,
             capability: VoiceCancellationCapability::PresentationEligibilityOnly,
             semantic_event_emitted: false,
+            semantic_event_cursor: None,
+            semantic_event_error: None,
             cognition_cancelled: false,
         }
+    }
+
+    /// Fast barge-in that always cancels future presentation first, then attempts to
+    /// publish the authoritative semantic interruption for this exact turn.
+    ///
+    /// The event sequencer accepts `VoiceInterrupted` only after `ResponseStarted`
+    /// has been published for this turn. If interruption arrives before that point,
+    /// presentation is still cancelled and the semantic rejection is reported in the
+    /// receipt instead of inventing invalid event order. Successful response turns
+    /// remain interruptible after `ResponseFinished` while whole-response TTS may
+    /// still be speaking.
+    pub fn interrupt(&self, host: &ServiceRuntimeHost) -> VoiceInterruptionReceipt {
+        let mut receipt = self.interrupt_presentation();
+        match host.voice_interrupted(
+            Some(self.identity.session_id.clone()),
+            self.turn_id.clone(),
+        ) {
+            Ok(cursor) => {
+                receipt.semantic_event_emitted = true;
+                receipt.semantic_event_cursor = Some(cursor);
+            }
+            Err(error) => {
+                receipt.semantic_event_error = Some(error.to_string());
+            }
+        }
+        receipt
     }
 
     pub async fn resolve(self) -> Result<VoiceCognitionOutcome, ServiceProtocolFailure> {
@@ -267,10 +291,14 @@ pub struct VoiceInterruptionReceipt {
     pub session_id: SessionId,
     pub cancelled_through_generation: u64,
     pub capability: VoiceCancellationCapability,
-    /// Remains false in this tranche because an admitted query may not yet have
-    /// published `ResponseStarted`; emitting earlier would invert semantic order.
+    /// True only when the shared semantic sequencer accepted `VoiceInterrupted`.
     pub semantic_event_emitted: bool,
-    /// The runtime owner does not yet support cooperative cancellation of an
+    /// Authoritative runtime cursor when semantic interruption was published.
+    pub semantic_event_cursor: Option<RuntimeCursor>,
+    /// Local diagnostic when semantic publication was rejected/degraded. Presentation
+    /// cancellation remains effective regardless of this field.
+    pub semantic_event_error: Option<String>,
+    /// The runtime owner still does not support cooperative cancellation of an
     /// already-admitted `Symthaea::process()` call.
     pub cognition_cancelled: bool,
 }
@@ -345,6 +373,8 @@ impl VoiceSession {
             cancelled_through_generation: through,
             capability: VoiceCancellationCapability::PresentationEligibilityOnly,
             semantic_event_emitted: false,
+            semantic_event_cursor: None,
+            semantic_event_error: None,
             cognition_cancelled: false,
         }
     }
@@ -381,6 +411,8 @@ mod tests {
         let receipt = session.interrupt_presentation();
         assert_eq!(receipt.cancelled_through_generation, 2);
         assert!(!receipt.semantic_event_emitted);
+        assert!(receipt.semantic_event_cursor.is_none());
+        assert!(receipt.semantic_event_error.is_none());
         assert!(!receipt.cognition_cancelled);
         assert!(first.presentation_token().is_cancelled());
         assert!(second.presentation_token().is_cancelled());
