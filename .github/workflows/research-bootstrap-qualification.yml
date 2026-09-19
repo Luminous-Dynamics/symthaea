@@ -1,0 +1,298 @@
+name: Research Bootstrap Qualification
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    paths:
+      - ".github/research-qualifiers/*.json"
+  workflow_dispatch:
+    inputs:
+      expected_head:
+        description: "Exact single-parent qualifier head SHA"
+        required: true
+        type: string
+      expected_base:
+        description: "Exact frozen source parent SHA"
+        required: true
+        type: string
+      manifest:
+        description: "Canonical .github/research-qualifiers/<PROGRAM>.json path"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: research-bootstrap-qualification-${{ github.event.pull_request.number || inputs.expected_head || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  TRUSTED_POLICY_SHA: ${{ github.sha }}
+  EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || inputs.expected_head }}
+  EXPECTED_BASE: ${{ github.event.pull_request.base.sha || inputs.expected_base }}
+  REQUESTED_MANIFEST_PATH: ${{ github.event_name == 'workflow_dispatch' && inputs.manifest || '' }}
+
+jobs:
+  admit:
+    name: Authenticate and freeze subject
+    if: >-
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref_name == github.event.repository.default_branch) ||
+      (github.event_name == 'pull_request_target' &&
+       github.event.pull_request.state == 'open' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       github.event.pull_request.base.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      manifest_path: ${{ steps.manifest.outputs.manifest_path }}
+      expected_rust: ${{ steps.manifest.outputs.expected_rust }}
+      manifest_sha256: ${{ steps.manifest.outputs.manifest_sha256 }}
+    env:
+      TRUSTED_ROOT: ${{ github.workspace }}/trusted
+      CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+
+    steps:
+      - name: Checkout trusted default-branch policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TRUSTED_POLICY_SHA }}
+          path: trusted
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact candidate subject without persistent credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify trusted policy source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$TRUSTED_ROOT" rev-parse HEAD)" = "$TRUSTED_POLICY_SHA"
+          bash -n "$TRUSTED_ROOT/scripts/qualify-research-crate.sh"
+          "$TRUSTED_ROOT/scripts/qualify-research-crate.sh" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py"
+          python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/validate-research-qualification-subject.py"
+          python3 "$TRUSTED_ROOT/scripts/validate-research-qualification-subject.py" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/seal-research-qualification-binding.py"
+          python3 "$TRUSTED_ROOT/scripts/seal-research-qualification-binding.py" --self-test
+
+      - name: Authenticate live PR before admission
+        if: github.event_name == 'pull_request_target'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" verify-pr \
+            --repo "$GITHUB_REPOSITORY" \
+            --pr-number "${{ github.event.pull_request.number }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE"
+
+      - name: Freeze manifest subject using trusted guards
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest_path="$REQUESTED_MANIFEST_PATH"
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+            mapfile -t changed < <(git -C "$CANDIDATE_ROOT" diff --no-renames --no-ext-diff --name-only "$EXPECTED_BASE" "$EXPECTED_HEAD")
+            if (( ${#changed[@]} != 1 )); then
+              printf 'qualifier subject must change exactly one path; observed %d\n' "${#changed[@]}" >&2
+              exit 1
+            fi
+            manifest_path="${changed[0]}"
+          fi
+          python3 "$TRUSTED_ROOT/scripts/validate-research-qualification-subject.py" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "$manifest_path" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE"
+          python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" resolve \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "$manifest_path" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+
+  execute:
+    name: Execute candidate theorem without repository-token postflight
+    needs: admit
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TRUSTED_ROOT: ${{ github.workspace }}/trusted
+      CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+      EVIDENCE_STAGING_DIR: ${{ runner.temp }}/research-bootstrap-qualification-unsealed
+
+    steps:
+      - name: Checkout trusted default-branch policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TRUSTED_POLICY_SHA }}
+          path: trusted
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact candidate subject without persistent credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Re-derive frozen subject on execution runner
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$TRUSTED_ROOT" rev-parse HEAD)" = "$TRUSTED_POLICY_SHA"
+          python3 "$TRUSTED_ROOT/scripts/validate-research-qualification-subject.py" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE"
+          python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" resolve \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+          test "${{ needs.admit.outputs.expected_rust }}" = "${{ steps.manifest.outputs.expected_rust }}"
+          test "${{ needs.admit.outputs.manifest_sha256 }}" = "${{ steps.manifest.outputs.manifest_sha256 }}"
+
+      - name: Install manifest-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          toolchain: ${{ needs.admit.outputs.expected_rust }}
+          components: rustfmt, clippy
+
+      - name: Execute trusted qualification theorem with scrubbed subprocess environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          safe_path="$PATH"
+          safe_home="$HOME"
+          safe_rustup="${RUSTUP_HOME:-$HOME/.rustup}"
+          safe_cargo="${CARGO_HOME:-$HOME/.cargo}"
+          env -i \
+            PATH="$safe_path" \
+            HOME="$safe_home" \
+            RUSTUP_HOME="$safe_rustup" \
+            CARGO_HOME="$safe_cargo" \
+            CI=true \
+            LANG="${LANG:-C.UTF-8}" \
+            python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" run \
+              --trusted-root "$TRUSTED_ROOT" \
+              --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+              --candidate-root "$CANDIDATE_ROOT" \
+              --manifest "${{ needs.admit.outputs.manifest_path }}" \
+              --expected-head "$EXPECTED_HEAD" \
+              --expected-base "$EXPECTED_BASE" \
+              --output-dir "$EVIDENCE_STAGING_DIR"
+
+      - name: Upload explicitly unsealed inter-job evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: research-bootstrap-unsealed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_STAGING_DIR }}
+          if-no-files-found: error
+          retention-days: 1
+
+  seal:
+    name: Authenticate postflight and seal on fresh runner
+    needs: [admit, execute]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TRUSTED_ROOT: ${{ github.workspace }}/trusted
+      CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+      EVIDENCE_STAGING_DIR: ${{ runner.temp }}/research-bootstrap-qualification-unsealed
+      EVIDENCE_DIR: ${{ runner.temp }}/research-bootstrap-qualification
+
+    steps:
+      - name: Checkout trusted default-branch policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TRUSTED_POLICY_SHA }}
+          path: trusted
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout exact candidate subject without persistent credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download unsealed evidence from execution runner
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: research-bootstrap-unsealed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_STAGING_DIR }}
+
+      - name: Re-derive frozen subject before authenticated seal
+        id: manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C "$TRUSTED_ROOT" rev-parse HEAD)" = "$TRUSTED_POLICY_SHA"
+          python3 "$TRUSTED_ROOT/scripts/validate-research-qualification-subject.py" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE"
+          python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" resolve \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+          test "${{ needs.admit.outputs.expected_rust }}" = "${{ steps.manifest.outputs.expected_rust }}"
+          test "${{ needs.admit.outputs.manifest_sha256 }}" = "${{ steps.manifest.outputs.manifest_sha256 }}"
+
+      - name: Seal adapter binding after authenticated postflight
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.event_name == 'pull_request_target' && github.token || '' }}
+        run: |
+          set -euo pipefail
+          args=(
+            --trusted-root "$TRUSTED_ROOT"
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA"
+            --candidate-root "$CANDIDATE_ROOT"
+            --manifest "${{ needs.admit.outputs.manifest_path }}"
+            --expected-head "$EXPECTED_HEAD"
+            --expected-base "$EXPECTED_BASE"
+            --staging-dir "$EVIDENCE_STAGING_DIR"
+            --final-dir "$EVIDENCE_DIR"
+            --github-run-id "$GITHUB_RUN_ID"
+            --github-run-attempt "$GITHUB_RUN_ATTEMPT"
+          )
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+            args+=(--repo "$GITHUB_REPOSITORY" --pr-number "${{ github.event.pull_request.number }}")
+          fi
+          python3 "$TRUSTED_ROOT/scripts/seal-research-qualification-binding.py" "${args[@]}"
+
+      - name: Upload sealed bootstrap evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: research-bootstrap-sealed-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 30
