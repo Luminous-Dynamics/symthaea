@@ -32,6 +32,10 @@ pub mod perceptual_study_protocol;
 pub mod perceptual_analysis_plan;
 #[path = "perceptual_stimulus_pack.rs"]
 pub mod perceptual_stimulus_pack;
+#[path = "perceptual_stimulus_qualification.rs"]
+pub mod perceptual_stimulus_qualification;
+#[path = "perceptual_stimulus_qualification_receipt.rs"]
+pub mod perceptual_stimulus_qualification_receipt;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
