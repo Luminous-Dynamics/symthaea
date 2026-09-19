@@ -72,6 +72,10 @@ pub mod screen_vision;
 #[cfg(feature = "screen-vision")]
 pub mod touch_body;
 
+// Exact framebuffer/touch observations for measured presentation interaction evidence.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_soma_interaction;
+
 // Decentralized positioning (GPS-independent)
 #[cfg(feature = "positioning")]
 pub mod positioning_bridge;
