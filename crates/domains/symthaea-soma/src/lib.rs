@@ -84,6 +84,10 @@ pub mod assurance_soma_interaction_verify;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_measured_attestation;
 
+// Strict reject-not-normalize platform ingress semantics for assurance-bearing input.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_platform_ingress;
+
 // Decentralized positioning (GPS-independent)
 #[cfg(feature = "positioning")]
 pub mod positioning_bridge;
