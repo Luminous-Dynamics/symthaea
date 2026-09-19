@@ -35,7 +35,15 @@ pub struct KeeperSemanticBundleV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{MeterPoint, TempoPoint};
+    use crate::{MeterPoint, MusicalTime, TempoPoint};
+
+    fn zero() -> MusicalTime {
+        MusicalTime {
+            tick: 0,
+            beats: 0.0,
+            seconds: 0.0,
+        }
+    }
 
     #[test]
     fn wire_contract_round_trips_without_process_scoped_piece_identity() {
@@ -48,19 +56,29 @@ mod tests {
             audio_sha256: "c".repeat(64),
             warnings: Vec::new(),
             payload: ListenCompositionBundle {
+                ticks_per_beat: 960,
+                duration_ticks: 3840,
                 duration_beats: 4.0,
                 duration_seconds: 2.0,
+                form_kind: "Ternary".into(),
                 tempo_map: vec![TempoPoint {
-                    beat: 0.0,
-                    seconds: 0.0,
+                    at: zero(),
                     bpm: 120.0,
                 }],
                 meter_map: vec![MeterPoint {
-                    beat: 0.0,
+                    at: zero(),
                     numerator: 4,
                     denominator: 4,
                 }],
-                ..ListenCompositionBundle::default()
+                sections: Vec::new(),
+                phrases: Vec::new(),
+                notes: Vec::new(),
+                motif_definitions: Vec::new(),
+                motif_occurrences: Vec::new(),
+                cadences: Vec::new(),
+                sonorities: Vec::new(),
+                orchestration: Vec::new(),
+                resonance: None,
             },
         };
 
