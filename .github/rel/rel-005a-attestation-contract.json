@@ -1,8 +1,8 @@
 {
-  "schema": "symthaea.rel.attestation-contract.v5",
+  "schema": "symthaea.rel.attestation-contract.v6",
   "authority": "AttestationContractOnly",
   "relation": "REL-005A",
-  "parent_pipeline_head": "10d21aad940f7702d477fc861a94549b4f4e202f",
+  "parent_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
   "qualification_contract_head": "452f0324a561a2872c00b6197237d4db46189f8d",
   "assembly_contract_head": "3dc01663ff8b2f9f6eb0568f8649ccdd999ddf29",
   "comparison_subject_head": "a47efccf80fa66bacbdfa9930f59c8439be7ee38",
