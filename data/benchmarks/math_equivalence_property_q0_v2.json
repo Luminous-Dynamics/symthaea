@@ -1,0 +1,116 @@
+{
+  "version": "math-equivalence-property-q0-v2",
+  "generator_id": "math-equivalence-property-q0-v2",
+  "authority": "MeasurementOnly",
+  "rng": {
+    "algorithm": "xorshift64-star",
+    "multiplier_hex": "2545f4914f6cdd1d",
+    "zero_seed_replacement_hex": "9e3779b97f4a7c15",
+    "modulo_sampling": true
+  },
+  "dev_seeds_hex": [
+    "91a23b4c5d6e7f01",
+    "c0decafe10203040",
+    "13579bdf2468ace1",
+    "7a11c0de55aaf00d"
+  ],
+  "evaluation_seeds_hex": [
+    "a17e5eed31415926",
+    "d15c0ffee0ddf00d",
+    "6c8e9cf570932bd1",
+    "f1a5c0debadc0ffe"
+  ],
+  "pairs_per_seed": 128,
+  "refusals_per_seed": 24,
+  "cases_per_split": 608,
+  "pair_family_cycle": [
+    "AddCommutative",
+    "AddAssociative",
+    "MulCommutative",
+    "MulAssociative",
+    "Distributive",
+    "AddZero",
+    "MulOne",
+    "DoubleNegation",
+    "SquareAsProduct",
+    "AdditiveCancellation",
+    "SubtractAsAddNegative",
+    "NegateSum",
+    "IntegerCoefficientSplit",
+    "RationalCoefficientSplit",
+    "PowerComposition",
+    "MultiplyZero",
+    "PowerOne",
+    "DifferenceOfSquares",
+    "FreshTermInjection",
+    "CoefficientPerturbation",
+    "ExponentPerturbation",
+    "OperatorPerturbation",
+    "SurvivingVariableChange",
+    "DomainIdentityChange"
+  ],
+  "same_normal_form_families": [
+    "AddCommutative",
+    "AddAssociative",
+    "MulCommutative",
+    "MulAssociative",
+    "Distributive",
+    "AddZero",
+    "MulOne",
+    "DoubleNegation",
+    "SquareAsProduct",
+    "AdditiveCancellation",
+    "SubtractAsAddNegative",
+    "NegateSum",
+    "IntegerCoefficientSplit",
+    "RationalCoefficientSplit",
+    "PowerComposition",
+    "MultiplyZero",
+    "PowerOne",
+    "DifferenceOfSquares"
+  ],
+  "different_normal_form_families": [
+    "FreshTermInjection",
+    "CoefficientPerturbation",
+    "ExponentPerturbation",
+    "OperatorPerturbation",
+    "SurvivingVariableChange",
+    "DomainIdentityChange"
+  ],
+  "refusal_family_cycle": [
+    "InexactRealLiteral",
+    "ConstantDivision",
+    "VariableDivision",
+    "FractionalIntLiteral",
+    "FractionalNatLiteral",
+    "ZeroDenominator",
+    "CoefficientOverflow",
+    "ExponentOverflow"
+  ],
+  "domain_policy": {
+    "base_distribution": "deterministic pseudorandom uniform over Int, Real, Nat",
+    "RationalCoefficientSplit": "Real only",
+    "additive_inverse_families": "Nat remapped deterministically to Int or Real",
+    "DomainIdentityChange": "same source term under different domain identity"
+  },
+  "atom_grammar": {
+    "variable_names": ["v0", "v1", "v2"],
+    "coefficient_range_inclusive": [1, 4],
+    "exponent_range_inclusive": [1, 3],
+    "offset_range_inclusive": [0, 3],
+    "negative_atom_coefficients": false
+  },
+  "oracle_rules": {
+    "labels_from_normalizer_under_test": false,
+    "labels_from_retriever_under_test": false,
+    "same_normal_form_basis": "local ring/semiring identity applied by construction under the frozen domain policy",
+    "different_normal_form_basis": "fresh surviving term, coefficient/exponent/operator/surviving-variable perturbation, or explicit domain-identity change",
+    "side_condition_sensitive_division_or_cancellation": false
+  },
+  "evaluation_policy": {
+    "dev_may_be_used_for_debugging": true,
+    "evaluation_seeds_must_not_be_used_to_tune_v2": true,
+    "open_source_evaluation_is_preregistered_not_blinded": true,
+    "future_independent_public_corpus_required_for_proof_search_claims": true
+  }
+}
