@@ -31,9 +31,13 @@ cannot silently become an unbound generic reservation in persisted state.
 ```text
 reservation
     -> exact grant digest (through account)
+    -> exact execution id
     -> exact effect digest
     -> exact risk charge
 ```
+
+Execution IDs are unique within an account. A second reservation may not reuse the same execution
+identity under another reservation ID.
 
 ## Exact delegation escrow identity
 
@@ -48,36 +52,46 @@ parent GrantAccount
     -> bind exact child.digest()
 ```
 
-A different child with identical numeric ceilings cannot close or consume that escrow.
+A different child with identical numeric ceilings cannot close or consume that escrow, and the same
+exact child grant cannot be escrowed twice in one parent account.
 
-## Monotonic uncertainty rule
+## Monotonic authority accounting
 
-Authority may be charged conservatively without proof; authority may not be returned after an
-uncertain external outcome without proof.
+This first accounting schema contains no capacity-return transition.
 
-This tranche therefore allows:
+Allowed reservation progression:
 
 ```text
-Reserved -> OutcomeUnknown
-OutcomeUnknown -> Committed
-OpenEscrow -> OutcomeUnknown
-OutcomeUnknownEscrow -> ClosedFullyCharged
+Reserved -> OutcomeUnknown -> Committed
+Reserved --------------------> Committed
 ```
 
-It deliberately does **not** expose historical-style:
+Allowed escrow progression:
 
 ```text
+Open -> OutcomeUnknown -> ClosedFullyCharged
+Open --------------------> ClosedFullyCharged
+```
+
+There is deliberately no:
+
+```text
+Reserved -> Released
 OutcomeUnknown -> Released
 partial child escrow refund
 ```
 
-Those transitions increase remaining authority. They require a future exact-grant-bound verified
-reconciliation receipt.
+Even an abandoned pre-dispatch reservation remains charged in this tranche. Returning capacity is an
+authority-increasing transition and belongs in a future exact-grant-bound verified reconciliation
+protocol. This is intentionally conservative.
 
-Cancellation before dispatch remains available because the reservation has not entered the
-uncertain-dispatch state. A future execution-admission layer must make the durable transition to
-`OutcomeUnknown` occur before or atomically with dispatch; this accounting crate itself has no
-effect-dispatch API.
+A future execution-admission layer must make the durable transition to `OutcomeUnknown` occur before
+or atomically with dispatch; this accounting crate itself has no effect-dispatch API.
+
+## Transactional mutation
+
+Commit transitions validate the existing account and compute all checked successor counters before
+writing the successor state. Failed arithmetic/invariant checks do not partially advance accounting.
 
 ## Anti-rollback checkpoint
 
@@ -134,5 +148,5 @@ evaluation.
 
 This tranche does not prove an effect occurred, authenticate a checkpoint head, prove currentness of
 a reconstructed chain, verify delegation ancestry beyond one static attenuation edge, return unused
-authority after uncertain child execution, mint a live capability, dispatch hardware/software effects,
-or establish scientific authority.
+authority after reservation/child execution, mint a live capability, dispatch hardware/software
+effects, or establish scientific authority.
