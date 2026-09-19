@@ -44,6 +44,8 @@ pub mod perceptual_unblinding;
 pub mod perceptual_model_input;
 #[path = "perceptual_glmm_result.rs"]
 pub mod perceptual_glmm_result;
+#[path = "perceptual_claim_adjudication.rs"]
+pub mod perceptual_claim_adjudication;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
