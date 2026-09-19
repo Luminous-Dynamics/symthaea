@@ -10,6 +10,7 @@ mod cargo_adapter_semantics;
 mod cargo_adapter_state;
 mod cargo_execution_attempt;
 mod cargo_execution_contract;
+mod cargo_execution_intent_v2;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -94,7 +95,7 @@ enum Commands {
     },
     /// Canonicalize and identify a Cargo execution intent for assurance admission.
     CargoExecutionIntent {
-        /// Strict Cargo execution-intent input JSON spec.
+        /// Strict Cargo execution-intent v2 input JSON spec. This schema contains no adapter digest field.
         #[arg(long)]
         spec: PathBuf,
         /// Validated repository-source subject to bind before execution.
@@ -103,6 +104,9 @@ enum Commands {
         /// Exact repository effect policy to bind before execution.
         #[arg(long = "effect-policy")]
         effect_policy: PathBuf,
+        /// Validated Cargo adapter-semantics receipt whose recomputed ID is bound into the intent.
+        #[arg(long = "adapter-semantics")]
+        adapter_semantics: PathBuf,
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
@@ -290,9 +294,16 @@ fn main() -> anyhow::Result<()> {
             spec,
             pre_snapshot,
             effect_policy,
+            adapter_semantics,
             output,
         } => {
-            cargo_execution_contract::run_intent(&spec, &pre_snapshot, &effect_policy, output)?;
+            cargo_execution_intent_v2::run(
+                &spec,
+                &pre_snapshot,
+                &effect_policy,
+                &adapter_semantics,
+                output,
+            )?;
         }
         Commands::CargoExecutionResult {
             intent,
@@ -317,7 +328,7 @@ fn main() -> anyhow::Result<()> {
             cargo_adapter_semantics::run(&spec, output)?;
         }
         Commands::CargoAdapterSemanticsVerify { receipt } => {
-            cargo_adapter_semantics::CargoAdapterSemanticsReceipt::load(&receipt)?;
+            cargo_adapter_semantics::run_verify(&receipt)?;
         }
     }
     Ok(())
