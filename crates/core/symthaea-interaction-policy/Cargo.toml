@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-interaction-policy"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Pure typed policy-decision evidence contracts for Symthaea interactions"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["agents", "policy", "evidence", "security"]
+categories = ["data-structures", "development-tools"]
+
+[dependencies]
+sha2 = { workspace = true }
+symthaea-interaction-core = { path = "../symthaea-interaction-core" }
+symthaea-interaction-egress = { path = "../symthaea-interaction-egress" }
