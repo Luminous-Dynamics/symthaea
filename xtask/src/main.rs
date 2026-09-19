@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod repository_snapshot;
+mod repository_snapshot_verify;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -45,6 +46,12 @@ enum Commands {
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Recompute the declared source scope and fail if it drifted from a frozen snapshot receipt.
+    RepositorySnapshotVerify {
+        /// Frozen snapshot emitted by `repository-snapshot`.
+        #[arg(long)]
+        snapshot: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -167,6 +174,13 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask always lives one level below the workspace root")
                 .to_path_buf();
             repository_snapshot::run(&root, include_ignored, output)?;
+        }
+        Commands::RepositorySnapshotVerify { snapshot } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            repository_snapshot_verify::run(&root, &snapshot)?;
         }
     }
     Ok(())
