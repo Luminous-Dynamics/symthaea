@@ -14,6 +14,7 @@ concurrency:
 jobs:
   governance:
     name: Governance Check (Class A/B Changes)
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
@@ -29,7 +30,7 @@ jobs:
           set -euo pipefail
           bash scripts/check-class-a-changes.sh --ci
 
-      - name: Preserve Showroom hygiene on draft PRs
+      - name: Preserve Showroom hygiene
         shell: bash
         run: bash .github/scripts/check-showroom-hygiene.sh
 
