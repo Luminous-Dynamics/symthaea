@@ -62,13 +62,15 @@ runner_module_blob="$(manifest_value runner_module_blob)"
 routing_policy_blob="$(manifest_value routing_policy_blob)"
 smoke_workflow_blob="$(manifest_value smoke_workflow_blob)"
 arc3_protocol_qualifier_workflow_blob="$(manifest_value arc3_protocol_qualifier_workflow_blob)"
+se001q_recovery_workflow_blob="$(manifest_value se001q_recovery_workflow_blob)"
+se001q_replay_helper_blob="$(manifest_value se001q_replay_helper_blob)"
 ci_rust_shell_blob="$(manifest_value ci_rust_shell_blob)"
 bootstrap_validator_blob="$(manifest_value bootstrap_validator_blob)"
 promotion_verifier_blob="$(manifest_value promotion_verifier_blob)"
 recovery_eligibility_verifier_blob="$(manifest_value recovery_eligibility_verifier_blob)"
 host_lifecycle_contract_blob="$(manifest_value host_lifecycle_contract_blob)"
 
-[[ "$schema" == 'symthaea.trusted-runner.bootstrap.v7' ]]
+[[ "$schema" == 'symthaea.trusted-runner.bootstrap.v8' ]]
 [[ "$result" == 'PASS' ]]
 [[ "$repository" == "$REPOSITORY_URL" ]]
 [[ "$recovery_branch" == "$RECOVERY_BRANCH" ]]
@@ -80,10 +82,10 @@ host_lifecycle_contract_blob="$(manifest_value host_lifecycle_contract_blob)"
 [[ "$main_head" =~ ^[0-9a-f]{40}$ ]]
 [[ "$main_tree" =~ ^[0-9a-f]{40}$ ]]
 [[ "$recovery_diff_paths_sha256" =~ ^[0-9a-f]{64}$ ]]
-for blob in "$runner_module_blob" "$routing_policy_blob" "$smoke_workflow_blob" "$arc3_protocol_qualifier_workflow_blob" "$ci_rust_shell_blob" "$bootstrap_validator_blob" "$promotion_verifier_blob" "$recovery_eligibility_verifier_blob" "$host_lifecycle_contract_blob"; do
+for blob in "$runner_module_blob" "$routing_policy_blob" "$smoke_workflow_blob" "$arc3_protocol_qualifier_workflow_blob" "$se001q_recovery_workflow_blob" "$se001q_replay_helper_blob" "$ci_rust_shell_blob" "$bootstrap_validator_blob" "$promotion_verifier_blob" "$recovery_eligibility_verifier_blob" "$host_lifecycle_contract_blob"; do
   [[ "$blob" =~ ^[0-9a-f]{40}$ ]]
 done
-for pass_key in operator_authorization_checked runner_policy_eval routing_policy_eval minimal_locked_rust_check refs_unchanged_during_validation; do
+for pass_key in operator_authorization_checked runner_policy_eval routing_policy_eval minimal_locked_rust_check se001q_helper_syntax_checked refs_unchanged_during_validation; do
   [[ "$(manifest_value "$pass_key")" == 'PASS' ]]
 done
 [[ "$(manifest_value evidence_scope)" == 'runner-bootstrap-correctness-only' ]]
@@ -133,6 +135,8 @@ verify_blob nix/modules/github-actions-runner.nix "$runner_module_blob"
 verify_blob nix/tests/eval-trusted-runner-routing.nix "$routing_policy_blob"
 verify_blob .github/workflows/self-hosted-runner-smoke.yml "$smoke_workflow_blob"
 verify_blob .github/workflows/arc3-protocol-trusted-cpu-qualify.yml "$arc3_protocol_qualifier_workflow_blob"
+verify_blob .github/workflows/self-hosted-se001q-evidence-recovery.yml "$se001q_recovery_workflow_blob"
+verify_blob nix/ci/se001q-trusted-replay.py "$se001q_replay_helper_blob"
 verify_blob nix/ci-rust-shell.nix "$ci_rust_shell_blob"
 verify_blob nix/ci/validate-trusted-runner-bootstrap.sh "$bootstrap_validator_blob"
 verify_blob nix/ci/validate-trusted-runner-promotion.sh "$promotion_verifier_blob"
@@ -150,9 +154,9 @@ git diff --exit-code
 git diff --cached --exit-code
 test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
 
-promotion_manifest="$(mktemp /tmp/symthaea-trusted-runner-promotion-v3.XXXXXX)"
+promotion_manifest="$(mktemp /tmp/symthaea-trusted-runner-promotion-v4.XXXXXX)"
 cat > "$promotion_manifest" <<EOF
-schema=symthaea.trusted-runner.promotion.v3
+schema=symthaea.trusted-runner.promotion.v4
 result=PASS
 bootstrap_manifest_sha256=$actual_manifest_sha256
 authorized_recovery_head=$operator_authorized_head
@@ -160,6 +164,8 @@ promoted_main_head=$public_main
 promoted_main_tree=$public_main_tree
 smoke_workflow_blob=$smoke_workflow_blob
 arc3_protocol_qualifier_workflow_blob=$arc3_protocol_qualifier_workflow_blob
+se001q_recovery_workflow_blob=$se001q_recovery_workflow_blob
+se001q_replay_helper_blob=$se001q_replay_helper_blob
 ci_rust_shell_blob=$ci_rust_shell_blob
 runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
@@ -169,6 +175,7 @@ promotion_ancestry_checked=PASS
 promotion_tree_identity_checked=PASS
 promotion_diff_surface_checked=PASS
 promotion_artifact_blobs_checked=PASS
+se001q_recovery_artifacts_checked=PASS
 promotion_local_checkout_checked=PASS
 promotion_refs_stable=PASS
 evidence_scope=stage-d-smoke-eligibility-only
