@@ -17,6 +17,8 @@ use crate::trust::{KeyEligibility, TrustSnapshot, TrustSnapshotError};
 pub const ATTESTATION_SCHEMA: &str = "symthaea.detached-attestation.v1";
 const ATTESTATION_MESSAGE_DOMAIN: &str = "symthaea.detached-attestation.message.v1";
 const ATTESTATION_IDENTITY_DOMAIN: &str = "symthaea.detached-attestation.identity.v1";
+const ATTESTATION_POLICY_DOMAIN: &str = "symthaea.detached-attestation-policy.identity.v1";
+const VERIFIED_AUTHORITY_DOMAIN: &str = "symthaea.verified-attestation-authority.identity.v1";
 pub const MAX_KEY_ID_BYTES: usize = 256;
 pub const MAX_SIGNATURE_BYTES: usize = 64 * 1024;
 pub const MAX_SIGNATURES: usize = 64;
@@ -209,8 +211,13 @@ impl Default for AttestationPolicy {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttestationPolicyError {
+    InvalidPolicy,
+}
+
 impl AttestationPolicy {
-    fn is_valid(&self) -> bool {
+    pub fn validate(&self) -> Result<(), AttestationPolicyError> {
         if self.minimum_valid_signatures == 0
             || self.maximum_signatures == 0
             || self.maximum_signatures > MAX_SIGNATURES
@@ -221,15 +228,41 @@ impl AttestationPolicy {
             || self.minimum_valid_signatures > self.maximum_signatures
             || self.required_algorithms.iter().any(|item| !item.is_canonical())
         {
-            return false;
+            return Err(AttestationPolicyError::InvalidPolicy);
         }
-        self.allowed_key_ids.as_ref().is_none_or(|ids| {
-            ids.iter().all(|key_id| {
-                !key_id.is_empty()
-                    && key_id == key_id.trim()
-                    && key_id.len() <= self.maximum_key_id_bytes
+        if self.allowed_key_ids.as_ref().is_some_and(|ids| {
+            ids.iter().any(|key_id| {
+                key_id.is_empty()
+                    || key_id != key_id.trim()
+                    || key_id.len() > self.maximum_key_id_bytes
             })
-        })
+        }) {
+            return Err(AttestationPolicyError::InvalidPolicy);
+        }
+        Ok(())
+    }
+
+    pub fn digest(&self) -> Result<Sha256Digest, AttestationPolicyError> {
+        self.validate()?;
+        let mut digest = FramedDigest::new(ATTESTATION_POLICY_DOMAIN);
+        digest.text(&self.minimum_valid_signatures.to_string());
+        digest.text(&self.maximum_signatures.to_string());
+        digest.text(&self.maximum_signature_bytes.to_string());
+        digest.text(&self.maximum_key_id_bytes.to_string());
+        for algorithm in &self.required_algorithms {
+            digest.text("required-algorithm");
+            digest_signature_algorithm(&mut digest, algorithm);
+        }
+        match &self.allowed_key_ids {
+            None => digest.text("allow-any-key-id"),
+            Some(ids) => {
+                digest.text("restricted-key-ids");
+                for key_id in ids {
+                    digest.text(key_id);
+                }
+            }
+        }
+        Ok(digest.digest())
     }
 }
 
@@ -274,6 +307,7 @@ pub struct AttestationVerificationReport {
     pub valid_signers: Vec<(SignatureAlgorithm, String)>,
     pub violations: Vec<AttestationViolation>,
     pub attestation_sha256: Sha256Digest,
+    pub policy_sha256: Option<Sha256Digest>,
     pub trust_snapshot_sha256: Option<Sha256Digest>,
     pub evaluation_time_unix_s: Option<u64>,
 }
@@ -285,24 +319,29 @@ impl AttestationVerificationReport {
         self.violations.is_empty()
     }
 
-    /// Authority-capable trust additionally requires a bound lifecycle snapshot
-    /// and evaluation time. Diagnostic verification can never return true here.
+    /// Authority-capable trust additionally requires exact policy, lifecycle
+    /// snapshot, and evaluation-time bindings. Diagnostic verification can never
+    /// return true here.
     pub fn trusted(&self) -> bool {
         self.verification_passed()
+            && self.policy_sha256.is_some()
             && self.trust_snapshot_sha256.is_some()
             && self.evaluation_time_unix_s.is_some()
     }
 }
 
 /// Capability-bearing attestation. It is intentionally not deserializable;
-/// rehydration must rerun signature, expectation, and trust-lifecycle checks.
+/// rehydration must rerun signature, policy, expectation, and trust-lifecycle
+/// checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VerifiedAttestation {
     envelope: AttestationEnvelope,
     attestation_sha256: Sha256Digest,
-    valid_signers: Vec<(SignatureAlgorithm, String)>,
+    policy_sha256: Sha256Digest,
     trust_snapshot_sha256: Sha256Digest,
     evaluation_time_unix_s: u64,
+    authority_sha256: Sha256Digest,
+    valid_signers: Vec<(SignatureAlgorithm, String)>,
 }
 
 impl VerifiedAttestation {
@@ -314,8 +353,8 @@ impl VerifiedAttestation {
         &self.attestation_sha256
     }
 
-    pub fn valid_signers(&self) -> &[(SignatureAlgorithm, String)] {
-        &self.valid_signers
+    pub fn policy_sha256(&self) -> &Sha256Digest {
+        &self.policy_sha256
     }
 
     pub fn trust_snapshot_sha256(&self) -> &Sha256Digest {
@@ -324,6 +363,15 @@ impl VerifiedAttestation {
 
     pub fn evaluation_time_unix_s(&self) -> u64 {
         self.evaluation_time_unix_s
+    }
+
+    /// Identity of the authority grant, not merely of the signed envelope.
+    pub fn authority_sha256(&self) -> &Sha256Digest {
+        &self.authority_sha256
+    }
+
+    pub fn valid_signers(&self) -> &[(SignatureAlgorithm, String)] {
+        &self.valid_signers
     }
 }
 
@@ -352,16 +400,31 @@ pub fn verify_attestation_authority(
     if !report.trusted() {
         return Err(report);
     }
+    let policy_sha256 = report
+        .policy_sha256
+        .clone()
+        .expect("trusted verification must bind an exact attestation policy");
+    let trust_snapshot_sha256 = report
+        .trust_snapshot_sha256
+        .clone()
+        .expect("trusted verification must bind a trust snapshot");
+    let evaluation_time_unix_s = report
+        .evaluation_time_unix_s
+        .expect("trusted verification must bind evaluation time");
+    let authority_sha256 = verified_authority_digest(
+        &report.attestation_sha256,
+        &policy_sha256,
+        &trust_snapshot_sha256,
+        evaluation_time_unix_s,
+    );
     Ok(VerifiedAttestation {
         envelope,
         attestation_sha256: report.attestation_sha256,
+        policy_sha256,
+        trust_snapshot_sha256,
+        evaluation_time_unix_s,
+        authority_sha256,
         valid_signers: report.valid_signers,
-        trust_snapshot_sha256: report
-            .trust_snapshot_sha256
-            .expect("trusted lifecycle verification must bind a trust snapshot"),
-        evaluation_time_unix_s: report
-            .evaluation_time_unix_s
-            .expect("trusted lifecycle verification must bind evaluation time"),
     })
 }
 
@@ -375,6 +438,13 @@ fn verify_internal(
     let mut violations = Vec::new();
     let mut valid_signers = Vec::new();
     let attestation_sha256 = attestation_digest(envelope);
+    let policy_sha256 = match policy.digest() {
+        Ok(digest) => Some(digest),
+        Err(AttestationPolicyError::InvalidPolicy) => {
+            violations.push(AttestationViolation::InvalidPolicy);
+            None
+        }
+    };
     let mut trust_snapshot_sha256 = None;
     let evaluation_time_unix_s = trust.map(|context| context.evaluation_time_unix_s);
     let mut trust_usable = false;
@@ -395,9 +465,6 @@ fn verify_internal(
         violations.push(AttestationViolation::ContextMismatch);
     }
 
-    if !policy.is_valid() {
-        violations.push(AttestationViolation::InvalidPolicy);
-    }
     if envelope.signatures.len() > policy.maximum_signatures {
         violations.push(AttestationViolation::TooManySignatures {
             actual: envelope.signatures.len(),
@@ -564,6 +631,7 @@ fn verify_internal(
         valid_signers,
         violations,
         attestation_sha256,
+        policy_sha256,
         trust_snapshot_sha256,
         evaluation_time_unix_s,
     }
@@ -585,6 +653,20 @@ pub fn attestation_digest(envelope: &AttestationEnvelope) -> Sha256Digest {
         digest.text(&signature.key_id);
         digest.text(Sha256Digest::of_bytes(&signature.signature).as_str());
     }
+    digest.digest()
+}
+
+fn verified_authority_digest(
+    attestation_sha256: &Sha256Digest,
+    policy_sha256: &Sha256Digest,
+    trust_snapshot_sha256: &Sha256Digest,
+    evaluation_time_unix_s: u64,
+) -> Sha256Digest {
+    let mut digest = FramedDigest::new(VERIFIED_AUTHORITY_DOMAIN);
+    digest.text(attestation_sha256.as_str());
+    digest.text(policy_sha256.as_str());
+    digest.text(trust_snapshot_sha256.as_str());
+    digest.text(&evaluation_time_unix_s.to_string());
     digest.digest()
 }
 
@@ -689,22 +771,26 @@ mod tests {
         .unwrap()
     }
 
+    fn expectation<'a>(
+        purpose: &'a TrustUsage,
+        envelope: &'a AttestationEnvelope,
+    ) -> AttestationExpectation<'a> {
+        AttestationExpectation {
+            purpose,
+            subject_sha256: &envelope.subject_sha256,
+            payload_sha256: &envelope.payload_sha256,
+            context_sha256: envelope.context_sha256.as_ref(),
+        }
+    }
+
     #[test]
     fn lifecycle_authority_mints_private_capability() {
         let envelope = envelope();
         let purpose = usage();
-        let subject = envelope.subject_sha256.clone();
-        let payload = envelope.payload_sha256.clone();
-        let context = envelope.context_sha256.clone();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
         let verified = verify_attestation_authority(
-            envelope,
-            AttestationExpectation {
-                purpose: &purpose,
-                subject_sha256: &subject,
-                payload_sha256: &payload,
-                context_sha256: context.as_ref(),
-            },
+            envelope.clone(),
+            expectation(&purpose, &envelope),
             &AttestationPolicy::default(),
             &EchoVerifier,
             AttestationTrustContext {
@@ -714,23 +800,19 @@ mod tests {
         )
         .unwrap();
         assert_eq!(verified.valid_signers().len(), 1);
+        assert_eq!(
+            verified.policy_sha256(),
+            &AttestationPolicy::default().digest().unwrap()
+        );
     }
 
     #[test]
     fn diagnostic_verification_is_not_trusted_authority() {
         let envelope = envelope();
         let purpose = usage();
-        let subject = envelope.subject_sha256.clone();
-        let payload = envelope.payload_sha256.clone();
-        let context = envelope.context_sha256.clone();
         let report = verify_attestation(
             &envelope,
-            AttestationExpectation {
-                purpose: &purpose,
-                subject_sha256: &subject,
-                payload_sha256: &payload,
-                context_sha256: context.as_ref(),
-            },
+            expectation(&purpose, &envelope),
             &AttestationPolicy::default(),
             &EchoVerifier,
         );
@@ -742,18 +824,10 @@ mod tests {
     fn revoked_signer_cannot_mint_authority() {
         let envelope = envelope();
         let purpose = usage();
-        let subject = envelope.subject_sha256.clone();
-        let payload = envelope.payload_sha256.clone();
-        let context = envelope.context_sha256.clone();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Revoked);
         let report = verify_attestation_authority(
-            envelope,
-            AttestationExpectation {
-                purpose: &purpose,
-                subject_sha256: &subject,
-                payload_sha256: &payload,
-                context_sha256: context.as_ref(),
-            },
+            envelope.clone(),
+            expectation(&purpose, &envelope),
             &AttestationPolicy::default(),
             &EchoVerifier,
             AttestationTrustContext {
@@ -772,17 +846,15 @@ mod tests {
     fn payload_substitution_is_rejected_even_with_valid_signature() {
         let envelope = envelope();
         let purpose = usage();
-        let subject = envelope.subject_sha256.clone();
         let wrong_payload = Sha256Digest::of_bytes(b"other-payload");
-        let context = envelope.context_sha256.clone();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
         let report = verify_attestation_authority(
-            envelope,
+            envelope.clone(),
             AttestationExpectation {
                 purpose: &purpose,
-                subject_sha256: &subject,
+                subject_sha256: &envelope.subject_sha256,
                 payload_sha256: &wrong_payload,
-                context_sha256: context.as_ref(),
+                context_sha256: envelope.context_sha256.as_ref(),
             },
             &AttestationPolicy::default(),
             &EchoVerifier,
@@ -799,18 +871,10 @@ mod tests {
     fn stale_snapshot_cannot_mint_authority() {
         let envelope = envelope();
         let purpose = usage();
-        let subject = envelope.subject_sha256.clone();
-        let payload = envelope.payload_sha256.clone();
-        let context = envelope.context_sha256.clone();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
         let report = verify_attestation_authority(
-            envelope,
-            AttestationExpectation {
-                purpose: &purpose,
-                subject_sha256: &subject,
-                payload_sha256: &payload,
-                context_sha256: context.as_ref(),
-            },
+            envelope.clone(),
+            expectation(&purpose, &envelope),
             &AttestationPolicy::default(),
             &EchoVerifier,
             AttestationTrustContext {
@@ -851,25 +915,55 @@ mod tests {
     fn malformed_policy_fails_closed() {
         let envelope = envelope();
         let purpose = usage();
-        let subject = envelope.subject_sha256.clone();
-        let payload = envelope.payload_sha256.clone();
-        let context = envelope.context_sha256.clone();
         let policy = AttestationPolicy {
             required_algorithms: BTreeSet::from([SignatureAlgorithm::Other(" bad ".into())]),
             ..AttestationPolicy::default()
         };
         let report = verify_attestation(
             &envelope,
-            AttestationExpectation {
-                purpose: &purpose,
-                subject_sha256: &subject,
-                payload_sha256: &payload,
-                context_sha256: context.as_ref(),
-            },
+            expectation(&purpose, &envelope),
             &policy,
             &EchoVerifier,
         );
         assert!(report.violations.contains(&AttestationViolation::InvalidPolicy));
+        assert!(report.policy_sha256.is_none());
         assert!(!report.trusted());
+    }
+
+    #[test]
+    fn policy_changes_authority_identity_even_for_same_envelope() {
+        let envelope = envelope();
+        let purpose = usage();
+        let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
+        let default_policy = AttestationPolicy::default();
+        let relaxed_capacity_policy = AttestationPolicy {
+            maximum_signatures: 8,
+            ..AttestationPolicy::default()
+        };
+        let left = verify_attestation_authority(
+            envelope.clone(),
+            expectation(&purpose, &envelope),
+            &default_policy,
+            &EchoVerifier,
+            AttestationTrustContext {
+                evaluation_time_unix_s: 500,
+                snapshot: &trust_snapshot,
+            },
+        )
+        .unwrap();
+        let right = verify_attestation_authority(
+            envelope.clone(),
+            expectation(&purpose, &envelope),
+            &relaxed_capacity_policy,
+            &EchoVerifier,
+            AttestationTrustContext {
+                evaluation_time_unix_s: 500,
+                snapshot: &trust_snapshot,
+            },
+        )
+        .unwrap();
+        assert_eq!(left.attestation_sha256(), right.attestation_sha256());
+        assert_ne!(left.policy_sha256(), right.policy_sha256());
+        assert_ne!(left.authority_sha256(), right.authority_sha256());
     }
 }
