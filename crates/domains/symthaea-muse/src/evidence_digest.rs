@@ -44,6 +44,8 @@ pub mod perceptual_unblinding;
 pub mod perceptual_model_input;
 #[path = "perceptual_glmm_result.rs"]
 pub mod perceptual_glmm_result;
+#[path = "perceptual_glmm_strict_interval.rs"]
+pub mod perceptual_glmm_strict_interval;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
