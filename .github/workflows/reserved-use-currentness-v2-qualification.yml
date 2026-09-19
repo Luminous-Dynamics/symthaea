@@ -1,0 +1,132 @@
+name: Reserved Use Currentness v0.2 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/reserved-use-currentness-v2-qualification.yml'
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/bridges/symthaea-action-frontier/**'
+      - 'crates/bridges/symthaea-reserved-use-currentness/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reserved-use-currentness-v2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  exact-head:
+    name: Exact-head reserved-use currentness v2
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce reserved-use authority ratchets
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-reserved-use-currentness/src/lib.rs
+
+          grep -Fq 'pub struct ReservedUseCurrentnessV2' "${SRC}"
+          grep -Fq 'pub struct CurrentnessBoundArmedReservationV2' "${SRC}"
+          grep -Fq 'authority_state.ensure_fresh' "${SRC}"
+          grep -Fq 'evaluate_reserved_use_nonbudget' "${SRC}"
+          grep -Fq 'frontier.arm_outcome_unknown' "${SRC}"
+          grep -Fq 'PersistedHeadMismatch' "${SRC}"
+
+          if grep -Fq 'DispatchPermit' "${SRC}"; then
+            echo 'V2D-A must not define or consume a dispatch permit' >&2
+            exit 1
+          fi
+
+          awk '/#\[cfg\(test\)\]/{exit} {print}' "${SRC}" > /tmp/reserved-use-currentness.prod.rs
+          if grep -Eq 'GrantUseState::|GrantUseState[[:space:]]*\{' /tmp/reserved-use-currentness.prod.rs; then
+            echo 'production reserved-use currentness must not manufacture accounting counters' >&2
+            exit 1
+          fi
+          if grep -Eq 'Phi|phi|conscious|simulation score|confidence score' /tmp/reserved-use-currentness.prod.rs; then
+            echo 'cognition/simulation/confidence must not enter positive authority currentness' >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import pathlib
+          import re
+
+          source = pathlib.Path('crates/bridges/symthaea-reserved-use-currentness/src/lib.rs').read_text()
+          for name in ('ReservedUseCurrentnessV2', 'CurrentnessBoundArmedReservationV2'):
+              match = re.search(r'#\[derive\((.*?)\)\]\s*pub struct ' + name, source, re.DOTALL)
+              if not match:
+                  raise SystemExit(f'could not locate derive surface for {name}')
+              derives = {part.strip() for part in match.group(1).split(',')}
+              forbidden = {'Clone', 'Copy', 'Serialize', 'Deserialize'} & derives
+              if forbidden:
+                  raise SystemExit(f'{name} must remain affine/non-Serde: {sorted(forbidden)}')
+          PY
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-reserved-use-currentness -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-reserved-use-currentness --all-targets
+          cargo test -p symthaea-reserved-use-currentness
+          cargo clippy -p symthaea-reserved-use-currentness --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-reserved-use-currentness --all-targets
+          cargo test --locked -p symthaea-reserved-use-currentness
+          cargo clippy --locked -p symthaea-reserved-use-currentness --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
