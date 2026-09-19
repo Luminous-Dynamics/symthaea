@@ -22,6 +22,7 @@ pub mod mining;
 pub mod properties;
 pub mod strategic;
 pub mod thermodynamic_evidence;
+pub mod wolverine_ablation;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
 pub use database::{MaterialDatabase, MaterialSearchResult};
@@ -46,4 +47,9 @@ pub use strategic::{
 pub use thermodynamic_evidence::{
     NormalizedThermodynamicEvidence, ThermodynamicDatabase, ThermodynamicEvidenceError,
     ThermodynamicEvidenceOrigin,
+};
+pub use wolverine_ablation::{
+    AtomicFractionPpm, COMPOSITION_PPM_TOTAL, CONTROLLED_ER_PPM, WOLVERINE_SCREENING_TABLE_ID,
+    WolverineAblationError, WolverineAblationManifest, WolverineCandidate, WolverineCandidateRole,
+    generate_wolverine_ablation_manifest, screen_wolverine_candidate,
 };

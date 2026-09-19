@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "study_id": "MAT-004:Ti-Zr-Nb-Ta-Er-ablation-v1",
+  "generator_version": "mat-004-generator-v1",
+  "candidates": [
+    {
+      "canonical_id": "sweep:Ti250000-Zr250000-Nb250000-Ta250000-Er000000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 0,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 250000 },
+        { "atomic_number": 40, "fraction_ppm": 250000 },
+        { "atomic_number": 41, "fraction_ppm": 250000 },
+        { "atomic_number": 73, "fraction_ppm": 250000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "sweep:Ti248750-Zr248750-Nb248750-Ta248750-Er005000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 5000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 248750 },
+        { "atomic_number": 40, "fraction_ppm": 248750 },
+        { "atomic_number": 41, "fraction_ppm": 248750 },
+        { "atomic_number": 73, "fraction_ppm": 248750 },
+        { "atomic_number": 68, "fraction_ppm": 5000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "sweep:Ti247500-Zr247500-Nb247500-Ta247500-Er010000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 10000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 247500 },
+        { "atomic_number": 40, "fraction_ppm": 247500 },
+        { "atomic_number": 41, "fraction_ppm": 247500 },
+        { "atomic_number": 73, "fraction_ppm": 247500 },
+        { "atomic_number": 68, "fraction_ppm": 10000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "sweep:Ti245000-Zr245000-Nb245000-Ta245000-Er020000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 20000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 245000 },
+        { "atomic_number": 40, "fraction_ppm": 245000 },
+        { "atomic_number": 41, "fraction_ppm": 245000 },
+        { "atomic_number": 73, "fraction_ppm": 245000 },
+        { "atomic_number": 68, "fraction_ppm": 20000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "sweep:Ti237500-Zr237500-Nb237500-Ta237500-Er050000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 50000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 237500 },
+        { "atomic_number": 40, "fraction_ppm": 237500 },
+        { "atomic_number": 41, "fraction_ppm": 237500 },
+        { "atomic_number": 73, "fraction_ppm": 237500 },
+        { "atomic_number": 68, "fraction_ppm": 50000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "sweep:Ti225000-Zr225000-Nb225000-Ta225000-Er100000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 100000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 225000 },
+        { "atomic_number": 40, "fraction_ppm": 225000 },
+        { "atomic_number": 41, "fraction_ppm": 225000 },
+        { "atomic_number": 73, "fraction_ppm": 225000 },
+        { "atomic_number": 68, "fraction_ppm": 100000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "sweep:Ti212500-Zr212500-Nb212500-Ta212500-Er150000:ppm",
+      "role": "ControlledSweep",
+      "er_fraction_ppm": 150000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 212500 },
+        { "atomic_number": 40, "fraction_ppm": 212500 },
+        { "atomic_number": 41, "fraction_ppm": 212500 },
+        { "atomic_number": 73, "fraction_ppm": 212500 },
+        { "atomic_number": 68, "fraction_ppm": 150000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    },
+    {
+      "canonical_id": "legacy:Ti250000-Zr250000-Nb200000-Ta150000-Er150000:ppm",
+      "role": "LegacyReference",
+      "er_fraction_ppm": 150000,
+      "components": [
+        { "atomic_number": 22, "fraction_ppm": 250000 },
+        { "atomic_number": 40, "fraction_ppm": 250000 },
+        { "atomic_number": 41, "fraction_ppm": 200000 },
+        { "atomic_number": 73, "fraction_ppm": 150000 },
+        { "atomic_number": 68, "fraction_ppm": 150000 }
+      ],
+      "screening_table_id": "symthaea-wolverine-screening-table-v1:legacy-radii-melting-points"
+    }
+  ]
+}
