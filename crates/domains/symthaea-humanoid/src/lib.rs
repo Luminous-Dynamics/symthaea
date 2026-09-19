@@ -37,6 +37,8 @@ pub mod inprocess_sparse_qp;
 pub mod inverse_dynamics;
 pub mod morphology;
 #[cfg(feature = "mujoco")]
+pub mod mujoco_complete_contact_evidence;
+#[cfg(feature = "mujoco")]
 pub mod mujoco_contact_interaction;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_contact_kinematics;
@@ -100,6 +102,8 @@ pub use hierarchical::*;
 pub use inprocess_solver_certification::*;
 pub use inprocess_sparse_qp::*;
 pub use inverse_dynamics::*;
+#[cfg(feature = "mujoco")]
+pub use mujoco_complete_contact_evidence::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_contact_interaction::*;
 #[cfg(feature = "mujoco")]
