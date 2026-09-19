@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Pure content-addressed data-lineage contracts for the Interaction Fabric.
 //!
-//! This crate tracks exact content provenance and monotone policy-restriction
-//! inheritance across derivations. It deliberately performs no networking,
-//! policy evaluation, declassification, credential access, authority checks,
-//! persistence, or external effects.
+//! This crate tracks exact content provenance plus monotone policy-restriction
+//! and trust-disposition inheritance across derivations. It deliberately
+//! performs no networking, policy evaluation, declassification, credential
+//! access, authority checks, persistence, or external effects.
 //!
 //! Core separation:
 //!
@@ -152,12 +152,12 @@ impl OriginKind {
     }
 }
 
-/// Control-plane disposition carried with content provenance.
+/// Content/control-plane disposition carried with provenance.
 ///
-/// A disposition is still metadata. In particular, `ControlPlaneCandidate`
-/// does not itself make content authoritative; admission belongs to later
-/// policy/authority layers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A disposition is metadata, never authority. Multiple dispositions may be
+/// present on one derived lineage. For example, a model-generated summary of
+/// an external page carries both `ExternalContent` and `InternalDerived`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ContentDisposition {
     ExternalContent,
     UserContent,
@@ -212,6 +212,10 @@ impl SourceBinding {
         })
     }
 
+    pub const fn disposition(&self) -> ContentDisposition {
+        self.disposition
+    }
+
     #[must_use]
     pub fn digest(&self) -> Digest32 {
         let mut transcript = Transcript::new(SOURCE_DOMAIN);
@@ -260,15 +264,17 @@ impl TransformRef {
 
 /// Content-addressed provenance node.
 ///
-/// Restrictions are opaque policy/classification commitments. They propagate
-/// monotonically through `derive`; this tranche intentionally has no API that
-/// removes a parent restriction or performs declassification.
+/// Restrictions are opaque policy/classification commitments. Restrictions and
+/// dispositions both propagate monotonically through `derive`; this tranche
+/// intentionally has no API that removes a parent restriction/disposition or
+/// performs declassification/control-plane promotion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataLineage {
     content_commitment: Digest32,
     parents: Vec<Digest32>,
     source: Option<SourceBinding>,
     transform: Option<TransformRef>,
+    dispositions: Vec<ContentDisposition>,
     restrictions: Vec<Digest32>,
 }
 
@@ -278,11 +284,13 @@ impl DataLineage {
         source: SourceBinding,
         restrictions: Vec<Digest32>,
     ) -> Result<Self, LineageError> {
+        let disposition = source.disposition();
         Ok(Self {
             content_commitment,
             parents: Vec::new(),
             source: Some(source),
             transform: None,
+            dispositions: vec![disposition],
             restrictions: normalize_digest_set("restrictions", restrictions)?,
         })
     }
@@ -309,10 +317,15 @@ impl DataLineage {
             parents.iter().map(DataLineage::digest).collect(),
         )?;
 
+        let mut dispositions = vec![ContentDisposition::InternalDerived];
         let mut restrictions = Vec::new();
         for parent in parents {
+            dispositions.extend_from_slice(&parent.dispositions);
             restrictions.extend_from_slice(&parent.restrictions);
         }
+        dispositions.sort();
+        dispositions.dedup();
+
         restrictions.extend(added_restrictions);
         restrictions.sort();
         restrictions.dedup();
@@ -329,8 +342,13 @@ impl DataLineage {
             parents: parent_ids,
             source: None,
             transform: Some(transform),
+            dispositions,
             restrictions,
         })
+    }
+
+    pub fn dispositions(&self) -> &[ContentDisposition] {
+        &self.dispositions
     }
 
     pub fn restrictions(&self) -> &[Digest32] {
@@ -349,6 +367,7 @@ impl DataLineage {
         transcript.digest_set(&self.parents);
         transcript.optional_digest(self.source.as_ref().map(SourceBinding::digest));
         transcript.optional_digest(self.transform.as_ref().map(TransformRef::digest));
+        transcript.disposition_set(&self.dispositions);
         transcript.digest_set(&self.restrictions);
         transcript.finish()
     }
@@ -468,6 +487,13 @@ impl Transcript {
         }
     }
 
+    fn disposition_set(&mut self, values: &[ContentDisposition]) {
+        self.u32(values.len() as u32);
+        for value in values {
+            self.u16(value.code());
+        }
+    }
+
     fn finish(self) -> Digest32 {
         let digest = self.hasher.finalize();
         let mut bytes = [0_u8; 32];
@@ -516,7 +542,7 @@ mod tests {
     fn origin_vector_is_stable() {
         assert_eq!(
             origin(0x44).digest().to_hex(),
-            "3a5c84412dd2d110c0c373f2754d7240a31537fdae6a4428dc5d6218aa241be3"
+            "8118245e56a36f4c803615e67c93ecba35f501c8bb7ce4581c7c8660837b9227"
         );
     }
 
@@ -532,7 +558,7 @@ mod tests {
         .expect("derived");
         assert_eq!(
             derived.digest().to_hex(),
-            "f05cbba506c2023a014cfc530741bb2920da45651ccb270ceeb98d354abe127d"
+            "efe6ab1a262bd04d52aad1bc9271a771a0fb70c9c33aa698d4c4981b3e2768b0"
         );
     }
 
@@ -553,6 +579,25 @@ mod tests {
         assert!(derived.restrictions().contains(&Digest32::new([0x44; 32])));
         assert!(derived.restrictions().contains(&Digest32::new([0x55; 32])));
         assert!(derived.restrictions().contains(&Digest32::new([0x88; 32])));
+    }
+
+    #[test]
+    fn derived_lineage_preserves_external_disposition_locally() {
+        let derived = DataLineage::derive(
+            Digest32::new([0x66; 32]),
+            &[origin(0x44)],
+            TransformRef::new("summarize/v1", None).expect("transform"),
+            Vec::new(),
+        )
+        .expect("derived");
+
+        assert_eq!(
+            derived.dispositions(),
+            &[
+                ContentDisposition::ExternalContent,
+                ContentDisposition::InternalDerived,
+            ]
+        );
     }
 
     #[test]
