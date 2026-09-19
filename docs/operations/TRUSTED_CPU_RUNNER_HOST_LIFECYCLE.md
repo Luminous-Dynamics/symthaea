@@ -29,7 +29,9 @@ At the repository-pinned nixpkgs revision, the runner service is configured so t
 - the runner uses a dynamic user and strict systemd filesystem/device/process restrictions;
 - the original access-token path and private comparison token are inaccessible to job code;
 - runner self-update is disabled;
-- default GitHub labels are disabled and only `symthaea-trusted-cpu-v1` is advertised.
+- default GitHub labels are disabled and only `symthaea-trusted-cpu-v1` is advertised;
+- the DynamicUser runner receives only a fixed supplementary group for the local Stage-F authorization socket;
+- the Stage-F authorization ledger is root-owned persistent host state outside the runner state/work directories.
 
 These properties are mechanically frozen by `nix/tests/eval-github-actions-runner.nix`.
 
@@ -38,6 +40,7 @@ However, the underlying machine remains the same machine unless the operator sep
 The following state can therefore persist across registrations/jobs outside the cleaned runner directories:
 
 - the Nix store and build cache;
+- the root-owned Stage-F authorization-consumption ledger;
 - operating-system state not owned by the runner service;
 - host/network identity and routing environment;
 - externally retained system/runner logs;
@@ -51,6 +54,60 @@ clean runner state
         !=
 fresh host state
 ```
+
+## One-time Stage-F authorization ledger
+
+The persistent appliance carries a dedicated root-owned ledger at:
+
+```text
+/var/lib/symthaea-stage-f-authorizations
+```
+
+It is **not** the upstream GitHub runner `StateDirectory` and must never be folded into the directory that ephemeral runner startup clears.
+
+Job code cannot write this directory directly. A root-owned, socket-activated local service owns the minimal protocol:
+
+```text
+BOOT_ID
+CONSUME <64-hex authorization nonce> <64-hex authorization-capsule SHA-256>
+```
+
+The socket is reachable only by the runner's fixed supplementary group. Successful `CONSUME` atomically creates a root-owned nonce marker and records the authorization SHA-256. A second attempt to consume the same nonce fails closed.
+
+The intended theorem is:
+
+```text
+valid Stage-F authorization.v2
++ qualified host boot identity
++ unused 256-bit nonce
++ atomic root-owned CONSUME
+= exactly one eligible execution attempt
+```
+
+The ledger provides **authority replay prevention**, not scientific evidence. Its contents do not qualify SE-001, classify a failure, or grant repair authority.
+
+A trusted job that can reach the socket can at worst consume a known authorization early, causing denial of service. It cannot delete a root-owned marker, mint an authorization capsule, make an old boot current, or turn a consumed authorization into additional authority. The recovery host remains an isolated trust appliance; do not add unrelated local users/services to the socket group.
+
+### Boot binding
+
+Stage-D smoke v2 records the Linux kernel boot ID after successfully querying the root authorization consumer. `recovery-eligibility.v5` carries that exact boot ID, and every Stage-F authorization.v2 must bind it.
+
+Immediately before consuming a nonce, the Stage-F workflow asks the root consumer for the current boot ID and requires an exact match.
+
+Therefore:
+
+```text
+host reboot
+=> prior smoke.v2 stale
+=> prior recovery-eligibility.v5 unusable
+=> prior Stage-F authorization.v2 unusable
+```
+
+A reboot requires a fresh Stage-D smoke, fresh Stage-E join, and a newly reviewed Stage-F authorization. This prevents loss/replacement of host-local state across a reboot from silently reopening prior execution authority.
+
+Root/operator mutation remains inside the host trust root. If the authorization ledger is deleted, rolled back, restored from an older snapshot, corrupted, or otherwise administratively altered, invalidate the current runner-substrate evidence and repeat Stage D/E before issuing any new Stage-F authorization.
+
+Do not garbage-collect nonce markers during a qualified boot. If ledger maintenance is necessary, perform it only across an explicit substrate reset and fresh smoke/eligibility generation.
 
 ## Allowed scope for the persistent-appliance profile
 
@@ -107,6 +164,8 @@ The next job must not inherit writable state from the previous candidate.
 
 Acceptable implementations may include a newly provisioned VM, a one-shot cloud instance, a disposable NixOS VM, or another architecture that demonstrates equivalent destruction/reversion semantics. Merely deleting `_work`, `RUNNER_TEMP`, or GitHub runner credential files is not equivalent.
 
+A future host-ephemeral design needs a replacement one-time authorization theorem. It must not assume the persistent-host ledger survives machine destruction.
+
 ## Nix-store boundary
 
 The Nix store is intentionally useful as a deterministic dependency/cache substrate, but on a persistent appliance it is cross-job host state.
@@ -131,13 +190,14 @@ Before Stage D/E recovery use, establish external retention for at least:
 - runner `Runner_*` logs;
 - runner `Worker_*` job logs where available;
 - relevant systemd journal records for `github-runner-symthaea-validation.service`;
+- `symthaea-stage-f-authorization@*.service` authorization-consumer records;
 - host boot/generation identity;
 - runner registration/restart timestamps;
 - disk/GC/resource exhaustion events relevant to correctness availability.
 
 The external destination must not expose a write path back into the runner and must have a declared retention period.
 
-Do not place GitHub access tokens or other secrets in diagnostic output.
+Do not place GitHub access tokens or other secrets in diagnostic output. Stage-F authorization nonces are authority identifiers, not credentials, but should still be retained only as part of the declared authorization/evidence record.
 
 ## Post-job persistent-host checks
 
@@ -150,6 +210,8 @@ new registration has the same unique capability label
 runner work directory began clean
 runner state was rebuilt from the external credential
 no unexpected service/sandbox policy drift
+host boot identity still equals the qualified smoke boot
+consumed Stage-F nonce marker remains present and root-owned
 host disk remained within declared bounds
 ```
 
@@ -167,24 +229,30 @@ candidate correctness PASS != performance equivalence
 host reuse != evidence reuse
 cache reuse != independent evidence
 new runner registration != new scientific observation
+Stage-F authorization != scientific authority
+Stage-F consumption != candidate PASS
+consumed authorization != reusable authorization
+host reboot != same recovery-eligibility epoch
 ```
 
-A recovered correctness result must continue to bind the exact source, harness, toolchain, runner/hardware context, and command/gate identity.
+A recovered correctness result must continue to bind the exact source, harness, toolchain, runner/hardware context, host boot, authorization, authorization consumption, and command/gate identity.
 
 ## Activation gate for current v1
 
 The persistent-appliance recovery profile is eligible for activation only after all of the following are true:
 
-1. the exact recovery branch generation receives fresh operator authorization;
+1. the exact recovery branch generation receives fresh external bootstrap authorization;
 2. Stage-A bootstrap validation succeeds on that exact generation;
-3. the eval-only runner and routing tests pass;
+3. the eval-only runner and routing tests pass, including one-time authorization ledger isolation;
 4. the external access-token file satisfies the existing root ownership/mode/no-newline contract;
 5. the host contains no unrelated credentials, production mounts, privileged control sockets, or sensitive LAN reachability;
-6. external runner/system log retention is configured and tested;
+6. external runner/system/authorization-consumer log retention is configured and tested;
 7. the runner appears with exactly `symthaea-trusted-cpu-v1` and no default labels;
-8. the main-only smoke succeeds;
-9. only the exact reviewed recovery workflows are dispatched;
-10. the operator records that this is a **persistent hardened host** profile, not a disposable-VM profile.
+8. the main-only smoke.v2 succeeds and binds the current host boot;
+9. recovery-eligibility.v5 joins the exact promotion and smoke identities;
+10. each Stage-F execution receives its own exact one-use authorization.v2 and unique 256-bit nonce;
+11. only the exact reviewed recovery workflows are dispatched;
+12. the operator records that this is a **persistent hardened host** profile, not a disposable-VM profile.
 
 ## Future Tier-Q gate
 
@@ -199,7 +267,8 @@ Before Tier Q can execute general candidate product code on self-hosted capacity
 - no secret exposure;
 - network egress policy appropriate to unmerged candidate code;
 - cleanup/destruction proof after each job;
-- denial of fork/untrusted external sources.
+- denial of fork/untrusted external sources;
+- one-time authorization semantics appropriate to an ephemeral host.
 
 Until then, Tier Q should prefer GitHub-hosted runners, and `symthaea-trusted-cpu-v1` remains a narrow recovery capability.
 
