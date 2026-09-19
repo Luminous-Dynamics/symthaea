@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod repository_effect_policy;
 mod repository_snapshot;
 mod repository_snapshot_diff;
 mod repository_snapshot_receipt;
@@ -63,6 +64,21 @@ enum Commands {
         /// Head repository-source snapshot receipt.
         #[arg(long)]
         head: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Evaluate an exact source-transition policy over two validated repository snapshots.
+    RepositoryEffectCheck {
+        /// Base repository-source snapshot receipt.
+        #[arg(long)]
+        base: PathBuf,
+        /// Head repository-source snapshot receipt.
+        #[arg(long)]
+        head: PathBuf,
+        /// Strict repository effect-policy JSON.
+        #[arg(long)]
+        policy: PathBuf,
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
@@ -198,6 +214,14 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RepositorySnapshotDiff { base, head, output } => {
             repository_snapshot_diff::run(&base, &head, output)?;
+        }
+        Commands::RepositoryEffectCheck {
+            base,
+            head,
+            policy,
+            output,
+        } => {
+            repository_effect_policy::run(&base, &head, &policy, output)?;
         }
     }
     Ok(())
