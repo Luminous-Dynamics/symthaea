@@ -1,0 +1,54 @@
+name: Math Retrieval Runtime Adapter
+
+on:
+  pull_request:
+    paths:
+      - 'tools/math-retrieval-runtime-seam/**'
+      - '.github/scripts/validate-math-search-experiment-v2.py'
+      - '.github/scripts/validate-math-search-experiment-v2.1.py'
+      - '.github/scripts/validate-math-retrieval-*.py'
+      - '.github/workflows/math-retrieval-runtime-adapter.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify runtime evidence adapter
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Requalify standalone Rust seam
+        run: |
+          cargo fmt --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml -- --check
+          cargo check --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml --locked
+          cargo test --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml --locked
+
+      - name: Check adapter syntax
+        run: python3 -m py_compile tools/math-retrieval-runtime-seam/qualify_contract_adapter.py
+
+      - name: Run frozen validator self-tests
+        run: |
+          python3 .github/scripts/validate-math-retrieval-graph-v1.1.py --self-test
+          python3 .github/scripts/validate-math-retrieval-trace.py --self-test
+          python3 .github/scripts/validate-math-retrieval-payload-audit.py --self-test
+
+      - name: Qualify graph -> Rust trace -> payload evidence
+        run: python3 tools/math-retrieval-runtime-seam/qualify_contract_adapter.py
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-ret-runtime-adapter-${{ github.sha }}
+          path: tools/math-retrieval-runtime-seam/target/contract-adapter-fixture/
+          if-no-files-found: error
+          retention-days: 30
