@@ -14,6 +14,8 @@ umask 077
 REPOSITORY_URL='https://github.com/Luminous-Dynamics/symthaea.git'
 RECOVERY_BRANCH='ci/nixos-ephemeral-runner-v1'
 EXPECTED_HEAD="${SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD:-}"
+AUTHORIZATION_PATH="${SYMTHAEA_TRUSTED_RECOVERY_AUTHORIZATION_PATH:-}"
+EXPECTED_AUTHORIZATION_SHA256="${SYMTHAEA_TRUSTED_RECOVERY_AUTHORIZATION_SHA256:-}"
 
 if [[ "${GITHUB_ACTIONS:-}" == 'true' ]]; then
   echo 'bootstrap validator must run directly on the isolated host, not inside GitHub Actions' >&2
@@ -24,8 +26,16 @@ if [[ ! "$EXPECTED_HEAD" =~ ^[0-9a-f]{40}$ ]]; then
   echo 'SYMTHAEA_TRUSTED_RECOVERY_EXPECTED_HEAD must be an explicitly operator-authorized 40-hex commit SHA' >&2
   exit 1
 fi
+[[ -n "$AUTHORIZATION_PATH" && -f "$AUTHORIZATION_PATH" ]] || {
+  echo 'SYMTHAEA_TRUSTED_RECOVERY_AUTHORIZATION_PATH must name the exact retained external bootstrap authorization capsule' >&2
+  exit 1
+}
+[[ "$EXPECTED_AUTHORIZATION_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+  echo 'SYMTHAEA_TRUSTED_RECOVERY_AUTHORIZATION_SHA256 must be the independently recorded 64-hex authorization-capsule SHA-256' >&2
+  exit 1
+}
 
-for command in git nix sha256sum mktemp awk bash; do
+for command in git nix sha256sum mktemp awk bash realpath; do
   command -v "$command" >/dev/null 2>&1 || {
     echo "required command missing: $command" >&2
     exit 1
@@ -34,6 +44,64 @@ done
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
+ROOT_REAL="$(realpath "$ROOT")"
+AUTHORIZATION_REAL="$(realpath "$AUTHORIZATION_PATH")"
+case "$AUTHORIZATION_REAL" in
+  "$ROOT_REAL"|"$ROOT_REAL"/*)
+    echo 'bootstrap authorization capsule must be retained outside the repository it authorizes' >&2
+    exit 1
+    ;;
+esac
+
+authorization_sha256="$(sha256sum "$AUTHORIZATION_REAL" | awk '{print $1}')"
+[[ "$authorization_sha256" == "$EXPECTED_AUTHORIZATION_SHA256" ]] || {
+  echo 'bootstrap authorization capsule bytes do not match the independently recorded SHA-256' >&2
+  printf 'expected=%s\nactual=%s\n' "$EXPECTED_AUTHORIZATION_SHA256" "$authorization_sha256" >&2
+  exit 1
+}
+
+authorization_value() {
+  local key="$1" value count
+  value="$(awk -v k="$key" 'index($0, k "=") == 1 { sub(/^[^=]*=/, ""); print }' "$AUTHORIZATION_REAL")"
+  count="$(awk -v k="$key" 'index($0, k "=") == 1 { n += 1 } END { print n + 0 }' "$AUTHORIZATION_REAL")"
+  [[ "$count" == '1' && -n "$value" ]] || {
+    echo "authorization key must occur exactly once with a non-empty value: $key" >&2
+    exit 1
+  }
+  printf '%s' "$value"
+}
+
+authorization_schema="$(authorization_value schema)"
+authorization_decision="$(authorization_value decision)"
+authorization_repository="$(authorization_value repository)"
+authorization_branch="$(authorization_value recovery_branch)"
+authorization_recovery_head="$(authorization_value authorized_recovery_head)"
+authorization_recovery_tree="$(authorization_value authorized_recovery_tree)"
+authorization_main_head="$(authorization_value authorized_main_head)"
+authorization_main_tree="$(authorization_value authorized_main_tree)"
+authorization_diff_paths_sha256="$(authorization_value recovery_diff_paths_sha256)"
+authorization_scope="$(authorization_value authorization_scope)"
+authorization_stage_f_authority="$(authorization_value stage_f_authority)"
+authorization_qualification_claim="$(authorization_value qualification_claim)"
+authorization_repair_authority_claim="$(authorization_value repair_authority_claim)"
+
+[[ "$authorization_schema" == 'symthaea.trusted-runner.bootstrap-authorization.v1' ]]
+[[ "$authorization_decision" == 'AUTHORIZE_BOOTSTRAP' ]]
+[[ "$authorization_repository" == "$REPOSITORY_URL" ]]
+[[ "$authorization_branch" == "$RECOVERY_BRANCH" ]]
+[[ "$authorization_recovery_head" =~ ^[0-9a-f]{40}$ ]]
+[[ "$authorization_recovery_tree" =~ ^[0-9a-f]{40}$ ]]
+[[ "$authorization_main_head" =~ ^[0-9a-f]{40}$ ]]
+[[ "$authorization_main_tree" =~ ^[0-9a-f]{40}$ ]]
+[[ "$authorization_diff_paths_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$authorization_scope" == 'trusted-runner-bootstrap-only' ]]
+[[ "$authorization_stage_f_authority" == 'NONE' ]]
+[[ "$authorization_qualification_claim" == 'NONE' ]]
+[[ "$authorization_repair_authority_claim" == 'NONE' ]]
+[[ "$authorization_recovery_head" == "$EXPECTED_HEAD" ]] || {
+  echo 'explicit expected head and authorization-capsule recovery head disagree' >&2
+  exit 1
+}
 
 origin_url="$(git remote get-url origin)"
 if [[ "$origin_url" != "$REPOSITORY_URL" && "$origin_url" != 'https://github.com/Luminous-Dynamics/symthaea' ]]; then
@@ -44,9 +112,10 @@ fi
 initial_head="$(git rev-parse HEAD)"
 initial_tree="$(git rev-parse HEAD^{tree})"
 
-if [[ "$initial_head" != "$EXPECTED_HEAD" ]]; then
-  echo 'checked-out recovery generation is not the operator-authorized generation' >&2
-  printf 'authorized_head=%s\nworking_head=%s\n' "$EXPECTED_HEAD" "$initial_head" >&2
+if [[ "$initial_head" != "$EXPECTED_HEAD" || "$initial_tree" != "$authorization_recovery_tree" ]]; then
+  echo 'checked-out recovery generation does not equal the externally authorized commit/tree' >&2
+  printf 'authorized_head=%s\nworking_head=%s\nauthorized_tree=%s\nworking_tree=%s\n' \
+    "$EXPECTED_HEAD" "$initial_head" "$authorization_recovery_tree" "$initial_tree" >&2
   exit 1
 fi
 
@@ -64,6 +133,13 @@ refresh_public_refs
 main_head_start="$(git rev-parse refs/remotes/origin/main)"
 main_tree_start="$(git rev-parse refs/remotes/origin/main^{tree})"
 recovery_head_start="$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")"
+
+if [[ "$main_head_start" != "$authorization_main_head" || "$main_tree_start" != "$authorization_main_tree" ]]; then
+  echo 'public main no longer equals the exact main identity authorized for bootstrap' >&2
+  printf 'authorized_main_head=%s\npublic_main_head=%s\nauthorized_main_tree=%s\npublic_main_tree=%s\n' \
+    "$authorization_main_head" "$main_head_start" "$authorization_main_tree" "$main_tree_start" >&2
+  exit 1
+fi
 
 if [[ "$recovery_head_start" != "$EXPECTED_HEAD" ]]; then
   echo 'published recovery branch does not equal the operator-authorized generation' >&2
@@ -118,6 +194,11 @@ if [[ "$actual_paths" != "$expected_paths" ]]; then
 fi
 
 diff_paths_sha256="$(printf '%s\n' "$actual_paths" | sha256sum | awk '{print $1}')"
+[[ "$diff_paths_sha256" == "$authorization_diff_paths_sha256" ]] || {
+  echo 'reviewed recovery path digest differs from the external bootstrap authorization capsule' >&2
+  exit 1
+}
+
 runner_module_blob="$(git rev-parse "$recovery_head_start:nix/modules/github-actions-runner.nix")"
 routing_policy_blob="$(git rev-parse "$recovery_head_start:nix/tests/eval-trusted-runner-routing.nix")"
 smoke_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-runner-smoke.yml")"
@@ -142,6 +223,7 @@ rust_channel="$(nix eval --raw --expr '(builtins.fromTOML (builtins.readFile ./r
 host_nix_system="$(nix eval --raw --impure --expr builtins.currentSystem)"
 host_nix_version="$(nix --version | awk '{print $3}')"
 
+printf 'bootstrap_authorization_sha256=%s\n' "$authorization_sha256"
 printf 'bootstrap_authorized_head=%s\n' "$EXPECTED_HEAD"
 printf 'bootstrap_recovery_head=%s\n' "$recovery_head_start"
 printf 'bootstrap_main_head=%s\n' "$main_head_start"
@@ -212,12 +294,16 @@ fi
 [[ "$initial_head" == "$recovery_head_end" ]]
 git merge-base --is-ancestor "$main_head_end" "$recovery_head_end"
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v8.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v9.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v8
+schema=symthaea.trusted-runner.bootstrap.v9
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
+operator_authorization_sha256=$authorization_sha256
+operator_authorization_schema=$authorization_schema
+operator_authorization_scope=$authorization_scope
+operator_authorization_stage_f_authority=$authorization_stage_f_authority
 operator_authorized_head=$EXPECTED_HEAD
 recovery_head=$recovery_head_end
 source_tree=$initial_tree
@@ -244,6 +330,7 @@ host_nix_version=$host_nix_version
 flake_lock_sha256=$flake_lock_sha256
 rust_toolchain_sha256=$rust_toolchain_sha256
 operator_authorization_checked=PASS
+operator_authorization_external=PASS
 runner_policy_eval=PASS
 routing_policy_eval=PASS
 minimal_locked_rust_check=PASS
