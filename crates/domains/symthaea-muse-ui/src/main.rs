@@ -13,6 +13,7 @@ mod atlas_page;
 mod audio_reactivity;
 mod browser_playback;
 pub mod comparison;
+pub mod comparison_timeline;
 mod create_page;
 mod evidence_view;
 mod harmony_view;
