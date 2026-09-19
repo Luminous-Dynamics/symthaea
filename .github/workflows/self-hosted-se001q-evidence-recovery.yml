@@ -111,6 +111,7 @@ jobs:
             --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
 
       - name: Capture independent provider evidence under pinned Rust and Python
+        id: capture
         shell: bash
         run: |
           set -euo pipefail
@@ -141,25 +142,124 @@ jobs:
               --evidence "$EVIDENCE_DIR" \
               --bundle "$BUNDLE_PATH"
 
-      - name: Publish concise provider boundary
+      - name: Publish provider boundary or reconstructible rejection evidence
+        if: always()
         shell: bash
+        env:
+          CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
         run: |
           set -euo pipefail
-          test -s "$EVIDENCE_DIR/summary.json"
-          test -s "$EVIDENCE_DIR/manifest.json"
-          test -s "$BUNDLE_PATH"
+
+          if [[ -n "${EVIDENCE_DIR:-}" && -s "$EVIDENCE_DIR/summary.json" && -s "$EVIDENCE_DIR/manifest.json" && -n "${BUNDLE_PATH:-}" && -s "$BUNDLE_PATH" ]]; then
+            {
+              echo '## SE-001Q trusted CPU reobservation'
+              echo
+              echo "- Frozen subject: \`$TARGET_COMMIT\` / \`$TARGET_TREE\`"
+              echo "- Hosted EV2.4 recipe reference: \`$HOSTED_VERIFIER_COMMIT\`"
+              echo '- Provider: `trusted-cpu-v1`'
+              echo '- Authority: `independent-provider-observation-only`'
+              echo
+              echo '```json'
+              cat "$EVIDENCE_DIR/summary.json"
+              echo '```'
+              echo
+              echo 'Exact evidence-bundle bytes were emitted as numbered base64 chunks in the capture step.'
+              echo 'This run cannot replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
           {
-            echo '## SE-001Q trusted CPU reobservation'
+            echo '## SE-001Q trusted CPU replay rejected or incomplete'
             echo
-            echo "- Frozen subject: \`$TARGET_COMMIT\` / \`$TARGET_TREE\`"
-            echo "- Hosted EV2.4 recipe reference: \`$HOSTED_VERIFIER_COMMIT\`"
-            echo '- Provider: `trusted-cpu-v1`'
-            echo '- Authority: `independent-provider-observation-only`'
+            echo "- Capture step outcome: \`${CAPTURE_OUTCOME:-unknown}\`"
+            echo '- Authority: `NONE`'
+            echo '- Qualification: `NONE`'
+            echo '- Repair authority: `NONE`'
             echo
-            echo '```json'
-            cat "$EVIDENCE_DIR/summary.json"
-            echo '```'
+            echo 'The successful observation capsule was not completed. Any partial files below are rejection diagnostics only.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ -z "${HARNESS_DIR:-}" || ! -d "$HARNESS_DIR" || -z "${SOURCE_DIR:-}" || ! -d "$SOURCE_DIR" || -z "${EVIDENCE_DIR:-}" || ! -d "$EVIDENCE_DIR" ]]; then
+            echo 'Trusted directories were not established; no partial evidence capsule can be reconstructed.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          cd "$SOURCE_DIR"
+          export CARGO_HOME="$RUNNER_TEMP/se001q-finalizer-cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/se001q-finalizer-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let
+              f = builtins.getFlake (toString ./.);
+              harness = builtins.getEnv "HARNESS_DIR";
+              shellFile = builtins.toPath (harness + "/nix/ci-rust-shell.nix");
+            in import shellFile {
+              nixpkgs = f.inputs.nixpkgs;
+              rust-overlay = f.inputs.rust-overlay;
+              toolchainFile = ./rust-toolchain.toml;
+              system = builtins.currentSystem;
+            }' \
+            --command python3 - "$EVIDENCE_DIR" <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          evidence = Path(sys.argv[1]).resolve()
+          rejection = {
+              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v1",
+              "result": "REJECTED_OR_INCOMPLETE",
+              "qualification_claim": "NONE",
+              "repair_authority_claim": "NONE",
+              "provider": "trusted-cpu-v1",
+              "capture_step_outcome": os.environ.get("CAPTURE_OUTCOME", "unknown"),
+              "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+              "target_commit": os.environ.get("TARGET_COMMIT", ""),
+              "hosted_verifier_commit": os.environ.get("HOSTED_VERIFIER_COMMIT", ""),
+              "evidence_scope": "independent-provider-rejection-only",
+          }
+          canonical = json.dumps(rejection, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
+          (evidence / "partial-rejection.json").write_bytes(canonical)
+
+          entries = []
+          for path in sorted(p for p in evidence.rglob("*") if p.is_file() and p.name != "partial-manifest.json"):
+              data = path.read_bytes()
+              entries.append({
+                  "path": path.relative_to(evidence).as_posix(),
+                  "sha256": hashlib.sha256(data).hexdigest(),
+                  "bytes": len(data),
+              })
+          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v1", "entries": entries}
+          manifest_id = "sha256:" + hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+          manifest = dict(identity)
+          manifest["manifest_id"] = manifest_id
+          manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+          (evidence / "partial-manifest.json").write_bytes(manifest_bytes)
+
+          files = sorted(p for p in evidence.rglob("*") if p.is_file())
+          print(f"partial_evidence_manifest_id={manifest_id}")
+          print(f"partial_evidence_files={len(files)}")
+          for index, path in enumerate(files):
+              data = path.read_bytes()
+              encoded = base64.b64encode(data).decode("ascii")
+              chunks = [encoded[i:i + 4096] for i in range(0, len(encoded), 4096)]
+              prefix = f"partial_file_{index:06d}"
+              print(f"{prefix}_path={path.relative_to(evidence).as_posix()}")
+              print(f"{prefix}_sha256={hashlib.sha256(data).hexdigest()}")
+              print(f"{prefix}_bytes={len(data)}")
+              print(f"{prefix}_base64_chunks={len(chunks)}")
+              for chunk_index, chunk in enumerate(chunks):
+                  print(f"{prefix}_base64_{chunk_index:06d}={chunk}")
+          PY
+
+          {
             echo
-            echo 'Exact evidence-bundle bytes are emitted as numbered base64 chunks in the preceding job step.'
-            echo 'This run cannot replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.'
+            echo 'Partial rejection evidence was emitted in the job log as individually hashed, numbered base64 file chunks.'
+            echo 'A partial-rejection capsule is diagnostic evidence only; it cannot satisfy the successful replay contract.'
           } >> "$GITHUB_STEP_SUMMARY"
