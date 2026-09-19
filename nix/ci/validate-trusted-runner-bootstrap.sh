@@ -97,6 +97,7 @@ docs/operations/SYM_ARCH_002A_TRUSTED_RECOVERY.md
 docs/operations/TRUSTED_CPU_RUNNER_BOOTSTRAP.md
 docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md
 nix/ci-rust-shell.nix
+nix/ci/se001q-trusted-replay.py
 nix/ci/validate-trusted-runner-bootstrap.sh
 nix/ci/validate-trusted-runner-promotion.sh
 nix/ci/validate-trusted-runner-recovery-eligibility.sh
