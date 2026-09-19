@@ -1,0 +1,92 @@
+{
+  "schema": "symthaea.rel.qualification-pipeline-source.v2",
+  "authority": "PipelineOrchestrationOnly",
+  "relation": "REL-005A",
+  "comparison": {
+    "subject_head": "a47efccf80fa66bacbdfa9930f59c8439be7ee38",
+    "source_run_id": 35349750595,
+    "workflow_name": "REL-005A ComparisonOnly V3 R2",
+    "job_name": "Adjudicate content-addressed sealed REL-005A v3 observation",
+    "artifact_name": "rel-005a-comparison-v3-a47efccf80fa66bacbdfa9930f59c8439be7ee38"
+  },
+  "projection_contract": {
+    "subject_head": "07af7c4bdfdda377aa8175efe7a3233ce90e889e",
+    "source_run_id": 35324485955,
+    "workflow_name": "REL-005A Qualification Projection Contract",
+    "job_name": "Verify EvidenceProjectionOnly contract",
+    "artifact_name": "rel-005a-qualification-projection-contract-07af7c4bdfdda377aa8175efe7a3233ce90e889e"
+  },
+  "predicate_source": {
+    "subject_head": "43bf1d588447f602ce0f1549986bb558a839762c",
+    "source_run_id": 35278498517,
+    "artifact_name": "rel-005a-full-predicate-contract-43bf1d588447f602ce0f1549986bb558a839762c"
+  },
+  "seal_source": {
+    "subject_head": "0a94ed976926fbdcd6b752f94e174df21f915fc8",
+    "source_run_id": 35284772522,
+    "source_job_id": 105414583527,
+    "artifact_name": "rel-005a-observation-seal-v3-6931639e53060809f9d459196a329c4fe983be7b",
+    "observation_sha256": "e271a5c2e6b51fda15cd6c3209e52859296f44ecd790b9c5e72f769d4aec1c4d",
+    "chain_commitment_sha256": "a3a288caa9221ec5859b5ac81fcc55f61b4ff43d5e52ad096021c99ea6bf31ab"
+  },
+  "contracts": {
+    "assembly_head": "3dc01663ff8b2f9f6eb0568f8649ccdd999ddf29",
+    "firewall_head": "952ca3d7754a043f03da0875cf63b8665e63bf91",
+    "qualification_head": "452f0324a561a2872c00b6197237d4db46189f8d",
+    "attestation_head": "2c81facb5b5ffb4e66428871b806f68622c9c188"
+  },
+  "content_blobs": {
+    "predicate_contract": "3cef5bb3e4203ec14b7d2cf8c165ce4e6ba7701a",
+    "projection_contract": "9a2f678d68977dc9d97cc514349feabb932f8bda",
+    "projection_evaluator": "7dfbd35ab39dd8355aa417b2b3269fa388f3fb6f",
+    "qualification_contract": "02b7ff897760c800a53ecb07feaaa745f20d5b7c",
+    "qualification_evaluator": "60663a6e797008669d75712e67acba9e3151a825",
+    "assembly_contract": "f52a2299f0e91d008b9f5384f872e9e62bc80020",
+    "firewall_contract": "3ad7ce19c80d51dea3711edde345649061d8cbb1",
+    "firewall_evaluator": "14c8473d1744f77acca19cff14d643ef6f3e7b67",
+    "attestation_contract": "418e84cfcd097f15191afed42be8859fd951a326",
+    "capsule_builder": "6a4bfbc29926be0a2efa0b7443cbdd476dbb4c2e",
+    "authority_receipt_extractor": "70b94a183b79764ee8a83320776588773e2a4bab",
+    "sealed_manifest_replay": "2500f14919a2ee586ba14f836b766aea5b09bb75",
+    "qualification_assembler": "a10f0841e3bfaca0c85b76714fa47cf2c2ad9a91"
+  },
+  "job_visibility": {
+    "AuthorityReceiptExtractionOnly": {
+      "may_materialize_sealed_source_capsule": true,
+      "may_receive_detailed_comparison": false,
+      "output_raw_observation": false,
+      "output_execution_logs": false,
+      "scientific_observation_fields_parsed": false
+    },
+    "EvidenceProjectionOnly": {
+      "may_receive_authority_receipts": true,
+      "may_receive_detailed_comparison": true,
+      "may_materialize_sealed_source_capsule": false
+    },
+    "QualificationAssemblyOnly": {
+      "may_receive_detailed_comparison": false,
+      "may_receive_projected_metric_free_bundle": true
+    },
+    "QualificationOnly": {
+      "fresh_job": true,
+      "may_receive_only_sanitized_six_file_bundle": true
+    },
+    "AttestationOnly": {
+      "may_receive_only_final_capsule": true
+    }
+  },
+  "final_capsule_name": "rel-005a-qualification-capsule.tar",
+  "allowed_comparison_results": [
+    "ALL_PREDICATES_PASS",
+    "PREDICATE_FAILURES"
+  ],
+  "selected_comparison_result": null,
+  "transport_identity_scientific_authority": false,
+  "claims": {
+    "pipeline_executed": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
