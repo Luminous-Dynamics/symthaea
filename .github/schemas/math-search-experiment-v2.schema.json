@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-search-experiment-v2.schema.json",
+  "title": "Symthaea Mathematical Search Experiment Manifest v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "authority",
+    "stage",
+    "frozen_before_evaluation",
+    "shared_contract",
+    "budget",
+    "statistical_plan_sha256",
+    "seeds",
+    "primary_endpoints",
+    "secondary_endpoints",
+    "manipulation_checks",
+    "strategy_controls",
+    "evolutionary_search",
+    "arms",
+    "planned_contrasts"
+  ],
+  "properties": {
+    "schema_version": { "const": "symthaea.math-search-experiment.v2" },
+    "experiment_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "authority": { "const": "MeasurementOnly" },
+    "stage": {
+      "enum": [
+        "Q0RepresentationRetrieval",
+        "Q1BlindSolvedTransfer",
+        "Q2CrossDomainTransfer",
+        "Q3FormalConjecturesRediscovery",
+        "Q4ResearchHeldOut"
+      ]
+    },
+    "frozen_before_evaluation": { "const": true },
+    "shared_contract": { "$ref": "#/$defs/sharedContract" },
+    "budget": { "$ref": "#/$defs/budget" },
+    "statistical_plan_sha256": { "$ref": "#/$defs/sha256" },
+    "seeds": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": { "type": "integer", "minimum": 0 }
+    },
+    "primary_endpoints": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/endpoint" }
+    },
+    "secondary_endpoints": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "manipulation_checks": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "strategy_controls": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "evolutionary_search": { "const": false },
+    "arms": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 32,
+      "items": { "$ref": "#/$defs/arm" }
+    },
+    "planned_contrasts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": { "$ref": "#/$defs/contrast" }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "endpoint": {
+      "enum": [
+        "StructuralNeighborRecallAtK",
+        "EquivalentFamilyRecallAtK",
+        "MeanReciprocalRank",
+        "NormalizedDiscountedCumulativeGain",
+        "PositiveRankMargin",
+        "FalseEquivalentNeighborRate",
+        "RetrievalLatency",
+        "RetrievalNormalizedCompute",
+        "FormallySolvedRate",
+        "VerifiedUsefulLemmaRate",
+        "ValidCounterexamples",
+        "ProofCallsPerSolved",
+        "SearchNodesPerSolved",
+        "NormalizedComputePerSolved",
+        "TimeToFirstUsefulLemma",
+        "CrossDomainTransferRate",
+        "RepeatedFailureRate",
+        "FalsePruningRate",
+        "HarmfulTransferRate"
+      ]
+    },
+    "sharedContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_set_sha256",
+        "corpus_snapshot_sha256",
+        "knowledge_boundary_sha256",
+        "source_object_contract_sha256",
+        "normalization_contract_sha256",
+        "normalization_implementation_sha256",
+        "toolchain_manifest_sha256",
+        "human_intervention_policy_sha256"
+      ],
+      "properties": {
+        "challenge_set_sha256": { "$ref": "#/$defs/sha256" },
+        "corpus_snapshot_sha256": { "$ref": "#/$defs/sha256" },
+        "knowledge_boundary_sha256": { "$ref": "#/$defs/sha256" },
+        "source_object_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "normalization_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "normalization_implementation_sha256": { "$ref": "#/$defs/sha256" },
+        "toolchain_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "human_intervention_policy_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accounting_policy_sha256",
+        "retrieved_items_max",
+        "retrieved_item_bytes_max",
+        "retrieval_context_bytes_max",
+        "total_context_bytes_max",
+        "normalized_compute_units_max",
+        "wall_time_ms_max",
+        "proof_calls_max",
+        "solver_calls_max",
+        "search_nodes_max",
+        "candidate_count_max",
+        "retrieval_queries_max",
+        "unused_budget_reallocation"
+      ],
+      "properties": {
+        "accounting_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "retrieved_items_max": { "type": "integer", "minimum": 0 },
+        "retrieved_item_bytes_max": { "type": "integer", "minimum": 0 },
+        "retrieval_context_bytes_max": { "type": "integer", "minimum": 0 },
+        "total_context_bytes_max": { "type": "integer", "minimum": 1 },
+        "normalized_compute_units_max": { "type": "number", "exclusiveMinimum": 0 },
+        "wall_time_ms_max": { "type": "integer", "minimum": 1 },
+        "proof_calls_max": { "type": "integer", "minimum": 0 },
+        "solver_calls_max": { "type": "integer", "minimum": 0 },
+        "search_nodes_max": { "type": "integer", "minimum": 0 },
+        "candidate_count_max": { "type": "integer", "minimum": 0 },
+        "retrieval_queries_max": { "type": "integer", "minimum": 0 },
+        "unused_budget_reallocation": { "const": false }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm_id",
+        "arm_role",
+        "representation_channels",
+        "representation_family",
+        "representation_sha256",
+        "retriever_family",
+        "retriever_sha256",
+        "control_kind",
+        "negative_search_memory"
+      ],
+      "properties": {
+        "arm_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$" },
+        "arm_role": { "enum": ["Baseline", "Treatment", "Control", "MemoryAugmented"] },
+        "representation_channels": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["Syntax", "ExactNormalForm"] }
+        },
+        "representation_family": {
+          "enum": ["None", "Lexical", "CanonicalSparse", "HDC", "FusionConventional", "FusionHDC"]
+        },
+        "representation_sha256": { "$ref": "#/$defs/sha256" },
+        "retriever_family": { "enum": ["None", "Conventional", "HDC", "Fusion", "Control"] },
+        "retriever_sha256": { "$ref": "#/$defs/sha256" },
+        "index_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "fusion_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "control_kind": {
+          "enum": ["None", "LexicalRetrieval", "RandomRetrieval", "ShuffledHdcVectors", "PermutedChallengeAssociations"]
+        },
+        "negative_search_memory": { "type": "boolean" },
+        "parent_arm_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$" }
+      }
+    },
+    "contrast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contrast_id",
+        "left_arm_id",
+        "right_arm_id",
+        "intended_difference",
+        "primary_endpoint",
+        "direction"
+      ],
+      "properties": {
+        "contrast_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$" },
+        "left_arm_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$" },
+        "right_arm_id": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$" },
+        "intended_difference": {
+          "enum": [
+            "RetrievalAugmentation",
+            "SyntaxVsNormalForm",
+            "HdcSpecificRepresentation",
+            "FusionBenefit",
+            "RetrieverMechanism",
+            "NegativeSearchMemory",
+            "Control"
+          ]
+        },
+        "primary_endpoint": { "$ref": "#/$defs/endpoint" },
+        "direction": { "enum": ["TwoSided", "LeftGreater", "RightGreater"] }
+      }
+    }
+  }
+}
