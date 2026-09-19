@@ -1,0 +1,149 @@
+name: HUM-WRENCH-001D4 Contact Authority
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/contact_authority.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/hum-wrench-001d4-contact-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001d4-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 20d85a9b694fb7ff224bff9c64f9389cfd3ea203
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-contact-authority-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact head, parent, and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001d4-contact-authority.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source, manifest, and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Static authority-boundary checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/contact_authority.rs
+          test -f "$src"
+          ! grep -F 'use crate::contact::' "$src"
+          ! grep -F 'ContactFrame' "$src"
+          ! grep -F 'FootContact' "$src"
+          ! grep -F 'impl Default for ContactAuthorityPolicyV1' "$src"
+          ! grep -E '#\[derive\([^]]*Default[^]]*\)\]' "$src"
+          grep -F '#[derive(Debug, Clone)]' "$src"
+          grep -F 'pub struct ContactAuthorityStateMachineV1' "$src"
+          grep -F 'ContactAuthorityModeV1::Established' "$src"
+          grep -F 'EvidenceTooOld' "$src"
+          grep -F 'EvidenceTooFarInFuture' "$src"
+          grep -F 'now_s >= self.last_transition_at_s' "$src"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked default compile
+        run: cargo check -p symthaea-humanoid --all-targets --locked
+
+      - name: Focused contact-authority regressions
+        run: cargo test -p symthaea-humanoid contact_authority --locked -- --nocapture
+
+      - name: MuJoCo-feature integration compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Strict default Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --locked -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001d4-evidence
+          {
+            echo "program=HUM-WRENCH-001D4"
+            echo "authority=contact-authority-state-machine-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "runtime_state_deserializable=FALSE"
+            echo "legacy_contactframe_authority=NONE"
+            echo "legacy_footcontact_authority=NONE"
+            echo "scheduled_surface_wrench_authority=NONE"
+            echo "acquiring_surface_wrench_authority=NONE"
+            echo "established_requires_explicit_evidence=TRUE"
+            echo "freshness_policy_default=NONE"
+            echo "freshness_policy_thresholds_qualified=NONE"
+            echo "temporal_causality_check=TRUE"
+            echo "stale_evidence_revocation=TRUE"
+            echo "establishment_epoch_recorded=TRUE"
+            echo "epistemic_source_class_preserved=TRUE"
+            echo "qp_authority=NONE"
+            echo "hardware_contact_truth_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_default=PASS"
+            echo "focused_tests=PASS"
+            echo "compile_mujoco_integration=PASS"
+            echo "clippy_default=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001d4-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001d4-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001d4-evidence/
+          if-no-files-found: error
