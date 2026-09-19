@@ -5,6 +5,7 @@ use std::path::PathBuf;
 mod cargo_adapter_commit;
 #[cfg(test)]
 mod cargo_adapter_postflight;
+mod cargo_adapter_semantics;
 #[cfg(test)]
 mod cargo_adapter_state;
 mod cargo_execution_attempt;
@@ -129,6 +130,21 @@ enum Commands {
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Canonicalize a safe Cargo adapter-semantics descriptor into a content-addressed receipt.
+    CargoAdapterSemantics {
+        /// Strict adapter-semantics input JSON spec.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Write the validated receipt JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Recompute and validate a stored Cargo adapter-semantics receipt.
+    CargoAdapterSemanticsVerify {
+        /// Stored adapter-semantics receipt JSON.
+        #[arg(long)]
+        receipt: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -296,6 +312,12 @@ fn main() -> anyhow::Result<()> {
                 git_worktree_state_after,
                 output,
             )?;
+        }
+        Commands::CargoAdapterSemantics { spec, output } => {
+            cargo_adapter_semantics::run(&spec, output)?;
+        }
+        Commands::CargoAdapterSemanticsVerify { receipt } => {
+            cargo_adapter_semantics::CargoAdapterSemanticsReceipt::load(&receipt)?;
         }
     }
     Ok(())
