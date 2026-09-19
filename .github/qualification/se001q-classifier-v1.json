@@ -1,0 +1,27 @@
+{
+  "schema": "symthaea.qualification-classifier-contract.v1",
+  "classifier_id": "SE-001Q-classifier-v1",
+  "rules": [
+    {
+      "rule_id": "rustfmt-diff-marker-v1",
+      "gate_id": "focused-format",
+      "when": {
+        "exit_code": "nonzero",
+        "combined_output_contains": "Diff in "
+      },
+      "classification": {
+        "state": "CLASSIFIED_FAIL",
+        "failure_class": "FORMAT_DIVERGENCE"
+      }
+    }
+  ],
+  "default_nonzero": {
+    "state": "FAIL_UNCLASSIFIED",
+    "failure_class": null
+  },
+  "invariants": [
+    "classification never grants repair authority",
+    "unmatched nonzero outcomes fail closed as FAIL_UNCLASSIFIED",
+    "a classification is bound to exactly one immutable observation"
+  ]
+}

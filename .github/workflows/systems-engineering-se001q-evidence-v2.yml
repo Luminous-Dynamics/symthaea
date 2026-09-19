@@ -1,0 +1,114 @@
+name: Systems Engineering SE-001Q Evidence Replay v2.2
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/systems-engineering-se001q-evidence-v2.yml'
+      - '.github/qualification/se001q-experiment-v1.json'
+      - '.github/qualification/se001q-classifier-v1.json'
+      - '.github/scripts/se001q_capture.py'
+      - '.github/scripts/se001q_verify.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: se001q-evidence-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  SE001_SUBJECT: 47de7f2a306cffb66b5505786220590aa5f42e90
+
+jobs:
+  frozen-subject-evidence-replay:
+    name: Frozen SE-001 evidence replay v2.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout verifier lineage
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen SE-001 subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SE001_SUBJECT }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install pinned Rust, rustfmt, and Clippy
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Replay every gate with immutable observations and separate classifications
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 verifier/.github/scripts/se001q_capture.py \
+            --subject subject \
+            --verifier verifier \
+            --experiment verifier/.github/qualification/se001q-experiment-v1.json \
+            --classifier verifier/.github/qualification/se001q-classifier-v1.json \
+            --workflow verifier/.github/workflows/systems-engineering-se001q-evidence-v2.yml \
+            --output evidence
+
+      - name: Independently verify the complete replay artifact
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 verifier/.github/scripts/se001q_verify.py \
+            --evidence evidence \
+            --subject subject \
+            --verifier verifier \
+            --experiment verifier/.github/qualification/se001q-experiment-v1.json \
+            --classifier verifier/.github/qualification/se001q-classifier-v1.json \
+            --workflow verifier/.github/workflows/systems-engineering-se001q-evidence-v2.yml \
+            --capture-runner verifier/.github/scripts/se001q_capture.py
+
+      - name: Publish concise replay summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f evidence/summary.json ]]; then
+            {
+              echo '### SE-001Q evidence replay v2.2'
+              echo
+              echo '```json'
+              cat evidence/summary.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'SE-001Q evidence replay did not produce summary.json' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload durable replay evidence
+        id: upload-evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: se001q-evidence-v2_2-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record uploaded artifact identity
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo
+            echo '### Uploaded evidence identity'
+            echo
+            echo 'artifact-id: `${{ steps.upload-evidence.outputs.artifact-id }}`'
+            echo 'artifact-digest: `${{ steps.upload-evidence.outputs.artifact-digest }}`'
+          } >> "$GITHUB_STEP_SUMMARY"
