@@ -5,7 +5,8 @@
 //! The internal `identity` module owns the frozen canonical transcript and
 //! independent golden vector. This facade adds the missing state-transition
 //! theorem so a hash-linked sequence of individually valid snapshots cannot
-//! silently delete, rewrite, or move historical reservations backward.
+//! silently delete, rewrite, move historical reservations backward, or return
+//! authority without a separately verified reconciliation theorem.
 
 #![deny(unsafe_code)]
 
@@ -52,11 +53,16 @@ impl GrantAccountCheckpointV2 {
         Ok(Self { inner })
     }
 
-    /// Construct the exact semantic successor of `previous`.
+    /// Construct the exact ordinary semantic successor of `previous`.
     ///
     /// The previous and next snapshots must both be valid under the exact grant,
     /// and the transition must preserve every historical reservation while
-    /// allowing only the runtime state machine's forward edges.
+    /// allowing only authority-preserving/decreasing ordinary runtime edges.
+    ///
+    /// This constructor deliberately cannot create `ReservationState::Released`.
+    /// Returning capacity is an authority-increasing transition and is reserved
+    /// for a future verifier-owned reconciliation constructor that consumes an
+    /// exact-attempt `ProvenNotApplied` proof.
     pub fn successor(
         previous: &Self,
         grant: &CapabilityGrant,
@@ -101,7 +107,8 @@ impl GrantAccountCheckpointV2 {
 
     /// Rebind the checkpoint payload to the exact externally supplied grant.
     ///
-    /// Success is pointwise structural validity only, not currentness.
+    /// Success is pointwise structural validity only, not currentness and not
+    /// proof that any contained `Released` state was legitimately earned.
     pub fn verify_payload(
         &self,
         grant: &CapabilityGrant,
@@ -141,7 +148,7 @@ impl GrantAccountCheckpointV2 {
             .map_err(identity_error)
     }
 
-    /// Verify that this checkpoint is the exact legal semantic successor of the
+    /// Verify that this checkpoint is the exact legal ordinary successor of the
     /// supplied full previous checkpoint.
     pub fn verify_successor_of(
         &self,
@@ -159,11 +166,12 @@ impl GrantAccountCheckpointV2 {
     }
 }
 
-/// Verify a caller-supplied chain from an empty generation-zero checkpoint.
+/// Verify a caller-supplied ordinary chain from an empty generation-zero checkpoint.
 ///
 /// Every edge is checked for exact predecessor identity and legal account-state
-/// transition. This still does not prove that the supplied final head is the
-/// externally current head; V2C must provide that stronger store/CAS theorem.
+/// transition. This path deliberately cannot authorize a transition into
+/// `Released`. It still does not prove that the supplied final head is the
+/// externally current head; V2C provides the store/CAS theorem.
 pub fn verify_supplied_chain(
     grant: &CapabilityGrant,
     checkpoints: &[GrantAccountCheckpointV2],
@@ -221,20 +229,19 @@ fn same_reservation_identity(
         && old.risk_charge == new.risk_charge
 }
 
+/// Ordinary successor edges only.
+///
+/// `Released` remains representable for future verified reconciliation, but no
+/// ordinary successor may create it. Once present in a future qualified lineage,
+/// it is terminal and may only self-loop.
 fn allowed_state_transition(from: ReservationState, to: ReservationState) -> bool {
     match from {
-        ReservationState::Reserved => matches!(
-            to,
-            ReservationState::Reserved
-                | ReservationState::OutcomeUnknown
-                | ReservationState::Released
-        ),
-        ReservationState::OutcomeUnknown => matches!(
-            to,
-            ReservationState::OutcomeUnknown
-                | ReservationState::Committed
-                | ReservationState::Released
-        ),
+        ReservationState::Reserved => {
+            matches!(to, ReservationState::Reserved | ReservationState::OutcomeUnknown)
+        }
+        ReservationState::OutcomeUnknown => {
+            matches!(to, ReservationState::OutcomeUnknown | ReservationState::Committed)
+        }
         ReservationState::Committed => to == ReservationState::Committed,
         ReservationState::Released => to == ReservationState::Released,
     }
@@ -364,6 +371,78 @@ mod tests {
         assert!(matches!(
             tampered.verify_successor_of(&reserved, &grant),
             Err(CheckpointV2Error::ReservationRemoved)
+        ));
+    }
+
+    #[test]
+    fn ordinary_successor_cannot_refund_reserved_authority() {
+        let grant = grant();
+        let mut account = GrantAccountV2::new_root(&grant).unwrap();
+        let genesis = GrantAccountCheckpointV2::first(&grant, &account).unwrap();
+        let reservation = account
+            .reserve_execution(
+                EffectIntentId(digest(2)),
+                AttemptId(digest(3)),
+                EffectBindingDigest(digest(4)),
+                risk(1),
+            )
+            .unwrap();
+        let reserved = GrantAccountCheckpointV2::successor(&genesis, &grant, &account).unwrap();
+
+        let mut refund = reserved.clone();
+        refund.inner.sequence += 1;
+        refund.inner.previous_checkpoint_digest = Some(reserved.digest().unwrap());
+        refund
+            .inner
+            .snapshot
+            .reservations
+            .get_mut(&reservation)
+            .unwrap()
+            .state = ReservationState::Released;
+
+        assert!(matches!(
+            refund.verify_successor_of(&reserved, &grant),
+            Err(CheckpointV2Error::InvalidReservationStateTransition {
+                from: ReservationState::Reserved,
+                to: ReservationState::Released,
+            })
+        ));
+    }
+
+    #[test]
+    fn ordinary_successor_cannot_refund_unknown_authority() {
+        let grant = grant();
+        let mut account = GrantAccountV2::new_root(&grant).unwrap();
+        let genesis = GrantAccountCheckpointV2::first(&grant, &account).unwrap();
+        let reservation = account
+            .reserve_execution(
+                EffectIntentId(digest(2)),
+                AttemptId(digest(3)),
+                EffectBindingDigest(digest(4)),
+                risk(1),
+            )
+            .unwrap();
+        let reserved = GrantAccountCheckpointV2::successor(&genesis, &grant, &account).unwrap();
+        account.mark_outcome_unknown(reservation).unwrap();
+        let unknown = GrantAccountCheckpointV2::successor(&reserved, &grant, &account).unwrap();
+
+        let mut refund = unknown.clone();
+        refund.inner.sequence += 1;
+        refund.inner.previous_checkpoint_digest = Some(unknown.digest().unwrap());
+        refund
+            .inner
+            .snapshot
+            .reservations
+            .get_mut(&reservation)
+            .unwrap()
+            .state = ReservationState::Released;
+
+        assert!(matches!(
+            refund.verify_successor_of(&unknown, &grant),
+            Err(CheckpointV2Error::InvalidReservationStateTransition {
+                from: ReservationState::OutcomeUnknown,
+                to: ReservationState::Released,
+            })
         ));
     }
 
