@@ -124,8 +124,9 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
     exit 1
   fi
 
-  # Freeze the authorization protocol itself. STATUS is read-only and the
-  # durable consumption record is published by same-directory atomic rename.
+  # Freeze the authorization protocol source and the live ExecStart wiring.
+  # STATUS is read-only and the durable consumption record is published by
+  # same-directory atomic rename.
   grep -F -- 'STATUS)' '${module}' >/dev/null
   grep -F -- 'consumption-record' '${module}' >/dev/null
   grep -F -- 'mv -T -- "$tmp" "$record"' '${module}' >/dev/null
@@ -133,6 +134,65 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   grep -F -- 'CONSUMED_DIFFERENT %s %s' '${module}' >/dev/null
   grep -F -- 'INCOMPLETE %s %s' '${module}' >/dev/null
   grep -F -- 'UNUSED %s %s' '${module}' >/dev/null
+
+  consumer_exec_start='${authorizationConsumer.serviceConfig.ExecStart}'
+  read -r consumer_bin consumer_live_ledger consumer_extra <<< "$consumer_exec_start"
+  test -x "$consumer_bin"
+  test "$consumer_live_ledger" = '${authorizationLedgerDir}'
+  test -z "$consumer_extra"
+
+  # Execute the exact Nix-store program used by the live root service against a
+  # temporary ledger. This proves state-machine behavior without GitHub, root,
+  # the production ledger, or a live socket.
+  test_ledger="$TMPDIR/stage-f-ledger"
+  mkdir -m 0700 "$test_ledger"
+  nonce='0000000000000000000000000000000000000000000000000000000000000001'
+  nonce_incomplete='0000000000000000000000000000000000000000000000000000000000000002'
+  nonce_malformed='0000000000000000000000000000000000000000000000000000000000000003'
+  nonce_unused='0000000000000000000000000000000000000000000000000000000000000004'
+  auth='1111111111111111111111111111111111111111111111111111111111111111'
+  other_auth='2222222222222222222222222222222222222222222222222222222222222222'
+
+  boot_output="$(printf 'BOOT_ID\n' | "$consumer_bin" "$test_ledger")"
+  read -r boot_tag boot_id boot_extra <<< "$boot_output"
+  test "$boot_tag" = 'BOOT_ID'
+  test -z "$boot_extra"
+  [[ "$boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+
+  unused_output="$(printf 'STATUS %s %s\n' "$nonce" "$auth" | "$consumer_bin" "$test_ledger")"
+  test "$unused_output" = "UNUSED $nonce $boot_id"
+
+  consume_output="$(printf 'CONSUME %s %s\n' "$nonce" "$auth" | "$consumer_bin" "$test_ledger")"
+  test "$consume_output" = "CONSUMED $nonce $auth $boot_id"
+  test "$(stat -c '%a' "$test_ledger/$nonce")" = '700'
+  test "$(stat -c '%a' "$test_ledger/$nonce/consumption-record")" = '400'
+  test "$(sed -n '1p' "$test_ledger/$nonce/consumption-record")" = "authorization_sha256=$auth"
+  test "$(sed -n '2p' "$test_ledger/$nonce/consumption-record")" = "boot_id=$boot_id"
+  test "$(wc -l < "$test_ledger/$nonce/consumption-record")" = '2'
+
+  status_output="$(printf 'STATUS %s %s\n' "$nonce" "$auth" | "$consumer_bin" "$test_ledger")"
+  test "$status_output" = "CONSUMED_STATUS $nonce $auth $boot_id"
+  different_output="$(printf 'STATUS %s %s\n' "$nonce" "$other_auth" | "$consumer_bin" "$test_ledger")"
+  test "$different_output" = "CONSUMED_DIFFERENT $nonce $boot_id"
+
+  set +e
+  replay_output="$(printf 'CONSUME %s %s\n' "$nonce" "$auth" | "$consumer_bin" "$test_ledger")"
+  replay_status="$?"
+  set -e
+  test "$replay_status" = '73'
+  test "$replay_output" = "ALREADY_CONSUMED $nonce $boot_id"
+
+  mkdir -m 0700 "$test_ledger/$nonce_incomplete"
+  incomplete_output="$(printf 'STATUS %s %s\n' "$nonce_incomplete" "$auth" | "$consumer_bin" "$test_ledger")"
+  test "$incomplete_output" = "INCOMPLETE $nonce_incomplete $boot_id"
+
+  mkdir -m 0700 "$test_ledger/$nonce_malformed"
+  printf 'authorization_sha256=broken\nboot_id=%s\n' "$boot_id" > "$test_ledger/$nonce_malformed/consumption-record"
+  malformed_output="$(printf 'STATUS %s %s\n' "$nonce_malformed" "$auth" | "$consumer_bin" "$test_ledger")"
+  test "$malformed_output" = "INCOMPLETE $nonce_malformed $boot_id"
+
+  final_unused_output="$(printf 'STATUS %s %s\n' "$nonce_unused" "$auth" | "$consumer_bin" "$test_ledger")"
+  test "$final_unused_output" = "UNUSED $nonce_unused $boot_id"
 
   # Pinned nixpkgs systemd hardening contract.
   test '${if service.serviceConfig.DynamicUser then "true" else "false"}' = 'true'
