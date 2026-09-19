@@ -76,6 +76,9 @@ pub mod assurance_presentation_currentness;
 /// Qualified surface-delivery binding for current authority-bearing presentations.
 #[allow(missing_docs)]
 pub mod assurance_trusted_surface;
+/// Linear one-use confirmation semantics for qualified current surface deliveries.
+#[allow(missing_docs)]
+pub mod assurance_confirmation_use;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
