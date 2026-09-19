@@ -179,9 +179,7 @@ pub enum CheckpointV2Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_action_runtime::{
-        AttemptId, EffectBindingDigest, EffectIntentId, GrantAccountSnapshotV2,
-    };
+    use symthaea_action_runtime::{AttemptId, EffectBindingDigest, EffectIntentId};
     use symthaea_authority::{
         AuthorityContextRef, AuthorityEpoch, Operation, PrincipalId, PurposeId, ResourceRef,
         RiskBudget,
@@ -212,7 +210,11 @@ mod tests {
 
     fn unknown_account(
         grant: &CapabilityGrant,
-    ) -> (GrantAccountCheckpointV2, GrantAccountV2, symthaea_action_runtime::ReservationId) {
+    ) -> (
+        GrantAccountCheckpointV2,
+        GrantAccountV2,
+        symthaea_action_runtime::ReservationId,
+    ) {
         let mut account = GrantAccountV2::new_root(grant).unwrap();
         let genesis = GrantAccountCheckpointV2::first(grant, &account).unwrap();
         let reservation = account
