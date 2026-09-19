@@ -14,6 +14,9 @@ let
   storeToken = builtins.toFile "symthaea-runner-test-token" "not-a-real-secret";
   storeTokenString = toString storeToken;
   upstreamService = "${pkgs.path}/nixos/modules/services/continuous-integration/github-runner/service.nix";
+  authorizationGroup = "symthaea-stage-f-authorization";
+  authorizationLedgerDir = "/var/lib/symthaea-stage-f-authorizations";
+  authorizationSocketPath = "/run/symthaea-stage-f-authorization.sock";
 
   evalWith = runnerConfig:
     import "${pkgs.path}/nixos/lib/eval-config.nix" {
@@ -39,6 +42,8 @@ let
 
   runner = evaluated.config.services.github-runners."symthaea-validation";
   service = evaluated.config.systemd.services."github-runner-symthaea-validation";
+  authorizationSocket = evaluated.config.systemd.sockets.symthaea-stage-f-authorization;
+  authorizationConsumer = evaluated.config.systemd.services."symthaea-stage-f-authorization@";
   publicOptions = evaluated.options.services.symthaea-ci-runner;
   tokenFileType = publicOptions.tokenFile.type;
   firstExecStartPre = builtins.elemAt service.serviceConfig.ExecStartPre 0;
@@ -63,7 +68,8 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   test '${toString (builtins.length runner.extraPackages)}' = '0'
 
   # The Symthaea-specific API must expose only the minimal host knobs. Routing,
-  # lifecycle, token mode, labels, packages, and runner groups are fixed.
+  # lifecycle, token mode, labels, packages, runner groups, and authorization
+  # ledger details are fixed.
   test '${lib.concatStringsSep "," (builtins.attrNames publicOptions)}' = 'enable,name,tokenFile'
 
   # Secret-path safety is a type-system invariant, not only a later assertion:
@@ -86,6 +92,37 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   test '${lib.concatStringsSep "," service.serviceConfig.RuntimeDirectory}' = 'github-runner/symthaea-validation'
   test '${lib.concatStringsSep "," service.serviceConfig.StateDirectory}' = 'github-runner/symthaea-validation'
   test '${service.serviceConfig.WorkingDirectory}' = '%t/github-runner/symthaea-validation'
+
+  # Stage-F one-time authority is consumed by a root-owned local socket service,
+  # not by direct runner access to the persistent ledger.
+  test '${if builtins.hasAttr authorizationGroup evaluated.config.users.groups then "true" else "false"}' = 'true'
+  test '${if lib.elem authorizationGroup service.serviceConfig.SupplementaryGroups then "true" else "false"}' = 'true'
+  test '${authorizationSocket.socketConfig.ListenStream}' = '${authorizationSocketPath}'
+  test '${authorizationSocket.socketConfig.SocketUser}' = 'root'
+  test '${authorizationSocket.socketConfig.SocketGroup}' = '${authorizationGroup}'
+  test '${authorizationSocket.socketConfig.SocketMode}' = '0660'
+  test '${if authorizationSocket.socketConfig.Accept then "true" else "false"}' = 'true'
+  test '${if authorizationSocket.socketConfig.RemoveOnStop then "true" else "false"}' = 'true'
+  printf '%s\n' ${lib.escapeShellArg (lib.concatStringsSep "\n" evaluated.config.systemd.tmpfiles.rules)} | grep -Fx 'd ${authorizationLedgerDir} 0700 root root - -'
+  test '${authorizationConsumer.serviceConfig.User}' = 'root'
+  test '${authorizationConsumer.serviceConfig.Group}' = 'root'
+  test '${authorizationConsumer.serviceConfig.StandardInput}' = 'socket'
+  test '${authorizationConsumer.serviceConfig.StandardOutput}' = 'socket'
+  test '${authorizationConsumer.serviceConfig.StandardError}' = 'journal'
+  test '${authorizationConsumer.serviceConfig.ProtectSystem}' = 'strict'
+  test '${if authorizationConsumer.serviceConfig.NoNewPrivileges then "true" else "false"}' = 'true'
+  test '${if authorizationConsumer.serviceConfig.PrivateDevices then "true" else "false"}' = 'true'
+  test '${if authorizationConsumer.serviceConfig.PrivateTmp then "true" else "false"}' = 'true'
+  test '${if authorizationConsumer.serviceConfig.ProtectHome then "true" else "false"}' = 'true'
+  test '${if authorizationConsumer.serviceConfig.LockPersonality then "true" else "false"}' = 'true'
+  test '${if authorizationConsumer.serviceConfig.MemoryDenyWriteExecute then "true" else "false"}' = 'true'
+  test '${lib.concatStringsSep "," authorizationConsumer.serviceConfig.RestrictAddressFamilies}' = 'AF_UNIX'
+  test '${lib.concatStringsSep "," authorizationConsumer.serviceConfig.ReadWritePaths}' = '${authorizationLedgerDir}'
+  runner_readwrite='${lib.concatStringsSep "," (service.serviceConfig.ReadWritePaths or [ ])}'
+  if echo "$runner_readwrite" | grep -F '${authorizationLedgerDir}'; then
+    echo 'runner unexpectedly has direct write access to Stage-F authorization ledger' >&2
+    exit 1
+  fi
 
   # Pinned nixpkgs systemd hardening contract.
   test '${if service.serviceConfig.DynamicUser then "true" else "false"}' = 'true'
