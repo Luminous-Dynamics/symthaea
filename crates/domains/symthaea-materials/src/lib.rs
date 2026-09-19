@@ -19,6 +19,7 @@ pub mod evidence;
 pub mod haptic_prober;
 pub mod hea_screening;
 pub mod irradiation_evidence;
+pub mod material_subject;
 pub mod mining;
 pub mod properties;
 pub mod strategic;
@@ -42,6 +43,12 @@ pub use irradiation_evidence::{
     ElementDisplacementCurve, ElementDpaContribution, IRRADIATION_COMPOSITION_PPM_TOTAL,
     IrradiationCompositionComponent, IrradiationEvidenceError, IrradiationEvidenceInput,
     NeutronSpectrumBin, calculate_composition_dpa_evidence,
+};
+pub use material_subject::{
+    AtomicCompositionPpm, CompositeConstituent, CompositionGradientKnot, ElementFractionPpm,
+    ElementStoichiometry, MaterialArchitecture, MaterialComposition, MaterialLayer,
+    MaterialPhaseState, MaterialPhaseSubject, MaterialSubject, MaterialSubjectError,
+    SUBJECT_FRACTION_PPM_TOTAL, StoichiometricComposition, SubjectLineageRef,
 };
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
