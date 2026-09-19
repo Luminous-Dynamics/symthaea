@@ -7,6 +7,7 @@
 //! still rejects unsupported mutation variants defensively.
 
 pub mod host;
+pub mod protocol;
 pub mod semantic;
 pub mod service;
 pub mod telemetry;
