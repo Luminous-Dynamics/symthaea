@@ -84,6 +84,7 @@ pub mod sym_rsi_experiment;
 mod sym_rsi_semantic_ambiguity_experiment;
 pub mod sym_rsi_semantic_ambiguity_protocol;
 pub mod sym_rsi_semantic_set_experiment;
+pub mod sym_rsi_semantic_set_stability;
 pub mod sym_rsi_fixtures;
 mod sym_rsi_fresh_evaluation;
 mod sym_rsi_c_fresh_gate;
