@@ -1,0 +1,319 @@
+name: REL-005A Transparent Capsule Finalizer Reusable
+
+on:
+  workflow_call:
+    inputs:
+      source_run_id:
+        description: Exact successful REL-005A Qualification Pipeline V3 run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: rel-005a-transparent-capsule-${{ inputs.source_run_id }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 2dbf4858eb5303390cdb5425638ac7e875081d8b
+  SOURCE_WORKFLOW_NAME: REL-005A Qualification Pipeline V3
+  SOURCE_PIPELINE_HEAD: 460b4c8a8f457f4bbf22820716ed6057d260d4fd
+  QUALIFICATION_ARTIFACT_NAME: rel-005a-qualification-evidence-460b4c8a8f457f4bbf22820716ed6057d260d4fd
+  AUDIT_ARTIFACT_NAME: rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd
+  FINALIZER_CONTRACT_BLOB: eaa9387ff0ba65a2fa9f5ff4dea2e2c9d28aebea
+  ATTESTATION_CONTRACT_BLOB: 2e9cc309ec41527795cc052b5ff05969bc33aa71
+  CAPSULE_BUILDER_BLOB: ddb674825e890334dcd71863656788bec55ee56a
+  OFFLINE_VERIFIER_BLOB: e51d570d57ef6cc001cc334a4f7f1ee26a31a0a0
+  CAPSULE_NAME: rel-005a-qualification-capsule.tar
+
+jobs:
+  finalize:
+    name: Build, offline-verify, and attest transparent qualification capsule
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Checkout exact called-workflow subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          fetch-depth: 0
+
+      - name: Bind exact called-workflow identity, parent, inherited code, and two-file scope
+        shell: bash
+        env:
+          CALLED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${CALLED_WORKFLOW_SHA}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-transparent-capsule-finalizer-contract.json)" = "${FINALIZER_CONTRACT_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-attestation-contract.json)" = "${ATTESTATION_CONTRACT_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/rel-005a-qualification-capsule.py)" = "${CAPSULE_BUILDER_BLOB}"
+          test "$(git rev-parse HEAD:.github/rel/verify-rel-005a-qualification-capsule.py)" = "${OFFLINE_VERIFIER_BLOB}"
+          mapfile -t changed < <(git diff --name-only "${EXPECTED_PARENT}" HEAD | sort)
+          expected=(
+            ".github/rel/rel-005a-transparent-capsule-finalizer-contract.json"
+            ".github/workflows/rel-005a-transparent-capsule-finalizer.yml"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Resolve exact successful source run and transport artifacts
+        id: source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "${SOURCE_RUN_ID}" =~ ^[0-9]+$ ]]
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SOURCE_RUN_ID}" > "${RUNNER_TEMP}/source-run.json"
+          curl -fsSL "${auth[@]}" "${api}/actions/runs/${SOURCE_RUN_ID}/artifacts?per_page=100" > "${RUNNER_TEMP}/source-artifacts.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          run = json.loads((root/'source-run.json').read_text())
+          assert str(run['id']) == os.environ['SOURCE_RUN_ID']
+          assert run['name'] == os.environ['SOURCE_WORKFLOW_NAME']
+          assert run['head_sha'] == os.environ['SOURCE_PIPELINE_HEAD']
+          assert run['status'] == 'completed' and run['conclusion'] == 'success'
+          arts = json.loads((root/'source-artifacts.json').read_text())
+          assert arts['total_count'] <= 100
+          def one(name):
+              found = [a for a in arts['artifacts'] if a['name'] == name and a['expired'] is False]
+              assert len(found) == 1, (name, len(found))
+              a = found[0]
+              assert str(a['workflow_run']['id']) == os.environ['SOURCE_RUN_ID']
+              assert a['workflow_run']['head_sha'] == os.environ['SOURCE_PIPELINE_HEAD']
+              assert isinstance(a['digest'], str) and a['digest'].startswith('sha256:') and len(a['digest']) == 71
+              return a
+          q = one(os.environ['QUALIFICATION_ARTIFACT_NAME'])
+          a = one(os.environ['AUDIT_ARTIFACT_NAME'])
+          out = pathlib.Path(os.environ['GITHUB_OUTPUT'])
+          with out.open('a') as f:
+              f.write(f"qualification_artifact_id={q['id']}\n")
+              f.write(f"qualification_artifact_digest={q['digest']}\n")
+              f.write(f"audit_artifact_id={a['id']}\n")
+              f.write(f"audit_artifact_digest={a['digest']}\n")
+          PY
+
+      - name: Download and verify source transport ZIPs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUALIFICATION_ARTIFACT_ID: ${{ steps.source.outputs.qualification_artifact_id }}
+          QUALIFICATION_ARTIFACT_DIGEST: ${{ steps.source.outputs.qualification_artifact_digest }}
+          AUDIT_ARTIFACT_ID: ${{ steps.source.outputs.audit_artifact_id }}
+          AUDIT_ARTIFACT_DIGEST: ${{ steps.source.outputs.audit_artifact_digest }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${QUALIFICATION_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/qualification.zip"
+          curl -fsSL -L "${auth[@]}" "${api}/actions/artifacts/${AUDIT_ARTIFACT_ID}/zip" -o "${RUNNER_TEMP}/audit.zip"
+          test "$(sha256sum "${RUNNER_TEMP}/qualification.zip" | cut -d' ' -f1)" = "${QUALIFICATION_ARTIFACT_DIGEST#sha256:}"
+          test "$(sha256sum "${RUNNER_TEMP}/audit.zip" | cut -d' ' -f1)" = "${AUDIT_ARTIFACT_DIGEST#sha256:}"
+          mkdir -p "${RUNNER_TEMP}/qualification-source" "${RUNNER_TEMP}/audit-source"
+          unzip -q "${RUNNER_TEMP}/qualification.zip" -d "${RUNNER_TEMP}/qualification-source"
+          unzip -q "${RUNNER_TEMP}/audit.zip" -d "${RUNNER_TEMP}/audit-source"
+
+      - name: Stage exact metric-free transparent capsule input
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, shutil, os
+          qroot = pathlib.Path(os.environ['RUNNER_TEMP'])/'qualification-source'
+          aroot = pathlib.Path(os.environ['RUNNER_TEMP'])/'audit-source'
+          out = pathlib.Path(os.environ['RUNNER_TEMP'])/'transparent-input'
+          out.mkdir()
+          q_expected = {
+            'predicate-contract-receipt.json',
+            'execution-v3-receipt.json',
+            'observation-seal-v3.json',
+            'comparison-only-qualification-receipt.json',
+            'qualification-input-manifest.json',
+            'qualification-assembly-receipt.json',
+            'qualification-only.json',
+          }
+          a_expected = {'sealed-manifest-replay-receipt.json','authority-receipt-extraction.json'}
+          def collect(root, expected):
+              files = [p for p in root.rglob('*') if p.is_file()]
+              names = [p.name for p in files]
+              assert len(names) == len(set(names)), 'duplicate source basename'
+              assert set(names) == expected, (sorted(names), sorted(expected))
+              for p in files:
+                  shutil.copy2(p, out/p.name)
+          collect(qroot, q_expected)
+          collect(aroot, a_expected)
+          assert {p.name for p in out.iterdir() if p.is_file()} == q_expected | a_expected
+          PY
+
+      - name: Build deterministic transparent qualification capsule
+        id: capsule
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/rel/rel-005a-qualification-capsule.py \
+            --input-dir "${RUNNER_TEMP}/transparent-input" \
+            --output "${RUNNER_TEMP}/${CAPSULE_NAME}" \
+            | tee "${RUNNER_TEMP}/attestation-input-receipt.json"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          root = pathlib.Path(os.environ['RUNNER_TEMP'])
+          capsule = root/os.environ['CAPSULE_NAME']
+          receipt = json.loads((root/'attestation-input-receipt.json').read_text())
+          assert receipt['authority'] == 'AttestationInputOnly'
+          assert receipt['member_count'] == 10
+          digest = hashlib.sha256(capsule.read_bytes()).hexdigest()
+          assert receipt['capsule_sha256'] == digest
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"capsule_sha256={digest}\n")
+          PY
+
+      - name: Offline-verify exact capsule before attestation
+        id: offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/rel/verify-rel-005a-qualification-capsule.py "${RUNNER_TEMP}/${CAPSULE_NAME}" \
+            | tee "${RUNNER_TEMP}/offline-verification.json"
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          p = pathlib.Path(os.environ['RUNNER_TEMP'])/'offline-verification.json'
+          r = json.loads(p.read_text())
+          assert r['authority'] == 'OfflineVerificationOnly'
+          assert r['member_count'] == 10
+          assert r['manifest_hashes_verified'] is True
+          assert r['audit_receipt_hash_links_verified'] is True
+          assert r['metric_leakage_absent'] is True
+          assert r['authority_chain_consistent'] is True
+          assert r['qualification_mapping_consistent'] is True
+          with pathlib.Path(os.environ['GITHUB_OUTPUT']).open('a') as f:
+              f.write(f"offline_receipt_sha256={hashlib.sha256(p.read_bytes()).hexdigest()}\n")
+          PY
+
+      - name: Attest exact offline-verified capsule digest
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.CAPSULE_NAME }}
+          subject-digest: sha256:${{ steps.capsule.outputs.capsule_sha256 }}
+
+      - name: Preserve and hash Sigstore attestation bundle
+        id: attestation_bundle
+        shell: bash
+        env:
+          ATTESTATION_BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test -n "${ATTESTATION_BUNDLE_PATH}"
+          test -f "${ATTESTATION_BUNDLE_PATH}"
+          cp "${ATTESTATION_BUNDLE_PATH}" "${RUNNER_TEMP}/sigstore-attestation-bundle.json"
+          digest="$(sha256sum "${RUNNER_TEMP}/sigstore-attestation-bundle.json" | cut -d' ' -f1)"
+          bytes="$(wc -c < "${RUNNER_TEMP}/sigstore-attestation-bundle.json" | tr -d ' ')"
+          echo "attestation_bundle_sha256=${digest}" >> "${GITHUB_OUTPUT}"
+          echo "attestation_bundle_byte_length=${bytes}" >> "${GITHUB_OUTPUT}"
+
+      - name: Build TransparentCapsuleFinalizerOnly receipt
+        shell: bash
+        env:
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+          QUALIFICATION_ARTIFACT_ID: ${{ steps.source.outputs.qualification_artifact_id }}
+          QUALIFICATION_ARTIFACT_DIGEST: ${{ steps.source.outputs.qualification_artifact_digest }}
+          AUDIT_ARTIFACT_ID: ${{ steps.source.outputs.audit_artifact_id }}
+          AUDIT_ARTIFACT_DIGEST: ${{ steps.source.outputs.audit_artifact_digest }}
+          CAPSULE_SHA256: ${{ steps.capsule.outputs.capsule_sha256 }}
+          OFFLINE_RECEIPT_SHA256: ${{ steps.offline.outputs.offline_receipt_sha256 }}
+          ATTESTATION_ID: ${{ steps.attest.outputs.attestation-id }}
+          ATTESTATION_URL: ${{ steps.attest.outputs.attestation-url }}
+          ATTESTATION_BUNDLE_SHA256: ${{ steps.attestation_bundle.outputs.attestation_bundle_sha256 }}
+          ATTESTATION_BUNDLE_BYTE_LENGTH: ${{ steps.attestation_bundle.outputs.attestation_bundle_byte_length }}
+          CALLED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          receipt = {
+            'schema':'symthaea.rel.transparent-capsule-finalizer-receipt.v3',
+            'authority':'TransparentCapsuleFinalizerOnly',
+            'finalizer_workflow_sha':os.environ['CALLED_WORKFLOW_SHA'],
+            'source_workflow':os.environ['SOURCE_WORKFLOW_NAME'],
+            'source_pipeline_head':os.environ['SOURCE_PIPELINE_HEAD'],
+            'source_run_id':int(os.environ['SOURCE_RUN_ID']),
+            'qualification_artifact':{
+              'id':int(os.environ['QUALIFICATION_ARTIFACT_ID']),
+              'name':os.environ['QUALIFICATION_ARTIFACT_NAME'],
+              'digest':os.environ['QUALIFICATION_ARTIFACT_DIGEST'],
+            },
+            'audit_artifact':{
+              'id':int(os.environ['AUDIT_ARTIFACT_ID']),
+              'name':os.environ['AUDIT_ARTIFACT_NAME'],
+              'digest':os.environ['AUDIT_ARTIFACT_DIGEST'],
+            },
+            'capsule_name':os.environ['CAPSULE_NAME'],
+            'capsule_sha256':os.environ['CAPSULE_SHA256'],
+            'attestation_subject_digest':'sha256:'+os.environ['CAPSULE_SHA256'],
+            'offline_verification_receipt_sha256':os.environ['OFFLINE_RECEIPT_SHA256'],
+            'attestation_id':os.environ.get('ATTESTATION_ID',''),
+            'attestation_url':os.environ.get('ATTESTATION_URL',''),
+            'attestation_bundle':{
+              'basename':'sigstore-attestation-bundle.json',
+              'sha256':os.environ['ATTESTATION_BUNDLE_SHA256'],
+              'byte_length':int(os.environ['ATTESTATION_BUNDLE_BYTE_LENGTH']),
+            },
+            'transport_identity_scientific_authority':False,
+            'claims':{
+              'capsule_built':True,
+              'offline_verified':True,
+              'attestation_created':True,
+              'qualification_completed':False,
+              'rel_005a_qualified':False,
+              'scientific_pass':False,
+              'scientific_fail':False,
+            },
+          }
+          pathlib.Path(os.environ['RUNNER_TEMP'],'transparent-finalizer-receipt.json').write_text(json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+          PY
+
+      - name: Upload transparent finalizer evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: rel-005a-transparent-capsule-${{ job.workflow_sha }}-source-${{ inputs.source_run_id }}
+          path: |
+            ${{ runner.temp }}/rel-005a-qualification-capsule.tar
+            ${{ runner.temp }}/attestation-input-receipt.json
+            ${{ runner.temp }}/offline-verification.json
+            ${{ runner.temp }}/sigstore-attestation-bundle.json
+            ${{ runner.temp }}/transparent-finalizer-receipt.json
+            ${{ runner.temp }}/source-run.json
+            ${{ runner.temp }}/source-artifacts.json
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Postflight exact called-workflow subject and checkout immutability
+        if: always()
+        shell: bash
+        env:
+          CALLED_WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${CALLED_WORKFLOW_SHA}"
+          test "$(git rev-parse HEAD^)" = "${EXPECTED_PARENT}"
+          rm -rf .github/rel/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
