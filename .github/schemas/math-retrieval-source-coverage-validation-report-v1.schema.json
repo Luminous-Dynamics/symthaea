@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-source-coverage-validation-report-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Source Coverage Validation Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version","authority","coverage_sha256","candidate_set_sha256","candidate_count",
+    "target_count","representation_occurrences","all_candidate_sources_covered",
+    "all_required_targets_ready","all_checks_passed"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-source-coverage-validation-report-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "coverage_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "candidate_set_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "candidate_count": {"type": "integer", "minimum": 1},
+    "target_count": {"type": "integer", "minimum": 1},
+    "representation_occurrences": {"type": "integer", "minimum": 1},
+    "all_candidate_sources_covered": {"const": true},
+    "all_required_targets_ready": {"const": true},
+    "all_checks_passed": {"const": true}
+  }
+}

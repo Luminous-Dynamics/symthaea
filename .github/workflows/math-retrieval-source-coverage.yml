@@ -1,0 +1,36 @@
+name: Math Retrieval Source Coverage
+
+on:
+  pull_request:
+    paths:
+      - '.github/schemas/math-retrieval-source-coverage-v1.schema.json'
+      - '.github/schemas/math-retrieval-source-coverage-validation-report-v1.schema.json'
+      - '.github/scripts/validate-math-retrieval-source-coverage.py'
+      - '.github/scripts/validate-math-retrieval-candidate-set.py'
+      - '.github/scripts/validate-math-search-experiment-v2.1.py'
+      - '.github/workflows/math-retrieval-source-coverage.yml'
+      - 'docs/research/MATH_RET_SOURCE_COVERAGE_001A.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Validate common retrieval representation coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON schemas parse
+        run: |
+          python -m json.tool .github/schemas/math-retrieval-source-coverage-v1.schema.json >/dev/null
+          python -m json.tool .github/schemas/math-retrieval-source-coverage-validation-report-v1.schema.json >/dev/null
+      - name: Compile validator
+        run: python -m py_compile .github/scripts/validate-math-retrieval-source-coverage.py
+      - name: Re-run dependencies
+        run: |
+          python .github/scripts/validate-math-retrieval-candidate-set.py --self-test
+          python .github/scripts/validate-math-search-experiment-v2.1.py --self-test
+      - name: Run adversarial coverage self-test
+        run: python .github/scripts/validate-math-retrieval-source-coverage.py --self-test
