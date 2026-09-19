@@ -88,6 +88,10 @@ pub mod assurance_measured_attestation;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_platform_ingress;
 
+// Current-policy admission for exact strict ingress profiles and observations.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_ingress_policy;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
