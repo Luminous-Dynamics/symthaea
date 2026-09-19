@@ -11,6 +11,9 @@
 //! activation commit. Preflight, review eligibility, a sandbox, or a digest alone
 //! are insufficient to create post-restart mutation authority.
 
+#[path = "epistemic_restart_authority_epoch_issuance_record.rs"]
+pub mod issuance_record;
+
 use std::error::Error;
 use std::fmt;
 
