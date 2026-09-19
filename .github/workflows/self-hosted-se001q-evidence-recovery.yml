@@ -340,7 +340,9 @@ jobs:
           PY
 
           consumption_sha256="$(sha256sum "$receipt_path" | awk '{print $1}')"
-          consumption_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["consumption_id"])' "$receipt_path" 2>/dev/null || true)"
+          receipt_line="$(<"$receipt_path")"
+          consumption_id="${receipt_line#*\"consumption_id\":\"}"
+          consumption_id="${consumption_id%%\"*}"
           [[ "$consumption_sha256" =~ ^[0-9a-f]{64}$ ]]
           [[ "$consumption_id" =~ ^sha256:[0-9a-f]{64}$ ]]
           {
