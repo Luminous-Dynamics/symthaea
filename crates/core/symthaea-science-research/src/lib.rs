@@ -12,11 +12,12 @@
 //! non-forgeable qualified-claim capabilities, delegated-root ratification of
 //! historical qualification, witnessed transparency publication of exact
 //! qualification ratifications and lifecycle events, append-only authenticated
-//! qualification lifecycle records, observed-view currentness assessments, typed
-//! provenance graphs, frozen study protocols, immutable execution/conformance
-//! records, adversarial falsification campaigns, explicit scientific uncertainty
-//! budgets, and provenance-checked replication lineage assessments. It does not
-//! run experiments, solvers, LLMs, HDC, statistics, formal provers, or network
+//! qualification lifecycle records, observed-view currentness assessments,
+//! complete-tail lifecycle publication freshness assessments, typed provenance
+//! graphs, frozen study protocols, immutable execution/conformance records,
+//! adversarial falsification campaigns, explicit scientific uncertainty budgets,
+//! and provenance-checked replication lineage assessments. It does not run
+//! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
 //! operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
@@ -45,6 +46,7 @@ pub mod qualification_decision_authority;
 mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
 pub mod qualification_lifecycle;
+pub mod qualification_lifecycle_head_freshness;
 pub mod qualification_lifecycle_publication;
 pub mod qualification_observed_currentness;
 pub mod qualification_profile_authority;
@@ -86,6 +88,7 @@ pub use qualification_eligibility::{
 };
 pub use qualification_eligibility_gate::*;
 pub use qualification_lifecycle::*;
+pub use qualification_lifecycle_head_freshness::*;
 pub use qualification_lifecycle_publication::*;
 pub use qualification_observed_currentness::*;
 pub use qualification_profile_authority::*;
