@@ -23,6 +23,8 @@
 //!   quorums whose identity metadata derives from the authorized trust root;
 //! - monitor receipts that detect witnessed equivocation and verify append-only
 //!   growth within one exact root-authority lineage;
+//! - stable transparency-log namespaces whose delegated authority can transfer
+//!   across an exact dual-root transition only with append-only handoff proofs;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
 //!   temporal lifecycle facts;
@@ -43,6 +45,7 @@ mod time;
 mod transparency;
 mod transparency_checkpoint;
 mod transparency_monitor;
+mod transparency_namespace;
 mod transparency_witness;
 mod trust;
 mod trust_root;
@@ -63,6 +66,7 @@ pub use time::*;
 pub use transparency::*;
 pub use transparency_checkpoint::*;
 pub use transparency_monitor::*;
+pub use transparency_namespace::*;
 pub use transparency_witness::*;
 pub use trust::*;
 pub use trust_root::*;
