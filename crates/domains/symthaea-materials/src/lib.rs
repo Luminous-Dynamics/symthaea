@@ -26,6 +26,7 @@ pub mod mining;
 pub mod multi_fidelity;
 pub mod novelty_synthesis;
 mod novelty_synthesis_hash;
+pub mod orchestrator;
 pub mod properties;
 pub mod sample_lineage;
 pub mod search_memory;
@@ -82,6 +83,10 @@ pub use novelty_synthesis::{
     MetastableProcessWindow, NoveltyAssessment, NoveltyAssessmentState, NoveltySynthesisError,
     PriorArtHitClass, PriorArtNeighborhood, PriorArtSearchOutcome, PriorArtSearchRecord,
     PriorArtSourceKind, ProcessWindowVariable, SynthesisRouteAssessment, SynthesizabilityState,
+};
+pub use orchestrator::{
+    AcquisitionStrategy, DiscoveryActionClass, DiscoveryActionProposal, DryRunMaterialsOrchestrator,
+    HumanAuthorization, OrchestratorBudgetLedger, OrchestratorError,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
 pub use sample_lineage::{
