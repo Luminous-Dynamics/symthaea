@@ -29,12 +29,18 @@ use symthaea_service_runtime::{BackgroundCycleKind, ProcessOrigin, ServiceMutati
 use tokio::task::JoinHandle;
 
 use super::semantic::{SemanticQueryExecution, SemanticSymthaeaQueryExecutor};
+use super::telemetry::{BridgeTelemetrySnapshot, capture_bridge_telemetry};
 use super::{SymthaeaSnapshotter, startup_snapshot};
 
 /// Result of one owner-executed service mutation.
 #[derive(Debug)]
 pub enum SymthaeaServiceExecution {
-    Query(SemanticQueryExecution),
+    Query {
+        execution: SemanticQueryExecution,
+        /// Compatibility projection for the live websocket. Present only after a
+        /// successful query when the experience bridge has produced a cycle.
+        telemetry: Option<BridgeTelemetrySnapshot>,
+    },
     Sleep(Result<SleepReport, anyhow::Error>),
     Save {
         path: PathBuf,
@@ -78,7 +84,19 @@ impl ServiceMutationExecutor<Symthaea> for SymthaeaServiceExecutor {
                             ServiceMutationCommand::ProcessText { content, origin },
                         )
                         .await;
-                    SymthaeaServiceExecution::Query(execution)
+                    // Preserve the daemon's existing behavior: publish bridge
+                    // telemetry only for successful query responses. Capture the
+                    // compatibility projection now, before another owner command
+                    // can overwrite the facade's turn-synchronous last cycle.
+                    let telemetry = execution
+                        .execution
+                        .is_ok()
+                        .then(|| capture_bridge_telemetry(engine))
+                        .flatten();
+                    SymthaeaServiceExecution::Query {
+                        execution,
+                        telemetry,
+                    }
                 }
                 ServiceMutationCommand::Sleep => {
                     SymthaeaServiceExecution::Sleep(engine.sleep().await)
