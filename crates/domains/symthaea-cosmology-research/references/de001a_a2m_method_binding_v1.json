@@ -1,0 +1,77 @@
+{
+  "authority": "optimizer-method-options-binding-only",
+  "forbidden_operations": {
+    "configuration_mutation": true,
+    "likelihood_evaluation": true,
+    "network": true,
+    "optimization": true,
+    "sampler_construction": true,
+    "sampler_execution": true
+  },
+  "method_policy": {
+    "backend_substitution_forbidden": true,
+    "effective_source": "exact reference-expanded-configuration sampler block",
+    "future_execution_must_bind_exact_effective_sampler_sha256": true,
+    "manual_option_addition_forbidden": true,
+    "manual_option_deletion_forbidden": true,
+    "manual_option_rewrite_forbidden": true,
+    "method_substitution_forbidden": true,
+    "normalization_or_migration_requires_separate_qualified_gate": true,
+    "require_exactly_one_expanded_sampler_component": true
+  },
+  "outputs": [
+    "effective sampler component name",
+    "exact expanded sampler option block",
+    "canonical effective sampler SHA-256",
+    "declared method field when present",
+    "input/expanded/minimizer sampler blocks and canonical hashes",
+    "sampled coordinate order inherited from A2R",
+    "configuration and upstream receipt hashes"
+  ],
+  "promotion": {
+    "a2_execution_authorized": false,
+    "does_not_establish": [
+      "optimizer execution",
+      "optimizer reproduction",
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "physical mechanism"
+    ],
+    "optimizer_execution_authorized": false,
+    "pass_authority": "optimizer method/options binding only"
+  },
+  "protocol": "DE-001A2M-OPTIMIZER-METHOD-BINDING-v1",
+  "required_configurations": {
+    "reference-expanded-configuration": {
+      "sha256": "c4c23032d1695635aaea6eb47fabd909006ff32df0a27eadbf64b36c89f31ba1",
+      "size": 3969
+    },
+    "reference-input-configuration": {
+      "sha256": "34499cb78ecaec78db44da9f06f61cd9c9ee497dc5c541b72b48cda54091c6ef",
+      "size": 2381
+    },
+    "reference-minimizer-configuration": {
+      "sha256": "6b51048b359e4b9d646de09379ca273a8d6a1bc1b5a88f585a09d8f2e61f290c",
+      "size": 2484
+    }
+  },
+  "required_upstream": {
+    "a0_protocol": "DE-001A0-BYTE-INTEGRITY-v1",
+    "a0_verdict": "PASS",
+    "a2g_protocol": "DE-001A2G-CONFIG-RESOLUTION-GUARD-v1",
+    "a2g_verdict": "PASS",
+    "a2r_protocol": "DE-001A2R-PARAMETER-ROLE-BINDING-v1",
+    "a2r_verdict": "PASS"
+  },
+  "runtime": {
+    "cobaya_source_commit": "899f30a49f85de610dac321e91a1af50018e56aa",
+    "cobaya_version": "3.6.2",
+    "yaml_loader": "cobaya.yaml.yaml_load(text) with no file_name"
+  },
+  "schema_version": 1,
+  "scientific_claim": "NONE",
+  "script_path": "crates/domains/symthaea-cosmology-research/scripts/de001a_a2m_method_binding.py",
+  "script_sha256": "27ab4f94c11789345ffb3367f2cd64cc1b1f3e7224982efb0795f7992380f23b",
+  "status": "implementation-frozen-unqualified"
+}
