@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-math-retrieval-candidate-loader"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Content-addressed candidate artifact loader for Symthaea mathematical retrieval"
+
+[dependencies]
+serde_json = "=1.0.151"
+sha2 = "=0.10.9"
+symthaea-math-retrieval-membership-guard = { path = "../math-retrieval-runtime-guard" }
+symthaea-math-retrieval-runtime-seam = { path = "../math-retrieval-runtime-seam" }
+
+# Standalone while the production retrieval boundary is qualified independently.
+[workspace]
