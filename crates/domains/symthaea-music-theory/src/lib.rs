@@ -69,6 +69,7 @@ pub mod pitch;
 pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
+pub mod prog_suite_work_bridge;
 pub mod renaissance;
 pub mod rhythm;
 pub mod rhythmic_identity;
@@ -137,6 +138,11 @@ pub use prog_suite::{
     PROG_SUITE_BARS_PER_SECTION, PROG_SUITE_PLAN_VERSION, ProgSuitePlanErrorV1,
     ProgSuitePlanV1, ProgSuiteRealizationV1, ProgSuiteSectionPlanV1, ProgSuiteTransformV1,
     plan_prog_suite, realize_prog_suite_with_plan,
+};
+pub use prog_suite_work_bridge::{
+    PROG_SUITE_WORK_BRIDGE_VERSION, ProgSuiteMeterProjectionV1,
+    ProgSuiteSectionWorkBindingV1, ProgSuiteWorkBindingV1, ProgSuiteWorkBridgeErrorV1,
+    ProgSuiteWorkRealizationBindingV1, bind_prog_suite_realization, bridge_prog_suite_plan,
 };
 pub use rhythm::Duration;
 pub use rhythmic_identity::{RhythmicIdentityReport, rhythmic_identity_report};
