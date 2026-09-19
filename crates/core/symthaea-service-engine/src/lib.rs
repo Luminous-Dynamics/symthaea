@@ -6,6 +6,7 @@
 //! capability rather than a raw `ServiceMutationCommand` handle, while the owner
 //! still rejects unsupported mutation variants defensively.
 
+pub mod host;
 pub mod semantic;
 pub mod service;
 

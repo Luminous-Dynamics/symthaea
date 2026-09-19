@@ -29,6 +29,7 @@ symthaea-interface-runtime = { path = "../symthaea-interface-runtime" }
 symthaea-interface-types = { path = "../symthaea-interface-types" }
 symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
 symthaea-service-events = { path = "../symthaea-service-events" }
+symthaea-service-read-model = { path = "../symthaea-service-read-model" }
 symthaea-service-runtime = { path = "../symthaea-service-runtime" }
 
 base64 = { version = "0.22", optional = true }
