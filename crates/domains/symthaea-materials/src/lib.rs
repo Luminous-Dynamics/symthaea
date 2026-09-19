@@ -27,6 +27,7 @@ pub mod multi_fidelity;
 pub mod novelty_synthesis;
 mod novelty_synthesis_hash;
 pub mod properties;
+pub mod sample_lineage;
 pub mod search_memory;
 pub mod strategic;
 pub mod technoeconomics;
@@ -83,6 +84,10 @@ pub use novelty_synthesis::{
     PriorArtSourceKind, ProcessWindowVariable, SynthesisRouteAssessment, SynthesizabilityState,
 };
 pub use properties::{MaterialCategory, MaterialProperty};
+pub use sample_lineage::{
+    CharacterizationRun, CharacterizationStatus, ExperimentalSampleLineage, ExperimentalScale,
+    PrecursorLot, SampleLineageError, SampleLineageNode, SampleNodeKind,
+};
 pub use search_memory::{
     MaterialSearchAttempt, MaterialsSearchMemory, SearchAttemptCost, SearchAttemptOutcome,
     SearchEvaluatorRef, SearchMemoryError, SearchNeighborhoodFingerprint,
