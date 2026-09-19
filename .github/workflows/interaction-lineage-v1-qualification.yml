@@ -1,0 +1,117 @@
+name: Interaction Lineage V1 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/interaction-lineage-v1-qualification.yml'
+      - 'crates/core/symthaea-interaction-lineage/**'
+      - 'crates/core/symthaea-interaction-core/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interaction-lineage-v1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  interaction-lineage-v1:
+    name: Exact-head interaction lineage v1
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce pure-lineage and monotone-restriction ratchets
+        run: |
+          set -euo pipefail
+          MANIFEST=crates/core/symthaea-interaction-lineage/Cargo.toml
+          SOURCE=crates/core/symthaea-interaction-lineage/src/lib.rs
+
+          grep -Fq 'symthaea-interaction-core = { path = "../symthaea-interaction-core" }' "${MANIFEST}"
+          grep -Fq 'sha2 = { workspace = true }' "${MANIFEST}"
+          if grep -Eiq 'reqwest|hyper|tokio|holochain|hdk|hdi|web3|ethers|alloy|kube|rmcp|a2a|keyring|secret-service|spiffe|rego|cedar' "${MANIFEST}"; then
+            echo 'runtime/protocol/policy dependency leaked into pure lineage core' >&2
+            exit 1
+          fi
+
+          grep -Fq 'symthaea.interaction.lineage.node.v1\0' "${SOURCE}"
+          grep -Fq 'DataLineage' "${SOURCE}"
+          grep -Fq 'DisclosureBinding' "${SOURCE}"
+          grep -Fq 'restrictions.extend_from_slice(&parent.restrictions)' "${SOURCE}"
+          if grep -Eq 'pub[[:space:]]+fn[[:space:]]+(declass|remove_restriction|clear_restriction)' "${SOURCE}"; then
+            echo 'unverified restriction-removal API is forbidden in lineage v1' >&2
+            exit 1
+          fi
+          if grep -Eq 'DispatchPermit|CapabilityGrant|std::net|std::fs|std::process|Command::new' "${SOURCE}"; then
+            echo 'authority/runtime I/O leaked into lineage v1' >&2
+            exit 1
+          fi
+
+      - name: Independent lineage oracle
+        run: |
+          set -euo pipefail
+          python3 crates/core/symthaea-interaction-lineage/scripts/lineage_oracle.py
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-interaction-lineage -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-interaction-lineage --all-targets
+          cargo test -p symthaea-interaction-lineage
+          cargo clippy -p symthaea-interaction-lineage --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-interaction-lineage --all-targets
+          cargo test --locked -p symthaea-interaction-lineage
+          cargo clippy --locked -p symthaea-interaction-lineage --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
