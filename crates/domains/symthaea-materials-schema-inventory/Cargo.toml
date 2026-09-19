@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-materials-schema-inventory"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Canonical MySQL schema and exact row-count inventory for historical materials imports"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-materials-historical-import = { path = "../symthaea-materials-historical-import" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
