@@ -5,9 +5,17 @@ use crate::{AuthorityProfile, EvidenceRecord, ResearchId, Sha256Digest};
 use serde::Serialize;
 use std::collections::BTreeSet;
 
-/// Authority-bearing claim assembled only through validated evidence. It is
-/// intentionally not directly deserializable; recovery/import must re-present
-/// the underlying evidence and rebuild the claim through `from_evidence`.
+/// Pre-adjudication structural claim assembled from validated evidence records.
+///
+/// The stored authority is a facet-wise structural max-union of the bound
+/// evidence. It deliberately does **not** encode whether an evidence record
+/// supports, contradicts, limits, or is merely contextual to the claim. Code
+/// that needs authority safe to expose as a scientific claim must use the
+/// polarity-aware claim-adjudication layer.
+///
+/// This type is intentionally not directly deserializable; recovery/import must
+/// re-present the underlying evidence and rebuild the claim through
+/// `from_evidence`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ScientificClaim {
     claim_id: ResearchId,
@@ -24,10 +32,12 @@ pub enum ClaimIssue {
 }
 
 impl ScientificClaim {
-    /// Build a claim only from already-bounded evidence records.
+    /// Build a pre-adjudication claim from already-bounded evidence records.
     ///
     /// Evidence count does not manufacture replication or independence. Those
-    /// facets appear only when an input record explicitly carries them.
+    /// facets appear only when an input record explicitly carries them. The
+    /// resulting structural authority is not yet polarity-aware and therefore
+    /// must not be interpreted as final claimable scientific authority.
     pub fn from_evidence(
         claim_id: ResearchId,
         subject_sha256: Sha256Digest,
@@ -81,12 +91,26 @@ impl ScientificClaim {
         &self.evidence_ids
     }
 
-    pub fn authority(&self) -> &AuthorityProfile {
+    /// Facet-wise max-union before support/contradiction adjudication.
+    ///
+    /// This is a structural ceiling/summary, not authority safe to assert for
+    /// the proposition. Use `adjudicate_scientific_claim` and then
+    /// `AdjudicatedScientificClaim::claimable_authority` for that purpose.
+    pub fn structural_authority(&self) -> &AuthorityProfile {
         &self.authority
     }
 
-    /// Conservative compatibility adapter. The target representation may lower
-    /// authority but can never raise any facet beyond this claim.
+    /// Compatibility accessor for the pre-adjudication structural authority.
+    ///
+    /// This method intentionally preserves the original API, but its return
+    /// value must not be treated as polarity-aware claimable authority.
+    pub fn authority(&self) -> &AuthorityProfile {
+        self.structural_authority()
+    }
+
+    /// Conservative compatibility adapter over the structural authority only.
+    /// The target representation may lower authority but can never raise a
+    /// facet beyond this pre-adjudication claim container.
     pub fn adapt_with_ceiling(&self, ceiling: &AuthorityProfile) -> AuthorityProfile {
         self.authority.bounded_by(ceiling)
     }
@@ -138,8 +162,22 @@ mod tests {
             computation(&subject, "E-3"),
         ];
         let claim = ScientificClaim::from_evidence(id("CLAIM-1"), subject, &evidence).unwrap();
-        assert_eq!(claim.authority().get(AuthorityFacet::Replication), AuthorityLevel::None);
-        assert_eq!(claim.authority().get(AuthorityFacet::Independence), AuthorityLevel::None);
+        assert_eq!(
+            claim.structural_authority().get(AuthorityFacet::Replication),
+            AuthorityLevel::None
+        );
+        assert_eq!(
+            claim.structural_authority().get(AuthorityFacet::Independence),
+            AuthorityLevel::None
+        );
+    }
+
+    #[test]
+    fn compatibility_authority_is_explicitly_structural() {
+        let subject = digest("subject");
+        let evidence = vec![computation(&subject, "E-1")];
+        let claim = ScientificClaim::from_evidence(id("CLAIM-1"), subject, &evidence).unwrap();
+        assert_eq!(claim.authority(), claim.structural_authority());
     }
 
     #[test]
