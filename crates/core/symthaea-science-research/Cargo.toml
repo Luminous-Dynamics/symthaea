@@ -8,6 +8,7 @@ description = "Evidence-bearing scientific research identities and authority bou
 [dependencies]
 serde = { workspace = true }
 sha2 = { workspace = true }
+symthaea-trust-core = { path = "../symthaea-trust-core" }
 
 [dev-dependencies]
 serde_json = { workspace = true }
