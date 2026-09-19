@@ -23,6 +23,7 @@ pub mod comparison_judgment;
 pub mod comparison_switch;
 pub mod comparison_timeline;
 pub mod comparison_transport;
+pub mod comparison_workspace_runtime;
 mod create_page;
 mod evidence_view;
 mod harmony_view;
