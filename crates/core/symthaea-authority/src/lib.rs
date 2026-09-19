@@ -8,14 +8,15 @@
 //!
 //! It deliberately does **not** authenticate that snapshot and does not mint
 //! runtime/live authority. Fresh trusted time, current verified negative facts,
-//! admission, reservation, and effect execution belong in separate verifier-owned
-//! layers.
+//! verified delegation ancestry, admission, reservation, and effect execution
+//! belong in separate verifier-owned layers.
 //!
 //! Core separation:
 //!
 //! ```text
 //! capability record
 //!     != verified current authority state
+//!     != verified delegation ancestry
 //!     != execution admission
 //!     != effect
 //! ```
@@ -153,12 +154,15 @@ pub struct CapabilityGrant {
     /// Cumulative consequence ceiling.
     pub risk_budget: RiskBudget,
     /// Parent commitment for delegated grants.
+    ///
+    /// Presence of this field is not proof that the parent or full ancestry is
+    /// current. Single-record evaluation fails closed when this field is set.
     pub parent_digest: Option<Digest32>,
 }
 
 impl CapabilityGrant {
-    /// Construct a minimally initialized record. Callers must still populate at
-    /// least one resource and operation before evaluation can succeed.
+    /// Construct a minimally initialized root record. Callers must still populate
+    /// at least one resource and operation before evaluation can succeed.
     pub fn new(
         grant_id: impl Into<String>,
         issuer: PrincipalId,
@@ -197,11 +201,17 @@ impl CapabilityGrant {
         if self.grant_id.is_empty() {
             return Err(GrantValidationError::EmptyGrantId);
         }
-        if self.issuer.0.is_empty() || self.subject.0.is_empty() {
+        if self.issuer.0.is_empty()
+            || self.subject.0.is_empty()
+            || self.audience.as_ref().is_some_and(|value| value.0.is_empty())
+        {
             return Err(GrantValidationError::EmptyPrincipal);
         }
         if self.purpose.0.is_empty() {
             return Err(GrantValidationError::EmptyPurpose);
+        }
+        if self.task.as_ref().is_some_and(|value| value.0.is_empty()) {
+            return Err(GrantValidationError::EmptyTask);
         }
         if self.authority_epoch.0 == 0 {
             return Err(GrantValidationError::ZeroAuthorityEpoch);
@@ -209,11 +219,20 @@ impl CapabilityGrant {
         if self.authority_context.namespace.0.is_empty() {
             return Err(GrantValidationError::EmptyAuthorityNamespace);
         }
+        if self.authority_context.digest.0 == [0; 32] {
+            return Err(GrantValidationError::ZeroAuthorityContextDigest);
+        }
         if self.resources.is_empty() {
             return Err(GrantValidationError::EmptyResources);
         }
+        if self.resources.iter().any(|value| value.0.is_empty()) {
+            return Err(GrantValidationError::EmptyResourceIdentifier);
+        }
         if self.operations.is_empty() {
             return Err(GrantValidationError::EmptyOperations);
+        }
+        if self.operations.iter().any(|value| value.0.is_empty()) {
+            return Err(GrantValidationError::EmptyOperationIdentifier);
         }
         if self.max_uses == 0 {
             return Err(GrantValidationError::ZeroMaxUses);
@@ -256,6 +275,9 @@ impl CapabilityGrant {
     }
 
     /// Verify that a delegated record is no broader than `parent`.
+    ///
+    /// A successful result proves only this static attenuation edge. It does not
+    /// prove that the parent or any earlier ancestor is currently valid.
     pub fn validate_attenuation(&self, parent: &Self) -> Result<(), AttenuationError> {
         self.validate().map_err(AttenuationError::InvalidGrant)?;
         parent.validate().map_err(AttenuationError::InvalidGrant)?;
@@ -337,18 +359,26 @@ pub enum GrantValidationError {
     UnsupportedSchema,
     #[error("grant ID must not be empty")]
     EmptyGrantId,
-    #[error("issuer and subject identities must not be empty")]
+    #[error("issuer, subject, and explicit audience identities must not be empty")]
     EmptyPrincipal,
     #[error("purpose must not be empty")]
     EmptyPurpose,
+    #[error("explicit task binding must not be empty")]
+    EmptyTask,
     #[error("authority epoch zero is reserved")]
     ZeroAuthorityEpoch,
     #[error("authority context namespace must not be empty")]
     EmptyAuthorityNamespace,
+    #[error("authority context digest must not be the all-zero placeholder")]
+    ZeroAuthorityContextDigest,
     #[error("grant must name at least one exact resource")]
     EmptyResources,
+    #[error("resource identifiers must not be empty")]
+    EmptyResourceIdentifier,
     #[error("grant must name at least one semantic operation")]
     EmptyOperations,
+    #[error("operation identifiers must not be empty")]
+    EmptyOperationIdentifier,
     #[error("max_uses must be greater than zero")]
     ZeroMaxUses,
 }
@@ -438,6 +468,7 @@ pub struct AuthorityEvaluationInput {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DenyReason {
     InvalidGrant(GrantValidationError),
+    DelegationChainRequired,
     EpochStale,
     ContextMismatch,
     Expired,
@@ -451,7 +482,7 @@ pub enum DenyReason {
 
 /// Pure semantic result only.
 ///
-/// `Allow` means the supplied record is eligible under the supplied evaluator
+/// `Allow` means a **root** record is eligible under the supplied evaluator
 /// inputs. It does **not** mean those inputs were authenticated, that a current
 /// verified authority state exists, or that execution is admitted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -460,11 +491,15 @@ pub enum AuthorityDecision {
     Deny(DenyReason),
 }
 
-/// Evaluate one positive authority record against supplied current-state facts.
+/// Evaluate one root positive-authority record against supplied current-state facts.
+///
+/// Delegated records fail closed here because a `parent_digest` does not prove
+/// the full ancestry is current. A separately qualified delegation-chain/admission
+/// layer must validate that ancestry before delegated authority can become live.
 ///
 /// The function is deliberately pure and deterministic. Security-sensitive
-/// callers must first obtain trusted/current authority inputs from a verifier-
-/// owned layer, and must perform execution admission separately after `Allow`.
+/// callers must first obtain trusted/current authority inputs from verifier-owned
+/// layers and must perform execution admission separately after `Allow`.
 pub fn evaluate_authority(
     grant: &CapabilityGrant,
     input: &AuthorityEvaluationInput,
@@ -472,6 +507,9 @@ pub fn evaluate_authority(
 ) -> AuthorityDecision {
     if let Err(error) = grant.validate() {
         return AuthorityDecision::Deny(DenyReason::InvalidGrant(error));
+    }
+    if grant.parent_digest.is_some() {
+        return AuthorityDecision::Deny(DenyReason::DelegationChainRequired);
     }
     if grant.authority_epoch != input.current_epoch {
         return AuthorityDecision::Deny(DenyReason::EpochStale);
@@ -646,10 +684,22 @@ mod tests {
     }
 
     #[test]
-    fn auth_tiny_001_exact_record_is_eligible_under_matching_inputs() {
+    fn auth_tiny_001_exact_root_record_is_eligible_under_matching_inputs() {
         assert_eq!(
             evaluate_authority(&robot_grant(), &evaluation_input(), &[]),
             AuthorityDecision::Allow
+        );
+    }
+
+    #[test]
+    fn historical_v1_schema_fails_closed() {
+        let mut grant = robot_grant();
+        grant.schema_version = 1;
+        assert_eq!(
+            evaluate_authority(&grant, &evaluation_input(), &[]),
+            AuthorityDecision::Deny(DenyReason::InvalidGrant(
+                GrantValidationError::UnsupportedSchema
+            ))
         );
     }
 
@@ -711,6 +761,24 @@ mod tests {
     }
 
     #[test]
+    fn delegated_record_requires_separate_chain_verification() {
+        let parent = robot_grant();
+        let mut child = parent.clone();
+        child.grant_id = "auth-tiny-001-child".into();
+        child.issuer = parent.subject.clone();
+        child.subject = PrincipalId("controller-2".into());
+        child.parent_digest = Some(parent.digest());
+        child.delegation_depth_remaining = 1;
+        child.max_uses = 1;
+        child.risk_budget.mutation_units = 5;
+        assert!(child.validate_attenuation(&parent).is_ok());
+        assert_eq!(
+            evaluate_authority(&child, &evaluation_input(), &[]),
+            AuthorityDecision::Deny(DenyReason::DelegationChainRequired)
+        );
+    }
+
+    #[test]
     fn delegation_attenuates_but_cannot_change_purpose_or_context() {
         let parent = robot_grant();
         let mut child = parent.clone();
@@ -761,6 +829,32 @@ mod tests {
             AuthorityDecision::Deny(DenyReason::InvalidGrant(
                 GrantValidationError::EmptyOperations
             ))
+        );
+    }
+
+    #[test]
+    fn empty_exact_identifiers_and_placeholder_context_are_rejected() {
+        let mut grant = robot_grant();
+        grant.resources.clear();
+        grant.resources.insert(ResourceRef(String::new()));
+        assert_eq!(
+            grant.validate(),
+            Err(GrantValidationError::EmptyResourceIdentifier)
+        );
+
+        let mut grant = robot_grant();
+        grant.operations.clear();
+        grant.operations.insert(Operation(String::new()));
+        assert_eq!(
+            grant.validate(),
+            Err(GrantValidationError::EmptyOperationIdentifier)
+        );
+
+        let mut grant = robot_grant();
+        grant.authority_context.digest = Digest32([0; 32]);
+        assert_eq!(
+            grant.validate(),
+            Err(GrantValidationError::ZeroAuthorityContextDigest)
         );
     }
 
