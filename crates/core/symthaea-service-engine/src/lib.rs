@@ -8,6 +8,8 @@
 
 pub mod cognitive_gate;
 pub mod host;
+#[cfg(feature = "live-voice")]
+pub mod live_voice_adapter;
 pub mod protocol;
 pub mod protocol_error;
 pub mod read_wire;
