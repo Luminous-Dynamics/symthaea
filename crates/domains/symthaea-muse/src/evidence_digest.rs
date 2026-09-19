@@ -6,6 +6,8 @@
 pub mod benchmark_manifest;
 #[path = "benchmark_mirex.rs"]
 pub mod benchmark_mirex;
+#[path = "benchmark_symbolic_metrics.rs"]
+pub mod benchmark_symbolic_metrics;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
