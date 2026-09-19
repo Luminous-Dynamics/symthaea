@@ -35,12 +35,14 @@ pub enum ObservationIssue<E> {
 
 /// Result returned by the observed handler.
 ///
-/// `execution` is the executor's domain result. `observation_issues` records state
-/// publication/correlation failures without pretending the cognitive command did
-/// not execute.
+/// `execution` is the executor's domain result. `snapshot` is the exact immutable
+/// state extracted under the same owner command before the next command may run.
+/// `observation_issues` records state publication/correlation failures without
+/// pretending the cognitive command did not execute.
 #[derive(Debug)]
 pub struct ObservedServiceReply<R, E> {
     pub execution: R,
+    pub snapshot: ServiceRuntimeSnapshot,
     pub observation_issues: Vec<ObservationIssue<E>>,
 }
 
@@ -143,7 +145,7 @@ where
             let expected = context.sequence();
 
             if snapshot.origin() == SnapshotOrigin::AfterCommand(expected) {
-                if let Err(error) = self.publisher.publish_snapshot(snapshot) {
+                if let Err(error) = self.publisher.publish_snapshot(snapshot.clone()) {
                     observation_issues.push(ObservationIssue::Publication {
                         stage: PublicationStage::Snapshot,
                         error,
@@ -169,6 +171,7 @@ where
 
             ObservedServiceReply {
                 execution,
+                snapshot,
                 observation_issues,
             }
         })
@@ -293,6 +296,8 @@ mod tests {
         let reply = ticket.resolve().await.unwrap();
 
         assert_eq!(reply.execution, 1);
+        assert_eq!(reply.snapshot.origin(), SnapshotOrigin::AfterCommand(expected));
+        assert_eq!(reply.snapshot.memory_count(), 1);
         assert!(reply.observations_clean());
 
         let observed = records.lock().unwrap();
@@ -363,6 +368,7 @@ mod tests {
         let expected = ticket.sequence();
         let reply = ticket.resolve().await.unwrap();
 
+        assert_eq!(reply.snapshot.origin(), SnapshotOrigin::Initialized);
         assert_eq!(reply.observation_issues.len(), 1);
         assert!(matches!(
             &reply.observation_issues[0],
