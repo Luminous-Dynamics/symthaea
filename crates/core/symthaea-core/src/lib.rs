@@ -67,6 +67,9 @@ pub mod assurance;
 /// Policy-defined completeness checks for material effects before presentation.
 #[allow(missing_docs)]
 pub mod assurance_materiality;
+/// Exact-byte render-artifact commitments for presentation evidence.
+#[allow(missing_docs)]
+pub mod assurance_render_artifact;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
