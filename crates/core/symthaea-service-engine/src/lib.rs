@@ -19,6 +19,8 @@ pub mod telemetry;
 #[cfg(feature = "voice-tts")]
 pub mod voice_control;
 #[cfg(feature = "voice-tts")]
+pub mod voice_flow;
+#[cfg(feature = "voice-tts")]
 pub mod voice_presenter;
 #[cfg(feature = "voice-tts")]
 pub mod voice_session_control;
