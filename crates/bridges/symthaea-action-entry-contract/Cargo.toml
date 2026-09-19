@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-action-entry-contract"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Precommitted executor/connector identity and dispatch-incarnation contracts for Symthaea effects"
+publish = false
+
+[dependencies]
+sha2 = { workspace = true }
+symthaea-action-admission = { path = "../symthaea-action-admission" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-authority-state = { path = "../symthaea-authority-state" }
+symthaea-executor-identity = { path = "../../core/symthaea-executor-identity" }
+symthaea-interaction-core = { path = "../../core/symthaea-interaction-core" }
+thiserror = { workspace = true }

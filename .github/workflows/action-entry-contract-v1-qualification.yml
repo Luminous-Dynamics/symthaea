@@ -1,0 +1,142 @@
+name: Action Entry Contract V1 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-entry-contract-v1-qualification.yml'
+      - 'crates/bridges/symthaea-action-entry-contract/**'
+      - '.github/workflows/action-executor-r2-convergence.yml'
+      - 'crates/bridges/symthaea-action-admission/**'
+      - 'crates/core/symthaea-executor-identity/**'
+      - 'crates/core/symthaea-interaction-core/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-entry-contract-v1-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  entry-contract:
+    name: Exact V2E-A entry identity contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact repaired V2D executor-identity predecessor and scope
+        env:
+          REQUIRED_BASE: 51e5922c6251cd34992a396d607088dd53821f07
+        run: |
+          set -euo pipefail
+          git cat-file -e "${REQUIRED_BASE}^{commit}"
+          test "$(git merge-base HEAD "${REQUIRED_BASE}")" = "${REQUIRED_BASE}"
+          git merge-base --is-ancestor "${REQUIRED_BASE}" HEAD
+          python3 - <<'PY'
+          import subprocess
+          base = '51e5922c6251cd34992a396d607088dd53821f07'
+          allowed = {
+              '.github/workflows/action-entry-contract-v1-qualification.yml',
+              'crates/bridges/symthaea-action-entry-contract/Cargo.toml',
+              'crates/bridges/symthaea-action-entry-contract/src/lib.rs',
+              'crates/bridges/symthaea-action-entry-contract/scripts/action_entry_contract_oracle.py',
+          }
+          changed = set(subprocess.check_output(
+              ['git', 'diff', '--name-only', f'{base}...HEAD'], text=True
+          ).splitlines())
+          unexpected = sorted(changed - allowed)
+          if unexpected:
+              raise SystemExit('unexpected V2E-A paths: ' + ', '.join(unexpected))
+          missing = sorted(allowed - changed)
+          if missing:
+              raise SystemExit('missing V2E-A paths: ' + ', '.join(missing))
+          PY
+
+      - name: Ratchet non-authority and producer boundaries
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-action-entry-contract/src/lib.rs
+          MANIFEST=crates/bridges/symthaea-action-entry-contract/Cargo.toml
+          grep -Fq 'pub struct EntryBindingCommitmentV1' "${SRC}"
+          grep -Fq 'pub struct DispatchIncarnationId' "${SRC}"
+          grep -Fq 'pub fn derive_dispatch_incarnation_id' "${SRC}"
+          grep -Fq 'executor_binding: &VerifiedExecutorBinding' "${SRC}"
+          grep -Fq 'executor_binding.structural_match' "${SRC}"
+          grep -Fq 'self.validate_effect_binding(permit.effect_binding())' "${SRC}"
+          grep -Fq 'challenge.principal_digest() != self.semantic_executor.digest()' "${SRC}"
+          grep -Fq 'challenge.requirement_digest() != self.identity_requirement.digest()' "${SRC}"
+          grep -Fq 'challenge.executor_profile() != self.executor_profile' "${SRC}"
+          grep -Fq 'EffectAuthorityBindingV2.parameters_digest' "${SRC}"
+
+          if grep -Eq 'pub[[:space:]]+(trait|fn).*enter_effect|BoundEffectExecutor|dispatch_once' "${SRC}"; then
+            echo 'V2E-A must not expose an effect-entry execution boundary' >&2
+            exit 1
+          fi
+          if grep -Fq 'serde' "${MANIFEST}"; then
+            echo 'V2E-A semantic identity contract must not depend on serde' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub[[:space:]]+fn[[:space:]].*(executor_binding_digest|from_parts)' "${SRC}"; then
+            echo 'public raw verified-binding digest/incarnation constructor is forbidden' >&2
+            exit 1
+          fi
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Run independent semantic oracle
+        run: |
+          set -euo pipefail
+          python3 crates/bridges/symthaea-action-entry-contract/scripts/action_entry_contract_oracle.py
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-entry-contract -- --check
+
+      - name: Focused compile test and strict Clippy
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-action-entry-contract --all-targets
+          cargo test -p symthaea-action-entry-contract
+          cargo clippy -p symthaea-action-entry-contract --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-entry-contract --all-targets
+          cargo test --locked -p symthaea-action-entry-contract
+          cargo clippy --locked -p symthaea-action-entry-contract --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
