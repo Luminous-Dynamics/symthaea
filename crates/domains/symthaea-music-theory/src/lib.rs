@@ -80,6 +80,7 @@ pub mod spec;
 pub mod spelling;
 pub mod style;
 pub mod temporal_map;
+pub mod temporal_midi_projection;
 pub mod temporal_score;
 pub mod voicing;
 
@@ -143,6 +144,12 @@ pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
 pub use style::Style;
 pub use temporal_map::{
     TEMPORAL_MAP_VERSION, TempoV1, TemporalMapErrorV1, TemporalMapV1, TemporalPointV1,
+};
+pub use temporal_midi_projection::{
+    DEFAULT_MIDI_TICKS_PER_QUARTER, MIDI_TEMPORAL_PROJECTION_VERSION,
+    MeterMidiProjectionReceiptV1, MidiTemporalMetaEventV1, MidiTemporalMetaKindV1,
+    MidiTemporalProjectionErrorV1, MidiTemporalProjectionPolicyV1, MidiTemporalProjectionV1,
+    TempoMidiProjectionReceiptV1, project_temporal_score_to_midi,
 };
 pub use temporal_score::{TEMPORAL_SCORE_VERSION, TemporalScoreErrorV1, TemporalScoreV1};
 pub use voicing::{lead_bass, lead_upper};
