@@ -9,6 +9,7 @@
 pub mod host;
 pub mod semantic;
 pub mod service;
+pub mod telemetry;
 
 use std::fmt;
 
