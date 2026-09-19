@@ -7,11 +7,9 @@
 //! semantic text through the sole cognition owner with the correct [`ProcessOrigin`].
 //!
 //! Cancellation is deliberately truthful. The current owner executes an admitted
-//! command exactly once and does not yet expose cooperative query cancellation, and
-//! the legacy blocking speaker cannot necessarily stop an already submitted audio
-//! buffer. A barge-in therefore cancels **presentation eligibility** immediately for
-//! the current/older voice generations. Cooperative cognition/audio-device abort is
-//! a later capability and must not be inferred from this token.
+//! command exactly once and does not yet expose cooperative query cancellation. A
+//! barge-in cancels presentation eligibility immediately and can separately request
+//! stop from a registered renderer; neither fact implies cognition was cancelled.
 
 use std::fmt;
 use std::sync::Arc;
@@ -24,6 +22,7 @@ use uuid::Uuid;
 use crate::host::ServiceRuntimeHost;
 use crate::protocol::{CorrelatedQueryTicket, ServiceProtocolCore};
 use crate::protocol_error::ServiceProtocolFailure;
+use crate::voice_control::{VoicePresentationControl, VoiceStopOutcome};
 use crate::wire::ServiceWireOutcome;
 
 /// How semantic text entered one voice turn.
@@ -44,12 +43,12 @@ impl VoiceIngress {
     }
 }
 
-/// What a voice barge-in can currently guarantee.
+/// What the base cancellation token itself can guarantee.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoiceCancellationCapability {
     /// Future presentation work can observe cancellation before enqueue/playback.
-    /// Already-admitted cognition and a blocking audio backend are not guaranteed to
-    /// abort yet.
+    /// Renderer stop and semantic interruption are reported separately, and
+    /// already-admitted cognition is not guaranteed to abort.
     PresentationEligibilityOnly,
 }
 
@@ -110,7 +109,8 @@ fn interrupt_started_presentations(cancellation: &VoiceCancellationState) -> u64
 /// Cloneable presentation token for one voice generation.
 ///
 /// Streaming TTS/audio code should check this before enqueueing each clause/chunk.
-/// A legacy blocking `speak()` call can at minimum check it before starting output.
+/// The real-time live presenter uses it as a monotonic cancellation probe at motor
+/// frame boundaries.
 #[derive(Debug, Clone)]
 pub struct VoicePresentationToken {
     generation: u64,
@@ -254,6 +254,25 @@ impl VoiceCognitionTicket {
         receipt
     }
 
+    /// Complete barge-in orchestration for an admitted turn.
+    ///
+    /// Presentation eligibility is cancelled first, semantic interruption is
+    /// attempted second, then the exact cancelled generation range is applied to the
+    /// active-renderer control plane. Cognition cancellation remains explicitly false
+    /// until the runtime owner gains a cooperative query-cancellation capability.
+    pub fn interrupt_and_stop(
+        &self,
+        host: &ServiceRuntimeHost,
+        control: &VoicePresentationControl,
+    ) -> VoiceBargeInReceipt {
+        let interruption = self.interrupt(host);
+        let presentation_stop = control.apply_interruption(&interruption);
+        VoiceBargeInReceipt {
+            interruption,
+            presentation_stop,
+        }
+    }
+
     pub async fn resolve(self) -> Result<VoiceCognitionOutcome, ServiceProtocolFailure> {
         let correlated = self.inner.resolve().await?;
         if correlated.turn_id.as_ref() != Some(&self.turn_id) {
@@ -285,7 +304,7 @@ impl VoiceCognitionOutcome {
     }
 }
 
-/// Receipt for one presentation-level barge-in.
+/// Receipt for one presentation/semantic barge-in attempt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VoiceInterruptionReceipt {
     pub session_id: SessionId,
@@ -301,6 +320,27 @@ pub struct VoiceInterruptionReceipt {
     /// The runtime owner still does not support cooperative cancellation of an
     /// already-admitted `Symthaea::process()` call.
     pub cognition_cancelled: bool,
+}
+
+/// Combined result of presentation cancellation, semantic interruption, and active
+/// renderer stop orchestration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VoiceBargeInReceipt {
+    pub interruption: VoiceInterruptionReceipt,
+    pub presentation_stop: VoiceStopOutcome,
+}
+
+impl VoiceBargeInReceipt {
+    pub fn renderer_stop_requested(&self) -> bool {
+        matches!(
+            self.presentation_stop,
+            VoiceStopOutcome::StopRequested { .. }
+        )
+    }
+
+    pub fn cognition_cancelled(&self) -> bool {
+        self.interruption.cognition_cancelled
+    }
 }
 
 /// One persistent voice conversation identity plus presentation-cancellation state.
@@ -378,14 +418,57 @@ impl VoiceSession {
             cognition_cancelled: false,
         }
     }
+
+    /// Presentation-only barge-in before or without a cognition ticket, with active
+    /// renderer stop applied in the same call.
+    pub fn interrupt_presentation_and_stop(
+        &self,
+        control: &VoicePresentationControl,
+    ) -> VoiceBargeInReceipt {
+        let interruption = self.interrupt_presentation();
+        let presentation_stop = control.apply_interruption(&interruption);
+        VoiceBargeInReceipt {
+            interruption,
+            presentation_stop,
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering as AtomicOrdering};
+
     use super::*;
+    use crate::voice_control::VoiceStopCapability;
 
     fn session() -> VoiceSession {
         VoiceSession::with_session_id(SessionId::new("voice-session:test").unwrap())
+    }
+
+    struct FakeStop {
+        speaking: AtomicBool,
+        stops: AtomicUsize,
+    }
+
+    impl FakeStop {
+        fn active() -> Arc<Self> {
+            Arc::new(Self {
+                speaking: AtomicBool::new(true),
+                stops: AtomicUsize::new(0),
+            })
+        }
+    }
+
+    impl VoiceStopCapability for FakeStop {
+        fn stop(&self) {
+            self.stops.fetch_add(1, AtomicOrdering::SeqCst);
+            self.speaking.store(false, AtomicOrdering::SeqCst);
+        }
+
+        fn is_speaking(&self) -> bool {
+            self.speaking.load(AtomicOrdering::SeqCst)
+        }
     }
 
     #[test]
@@ -420,6 +503,26 @@ mod tests {
         let third = session.begin_turn(VoiceIngress::LiveMicrophone).unwrap();
         assert_eq!(third.presentation_token().generation(), 3);
         assert!(!third.presentation_token().is_cancelled());
+    }
+
+    #[test]
+    fn session_barge_in_cancels_token_and_stops_matching_renderer() {
+        let session = session();
+        let turn = session.begin_turn(VoiceIngress::LiveMicrophone).unwrap();
+        let control = VoicePresentationControl::default();
+        let stop = FakeStop::active();
+        let capability: Arc<dyn VoiceStopCapability> = stop.clone();
+        let _lease = control
+            .try_register(turn.presentation_token().generation(), capability)
+            .unwrap();
+
+        let receipt = session.interrupt_presentation_and_stop(&control);
+
+        assert!(turn.presentation_token().is_cancelled());
+        assert!(receipt.renderer_stop_requested());
+        assert!(!receipt.cognition_cancelled());
+        assert_eq!(stop.stops.load(AtomicOrdering::SeqCst), 1);
+        assert!(!stop.is_speaking());
     }
 
     #[test]
