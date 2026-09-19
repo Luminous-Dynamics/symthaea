@@ -1,0 +1,145 @@
+name: Interaction Policy Selection V1 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/interaction-policy-selection-v1-qualification.yml'
+      - 'crates/core/symthaea-interaction-policy-selection/**'
+      - 'crates/core/symthaea-interaction-policy/**'
+      - 'crates/core/symthaea-interaction-core/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interaction-policy-selection-v1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  interaction-policy-selection-v1:
+    name: Exact-head interaction policy selection v1
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact PR head and required policy-evidence parent
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          REQUIRED_PARENT: 6f204822bf1bf153113fef90fb23d32cd6fc3ce5
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          fi
+          git cat-file -e "${REQUIRED_PARENT}^{commit}"
+          test "$(git merge-base HEAD "${REQUIRED_PARENT}")" = "${REQUIRED_PARENT}"
+          git merge-base --is-ancestor "${REQUIRED_PARENT}" HEAD
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce pure selection-match boundary
+        run: |
+          set -euo pipefail
+          MANIFEST=crates/core/symthaea-interaction-policy-selection/Cargo.toml
+          SOURCE=crates/core/symthaea-interaction-policy-selection/src/lib.rs
+
+          grep -Fq 'symthaea-interaction-core = { path = "../symthaea-interaction-core" }' "${MANIFEST}"
+          grep -Fq 'symthaea-interaction-policy = { path = "../symthaea-interaction-policy" }' "${MANIFEST}"
+          grep -Fq 'sha2 = { workspace = true }' "${MANIFEST}"
+          if grep -Eiq 'symthaea-authority|symthaea-action|reqwest|hyper|tokio|holochain|hdk|hdi|web3|ethers|alloy|kube|rmcp|a2a|keyring|secret-service|spiffe|rego|cedar|wasmtime' "${MANIFEST}"; then
+            echo 'authority/runtime/protocol/authentication dependency leaked into pure policy selection' >&2
+            exit 1
+          fi
+
+          grep -Fq 'symthaea.interaction.policy.selection.revision.v1\0' "${SOURCE}"
+          grep -Fq 'symthaea.interaction.policy.selection.snapshot.v1\0' "${SOURCE}"
+          grep -Fq 'symthaea.interaction.policy.time.observation.v1\0' "${SOURCE}"
+          grep -Fq 'symthaea.interaction.policy.selection.match.v1\0' "${SOURCE}"
+          grep -Fq 'PolicySelectionMatchCandidateV1' "${SOURCE}"
+          grep -Fq 'AmbiguousRevisionPair' "${SOURCE}"
+          grep -Fq 'ReceiptCurrentnessReferenceRequired' "${SOURCE}"
+          grep -Fq '!= verified current policy' "${SOURCE}"
+          grep -Fq 'does not claim that the clock/evidence source is' "${SOURCE}"
+          grep -Fq 'producer_requirement' "${SOURCE}"
+          grep -Fq 'canonical_vectors_are_stable' "${SOURCE}"
+          grep -Fq 'ambiguous_bundle_engine_pair_fails_closed' "${SOURCE}"
+
+          if grep -Eq 'use .*DispatchPermit|use .*CapabilityGrant|use .*VerifiedAuthority|std::net::|std::fs::|std::process::|Command::new' "${SOURCE}"; then
+            echo 'authority/runtime I/O leaked into pure policy selection' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub[[:space:]]+(struct|enum)[[:space:]]+Verified(Current)?Policy|pub[[:space:]]+fn[[:space:]]+(from_digest|from_raw|from_match_digest)' "${SOURCE}"; then
+            echo 'pure selection tranche must not mint verified-current policy or raw match identities' >&2
+            exit 1
+          fi
+          if grep -Eiq 'phi|confidence|utility|reputation' "${SOURCE}"; then
+            python3 - <<'PY'
+          from pathlib import Path
+          source = Path('crates/core/symthaea-interaction-policy-selection/src/lib.rs').read_text()
+          forbidden = (
+              'pub phi:', 'phi:', 'current_phi', 'confidence:', 'utility:',
+              'reputation:', 'collective_phi', 'effective_phi'
+          )
+          if any(item in source for item in forbidden):
+              raise SystemExit('cognition-derived score leaked into policy selection identity')
+          PY
+          fi
+
+      - name: Independent policy selection oracle
+        run: |
+          set -euo pipefail
+          python3 crates/core/symthaea-interaction-policy-selection/scripts/policy_selection_oracle.py
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-interaction-policy-selection -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-interaction-policy-selection --all-targets
+          cargo test -p symthaea-interaction-policy-selection
+          cargo clippy -p symthaea-interaction-policy-selection --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-interaction-policy-selection --all-targets
+          cargo test --locked -p symthaea-interaction-policy-selection
+          cargo clippy --locked -p symthaea-interaction-policy-selection --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
