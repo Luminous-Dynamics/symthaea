@@ -213,19 +213,19 @@ impl CodingAgent {
         };
 
         let selected_idx = selected_idx?;
-        let selected = &candidates[selected_idx];
+        let candidate_count = candidates.len();
+        let selected = candidates.into_iter().nth(selected_idx)?;
 
         tracing::debug!(
             target: "symthaea::coding_agent",
             phase = %self.phase,
             selected = %selected.name,
-            candidates = candidates.len(),
+            candidates = candidate_count,
             energy = selected.profile.total_energy,
             "FEP selected plan (history-aware)"
         );
 
-        let profile = selected.profile.clone();
-        self.build_execution_plan().map(|m| (m, profile))
+        Some((selected.molecule, selected.profile))
     }
 
     /// Evaluate whether the current plan is safe and affordable.
@@ -986,5 +986,37 @@ impl CodingAgent {
             .unwrap_or_else(|| Molecule::atom(Atom::cargo_check(working_dir)));
 
         self.execute_molecule(&molecule)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn fep_selection_returns_the_exact_selected_molecule() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let target = dir.path().join("target.rs");
+        std::fs::write(&target, "fn main() {}\n").expect("write fixture");
+
+        let config = CodingAgentConfig {
+            working_dir: dir.path().to_path_buf(),
+            target_file: Some(PathBuf::from("target.rs")),
+            ..Default::default()
+        };
+        let mut agent = CodingAgent::new(config).expect("agent");
+
+        agent.experience_store = None;
+        agent.phase = TaskPhase::Understanding;
+        agent.phi_trace.push(1.0);
+
+        let (molecule, selected_profile) = agent.select_plan_fep().expect("selected plan");
+        let executed_profile = molecule.profile();
+
+        assert_eq!(selected_profile.step_count, 1);
+        assert_eq!(executed_profile.step_count, selected_profile.step_count);
+        assert_eq!(executed_profile.atom_names, selected_profile.atom_names);
+        assert!((executed_profile.total_energy - selected_profile.total_energy).abs() < f32::EPSILON);
     }
 }
