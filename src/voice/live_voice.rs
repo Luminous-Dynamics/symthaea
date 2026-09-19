@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
 
-use super::audio_out::AudioOutput;
+use super::audio_out::{AudioOutput, AudioOutputPurgeHandle};
 use super::formant_targets::FormantDatabase;
 use super::repl_voice::SimpleG2P;
 use super::vocal_tract_controller::train_controller_on_phoneme_db;
@@ -58,23 +58,32 @@ pub enum LiveVoiceSpeakOutcome {
 #[derive(Debug, Clone)]
 pub struct LiveVoiceStopHandle {
     speaking: Arc<AtomicBool>,
+    purge: AudioOutputPurgeHandle,
 }
 
 impl LiveVoiceStopHandle {
-    fn new(speaking: Arc<AtomicBool>) -> Self {
-        Self { speaking }
+    fn new(speaking: Arc<AtomicBool>, purge: AudioOutputPurgeHandle) -> Self {
+        Self { speaking, purge }
     }
 
-    /// Request that the live synthesis/push loops stop at their next cancellation
-    /// check. This does not claim that already-buffered device audio is instantly
-    /// silent; the ring buffer drains according to the audio backend.
+    /// Request that synthesis/push stop at the next cancellation check and ask the
+    /// realtime audio callback to discard PCM already queued in the ring.
+    ///
+    /// Samples already handed to CPAL/the OS/device may still be audible briefly;
+    /// this capability removes the much larger software-ring drain tail.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.purge.request_purge();
     }
 
     /// Whether the shared live utterance state still reports active synthesis/push.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
+    }
+
+    /// Whether queued PCM purge is still waiting for the realtime callback.
+    pub fn purge_pending(&self) -> bool {
+        self.purge.is_pending()
     }
 }
 
@@ -85,15 +94,17 @@ impl LiveVoiceStopHandle {
 pub struct SpeakHandle {
     thread: Option<std::thread::JoinHandle<Result<()>>>,
     speaking: Arc<AtomicBool>,
+    purge: AudioOutputPurgeHandle,
 }
 
 impl SpeakHandle {
-    /// Stop the background utterance. The ring buffer drains naturally to silence.
+    /// Stop the background utterance and request that queued PCM be discarded.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.purge.request_purge();
     }
 
-    /// Whether the background thread is still synthesizing.
+    /// Whether the background thread is still synthesizing/pushing.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
     }
@@ -208,13 +219,13 @@ impl LiveVoice {
         F: Fn() -> bool,
     {
         if cancelled() {
-            self.speaking.store(false, Ordering::SeqCst);
+            self.stop();
             return Ok(LiveVoiceSpeakOutcome::Cancelled);
         }
 
         self.speaking.store(true, Ordering::SeqCst);
         if cancelled() {
-            self.speaking.store(false, Ordering::SeqCst);
+            self.stop();
             return Ok(LiveVoiceSpeakOutcome::Cancelled);
         }
 
@@ -247,19 +258,24 @@ impl LiveVoice {
 
                 let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
                 self.push_with_backpressure(&chunk);
+                if !self.speaking.load(Ordering::SeqCst) {
+                    was_cancelled = true;
+                    break 'phonemes;
+                }
             }
         }
 
         if cancelled() || !self.speaking.load(Ordering::SeqCst) {
             was_cancelled = true;
         }
-        self.speaking.store(false, Ordering::SeqCst);
 
-        Ok(if was_cancelled {
-            LiveVoiceSpeakOutcome::Cancelled
+        if was_cancelled {
+            self.stop();
+            Ok(LiveVoiceSpeakOutcome::Cancelled)
         } else {
-            LiveVoiceSpeakOutcome::Completed
-        })
+            self.speaking.store(false, Ordering::SeqCst);
+            Ok(LiveVoiceSpeakOutcome::Completed)
+        }
     }
 
     fn analyze_prosody(&self, text: &str) -> ProsodyAnalysis {
@@ -320,6 +336,7 @@ impl LiveVoice {
         // Push synthesized audio to the ring buffer on a background thread
         // (backpressure may block, so we don't want to block the caller)
         let speaking_bg = Arc::clone(&self.speaking);
+        let purge = self.audio.purge_handle();
         let mut audio = self.audio.take_producer();
 
         let thread = std::thread::Builder::new()
@@ -348,6 +365,7 @@ impl LiveVoice {
         SpeakHandle {
             thread: Some(thread),
             speaking: Arc::clone(&self.speaking),
+            purge,
         }
     }
 
@@ -380,24 +398,27 @@ impl LiveVoice {
         Ok(all_samples.len())
     }
 
-    /// Push samples to the ring buffer with simple backpressure.
+    /// Push samples to the ring buffer with simple backpressure. A stop request
+    /// breaks retry sleep promptly rather than waiting for the current frame to be
+    /// fully admitted after cancellation.
     fn push_with_backpressure(&mut self, samples: &[f32]) {
         let mut offset = 0;
-        while offset < samples.len() {
+        while offset < samples.len() && self.speaking.load(Ordering::SeqCst) {
             let written = self.audio.push_samples(&samples[offset..]);
             offset += written;
-            if offset < samples.len() {
+            if offset < samples.len() && self.speaking.load(Ordering::SeqCst) {
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
         }
     }
 
-    /// Stop speaking immediately. The ring buffer drains naturally to silence.
+    /// Stop live synthesis/push and request queued PCM purge.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.audio.purge_handle().request_purge();
     }
 
-    /// Whether `speak()` or `speak_async()` is currently running.
+    /// Whether `speak()` or `speak_async()` is currently synthesizing/pushing.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
     }
@@ -407,7 +428,7 @@ impl LiveVoice {
     /// Unlike exposing the atomic directly, this handle grants only stop/status
     /// operations and can safely be retained by an interface control plane.
     pub fn stop_handle(&self) -> LiveVoiceStopHandle {
-        LiveVoiceStopHandle::new(Arc::clone(&self.speaking))
+        LiveVoiceStopHandle::new(Arc::clone(&self.speaking), self.audio.purge_handle())
     }
 
     /// Get a clone of the stop flag for cross-thread interruption.
@@ -523,16 +544,21 @@ mod tests {
     }
 
     #[test]
-    fn typed_stop_handle_is_cloneable_and_capability_narrow() {
+    fn typed_stop_handle_stops_synthesis_and_requests_pcm_purge() {
         let flag = Arc::new(AtomicBool::new(true));
-        let first = LiveVoiceStopHandle::new(Arc::clone(&flag));
+        let audio = AudioOutput::new_dummy(24000);
+        let purge = audio.purge_handle();
+        let first = LiveVoiceStopHandle::new(Arc::clone(&flag), purge.clone());
         let second = first.clone();
 
         assert!(first.is_speaking());
         assert!(second.is_speaking());
+        assert!(!purge.is_pending());
         second.stop();
         assert!(!first.is_speaking());
         assert!(!flag.load(Ordering::SeqCst));
+        assert!(purge.is_pending());
+        assert!(first.purge_pending());
     }
 
     #[test]
