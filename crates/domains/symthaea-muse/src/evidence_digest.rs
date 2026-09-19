@@ -30,6 +30,8 @@ pub mod rendered_multimodal_attack_panel;
 pub mod perceptual_study_protocol;
 #[path = "perceptual_analysis_plan.rs"]
 pub mod perceptual_analysis_plan;
+#[path = "perceptual_power_qualification.rs"]
+pub mod perceptual_power_qualification;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
