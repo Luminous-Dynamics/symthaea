@@ -8,9 +8,9 @@
 //! saved artifact with MIDI/WAV/Recipe downloads.
 //!
 //! Kept artifacts remain independent of `MuseState::current`. Audition uses
-//! the one persistent shared transport, while `keeper_api` also preserves the
-//! identity handles already present in newer keeper-log rows instead of silently
-//! discarding them at the client boundary.
+//! the one persistent shared transport. Newer keeper rows can additionally
+//! resolve their stored genealogy manifest on demand; only a successfully
+//! cross-checked manifest may contribute a rendition identity to playback.
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
@@ -25,10 +25,12 @@ pub fn LikedPage() -> impl IntoView {
     let muse = use_context::<MuseState>().expect("MuseState provided by App");
     let entries = RwSignal::new(Vec::<KeeperRecord>::new());
     let status = RwSignal::new(String::new());
+    let identity_notice = RwSignal::new(None::<String>);
     let loaded = RwSignal::new(false);
 
     let reload = move || {
         status.set("loading…".to_string());
+        identity_notice.set(None);
         spawn_local(async move {
             match keeper_api::fetch_keeper_records(api::DEFAULT_BACKEND).await {
                 Ok(v) => {
@@ -57,11 +59,15 @@ pub fn LikedPage() -> impl IntoView {
             <div class="liked-header">
                 <h2>"Library"</h2>
                 <p class="muted small">
-                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Auditions use the persistent player, so Return restores whatever you were hearing before. Newer keeper records also preserve their stored genealogy/score identity handles; legacy entries remain valid without inventing them."
+                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Auditions use the persistent player, so Return restores whatever you were hearing before. Newer keepers verify their stored genealogy before the player is allowed to carry a rendition identity; legacy keepers remain valid identity-less auditions."
                 </p>
                 <A href="/library/import" attr:class="link-btn">"Import music"</A>
                 <button type="button" on:click=move |_| reload()>"Refresh"</button>
             </div>
+
+            {move || identity_notice.get().map(|notice| view! {
+                <p class="status-line" role="status">{notice}</p>
+            })}
 
             {move || {
                 if !status.get().is_empty() {
@@ -78,6 +84,7 @@ pub fn LikedPage() -> impl IntoView {
                             {entries.get().into_iter().map(|record| {
                                 let identity_linked = record.genealogy_id.is_some()
                                     && record.score_sha256.is_some();
+                                let audition_record = record.clone();
                                 let e = record.entry;
                                 let when = if e.ts > 0 {
                                     format_timestamp(e.ts)
@@ -106,7 +113,7 @@ pub fn LikedPage() -> impl IntoView {
                                         <p class="muted">{meta}</p>
                                         <p class="muted">{grammar_line}</p>
                                         {identity_linked.then(|| view! {
-                                            <p class="muted small" title="This keeper row carries both a stored genealogy id and score SHA-256 handle.">
+                                            <p class="muted small" title="This keeper row carries both a stored genealogy id and score SHA-256 handle; audition verifies the manifest before promoting rendition identity.">
                                                 "identity-linked"
                                             </p>
                                         })}
@@ -116,10 +123,38 @@ pub fn LikedPage() -> impl IntoView {
                                                 type="button"
                                                 aria-label=format!("Audition {audition_title}")
                                                 on:click=move |_| {
-                                                    muse.play_review_audio(
-                                                        audition_url.clone(),
-                                                        audition_title.clone(),
+                                                    let record = audition_record.clone();
+                                                    let audio_url = audition_url.clone();
+                                                    let title = audition_title.clone();
+                                                    identity_notice.set(
+                                                        identity_linked.then(|| "verifying saved identity…".to_string())
                                                     );
+                                                    spawn_local(async move {
+                                                        match keeper_api::fetch_verified_keeper_identity(
+                                                            api::DEFAULT_BACKEND,
+                                                            &record,
+                                                        )
+                                                        .await
+                                                        {
+                                                            Ok(Some(verified)) => {
+                                                                identity_notice.set(None);
+                                                                muse.play_identity_bound_review_audio(
+                                                                    audio_url,
+                                                                    title,
+                                                                    verified.artifact.rendition,
+                                                                );
+                                                            }
+                                                            Ok(None) => {
+                                                                identity_notice.set(None);
+                                                                muse.play_review_audio(audio_url, title);
+                                                            }
+                                                            Err(error) => {
+                                                                identity_notice.set(Some(format!(
+                                                                    "Audition blocked: saved keeper identity could not be verified — {error}"
+                                                                )));
+                                                            }
+                                                        }
+                                                    });
                                                 }
                                             >
                                                 "Audition"
