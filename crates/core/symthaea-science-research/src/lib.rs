@@ -8,16 +8,16 @@
 //! scientific subjects, claims, polarity-aware adjudication, semantic
 //! evidence-to-claim binding, protocol-scoped evidence accounting and corpus
 //! decision binding, non-authorizing qualification eligibility and review-ready
-//! capabilities, lifecycle-authenticated qualification-profile authority, typed
-//! provenance graphs, frozen study protocols, immutable execution/conformance
-//! records, adversarial falsification campaigns, explicit scientific uncertainty
-//! budgets, and provenance-checked replication lineage assessments. It does not
-//! run experiments, solvers, LLMs, HDC, statistics, formal provers, or network
-//! operations.
+//! capabilities, lifecycle-authenticated qualification-profile and claim-decision
+//! authority, typed provenance graphs, frozen study protocols, immutable
+//! execution/conformance records, adversarial falsification campaigns, explicit
+//! scientific uncertainty budgets, and provenance-checked replication lineage
+//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
+//! formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
-//! Qualification is intentionally reserved for a later independently authenticated
-//! claim-decision capability boundary.
+//! Final scientific qualification is reserved for a later capability that consumes
+//! an authenticated claim decision.
 
 pub mod authority;
 pub mod claim;
@@ -33,6 +33,7 @@ pub mod identity;
 pub mod independence;
 pub mod protocol;
 pub mod provenance;
+pub mod qualification_decision_authority;
 mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
 pub mod qualification_profile_authority;
@@ -61,6 +62,7 @@ pub use identity::*;
 pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
+pub use qualification_decision_authority::*;
 pub use qualification_eligibility::{
     QUALIFICATION_ELIGIBILITY_SCHEMA, EligibilityGateKind, EligibilityGateState,
     FrozenQualificationEligibilityProfile, QualificationEligibilityClosure,
