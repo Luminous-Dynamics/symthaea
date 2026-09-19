@@ -29,6 +29,7 @@
 //! - **TemporalPredictor**: Implements the shared trait for cross-domain integration.
 
 pub mod attention;
+pub mod belief_export;
 pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
@@ -40,6 +41,13 @@ pub mod training;
 pub mod types;
 
 pub use attention::SurpriseMap;
+pub use belief_export::{
+    ConfidenceUnavailableReasonV1, ObservationLineageUnavailableReasonV1,
+    VISUAL_BELIEF_EXPORT_SCHEMA_ID, VISUAL_BELIEF_EXPORT_SCHEMA_VERSION,
+    VisualBeliefConfidenceV1, VisualBeliefExportError, VisualBeliefExportV1,
+    VisualBeliefLifecycleV1, VisualCoordinateFrameV1, VisualEntityBeliefV1,
+    VisualEvidenceOriginV1, VisualGridKinematicsV1, VisualObservationLineageV1,
+};
 pub use bridge::{
     CROSS_MANIFOLD_PREDICTOR_STATE_SCHEMA_VERSION, CognitiveGoalSignal, CognitiveGoalSignalState,
     CrossManifoldPredictor, CrossManifoldPredictorState, VISION_BRIDGE_STATE_SCHEMA_VERSION,
