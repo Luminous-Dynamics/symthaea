@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #
-# Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v4
+# Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v5
 # and smoke.v1 evidence objects before any trusted recovery workload is eligible.
 
 set -euo pipefail
@@ -66,6 +66,10 @@ manifest_value() {
 
 promotion_schema="$(manifest_value "$PROMOTION_MANIFEST_PATH" schema)"
 promotion_result="$(manifest_value "$PROMOTION_MANIFEST_PATH" result)"
+promotion_operator_authorization_sha256="$(manifest_value "$PROMOTION_MANIFEST_PATH" operator_authorization_sha256)"
+promotion_operator_authorization_schema="$(manifest_value "$PROMOTION_MANIFEST_PATH" operator_authorization_schema)"
+promotion_operator_authorization_scope="$(manifest_value "$PROMOTION_MANIFEST_PATH" operator_authorization_scope)"
+promotion_operator_authorization_stage_f_authority="$(manifest_value "$PROMOTION_MANIFEST_PATH" operator_authorization_stage_f_authority)"
 authorized_recovery_head="$(manifest_value "$PROMOTION_MANIFEST_PATH" authorized_recovery_head)"
 promoted_main_head="$(manifest_value "$PROMOTION_MANIFEST_PATH" promoted_main_head)"
 promoted_main_tree="$(manifest_value "$PROMOTION_MANIFEST_PATH" promoted_main_tree)"
@@ -78,12 +82,16 @@ promotion_runner_module_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" runner
 promotion_routing_policy_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" routing_policy_blob)"
 recovery_eligibility_verifier_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" recovery_eligibility_verifier_blob)"
 
-[[ "$promotion_schema" == 'symthaea.trusted-runner.promotion.v4' ]]
+[[ "$promotion_schema" == 'symthaea.trusted-runner.promotion.v5' ]]
 [[ "$promotion_result" == 'PASS' ]]
+[[ "$promotion_operator_authorization_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$promotion_operator_authorization_schema" == 'symthaea.trusted-runner.bootstrap-authorization.v1' ]]
+[[ "$promotion_operator_authorization_scope" == 'trusted-runner-bootstrap-only' ]]
+[[ "$promotion_operator_authorization_stage_f_authority" == 'NONE' ]]
 for value in "$authorized_recovery_head" "$promoted_main_head" "$promoted_main_tree" "$promotion_smoke_workflow_blob" "$promotion_arc3_qualifier_workflow_blob" "$promotion_se001q_recovery_workflow_blob" "$promotion_se001q_replay_helper_blob" "$promotion_ci_rust_shell_blob" "$promotion_runner_module_blob" "$promotion_routing_policy_blob" "$recovery_eligibility_verifier_blob"; do
   [[ "$value" =~ ^[0-9a-f]{40}$ ]]
 done
-for pass_key in recovery_verifier_syntax_checked promotion_ancestry_checked promotion_tree_identity_checked promotion_diff_surface_checked promotion_artifact_blobs_checked se001q_recovery_artifacts_checked promotion_local_checkout_checked promotion_refs_stable; do
+for pass_key in operator_authorization_continuity_checked recovery_verifier_syntax_checked promotion_ancestry_checked promotion_tree_identity_checked promotion_diff_surface_checked promotion_artifact_blobs_checked se001q_recovery_artifacts_checked promotion_local_checkout_checked promotion_refs_stable; do
   [[ "$(manifest_value "$PROMOTION_MANIFEST_PATH" "$pass_key")" == 'PASS' ]]
 done
 [[ "$(manifest_value "$PROMOTION_MANIFEST_PATH" evidence_scope)" == 'stage-d-smoke-eligibility-only' ]]
@@ -167,12 +175,16 @@ git -c protocol.version=2 fetch --no-tags origin \
 [[ "$(git rev-parse refs/remotes/origin/main)" == "$public_main" ]]
 [[ "$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")" == "$public_recovery" ]]
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-recovery-eligibility-v3.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-recovery-eligibility-v4.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.recovery-eligibility.v3
+schema=symthaea.trusted-runner.recovery-eligibility.v4
 result=PASS
 promotion_manifest_sha256=$PROMOTION_MANIFEST_SHA256
 smoke_manifest_sha256=$SMOKE_MANIFEST_SHA256
+operator_authorization_sha256=$promotion_operator_authorization_sha256
+operator_authorization_schema=$promotion_operator_authorization_schema
+operator_authorization_scope=$promotion_operator_authorization_scope
+operator_authorization_stage_f_authority=$promotion_operator_authorization_stage_f_authority
 authorized_recovery_head=$authorized_recovery_head
 qualified_main_head=$public_main
 qualified_main_tree=$public_main_tree
@@ -186,6 +198,7 @@ se001q_recovery_workflow_blob=$promotion_se001q_recovery_workflow_blob
 se001q_replay_helper_blob=$promotion_se001q_replay_helper_blob
 ci_rust_shell_blob=$promotion_ci_rust_shell_blob
 recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
+operator_authorization_continuity_checked=PASS
 recovery_verifier_syntax_checked=PASS
 promotion_smoke_join_checked=PASS
 current_main_identity_checked=PASS
