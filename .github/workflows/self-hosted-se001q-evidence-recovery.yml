@@ -185,7 +185,7 @@ jobs:
           test "$AUTH_HELPER_BLOB" = "$CURRENT_HELPER_BLOB"
           [[ "$AUTH_NONCE" =~ ^[0-9a-f]{64}$ ]]
           test "$AUTH_MAX_USES" = '1'
-          test "$AUTH_CONSUMPTION_MODE" = 'root-owned-host-ledger-v1'
+          test "$AUTH_CONSUMPTION_MODE" = 'root-owned-host-ledger-v2'
           test "$AUTH_SCOPE" = 'se001q-independent-provider-reobservation-only'
           test "$AUTH_QUALIFICATION_CLAIM" = 'NONE'
           test "$AUTH_REPAIR_CLAIM" = 'NONE'
@@ -264,7 +264,7 @@ jobs:
           export CARGO_HOME="$RUNNER_TEMP/consume-cargo-home"
           export CARGO_TARGET_DIR="$RUNNER_TEMP/consume-target"
           mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
-          receipt_path="$RUNNER_TEMP/stage-f-consumption.v1.json"
+          receipt_path="$RUNNER_TEMP/stage-f-consumption.v2.json"
 
           nix develop --no-write-lock-file \
             --impure \
@@ -313,15 +313,21 @@ jobs:
           if consume_response != expected_consume:
               raise SystemExit(f"Stage-F authorization was not consumed: {consume_response!r}")
 
+          status_response = request(f"STATUS {nonce} {authorization_sha256}\n")
+          expected_status = f"CONSUMED_STATUS {nonce} {authorization_sha256} {expected_boot_id}"
+          if status_response != expected_status:
+              raise SystemExit(f"Stage-F ledger did not confirm durable consumption: {status_response!r}")
+
           receipt = {
-              "schema": "symthaea.trusted-runner.stage-f-consumption.v1",
+              "schema": "symthaea.trusted-runner.stage-f-consumption.v2",
               "result": "CONSUMED",
               "provider": "trusted-cpu-v1",
               "authorization_sha256": authorization_sha256,
               "authorization_nonce": nonce,
               "max_uses": 1,
-              "consumption_mode": "root-owned-host-ledger-v1",
+              "consumption_mode": "root-owned-host-ledger-v2",
               "qualified_host_boot_id": expected_boot_id,
+              "ledger_status_checked": "PASS",
               "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
               "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
               "qualified_main_head": os.environ.get("GITHUB_SHA", ""),
@@ -348,6 +354,7 @@ jobs:
           [[ "$consumption_id" =~ ^sha256:[0-9a-f]{64}$ ]]
           {
             printf 'STAGE_F_AUTHORIZATION_CONSUMED=PASS\n'
+            printf 'STAGE_F_LEDGER_STATUS=CONSUMED_CONFIRMED\n'
             printf 'STAGE_F_CONSUMPTION_RECEIPT_PATH=%s\n' "$receipt_path"
             printf 'STAGE_F_CONSUMPTION_RECEIPT_SHA256=%s\n' "$consumption_sha256"
             printf 'STAGE_F_CONSUMPTION_ID=%s\n' "$consumption_id"
@@ -359,6 +366,7 @@ jobs:
         run: |
           set -euo pipefail
           test "${STAGE_F_AUTHORIZATION_CONSUMED:-}" = 'PASS'
+          test "${STAGE_F_LEDGER_STATUS:-}" = 'CONSUMED_CONFIRMED'
           cd "$SOURCE_DIR"
           test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
           test "$(git rev-parse HEAD^{tree})" = "$TARGET_TREE"
@@ -411,7 +419,7 @@ jobs:
           emit_external_capsule stage_f_authorization "${STAGE_F_AUTHORIZATION_PATH:-}" "${STAGE_F_AUTHORIZATION_SHA256:-}"
           emit_external_capsule stage_f_consumption "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" "${STAGE_F_CONSUMPTION_RECEIPT_SHA256:-}"
 
-          if [[ "${STAGE_F_AUTHORIZATION_CONSUMED:-}" == 'PASS' && -n "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" && -s "$STAGE_F_CONSUMPTION_RECEIPT_PATH" && -n "${EVIDENCE_DIR:-}" && -s "$EVIDENCE_DIR/summary.json" && -s "$EVIDENCE_DIR/manifest.json" && -n "${BUNDLE_PATH:-}" && -s "$BUNDLE_PATH" ]]; then
+          if [[ "${STAGE_F_AUTHORIZATION_CONSUMED:-}" == 'PASS' && "${STAGE_F_LEDGER_STATUS:-}" == 'CONSUMED_CONFIRMED' && -n "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" && -s "$STAGE_F_CONSUMPTION_RECEIPT_PATH" && -n "${EVIDENCE_DIR:-}" && -s "$EVIDENCE_DIR/summary.json" && -s "$EVIDENCE_DIR/manifest.json" && -n "${BUNDLE_PATH:-}" && -s "$BUNDLE_PATH" ]]; then
             export CARGO_HOME="$RUNNER_TEMP/se001q-binding-cargo-home"
             export CARGO_TARGET_DIR="$RUNNER_TEMP/se001q-binding-target"
             mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
@@ -435,6 +443,7 @@ jobs:
           import json
           import os
           from pathlib import Path
+          import socket
           import sys
 
           evidence = Path(sys.argv[1])
@@ -448,24 +457,51 @@ jobs:
           consumption_id = consumption.get("consumption_id")
           if not isinstance(consumption_id, str) or not consumption_id.startswith("sha256:"):
               raise SystemExit("missing authorization consumption identity")
+          if consumption.get("schema") != "symthaea.trusted-runner.stage-f-consumption.v2":
+              raise SystemExit("unexpected Stage-F consumption schema")
+          if consumption.get("ledger_status_checked") != "PASS":
+              raise SystemExit("Stage-F receipt lacks durable-ledger confirmation")
+
+          nonce = os.environ.get("STAGE_F_AUTHORIZATION_NONCE", "")
+          authorization_sha256 = os.environ.get("STAGE_F_AUTHORIZATION_SHA256", "")
+          expected_boot_id = os.environ.get("QUALIFIED_HOST_BOOT_ID", "")
+          if consumption.get("authorization_nonce") != nonce or consumption.get("authorization_sha256") != authorization_sha256 or consumption.get("qualified_host_boot_id") != expected_boot_id:
+              raise SystemExit("Stage-F receipt identity mismatch")
+
+          client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+          client.connect("/run/symthaea-stage-f-authorization.sock")
+          client.sendall(f"STATUS {nonce} {authorization_sha256}\n".encode("ascii"))
+          status_bytes = b""
+          while True:
+              chunk = client.recv(4096)
+              if not chunk:
+                  break
+              status_bytes += chunk
+          client.close()
+          ledger_status_response = status_bytes.decode("ascii").strip()
+          expected_status = f"CONSUMED_STATUS {nonce} {authorization_sha256} {expected_boot_id}"
+          if ledger_status_response != expected_status:
+              raise SystemExit(f"Stage-F durable ledger changed before execution binding: {ledger_status_response!r}")
+
           summary_bytes = (evidence / "summary.json").read_bytes()
           bundle_bytes = bundle.read_bytes()
           consumption_bytes = consumption_path.read_bytes()
           binding = {
-              "schema": "symthaea.se001q.trusted-cpu-execution-binding.v2",
+              "schema": "symthaea.se001q.trusted-cpu-execution-binding.v3",
               "result": "BOUND",
               "provider": "trusted-cpu-v1",
               "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
               "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
               "qualified_main_head": os.environ.get("GITHUB_SHA", ""),
-              "qualified_host_boot_id": os.environ.get("QUALIFIED_HOST_BOOT_ID", ""),
+              "qualified_host_boot_id": expected_boot_id,
               "authorized_recovery_head": os.environ.get("AUTHORIZED_RECOVERY_HEAD", ""),
               "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
-              "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
-              "stage_f_authorization_nonce": os.environ.get("STAGE_F_AUTHORIZATION_NONCE", ""),
+              "stage_f_authorization_sha256": authorization_sha256,
+              "stage_f_authorization_nonce": nonce,
               "stage_f_authorization_max_uses": 1,
               "stage_f_authorization_consumption_mode": os.environ.get("STAGE_F_AUTHORIZATION_CONSUMPTION_MODE", ""),
               "stage_f_authorization_consumed": "PASS",
+              "stage_f_ledger_status": "CONSUMED_CONFIRMED",
               "stage_f_consumption_id": consumption_id,
               "stage_f_consumption_receipt_sha256": hashlib.sha256(consumption_bytes).hexdigest(),
               "se001q_recovery_workflow_blob": os.environ.get("CURRENT_SE001Q_WORKFLOW_BLOB", ""),
@@ -500,6 +536,7 @@ jobs:
               echo "- Qualified host boot: \`$QUALIFIED_HOST_BOOT_ID\`"
               echo "- Stage-F authorization: \`$STAGE_F_AUTHORIZATION_SHA256\`"
               echo "- One-time authorization nonce: \`$STAGE_F_AUTHORIZATION_NONCE\`"
+              echo "- Durable ledger status: \`CONSUMED_CONFIRMED\`"
               echo "- Consumption receipt: \`$STAGE_F_CONSUMPTION_RECEIPT_SHA256\`"
               echo '- Provider: `trusted-cpu-v1`'
               echo '- Authority: `independent-provider-observation-only`'
@@ -544,7 +581,7 @@ jobs:
             cp "$STAGE_F_AUTHORIZATION_PATH" "$EVIDENCE_DIR/stage-f-authorization.v2"
           fi
           if [[ -n "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" && -f "$STAGE_F_CONSUMPTION_RECEIPT_PATH" ]]; then
-            cp "$STAGE_F_CONSUMPTION_RECEIPT_PATH" "$EVIDENCE_DIR/stage-f-consumption.v1.json"
+            cp "$STAGE_F_CONSUMPTION_RECEIPT_PATH" "$EVIDENCE_DIR/stage-f-consumption.v2.json"
           fi
 
           cd "$SOURCE_DIR"
@@ -570,11 +607,46 @@ jobs:
           import json
           import os
           from pathlib import Path
+          import re
+          import socket
           import sys
 
           evidence = Path(sys.argv[1]).resolve()
+          nonce = os.environ.get("STAGE_F_AUTHORIZATION_NONCE", "")
+          authorization_sha256 = os.environ.get("STAGE_F_AUTHORIZATION_SHA256", "")
+          qualified_boot_id = os.environ.get("QUALIFIED_HOST_BOOT_ID", "")
+          ledger_status = "NOT_CHECKED"
+          ledger_status_response = ""
+
+          if re.fullmatch(r"[0-9a-f]{64}", nonce) and re.fullmatch(r"[0-9a-f]{64}", authorization_sha256) and re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", qualified_boot_id):
+              try:
+                  client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                  client.connect("/run/symthaea-stage-f-authorization.sock")
+                  client.sendall(f"STATUS {nonce} {authorization_sha256}\n".encode("ascii"))
+                  chunks = []
+                  while True:
+                      chunk = client.recv(4096)
+                      if not chunk:
+                          break
+                      chunks.append(chunk)
+                  client.close()
+                  ledger_status_response = b"".join(chunks).decode("ascii").strip()
+                  if ledger_status_response == f"CONSUMED_STATUS {nonce} {authorization_sha256} {qualified_boot_id}":
+                      ledger_status = "CONSUMED_CONFIRMED"
+                  elif ledger_status_response == f"UNUSED {nonce} {qualified_boot_id}":
+                      ledger_status = "UNUSED_CONFIRMED"
+                  elif ledger_status_response == f"INCOMPLETE {nonce} {qualified_boot_id}":
+                      ledger_status = "CONSUMPTION_UNCERTAIN"
+                  elif ledger_status_response == f"CONSUMED_DIFFERENT {nonce} {qualified_boot_id}":
+                      ledger_status = "NONCE_CONSUMED_DIFFERENT_AUTHORIZATION"
+                  else:
+                      ledger_status = "UNEXPECTED_STATUS_RESPONSE"
+              except Exception as exc:
+                  ledger_status = "STATUS_QUERY_FAILED"
+                  ledger_status_response = type(exc).__name__
+
           rejection = {
-              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v4",
+              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v5",
               "result": "REJECTED_OR_INCOMPLETE",
               "qualification_claim": "NONE",
               "repair_authority_claim": "NONE",
@@ -585,11 +657,13 @@ jobs:
               "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
               "target_commit": os.environ.get("TARGET_COMMIT", ""),
               "hosted_verifier_commit": os.environ.get("HOSTED_VERIFIER_COMMIT", ""),
-              "qualified_host_boot_id": os.environ.get("QUALIFIED_HOST_BOOT_ID", ""),
+              "qualified_host_boot_id": qualified_boot_id,
               "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
-              "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
-              "stage_f_authorization_nonce": os.environ.get("STAGE_F_AUTHORIZATION_NONCE", ""),
+              "stage_f_authorization_sha256": authorization_sha256,
+              "stage_f_authorization_nonce": nonce,
               "stage_f_authorization_consumed": os.environ.get("STAGE_F_AUTHORIZATION_CONSUMED", "NOT_DEMONSTRATED"),
+              "stage_f_ledger_status": ledger_status,
+              "stage_f_ledger_status_response": ledger_status_response,
               "stage_f_consumption_receipt_sha256": os.environ.get("STAGE_F_CONSUMPTION_RECEIPT_SHA256", ""),
               "evidence_scope": "independent-provider-rejection-only",
           }
@@ -604,13 +678,15 @@ jobs:
                   "sha256": hashlib.sha256(data).hexdigest(),
                   "bytes": len(data),
               })
-          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v4", "entries": entries}
+          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v5", "entries": entries}
           manifest_id = "sha256:" + hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
           manifest = dict(identity)
           manifest["manifest_id"] = manifest_id
           manifest_bytes = json.dumps(manifest, sort_keys=True, separators=(",", ":")).encode() + b"\n"
           (evidence / "partial-manifest.json").write_bytes(manifest_bytes)
 
+          print(f"stage_f_ledger_status={ledger_status}")
+          print(f"stage_f_ledger_status_response={ledger_status_response}")
           files = sorted(p for p in evidence.rglob("*") if p.is_file())
           print(f"partial_evidence_manifest_id={manifest_id}")
           print(f"partial_evidence_files={len(files)}")
@@ -630,5 +706,6 @@ jobs:
           {
             echo
             echo 'Partial rejection evidence was emitted in the job log as individually hashed, numbered base64 file chunks.'
+            echo 'The root-ledger STATUS query distinguishes confirmed unused, confirmed consumed, mismatched consumption, and incomplete/uncertain consumption when available.'
             echo 'A partial-rejection capsule is diagnostic evidence only; it cannot satisfy the successful replay contract.'
           } >> "$GITHUB_STEP_SUMMARY"
