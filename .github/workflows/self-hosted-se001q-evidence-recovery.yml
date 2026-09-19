@@ -4,19 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       recovery_eligibility_manifest_base64:
-        description: Exact recovery-eligibility.v4 manifest bytes, base64 encoded
+        description: Exact recovery-eligibility.v5 manifest bytes, base64 encoded
         required: true
         type: string
       recovery_eligibility_manifest_sha256:
-        description: Independently retained SHA-256 of the exact recovery-eligibility.v4 manifest bytes
+        description: Independently retained SHA-256 of the exact recovery-eligibility.v5 manifest bytes
         required: true
         type: string
       stage_f_authorization_base64:
-        description: Exact SE-001Q Stage-F authorization capsule bytes, base64 encoded
+        description: Exact SE-001Q Stage-F authorization.v2 capsule bytes, base64 encoded
         required: true
         type: string
       stage_f_authorization_sha256:
-        description: Independently retained SHA-256 of the exact Stage-F authorization capsule bytes
+        description: Independently retained SHA-256 of the exact Stage-F authorization.v2 capsule bytes
         required: true
         type: string
 
@@ -40,7 +40,8 @@ env:
   HOSTED_ATTEST_BLOB: 24faac94620cba9222a40492d1e633d523147c52
 
 concurrency:
-  # Every manual recovery attempt is a distinct provider observation.
+  # Every manual recovery attempt is a distinct provider observation. Replays of
+  # one authorization are rejected by the host-persistent one-time ledger.
   group: ${{ github.workflow }}-${{ github.run_id }}
   cancel-in-progress: false
 
@@ -77,8 +78,8 @@ jobs:
           RECIPE_DIR="$RUNNER_TEMP/hosted-se001q-recipe"
           EVIDENCE_DIR="$RUNNER_TEMP/se001q-trusted-recovery-evidence"
           BUNDLE_PATH="$RUNNER_TEMP/se001q-trusted-cpu-observation-v2.zip"
-          ELIGIBILITY_PATH="$RUNNER_TEMP/recovery-eligibility.v4"
-          STAGE_F_AUTH_PATH="$RUNNER_TEMP/se001q-stage-f-authorization.v1"
+          ELIGIBILITY_PATH="$RUNNER_TEMP/recovery-eligibility.v5"
+          STAGE_F_AUTH_PATH="$RUNNER_TEMP/se001q-stage-f-authorization.v2"
           rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR" "$BUNDLE_PATH" "$ELIGIBILITY_PATH" "$STAGE_F_AUTH_PATH"
           mkdir -p "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR"
 
@@ -106,11 +107,12 @@ jobs:
           ELIGIBILITY_RECOVERY_HEAD="$(kv "$ELIGIBILITY_PATH" authorized_recovery_head)"
           ELIGIBILITY_MAIN_HEAD="$(kv "$ELIGIBILITY_PATH" qualified_main_head)"
           ELIGIBILITY_MAIN_TREE="$(kv "$ELIGIBILITY_PATH" qualified_main_tree)"
+          ELIGIBILITY_HOST_BOOT_ID="$(kv "$ELIGIBILITY_PATH" qualified_host_boot_id)"
           ELIGIBILITY_WORKFLOW_BLOB="$(kv "$ELIGIBILITY_PATH" se001q_recovery_workflow_blob)"
           ELIGIBILITY_HELPER_BLOB="$(kv "$ELIGIBILITY_PATH" se001q_replay_helper_blob)"
           ELIGIBILITY_SCOPE="$(kv "$ELIGIBILITY_PATH" evidence_scope)"
 
-          test "$ELIGIBILITY_SCHEMA" = 'symthaea.trusted-runner.recovery-eligibility.v4'
+          test "$ELIGIBILITY_SCHEMA" = 'symthaea.trusted-runner.recovery-eligibility.v5'
           test "$ELIGIBILITY_RESULT" = 'PASS'
           [[ "$ELIGIBILITY_OPERATOR_AUTH_SHA256" =~ ^[0-9a-f]{64}$ ]]
           test "$ELIGIBILITY_OPERATOR_AUTH_SCOPE" = 'trusted-runner-bootstrap-only'
@@ -118,10 +120,11 @@ jobs:
           [[ "$ELIGIBILITY_RECOVERY_HEAD" =~ ^[0-9a-f]{40}$ ]]
           [[ "$ELIGIBILITY_MAIN_HEAD" =~ ^[0-9a-f]{40}$ ]]
           [[ "$ELIGIBILITY_MAIN_TREE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ELIGIBILITY_HOST_BOOT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
           [[ "$ELIGIBILITY_WORKFLOW_BLOB" =~ ^[0-9a-f]{40}$ ]]
           [[ "$ELIGIBILITY_HELPER_BLOB" =~ ^[0-9a-f]{40}$ ]]
           test "$ELIGIBILITY_SCOPE" = 'trusted-cpu-recovery-eligibility-only'
-          for key in operator_authorization_continuity_checked recovery_verifier_syntax_checked promotion_smoke_join_checked current_main_identity_checked current_recovery_identity_checked local_verifier_identity_checked se001q_recovery_artifacts_checked refs_stable; do
+          for key in operator_authorization_continuity_checked recovery_verifier_syntax_checked promotion_smoke_join_checked host_boot_identity_checked current_main_identity_checked current_recovery_identity_checked local_verifier_identity_checked se001q_recovery_artifacts_checked refs_stable; do
             test "$(kv "$ELIGIBILITY_PATH" "$key")" = 'PASS'
           done
 
@@ -154,14 +157,18 @@ jobs:
           AUTH_ELIGIBILITY_SHA256="$(kv "$STAGE_F_AUTH_PATH" recovery_eligibility_manifest_sha256)"
           AUTH_MAIN_HEAD="$(kv "$STAGE_F_AUTH_PATH" qualified_main_head)"
           AUTH_MAIN_TREE="$(kv "$STAGE_F_AUTH_PATH" qualified_main_tree)"
+          AUTH_HOST_BOOT_ID="$(kv "$STAGE_F_AUTH_PATH" qualified_host_boot_id)"
           AUTH_RECOVERY_HEAD="$(kv "$STAGE_F_AUTH_PATH" authorized_recovery_head)"
           AUTH_WORKFLOW_BLOB="$(kv "$STAGE_F_AUTH_PATH" se001q_recovery_workflow_blob)"
           AUTH_HELPER_BLOB="$(kv "$STAGE_F_AUTH_PATH" se001q_replay_helper_blob)"
+          AUTH_NONCE="$(kv "$STAGE_F_AUTH_PATH" authorization_nonce)"
+          AUTH_MAX_USES="$(kv "$STAGE_F_AUTH_PATH" max_uses)"
+          AUTH_CONSUMPTION_MODE="$(kv "$STAGE_F_AUTH_PATH" consumption_mode)"
           AUTH_SCOPE="$(kv "$STAGE_F_AUTH_PATH" authorization_scope)"
           AUTH_QUALIFICATION_CLAIM="$(kv "$STAGE_F_AUTH_PATH" qualification_claim)"
           AUTH_REPAIR_CLAIM="$(kv "$STAGE_F_AUTH_PATH" repair_authority_claim)"
 
-          test "$AUTH_SCHEMA" = 'symthaea.trusted-runner.stage-f-authorization.v1'
+          test "$AUTH_SCHEMA" = 'symthaea.trusted-runner.stage-f-authorization.v2'
           test "$AUTH_DECISION" = 'AUTHORIZE_SE001Q_REOBSERVATION'
           test "$AUTH_REPOSITORY" = 'https://github.com/Luminous-Dynamics/symthaea.git'
           test "$AUTH_PROVIDER" = 'trusted-cpu-v1'
@@ -172,9 +179,13 @@ jobs:
           test "$AUTH_ELIGIBILITY_SHA256" = "$ELIGIBILITY_SHA256_INPUT"
           test "$AUTH_MAIN_HEAD" = "$ELIGIBILITY_MAIN_HEAD"
           test "$AUTH_MAIN_TREE" = "$ELIGIBILITY_MAIN_TREE"
+          test "$AUTH_HOST_BOOT_ID" = "$ELIGIBILITY_HOST_BOOT_ID"
           test "$AUTH_RECOVERY_HEAD" = "$ELIGIBILITY_RECOVERY_HEAD"
           test "$AUTH_WORKFLOW_BLOB" = "$CURRENT_WORKFLOW_BLOB"
           test "$AUTH_HELPER_BLOB" = "$CURRENT_HELPER_BLOB"
+          [[ "$AUTH_NONCE" =~ ^[0-9a-f]{64}$ ]]
+          test "$AUTH_MAX_USES" = '1'
+          test "$AUTH_CONSUMPTION_MODE" = 'root-owned-host-ledger-v1'
           test "$AUTH_SCOPE" = 'se001q-independent-provider-reobservation-only'
           test "$AUTH_QUALIFICATION_CLAIM" = 'NONE'
           test "$AUTH_REPAIR_CLAIM" = 'NONE'
@@ -220,6 +231,10 @@ jobs:
             printf 'RECOVERY_ELIGIBILITY_MANIFEST_SHA256=%s\n' "$ELIGIBILITY_SHA256_INPUT"
             printf 'STAGE_F_AUTHORIZATION_PATH=%s\n' "$STAGE_F_AUTH_PATH"
             printf 'STAGE_F_AUTHORIZATION_SHA256=%s\n' "$STAGE_F_AUTH_SHA256_INPUT"
+            printf 'STAGE_F_AUTHORIZATION_NONCE=%s\n' "$AUTH_NONCE"
+            printf 'STAGE_F_AUTHORIZATION_MAX_USES=%s\n' "$AUTH_MAX_USES"
+            printf 'STAGE_F_AUTHORIZATION_CONSUMPTION_MODE=%s\n' "$AUTH_CONSUMPTION_MODE"
+            printf 'QUALIFIED_HOST_BOOT_ID=%s\n' "$ELIGIBILITY_HOST_BOOT_ID"
             printf 'AUTHORIZED_RECOVERY_HEAD=%s\n' "$ELIGIBILITY_RECOVERY_HEAD"
             printf 'CURRENT_SE001Q_WORKFLOW_BLOB=%s\n' "$CURRENT_WORKFLOW_BLOB"
             printf 'CURRENT_SE001Q_HELPER_BLOB=%s\n' "$CURRENT_HELPER_BLOB"
@@ -238,11 +253,109 @@ jobs:
             --impure \
             --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
 
+      - name: Consume Stage-F authorization exactly once
+        id: consume_authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          socket=/run/symthaea-stage-f-authorization.sock
+          test -S "$socket"
+          export CARGO_HOME="$RUNNER_TEMP/consume-cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/consume-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+          receipt_path="$RUNNER_TEMP/stage-f-consumption.v1.json"
+
+          nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let
+              f = builtins.getFlake (toString ./.);
+              harness = builtins.getEnv "HARNESS_DIR";
+              shellFile = builtins.toPath (harness + "/nix/ci-rust-shell.nix");
+            in import shellFile {
+              nixpkgs = f.inputs.nixpkgs;
+              rust-overlay = f.inputs.rust-overlay;
+              toolchainFile = ./rust-toolchain.toml;
+              system = builtins.currentSystem;
+            }' \
+            --command python3 - "$STAGE_F_AUTHORIZATION_NONCE" "$STAGE_F_AUTHORIZATION_SHA256" "$QUALIFIED_HOST_BOOT_ID" "$receipt_path" <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import socket
+          import sys
+
+          nonce, authorization_sha256, expected_boot_id, receipt_path = sys.argv[1:5]
+          socket_path = "/run/symthaea-stage-f-authorization.sock"
+
+          def request(line: str) -> str:
+              client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+              client.connect(socket_path)
+              client.sendall(line.encode("ascii"))
+              data = b""
+              while True:
+                  chunk = client.recv(4096)
+                  if not chunk:
+                      break
+                  data += chunk
+              client.close()
+              return data.decode("ascii").strip()
+
+          boot_response = request("BOOT_ID\n")
+          expected_boot_response = f"BOOT_ID {expected_boot_id}"
+          if boot_response != expected_boot_response:
+              raise SystemExit(f"qualified host boot changed: {boot_response!r}")
+
+          consume_response = request(f"CONSUME {nonce} {authorization_sha256}\n")
+          expected_consume = f"CONSUMED {nonce} {authorization_sha256} {expected_boot_id}"
+          if consume_response != expected_consume:
+              raise SystemExit(f"Stage-F authorization was not consumed: {consume_response!r}")
+
+          receipt = {
+              "schema": "symthaea.trusted-runner.stage-f-consumption.v1",
+              "result": "CONSUMED",
+              "provider": "trusted-cpu-v1",
+              "authorization_sha256": authorization_sha256,
+              "authorization_nonce": nonce,
+              "max_uses": 1,
+              "consumption_mode": "root-owned-host-ledger-v1",
+              "qualified_host_boot_id": expected_boot_id,
+              "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+              "qualified_main_head": os.environ.get("GITHUB_SHA", ""),
+              "authorized_recovery_head": os.environ.get("AUTHORIZED_RECOVERY_HEAD", ""),
+              "qualification_claim": "NONE",
+              "repair_authority_claim": "NONE",
+              "evidence_scope": "stage-f-authorization-consumption-only",
+          }
+          identity = json.dumps(receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+          receipt_id = "sha256:" + hashlib.sha256(identity).hexdigest()
+          receipt["consumption_id"] = receipt_id
+          data = json.dumps(receipt, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
+          Path(receipt_path).write_bytes(data)
+          print(f"stage_f_consumption_id={receipt_id}")
+          print(f"stage_f_consumption_sha256={hashlib.sha256(data).hexdigest()}")
+          print("stage_f_consumption_base64=" + base64.b64encode(data).decode("ascii"))
+          PY
+
+          consumption_sha256="$(sha256sum "$receipt_path" | awk '{print $1}')"
+          consumption_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["consumption_id"])' "$receipt_path" 2>/dev/null || true)"
+          [[ "$consumption_sha256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$consumption_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+          {
+            printf 'STAGE_F_AUTHORIZATION_CONSUMED=PASS\n'
+            printf 'STAGE_F_CONSUMPTION_RECEIPT_PATH=%s\n' "$receipt_path"
+            printf 'STAGE_F_CONSUMPTION_RECEIPT_SHA256=%s\n' "$consumption_sha256"
+            printf 'STAGE_F_CONSUMPTION_ID=%s\n' "$consumption_id"
+          } >> "$GITHUB_ENV"
+
       - name: Capture independent provider evidence under pinned Rust and Python
         id: capture
         shell: bash
         run: |
           set -euo pipefail
+          test "${STAGE_F_AUTHORIZATION_CONSUMED:-}" = 'PASS'
           cd "$SOURCE_DIR"
           test "$(git rev-parse HEAD)" = "$TARGET_COMMIT"
           test "$(git rev-parse HEAD^{tree})" = "$TARGET_TREE"
@@ -275,6 +388,7 @@ jobs:
         shell: bash
         env:
           CAPTURE_OUTCOME: ${{ steps.capture.outcome }}
+          CONSUMPTION_OUTCOME: ${{ steps.consume_authorization.outcome }}
         run: |
           set -euo pipefail
 
@@ -292,8 +406,9 @@ jobs:
 
           emit_external_capsule recovery_eligibility "${RECOVERY_ELIGIBILITY_PATH:-}" "${RECOVERY_ELIGIBILITY_MANIFEST_SHA256:-}"
           emit_external_capsule stage_f_authorization "${STAGE_F_AUTHORIZATION_PATH:-}" "${STAGE_F_AUTHORIZATION_SHA256:-}"
+          emit_external_capsule stage_f_consumption "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" "${STAGE_F_CONSUMPTION_RECEIPT_SHA256:-}"
 
-          if [[ -n "${EVIDENCE_DIR:-}" && -s "$EVIDENCE_DIR/summary.json" && -s "$EVIDENCE_DIR/manifest.json" && -n "${BUNDLE_PATH:-}" && -s "$BUNDLE_PATH" ]]; then
+          if [[ "${STAGE_F_AUTHORIZATION_CONSUMED:-}" == 'PASS' && -n "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" && -s "$STAGE_F_CONSUMPTION_RECEIPT_PATH" && -n "${EVIDENCE_DIR:-}" && -s "$EVIDENCE_DIR/summary.json" && -s "$EVIDENCE_DIR/manifest.json" && -n "${BUNDLE_PATH:-}" && -s "$BUNDLE_PATH" ]]; then
             export CARGO_HOME="$RUNNER_TEMP/se001q-binding-cargo-home"
             export CARGO_TARGET_DIR="$RUNNER_TEMP/se001q-binding-target"
             mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
@@ -311,7 +426,7 @@ jobs:
                 toolchainFile = ./rust-toolchain.toml;
                 system = builtins.currentSystem;
               }' \
-              --command python3 - "$EVIDENCE_DIR" "$BUNDLE_PATH" <<'PY'
+              --command python3 - "$EVIDENCE_DIR" "$BUNDLE_PATH" "$STAGE_F_CONSUMPTION_RECEIPT_PATH" <<'PY'
           import base64
           import hashlib
           import json
@@ -321,22 +436,35 @@ jobs:
 
           evidence = Path(sys.argv[1])
           bundle = Path(sys.argv[2])
+          consumption_path = Path(sys.argv[3])
           manifest = json.loads((evidence / "manifest.json").read_text(encoding="utf-8"))
           manifest_id = manifest.get("manifest_id")
           if not isinstance(manifest_id, str) or not manifest_id.startswith("sha256:"):
               raise SystemExit("missing observation manifest identity")
+          consumption = json.loads(consumption_path.read_text(encoding="utf-8"))
+          consumption_id = consumption.get("consumption_id")
+          if not isinstance(consumption_id, str) or not consumption_id.startswith("sha256:"):
+              raise SystemExit("missing authorization consumption identity")
           summary_bytes = (evidence / "summary.json").read_bytes()
           bundle_bytes = bundle.read_bytes()
+          consumption_bytes = consumption_path.read_bytes()
           binding = {
-              "schema": "symthaea.se001q.trusted-cpu-execution-binding.v1",
+              "schema": "symthaea.se001q.trusted-cpu-execution-binding.v2",
               "result": "BOUND",
               "provider": "trusted-cpu-v1",
               "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
               "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
               "qualified_main_head": os.environ.get("GITHUB_SHA", ""),
+              "qualified_host_boot_id": os.environ.get("QUALIFIED_HOST_BOOT_ID", ""),
               "authorized_recovery_head": os.environ.get("AUTHORIZED_RECOVERY_HEAD", ""),
               "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
               "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
+              "stage_f_authorization_nonce": os.environ.get("STAGE_F_AUTHORIZATION_NONCE", ""),
+              "stage_f_authorization_max_uses": 1,
+              "stage_f_authorization_consumption_mode": os.environ.get("STAGE_F_AUTHORIZATION_CONSUMPTION_MODE", ""),
+              "stage_f_authorization_consumed": "PASS",
+              "stage_f_consumption_id": consumption_id,
+              "stage_f_consumption_receipt_sha256": hashlib.sha256(consumption_bytes).hexdigest(),
               "se001q_recovery_workflow_blob": os.environ.get("CURRENT_SE001Q_WORKFLOW_BLOB", ""),
               "se001q_replay_helper_blob": os.environ.get("CURRENT_SE001Q_HELPER_BLOB", ""),
               "target_commit": os.environ.get("TARGET_COMMIT", ""),
@@ -366,7 +494,10 @@ jobs:
               echo "- Frozen subject: \`$TARGET_COMMIT\` / \`$TARGET_TREE\`"
               echo "- Hosted EV2.4 recipe reference: \`$HOSTED_VERIFIER_COMMIT\`"
               echo "- Recovery eligibility: \`$RECOVERY_ELIGIBILITY_MANIFEST_SHA256\`"
+              echo "- Qualified host boot: \`$QUALIFIED_HOST_BOOT_ID\`"
               echo "- Stage-F authorization: \`$STAGE_F_AUTHORIZATION_SHA256\`"
+              echo "- One-time authorization nonce: \`$STAGE_F_AUTHORIZATION_NONCE\`"
+              echo "- Consumption receipt: \`$STAGE_F_CONSUMPTION_RECEIPT_SHA256\`"
               echo '- Provider: `trusted-cpu-v1`'
               echo '- Authority: `independent-provider-observation-only`'
               echo
@@ -375,7 +506,7 @@ jobs:
               echo '```'
               echo
               echo 'Exact observation-bundle bytes were emitted as numbered base64 chunks in the capture step.'
-              echo 'Exact eligibility, Stage-F authorization, and execution-binding bytes are retained in this job log.'
+              echo 'Exact eligibility, one-time Stage-F authorization, consumption receipt, and execution-binding bytes are retained in this job log.'
               echo 'This run cannot replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -384,9 +515,13 @@ jobs:
           {
             echo '## SE-001Q trusted CPU replay rejected or incomplete'
             echo
+            echo "- Stage-F consumption step outcome: \`${CONSUMPTION_OUTCOME:-unknown}\`"
             echo "- Capture step outcome: \`${CAPTURE_OUTCOME:-unknown}\`"
             echo "- Recovery eligibility: \`${RECOVERY_ELIGIBILITY_MANIFEST_SHA256:-unavailable}\`"
+            echo "- Qualified host boot: \`${QUALIFIED_HOST_BOOT_ID:-unavailable}\`"
             echo "- Stage-F authorization: \`${STAGE_F_AUTHORIZATION_SHA256:-unavailable}\`"
+            echo "- Stage-F nonce: \`${STAGE_F_AUTHORIZATION_NONCE:-unavailable}\`"
+            echo "- Authorization consumed: \`${STAGE_F_AUTHORIZATION_CONSUMED:-NO}\`"
             echo '- Authority: `NONE`'
             echo '- Qualification: `NONE`'
             echo '- Repair authority: `NONE`'
@@ -400,10 +535,13 @@ jobs:
           fi
 
           if [[ -n "${RECOVERY_ELIGIBILITY_PATH:-}" && -f "$RECOVERY_ELIGIBILITY_PATH" ]]; then
-            cp "$RECOVERY_ELIGIBILITY_PATH" "$EVIDENCE_DIR/recovery-eligibility.v4"
+            cp "$RECOVERY_ELIGIBILITY_PATH" "$EVIDENCE_DIR/recovery-eligibility.v5"
           fi
           if [[ -n "${STAGE_F_AUTHORIZATION_PATH:-}" && -f "$STAGE_F_AUTHORIZATION_PATH" ]]; then
-            cp "$STAGE_F_AUTHORIZATION_PATH" "$EVIDENCE_DIR/stage-f-authorization.v1"
+            cp "$STAGE_F_AUTHORIZATION_PATH" "$EVIDENCE_DIR/stage-f-authorization.v2"
+          fi
+          if [[ -n "${STAGE_F_CONSUMPTION_RECEIPT_PATH:-}" && -f "$STAGE_F_CONSUMPTION_RECEIPT_PATH" ]]; then
+            cp "$STAGE_F_CONSUMPTION_RECEIPT_PATH" "$EVIDENCE_DIR/stage-f-consumption.v1.json"
           fi
 
           cd "$SOURCE_DIR"
@@ -433,18 +571,23 @@ jobs:
 
           evidence = Path(sys.argv[1]).resolve()
           rejection = {
-              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v2",
+              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v3",
               "result": "REJECTED_OR_INCOMPLETE",
               "qualification_claim": "NONE",
               "repair_authority_claim": "NONE",
               "provider": "trusted-cpu-v1",
+              "stage_f_consumption_step_outcome": os.environ.get("CONSUMPTION_OUTCOME", "unknown"),
               "capture_step_outcome": os.environ.get("CAPTURE_OUTCOME", "unknown"),
               "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
               "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
               "target_commit": os.environ.get("TARGET_COMMIT", ""),
               "hosted_verifier_commit": os.environ.get("HOSTED_VERIFIER_COMMIT", ""),
+              "qualified_host_boot_id": os.environ.get("QUALIFIED_HOST_BOOT_ID", ""),
               "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
               "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
+              "stage_f_authorization_nonce": os.environ.get("STAGE_F_AUTHORIZATION_NONCE", ""),
+              "stage_f_authorization_consumed": os.environ.get("STAGE_F_AUTHORIZATION_CONSUMED", "NO"),
+              "stage_f_consumption_receipt_sha256": os.environ.get("STAGE_F_CONSUMPTION_RECEIPT_SHA256", ""),
               "evidence_scope": "independent-provider-rejection-only",
           }
           canonical = json.dumps(rejection, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
@@ -458,7 +601,7 @@ jobs:
                   "sha256": hashlib.sha256(data).hexdigest(),
                   "bytes": len(data),
               })
-          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v2", "entries": entries}
+          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v3", "entries": entries}
           manifest_id = "sha256:" + hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
           manifest = dict(identity)
           manifest["manifest_id"] = manifest_id
