@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/spore/spore-migration-manifest-v1.schema.json",
+  "title": "Spore Migration Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "destination_repository",
+    "destination_repository_status",
+    "qualification_transfer_policy",
+    "lineages",
+    "artifacts"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schema": { "const": "spore-migration-manifest-v1" },
+    "destination_repository": { "const": "Luminous-Dynamics/spore" },
+    "destination_repository_status": { "enum": ["not-created", "created"] },
+    "qualification_transfer_policy": { "const": "never-inherit" },
+    "lineages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "source_repository",
+          "source_branch",
+          "source_commit",
+          "source_tree",
+          "commit_verification",
+          "qualification_boundary",
+          "source_mutation_in_qualification",
+          "notes"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "source_repository": { "type": "string", "minLength": 3 },
+          "source_branch": { "type": "string", "minLength": 1 },
+          "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "source_tree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "commit_verification": { "enum": ["verified", "unsigned", "unknown"] },
+          "qualification_boundary": {
+            "enum": [
+              "exact-committed-source",
+              "transformed-candidate",
+              "provenance-only",
+              "not-assessed"
+            ]
+          },
+          "source_mutation_in_qualification": { "type": "boolean" },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "lineage_id",
+          "source_path",
+          "source_blob_sha1",
+          "source_role",
+          "authority_class",
+          "target_owner",
+          "migration_kind",
+          "destination_path",
+          "destination_qualification",
+          "notes"
+        ],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "lineage_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "source_path": { "type": "string", "minLength": 1 },
+          "source_blob_sha1": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "source_role": {
+            "enum": [
+              "product-source",
+              "qualification-tool",
+              "migration-tool",
+              "test-fixture",
+              "workflow",
+              "presentation",
+              "other"
+            ]
+          },
+          "authority_class": {
+            "enum": [
+              "recovery",
+              "qualification",
+              "presentation",
+              "host-policy",
+              "test-evidence",
+              "migration-tooling",
+              "workflow",
+              "other"
+            ]
+          },
+          "target_owner": { "enum": ["spore", "symthaea", "nixos-config", "undecided"] },
+          "migration_kind": { "enum": ["move", "copy", "extract", "retain", "reference", "undecided"] },
+          "destination_path": { "type": ["string", "null"] },
+          "destination_qualification": { "const": "required" },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}
