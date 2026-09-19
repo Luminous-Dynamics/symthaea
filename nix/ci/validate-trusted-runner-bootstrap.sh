@@ -130,6 +130,11 @@ promotion_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-t
 recovery_eligibility_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-recovery-eligibility.sh")"
 host_lifecycle_contract_blob="$(git rev-parse "$recovery_head_start:docs/operations/TRUSTED_CPU_RUNNER_HOST_LIFECYCLE.md")"
 
+bash -n \
+  nix/ci/validate-trusted-runner-bootstrap.sh \
+  nix/ci/validate-trusted-runner-promotion.sh \
+  nix/ci/validate-trusted-runner-recovery-eligibility.sh
+
 flake_lock_sha256="$(sha256sum flake.lock | awk '{print $1}')"
 rust_toolchain_sha256="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
 nixpkgs_rev="$(nix eval --raw --expr 'let l = builtins.fromJSON (builtins.readFile ./flake.lock); n = l.nodes.root.inputs.nixpkgs; in (builtins.getAttr n l.nodes).locked.rev')"
@@ -243,6 +248,7 @@ runner_policy_eval=PASS
 routing_policy_eval=PASS
 minimal_locked_rust_check=PASS
 se001q_helper_syntax_checked=PASS
+recovery_verifier_syntax_checked=PASS
 refs_unchanged_during_validation=PASS
 evidence_scope=runner-bootstrap-correctness-only
 EOF
