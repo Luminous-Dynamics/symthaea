@@ -10,6 +10,8 @@ pub mod benchmark_mirex;
 pub mod benchmark_symbolic_metrics;
 #[path = "benchmark_symbolic_parity.rs"]
 pub mod benchmark_symbolic_parity;
+#[path = "benchmark_time_grid.rs"]
+pub mod benchmark_time_grid;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
