@@ -75,7 +75,9 @@ Those transitions increase remaining authority. They require a future exact-gran
 reconciliation receipt.
 
 Cancellation before dispatch remains available because the reservation has not entered the
-uncertain-dispatch state.
+uncertain-dispatch state. A future execution-admission layer must make the durable transition to
+`OutcomeUnknown` occur before or atomically with dispatch; this accounting crate itself has no
+effect-dispatch API.
 
 ## Anti-rollback checkpoint
 
@@ -89,52 +91,48 @@ uncertain-dispatch state.
 - child escrow identities;
 - all accounting records and counters.
 
-The checkpoint head now also carries `grant_digest`, preventing cross-grant head substitution.
+The checkpoint head also carries `grant_digest`, preventing cross-grant head substitution.
 
-## VerifiedGrantAccounting
+## Head-bound accounting is not verified-current accounting
 
 Chain reconstruction alone does not establish currentness. `verify_chain()` is an audit/recovery
 operation only.
 
-An opaque `VerifiedGrantAccounting` is produced only when one checkpoint exactly matches an
-externally retained/authenticated `CheckpointHead`:
+This crate can deterministically bind one checkpoint to one supplied `CheckpointHead`:
 
 ```text
-checkpoint.head() == trusted_external_head
+checkpoint.head() == supplied_head
+    -> HeadBoundGrantAccounting
 ```
 
-The external head remains an explicit trust boundary. This crate does not claim to authenticate
-Xenia, TPM, append-only-log, or supervisor custody of that head.
+`HeadBoundGrantAccounting` is non-Serde and non-Clone and binds the exact grant digest, exact head,
+crash-conservative use state, and charged risk.
 
-The proof binds:
+However, `CheckpointHead` is only serializable identity data here. A caller can construct one. This
+crate does not authenticate Xenia, TPM, append-only-log, supervisor, or institutional custody of the
+head. Therefore the output is deliberately **not** named `VerifiedGrantAccounting` and must not be
+treated as verified currentness.
 
-```text
-VerifiedGrantAccounting {
-    exact grant digest,
-    exact trusted checkpoint head,
-    crash-conservative use state,
-    charged risk,
-}
-```
-
-It is non-Serde and non-Clone.
+A later external-head verifier must authenticate the head's source/currentness before promoting the
+head-bound accounting state into verified-current accounting evidence.
 
 ## Composition target
 
-This tranche still does not construct `AuthorityEvaluationInput` or execution admission. The next
-composition boundary must prove:
+This tranche still does not construct `AuthorityEvaluationInput` or execution admission. A later
+composition boundary must ultimately prove:
 
 ```text
 grant.digest()
     == VerifiedAuthorityStateV2.grant_digest()
-    == VerifiedGrantAccounting.grant_digest()
+    == externally-verified accounting grant digest
 ```
 
-and separately require fresh verified time/state before pure evaluation.
+and separately require fresh verified time/state plus authenticated current accounting before pure
+evaluation.
 
 ## Non-claims
 
-This tranche does not prove an effect occurred, authenticate the externally trusted checkpoint head,
-verify delegation ancestry beyond one static attenuation edge, return unused authority after uncertain
-child execution, mint a live capability, dispatch hardware/software effects, or establish scientific
-authority.
+This tranche does not prove an effect occurred, authenticate a checkpoint head, prove currentness of
+a reconstructed chain, verify delegation ancestry beyond one static attenuation edge, return unused
+authority after uncertain child execution, mint a live capability, dispatch hardware/software effects,
+or establish scientific authority.

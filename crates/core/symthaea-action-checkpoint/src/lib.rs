@@ -3,9 +3,9 @@
 //! Exact-grant anti-rollback checkpoints for action accounting.
 //!
 //! Historical checkpointing bound a runtime snapshot to a grant and predecessor
-//! chain. v0.2 additionally exposes an opaque `VerifiedGrantAccounting` only when
-//! the checkpoint exactly matches an externally retained trusted head. Chain
-//! reconstruction alone is not currentness.
+//! chain. v0.2 additionally exposes an opaque `HeadBoundGrantAccounting` only
+//! when a checkpoint exactly matches a supplied head. This proves binding, not
+//! authentication or currentness of the head itself.
 
 #![deny(unsafe_code)]
 
@@ -17,6 +17,8 @@ use thiserror::Error;
 pub const ACTION_CHECKPOINT_SCHEMA_VERSION: u16 = 2;
 const ACTION_CHECKPOINT_DOMAIN: &[u8] = b"symthaea.action-checkpoint.v2\0";
 
+/// Serializable head identity only. Possession of this value does not prove the
+/// head came from Xenia, a TPM, an append-only log, or another trusted custodian.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckpointHead {
     pub grant_digest: Digest32,
@@ -129,17 +131,20 @@ impl GrantAccountCheckpoint {
     }
 }
 
-/// Opaque grant-bound accounting proof relative to one externally supplied
-/// trusted checkpoint head. Not Clone and not Serde.
+/// Opaque exact-grant accounting state bound to one supplied checkpoint head.
+///
+/// This object proves deterministic equality/binding only. It is deliberately
+/// not named `VerifiedGrantAccounting`: the source/currentness/authenticity of
+/// the supplied `CheckpointHead` remains unverified in this crate.
 #[derive(Debug)]
-pub struct VerifiedGrantAccounting {
+pub struct HeadBoundGrantAccounting {
     grant_digest: Digest32,
     checkpoint_head: CheckpointHead,
     use_state: GrantUseState,
     charged_risk: RiskBudget,
 }
 
-impl VerifiedGrantAccounting {
+impl HeadBoundGrantAccounting {
     pub fn grant_digest(&self) -> Digest32 {
         self.grant_digest
     }
@@ -165,23 +170,23 @@ impl VerifiedGrantAccounting {
     }
 }
 
-/// Verify the exact checkpoint selected by an externally authenticated/retained
-/// head. Supplying a head is an explicit trust boundary; this crate does not
-/// authenticate Xenia/TPM/log custody of that head.
-pub fn verify_current_checkpoint(
+/// Bind one checkpoint to one supplied head. This does not authenticate the
+/// head. A higher verifier must establish the head's trusted custody/currentness
+/// before promoting this binding into verified-current accounting evidence.
+pub fn bind_checkpoint_to_head(
     grant: &CapabilityGrant,
     checkpoint: &GrantAccountCheckpoint,
-    trusted_head: CheckpointHead,
-) -> Result<VerifiedGrantAccounting, CheckpointError> {
-    if trusted_head.grant_digest != grant.digest() {
-        return Err(CheckpointError::TrustedHeadGrantMismatch);
+    supplied_head: CheckpointHead,
+) -> Result<HeadBoundGrantAccounting, CheckpointError> {
+    if supplied_head.grant_digest != grant.digest() {
+        return Err(CheckpointError::HeadGrantMismatch);
     }
     let account = checkpoint.verify_payload(grant)?;
     let actual_head = checkpoint.head()?;
-    if actual_head != trusted_head {
-        return Err(CheckpointError::TrustedHeadMismatch);
+    if actual_head != supplied_head {
+        return Err(CheckpointError::HeadMismatch);
     }
-    Ok(VerifiedGrantAccounting {
+    Ok(HeadBoundGrantAccounting {
         grant_digest: grant.digest(),
         checkpoint_head: actual_head,
         use_state: account.unverified_use_state()?,
@@ -190,7 +195,7 @@ pub fn verify_current_checkpoint(
 }
 
 /// Reconstruct a complete ordered chain for audit/recovery. This does not by
-/// itself establish that the returned head is the externally current head.
+/// itself establish that the returned head is externally current or authentic.
 pub fn verify_chain(
     grant: &CapabilityGrant,
     checkpoints: &[GrantAccountCheckpoint],
@@ -225,10 +230,10 @@ pub enum CheckpointError {
     PreviousDigestMismatch,
     #[error("checkpoint chain is empty")]
     EmptyChain,
-    #[error("trusted current head belongs to another grant")]
-    TrustedHeadGrantMismatch,
-    #[error("checkpoint does not exactly match the externally trusted current head")]
-    TrustedHeadMismatch,
+    #[error("supplied head belongs to another grant")]
+    HeadGrantMismatch,
+    #[error("checkpoint does not exactly match the supplied head")]
+    HeadMismatch,
     #[error("runtime accounting failed: {0}")]
     Runtime(#[from] RuntimeAccountingError),
 }
@@ -269,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn exact_trusted_head_yields_opaque_grant_bound_accounting() {
+    fn exact_supplied_head_yields_head_bound_grant_accounting() {
         let grant = grant("g1");
         let mut account = GrantAccount::new(&grant).unwrap();
         account
@@ -281,16 +286,15 @@ mod tests {
             )
             .unwrap();
         let checkpoint = GrantAccountCheckpoint::first(&grant, account.snapshot()).unwrap();
-        let verified = verify_current_checkpoint(&grant, &checkpoint, checkpoint.head().unwrap())
-            .unwrap();
-        assert_eq!(verified.grant_digest(), grant.digest());
-        assert_eq!(verified.use_state().committed, 0);
-        assert_eq!(verified.use_state().reserved, 1);
-        assert_eq!(verified.charged_risk(), risk(1));
+        let bound = bind_checkpoint_to_head(&grant, &checkpoint, checkpoint.head().unwrap()).unwrap();
+        assert_eq!(bound.grant_digest(), grant.digest());
+        assert_eq!(bound.use_state().committed, 0);
+        assert_eq!(bound.use_state().reserved, 1);
+        assert_eq!(bound.charged_risk(), risk(1));
     }
 
     #[test]
-    fn stale_checkpoint_cannot_validate_against_newer_trusted_head() {
+    fn stale_checkpoint_cannot_bind_to_newer_head() {
         let grant = grant("g1");
         let mut account = GrantAccount::new(&grant).unwrap();
         let first = GrantAccountCheckpoint::first(&grant, account.snapshot()).unwrap();
@@ -304,20 +308,20 @@ mod tests {
             .unwrap();
         let second = GrantAccountCheckpoint::successor(&first, &grant, account.snapshot()).unwrap();
         assert!(matches!(
-            verify_current_checkpoint(&grant, &first, second.head().unwrap()),
-            Err(CheckpointError::TrustedHeadMismatch)
+            bind_checkpoint_to_head(&grant, &first, second.head().unwrap()),
+            Err(CheckpointError::HeadMismatch)
         ));
     }
 
     #[test]
-    fn trusted_head_is_grant_bound() {
+    fn supplied_head_is_grant_bound() {
         let grant_a = grant("a");
         let grant_b = grant("b");
         let account = GrantAccount::new(&grant_a).unwrap();
         let checkpoint = GrantAccountCheckpoint::first(&grant_a, account.snapshot()).unwrap();
         assert!(matches!(
-            verify_current_checkpoint(&grant_b, &checkpoint, checkpoint.head().unwrap()),
-            Err(CheckpointError::TrustedHeadGrantMismatch)
+            bind_checkpoint_to_head(&grant_b, &checkpoint, checkpoint.head().unwrap()),
+            Err(CheckpointError::HeadGrantMismatch)
         ));
     }
 
@@ -343,13 +347,13 @@ mod tests {
         let altered = GrantAccountCheckpoint::first(&grant, changed).unwrap();
         assert_ne!(first.digest().unwrap(), altered.digest().unwrap());
         assert!(matches!(
-            verify_current_checkpoint(&grant, &altered, first.head().unwrap()),
-            Err(CheckpointError::TrustedHeadMismatch)
+            bind_checkpoint_to_head(&grant, &altered, first.head().unwrap()),
+            Err(CheckpointError::HeadMismatch)
         ));
     }
 
     #[test]
-    fn chain_reconstruction_is_not_currentness_but_preserves_order() {
+    fn chain_reconstruction_preserves_order_without_claiming_currentness() {
         let grant = grant("g1");
         let mut account = GrantAccount::new(&grant).unwrap();
         let first = GrantAccountCheckpoint::first(&grant, account.snapshot()).unwrap();
