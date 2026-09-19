@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod repository_snapshot;
+mod repository_snapshot_diff;
 mod repository_snapshot_receipt;
 mod repository_snapshot_verify;
 mod rhn_sweep;
@@ -53,6 +54,18 @@ enum Commands {
         /// Frozen snapshot emitted by `repository-snapshot`.
         #[arg(long)]
         snapshot: PathBuf,
+    },
+    /// Compare two validated repository-source receipts and emit a typed deterministic transition.
+    RepositorySnapshotDiff {
+        /// Base repository-source snapshot receipt.
+        #[arg(long)]
+        base: PathBuf,
+        /// Head repository-source snapshot receipt.
+        #[arg(long)]
+        head: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -182,6 +195,9 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask always lives one level below the workspace root")
                 .to_path_buf();
             repository_snapshot_verify::run(&root, &snapshot)?;
+        }
+        Commands::RepositorySnapshotDiff { base, head, output } => {
+            repository_snapshot_diff::run(&base, &head, output)?;
         }
     }
     Ok(())
