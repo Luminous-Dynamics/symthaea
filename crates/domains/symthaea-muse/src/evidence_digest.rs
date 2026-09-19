@@ -12,6 +12,8 @@ pub mod benchmark_symbolic_metrics;
 pub mod benchmark_symbolic_parity;
 #[path = "benchmark_time_grid.rs"]
 pub mod benchmark_time_grid;
+#[path = "benchmark_raster_metrics.rs"]
+pub mod benchmark_raster_metrics;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
