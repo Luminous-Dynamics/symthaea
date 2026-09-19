@@ -4,6 +4,7 @@
   "relation": "REL-005A",
   "harness_base_head": "1e445d072c269d189145c98118b60e8d174a5495",
   "harness_allowed_diff": [
+    ".github/rel/rel-005a-reproduce-hermetic.py",
     ".github/rel/rel-005a-reproduce.py",
     ".github/rel/rel-005a-reproduction-recipe.json"
   ],
@@ -35,6 +36,89 @@
     "cargo_target_must_be_outside_worktrees": true,
     "temporary_execution_worktree_must_be_removed": true
   },
+  "environment_envelope": {
+    "authority": "IndependentReproductionEnvironmentOnly",
+    "policy": "allowlist-plus-fresh-cargo-home-v1",
+    "wrapper_path": ".github/rel/rel-005a-reproduce-hermetic.py",
+    "wrapper_blob": "315dc8bb03a424e2a7114b6cfeb673655f1473f6",
+    "harness_path": ".github/rel/rel-005a-reproduce.py",
+    "harness_blob": "4eee623ac964eb23195ff2422c444a3a03d7db58",
+    "fresh_cargo_home_required": true,
+    "ambient_environment_allowlist": [
+      "ALL_PROXY",
+      "HOME",
+      "HTTPS_PROXY",
+      "HTTP_PROXY",
+      "LANG",
+      "LC_ALL",
+      "LOGNAME",
+      "NIX_LD",
+      "NIX_LD_LIBRARY_PATH",
+      "NO_PROXY",
+      "PATH",
+      "RUSTUP_HOME",
+      "SHELL",
+      "SSL_CERT_DIR",
+      "SSL_CERT_FILE",
+      "TEMP",
+      "TERM",
+      "TMP",
+      "TMPDIR",
+      "USER",
+      "all_proxy",
+      "http_proxy",
+      "https_proxy",
+      "no_proxy"
+    ],
+    "forbidden_exact": [
+      "AR",
+      "CARGO_ENCODED_RUSTFLAGS",
+      "CARGO_HOME",
+      "CARGO_INCREMENTAL",
+      "CARGO_TARGET_DIR",
+      "CC",
+      "CXX",
+      "LD",
+      "PKG_CONFIG",
+      "PKG_CONFIG_LIBDIR",
+      "PKG_CONFIG_PATH",
+      "PKG_CONFIG_SYSROOT_DIR",
+      "RANLIB",
+      "RUSTC",
+      "RUSTC_WORKSPACE_WRAPPER",
+      "RUSTC_WRAPPER",
+      "RUSTDOC",
+      "RUSTDOCFLAGS",
+      "RUSTFLAGS",
+      "RUSTUP_TOOLCHAIN"
+    ],
+    "forbidden_prefixes": [
+      "CARGO_BUILD_",
+      "CARGO_PROFILE_",
+      "CARGO_TARGET_",
+      "CARGO_REGISTRIES_",
+      "CARGO_SOURCE_",
+      "CARGO_NET_",
+      "CARGO_HTTP_",
+      "CFLAGS",
+      "CXXFLAGS",
+      "CPPFLAGS",
+      "LDFLAGS"
+    ],
+    "receipt_schema": "symthaea.rel.reproduction-environment-envelope-receipt.v1",
+    "manifest_schema": "symthaea.rel.reproduction-environment-envelope-manifest.v1",
+    "may_parse_scientific_payload": false,
+    "may_interpret_scientific_result": false,
+    "may_change_original_qualification": false,
+    "known_limits": [
+      "PATH, HOME, RUSTUP_HOME, platform loader variables, proxy variables, and certificate variables may be inherited",
+      "the wrapper does not isolate the host filesystem, network, kernel, CPU, or system libraries",
+      "the wrapper directly proves fresh CARGO_HOME is outside the harness worktree; it does not independently compare that path against the harness-created temporary execution worktree",
+      "repository-local Cargo configuration remains allowed because it is part of the exact Git subject"
+    ],
+    "cargo_home_outside_harness_worktree": true,
+    "sensitive_inherited_values_must_not_be_recorded": true
+  },
   "commands": {
     "install_toolchain": "rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy",
     "rustc_version": "rustup run 1.96.0 rustc -Vv",
@@ -55,7 +139,10 @@
     "evaluator": ".github/rel/rel-005a-comparison-only.py",
     "predicate_contract": ".github/rel/rel-005a-full-predicate-contract.json",
     "comparison_contract": ".github/rel/rel-005a-comparison-only-contract.json",
-    "valid_results": ["ALL_PREDICATES_PASS", "PREDICATE_FAILURES"],
+    "valid_results": [
+      "ALL_PREDICATES_PASS",
+      "PREDICATE_FAILURES"
+    ],
     "predicate_count": 41
   },
   "reproduction_semantics": {
@@ -68,7 +155,10 @@
     "uses_frozen_generic_comparison_evaluator": true,
     "scientific_negative_result_is_not_infrastructure_failure": true,
     "may_assert_original_qualification_status": false,
-    "fresh_seal_execution_subject_is_literal_detached_git_head": true
+    "fresh_seal_execution_subject_is_literal_detached_git_head": true,
+    "environment_envelope_required_for_v4_assurance": true,
+    "fresh_cargo_home_required_for_v4_assurance": true,
+    "ambient_build_control_environment_must_be_sanitized_for_v4_assurance": true
   },
   "does_not_change": [
     "the original REL-005A qualification result",
