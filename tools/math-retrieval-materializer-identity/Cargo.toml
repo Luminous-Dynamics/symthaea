@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-math-retrieval-materializer-identity"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Pre-fetch materializer identity binding for Symthaea mathematical retrieval"
+
+[dependencies]
+symthaea-math-retrieval-runtime-seam = { path = "../math-retrieval-runtime-seam" }
+
+# Standalone while the production materialization boundary is qualified.
+[workspace]
