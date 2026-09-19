@@ -15,8 +15,13 @@ use symthaea::symthaea::SleepReport;
 use symthaea_interface_events::{EventPlaneError, SemanticEventSubscriber, SubscribeFrom};
 use symthaea_interface_runtime::StatePlaneError;
 use symthaea_interface_types::{RuntimeCursor, RuntimeId, SessionId, TurnId};
-use symthaea_runtime_owner::{OwnerCompletionError, OwnerSubmitError, RuntimeOwnerExit};
-use symthaea_service_events::{ServiceEventError, ServiceVoiceEventEmitter};
+use symthaea_runtime_owner::{
+    OwnerCommandSeq, OwnerCompletionError, OwnerSubmitError, RuntimeCommandTicket,
+    RuntimeOwnerExit,
+};
+use symthaea_service_events::{
+    ServiceEventError, ServiceVoiceEventEmitter, turn_id_for_owner_sequence,
+};
 use symthaea_service_read_model::{
     CognitiveStatusRead, IntrospectionRead, PartnershipRead, ServiceReadModel,
     ServiceReadModelError,
@@ -60,6 +65,37 @@ pub struct ServiceQueryReply {
     pub snapshot: ServiceRuntimeSnapshot,
     pub telemetry: Option<BridgeTelemetrySnapshot>,
     pub observation_issues: Vec<ObservationIssue<StatePlaneError>>,
+}
+
+/// One query that has already been accepted by the bounded owner mailbox.
+///
+/// The semantic `TurnId` and owner-command sequence are available immediately from
+/// mailbox admission, before cognition begins/finishes. The raw generic runtime
+/// ticket stays private so callers cannot use this wrapper to submit other mutation
+/// variants.
+pub struct ServiceQueryTicket {
+    sequence: OwnerCommandSeq,
+    turn_id: TurnId,
+    inner: RuntimeCommandTicket<SymthaeaObservedServiceReply>,
+}
+
+impl ServiceQueryTicket {
+    pub fn owner_command_seq(&self) -> OwnerCommandSeq {
+        self.sequence
+    }
+
+    pub fn turn_id(&self) -> &TurnId {
+        &self.turn_id
+    }
+
+    pub async fn resolve(self) -> Result<ServiceQueryReply, ServiceHostCommandError> {
+        let reply = self
+            .inner
+            .resolve()
+            .await
+            .map_err(ServiceHostCommandError::from_completion)?;
+        resolve_query_reply(reply)
+    }
 }
 
 #[derive(Debug)]
@@ -231,6 +267,27 @@ impl ServiceRuntimeHost {
         &self.runtime_id
     }
 
+    /// Admit a text turn to the bounded owner mailbox without waiting for cognition.
+    /// The returned ticket exposes only the exact semantic `TurnId` plus resolution
+    /// of this query; it does not expose generic mutation submission.
+    pub fn try_query(
+        &self,
+        content: impl Into<String>,
+        origin: ProcessOrigin,
+    ) -> Result<ServiceQueryTicket, ServiceHostCommandError> {
+        let inner = self
+            .commands
+            .try_query(content, origin)
+            .map_err(ServiceHostCommandError::from_submit)?;
+        let sequence = inner.sequence();
+        let turn_id = turn_id_for_owner_sequence(sequence);
+        Ok(ServiceQueryTicket {
+            sequence,
+            turn_id,
+            inner,
+        })
+    }
+
     /// Submit a text turn through the bounded sole-owner mailbox and wait only for
     /// that admitted command's completion ticket.
     pub async fn query(
@@ -238,15 +295,7 @@ impl ServiceRuntimeHost {
         content: impl Into<String>,
         origin: ProcessOrigin,
     ) -> Result<ServiceQueryReply, ServiceHostCommandError> {
-        let ticket = self
-            .commands
-            .try_query(content, origin)
-            .map_err(ServiceHostCommandError::from_submit)?;
-        let reply = ticket
-            .resolve()
-            .await
-            .map_err(ServiceHostCommandError::from_completion)?;
-        resolve_query_reply(reply)
+        self.try_query(content, origin)?.resolve().await
     }
 
     pub async fn sleep(&self) -> Result<ServiceSleepReply, ServiceHostCommandError> {

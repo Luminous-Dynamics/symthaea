@@ -19,7 +19,7 @@ use symthaea_interface_types::{
     EventSeq, IdError, ProtocolError, RuntimeCursor, RuntimeEvent, RuntimeEventKind, RuntimeId,
     SessionId, TurnId,
 };
-use symthaea_runtime_owner::OwnerCommandContext;
+use symthaea_runtime_owner::{OwnerCommandContext, OwnerCommandSeq};
 
 /// Failure while constructing or publishing an owner-authored semantic event.
 #[derive(Debug)]
@@ -243,15 +243,26 @@ pub fn service_event_plane(
     Ok((emitter, hub))
 }
 
+/// Deterministic correlation identity for one owner-admitted command sequence.
+///
+/// This is safe to derive immediately after bounded mailbox admission: the owner
+/// receives the exact same sequence in [`OwnerCommandContext`]. The generated token
+/// is always a valid interface ID (`turn:` plus at most 20 ASCII digits), so this
+/// helper cannot fail for any `OwnerCommandSeq`.
+pub fn turn_id_for_owner_sequence(sequence: OwnerCommandSeq) -> TurnId {
+    TurnId::new(format!("turn:{}", sequence.get()))
+        .expect("owner command sequence always forms a valid TurnId")
+}
+
 /// Deterministic correlation identity for one owner-admitted command.
 ///
 /// Owner-command sequence and semantic event sequence remain distinct types and
-/// counters. This helper only derives a `TurnId` label for correlation inside one
-/// `RuntimeId` lineage.
+/// counters. This helper delegates to the admission-side derivation so a caller's
+/// ticket and the owner's lifecycle events cannot disagree about the turn label.
 pub fn turn_id_for_owner_context(
     context: OwnerCommandContext,
 ) -> Result<TurnId, IdError> {
-    TurnId::new(format!("turn:{}", context.sequence().get()))
+    Ok(turn_id_for_owner_sequence(context.sequence()))
 }
 
 #[cfg(test)]

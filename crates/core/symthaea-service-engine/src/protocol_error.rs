@@ -44,6 +44,18 @@ impl ServiceProtocolFailure {
         }
     }
 
+    /// Admission-side and owner-side turn identity must be the same deterministic
+    /// function of one owner-command sequence. Any disagreement is an internal
+    /// correlation failure and must never be papered over at a voice/interface edge.
+    pub const fn runtime_turn_mismatch() -> Self {
+        Self {
+            code: "runtime_turn_mismatch",
+            class: ServiceProtocolFailureClass::Internal,
+            message: "Symthaea runtime turn correlation failed",
+            retryable: false,
+        }
+    }
+
     pub fn legacy_response(self) -> ServiceWireResponse {
         ServiceWireResponse::Error {
             message: self.message.to_string(),
@@ -212,5 +224,13 @@ mod tests {
         assert_eq!(failure.code, "cognitive_gate_not_idle");
         assert_eq!(failure.class, ServiceProtocolFailureClass::Observation);
         assert!(failure.retryable);
+    }
+
+    #[test]
+    fn turn_correlation_mismatch_is_internal_and_not_retryable() {
+        let failure = ServiceProtocolFailure::runtime_turn_mismatch();
+        assert_eq!(failure.code, "runtime_turn_mismatch");
+        assert_eq!(failure.class, ServiceProtocolFailureClass::Internal);
+        assert!(!failure.retryable);
     }
 }

@@ -14,7 +14,7 @@ use symthaea_interface_types::TurnId;
 use symthaea_service_runtime::{ProcessOrigin, ServiceCounters};
 
 use crate::cognitive_gate::MeasuredCognitiveGate;
-use crate::host::ServiceRuntimeHost;
+use crate::host::{ServiceQueryTicket, ServiceRuntimeHost};
 use crate::protocol_error::ServiceProtocolFailure;
 use crate::read_wire::MeasuredIntrospectionV2;
 use crate::wire::{
@@ -31,6 +31,41 @@ use crate::wire::{
 pub struct CorrelatedQueryOutcome {
     pub turn_id: Option<TurnId>,
     pub outcome: ServiceWireOutcome,
+}
+
+/// One protocol query already admitted to the sole-owner mailbox.
+///
+/// The exact `TurnId` is available synchronously after bounded admission, while
+/// resolution remains asynchronous. This is the seam required for an in-flight
+/// voice interruption to target the active semantic turn.
+pub struct CorrelatedQueryTicket {
+    turn_id: TurnId,
+    started_at: Instant,
+    inner: ServiceQueryTicket,
+}
+
+impl CorrelatedQueryTicket {
+    pub fn turn_id(&self) -> &TurnId {
+        &self.turn_id
+    }
+
+    pub async fn resolve(self) -> Result<CorrelatedQueryOutcome, ServiceProtocolFailure> {
+        let reply = self.inner.resolve().await?;
+
+        // The owner must derive the exact same label from the same admitted sequence.
+        // Fail closed if this invariant is ever violated rather than correlating an
+        // utterance with the wrong semantic turn.
+        if reply.execution.turn_id.as_ref() != Some(&self.turn_id) {
+            return Err(ServiceProtocolFailure::runtime_turn_mismatch());
+        }
+
+        let turn_id = self.turn_id;
+        let outcome = ServiceWireOutcome::from_query(reply, self.started_at.elapsed());
+        Ok(CorrelatedQueryOutcome {
+            turn_id: Some(turn_id),
+            outcome,
+        })
+    }
 }
 
 /// Daemon operational state that is not cognitive state.
@@ -137,6 +172,24 @@ impl ServiceProtocolCore {
         Ok(partnership_response(host.partnership()?))
     }
 
+    /// Admit an owner-backed text query without waiting for cognition. The caller
+    /// gets the exact semantic turn identity immediately after mailbox acceptance.
+    pub fn try_query_correlated_with_origin(
+        &self,
+        host: &ServiceRuntimeHost,
+        content: impl Into<String>,
+        origin: ProcessOrigin,
+    ) -> Result<CorrelatedQueryTicket, ServiceProtocolFailure> {
+        let started_at = Instant::now();
+        let inner = host.try_query(content, origin)?;
+        let turn_id = inner.turn_id().clone();
+        Ok(CorrelatedQueryTicket {
+            turn_id,
+            started_at,
+            inner,
+        })
+    }
+
     /// Owner-backed text query with the exact semantic turn identity retained for
     /// correlation surfaces such as voice. This identity is deliberately not added
     /// to the compatibility JSON response.
@@ -146,11 +199,9 @@ impl ServiceProtocolCore {
         content: impl Into<String>,
         origin: ProcessOrigin,
     ) -> Result<CorrelatedQueryOutcome, ServiceProtocolFailure> {
-        let started = Instant::now();
-        let reply = host.query(content, origin).await?;
-        let turn_id = reply.execution.turn_id.clone();
-        let outcome = ServiceWireOutcome::from_query(reply, started.elapsed());
-        Ok(CorrelatedQueryOutcome { turn_id, outcome })
+        self.try_query_correlated_with_origin(host, content, origin)?
+            .resolve()
+            .await
     }
 
     /// Owner-backed text query. `origin` lets voice/semantic-ear paths reuse the

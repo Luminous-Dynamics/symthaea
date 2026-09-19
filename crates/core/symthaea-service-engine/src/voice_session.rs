@@ -22,7 +22,7 @@ use symthaea_service_runtime::ProcessOrigin;
 use uuid::Uuid;
 
 use crate::host::ServiceRuntimeHost;
-use crate::protocol::ServiceProtocolCore;
+use crate::protocol::{CorrelatedQueryTicket, ServiceProtocolCore};
 use crate::protocol_error::ServiceProtocolFailure;
 use crate::wire::ServiceWireOutcome;
 
@@ -99,6 +99,14 @@ impl Default for VoiceCancellationState {
     }
 }
 
+fn interrupt_started_presentations(cancellation: &VoiceCancellationState) -> u64 {
+    let through = cancellation.current_generation.load(Ordering::Acquire);
+    cancellation
+        .cancelled_through
+        .fetch_max(through, Ordering::AcqRel);
+    through
+}
+
 /// Cloneable presentation token for one voice generation.
 ///
 /// Streaming TTS/audio code should check this before enqueueing each clause/chunk.
@@ -117,6 +125,10 @@ impl VoicePresentationToken {
     pub fn is_cancelled(&self) -> bool {
         self.cancellation.cancelled_through.load(Ordering::Acquire) >= self.generation
     }
+
+    fn interrupt_started(&self) -> u64 {
+        interrupt_started_presentations(&self.cancellation)
+    }
 }
 
 /// Immutable correlation identity for one recognized user utterance.
@@ -128,7 +140,7 @@ pub struct VoiceTurnIdentity {
     pub presentation_generation: u64,
 }
 
-/// One admitted voice turn before/while cognition executes.
+/// One voice utterance before cognition admission.
 #[derive(Debug, Clone)]
 pub struct VoiceTurn {
     identity: VoiceTurnIdentity,
@@ -144,25 +156,90 @@ impl VoiceTurn {
         &self.presentation
     }
 
-    /// Route recognized semantic text through the sole runtime owner.
-    ///
-    /// The returned semantic `TurnId` (when event correlation succeeded) remains
-    /// distinct from the human-utterance identity. Keeping both prevents voice,
-    /// cognition, and semantic event sequencing from collapsing into one counter.
+    /// Admit recognized semantic text to the sole cognition owner without waiting
+    /// for cognition to finish. The returned ticket already knows the exact semantic
+    /// `TurnId`, enabling later lifecycle-aware barge-in while it is unresolved.
+    pub fn admit_transcript(
+        &self,
+        core: &ServiceProtocolCore,
+        host: &ServiceRuntimeHost,
+        transcript: impl Into<String>,
+    ) -> Result<VoiceCognitionTicket, ServiceProtocolFailure> {
+        let inner = core.try_query_correlated_with_origin(
+            host,
+            transcript,
+            self.identity.ingress.process_origin(),
+        )?;
+        let turn_id = inner.turn_id().clone();
+        Ok(VoiceCognitionTicket {
+            identity: self.identity.clone(),
+            turn_id,
+            presentation: self.presentation.clone(),
+            inner,
+        })
+    }
+
+    /// Convenience path for callers that do not need in-flight control.
     pub async fn process_transcript(
         &self,
         core: &ServiceProtocolCore,
         host: &ServiceRuntimeHost,
         transcript: impl Into<String>,
     ) -> Result<VoiceCognitionOutcome, ServiceProtocolFailure> {
-        let correlated = core
-            .query_correlated_with_origin(host, transcript, self.identity.ingress.process_origin())
-            .await?;
+        self.admit_transcript(core, host, transcript)?.resolve().await
+    }
+}
+
+/// One voice turn already admitted to cognition but not necessarily completed.
+///
+/// Dropping this ticket does not cancel the admitted owner command. It only drops
+/// the caller's completion observation, matching the runtime-owner contract.
+pub struct VoiceCognitionTicket {
+    identity: VoiceTurnIdentity,
+    turn_id: TurnId,
+    presentation: VoicePresentationToken,
+    inner: CorrelatedQueryTicket,
+}
+
+impl VoiceCognitionTicket {
+    pub fn identity(&self) -> &VoiceTurnIdentity {
+        &self.identity
+    }
+
+    pub fn turn_id(&self) -> &TurnId {
+        &self.turn_id
+    }
+
+    pub fn presentation_token(&self) -> &VoicePresentationToken {
+        &self.presentation
+    }
+
+    /// Fast presentation-only barge-in available immediately after admission.
+    ///
+    /// Semantic interruption is intentionally not emitted here yet: admission can
+    /// precede owner-side `ResponseStarted` publication. The next lifecycle-aware
+    /// tranche will emit `VoiceInterrupted` only after that turn is proven active.
+    pub fn interrupt_presentation(&self) -> VoiceInterruptionReceipt {
+        let through = self.presentation.interrupt_started();
+        VoiceInterruptionReceipt {
+            session_id: self.identity.session_id.clone(),
+            cancelled_through_generation: through,
+            capability: VoiceCancellationCapability::PresentationEligibilityOnly,
+            semantic_event_emitted: false,
+            cognition_cancelled: false,
+        }
+    }
+
+    pub async fn resolve(self) -> Result<VoiceCognitionOutcome, ServiceProtocolFailure> {
+        let correlated = self.inner.resolve().await?;
+        if correlated.turn_id.as_ref() != Some(&self.turn_id) {
+            return Err(ServiceProtocolFailure::runtime_turn_mismatch());
+        }
 
         Ok(VoiceCognitionOutcome {
-            identity: self.identity.clone(),
+            identity: self.identity,
             turn_id: correlated.turn_id,
-            presentation: self.presentation.clone(),
+            presentation: self.presentation,
             outcome: correlated.outcome,
         })
     }
@@ -190,8 +267,8 @@ pub struct VoiceInterruptionReceipt {
     pub session_id: SessionId,
     pub cancelled_through_generation: u64,
     pub capability: VoiceCancellationCapability,
-    /// Semantic `VoiceInterrupted` publication is not yet wired to the sole event
-    /// emitter; keep this structurally explicit instead of implying success.
+    /// Remains false in this tranche because an admitted query may not yet have
+    /// published `ResponseStarted`; emitting earlier would invert semantic order.
     pub semantic_event_emitted: bool,
     /// The runtime owner does not yet support cooperative cancellation of an
     /// already-admitted `Symthaea::process()` call.
@@ -261,13 +338,7 @@ impl VoiceSession {
     /// This operation is synchronous/lock-free and can therefore live on a fast
     /// barge-in path even while the cognition owner is occupied.
     pub fn interrupt_presentation(&self) -> VoiceInterruptionReceipt {
-        let through = self
-            .cancellation
-            .current_generation
-            .load(Ordering::Acquire);
-        self.cancellation
-            .cancelled_through
-            .fetch_max(through, Ordering::AcqRel);
+        let through = interrupt_started_presentations(&self.cancellation);
 
         VoiceInterruptionReceipt {
             session_id: self.session_id.clone(),
@@ -331,5 +402,17 @@ mod tests {
             first.identity().presentation_generation,
             second.identity().presentation_generation
         );
+    }
+
+    #[test]
+    fn turn_level_interrupt_uses_shared_session_cancellation_state() {
+        let session = session();
+        let turn = session.begin_turn(VoiceIngress::LiveMicrophone).unwrap();
+        let token = turn.presentation_token().clone();
+        assert!(!token.is_cancelled());
+
+        let through = token.interrupt_started();
+        assert_eq!(through, 1);
+        assert!(token.is_cancelled());
     }
 }
