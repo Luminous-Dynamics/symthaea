@@ -152,6 +152,23 @@ fn GlobalHeader(muse: MuseState) -> impl IntoView {
                         .map(|source| source.presentation.title)
                         .unwrap_or_else(|| "Awaiting a piece".to_string())
                 }}</strong>
+                {move || {
+                    muse.playback.get().return_bookmark.map(|bookmark| {
+                        let return_title = bookmark.source.presentation.title;
+                        let aria_label = format!("Return to {return_title}");
+                        view! {
+                            <button
+                                type="button"
+                                class="link-btn"
+                                title=aria_label.clone()
+                                aria-label=aria_label
+                                on:click=move |_| muse.return_from_audition()
+                            >
+                                {format!("Return to {return_title}")}
+                            </button>
+                        }
+                    })
+                }}
             </div>
             <nav class="mode-nav" aria-label="Muse modes">
                 <A href="/" attr:class=move || if is_active("/") { "active" } else { "" }>
