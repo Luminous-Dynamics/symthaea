@@ -13,6 +13,7 @@ symthaea-aesthetic = { path = "../symthaea-aesthetic" }
 symthaea-fep = { path = "../../core/symthaea-fep" }
 serde = { workspace = true }
 rand = { workspace = true }
+libc = { workspace = true }
 hound = { workspace = true }
 flacenc = "0.5.1"
 rustfft = { workspace = true }
