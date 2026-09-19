@@ -1,0 +1,354 @@
+name: DE-001A2 Optimizer Execution Authorization
+
+on:
+  workflow_dispatch:
+    inputs:
+      a1x_run_id:
+        description: Exact successful DE-001A1X comparison run ID with AGREE verdict
+        required: true
+        type: string
+      a2m_run_id:
+        description: Exact successful DE-001A2M qualification run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      a1x_run_id:
+        required: true
+        type: string
+      a2m_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a2-auth-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  authorize:
+    name: A2 exact optimizer execution authorization
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AUTHORIZER_HEAD: ${{ github.sha }}
+      A1X_RUN_ID: ${{ inputs.a1x_run_id }}
+      A2M_RUN_ID: ${{ inputs.a2m_run_id }}
+
+    steps:
+      - name: Check out exact authorizer subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.AUTHORIZER_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind authorizer identity and paths
+        id: authorizer
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$AUTHORIZER_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a2-authorization" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A1X=$RUNNER_TEMP/de001a-upstream-a1x" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A2M=$RUNNER_TEMP/de001a-upstream-a2m" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a2-authorization" \
+            "$RUNNER_TEMP/de001a-upstream-a1x" \
+            "$RUNNER_TEMP/de001a-upstream-a2m"
+
+      - name: Download exact A1X evidence
+        id: download_a1x
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a1x-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a1x
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a1x_run_id }}
+
+      - name: Download exact A2M evidence
+        id: download_a2m
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a2m-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a2m
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a2m_run_id }}
+
+      - name: Verify explicit upstream runs and lineage
+        id: upstream
+        if: steps.download_a1x.outcome == 'success' && steps.download_a2m.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$A1X_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+          case "$A2M_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A1X_RUN_ID" > "$EVIDENCE_DIR/a1x-run.json"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A2M_RUN_ID" > "$EVIDENCE_DIR/a2m-run.json"
+
+          for required in \
+            "$UPSTREAM_A1X/a1x.json" \
+            "$UPSTREAM_A1X/comparison-capsule.json" \
+            "$UPSTREAM_A2M/a2m.json" \
+            "$UPSTREAM_A2M/qualification-capsule.json" \
+            "$UPSTREAM_A2M/a2r-qualification-capsule.json"
+          do
+            test -f "$required"
+          done
+
+          python3 - \
+            "$EVIDENCE_DIR/a1x-run.json" \
+            "$EVIDENCE_DIR/a2m-run.json" \
+            "$UPSTREAM_A1X/a1x.json" \
+            "$UPSTREAM_A1X/comparison-capsule.json" \
+            "$UPSTREAM_A2M/a2m.json" \
+            "$UPSTREAM_A2M/qualification-capsule.json" \
+            "$UPSTREAM_A2M/a2r-qualification-capsule.json" \
+            "$A1X_RUN_ID" "$A2M_RUN_ID" <<'PY'
+          import hashlib, json, re, sys
+          (a1x_run_path, a2m_run_path, a1x_path, a1x_cap_path,
+           a2m_path, a2m_cap_path, a2r_cap_path, expected_a1x, expected_a2m) = sys.argv[1:]
+          a1x_run = json.load(open(a1x_run_path, encoding="utf-8"))
+          a2m_run = json.load(open(a2m_run_path, encoding="utf-8"))
+          assert str(a1x_run["id"]) == expected_a1x
+          assert str(a2m_run["id"]) == expected_a2m
+          assert a1x_run["status"] == a2m_run["status"] == "completed"
+          assert a1x_run["conclusion"] == a2m_run["conclusion"] == "success"
+
+          a1x = json.load(open(a1x_path, encoding="utf-8"))
+          a1x_cap = json.load(open(a1x_cap_path, encoding="utf-8"))
+          assert a1x["protocol"] == "DE-001A1X-CROSS-IMPLEMENTATION-v1"
+          assert a1x["verdict"] == "AGREE"
+          assert a1x["a2_execution_authorized"] is False
+          assert a1x_cap["protocol"] == "DE-001A1X-COMPARISON-CAPSULE-v1"
+          assert a1x_cap["comparison_verdict"] == "AGREE"
+          assert a1x_cap["comparator_head"] == a1x_run["head_sha"]
+          assert a1x_cap["subject_head"] == a1x["subject_head"]
+          assert a1x_cap["workflow"]["comparison_exit_code"] == "0"
+          assert a1x_cap["workflow"]["comparison_outcome"] == "success"
+          assert a1x_cap["workflow"]["postflight_outcome"] == "success"
+          assert a1x_cap["receipt_sha256"]["a1x"] == hashlib.sha256(open(a1x_path, "rb").read()).hexdigest()
+
+          a2m = json.load(open(a2m_path, encoding="utf-8"))
+          a2m_cap = json.load(open(a2m_cap_path, encoding="utf-8"))
+          a2r_cap = json.load(open(a2r_cap_path, encoding="utf-8"))
+          assert a2m["protocol"] == "DE-001A2M-OPTIMIZER-METHOD-BINDING-v1"
+          assert a2m["verdict"] == "PASS"
+          assert a2m["optimizer_execution_authorized"] is False
+          assert a2m["a2_execution_authorized"] is False
+          assert re.fullmatch(r"[0-9a-f]{64}", a2m["effective_sampler_sha256"])
+          assert a2m_cap["protocol"] == "DE-001A2M-QUALIFICATION-CAPSULE-v1"
+          assert a2m_cap["binder_head"] == a2m_run["head_sha"]
+          assert a2m_cap["effective_sampler_sha256"] == a2m["effective_sampler_sha256"]
+          assert a2m_cap["receipt_sha256"]["a2m"] == hashlib.sha256(open(a2m_path, "rb").read()).hexdigest()
+          for key in ("software_outcome", "a1e_outcome", "a0_artifacts_outcome", "assemble_outcome", "a2m_outcome", "postflight_outcome"):
+              assert a2m_cap["workflow"][key] == "success"
+
+          assert a2r_cap["protocol"] == "DE-001A2R-QUALIFICATION-CAPSULE-v1"
+          assert a2r_cap["subject_head"] == a1x["subject_head"]
+          assert a2r_cap["subject_tree"] == a1x["subject_tree"]
+          assert a2m_cap["a2r_subject_head"] == a1x["subject_head"]
+          assert a2m_cap["a2r_run_id"] == a2r_cap["workflow"]["run_id"]
+          assert a2m_cap["receipt_sha256"]["a2r"] == a2r_cap["receipt_sha256"]["a2r"]
+          PY
+
+      - name: Assemble self-contained authorization evidence
+        id: assemble
+        if: steps.upstream.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR/qualified-a1x" "$EVIDENCE_DIR/qualified-a2m"
+          cp "$UPSTREAM_A1X/a1x.json" "$EVIDENCE_DIR/qualified-a1x/a1x.json"
+          cp "$UPSTREAM_A1X/comparison-capsule.json" "$EVIDENCE_DIR/qualified-a1x/comparison-capsule.json"
+
+          for name in \
+            a0.json a1e.json a2r.json a2r-qualification-capsule.json \
+            a2g.json a2g-qualification-capsule.json a2m.json qualification-capsule.json \
+            environment-v3-receipt.txt environment-v3-versions.json \
+            reference-input-configuration reference-expanded-configuration reference-minimizer-configuration
+          do
+            test -f "$UPSTREAM_A2M/$name"
+            cp "$UPSTREAM_A2M/$name" "$EVIDENCE_DIR/qualified-a2m/$name"
+          done
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Qualify authorization software subject
+        id: software
+        if: steps.assemble.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bin de001a-a2-authorize --release --locked
+          test -x target/release/de001a-a2-authorize
+          sha256sum target/release/de001a-a2-authorize > "$EVIDENCE_DIR/de001a-a2-authorize.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+
+      - name: Authorize exact optimizer execution
+        id: authorization
+        if: steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a2-authorize \
+            "$EVIDENCE_DIR/qualified-a1x/a1x.json" \
+            "$EVIDENCE_DIR/qualified-a1x/comparison-capsule.json" \
+            "$EVIDENCE_DIR/qualified-a2m/a2m.json" \
+            "$EVIDENCE_DIR/qualified-a2m/qualification-capsule.json" \
+            "$EVIDENCE_DIR/qualified-a2m/a2r-qualification-capsule.json" \
+            > "$EVIDENCE_DIR/a2-authorization.json"
+
+          python3 - "$EVIDENCE_DIR/a2-authorization.json" <<'PY'
+          import json, re, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A2-EXECUTION-AUTHORIZATION-v1"
+          assert value["verdict"] == "PASS"
+          assert value["scientific_claim"] == "NONE"
+          assert value["authority"] == "exact-optimizer-execution-authorization-only"
+          assert value["optimizer_execution_authorized"] is True
+          assert value["a2_execution_authorized"] is True
+          assert value["normalization_or_migration_authorized"] is False
+          assert value["optimizer_invocation_budget"] == 1
+          assert value["network_allowed"] is False
+          assert value["runtime_package_installation_allowed"] is False
+          assert re.fullmatch(r"[0-9a-f]{64}", value["effective_sampler_sha256"])
+          sampled = value["sampled_coordinate_order"]
+          assert isinstance(sampled, list) and sampled and len(sampled) == len(set(sampled))
+          PY
+
+      - name: Postflight authorizer immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.authorizer.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.authorizer.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write authorization capsule
+        if: always()
+        env:
+          AUTHORIZER_HEAD_OUT: ${{ steps.authorizer.outputs.head }}
+          AUTHORIZER_TREE_OUT: ${{ steps.authorizer.outputs.tree }}
+          DOWNLOAD_A1X_OUTCOME: ${{ steps.download_a1x.outcome }}
+          DOWNLOAD_A2M_OUTCOME: ${{ steps.download_a2m.outcome }}
+          UPSTREAM_OUTCOME: ${{ steps.upstream.outcome }}
+          ASSEMBLE_OUTCOME: ${{ steps.assemble.outcome }}
+          SOFTWARE_OUTCOME: ${{ steps.software.outcome }}
+          AUTHORIZATION_OUTCOME: ${{ steps.authorization.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib, json, os, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+          def digest(path):
+              p = root / path
+              return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "UNAVAILABLE"
+          auth = {}
+          if (root / "a2-authorization.json").is_file():
+              try:
+                  auth = json.loads((root / "a2-authorization.json").read_text(encoding="utf-8"))
+              except Exception:
+                  auth = {}
+          capsule = {
+              "protocol": "DE-001A2-AUTHORIZATION-CAPSULE-v1",
+              "scientific_claim": "NONE",
+              "authority": "exact-optimizer-execution-authorization-only",
+              "optimizer_execution_authorized": auth.get("optimizer_execution_authorized", False),
+              "a2_execution_authorized": auth.get("a2_execution_authorized", False),
+              "normalization_or_migration_authorized": False,
+              "authorizer_head": os.environ.get("AUTHORIZER_HEAD_OUT", "UNAVAILABLE"),
+              "authorizer_tree": os.environ.get("AUTHORIZER_TREE_OUT", "UNAVAILABLE"),
+              "scientific_subject_head": auth.get("scientific_subject_head", "UNAVAILABLE"),
+              "scientific_subject_tree": auth.get("scientific_subject_tree", "UNAVAILABLE"),
+              "a1x_run_id": os.environ["A1X_RUN_ID"],
+              "a2m_run_id": os.environ["A2M_RUN_ID"],
+              "effective_sampler_sha256": auth.get("effective_sampler_sha256", "UNAVAILABLE"),
+              "workflow": {
+                  "run_id": os.environ["GITHUB_RUN_ID"],
+                  "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "download_a1x_outcome": os.environ.get("DOWNLOAD_A1X_OUTCOME", "UNAVAILABLE"),
+                  "download_a2m_outcome": os.environ.get("DOWNLOAD_A2M_OUTCOME", "UNAVAILABLE"),
+                  "upstream_outcome": os.environ.get("UPSTREAM_OUTCOME", "UNAVAILABLE"),
+                  "assemble_outcome": os.environ.get("ASSEMBLE_OUTCOME", "UNAVAILABLE"),
+                  "software_outcome": os.environ.get("SOFTWARE_OUTCOME", "UNAVAILABLE"),
+                  "authorization_outcome": os.environ.get("AUTHORIZATION_OUTCOME", "UNAVAILABLE"),
+                  "postflight_outcome": os.environ.get("POSTFLIGHT_OUTCOME", "UNAVAILABLE"),
+              },
+              "receipt_sha256": {
+                  "a1x": digest("qualified-a1x/a1x.json"),
+                  "a1x_capsule": digest("qualified-a1x/comparison-capsule.json"),
+                  "a2m": digest("qualified-a2m/a2m.json"),
+                  "a2m_capsule": digest("qualified-a2m/qualification-capsule.json"),
+                  "a2r_qualification_capsule": digest("qualified-a2m/a2r-qualification-capsule.json"),
+                  "authorization": digest("a2-authorization.json"),
+              },
+              "implementation_sha256": {
+                  "authorization_spec": hashlib.sha256(pathlib.Path("crates/domains/symthaea-cosmology-research/references/de001a_a2_authorization_v1.json").read_bytes()).hexdigest(),
+                  "cargo_lock": hashlib.sha256(pathlib.Path("Cargo.lock").read_bytes()).hexdigest(),
+                  "authorizer_binary_record": digest("de001a-a2-authorize.sha256"),
+              },
+          }
+          (root / "authorization-capsule.json").write_text(
+              json.dumps(capsule, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(capsule, sort_keys=True, indent=2))
+          PY
+
+      - name: Upload A2 authorization evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a2-authorization-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a2-authorization
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce valid A2 authorization
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_a1x.outcome }}" = "success"
+          test "${{ steps.download_a2m.outcome }}" = "success"
+          test "${{ steps.upstream.outcome }}" = "success"
+          test "${{ steps.assemble.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.authorization.outcome }}" = "success"
+          test "${{ steps.postflight.outcome }}" = "success"
