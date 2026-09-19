@@ -1,5 +1,5 @@
 {
-  "schema": "symthaea.rel.qualification-durability-contract.v4",
+  "schema": "symthaea.rel.qualification-durability-contract.v5",
   "authority": "QualificationDurabilityContractOnly",
   "relation": "REL-005A",
   "source_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
@@ -74,7 +74,9 @@
       "bind_source_pipeline_head": true,
       "bind_source_pipeline_tree": true,
       "bind_ordered_payload_entries": true
-    }
+    },
+    "runtime_tools_must_hardcode_forbidden_result_fields": true,
+    "persistence_receipt_must_self_describe_commitment": true
   },
   "failure_semantics": {
     "persistence_failure_before_durable_artifact": "QUALIFICATION_EVIDENCE_NOT_DURABLE",
