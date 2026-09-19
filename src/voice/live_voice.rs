@@ -43,6 +43,34 @@ const DT: f32 = 1.0 / FRAME_RATE as f32;
 /// Base phoneme duration (seconds) for G2P timing.
 const BASE_PHONEME_DURATION: f32 = 0.06;
 
+/// Cloneable, capability-narrow stop control for the current live utterance.
+///
+/// This intentionally exposes only interruption state. It cannot synthesize audio,
+/// mutate cognitive prosody, access the device/ring buffer, or start a new utterance.
+/// A caller may therefore retain it on another thread without sharing `&mut LiveVoice`.
+#[derive(Debug, Clone)]
+pub struct LiveVoiceStopHandle {
+    speaking: Arc<AtomicBool>,
+}
+
+impl LiveVoiceStopHandle {
+    fn new(speaking: Arc<AtomicBool>) -> Self {
+        Self { speaking }
+    }
+
+    /// Request that the live synthesis/push loops stop at their next cancellation
+    /// check. This does not claim that already-buffered device audio is instantly
+    /// silent; the ring buffer drains according to the audio backend.
+    pub fn stop(&self) {
+        self.speaking.store(false, Ordering::SeqCst);
+    }
+
+    /// Whether the shared live utterance state still reports active synthesis/push.
+    pub fn is_speaking(&self) -> bool {
+        self.speaking.load(Ordering::SeqCst)
+    }
+}
+
 /// Handle to a background `speak_async()` call.
 ///
 /// Dropping the handle does NOT stop playback — call [`SpeakHandle::stop()`] explicitly,
@@ -212,7 +240,7 @@ impl LiveVoice {
     pub fn speak_async(&mut self, text: &str) -> SpeakHandle {
         self.speaking.store(true, Ordering::SeqCst);
 
-        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEM_DURATION);
         let speaking = Arc::clone(&self.speaking);
         let cog_state = Arc::clone(&self.cognitive_state);
 
@@ -281,7 +309,7 @@ impl LiveVoice {
     /// Uses the same G2P → frame-by-frame synthesis pipeline as `speak()`,
     /// but collects all samples and writes them to disk via `hound`.
     pub fn speak_to_file(&mut self, text: &str, path: &Path) -> Result<usize> {
-        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEME_DURATION);
+        let phonemes = self.g2p.text_to_phonemes(text, BASE_PHONEM_DURATION);
         let mut all_samples = Vec::new();
 
         for timed in &phonemes {
@@ -327,7 +355,18 @@ impl LiveVoice {
         self.speaking.load(Ordering::SeqCst)
     }
 
+    /// Return a typed, cloneable interruption capability for this live voice.
+    ///
+    /// Unlike exposing the atomic directly, this handle grants only stop/status
+    /// operations and can safely be retained by an interface control plane.
+    pub fn stop_handle(&self) -> LiveVoiceStopHandle {
+        LiveVoiceStopHandle::new(Arc::clone(&self.speaking))
+    }
+
     /// Get a clone of the stop flag for cross-thread interruption.
+    ///
+    /// Prefer [`Self::stop_handle`] for new capability-oriented callers. This raw
+    /// form remains for compatibility with existing internal code.
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.speaking)
     }
@@ -433,6 +472,19 @@ mod tests {
         assert!(flag.load(Ordering::SeqCst));
 
         flag.store(false, Ordering::SeqCst);
+        assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn typed_stop_handle_is_cloneable_and_capability_narrow() {
+        let flag = Arc::new(AtomicBool::new(true));
+        let first = LiveVoiceStopHandle::new(Arc::clone(&flag));
+        let second = first.clone();
+
+        assert!(first.is_speaking());
+        assert!(second.is_speaking());
+        second.stop();
+        assert!(!first.is_speaking());
         assert!(!flag.load(Ordering::SeqCst));
     }
 
