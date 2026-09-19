@@ -6,6 +6,7 @@ mod cargo_graph;
 mod cargo_impact;
 mod cargo_invocation;
 mod cargo_observation;
+mod cargo_observation_verify;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -90,6 +91,18 @@ enum Commands {
         #[arg(long)]
         messages: PathBuf,
         /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Re-derive a stored Cargo observation from its exact transcript and fail on any mismatch.
+    CargoObservationVerify {
+        /// Frozen Cargo observation receipt emitted by `cargo-observation`.
+        #[arg(long)]
+        observation: PathBuf,
+        /// Exact Cargo JSONL transcript bound by the receipt.
+        #[arg(long)]
+        messages: PathBuf,
+        /// Write verification JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
     },
@@ -244,6 +257,13 @@ fn main() -> anyhow::Result<()> {
             output,
         } => {
             cargo_observation::run(&spec, &messages, output)?;
+        }
+        Commands::CargoObservationVerify {
+            observation,
+            messages,
+            output,
+        } => {
+            cargo_observation_verify::run(&observation, &messages, output)?;
         }
         Commands::RustDiagnostics {
             spec,
