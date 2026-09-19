@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-materials-benchmark-governance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Temporal leakage and interpretation governance for Symthaea materials benchmarks"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+
+[dependencies]
+symthaea-materials-benchmarks = { path = "../symthaea-materials-benchmarks" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
