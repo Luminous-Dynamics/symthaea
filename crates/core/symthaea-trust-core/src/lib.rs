@@ -13,6 +13,7 @@
 //! - content-addressed key-to-principal/organization/region/role bindings;
 //! - frozen delegated trust-root policies and non-authorizing dual-threshold
 //!   rotation contracts;
+//! - bounded interval-based time evidence with explicit source strength;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
 //!   temporal lifecycle facts;
@@ -28,6 +29,7 @@ mod identity;
 mod principal;
 mod revalidation;
 mod temporal_lifecycle;
+mod time;
 mod trust;
 mod trust_root;
 
@@ -36,5 +38,6 @@ pub use identity::*;
 pub use principal::*;
 pub use revalidation::*;
 pub use temporal_lifecycle::*;
+pub use time::*;
 pub use trust::*;
 pub use trust_root::*;
