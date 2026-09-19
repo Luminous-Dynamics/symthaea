@@ -4,8 +4,9 @@
 //! Domain-neutral lifecycle-governed trust snapshots.
 //!
 //! Cryptographic validity is necessary but not sufficient authority. A key must
-//! also be known, active, purpose-authorized, inside its validity window, and
-//! evaluated against the current snapshot accepted by a monotonic tracker.
+//! also be known, bound to exact verification-key material, active,
+//! purpose-authorized, inside its validity window, and evaluated against the
+//! current snapshot accepted by a monotonic tracker.
 
 use std::collections::BTreeSet;
 
@@ -30,6 +31,10 @@ pub enum KeyLifecycleStatus {
 pub struct KeyTrustRecord {
     pub algorithm: SignatureAlgorithm,
     pub key_id: String,
+    /// SHA-256 of the canonical verification/public-key bytes resolved for this
+    /// identity. Authority verification passes this exact commitment to the
+    /// cryptographic provider so a key ID cannot silently resolve to new bytes.
+    pub verification_key_sha256: Sha256Digest,
     pub not_before_unix_s: u64,
     pub not_after_unix_s: Option<u64>,
     pub status: KeyLifecycleStatus,
@@ -166,6 +171,16 @@ impl TrustSnapshot {
         unix_s >= self.issued_at_unix_s && unix_s < self.expires_at_unix_s
     }
 
+    pub fn key_record(
+        &self,
+        algorithm: &SignatureAlgorithm,
+        key_id: &str,
+    ) -> Option<&KeyTrustRecord> {
+        self.keys
+            .iter()
+            .find(|key| &key.algorithm == algorithm && key.key_id == key_id)
+    }
+
     pub fn key_eligibility(
         &self,
         algorithm: &SignatureAlgorithm,
@@ -173,11 +188,7 @@ impl TrustSnapshot {
         usage: &TrustUsage,
         unix_s: u64,
     ) -> KeyEligibility {
-        let Some(key) = self
-            .keys
-            .iter()
-            .find(|key| &key.algorithm == algorithm && key.key_id == key_id)
-        else {
+        let Some(key) = self.key_record(algorithm, key_id) else {
             return KeyEligibility::Unknown;
         };
         if unix_s < key.not_before_unix_s {
@@ -213,6 +224,7 @@ impl TrustSnapshot {
             digest.text("key");
             digest_signature_algorithm(&mut digest, &key.algorithm);
             digest.text(&key.key_id);
+            digest.text(key.verification_key_sha256.as_str());
             digest.text(&key.not_before_unix_s.to_string());
             match key.not_after_unix_s {
                 Some(value) => {
@@ -348,10 +360,15 @@ mod tests {
         TrustUsage::parse(value).unwrap()
     }
 
+    fn key_material(key_id: &str) -> Sha256Digest {
+        Sha256Digest::of_bytes(format!("verification-key:{key_id}").as_bytes())
+    }
+
     fn active_key(key_id: &str) -> KeyTrustRecord {
         KeyTrustRecord {
             algorithm: SignatureAlgorithm::Ed25519,
             key_id: key_id.into(),
+            verification_key_sha256: key_material(key_id),
             not_before_unix_s: 100,
             not_after_unix_s: Some(900),
             status: KeyLifecycleStatus::Active,
@@ -442,6 +459,21 @@ mod tests {
             })
         ));
         assert_eq!(tracker.require_current(&second).unwrap(), second.digest().unwrap());
+    }
+
+    #[test]
+    fn same_key_id_with_new_key_material_changes_snapshot_identity() {
+        let first = TrustSnapshot::new(1, 100, 1_000, vec![active_key("same")]).unwrap();
+        let mut rotated = active_key("same");
+        rotated.verification_key_sha256 = Sha256Digest::of_bytes(b"rotated-key-material");
+        let second = TrustSnapshot::new(1, 100, 1_000, vec![rotated]).unwrap();
+        assert_ne!(first.digest().unwrap(), second.digest().unwrap());
+        let mut tracker = TrustSnapshotTracker::default();
+        tracker.accept(&first).unwrap();
+        assert!(matches!(
+            tracker.accept(&second),
+            Err(TrustSnapshotTrackingError::SequenceCollision { sequence: 1 })
+        ));
     }
 
     #[test]

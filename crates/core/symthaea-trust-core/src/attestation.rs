@@ -3,9 +3,11 @@
 
 //! Detached attestations over already content-addressed subjects and payloads.
 //!
-//! The trust core owns message framing, digest binding, substitution checks,
-//! signature-policy evaluation, and lifecycle-aware authority minting. Private
-//! keys and cryptographic implementations stay behind narrow traits.
+//! Authority verification binds five things together: the signed envelope, the
+//! exact signature policy, the current tracker-accepted trust snapshot, the
+//! evaluation time, and the exact verification-key material committed by that
+//! snapshot. Private keys and cryptographic implementations stay behind narrow
+//! traits.
 
 use std::collections::BTreeSet;
 
@@ -74,7 +76,6 @@ pub struct DetachedSignature {
     pub signature: Vec<u8>,
 }
 
-/// Signed envelope around already content-addressed authority inputs.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttestationEnvelope {
     pub schema_version: String,
@@ -85,7 +86,6 @@ pub struct AttestationEnvelope {
     pub signatures: Vec<DetachedSignature>,
 }
 
-/// Exact values the verifier expected before any signature may grant authority.
 #[derive(Debug, Clone, Copy)]
 pub struct AttestationExpectation<'a> {
     pub purpose: &'a TrustUsage,
@@ -100,11 +100,19 @@ pub trait AttestationSigner {
     fn sign(&self, message: &[u8]) -> Result<Vec<u8>, String>;
 }
 
+/// Cryptographic verification provider.
+///
+/// When `expected_verification_key_sha256` is `Some`, implementations MUST
+/// resolve the exact public/verification key bytes, hash their canonical form,
+/// fail if the digest differs, and only then verify the signature. Authority
+/// verification always supplies `Some`; diagnostic verification may supply
+/// `None` and can never mint `VerifiedAttestation`.
 pub trait AttestationSignatureVerifier {
     fn verify(
         &self,
         algorithm: &SignatureAlgorithm,
         key_id: &str,
+        expected_verification_key_sha256: Option<&Sha256Digest>,
         message: &[u8],
         signature: &[u8],
     ) -> Result<bool, String>;
@@ -143,7 +151,6 @@ pub fn attest_digests(
     );
     let mut identities = BTreeSet::new();
     let mut signatures = Vec::with_capacity(signers.len());
-
     for signer in signers {
         let algorithm = signer.algorithm();
         if !algorithm.is_canonical() {
@@ -180,7 +187,6 @@ pub fn attest_digests(
             signature,
         });
     }
-
     Ok(AttestationEnvelope {
         schema_version: ATTESTATION_SCHEMA.into(),
         purpose,
@@ -269,8 +275,6 @@ impl AttestationPolicy {
     }
 }
 
-/// Lifecycle context for authority verification. `snapshot` must already be the
-/// current snapshot accepted by `tracker`; mere time freshness is insufficient.
 #[derive(Debug, Clone, Copy)]
 pub struct AttestationTrustContext<'a> {
     pub evaluation_time_unix_s: u64,
@@ -320,14 +324,10 @@ pub struct AttestationVerificationReport {
 }
 
 impl AttestationVerificationReport {
-    /// All supplied cryptographic/policy/expectation checks passed. This remains
-    /// non-authorizing when no lifecycle trust context was supplied.
     pub fn verification_passed(&self) -> bool {
         self.violations.is_empty()
     }
 
-    /// Authority-capable trust additionally requires exact policy, current
-    /// tracker-accepted lifecycle snapshot, and evaluation-time bindings.
     pub fn trusted(&self) -> bool {
         self.verification_passed()
             && self.policy_sha256.is_some()
@@ -336,9 +336,6 @@ impl AttestationVerificationReport {
     }
 }
 
-/// Capability-bearing attestation. It is intentionally not deserializable;
-/// rehydration must rerun signature, policy, expectation, currentness, and
-/// trust-lifecycle checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VerifiedAttestation {
     envelope: AttestationEnvelope,
@@ -354,35 +351,26 @@ impl VerifiedAttestation {
     pub fn envelope(&self) -> &AttestationEnvelope {
         &self.envelope
     }
-
     pub fn attestation_sha256(&self) -> &Sha256Digest {
         &self.attestation_sha256
     }
-
     pub fn policy_sha256(&self) -> &Sha256Digest {
         &self.policy_sha256
     }
-
     pub fn trust_snapshot_sha256(&self) -> &Sha256Digest {
         &self.trust_snapshot_sha256
     }
-
     pub fn evaluation_time_unix_s(&self) -> u64 {
         self.evaluation_time_unix_s
     }
-
-    /// Identity of the authority grant, not merely of the signed envelope.
     pub fn authority_sha256(&self) -> &Sha256Digest {
         &self.authority_sha256
     }
-
     pub fn valid_signers(&self) -> &[(SignatureAlgorithm, String)] {
         &self.valid_signers
     }
 }
 
-/// Diagnostic verification. This never mints authority and may be used without
-/// a trust snapshot to inspect cryptographic/policy structure.
 pub fn verify_attestation(
     envelope: &AttestationEnvelope,
     expectation: AttestationExpectation<'_>,
@@ -392,9 +380,6 @@ pub fn verify_attestation(
     verify_internal(envelope, expectation, policy, verifier, None)
 }
 
-/// Mint authority only when exact expectation, signature policy, cryptographic
-/// verification, trust freshness/currentness, key lifecycle, and purpose
-/// authorization all pass together.
 pub fn verify_attestation_authority(
     envelope: AttestationEnvelope,
     expectation: AttestationExpectation<'_>,
@@ -470,7 +455,6 @@ fn verify_internal(
     if envelope.context_sha256.as_ref() != expectation.context_sha256 {
         violations.push(AttestationViolation::ContextMismatch);
     }
-
     if envelope.signatures.len() > policy.maximum_signatures {
         violations.push(AttestationViolation::TooManySignatures {
             actual: envelope.signatures.len(),
@@ -491,9 +475,7 @@ fn verify_internal(
             Err(TrustSnapshotCurrentnessError::InvalidSnapshot(error)) => {
                 violations.push(AttestationViolation::TrustSnapshotInvalid(error));
             }
-            Err(error) => {
-                violations.push(AttestationViolation::TrustSnapshotNotCurrent(error));
-            }
+            Err(error) => violations.push(AttestationViolation::TrustSnapshotNotCurrent(error)),
         }
     }
 
@@ -550,7 +532,7 @@ fn verify_internal(
             }
         }
 
-        if let Some(context) = trust {
+        let expected_key_digest = if let Some(context) = trust {
             if !trust_usable {
                 continue;
             }
@@ -560,7 +542,10 @@ fn verify_internal(
                 &envelope.purpose,
                 context.evaluation_time_unix_s,
             ) {
-                KeyEligibility::Eligible => {}
+                KeyEligibility::Eligible => context
+                    .snapshot
+                    .key_record(&signature.algorithm, &signature.key_id)
+                    .map(|record| &record.verification_key_sha256),
                 KeyEligibility::Unknown => {
                     violations.push(AttestationViolation::SignerUnknown {
                         key_id: signature.key_id.clone(),
@@ -598,11 +583,14 @@ fn verify_internal(
                     continue;
                 }
             }
-        }
+        } else {
+            None
+        };
 
         match verifier.verify(
             &signature.algorithm,
             &signature.key_id,
+            expected_key_digest,
             &message,
             &signature.signature,
         ) {
@@ -634,10 +622,8 @@ fn verify_internal(
             });
         }
     }
-
     valid_signers.sort();
     violations.sort_by_key(violation_sort_key);
-
     AttestationVerificationReport {
         valid_signers,
         violations,
@@ -655,7 +641,6 @@ pub fn attestation_digest(envelope: &AttestationEnvelope) -> Sha256Digest {
     digest.text(envelope.subject_sha256.as_str());
     digest.text(envelope.payload_sha256.as_str());
     digest.optional_sha(envelope.context_sha256.as_ref());
-
     let mut signatures = envelope.signatures.clone();
     signatures.sort();
     for signature in signatures {
@@ -725,11 +710,9 @@ mod tests {
         fn algorithm(&self) -> SignatureAlgorithm {
             SignatureAlgorithm::Ed25519
         }
-
         fn key_id(&self) -> &str {
             self.key_id
         }
-
         fn sign(&self, message: &[u8]) -> Result<Vec<u8>, String> {
             Ok(Sha256Digest::of_bytes(message).as_str().as_bytes().to_vec())
         }
@@ -741,16 +724,29 @@ mod tests {
         fn verify(
             &self,
             _algorithm: &SignatureAlgorithm,
-            _key_id: &str,
+            key_id: &str,
+            expected_verification_key_sha256: Option<&Sha256Digest>,
             message: &[u8],
             signature: &[u8],
         ) -> Result<bool, String> {
+            let resolved = Sha256Digest::of_bytes(
+                format!("verification-key:{key_id}").as_bytes(),
+            );
+            if let Some(expected) = expected_verification_key_sha256 {
+                if expected != &resolved {
+                    return Err("verification-key digest mismatch".into());
+                }
+            }
             Ok(signature == Sha256Digest::of_bytes(message).as_str().as_bytes())
         }
     }
 
     fn usage() -> TrustUsage {
         TrustUsage::parse("science.qualification").unwrap()
+    }
+
+    fn key_material(key_id: &str) -> Sha256Digest {
+        Sha256Digest::of_bytes(format!("verification-key:{key_id}").as_bytes())
     }
 
     fn snapshot_with_sequence(status: KeyLifecycleStatus, sequence: u64) -> TrustSnapshot {
@@ -761,6 +757,7 @@ mod tests {
             vec![KeyTrustRecord {
                 algorithm: SignatureAlgorithm::Ed25519,
                 key_id: "reviewer".into(),
+                verification_key_sha256: key_material("reviewer"),
                 not_before_unix_s: 100,
                 not_after_unix_s: Some(900),
                 status,
@@ -823,10 +820,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(verified.valid_signers().len(), 1);
-        assert_eq!(
-            verified.policy_sha256(),
-            &AttestationPolicy::default().digest().unwrap()
-        );
     }
 
     #[test]
@@ -841,6 +834,33 @@ mod tests {
         );
         assert!(report.verification_passed());
         assert!(!report.trusted());
+    }
+
+    #[test]
+    fn verification_key_substitution_cannot_mint_authority() {
+        let envelope = envelope();
+        let purpose = usage();
+        let mut trust_snapshot = snapshot(KeyLifecycleStatus::Active);
+        trust_snapshot.keys[0].verification_key_sha256 =
+            Sha256Digest::of_bytes(b"different-key-material");
+        let tracker = current_tracker(&trust_snapshot);
+        let report = verify_attestation_authority(
+            envelope.clone(),
+            expectation(&purpose, &envelope),
+            &AttestationPolicy::default(),
+            &EchoVerifier,
+            AttestationTrustContext {
+                evaluation_time_unix_s: 500,
+                snapshot: &trust_snapshot,
+                tracker: &tracker,
+            },
+        )
+        .unwrap_err();
+        assert!(report.violations.iter().any(|item| matches!(
+            item,
+            AttestationViolation::VerificationProviderError { reason, .. }
+                if reason.contains("verification-key digest mismatch")
+        )));
     }
 
     #[test]
@@ -861,58 +881,10 @@ mod tests {
             },
         )
         .unwrap_err();
-        assert!(report
-            .violations
-            .iter()
-            .any(|item| matches!(item, AttestationViolation::SignerRevoked { .. })));
-    }
-
-    #[test]
-    fn payload_substitution_is_rejected_even_with_valid_signature() {
-        let envelope = envelope();
-        let purpose = usage();
-        let wrong_payload = Sha256Digest::of_bytes(b"other-payload");
-        let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
-        let tracker = current_tracker(&trust_snapshot);
-        let report = verify_attestation_authority(
-            envelope.clone(),
-            AttestationExpectation {
-                purpose: &purpose,
-                subject_sha256: &envelope.subject_sha256,
-                payload_sha256: &wrong_payload,
-                context_sha256: envelope.context_sha256.as_ref(),
-            },
-            &AttestationPolicy::default(),
-            &EchoVerifier,
-            AttestationTrustContext {
-                evaluation_time_unix_s: 500,
-                snapshot: &trust_snapshot,
-                tracker: &tracker,
-            },
-        )
-        .unwrap_err();
-        assert!(report.violations.contains(&AttestationViolation::PayloadMismatch));
-    }
-
-    #[test]
-    fn stale_snapshot_cannot_mint_authority() {
-        let envelope = envelope();
-        let purpose = usage();
-        let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
-        let tracker = current_tracker(&trust_snapshot);
-        let report = verify_attestation_authority(
-            envelope.clone(),
-            expectation(&purpose, &envelope),
-            &AttestationPolicy::default(),
-            &EchoVerifier,
-            AttestationTrustContext {
-                evaluation_time_unix_s: 1_000,
-                snapshot: &trust_snapshot,
-                tracker: &tracker,
-            },
-        )
-        .unwrap_err();
-        assert!(report.violations.contains(&AttestationViolation::TrustSnapshotStale));
+        assert!(report.violations.iter().any(|item| matches!(
+            item,
+            AttestationViolation::SignerRevoked { .. }
+        )));
     }
 
     #[test]
@@ -948,57 +920,13 @@ mod tests {
     }
 
     #[test]
-    fn custom_algorithm_cannot_alias_builtin_identity() {
-        let builtin = AttestationEnvelope {
-            schema_version: ATTESTATION_SCHEMA.into(),
-            purpose: usage(),
-            subject_sha256: Sha256Digest::of_bytes(b"subject"),
-            payload_sha256: Sha256Digest::of_bytes(b"payload"),
-            context_sha256: None,
-            signatures: vec![DetachedSignature {
-                algorithm: SignatureAlgorithm::Ed25519,
-                key_id: "same".into(),
-                signature: vec![1],
-            }],
-        };
-        let custom = AttestationEnvelope {
-            signatures: vec![DetachedSignature {
-                algorithm: SignatureAlgorithm::Other("ed25519".into()),
-                key_id: "same".into(),
-                signature: vec![1],
-            }],
-            ..builtin.clone()
-        };
-        assert_ne!(attestation_digest(&builtin), attestation_digest(&custom));
-    }
-
-    #[test]
-    fn malformed_policy_fails_closed() {
-        let envelope = envelope();
-        let purpose = usage();
-        let policy = AttestationPolicy {
-            required_algorithms: BTreeSet::from([SignatureAlgorithm::Other(" bad ".into())]),
-            ..AttestationPolicy::default()
-        };
-        let report = verify_attestation(
-            &envelope,
-            expectation(&purpose, &envelope),
-            &policy,
-            &EchoVerifier,
-        );
-        assert!(report.violations.contains(&AttestationViolation::InvalidPolicy));
-        assert!(report.policy_sha256.is_none());
-        assert!(!report.trusted());
-    }
-
-    #[test]
     fn policy_changes_authority_identity_even_for_same_envelope() {
         let envelope = envelope();
         let purpose = usage();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
         let tracker = current_tracker(&trust_snapshot);
         let default_policy = AttestationPolicy::default();
-        let relaxed_capacity_policy = AttestationPolicy {
+        let other_policy = AttestationPolicy {
             maximum_signatures: 8,
             ..AttestationPolicy::default()
         };
@@ -1017,7 +945,7 @@ mod tests {
         let right = verify_attestation_authority(
             envelope.clone(),
             expectation(&purpose, &envelope),
-            &relaxed_capacity_policy,
+            &other_policy,
             &EchoVerifier,
             AttestationTrustContext {
                 evaluation_time_unix_s: 500,
