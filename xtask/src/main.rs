@@ -5,6 +5,7 @@ mod cargo_context;
 mod cargo_graph;
 mod cargo_impact;
 mod cargo_invocation;
+mod cargo_observation;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -75,6 +76,18 @@ enum Commands {
         /// Strict JSON containing exact raw argv plus non-argv toolchain/config fingerprints.
         #[arg(long)]
         spec: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Bind stable Cargo JSON-message observations to an exact context and invocation.
+    CargoObservation {
+        /// Strict JSON containing context/invocation/toolchain/exit identities.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Exact stdout transcript from Cargo `--message-format=json`.
+        #[arg(long)]
+        messages: PathBuf,
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
@@ -211,6 +224,13 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CargoInvocation { spec, output } => {
             cargo_invocation::run(&spec, output)?;
+        }
+        Commands::CargoObservation {
+            spec,
+            messages,
+            output,
+        } => {
+            cargo_observation::run(&spec, &messages, output)?;
         }
     }
     Ok(())
