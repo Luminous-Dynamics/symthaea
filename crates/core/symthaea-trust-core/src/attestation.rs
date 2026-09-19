@@ -12,7 +12,10 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::identity::{FramedDigest, Sha256Digest, TrustUsage};
-use crate::trust::{KeyEligibility, TrustSnapshot, TrustSnapshotError};
+use crate::trust::{
+    KeyEligibility, TrustSnapshot, TrustSnapshotCurrentnessError, TrustSnapshotError,
+    TrustSnapshotTracker,
+};
 
 pub const ATTESTATION_SCHEMA: &str = "symthaea.detached-attestation.v1";
 const ATTESTATION_MESSAGE_DOMAIN: &str = "symthaea.detached-attestation.message.v1";
@@ -266,10 +269,13 @@ impl AttestationPolicy {
     }
 }
 
+/// Lifecycle context for authority verification. `snapshot` must already be the
+/// current snapshot accepted by `tracker`; mere time freshness is insufficient.
 #[derive(Debug, Clone, Copy)]
 pub struct AttestationTrustContext<'a> {
     pub evaluation_time_unix_s: u64,
     pub snapshot: &'a TrustSnapshot,
+    pub tracker: &'a TrustSnapshotTracker,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -293,6 +299,7 @@ pub enum AttestationViolation {
     InsufficientValidSignatures { actual: usize, required: usize },
     MissingRequiredAlgorithm { algorithm: SignatureAlgorithm },
     TrustSnapshotInvalid(TrustSnapshotError),
+    TrustSnapshotNotCurrent(TrustSnapshotCurrentnessError),
     TrustSnapshotStale,
     SignerUnknown { key_id: String },
     SignerNotYetValid { key_id: String },
@@ -314,14 +321,13 @@ pub struct AttestationVerificationReport {
 
 impl AttestationVerificationReport {
     /// All supplied cryptographic/policy/expectation checks passed. This remains
-    /// non-authorizing when no lifecycle trust snapshot was supplied.
+    /// non-authorizing when no lifecycle trust context was supplied.
     pub fn verification_passed(&self) -> bool {
         self.violations.is_empty()
     }
 
-    /// Authority-capable trust additionally requires exact policy, lifecycle
-    /// snapshot, and evaluation-time bindings. Diagnostic verification can never
-    /// return true here.
+    /// Authority-capable trust additionally requires exact policy, current
+    /// tracker-accepted lifecycle snapshot, and evaluation-time bindings.
     pub fn trusted(&self) -> bool {
         self.verification_passed()
             && self.policy_sha256.is_some()
@@ -331,8 +337,8 @@ impl AttestationVerificationReport {
 }
 
 /// Capability-bearing attestation. It is intentionally not deserializable;
-/// rehydration must rerun signature, policy, expectation, and trust-lifecycle
-/// checks.
+/// rehydration must rerun signature, policy, expectation, currentness, and
+/// trust-lifecycle checks.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VerifiedAttestation {
     envelope: AttestationEnvelope,
@@ -387,8 +393,8 @@ pub fn verify_attestation(
 }
 
 /// Mint authority only when exact expectation, signature policy, cryptographic
-/// verification, trust freshness, key lifecycle, and purpose authorization all
-/// pass together.
+/// verification, trust freshness/currentness, key lifecycle, and purpose
+/// authorization all pass together.
 pub fn verify_attestation_authority(
     envelope: AttestationEnvelope,
     expectation: AttestationExpectation<'_>,
@@ -407,7 +413,7 @@ pub fn verify_attestation_authority(
     let trust_snapshot_sha256 = report
         .trust_snapshot_sha256
         .clone()
-        .expect("trusted verification must bind a trust snapshot");
+        .expect("trusted verification must bind a current trust snapshot");
     let evaluation_time_unix_s = report
         .evaluation_time_unix_s
         .expect("trusted verification must bind evaluation time");
@@ -473,7 +479,7 @@ fn verify_internal(
     }
 
     if let Some(context) = trust {
-        match context.snapshot.digest() {
+        match context.tracker.require_current(context.snapshot) {
             Ok(digest) => {
                 trust_snapshot_sha256 = Some(digest);
                 if context.snapshot.is_fresh_at(context.evaluation_time_unix_s) {
@@ -482,7 +488,12 @@ fn verify_internal(
                     violations.push(AttestationViolation::TrustSnapshotStale);
                 }
             }
-            Err(error) => violations.push(AttestationViolation::TrustSnapshotInvalid(error)),
+            Err(TrustSnapshotCurrentnessError::InvalidSnapshot(error)) => {
+                violations.push(AttestationViolation::TrustSnapshotInvalid(error));
+            }
+            Err(error) => {
+                violations.push(AttestationViolation::TrustSnapshotNotCurrent(error));
+            }
         }
     }
 
@@ -704,7 +715,7 @@ fn violation_sort_key(value: &AttestationViolation) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::trust::{KeyLifecycleStatus, KeyTrustRecord, TrustSnapshot};
+    use crate::trust::{KeyLifecycleStatus, KeyTrustRecord};
 
     struct EchoSigner {
         key_id: &'static str,
@@ -742,10 +753,10 @@ mod tests {
         TrustUsage::parse("science.qualification").unwrap()
     }
 
-    fn snapshot(status: KeyLifecycleStatus) -> TrustSnapshot {
+    fn snapshot_with_sequence(status: KeyLifecycleStatus, sequence: u64) -> TrustSnapshot {
         TrustSnapshot::new(
-            1,
-            100,
+            sequence,
+            100 + sequence,
             1_000,
             vec![KeyTrustRecord {
                 algorithm: SignatureAlgorithm::Ed25519,
@@ -757,6 +768,16 @@ mod tests {
             }],
         )
         .unwrap()
+    }
+
+    fn snapshot(status: KeyLifecycleStatus) -> TrustSnapshot {
+        snapshot_with_sequence(status, 1)
+    }
+
+    fn current_tracker(snapshot: &TrustSnapshot) -> TrustSnapshotTracker {
+        let mut tracker = TrustSnapshotTracker::default();
+        tracker.accept(snapshot).unwrap();
+        tracker
     }
 
     fn envelope() -> AttestationEnvelope {
@@ -788,6 +809,7 @@ mod tests {
         let envelope = envelope();
         let purpose = usage();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
+        let tracker = current_tracker(&trust_snapshot);
         let verified = verify_attestation_authority(
             envelope.clone(),
             expectation(&purpose, &envelope),
@@ -796,6 +818,7 @@ mod tests {
             AttestationTrustContext {
                 evaluation_time_unix_s: 500,
                 snapshot: &trust_snapshot,
+                tracker: &tracker,
             },
         )
         .unwrap();
@@ -825,6 +848,7 @@ mod tests {
         let envelope = envelope();
         let purpose = usage();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Revoked);
+        let tracker = current_tracker(&trust_snapshot);
         let report = verify_attestation_authority(
             envelope.clone(),
             expectation(&purpose, &envelope),
@@ -833,6 +857,7 @@ mod tests {
             AttestationTrustContext {
                 evaluation_time_unix_s: 500,
                 snapshot: &trust_snapshot,
+                tracker: &tracker,
             },
         )
         .unwrap_err();
@@ -848,6 +873,7 @@ mod tests {
         let purpose = usage();
         let wrong_payload = Sha256Digest::of_bytes(b"other-payload");
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
+        let tracker = current_tracker(&trust_snapshot);
         let report = verify_attestation_authority(
             envelope.clone(),
             AttestationExpectation {
@@ -861,6 +887,7 @@ mod tests {
             AttestationTrustContext {
                 evaluation_time_unix_s: 500,
                 snapshot: &trust_snapshot,
+                tracker: &tracker,
             },
         )
         .unwrap_err();
@@ -872,6 +899,7 @@ mod tests {
         let envelope = envelope();
         let purpose = usage();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
+        let tracker = current_tracker(&trust_snapshot);
         let report = verify_attestation_authority(
             envelope.clone(),
             expectation(&purpose, &envelope),
@@ -880,10 +908,43 @@ mod tests {
             AttestationTrustContext {
                 evaluation_time_unix_s: 1_000,
                 snapshot: &trust_snapshot,
+                tracker: &tracker,
             },
         )
         .unwrap_err();
         assert!(report.violations.contains(&AttestationViolation::TrustSnapshotStale));
+    }
+
+    #[test]
+    fn older_fresh_snapshot_cannot_mint_after_tracker_advance() {
+        let envelope = envelope();
+        let purpose = usage();
+        let first = snapshot_with_sequence(KeyLifecycleStatus::Active, 1);
+        let second = snapshot_with_sequence(KeyLifecycleStatus::Revoked, 2);
+        let mut tracker = TrustSnapshotTracker::default();
+        tracker.accept(&first).unwrap();
+        tracker.accept(&second).unwrap();
+        let report = verify_attestation_authority(
+            envelope.clone(),
+            expectation(&purpose, &envelope),
+            &AttestationPolicy::default(),
+            &EchoVerifier,
+            AttestationTrustContext {
+                evaluation_time_unix_s: 500,
+                snapshot: &first,
+                tracker: &tracker,
+            },
+        )
+        .unwrap_err();
+        assert!(report.violations.iter().any(|item| matches!(
+            item,
+            AttestationViolation::TrustSnapshotNotCurrent(
+                TrustSnapshotCurrentnessError::SequenceMismatch {
+                    accepted: 2,
+                    presented: 1,
+                }
+            )
+        )));
     }
 
     #[test]
@@ -935,6 +996,7 @@ mod tests {
         let envelope = envelope();
         let purpose = usage();
         let trust_snapshot = snapshot(KeyLifecycleStatus::Active);
+        let tracker = current_tracker(&trust_snapshot);
         let default_policy = AttestationPolicy::default();
         let relaxed_capacity_policy = AttestationPolicy {
             maximum_signatures: 8,
@@ -948,6 +1010,7 @@ mod tests {
             AttestationTrustContext {
                 evaluation_time_unix_s: 500,
                 snapshot: &trust_snapshot,
+                tracker: &tracker,
             },
         )
         .unwrap();
@@ -959,6 +1022,7 @@ mod tests {
             AttestationTrustContext {
                 evaluation_time_unix_s: 500,
                 snapshot: &trust_snapshot,
+                tracker: &tracker,
             },
         )
         .unwrap();

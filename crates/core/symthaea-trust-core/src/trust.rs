@@ -5,7 +5,7 @@
 //!
 //! Cryptographic validity is necessary but not sufficient authority. A key must
 //! also be known, active, purpose-authorized, inside its validity window, and
-//! evaluated against a fresh, non-rollback trust snapshot.
+//! evaluated against the current snapshot accepted by a monotonic tracker.
 
 use std::collections::BTreeSet;
 
@@ -246,7 +246,18 @@ pub enum TrustSnapshotTrackingError {
     IssuedAtRegressed { latest: u64, proposed: u64 },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TrustSnapshotCurrentnessError {
+    InvalidSnapshot(TrustSnapshotError),
+    NoAcceptedSnapshot,
+    SequenceMismatch { accepted: u64, presented: u64 },
+    DigestMismatch { sequence: u64 },
+}
+
 impl TrustSnapshotTracker {
+    /// Advance the accepted trust state monotonically. The caller is responsible
+    /// for persisting this tracker (or equivalent trusted state) across process
+    /// restarts; resetting trusted state is outside this in-memory primitive.
     pub fn accept(
         &mut self,
         snapshot: &TrustSnapshot,
@@ -281,6 +292,34 @@ impl TrustSnapshotTracker {
         self.latest_sequence = Some(snapshot.sequence);
         self.latest_issued_at_unix_s = Some(snapshot.issued_at_unix_s);
         self.latest_digest = Some(digest.clone());
+        Ok(digest)
+    }
+
+    /// Prove that `snapshot` is exactly the current accepted snapshot, not merely
+    /// a valid/fresh older snapshot. Authority verification should use this gate
+    /// so a still-time-valid pre-revocation snapshot cannot be replayed after a
+    /// newer snapshot has been accepted.
+    pub fn require_current(
+        &self,
+        snapshot: &TrustSnapshot,
+    ) -> Result<Sha256Digest, TrustSnapshotCurrentnessError> {
+        let digest = snapshot
+            .digest()
+            .map_err(TrustSnapshotCurrentnessError::InvalidSnapshot)?;
+        let accepted_sequence = self
+            .latest_sequence
+            .ok_or(TrustSnapshotCurrentnessError::NoAcceptedSnapshot)?;
+        if snapshot.sequence != accepted_sequence {
+            return Err(TrustSnapshotCurrentnessError::SequenceMismatch {
+                accepted: accepted_sequence,
+                presented: snapshot.sequence,
+            });
+        }
+        if self.latest_digest.as_ref() != Some(&digest) {
+            return Err(TrustSnapshotCurrentnessError::DigestMismatch {
+                sequence: snapshot.sequence,
+            });
+        }
         Ok(digest)
     }
 
@@ -384,6 +423,25 @@ mod tests {
             tracker.accept(&collision),
             Err(TrustSnapshotTrackingError::SequenceCollision { sequence: 10 })
         ));
+    }
+
+    #[test]
+    fn older_but_still_valid_snapshot_is_not_current_after_advance() {
+        let first = TrustSnapshot::new(1, 100, 1_000, vec![active_key("a")]).unwrap();
+        let mut revoked = active_key("a");
+        revoked.status = KeyLifecycleStatus::Revoked;
+        let second = TrustSnapshot::new(2, 200, 1_000, vec![revoked]).unwrap();
+        let mut tracker = TrustSnapshotTracker::default();
+        tracker.accept(&first).unwrap();
+        tracker.accept(&second).unwrap();
+        assert!(matches!(
+            tracker.require_current(&first),
+            Err(TrustSnapshotCurrentnessError::SequenceMismatch {
+                accepted: 2,
+                presented: 1,
+            })
+        ));
+        assert_eq!(tracker.require_current(&second).unwrap(), second.digest().unwrap());
     }
 
     #[test]
