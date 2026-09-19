@@ -1,0 +1,25 @@
+[package]
+name = "symthaea-action-entry"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "One-shot point-of-entry authority firewall for Symthaea effects"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["authorization", "capabilities", "firewall", "safety"]
+categories = ["authentication", "development-tools"]
+
+[dependencies]
+symthaea-action-admission = { path = "../symthaea-action-admission" }
+symthaea-action-runtime = { path = "../../core/symthaea-action-runtime" }
+symthaea-authority = { path = "../../core/symthaea-authority" }
+symthaea-authority-state = { path = "../symthaea-authority-state" }
+symthaea-authority-time = { path = "../symthaea-authority-time" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+ed25519-dalek = { workspace = true }
+symthaea-action-checkpoint = { path = "../../core/symthaea-action-checkpoint" }
+symthaea-action-frontier = { path = "../symthaea-action-frontier" }
