@@ -38,6 +38,8 @@ pub mod perceptual_participant_schedule;
 pub mod perceptual_schedule_reveal;
 #[path = "perceptual_collection_evidence.rs"]
 pub mod perceptual_collection_evidence;
+#[path = "perceptual_collection_chronology.rs"]
+pub mod perceptual_collection_chronology;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};

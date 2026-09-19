@@ -20,6 +20,7 @@ midly = "0.5"
 roxmltree = "0.20"
 serde_json = { workspace = true }
 sha2 = "0.10"
+chrono = { workspace = true }
 bevy = { version = "0.18", default-features = false, optional = true }
 symthaea-vocal-tract = { path = "../symthaea-vocal-tract", optional = true }
 symthaea-broca = { path = "../symthaea-broca", optional = true }
@@ -95,7 +96,7 @@ required-features = ["theory"]
 
 [[example]]
 name = "clap_fad_compare"
-required-features = ["clap-fad"]
+required-features = ["clap-fad", "theory"]
 
 [[example]]
 name = "baroque_campaign"
@@ -165,3 +166,4 @@ required-features = ["theory"]
 [[example]]
 name = "rhythm_gate_calibration"
 required-features = ["theory"]
+
