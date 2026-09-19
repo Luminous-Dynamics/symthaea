@@ -53,6 +53,8 @@ pub struct TemporalMapV1 {
 pub enum TemporalMapErrorV1 {
     ZeroTempoNumerator,
     ZeroTempoDenominator,
+    InvalidFloatTempo,
+    FloatTempoUnrepresentable,
     WrongVersion { found: String },
     EmptyMap,
     InitialPointNotAtZero,
@@ -83,6 +85,66 @@ impl TempoV1 {
 
     pub fn integer(bpm: u32) -> Result<Self, TemporalMapErrorV1> {
         Self::new(bpm, 1)
+    }
+
+    /// Preserve a positive finite legacy `f32` BPM value as an exact reduced
+    /// rational whenever that rational fits V1's `u32/u32` representation.
+    ///
+    /// This is not a decimal approximation: the IEEE-754 significand and
+    /// binary exponent are converted exactly. As a result, projecting the
+    /// returned rational back through `f64 -> f32` reproduces the source tempo
+    /// bit-for-bit. Extremely tiny/large finite floats whose reduced rational
+    /// cannot fit `u32/u32` fail closed instead of being rounded silently.
+    pub fn from_f32_exact(bpm: f32) -> Result<Self, TemporalMapErrorV1> {
+        if !bpm.is_finite() || bpm <= 0.0 {
+            return Err(TemporalMapErrorV1::InvalidFloatTempo);
+        }
+
+        let bits = bpm.to_bits();
+        let exponent_bits = ((bits >> 23) & 0xff) as i32;
+        let fraction = u64::from(bits & 0x7f_ffff);
+        let (mut mantissa, mut exponent_two) = if exponent_bits == 0 {
+            // Positive subnormal: fraction * 2^-149.
+            (fraction, -149)
+        } else {
+            // Positive normal: (2^23 + fraction) * 2^(e-127-23).
+            ((1_u64 << 23) | fraction, exponent_bits - 127 - 23)
+        };
+
+        if mantissa == 0 {
+            return Err(TemporalMapErrorV1::InvalidFloatTempo);
+        }
+
+        // Reduce powers of two before checking whether the denominator fits.
+        if exponent_two < 0 {
+            let removable = mantissa
+                .trailing_zeros()
+                .min((-exponent_two) as u32);
+            mantissa >>= removable;
+            exponent_two += removable as i32;
+        }
+
+        let (numerator, denominator) = if exponent_two >= 0 {
+            let shifted = mantissa
+                .checked_shl(exponent_two as u32)
+                .ok_or(TemporalMapErrorV1::FloatTempoUnrepresentable)?;
+            if shifted > u64::from(u32::MAX) {
+                return Err(TemporalMapErrorV1::FloatTempoUnrepresentable);
+            }
+            (shifted as u32, 1)
+        } else {
+            let denominator_shift = (-exponent_two) as u32;
+            if denominator_shift >= u32::BITS || mantissa > u64::from(u32::MAX) {
+                return Err(TemporalMapErrorV1::FloatTempoUnrepresentable);
+            }
+            (mantissa as u32, 1_u32 << denominator_shift)
+        };
+
+        let tempo = Self::new(numerator, denominator)?;
+        if (tempo.bpm() as f32).to_bits() != bpm.to_bits() {
+            return Err(TemporalMapErrorV1::FloatTempoUnrepresentable);
+        }
+        Ok(tempo)
     }
 
     pub const fn numerator_bpm(self) -> u32 {
@@ -311,6 +373,32 @@ mod tests {
         assert_eq!(TempoV1::new(240, 2).unwrap(), TempoV1::integer(120).unwrap());
         assert_eq!(TempoV1::new(0, 1), Err(TemporalMapErrorV1::ZeroTempoNumerator));
         assert_eq!(TempoV1::new(120, 0), Err(TemporalMapErrorV1::ZeroTempoDenominator));
+    }
+
+    #[test]
+    fn legacy_f32_tempo_is_preserved_bit_exactly_when_representable() {
+        for bpm in [60.0_f32, 121.5_f32, 93.7_f32, 137.33333_f32] {
+            let tempo = TempoV1::from_f32_exact(bpm).unwrap();
+            assert_eq!((tempo.bpm() as f32).to_bits(), bpm.to_bits());
+        }
+        assert_eq!(
+            TempoV1::from_f32_exact(120.0).unwrap(),
+            TempoV1::integer(120).unwrap()
+        );
+    }
+
+    #[test]
+    fn legacy_f32_tempo_rejects_invalid_or_unrepresentable_values() {
+        for bpm in [0.0_f32, -1.0_f32, f32::NAN, f32::INFINITY] {
+            assert_eq!(
+                TempoV1::from_f32_exact(bpm),
+                Err(TemporalMapErrorV1::InvalidFloatTempo)
+            );
+        }
+        assert_eq!(
+            TempoV1::from_f32_exact(f32::MIN_POSITIVE),
+            Err(TemporalMapErrorV1::FloatTempoUnrepresentable)
+        );
     }
 
     #[test]
