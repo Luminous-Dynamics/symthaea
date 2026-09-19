@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod cargo_context;
 mod cargo_graph;
 mod cargo_impact;
+mod cargo_invocation;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -63,6 +64,15 @@ enum Commands {
     /// Canonicalize a declared Cargo build-context spec and emit stable context/invocation IDs.
     CargoContext {
         /// Strict JSON build-context specification.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Parse already-tokenized Cargo argv into a declared build context, failing closed on unknown semantics.
+    CargoInvocation {
+        /// Strict JSON containing exact raw argv plus non-argv toolchain/config fingerprints.
         #[arg(long)]
         spec: PathBuf,
         /// Write JSON to this path instead of stdout.
@@ -198,6 +208,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CargoContext { spec, output } => {
             cargo_context::run(&spec, output)?;
+        }
+        Commands::CargoInvocation { spec, output } => {
+            cargo_invocation::run(&spec, output)?;
         }
     }
     Ok(())
