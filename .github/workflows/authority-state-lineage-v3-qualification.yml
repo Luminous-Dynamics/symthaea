@@ -1,0 +1,133 @@
+name: Authority State Lineage V3 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/authority-state-lineage-v3-qualification.yml'
+      - 'crates/bridges/symthaea-authority-state-lineage/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/AUTHORITY_STATE_LINEAGE_V3.md'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: authority-state-lineage-v3-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  exact-head:
+    name: Exact-head authority state lineage v3
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce lineage and ordering ratchets
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-authority-state-lineage/src/lib.rs
+          grep -Fq 'AuthorityFrontierLineageV1' "${SRC}"
+          grep -Fq 'AuthorityStateStatementV3' "${SRC}"
+          grep -Fq 'VerifiedAuthorityStateV3' "${SRC}"
+          grep -Fq 'source_frontier_lineage' "${SRC}"
+          grep -Fq 'symthaea.authority-state.statement.v3' "${SRC}"
+          grep -Fq 'symthaea.authority-state.snapshot.v3' "${SRC}"
+          grep -Fq 'compare_source_frontier' "${SRC}"
+          grep -Fq 'DifferentLineage' "${SRC}"
+          grep -Fq 'Rollback' "${SRC}"
+          grep -Fq 'Contradiction' "${SRC}"
+          grep -Fq 'witnesses_must_agree_on_exact_frontier_lineage' "${SRC}"
+          grep -Fq 'v2_and_v3_statement_domains_are_not_replay_equivalent' "${SRC}"
+          grep -Fq 'same_lineage_lower_sequence_is_rollback' "${SRC}"
+          grep -Fq 'same_lineage_equal_sequence_conflicting_digest_is_contradiction' "${SRC}"
+          grep -Fq 'different_lineage_is_incomparable_even_with_higher_sequence' "${SRC}"
+          grep -Fq 'v3_preserves_negative_fact_count_bound' "${SRC}"
+
+          # V3 reuses V2 negative-fact semantics and must preserve V2's bounded
+          # per-grant fact-set resource theorem rather than silently widening it.
+          grep -Fq 'MAX_NEGATIVE_FACTS_PER_GRANT' "${SRC}"
+          grep -Eq 'facts\.len\(\)[[:space:]]*>[[:space:]]*MAX_NEGATIVE_FACTS_PER_GRANT' "${SRC}"
+          grep -Fq 'TooManyNegativeFacts' "${SRC}"
+
+          if grep -Eq 'DifferentLineage.*(Newer|Same)' "${SRC}"; then
+            echo 'different authority lineages must never be ordered by numeric sequence alone' >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          src = Path('crates/bridges/symthaea-authority-state-lineage/src/lib.rs').read_text()
+          m = re.search(r'#\[derive\(([^)]*)\)\]\s*pub struct\s+VerifiedAuthorityStateV3', src, re.S)
+          if not m:
+              raise SystemExit('missing explicit derive declaration for VerifiedAuthorityStateV3')
+          derives = {x.strip() for x in m.group(1).split(',')}
+          forbidden = {'Clone', 'Serialize', 'Deserialize'} & derives
+          if forbidden:
+              raise SystemExit(f'VerifiedAuthorityStateV3 must remain verifier-owned/non-Serde; found {sorted(forbidden)}')
+          PY
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-authority-state-lineage -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-authority-state-lineage --all-targets
+          cargo test -p symthaea-authority-state-lineage
+          cargo clippy -p symthaea-authority-state-lineage --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-authority-state-lineage --all-targets
+          cargo test --locked -p symthaea-authority-state-lineage
+          cargo clippy --locked -p symthaea-authority-state-lineage --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
