@@ -1,0 +1,42 @@
+name: Math Retrieval Runtime Membership Guard
+
+on:
+  pull_request:
+    paths:
+      - 'tools/math-retrieval-runtime-guard/**'
+      - 'tools/math-retrieval-runtime-seam/**'
+      - '.github/schemas/math-retrieval-candidate-set-v1.schema.json'
+      - '.github/scripts/validate-math-retrieval-candidate-set.py'
+      - '.github/scripts/validate-math-retrieval-candidate-membership.py'
+      - '.github/workflows/math-retrieval-runtime-membership-guard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify pre-materialization membership guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml -- --check
+
+      - name: Check exact locked package
+        run: cargo check --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml --locked
+
+      - name: Run membership guard canaries
+        run: cargo test --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml --locked
+
+      - name: Re-run candidate contract self-tests
+        run: |
+          python .github/scripts/validate-math-retrieval-candidate-set.py --self-test
+          python .github/scripts/validate-math-retrieval-candidate-membership.py --self-test

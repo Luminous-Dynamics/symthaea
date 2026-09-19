@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-math-retrieval-membership-guard"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Candidate-universe membership guard for Symthaea qualified mathematical retrieval backends"
+
+[dependencies]
+symthaea-math-retrieval-runtime-seam = { path = "../math-retrieval-runtime-seam" }
+
+# Deliberately standalone while the retrieval runtime evidence stack is qualified.
+[workspace]
