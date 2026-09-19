@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod cargo_context;
+mod cargo_context_verify;
 mod cargo_graph;
 mod cargo_impact;
 mod cargo_invocation;
@@ -69,6 +70,12 @@ enum Commands {
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Rebuild and verify a stored Cargo build-context document before it is used as evidence.
+    CargoContextVerify {
+        /// Stored context document emitted by `cargo-context` or a successful parsed invocation.
+        #[arg(long)]
+        document: PathBuf,
     },
     /// Parse already-tokenized Cargo argv into a declared build context, failing closed on unknown semantics.
     CargoInvocation {
@@ -208,6 +215,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CargoContext { spec, output } => {
             cargo_context::run(&spec, output)?;
+        }
+        Commands::CargoContextVerify { document } => {
+            cargo_context_verify::run(&document)?;
         }
         Commands::CargoInvocation { spec, output } => {
             cargo_invocation::run(&spec, output)?;
