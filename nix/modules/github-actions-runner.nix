@@ -101,14 +101,14 @@ in
 
         case "$operation" in
           BOOT_ID)
-            [[ -z "${nonce:-}" && -z "${authorization_sha:-}" && -z "${extra:-}" ]]
+            [[ -z "$nonce" && -z "$authorization_sha" && -z "$extra" ]]
             [[ "$boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
             printf 'BOOT_ID %s\n' "$boot_id"
             ;;
           CONSUME)
             [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
             [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
-            [[ -z "${extra:-}" ]]
+            [[ -z "$extra" ]]
             marker="${authorizationLedgerDir}/$nonce"
             if mkdir --mode=0700 -- "$marker" 2>/dev/null; then
               printf '%s\n' "$authorization_sha" > "$marker/authorization-sha256"
