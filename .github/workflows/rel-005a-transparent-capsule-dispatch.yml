@@ -22,6 +22,6 @@ concurrency:
 jobs:
   finalize:
     name: Invoke exact frozen REL-005A transparent finalizer
-    uses: Luminous-Dynamics/symthaea/.github/workflows/rel-005a-transparent-capsule-finalizer.yml@5eb7a300d5db2cfcc0e426050c1bba35a6043b27
+    uses: Luminous-Dynamics/symthaea/.github/workflows/rel-005a-transparent-capsule-finalizer.yml@dc6b6ecbf6dc2ff1f22070abd4616ecc3a803f1f
     with:
       source_run_id: ${{ inputs.source_run_id }}
