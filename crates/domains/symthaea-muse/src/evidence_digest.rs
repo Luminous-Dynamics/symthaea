@@ -16,6 +16,8 @@ pub mod rendered_attack_panel;
 pub mod rendered_transient_contrast;
 #[path = "rendered_attack_crosscheck.rs"]
 pub mod rendered_attack_crosscheck;
+#[path = "acoustic_window_dependency.rs"]
+pub mod acoustic_window_dependency;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
