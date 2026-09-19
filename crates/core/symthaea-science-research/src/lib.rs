@@ -15,12 +15,12 @@
 //! qualification lifecycle records, observed-view currentness assessments,
 //! complete-tail lifecycle publication freshness assessments, authenticated
 //! frozen-protocol evidence freshness assessments, aligned validity-readiness
-//! assessments over one exact authenticated evaluation horizon, typed provenance
-//! graphs, frozen study protocols, immutable execution/conformance records,
-//! adversarial falsification campaigns, explicit scientific uncertainty budgets,
-//! and provenance-checked replication lineage assessments. It does not run
-//! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
-//! operations.
+//! assessments over one exact authenticated evaluation horizon, institution-
+//! scoped currentness capabilities, typed provenance graphs, frozen study
+//! protocols, immutable execution/conformance records, adversarial falsification
+//! campaigns, explicit scientific uncertainty budgets, and provenance-checked
+//! replication lineage assessments. It does not run experiments, solvers, LLMs,
+//! HDC, statistics, formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Scientific qualification exists only as a private capability after the exact
@@ -28,7 +28,7 @@
 //! separate append-only authority and never rewrites historical qualification.
 //! Delegated-root ratification is also distinct from claiming that an older
 //! qualification was originally issued under the newer root architecture, and
-//! public/observed currentness or freshness is distinct from global current
+//! public/observed/institutional currentness remains distinct from global current
 //! validity or scientific truth.
 
 pub mod authority;
@@ -49,6 +49,8 @@ pub mod provenance;
 pub mod qualification_decision_authority;
 mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
+mod qualification_institutional_currentness;
+pub mod qualification_institutional_currentness_gate;
 pub mod qualification_lifecycle;
 pub mod qualification_lifecycle_head_freshness;
 pub mod qualification_lifecycle_publication;
@@ -93,6 +95,11 @@ pub use qualification_eligibility::{
     QualificationEligibilityProfileIssue,
 };
 pub use qualification_eligibility_gate::*;
+pub use qualification_institutional_currentness::{
+    InstitutionallyCurrentQualifiedScientificClaim, QualificationCurrentnessError,
+    QualificationCurrentnessStatement,
+};
+pub use qualification_institutional_currentness_gate::*;
 pub use qualification_lifecycle::*;
 pub use qualification_lifecycle_head_freshness::*;
 pub use qualification_lifecycle_publication::*;
