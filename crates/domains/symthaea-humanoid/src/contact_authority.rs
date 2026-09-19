@@ -3,8 +3,7 @@
 //! Evidence-bound surface-contact authority state machine.
 //!
 //! This module deliberately separates planner/contact intent from hard surface
-//! authority. Legacy booleans such as `ContactFrame::in_contact` are not an
-//! authority source here.
+//! authority. Legacy contact booleans are not an authority source here.
 
 use serde::{Deserialize, Serialize};
 
@@ -143,7 +142,7 @@ pub enum ContactAuthorityError {
 }
 
 /// Runtime contact-authority state. It is intentionally not deserializable: a
-/// persisted mode bit must not be able to manufacture Established authority.
+/// persisted mode bit must not be able to manufacture `Established` authority.
 #[derive(Debug, Clone)]
 pub struct ContactAuthorityStateMachineV1 {
     site: ContactSite,
@@ -196,6 +195,14 @@ impl ContactAuthorityStateMachineV1 {
         self.establishment_epoch
     }
 
+    pub const fn last_transition_at_s(&self) -> f64 {
+        self.last_transition_at_s
+    }
+
+    pub fn last_reason_id(&self) -> &str {
+        &self.last_reason_id
+    }
+
     pub const fn policy(&self) -> ContactAuthorityPolicyV1 {
         self.policy
     }
@@ -213,7 +220,9 @@ impl ContactAuthorityStateMachineV1 {
     }
 
     pub fn surface_wrench_eligible_at(&self, now_s: f64) -> bool {
-        self.mode == ContactAuthorityModeV1::Established
+        valid_time(now_s)
+            && now_s >= self.last_transition_at_s
+            && self.mode == ContactAuthorityModeV1::Established
             && self
                 .established_evidence
                 .as_ref()
@@ -371,7 +380,10 @@ impl ContactAuthorityStateMachineV1 {
         now_s: f64,
         reason_id: &str,
     ) -> Result<ContactAuthorityTransitionV1, ContactAuthorityError> {
-        if matches!(self.mode, ContactAuthorityModeV1::Inactive | ContactAuthorityModeV1::Lost) {
+        if matches!(
+            self.mode,
+            ContactAuthorityModeV1::Inactive | ContactAuthorityModeV1::Lost
+        ) {
             return Err(ContactAuthorityError::IllegalTransition);
         }
         self.transition(
@@ -605,7 +617,7 @@ mod tests {
     }
 
     #[test]
-    fn incomplete_stale_and_future_evidence_fail_closed() {
+    fn incomplete_stale_future_and_cross_site_evidence_fail_closed() {
         let mut state = acquiring(1.0);
         let mut empty = evidence(1.0);
         empty.geometry_id.clear();
@@ -625,6 +637,14 @@ mod tests {
             future.establish(1.0, "future", evidence(1.01)),
             Err(ContactAuthorityError::EvidenceTooFarInFuture)
         );
+
+        let mut wrong_site = acquiring(1.0);
+        let mut left = evidence(1.0);
+        left.site = ContactSite::LeftFoot;
+        assert_eq!(
+            wrong_site.establish(1.0, "wrong-site", left),
+            Err(ContactAuthorityError::EvidenceSiteMismatch)
+        );
     }
 
     #[test]
@@ -636,11 +656,19 @@ mod tests {
         assert_eq!(transition.to, ContactAuthorityModeV1::Established);
         assert_eq!(transition.establishment_epoch, 1);
         assert_eq!(state.establishment_epoch(), 1);
+        assert_eq!(state.last_reason_id(), "evidence-established");
         assert!(state.surface_wrench_eligible_at(1.0));
         assert_eq!(
             state.established_evidence().unwrap().source_class,
             ContactEvidenceClassV1::SimulatorDerived
         );
+    }
+
+    #[test]
+    fn authority_does_not_exist_before_the_establish_transition_time() {
+        let state = established(1.0);
+        assert!(!state.surface_wrench_eligible_at(0.999));
+        assert!(state.surface_wrench_eligible_at(1.0));
     }
 
     #[test]
@@ -663,7 +691,10 @@ mod tests {
         let mut state = established(1.0);
         assert!(state.reconcile_time(1.049).unwrap().is_none());
         let transition = state.reconcile_time(1.051).unwrap().unwrap();
-        assert_eq!(transition.kind, ContactAuthorityTransitionKindV1::EvidenceExpired);
+        assert_eq!(
+            transition.kind,
+            ContactAuthorityTransitionKindV1::EvidenceExpired
+        );
         assert_eq!(state.mode(), ContactAuthorityModeV1::Lost);
         assert!(!state.surface_wrench_eligible_at(1.051));
     }
@@ -713,7 +744,10 @@ mod tests {
         let transition = state
             .refresh_established(1.01, "fresh-frame", refreshed.clone())
             .unwrap();
-        assert_eq!(transition.kind, ContactAuthorityTransitionKindV1::RefreshEstablished);
+        assert_eq!(
+            transition.kind,
+            ContactAuthorityTransitionKindV1::RefreshEstablished
+        );
         assert_eq!(state.establishment_epoch(), epoch);
         assert_eq!(
             state.established_evidence().unwrap().interaction_id,
@@ -746,11 +780,13 @@ mod tests {
             maximum_future_skew_s: 0.002,
         };
         assert_ne!(first.policy_id(), second.policy_id());
-        assert!(!ContactAuthorityPolicyV1 {
-            maximum_evidence_age_s: 0.0,
-            maximum_future_skew_s: 0.0,
-        }
-        .validate());
+        assert!(
+            !ContactAuthorityPolicyV1 {
+                maximum_evidence_age_s: 0.0,
+                maximum_future_skew_s: 0.0,
+            }
+            .validate()
+        );
     }
 
     #[test]
