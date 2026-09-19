@@ -84,6 +84,7 @@ pub mod temporal_midi_projection;
 pub mod temporal_score;
 pub mod thematic_identity;
 pub mod voicing;
+pub mod work_obligation;
 pub mod work_plan;
 
 pub use accompaniment::Accompaniment;
@@ -160,6 +161,10 @@ pub use thematic_identity::{
     ThematicTransformationClassV1,
 };
 pub use voicing::{lead_bass, lead_upper};
+pub use work_obligation::{
+    ObligationDueWindowV2, WORK_OBLIGATION_PLAN_VERSION, WorkObligationErrorV2,
+    WorkObligationKindV2, WorkObligationPlanV2, WorkObligationV2,
+};
 pub use work_plan::{
     FormalFunctionV1, HIERARCHICAL_WORK_PLAN_VERSION, HierarchicalWorkPlanV1,
     WorkNodeKindV1, WorkNodeV1, WorkPlanErrorV1,
