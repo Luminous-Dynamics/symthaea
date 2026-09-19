@@ -2,6 +2,23 @@ name: Trusted Recovery - SE-001Q Evidence Replay
 
 on:
   workflow_dispatch:
+    inputs:
+      recovery_eligibility_manifest_base64:
+        description: Exact recovery-eligibility.v4 manifest bytes, base64 encoded
+        required: true
+        type: string
+      recovery_eligibility_manifest_sha256:
+        description: Independently retained SHA-256 of the exact recovery-eligibility.v4 manifest bytes
+        required: true
+        type: string
+      stage_f_authorization_base64:
+        description: Exact SE-001Q Stage-F authorization capsule bytes, base64 encoded
+        required: true
+        type: string
+      stage_f_authorization_sha256:
+        description: Independently retained SHA-256 of the exact Stage-F authorization capsule bytes
+        required: true
+        type: string
 
 # Trusted-CPU recovery is a correctness/evidence substrate only. The job uses
 # public unauthenticated Git and needs no GITHUB_TOKEN authority.
@@ -37,26 +54,130 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Authenticate trusted harness, frozen subject, and hosted recipe identities
+      - name: Authenticate eligibility, Stage-F authority, harness, subject, and hosted recipe
         shell: bash
+        env:
+          ELIGIBILITY_B64: ${{ inputs.recovery_eligibility_manifest_base64 }}
+          ELIGIBILITY_SHA256_INPUT: ${{ inputs.recovery_eligibility_manifest_sha256 }}
+          STAGE_F_AUTH_B64: ${{ inputs.stage_f_authorization_base64 }}
+          STAGE_F_AUTH_SHA256_INPUT: ${{ inputs.stage_f_authorization_sha256 }}
         run: |
           set -euo pipefail
           test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
           test "$GITHUB_REF" = 'refs/heads/main'
+          command -v base64 >/dev/null
+          command -v sha256sum >/dev/null
+          command -v awk >/dev/null
+
+          [[ "$ELIGIBILITY_SHA256_INPUT" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$STAGE_F_AUTH_SHA256_INPUT" =~ ^[0-9a-f]{64}$ ]]
 
           HARNESS_DIR="$RUNNER_TEMP/trusted-harness"
           SOURCE_DIR="$RUNNER_TEMP/frozen-se001"
           RECIPE_DIR="$RUNNER_TEMP/hosted-se001q-recipe"
           EVIDENCE_DIR="$RUNNER_TEMP/se001q-trusted-recovery-evidence"
           BUNDLE_PATH="$RUNNER_TEMP/se001q-trusted-cpu-observation-v2.zip"
-          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR" "$BUNDLE_PATH"
+          ELIGIBILITY_PATH="$RUNNER_TEMP/recovery-eligibility.v4"
+          STAGE_F_AUTH_PATH="$RUNNER_TEMP/se001q-stage-f-authorization.v1"
+          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR" "$BUNDLE_PATH" "$ELIGIBILITY_PATH" "$STAGE_F_AUTH_PATH"
           mkdir -p "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR"
+
+          printf '%s' "$ELIGIBILITY_B64" | base64 --decode > "$ELIGIBILITY_PATH"
+          printf '%s' "$STAGE_F_AUTH_B64" | base64 --decode > "$STAGE_F_AUTH_PATH"
+          test "$(sha256sum "$ELIGIBILITY_PATH" | awk '{print $1}')" = "$ELIGIBILITY_SHA256_INPUT"
+          test "$(sha256sum "$STAGE_F_AUTH_PATH" | awk '{print $1}')" = "$STAGE_F_AUTH_SHA256_INPUT"
+
+          kv() {
+            local file="$1" key="$2" value count
+            value="$(awk -v k="$key" 'index($0, k "=") == 1 { sub(/^[^=]*=/, ""); print }' "$file")"
+            count="$(awk -v k="$key" 'index($0, k "=") == 1 { n += 1 } END { print n + 0 }' "$file")"
+            [[ "$count" == '1' && -n "$value" ]] || {
+              echo "capsule key must occur exactly once with a non-empty value: $key" >&2
+              exit 1
+            }
+            printf '%s' "$value"
+          }
+
+          ELIGIBILITY_SCHEMA="$(kv "$ELIGIBILITY_PATH" schema)"
+          ELIGIBILITY_RESULT="$(kv "$ELIGIBILITY_PATH" result)"
+          ELIGIBILITY_OPERATOR_AUTH_SHA256="$(kv "$ELIGIBILITY_PATH" operator_authorization_sha256)"
+          ELIGIBILITY_OPERATOR_AUTH_SCOPE="$(kv "$ELIGIBILITY_PATH" operator_authorization_scope)"
+          ELIGIBILITY_OPERATOR_STAGE_F="$(kv "$ELIGIBILITY_PATH" operator_authorization_stage_f_authority)"
+          ELIGIBILITY_RECOVERY_HEAD="$(kv "$ELIGIBILITY_PATH" authorized_recovery_head)"
+          ELIGIBILITY_MAIN_HEAD="$(kv "$ELIGIBILITY_PATH" qualified_main_head)"
+          ELIGIBILITY_MAIN_TREE="$(kv "$ELIGIBILITY_PATH" qualified_main_tree)"
+          ELIGIBILITY_WORKFLOW_BLOB="$(kv "$ELIGIBILITY_PATH" se001q_recovery_workflow_blob)"
+          ELIGIBILITY_HELPER_BLOB="$(kv "$ELIGIBILITY_PATH" se001q_replay_helper_blob)"
+          ELIGIBILITY_SCOPE="$(kv "$ELIGIBILITY_PATH" evidence_scope)"
+
+          test "$ELIGIBILITY_SCHEMA" = 'symthaea.trusted-runner.recovery-eligibility.v4'
+          test "$ELIGIBILITY_RESULT" = 'PASS'
+          [[ "$ELIGIBILITY_OPERATOR_AUTH_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          test "$ELIGIBILITY_OPERATOR_AUTH_SCOPE" = 'trusted-runner-bootstrap-only'
+          test "$ELIGIBILITY_OPERATOR_STAGE_F" = 'NONE'
+          [[ "$ELIGIBILITY_RECOVERY_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ELIGIBILITY_MAIN_HEAD" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ELIGIBILITY_MAIN_TREE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ELIGIBILITY_WORKFLOW_BLOB" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$ELIGIBILITY_HELPER_BLOB" =~ ^[0-9a-f]{40}$ ]]
+          test "$ELIGIBILITY_SCOPE" = 'trusted-cpu-recovery-eligibility-only'
+          for key in operator_authorization_continuity_checked recovery_verifier_syntax_checked promotion_smoke_join_checked current_main_identity_checked current_recovery_identity_checked local_verifier_identity_checked se001q_recovery_artifacts_checked refs_stable; do
+            test "$(kv "$ELIGIBILITY_PATH" "$key")" = 'PASS'
+          done
 
           git -C "$HARNESS_DIR" init
           git -C "$HARNESS_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
-          git -C "$HARNESS_DIR" -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
-          git -C "$HARNESS_DIR" checkout --detach FETCH_HEAD
+          git -C "$HARNESS_DIR" -c protocol.version=2 fetch --no-tags origin \
+            "$GITHUB_SHA" \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/heads/ci/nixos-ephemeral-runner-v1:refs/remotes/origin/ci/nixos-ephemeral-runner-v1'
+          git -C "$HARNESS_DIR" checkout --detach "$GITHUB_SHA"
           test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -C "$HARNESS_DIR" rev-parse refs/remotes/origin/main)" = "$GITHUB_SHA"
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD^{tree})" = "$ELIGIBILITY_MAIN_TREE"
+          test "$GITHUB_SHA" = "$ELIGIBILITY_MAIN_HEAD"
+          test "$(git -C "$HARNESS_DIR" rev-parse refs/remotes/origin/ci/nixos-ephemeral-runner-v1)" = "$ELIGIBILITY_RECOVERY_HEAD"
+
+          CURRENT_WORKFLOW_BLOB="$(git -C "$HARNESS_DIR" rev-parse HEAD:.github/workflows/self-hosted-se001q-evidence-recovery.yml)"
+          CURRENT_HELPER_BLOB="$(git -C "$HARNESS_DIR" rev-parse HEAD:nix/ci/se001q-trusted-replay.py)"
+          test "$CURRENT_WORKFLOW_BLOB" = "$ELIGIBILITY_WORKFLOW_BLOB"
+          test "$CURRENT_HELPER_BLOB" = "$ELIGIBILITY_HELPER_BLOB"
+
+          AUTH_SCHEMA="$(kv "$STAGE_F_AUTH_PATH" schema)"
+          AUTH_DECISION="$(kv "$STAGE_F_AUTH_PATH" decision)"
+          AUTH_REPOSITORY="$(kv "$STAGE_F_AUTH_PATH" repository)"
+          AUTH_PROVIDER="$(kv "$STAGE_F_AUTH_PATH" provider)"
+          AUTH_TARGET_ID="$(kv "$STAGE_F_AUTH_PATH" target_id)"
+          AUTH_TARGET_COMMIT="$(kv "$STAGE_F_AUTH_PATH" target_commit)"
+          AUTH_TARGET_TREE="$(kv "$STAGE_F_AUTH_PATH" target_tree)"
+          AUTH_HOSTED_VERIFIER_COMMIT="$(kv "$STAGE_F_AUTH_PATH" hosted_verifier_commit)"
+          AUTH_ELIGIBILITY_SHA256="$(kv "$STAGE_F_AUTH_PATH" recovery_eligibility_manifest_sha256)"
+          AUTH_MAIN_HEAD="$(kv "$STAGE_F_AUTH_PATH" qualified_main_head)"
+          AUTH_MAIN_TREE="$(kv "$STAGE_F_AUTH_PATH" qualified_main_tree)"
+          AUTH_RECOVERY_HEAD="$(kv "$STAGE_F_AUTH_PATH" authorized_recovery_head)"
+          AUTH_WORKFLOW_BLOB="$(kv "$STAGE_F_AUTH_PATH" se001q_recovery_workflow_blob)"
+          AUTH_HELPER_BLOB="$(kv "$STAGE_F_AUTH_PATH" se001q_replay_helper_blob)"
+          AUTH_SCOPE="$(kv "$STAGE_F_AUTH_PATH" authorization_scope)"
+          AUTH_QUALIFICATION_CLAIM="$(kv "$STAGE_F_AUTH_PATH" qualification_claim)"
+          AUTH_REPAIR_CLAIM="$(kv "$STAGE_F_AUTH_PATH" repair_authority_claim)"
+
+          test "$AUTH_SCHEMA" = 'symthaea.trusted-runner.stage-f-authorization.v1'
+          test "$AUTH_DECISION" = 'AUTHORIZE_SE001Q_REOBSERVATION'
+          test "$AUTH_REPOSITORY" = 'https://github.com/Luminous-Dynamics/symthaea.git'
+          test "$AUTH_PROVIDER" = 'trusted-cpu-v1'
+          test "$AUTH_TARGET_ID" = 'SE-001Q'
+          test "$AUTH_TARGET_COMMIT" = "$TARGET_COMMIT"
+          test "$AUTH_TARGET_TREE" = "$TARGET_TREE"
+          test "$AUTH_HOSTED_VERIFIER_COMMIT" = "$HOSTED_VERIFIER_COMMIT"
+          test "$AUTH_ELIGIBILITY_SHA256" = "$ELIGIBILITY_SHA256_INPUT"
+          test "$AUTH_MAIN_HEAD" = "$ELIGIBILITY_MAIN_HEAD"
+          test "$AUTH_MAIN_TREE" = "$ELIGIBILITY_MAIN_TREE"
+          test "$AUTH_RECOVERY_HEAD" = "$ELIGIBILITY_RECOVERY_HEAD"
+          test "$AUTH_WORKFLOW_BLOB" = "$CURRENT_WORKFLOW_BLOB"
+          test "$AUTH_HELPER_BLOB" = "$CURRENT_HELPER_BLOB"
+          test "$AUTH_SCOPE" = 'se001q-independent-provider-reobservation-only'
+          test "$AUTH_QUALIFICATION_CLAIM" = 'NONE'
+          test "$AUTH_REPAIR_CLAIM" = 'NONE'
 
           git -C "$SOURCE_DIR" init
           git -C "$SOURCE_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
@@ -95,6 +216,13 @@ jobs:
             printf 'RECIPE_DIR=%s\n' "$RECIPE_DIR"
             printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR"
             printf 'BUNDLE_PATH=%s\n' "$BUNDLE_PATH"
+            printf 'RECOVERY_ELIGIBILITY_PATH=%s\n' "$ELIGIBILITY_PATH"
+            printf 'RECOVERY_ELIGIBILITY_MANIFEST_SHA256=%s\n' "$ELIGIBILITY_SHA256_INPUT"
+            printf 'STAGE_F_AUTHORIZATION_PATH=%s\n' "$STAGE_F_AUTH_PATH"
+            printf 'STAGE_F_AUTHORIZATION_SHA256=%s\n' "$STAGE_F_AUTH_SHA256_INPUT"
+            printf 'AUTHORIZED_RECOVERY_HEAD=%s\n' "$ELIGIBILITY_RECOVERY_HEAD"
+            printf 'CURRENT_SE001Q_WORKFLOW_BLOB=%s\n' "$CURRENT_WORKFLOW_BLOB"
+            printf 'CURRENT_SE001Q_HELPER_BLOB=%s\n' "$CURRENT_HELPER_BLOB"
           } >> "$GITHUB_ENV"
 
       - name: Evaluate trusted runner policy
@@ -150,12 +278,95 @@ jobs:
         run: |
           set -euo pipefail
 
+          emit_external_capsule() {
+            local label="$1" path="$2" expected_sha="$3"
+            if [[ -n "$path" && -f "$path" && "$expected_sha" =~ ^[0-9a-f]{64}$ ]]; then
+              local actual encoded
+              actual="$(sha256sum "$path" | awk '{print $1}')"
+              test "$actual" = "$expected_sha"
+              encoded="$(base64 -w 0 "$path")"
+              printf '%s_sha256=%s\n' "$label" "$actual"
+              printf '%s_base64=%s\n' "$label" "$encoded"
+            fi
+          }
+
+          emit_external_capsule recovery_eligibility "${RECOVERY_ELIGIBILITY_PATH:-}" "${RECOVERY_ELIGIBILITY_MANIFEST_SHA256:-}"
+          emit_external_capsule stage_f_authorization "${STAGE_F_AUTHORIZATION_PATH:-}" "${STAGE_F_AUTHORIZATION_SHA256:-}"
+
           if [[ -n "${EVIDENCE_DIR:-}" && -s "$EVIDENCE_DIR/summary.json" && -s "$EVIDENCE_DIR/manifest.json" && -n "${BUNDLE_PATH:-}" && -s "$BUNDLE_PATH" ]]; then
+            export CARGO_HOME="$RUNNER_TEMP/se001q-binding-cargo-home"
+            export CARGO_TARGET_DIR="$RUNNER_TEMP/se001q-binding-target"
+            mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+            cd "$SOURCE_DIR"
+            nix develop --no-write-lock-file \
+              --impure \
+              --expr 'let
+                f = builtins.getFlake (toString ./.);
+                harness = builtins.getEnv "HARNESS_DIR";
+                shellFile = builtins.toPath (harness + "/nix/ci-rust-shell.nix");
+              in import shellFile {
+                nixpkgs = f.inputs.nixpkgs;
+                rust-overlay = f.inputs.rust-overlay;
+                toolchainFile = ./rust-toolchain.toml;
+                system = builtins.currentSystem;
+              }' \
+              --command python3 - "$EVIDENCE_DIR" "$BUNDLE_PATH" <<'PY'
+          import base64
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import sys
+
+          evidence = Path(sys.argv[1])
+          bundle = Path(sys.argv[2])
+          manifest = json.loads((evidence / "manifest.json").read_text(encoding="utf-8"))
+          manifest_id = manifest.get("manifest_id")
+          if not isinstance(manifest_id, str) or not manifest_id.startswith("sha256:"):
+              raise SystemExit("missing observation manifest identity")
+          summary_bytes = (evidence / "summary.json").read_bytes()
+          bundle_bytes = bundle.read_bytes()
+          binding = {
+              "schema": "symthaea.se001q.trusted-cpu-execution-binding.v1",
+              "result": "BOUND",
+              "provider": "trusted-cpu-v1",
+              "github_run_id": os.environ.get("GITHUB_RUN_ID", ""),
+              "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
+              "qualified_main_head": os.environ.get("GITHUB_SHA", ""),
+              "authorized_recovery_head": os.environ.get("AUTHORIZED_RECOVERY_HEAD", ""),
+              "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
+              "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
+              "se001q_recovery_workflow_blob": os.environ.get("CURRENT_SE001Q_WORKFLOW_BLOB", ""),
+              "se001q_replay_helper_blob": os.environ.get("CURRENT_SE001Q_HELPER_BLOB", ""),
+              "target_commit": os.environ.get("TARGET_COMMIT", ""),
+              "target_tree": os.environ.get("TARGET_TREE", ""),
+              "hosted_verifier_commit": os.environ.get("HOSTED_VERIFIER_COMMIT", ""),
+              "observation_manifest_id": manifest_id,
+              "observation_summary_sha256": hashlib.sha256(summary_bytes).hexdigest(),
+              "evidence_bundle_sha256": hashlib.sha256(bundle_bytes).hexdigest(),
+              "qualification_claim": "NONE",
+              "repair_authority_claim": "NONE",
+              "evidence_scope": "execution-authorization-binding-only",
+          }
+          identity_bytes = json.dumps(binding, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+          binding_id = "sha256:" + hashlib.sha256(identity_bytes).hexdigest()
+          binding["binding_id"] = binding_id
+          data = json.dumps(binding, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
+          path = evidence / "execution-authorization-binding.json"
+          path.write_bytes(data)
+          print(f"execution_authorization_binding_id={binding_id}")
+          print(f"execution_authorization_binding_sha256={hashlib.sha256(data).hexdigest()}")
+          print("execution_authorization_binding_base64=" + base64.b64encode(data).decode("ascii"))
+          PY
+
             {
               echo '## SE-001Q trusted CPU reobservation'
               echo
               echo "- Frozen subject: \`$TARGET_COMMIT\` / \`$TARGET_TREE\`"
               echo "- Hosted EV2.4 recipe reference: \`$HOSTED_VERIFIER_COMMIT\`"
+              echo "- Recovery eligibility: \`$RECOVERY_ELIGIBILITY_MANIFEST_SHA256\`"
+              echo "- Stage-F authorization: \`$STAGE_F_AUTHORIZATION_SHA256\`"
               echo '- Provider: `trusted-cpu-v1`'
               echo '- Authority: `independent-provider-observation-only`'
               echo
@@ -163,7 +374,8 @@ jobs:
               cat "$EVIDENCE_DIR/summary.json"
               echo '```'
               echo
-              echo 'Exact evidence-bundle bytes were emitted as numbered base64 chunks in the capture step.'
+              echo 'Exact observation-bundle bytes were emitted as numbered base64 chunks in the capture step.'
+              echo 'Exact eligibility, Stage-F authorization, and execution-binding bytes are retained in this job log.'
               echo 'This run cannot replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.'
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -173,6 +385,8 @@ jobs:
             echo '## SE-001Q trusted CPU replay rejected or incomplete'
             echo
             echo "- Capture step outcome: \`${CAPTURE_OUTCOME:-unknown}\`"
+            echo "- Recovery eligibility: \`${RECOVERY_ELIGIBILITY_MANIFEST_SHA256:-unavailable}\`"
+            echo "- Stage-F authorization: \`${STAGE_F_AUTHORIZATION_SHA256:-unavailable}\`"
             echo '- Authority: `NONE`'
             echo '- Qualification: `NONE`'
             echo '- Repair authority: `NONE`'
@@ -183,6 +397,13 @@ jobs:
           if [[ -z "${HARNESS_DIR:-}" || ! -d "$HARNESS_DIR" || -z "${SOURCE_DIR:-}" || ! -d "$SOURCE_DIR" || -z "${EVIDENCE_DIR:-}" || ! -d "$EVIDENCE_DIR" ]]; then
             echo 'Trusted directories were not established; no partial evidence capsule can be reconstructed.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
+          fi
+
+          if [[ -n "${RECOVERY_ELIGIBILITY_PATH:-}" && -f "$RECOVERY_ELIGIBILITY_PATH" ]]; then
+            cp "$RECOVERY_ELIGIBILITY_PATH" "$EVIDENCE_DIR/recovery-eligibility.v4"
+          fi
+          if [[ -n "${STAGE_F_AUTHORIZATION_PATH:-}" && -f "$STAGE_F_AUTHORIZATION_PATH" ]]; then
+            cp "$STAGE_F_AUTHORIZATION_PATH" "$EVIDENCE_DIR/stage-f-authorization.v1"
           fi
 
           cd "$SOURCE_DIR"
@@ -212,7 +433,7 @@ jobs:
 
           evidence = Path(sys.argv[1]).resolve()
           rejection = {
-              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v1",
+              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v2",
               "result": "REJECTED_OR_INCOMPLETE",
               "qualification_claim": "NONE",
               "repair_authority_claim": "NONE",
@@ -222,6 +443,8 @@ jobs:
               "github_run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", ""),
               "target_commit": os.environ.get("TARGET_COMMIT", ""),
               "hosted_verifier_commit": os.environ.get("HOSTED_VERIFIER_COMMIT", ""),
+              "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
+              "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
               "evidence_scope": "independent-provider-rejection-only",
           }
           canonical = json.dumps(rejection, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
@@ -235,7 +458,7 @@ jobs:
                   "sha256": hashlib.sha256(data).hexdigest(),
                   "bytes": len(data),
               })
-          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v1", "entries": entries}
+          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v2", "entries": entries}
           manifest_id = "sha256:" + hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
           manifest = dict(identity)
           manifest["manifest_id"] = manifest_id
