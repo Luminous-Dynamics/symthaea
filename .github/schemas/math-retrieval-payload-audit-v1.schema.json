@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-payload-audit-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Payload Audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version", "audit_id", "authority", "trace_sha256", "graph_report_sha256",
+    "context_packer_sha256", "payload_serialization_sha256", "entries"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-payload-audit-v1"},
+    "audit_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority": {"const": "MeasurementOnly"},
+    "trace_sha256": {"$ref": "#/$defs/sha256"},
+    "graph_report_sha256": {"$ref": "#/$defs/sha256"},
+    "context_packer_sha256": {"$ref": "#/$defs/sha256"},
+    "payload_serialization_sha256": {"$ref": "#/$defs/sha256"},
+    "entries": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role", "rank", "source_object_sha256", "payload_path",
+        "payload_sha256", "canonical_payload_bytes"
+      ],
+      "properties": {
+        "role": {"enum": ["Delivered", "FirstNonFitting"]},
+        "rank": {"type": "integer", "minimum": 1},
+        "source_object_sha256": {"$ref": "#/$defs/sha256"},
+        "payload_path": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "payload_sha256": {"$ref": "#/$defs/sha256"},
+        "canonical_payload_bytes": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

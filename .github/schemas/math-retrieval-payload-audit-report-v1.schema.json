@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-payload-audit-report-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Payload Audit Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version", "authority", "audit_id", "audit_sha256", "trace_sha256",
+    "graph_report_sha256", "context_packer_sha256", "payload_serialization_sha256",
+    "audited_entry_count", "delivered_payload_bytes", "first_nonfitting_audited",
+    "all_checks_passed"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-payload-audit-report-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "audit_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "audit_sha256": {"$ref": "#/$defs/sha256"},
+    "trace_sha256": {"$ref": "#/$defs/sha256"},
+    "graph_report_sha256": {"$ref": "#/$defs/sha256"},
+    "context_packer_sha256": {"$ref": "#/$defs/sha256"},
+    "payload_serialization_sha256": {"$ref": "#/$defs/sha256"},
+    "audited_entry_count": {"type": "integer", "minimum": 0},
+    "delivered_payload_bytes": {"type": "integer", "minimum": 0},
+    "first_nonfitting_audited": {"type": "boolean"},
+    "all_checks_passed": {"const": true}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
