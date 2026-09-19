@@ -2,6 +2,9 @@
 """Independent canonical SHA-256 oracle for INTX-017A lineage v1.
 
 Uses only Python's standard library and imports no Symthaea production code.
+The oracle reconstructs both the exact lineage identity transcript and the
+monotone local disposition summary introduced before the v1 qualification
+freeze.
 """
 
 from __future__ import annotations
@@ -15,8 +18,11 @@ SOURCE_DOMAIN = b"symthaea.interaction.lineage.source.v1\0"
 TRANSFORM_DOMAIN = b"symthaea.interaction.lineage.transform.v1\0"
 LINEAGE_DOMAIN = b"symthaea.interaction.lineage.node.v1\0"
 
-EXPECTED_ORIGIN = "3a5c84412dd2d110c0c373f2754d7240a31537fdae6a4428dc5d6218aa241be3"
-EXPECTED_DERIVED = "f05cbba506c2023a014cfc530741bb2920da45651ccb270ceeb98d354abe127d"
+EXTERNAL_CONTENT = 0
+INTERNAL_DERIVED = 2
+
+EXPECTED_ORIGIN = "8118245e56a36f4c803615e67c93ecba35f501c8bb7ce4581c7c8660837b9227"
+EXPECTED_DERIVED = "efe6ab1a262bd04d52aad1bc9271a771a0fb70c9c33aa698d4c4981b3e2768b0"
 
 
 def u16(value: int) -> bytes:
@@ -41,6 +47,11 @@ def digest_set(values: list[bytes]) -> bytes:
     return u32(len(values)) + b"".join(values)
 
 
+def disposition_set(values: list[int]) -> bytes:
+    values = sorted(set(values))
+    return u32(len(values)) + b"".join(u16(value) for value in values)
+
+
 def sha(domain: bytes, payload: bytes) -> bytes:
     return hashlib.sha256(domain + payload).digest()
 
@@ -62,7 +73,7 @@ def source_binding() -> bytes:
     payload = (
         u16(SCHEMA)
         + u16(0)  # ExternalObservation
-        + u16(0)  # ExternalContent
+        + u16(EXTERNAL_CONTENT)
         + optional_digest(resource())
         + optional_digest(bytes([0x22]) * 32)
         + optional_digest(None)
@@ -78,6 +89,7 @@ def origin(restriction: int) -> bytes:
         + digest_set([])
         + optional_digest(source_binding())
         + optional_digest(None)
+        + disposition_set([EXTERNAL_CONTENT])
         + digest_set([bytes([restriction]) * 32])
     )
     return sha(LINEAGE_DOMAIN, payload)
@@ -99,6 +111,7 @@ def derived() -> bytes:
         + digest_set([origin(0x44), origin(0x55)])
         + optional_digest(None)
         + optional_digest(transform())
+        + disposition_set([EXTERNAL_CONTENT, INTERNAL_DERIVED])
         + digest_set(
             [
                 bytes([0x44]) * 32,
