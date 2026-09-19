@@ -92,6 +92,11 @@ pub mod assurance_platform_ingress;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_ingress_policy;
 
+// Android trusted-attention state and policy requirements remain a vector of
+// independently observed platform protections rather than one "secure" bit.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_attention;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
