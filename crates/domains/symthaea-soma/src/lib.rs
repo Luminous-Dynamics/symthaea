@@ -61,6 +61,10 @@ pub mod sensor_bridge;
 // pairing at all.
 pub mod pairing;
 
+// Strict Ed25519 verifier adapter for the presentation-assurance attestation trait.
+#[cfg(feature = "pairing")]
+pub mod assurance_ed25519;
+
 // Screen embodiment (Phase 3)
 #[cfg(feature = "screen-vision")]
 pub mod screen_vision;
