@@ -102,6 +102,11 @@ pub mod assurance_android_attention;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_attention_policy;
 
+// Pin the exact admitted Android attention + motion policy in Rust before
+// untrusted event/JNI observations are evaluated.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_pin;
+
 // Bind each Android MotionEvent's obscuration/pointer facts to the current
 // attention theorem and the exact measured touch observation.
 #[cfg(feature = "screen-vision")]
