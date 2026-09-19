@@ -1,6 +1,8 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+#[cfg(test)]
+mod cargo_adapter_state;
 mod cargo_execution_contract;
 mod crate_status;
 mod duplicate_scan;
