@@ -1,0 +1,125 @@
+name: MEL-BENCH-000 exact qualification
+
+on:
+  push:
+    branches:
+      - qualify/mel-bench-000-7329077
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-bench-000-exact-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  MEL_BENCH_000_SUBJECT: 732907740d4c3bc31702493b077af6e4bab15f89
+  MEL_BENCH_000_BASE: a884f7770f7df98a9a955881cf03e813d709d7de
+
+jobs:
+  qualify:
+    name: Qualify frozen MEL-BENCH-000 subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEL_BENCH_000_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Bind exact subject and surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_BENCH_000_SUBJECT"
+          test "$(git merge-base "$MEL_BENCH_000_BASE" HEAD)" = "$MEL_BENCH_000_BASE"
+          git diff --name-only "$MEL_BENCH_000_BASE"..HEAD | sort > /tmp/mel_bench_000_changed
+          cat > /tmp/mel_bench_000_allowed <<'EOF'
+          crates/domains/symthaea-muse/src/benchmark_manifest.rs
+          crates/domains/symthaea-muse/src/evidence_digest.rs
+          EOF
+          sort -o /tmp/mel_bench_000_allowed /tmp/mel_bench_000_allowed
+          diff -u /tmp/mel_bench_000_allowed /tmp/mel_bench_000_changed
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Muse system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Capture environment identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-000"
+          mkdir -p "$out"
+          {
+            echo 'schema=melothaea.mel-bench-000.qualification.v1'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "base_sha=$MEL_BENCH_000_BASE"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            rustc -Vv
+            cargo -V
+          } > "$out/environment.txt"
+          cp /tmp/mel_bench_000_changed "$out/changed-files.txt"
+
+      - name: Focused formatting gate
+        run: cargo fmt --check -p symthaea-muse
+
+      - name: Focused BENCH-000 regressions
+        run: cargo test -p symthaea-muse --features theory benchmark_manifest
+
+      - name: Theory all-targets compile gate
+        run: cargo check -p symthaea-muse --features theory --all-targets
+
+      - name: Theory all-targets Clippy gate
+        run: cargo clippy -p symthaea-muse --features theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal exact-head qualification evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-000"
+          {
+            echo 'status=MEL_BENCH_000_EXACT_SUBJECT_PASS'
+            echo 'authority=benchmark-contract-only'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo 'format_gate=PASS'
+            echo 'focused_regressions=PASS'
+            echo 'all_targets_check=PASS'
+            echo 'all_targets_clippy=PASS'
+            echo 'mirex_compatibility_claimed=false'
+            echo 'external_metric_parity_claimed=false'
+            echo 'musical_quality_claimed=false'
+            echo 'product_authority_claimed=false'
+          } > "$out/receipt.txt"
+          sha256sum "$out/environment.txt" "$out/changed-files.txt" "$out/receipt.txt" > "$out/SHA256SUMS"
+
+      - name: Postflight subject immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_BENCH_000_SUBJECT"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload exact-head evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-bench-000-${{ env.MEL_BENCH_000_SUBJECT }}
+          path: ${{ runner.temp }}/mel-bench-000/
+          retention-days: 90
