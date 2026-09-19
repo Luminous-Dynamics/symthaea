@@ -37,6 +37,10 @@ pub struct VerifiedSurfaceSupportEvidenceV1 {
     model_id: String,
     model_signature: u64,
     sampled_at_s: f64,
+    physical_geom_name: String,
+    physical_geom_id: usize,
+    support_site_name: String,
+    support_site_id: usize,
     placed_patch: PlacedContactPatchV1,
     interaction_limits: ContactInteractionLimitsV1,
     interaction_dimensionality: MuJoCoContactDimensionalityV1,
@@ -65,6 +69,22 @@ impl VerifiedSurfaceSupportEvidenceV1 {
 
     pub fn sampled_at_s(&self) -> f64 {
         self.sampled_at_s
+    }
+
+    pub fn physical_geom_name(&self) -> &str {
+        &self.physical_geom_name
+    }
+
+    pub fn physical_geom_id(&self) -> usize {
+        self.physical_geom_id
+    }
+
+    pub fn support_site_name(&self) -> &str {
+        &self.support_site_name
+    }
+
+    pub fn support_site_id(&self) -> usize {
+        self.support_site_id
     }
 
     pub fn placed_patch(&self) -> &PlacedContactPatchV1 {
@@ -125,6 +145,8 @@ impl VerifiedSurfaceSupportEvidenceV1 {
             && same_sample_time(self.placed_patch.sampled_at_s, self.sampled_at_s)
             && same_sample_time(self.interaction_limits.sampled_at_s, self.sampled_at_s)
             && !self.model_id.trim().is_empty()
+            && !self.physical_geom_name.trim().is_empty()
+            && !self.support_site_name.trim().is_empty()
             && !self.support_normal_policy_id.trim().is_empty()
             && self.support_normal_policy_id == self.verification.policy_id
             && !self.support_normal_evidence_lineage_id.trim().is_empty()
@@ -236,6 +258,11 @@ pub(crate) fn bind_verified_mujoco_surface_support_v1(
     let normal_evidence_lineage_id = normal_evidence_lineage_id(normal_region);
     let verification_lineage_id = verification_lineage_id(normal_region, &verification);
     let support_lineage_id = support_lineage_id(
+        &patches.model_id,
+        &patch_record.physical_geom_name,
+        patch_record.geom_id,
+        &patch_record.support_site_name,
+        patch_record.support_site_id,
         &patch_record.placed_patch.geometry.geometry_id,
         &interaction.limits.interaction_id,
         &verification_lineage_id,
@@ -249,6 +276,10 @@ pub(crate) fn bind_verified_mujoco_surface_support_v1(
         model_id: patches.model_id.clone(),
         model_signature: patches.model_signature,
         sampled_at_s: interaction.sampled_at_s,
+        physical_geom_name: patch_record.physical_geom_name.clone(),
+        physical_geom_id: patch_record.geom_id,
+        support_site_name: patch_record.support_site_name.clone(),
+        support_site_id: patch_record.support_site_id,
         placed_patch: patch_record.placed_patch.clone(),
         interaction_limits: interaction.limits.clone(),
         interaction_dimensionality: interaction.dimensionality,
@@ -306,7 +337,13 @@ fn verification_lineage_id(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn support_lineage_id(
+    model_id: &str,
+    physical_geom_name: &str,
+    physical_geom_id: usize,
+    support_site_name: &str,
+    support_site_id: usize,
     geometry_id: &str,
     interaction_id: &str,
     verification_id: &str,
@@ -315,8 +352,13 @@ fn support_lineage_id(
     sampled_at_s: f64,
 ) -> String {
     format!(
-        "verified-surface-support-v1:sig:{model_signature:016x}:site:{site:?}:time-bits:{:016x}:geometry:{}:interaction:{}:verification:{}",
+        "verified-surface-support-v1:model:{}:sig:{model_signature:016x}:site:{site:?}:time-bits:{:016x}:physical-geom:{}:{}:support-site:{}:{}:geometry:{}:interaction:{}:verification:{}",
+        component(model_id),
         sampled_at_s.to_bits(),
+        component(physical_geom_name),
+        physical_geom_id,
+        component(support_site_name),
+        support_site_id,
         component(geometry_id),
         component(interaction_id),
         component(verification_id),
@@ -417,9 +459,14 @@ mod tests {
         let (patches, interaction, region) = live_bundle();
         let token = bind_verified_mujoco_surface_support_v1(&patches, &interaction, &region)
             .unwrap();
+        let patch_record = patches.record_for_site(interaction.site).unwrap();
         assert_eq!(token.site(), interaction.site);
         assert_eq!(token.source_class(), ContactEvidenceClassV1::SimulatorDerived);
         assert!(token.surface_support_eligible());
+        assert_eq!(token.physical_geom_name(), patch_record.physical_geom_name);
+        assert_eq!(token.physical_geom_id(), patch_record.geom_id);
+        assert_eq!(token.support_site_name(), patch_record.support_site_name);
+        assert_eq!(token.support_site_id(), patch_record.support_site_id);
         assert_eq!(
             token.interaction_limits().interaction_id,
             interaction.limits.interaction_id
@@ -500,52 +547,62 @@ mod tests {
     }
 
     #[test]
-    fn lineage_changes_with_time_interaction_and_policy_identity() {
+    fn lineage_changes_with_time_interaction_policy_and_support_site_identity() {
         let (patches, interaction, region) = live_bundle();
         let verification = verify_support_normal_evidence_v1(&region).unwrap();
-        let base = support_lineage_id(
-            &region.source_geometry_id,
-            &interaction.limits.interaction_id,
-            &verification_lineage_id(&region, &verification),
-            patches.model_signature,
-            interaction.site,
+        let patch_record = patches.record_for_site(interaction.site).unwrap();
+        let make = |time: f64, interaction_id: &str, policy_region: &NormalQualifiedSupportRegionV1, support_site_name: &str| {
+            let mut verification_for_policy = verification.clone();
+            verification_for_policy.policy_id = policy_region.policy_id.clone();
+            support_lineage_id(
+                &patches.model_id,
+                &patch_record.physical_geom_name,
+                patch_record.geom_id,
+                support_site_name,
+                patch_record.support_site_id,
+                &region.source_geometry_id,
+                interaction_id,
+                &verification_lineage_id(policy_region, &verification_for_policy),
+                patches.model_signature,
+                interaction.site,
+                time,
+            )
+        };
+        let base = make(
             interaction.sampled_at_s,
-        );
-        let different_time = support_lineage_id(
-            &region.source_geometry_id,
             &interaction.limits.interaction_id,
-            &verification_lineage_id(&region, &verification),
-            patches.model_signature,
-            interaction.site,
+            &region,
+            &patch_record.support_site_name,
+        );
+        let different_time = make(
             interaction.sampled_at_s + 0.001,
+            &interaction.limits.interaction_id,
+            &region,
+            &patch_record.support_site_name,
         );
-        let different_interaction = support_lineage_id(
-            &region.source_geometry_id,
-            "another-interaction",
-            &verification_lineage_id(&region, &verification),
-            patches.model_signature,
-            interaction.site,
+        let different_interaction = make(
             interaction.sampled_at_s,
+            "another-interaction",
+            &region,
+            &patch_record.support_site_name,
         );
         let mut different_policy_region = region.clone();
         different_policy_region.policy_id.push_str("-other");
-        let different_policy_verification = SupportNormalEvidenceVerificationV1 {
-            policy_id: different_policy_region.policy_id.clone(),
-            ..verification.clone()
-        };
-        let different_policy = support_lineage_id(
-            &region.source_geometry_id,
-            &interaction.limits.interaction_id,
-            &verification_lineage_id(
-                &different_policy_region,
-                &different_policy_verification,
-            ),
-            patches.model_signature,
-            interaction.site,
+        let different_policy = make(
             interaction.sampled_at_s,
+            &interaction.limits.interaction_id,
+            &different_policy_region,
+            &patch_record.support_site_name,
+        );
+        let different_support_site = make(
+            interaction.sampled_at_s,
+            &interaction.limits.interaction_id,
+            &region,
+            "different-support-site",
         );
         assert_ne!(base, different_time);
         assert_ne!(base, different_interaction);
         assert_ne!(base, different_policy);
+        assert_ne!(base, different_support_site);
     }
 }
