@@ -1,0 +1,119 @@
+name: MEL-FORM-000A exact qualification
+
+on:
+  push:
+    branches:
+      - qualify/mel-form-000a-f3b02da
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-form-000a-exact-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  MEL_FORM_000A_SUBJECT: f3b02dae5c6423792dc4636ec874d6d75961b7ff
+  MEL_FORM_000A_BASE: a884f7770f7df98a9a955881cf03e813d709d7de
+
+jobs:
+  qualify:
+    name: Execute frozen temporal-map subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEL_FORM_000A_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Bind exact subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_FORM_000A_SUBJECT"
+          test "$(git merge-base "$MEL_FORM_000A_BASE" HEAD)" = "$MEL_FORM_000A_BASE"
+          git diff --name-only "$MEL_FORM_000A_BASE"..HEAD | sort > /tmp/mel_form_000a_changed
+          cat > /tmp/mel_form_000a_allowed <<'EOF'
+          crates/domains/symthaea-music-theory/src/lib.rs
+          crates/domains/symthaea-music-theory/src/temporal_map.rs
+          EOF
+          sort -o /tmp/mel_form_000a_allowed /tmp/mel_form_000a_allowed
+          diff -u /tmp/mel_form_000a_allowed /tmp/mel_form_000a_changed
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Capture preflight identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mel-form-000a"
+          {
+            echo 'schema=melothaea.mel-form-000a.qualification.v1'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "base_sha=$MEL_FORM_000A_BASE"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            rustc -Vv
+            cargo -V
+          } > "$RUNNER_TEMP/mel-form-000a/environment.txt"
+          cp /tmp/mel_form_000a_changed "$RUNNER_TEMP/mel-form-000a/changed-files.txt"
+
+      - name: Focused formatting gate
+        run: cargo fmt --check -p symthaea-music-theory
+
+      - name: Temporal-map regressions
+        run: cargo test -p symthaea-music-theory temporal_map
+
+      - name: All-targets compile gate
+        run: cargo check -p symthaea-music-theory --all-targets
+
+      - name: All-targets Clippy gate
+        run: cargo clippy -p symthaea-music-theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal bounded qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-form-000a"
+          {
+            echo 'status=MEL_FORM_000A_ENGINEERING_PASS'
+            echo 'authority=temporal-map-contract-only'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo 'score_schema_changed=false'
+            echo 'midi_writer_claimed=false'
+            echo 'tempo_ramp_claimed=false'
+            echo 'metric_modulation_claimed=false'
+            echo 'musical_quality_claimed=false'
+          } > "$out/receipt.txt"
+          sha256sum \
+            "$out/environment.txt" \
+            "$out/changed-files.txt" \
+            "$out/receipt.txt" \
+            > "$out/SHA256SUMS"
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_FORM_000A_SUBJECT"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload exact qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-form-000a-${{ env.MEL_FORM_000A_SUBJECT }}
+          path: ${{ runner.temp }}/mel-form-000a/
+          retention-days: 90
