@@ -1,0 +1,152 @@
+name: HUM-DYN-002C MuJoCo Contact Bias
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/**"
+      - ".github/workflows/hum-dyn-002c-mujoco-contact-bias.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-dyn-002c-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 46c1500a4c389b6c654db895a200cf144bf25539
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-mujoco-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact parent and one-file qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-dyn-002c-mujoco-contact-bias.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen HUM-DYN-002C source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Verify repaired pinned API semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/mujoco_contact_kinematics.rs
+          grep -F '.name_to_id(MjtObj::mjOBJ_SITE' "$src"
+          grep -F '.ok_or_else(|| MujocoContactBiasExtractionError::MissingSite' "$src"
+          ! grep -F 'raw_site_id < 0' "$src"
+          ! grep -F 'raw_site_id as usize' "$src"
+          grep -F 'model.signature() != data.model().signature()' "$src"
+          grep -F 'MujocoContactBiasExtractionError::ModelMismatch' "$src"
+          grep -F 'missing_contact_site_fails_closed_under_pinned_lookup_api' "$src"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify pinned MuJoCo dependency and locked graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'mujoco-rs = { version = "4.0.1"' crates/domains/symthaea-humanoid/Cargo.toml
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo tree -p symthaea-humanoid --features mujoco --locked | tee "$RUNNER_TEMP/cargo-tree.txt"
+          grep -F 'mujoco-rs v4.0.1' "$RUNNER_TEMP/cargo-tree.txt"
+
+      - name: Focused rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Feature-enabled compile
+        run: cargo check -p symthaea-humanoid --features mujoco --all-targets --locked
+
+      - name: Execute MuJoCo contact-bias regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-humanoid --features mujoco --lib mujoco_contact_kinematics --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco --lib generated_mujoco_exposes_solver_derived_floating_base_dynamics --locked -- --nocapture
+
+      - name: Strict feature-enabled Clippy
+        run: cargo clippy -p symthaea-humanoid --features mujoco --all-targets --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-dyn-002c-evidence
+          cp "$RUNNER_TEMP/cargo-tree.txt" hum-dyn-002c-evidence/cargo-tree.txt
+          {
+            echo "program=HUM-DYN-002C"
+            echo "authority=mujoco-contact-bias-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "pinned_name_lookup_api=Option<usize>"
+            echo "model_data_signature_bound=TRUE"
+            echo "missing_site_fails_closed=TRUE"
+            echo "controller_authority=NONE"
+            echo "physical_claim=NONE"
+            echo "hardware_measurement_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "mujoco_dependency=mujoco-rs-v4.0.1"
+            echo "locked_graph=PASS"
+            echo "source_immutable=PASS"
+            echo "format=PASS"
+            echo "feature_compile=PASS"
+            echo "mujoco_contact_bias_tests=PASS"
+            echo "existing_floating_base_mujoco_test=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_immutable=PASS"
+          } > hum-dyn-002c-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-dyn-002c-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-dyn-002c-evidence/
+          if-no-files-found: error
