@@ -10,7 +10,7 @@
 # capability label, and the Stage-F one-time authorization consumer cannot be
 # weakened by a host configuration typo.
 
-{ config, lib, ... }:
+{ config, lib, pkgs, ... }:
 
 let
   cfg = config.services.symthaea-ci-runner;
@@ -21,6 +21,101 @@ let
   authorizationGroup = "symthaea-stage-f-authorization";
   authorizationLedgerDir = "/var/lib/symthaea-stage-f-authorizations";
   authorizationSocket = "/run/symthaea-stage-f-authorization.sock";
+
+  # Keep the authorization protocol in one executable implementation. The live
+  # root-owned socket service invokes this exact Nix-store program against the
+  # fixed host ledger, while eval-github-actions-runner.nix invokes the same
+  # binary against an isolated temporary ledger to prove the state machine.
+  authorizationConsumerProgram = pkgs.writeShellApplication {
+    name = "symthaea-stage-f-authorization-consumer";
+    runtimeInputs = [ pkgs.coreutils ];
+    text = ''
+      set -euo pipefail
+      umask 077
+      [[ "$#" == '1' ]]
+      ledger_dir="$1"
+      [[ "$ledger_dir" == /* ]]
+
+      IFS= read -r request
+      read -r operation nonce authorization_sha extra <<< "$request"
+      boot_id="$(< /proc/sys/kernel/random/boot_id)"
+
+      case "$operation" in
+        BOOT_ID)
+          [[ -z "$nonce" && -z "$authorization_sha" && -z "$extra" ]]
+          [[ "$boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+          printf 'BOOT_ID %s\n' "$boot_id"
+          ;;
+        CONSUME)
+          [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ -z "$extra" ]]
+          marker="$ledger_dir/$nonce"
+          record="$marker/consumption-record"
+          if mkdir --mode=0700 -- "$marker" 2>/dev/null; then
+            tmp="$marker/.consumption-record"
+            {
+              printf 'authorization_sha256=%s\n' "$authorization_sha"
+              printf 'boot_id=%s\n' "$boot_id"
+            } > "$tmp"
+            chmod 0400 "$tmp"
+            mv -T -- "$tmp" "$record"
+            printf 'CONSUMED %s %s %s\n' "$nonce" "$authorization_sha" "$boot_id"
+          else
+            printf 'ALREADY_CONSUMED %s %s\n' "$nonce" "$boot_id"
+            exit 73
+          fi
+          ;;
+        STATUS)
+          [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
+          [[ -z "$extra" ]]
+          marker="$ledger_dir/$nonce"
+          record="$marker/consumption-record"
+          if [[ ! -d "$marker" ]]; then
+            printf 'UNUSED %s %s\n' "$nonce" "$boot_id"
+            exit 0
+          fi
+          if [[ ! -f "$record" ]]; then
+            printf 'INCOMPLETE %s %s\n' "$nonce" "$boot_id"
+            exit 0
+          fi
+
+          line1=''
+          line2=''
+          line3=''
+          {
+            IFS= read -r line1 || true
+            IFS= read -r line2 || true
+            IFS= read -r line3 || true
+          } < "$record"
+          key1=''
+          stored_authorization_sha=''
+          extra1=''
+          key2=''
+          stored_boot_id=''
+          extra2=''
+          IFS='=' read -r key1 stored_authorization_sha extra1 <<< "$line1"
+          IFS='=' read -r key2 stored_boot_id extra2 <<< "$line2"
+
+          if [[ "$key1" != 'authorization_sha256' || ! "$stored_authorization_sha" =~ ^[0-9a-f]{64}$ || -n "$extra1" || "$key2" != 'boot_id' || ! "$stored_boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ || -n "$extra2" || -n "$line3" ]]; then
+            printf 'INCOMPLETE %s %s\n' "$nonce" "$boot_id"
+            exit 0
+          fi
+
+          if [[ "$stored_authorization_sha" == "$authorization_sha" ]]; then
+            printf 'CONSUMED_STATUS %s %s %s\n' "$nonce" "$stored_authorization_sha" "$stored_boot_id"
+          else
+            printf 'CONSUMED_DIFFERENT %s %s\n' "$nonce" "$stored_boot_id"
+          fi
+          ;;
+        *)
+          echo 'INVALID_REQUEST' >&2
+          exit 64
+          ;;
+      esac
+    '';
+  };
 in
 {
   options.services.symthaea-ci-runner = {
@@ -85,101 +180,13 @@ in
       };
     };
 
-    # One root-owned process per local socket connection. The protocol is tiny:
-    #   BOOT_ID
-    #   CONSUME <64-hex nonce> <64-hex authorization-sha256>
-    #   STATUS  <64-hex nonce> <64-hex authorization-sha256>
-    # A successful CONSUME atomically reserves the nonce directory, then writes
-    # an atomic immutable record. STATUS is read-only: it can prove UNUSED,
-    # CONSUMED_STATUS, CONSUMED_DIFFERENT, or INCOMPLETE without reopening
-    # authority. Reusing the nonce therefore fails closed even across runner
-    # re-registration, while a lost CONSUME response remains auditable.
+    # One root-owned process per local socket connection. The executable is also
+    # exercised behaviorally by the eval-only test against an isolated ledger.
     systemd.services."symthaea-stage-f-authorization@" = {
       description = "Consume or inspect one Symthaea Stage-F authorization";
-      script = ''
-        set -euo pipefail
-        umask 077
-        IFS= read -r request
-        read -r operation nonce authorization_sha extra <<< "$request"
-        boot_id="$(< /proc/sys/kernel/random/boot_id)"
-
-        case "$operation" in
-          BOOT_ID)
-            [[ -z "$nonce" && -z "$authorization_sha" && -z "$extra" ]]
-            [[ "$boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
-            printf 'BOOT_ID %s\n' "$boot_id"
-            ;;
-          CONSUME)
-            [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
-            [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
-            [[ -z "$extra" ]]
-            marker="${authorizationLedgerDir}/$nonce"
-            record="$marker/consumption-record"
-            if mkdir --mode=0700 -- "$marker" 2>/dev/null; then
-              tmp="$marker/.consumption-record"
-              {
-                printf 'authorization_sha256=%s\n' "$authorization_sha"
-                printf 'boot_id=%s\n' "$boot_id"
-              } > "$tmp"
-              chmod 0400 "$tmp"
-              mv -T -- "$tmp" "$record"
-              printf 'CONSUMED %s %s %s\n' "$nonce" "$authorization_sha" "$boot_id"
-            else
-              printf 'ALREADY_CONSUMED %s %s\n' "$nonce" "$boot_id"
-              exit 73
-            fi
-            ;;
-          STATUS)
-            [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
-            [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
-            [[ -z "$extra" ]]
-            marker="${authorizationLedgerDir}/$nonce"
-            record="$marker/consumption-record"
-            if [[ ! -d "$marker" ]]; then
-              printf 'UNUSED %s %s\n' "$nonce" "$boot_id"
-              exit 0
-            fi
-            if [[ ! -f "$record" ]]; then
-              printf 'INCOMPLETE %s %s\n' "$nonce" "$boot_id"
-              exit 0
-            fi
-
-            line1=''
-            line2=''
-            line3=''
-            {
-              IFS= read -r line1 || true
-              IFS= read -r line2 || true
-              IFS= read -r line3 || true
-            } < "$record"
-            key1=''
-            stored_authorization_sha=''
-            extra1=''
-            key2=''
-            stored_boot_id=''
-            extra2=''
-            IFS='=' read -r key1 stored_authorization_sha extra1 <<< "$line1"
-            IFS='=' read -r key2 stored_boot_id extra2 <<< "$line2"
-
-            if [[ "$key1" != 'authorization_sha256' || ! "$stored_authorization_sha" =~ ^[0-9a-f]{64}$ || -n "$extra1" || "$key2" != 'boot_id' || ! "$stored_boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ || -n "$extra2" || -n "$line3" ]]; then
-              printf 'INCOMPLETE %s %s\n' "$nonce" "$boot_id"
-              exit 0
-            fi
-
-            if [[ "$stored_authorization_sha" == "$authorization_sha" ]]; then
-              printf 'CONSUMED_STATUS %s %s %s\n' "$nonce" "$stored_authorization_sha" "$stored_boot_id"
-            else
-              printf 'CONSUMED_DIFFERENT %s %s\n' "$nonce" "$stored_boot_id"
-            fi
-            ;;
-          *)
-            echo 'INVALID_REQUEST' >&2
-            exit 64
-            ;;
-        esac
-      '';
       serviceConfig = {
         Type = "simple";
+        ExecStart = "${authorizationConsumerProgram}/bin/symthaea-stage-f-authorization-consumer ${authorizationLedgerDir}";
         User = "root";
         Group = "root";
         UMask = "0077";
