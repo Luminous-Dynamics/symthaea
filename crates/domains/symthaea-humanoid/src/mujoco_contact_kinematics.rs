@@ -15,6 +15,7 @@
 use std::sync::Arc;
 
 use mujoco_rs::prelude::{MjData, MjModel, MjtObj};
+use serde::Serialize;
 
 use crate::contact_kinematics::{
     BiasQualifiedFloatingBaseDynamicsV1, ContactAccelerationBiasV1,
@@ -34,6 +35,51 @@ pub enum MujocoContactBiasExtractionError {
     NonFiniteGeneralizedVelocity,
     NonFiniteJacobianDerivative(String),
     QualifiedBindingRejected,
+}
+
+/// Sealed MuJoCo-specific contact-bias evidence.
+///
+/// `BiasQualifiedFloatingBaseDynamicsV1` binds model identity, time, contact
+/// sites and complete `Jdot*qdot` records, but it is backend-neutral and does
+/// not carry the MuJoCo compilation signature. This wrapper preserves that
+/// exact simulator-model identity for later cross-lineage evidence binding.
+/// It is serialize-only and has private fields so a deserialized payload cannot
+/// manufacture a verified MuJoCo signature binding.
+#[derive(Debug, Clone, Serialize)]
+pub struct VerifiedMujocoContactBiasEvidenceV1 {
+    model_signature: u64,
+    qualified: BiasQualifiedFloatingBaseDynamicsV1,
+}
+
+impl VerifiedMujocoContactBiasEvidenceV1 {
+    pub fn model_signature(&self) -> u64 {
+        self.model_signature
+    }
+
+    pub fn qualified(&self) -> &BiasQualifiedFloatingBaseDynamicsV1 {
+        &self.qualified
+    }
+
+    pub fn model_id(&self) -> &str {
+        &self.qualified.dynamics.model_id
+    }
+
+    pub fn sampled_at_s(&self) -> f64 {
+        self.qualified.dynamics.sampled_at_s
+    }
+
+    pub fn bias_for_site(&self, site_id: &str) -> Option<&ContactAccelerationBiasV1> {
+        self.qualified.bias_for_site(site_id)
+    }
+
+    pub fn validate_binding(&self) -> bool {
+        self.qualified.validate_binding().is_ok()
+            && self
+                .qualified
+                .contact_biases
+                .iter()
+                .all(|bias| bias.source == ContactBiasAccelerationSource::SimulatorSolver)
+    }
 }
 
 /// Extract a complete `Jdot qdot` evidence set for every contact declared by an
@@ -148,6 +194,26 @@ pub fn extract_mujoco_contact_bias_qualified_dynamics(
     Ok(qualified)
 }
 
+/// Stronger MuJoCo evidence token that retains the exact compiled-model
+/// signature in addition to the backend-neutral qualified dynamics subject.
+pub fn extract_verified_mujoco_contact_bias_evidence_v1(
+    model: &MjModel,
+    data: &MjData<Arc<MjModel>>,
+    dynamics: FloatingBaseDynamicsSnapshot,
+) -> Result<VerifiedMujocoContactBiasEvidenceV1, MujocoContactBiasExtractionError> {
+    let model_signature = model.signature();
+    let qualified = extract_mujoco_contact_bias_qualified_dynamics(model, data, dynamics)?;
+    let result = VerifiedMujocoContactBiasEvidenceV1 {
+        model_signature,
+        qualified,
+    };
+    if result.validate_binding() {
+        Ok(result)
+    } else {
+        Err(MujocoContactBiasExtractionError::QualifiedBindingRejected)
+    }
+}
+
 fn dot(left: &[f64], right: &[f64]) -> f64 {
     left.iter()
         .zip(right.iter())
@@ -194,7 +260,7 @@ mod tests {
     #[test]
     fn articulated_velocity_produces_same_subject_nonzero_bias() {
         let morphology = HumanoidMorphology::Dmc21;
-        let mut sim = MuJoCoHumanoidSimulator::for_morphology(morphology).unwrap();
+        let mut sim = MuJoHumanoidSimulator::for_morphology(morphology).unwrap();
         let qpos = sim.data_mut().qpos().to_vec();
         let nv = sim.model_arc().ffi().nv as usize;
         let mut qvel = vec![0.0; nv];
@@ -223,6 +289,34 @@ mod tests {
                 .iter()
                 .any(|value| value.abs() > 1.0e-10)
         }));
+    }
+
+    #[test]
+    fn verified_wrapper_retains_exact_mujoco_model_signature() {
+        let morphology = HumanoidMorphology::Dmc21;
+        let mut sim = MuJoCoHumanoidSimulator::for_morphology(morphology).unwrap();
+        let dynamics = sim.floating_base_dynamics_snapshot().unwrap();
+        let expected_model_id = dynamics.model_id.clone();
+        let expected_time = dynamics.sampled_at_s;
+        let model = Arc::clone(sim.model_arc());
+        let expected_signature = model.signature();
+
+        let evidence = extract_verified_mujoco_contact_bias_evidence_v1(
+            model.as_ref(),
+            sim.data_mut(),
+            dynamics,
+        )
+        .unwrap();
+
+        assert!(evidence.validate_binding());
+        assert_eq!(evidence.model_signature(), expected_signature);
+        assert_eq!(evidence.model_id(), expected_model_id);
+        assert!((evidence.sampled_at_s() - expected_time).abs() < 1.0e-12);
+        assert!(evidence
+            .qualified()
+            .contact_biases
+            .iter()
+            .all(|bias| bias.source == ContactBiasAccelerationSource::SimulatorSolver));
     }
 
     #[test]
