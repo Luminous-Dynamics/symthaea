@@ -40,6 +40,8 @@ pub mod perceptual_participant_identity;
 pub mod perceptual_enrollment_lifecycle;
 #[path = "perceptual_enrollment_store.rs"]
 pub mod perceptual_enrollment_store;
+#[path = "perceptual_enrollment_store_observation.rs"]
+pub mod perceptual_enrollment_store_observation;
 #[path = "perceptual_schedule_reveal.rs"]
 pub mod perceptual_schedule_reveal;
 #[path = "perceptual_collection_evidence.rs"]
