@@ -1,0 +1,21 @@
+[package]
+name = "symthaea-action-runtime"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Crash-conservative grant-use accounting for Symthaea authority v0.2"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["authorization", "capabilities", "safety", "agents"]
+categories = ["authentication", "development-tools"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+symthaea-authority = { path = "../symthaea-authority" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
