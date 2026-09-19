@@ -1,0 +1,69 @@
+name: Math Retrieval Guarded Ranking Replay Capsule
+
+on:
+  pull_request:
+    paths:
+      - 'tools/math-retrieval-runtime-guard/**'
+      - 'tools/math-retrieval-runtime-seam/**'
+      - '.github/schemas/math-retrieval-*.json'
+      - '.github/schemas/math-search-experiment-*.json'
+      - '.github/scripts/math-retrieval-ranking-replay-core.py'
+      - '.github/scripts/validate-math-retrieval-*.py'
+      - '.github/scripts/validate-math-search-experiment-*.py'
+      - '.github/scripts/test-math-retrieval-*.py'
+      - '.github/workflows/math-retrieval-guarded-ranking-replay.yml'
+      - 'docs/research/MATH_RET_E2E_001A.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify guarded S through exact ranking replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check guarded runtime packages
+        run: |
+          cargo fmt --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml -- --check
+          cargo check --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml --locked
+          cargo test --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml --locked
+          cargo fmt --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml -- --check
+          cargo check --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml --locked
+          cargo test --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml --locked
+      - name: Compile capsule and normative validators
+        run: |
+          python -m py_compile tools/math-retrieval-runtime-guard/qualify_guarded_ranking_replay.py
+          python -m py_compile .github/scripts/validate-math-retrieval-source-coverage.py
+          python -m py_compile .github/scripts/validate-math-retrieval-index-build.py
+          python -m py_compile .github/scripts/validate-math-retrieval-representation-wire.py
+          python -m py_compile .github/scripts/validate-math-retrieval-query-representation.py
+          python -m py_compile .github/scripts/math-retrieval-ranking-replay-core.py
+          python -m py_compile .github/scripts/validate-math-retrieval-ranking-replay.py
+      - name: Re-run focused adversarial contracts
+        run: |
+          python .github/scripts/validate-math-retrieval-candidate-set.py --self-test
+          python .github/scripts/validate-math-retrieval-source-coverage.py --self-test
+          python .github/scripts/test-math-retrieval-index-build.py
+          python .github/scripts/validate-math-retrieval-representation-wire.py --self-test
+          python .github/scripts/validate-math-retrieval-query-representation.py --self-test
+          python .github/scripts/test-math-retrieval-ranking-replay.py
+          python .github/scripts/validate-math-retrieval-trace.py --self-test
+          python .github/scripts/validate-math-retrieval-payload-audit.py --self-test
+          python .github/scripts/validate-math-retrieval-candidate-membership.py --self-test
+      - name: Qualify full guarded S evidence capsule
+        run: python tools/math-retrieval-runtime-guard/qualify_guarded_ranking_replay.py
+      - name: Upload exact capsule evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-ret-e2e-001a-${{ github.sha }}
+          path: tools/math-retrieval-runtime-guard/target/guarded-ranking-replay-fixture
+          if-no-files-found: warn
+          retention-days: 30
