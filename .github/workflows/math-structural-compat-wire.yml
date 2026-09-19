@@ -1,0 +1,42 @@
+name: Math Structural Compatibility Wire
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/math_structural_compat_wire_v1.py"
+      - ".github/workflows/math-structural-compat-wire.yml"
+      - "data/benchmarks/math_structural_compat_wire_vectors_v1.json"
+      - "docs/research/MATH_STRUCTURAL_COMPAT_WIRE_V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-wire:
+    name: Validate structural compatibility wire v1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Run reference vectors and negative controls
+        run: >-
+          python3 .github/scripts/math_structural_compat_wire_v1.py
+          --vectors data/benchmarks/math_structural_compat_wire_vectors_v1.json
+          --self-test
+
+      - name: Verify wire contract does not evaluate holdout
+        shell: bash
+        run: |
+          set -euo pipefail
+          script=.github/scripts/math_structural_compat_wire_v1.py
+          workflow=.github/workflows/math-structural-compat-wire.yml
+          doc=docs/research/MATH_STRUCTURAL_COMPAT_WIRE_V1.md
+
+          # Contract/reference-vector tranche only: it must not import or execute
+          # the preregistered holdout fixture or invoke Cargo against it.
+          ! grep -E 'math_structural_q0_holdout_v1|cargo (run|test).*holdout' "$script" "$workflow"
+          grep -q 'Blind holdout representation aggregate' "$doc"
+          echo 'PASS: wire tranche remains a serialization contract, not holdout evaluation'
