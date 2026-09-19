@@ -15,17 +15,18 @@
 //! cadence-conformant currentness evaluations, and currentness-cadence policy,
 //! append-only authenticated qualification lifecycle records, observed-view
 //! currentness assessments, complete-tail lifecycle/currentness/cadence/
-//! cadence-currentness publication freshness assessments, cross-stream
-//! currentness/lifecycle rollback guards, authenticated per-qualification
-//! currentness cadence policy, non-weakening cadence-policy lineage proofs,
-//! replay-bound policy provenance for validity readiness, cadence-conformant
-//! currentness at one exact authenticated evaluation horizon, authenticated
-//! frozen-protocol evidence freshness assessments, aligned validity-readiness
-//! assessments, institution-scoped currentness-at-evaluation capabilities,
-//! monotonic currentness-observation tracking, typed provenance graphs, frozen
-//! study protocols, immutable execution/conformance records, adversarial
-//! falsification campaigns, explicit scientific uncertainty budgets, and
-//! provenance-checked replication lineage assessments. It does not run
+//! cadence-currentness publication freshness assessments, durable anti-rollback
+//! of cadence-currentness publications through monitored federated heads,
+//! cross-stream currentness/lifecycle rollback guards, authenticated
+//! per-qualification currentness cadence policy, non-weakening cadence-policy
+//! lineage proofs, replay-bound policy provenance for validity readiness,
+//! cadence-conformant currentness at one exact authenticated evaluation horizon,
+//! authenticated frozen-protocol evidence freshness assessments, aligned
+//! validity-readiness assessments, institution-scoped currentness-at-evaluation
+//! capabilities, monotonic currentness-observation tracking, typed provenance
+//! graphs, frozen study protocols, immutable execution/conformance records,
+//! adversarial falsification campaigns, explicit scientific uncertainty budgets,
+//! and provenance-checked replication lineage assessments. It does not run
 //! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
 //! operations.
 //!
@@ -54,6 +55,7 @@ pub mod independence;
 pub mod protocol;
 pub mod provenance;
 pub mod qualification_cadence_conformant_currentness;
+pub mod qualification_cadence_currentness_durable_head;
 pub mod qualification_cadence_currentness_head;
 pub mod qualification_cadence_currentness_publication;
 pub mod qualification_currentness_cadence;
@@ -106,6 +108,7 @@ pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
 pub use qualification_cadence_conformant_currentness::*;
+pub use qualification_cadence_currentness_durable_head::*;
 pub use qualification_cadence_currentness_head::*;
 pub use qualification_cadence_currentness_publication::*;
 pub use qualification_currentness_cadence::*;
