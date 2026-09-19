@@ -23,6 +23,8 @@ separate exact, one-use Stage-F target authorization.v2
         ↓
 root-owned atomic authorization consumption
         ↓
+exact durable-ledger STATUS confirmation
+        ↓
 Stage F: one exact correctness recovery attempt
 ```
 
@@ -110,7 +112,7 @@ The validator independently requires:
 - exact reviewed recovery path allowlist;
 - exact runner/routing/smoke/ARC3-qualifier/SE-001Q-recovery/SE-001Q-helper/CI-shell/bootstrap/promotion/recovery-eligibility/lifecycle artifact identities;
 - shell syntax validation of bootstrap/promotion/recovery-eligibility verifiers;
-- runner-policy and routing-policy Nix evaluation, including authorization socket/ledger isolation;
+- runner-policy and routing-policy Nix evaluation, including authorization socket/ledger isolation and query semantics;
 - pinned minimal Rust environment with locked Cargo metadata and compilation;
 - parse-compilation of the trusted SE-001Q replay helper under the pinned Python environment;
 - unchanged source commit/tree;
@@ -335,7 +337,7 @@ se001q_recovery_workflow_blob=<se001q_recovery_workflow_blob from recovery-eligi
 se001q_replay_helper_blob=<se001q_replay_helper_blob from recovery-eligibility.v5>
 authorization_nonce=<fresh 64-hex 256-bit nonce>
 max_uses=1
-consumption_mode=root-owned-host-ledger-v1
+consumption_mode=root-owned-host-ledger-v2
 authorization_scope=se001q-independent-provider-reobservation-only
 qualification_claim=NONE
 repair_authority_claim=NONE
@@ -376,12 +378,12 @@ Before consuming authority or executing a Rust gate, the workflow fails closed u
 - Stage-F capsule boot identity equals the eligibility-qualified boot;
 - authorization nonce is exactly 64 lowercase hex characters;
 - `max_uses=1`;
-- `consumption_mode=root-owned-host-ledger-v1`;
+- `consumption_mode=root-owned-host-ledger-v2`;
 - authorization scope is `se001q-independent-provider-reobservation-only`;
 - qualification and repair-authority claims remain `NONE`;
 - runner/routing eval tests still pass.
 
-### Atomic one-time consumption
+### Atomic one-time consumption and status confirmation
 
 Only after all preflight/policy checks pass does the workflow approach the local root-owned authorization consumer.
 
@@ -399,15 +401,27 @@ It then sends exactly:
 CONSUME <authorization_nonce> <stage_f_authorization_sha256>
 ```
 
-The root consumer atomically creates the nonce marker in the persistent ledger. Exactly one concurrent/repeated consumer can succeed.
+The root consumer atomically reserves the nonce marker in the persistent ledger, writes the authorization digest and boot identity to a temporary file, then atomically renames that file to the durable consumption record. Exactly one concurrent/repeated consumer can reserve the nonce.
 
-A successful response produces a content-addressed:
+A `CONSUMED` response is not sufficient by itself. The workflow immediately sends:
 
 ```text
-symthaea.trusted-runner.stage-f-consumption.v1
+STATUS <authorization_nonce> <stage_f_authorization_sha256>
 ```
 
-receipt bound to the authorization hash/nonce, qualified boot, GitHub run/attempt, qualified main and authorized recovery head.
+and requires the exact response:
+
+```text
+CONSUMED_STATUS <authorization_nonce> <stage_f_authorization_sha256> <qualified_host_boot_id>
+```
+
+Only after that durable-ledger confirmation does the workflow emit a content-addressed:
+
+```text
+symthaea.trusted-runner.stage-f-consumption.v2
+```
+
+receipt. The receipt is bound to the authorization hash/nonce, qualified boot, GitHub run/attempt, qualified main and authorized recovery head and records `ledger_status_checked=PASS`.
 
 Only after this receipt exists may the scientific replay step begin.
 
@@ -428,11 +442,20 @@ For another attempt, create a **new Stage-F authorization.v2 with a new 256-bit 
 
 A GitHub job re-run after consumption is expected to fail at the one-time consumer. Do not weaken this behavior to make re-runs convenient.
 
-If a run fails **before** the atomic consume step and no consumption receipt/ledger event exists, the authorization has not been demonstrated consumed. Review the failure mechanics before deciding whether to dispatch it again; never infer unconsumed status merely from a cancelled GitHub UI state.
+If a run fails before or around consumption, do not infer authority state from the GitHub job conclusion or from absence of a local receipt. Query the root ledger with the exact nonce/authorization pair when possible:
+
+```text
+UNUSED                 => no marker exists on this qualified boot
+CONSUMED_STATUS        => exact authorization is spent
+CONSUMED_DIFFERENT     => nonce is spent by a different authorization identity
+INCOMPLETE             => nonce reservation occurred but complete record is unavailable
+```
+
+`INCOMPLETE` is fail-closed: treat the authorization as unavailable and issue a fresh Stage-F authorization with a fresh nonce for any later attempt. The rejection finalizer records the corresponding state as `UNUSED_CONFIRMED`, `CONSUMED_CONFIRMED`, `NONCE_CONSUMED_DIFFERENT_AUTHORIZATION`, or `CONSUMPTION_UNCERTAIN` where the query is available.
 
 ## SE-001Q provider observation and execution binding
 
-After successful authorization consumption, the trusted helper:
+After successful authorization consumption and durable status confirmation, the trusted helper:
 
 - authenticates the EV2.4 experiment/classifier as inert data;
 - proves the five gate vectors and negative-control semantics match the trusted implementation;
@@ -441,18 +464,21 @@ After successful authorization consumption, the trusted helper:
 - executes no unmerged EV2.4 Python implementation;
 - grants no qualification or repair authority.
 
+Before constructing the successful execution binding, the finalizer independently re-queries `STATUS` and again requires the exact consumed nonce/authorization/boot tuple.
+
 A successful replay additionally emits:
 
 ```text
-symthaea.se001q.trusted-cpu-execution-binding.v2
+symthaea.se001q.trusted-cpu-execution-binding.v3
 ```
 
 which binds the provider observation to:
 
 - exact eligibility SHA-256;
 - exact Stage-F authorization SHA-256 and nonce;
-- `max_uses=1` / consumption mode;
-- exact Stage-F consumption receipt;
+- `max_uses=1` / `root-owned-host-ledger-v2` consumption mode;
+- exact Stage-F consumption.v2 receipt;
+- independently reconfirmed durable ledger status;
 - qualified host boot;
 - GitHub run/attempt;
 - current main/recovery/workflow/helper identities;
@@ -464,6 +490,7 @@ Keep the objects distinct:
 ```text
 Stage-F Authorization
     != Authorization Consumption
+    != Durable Ledger Status
     != Provider Observation
     != Execution Authorization Binding
     != Classification
@@ -471,7 +498,7 @@ Stage-F Authorization
     != RepairGrant
 ```
 
-A failed/incomplete execution still emits reconstructible rejection evidence where possible. Partial rejection evidence cannot satisfy the successful replay contract.
+A failed/incomplete execution still emits reconstructible rejection evidence where possible. Partial rejection v5 records the best independently queryable ledger state but cannot satisfy the successful replay contract.
 
 ## Recovery-target priority
 
@@ -500,8 +527,10 @@ promotion PASS != smoke PASS
 smoke PASS != recovery eligibility
 recovery eligibility != Stage-F authority
 Stage-F authority != Stage-F consumption
+Stage-F consumption != durable-ledger confirmation
 Stage-F consumption != scientific qualification
 consumed authorization != reusable authorization
+INCOMPLETE consumption != reusable authorization
 host reboot => prior smoke/eligibility/Stage-F authorization stale
 trusted CPU correctness PASS != performance equivalence
 trusted CPU SE-001Q observation != hosted EV2.4 observation
