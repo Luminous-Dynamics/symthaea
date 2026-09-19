@@ -50,6 +50,8 @@ pub mod perceptual_collection_authenticity;
 pub mod perceptual_enrollment_witness;
 #[path = "perceptual_enrollment_coordinator.rs"]
 pub mod perceptual_enrollment_coordinator;
+#[path = "perceptual_enrollment_witness_recovery.rs"]
+pub mod perceptual_enrollment_witness_recovery;
 #[cfg(test)]
 #[path = "perceptual_enrollment_coordinator_tests.rs"]
 mod perceptual_enrollment_coordinator_tests;
