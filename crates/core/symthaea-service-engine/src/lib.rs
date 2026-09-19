@@ -14,6 +14,7 @@ pub mod read_wire;
 pub mod semantic;
 pub mod service;
 pub mod telemetry;
+pub mod voice_session;
 pub mod wire;
 
 use std::fmt;
