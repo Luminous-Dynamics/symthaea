@@ -1,0 +1,250 @@
+name: HUM-WRENCH-001D5B3 Prepared Contact Authority Evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/mujoco_prepared_contact_authority.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/hum-wrench-001d5b3-prepared-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001d5b3-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 44a0cdf8b3c939d02b8dad89a531d18b50d4979a
+  D5B2_SOURCE: 47f6e0339a36ddfcef025e6277adbab1b91b6163
+  D5B_SOURCE: 156ed01855b2c6fd89118b5ac4063282added0cb
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-prepared-authority-mapping-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 16
+          persist-credentials: false
+
+      - name: Bind exact qualifier parent and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001d5b3-prepared-authority.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source and exact predecessor ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+          git merge-base --is-ancestor "$D5B2_SOURCE" "$EXPECTED_PARENT"
+          git merge-base --is-ancestor "$D5B_SOURCE" "$EXPECTED_PARENT"
+
+      - name: Verify pre-authority descriptor boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/mujoco_prepared_contact_authority.rs
+          test -f "$src"
+          grep -F 'pub struct PreparedContactAuthorityEvidenceV1' "$src"
+          grep -F 'pub(crate) fn prepare_contact_authority_evidence_v1' "$src"
+          grep -F 'verify_complete_contact_evidence_v1(evidence)' "$src"
+          grep -F 'model_subject_id' "$src"
+          grep -F 'contact_frame_id' "$src"
+          grep -F 'support_normal_evidence_id' "$src"
+          grep -F 'support_normal_verification_id' "$src"
+          grep -F 'contact_kinematics_evidence_id' "$src"
+          grep -F 'complete_evidence_id' "$src"
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-humanoid/src/mujoco_prepared_contact_authority.rs').read_text()
+          production = text.split('#[cfg(test)]', 1)[0]
+
+          forbidden = (
+              'EstablishedContactEvidenceV1',
+              'ContactAuthorityStateMachineV1',
+              'floating_base_inverse_dynamics',
+              'csc_qp',
+              'osqp',
+          )
+          for needle in forbidden:
+              assert needle not in production, needle
+
+          prefix, rest = production.split('pub struct PreparedContactAuthorityEvidenceV1 {', 1)
+          fields = rest.split('\n}\n\nimpl PreparedContactAuthorityEvidenceV1', 1)[0]
+          for field in (
+              'site', 'sampled_at_s', 'model_id', 'model_signature',
+              'physical_geom_name', 'physical_geom_id', 'support_site_name',
+              'support_site_id', 'immutable_geometry_id', 'model_subject_id',
+              'contact_frame_id', 'interaction_id', 'support_normal_policy_id',
+              'support_normal_evidence_id', 'support_normal_verification_id',
+              'contact_kinematics_evidence_id', 'complete_evidence_id',
+              'verification', 'prepared_lineage_id', 'source_class',
+          ):
+              assert f'pub {field}:' not in fields, field
+          derive_lines = prefix.splitlines()[-3:]
+          assert any('Serialize' in line for line in derive_lines), derive_lines
+          assert not any('Deserialize' in line for line in derive_lines), derive_lines
+
+          def body_between(start, end):
+              return production.split(start, 1)[1].split(end, 1)[0]
+
+          model_body = body_between(
+              'fn model_subject_id(model_id: &str, model_signature: u64) -> String {',
+              '\n}\n\nfn contact_frame_id(',
+          )
+          assert 'model_id' in model_body
+          assert 'model_signature' in model_body
+          for dynamic in (
+              'interaction_id', 'support_normal', 'contact_kinematics',
+              'complete_evidence', 'sampled_at_s',
+          ):
+              assert dynamic not in model_body, dynamic
+
+          frame_body = body_between(
+              'fn contact_frame_id(',
+              '\n}\n\n#[allow(clippy::too_many_arguments)]\nfn prepared_lineage_id(',
+          )
+          for static in (
+              'site', 'physical_geom_name', 'physical_geom_id',
+              'support_site_name', 'support_site_id', 'immutable_geometry_id',
+          ):
+              assert static in frame_body, static
+          for dynamic in (
+              'interaction_id', 'support_normal_policy_id',
+              'support_normal_evidence_id', 'support_normal_verification_id',
+              'contact_kinematics_evidence_id', 'complete_evidence_id',
+              'sampled_at_s',
+          ):
+              assert dynamic not in frame_body, dynamic
+
+          prepared_body = production.split('fn prepared_lineage_id(', 1)[1]
+          for dynamic in (
+              'interaction_id', 'support_normal_policy_id',
+              'support_normal_evidence_id', 'support_normal_verification_id',
+              'contact_kinematics_evidence_id', 'complete_evidence_id',
+          ):
+              assert dynamic in prepared_body, dynamic
+          PY
+
+      - name: Verify pinned MuJoCo dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'mujoco-rs = { version = "4.0.1"' crates/domains/symthaea-humanoid/Cargo.toml
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo tree -p symthaea-humanoid --features mujoco --locked | tee "$RUNNER_TEMP/cargo-tree.txt"
+          grep -F 'mujoco-rs v4.0.1' "$RUNNER_TEMP/cargo-tree.txt"
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked MuJoCo all-target compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Execute D5B3 mapping regressions
+        run: cargo test -p symthaea-humanoid --features mujoco mujoco_prepared_contact_authority --locked -- --nocapture
+
+      - name: Re-execute verifier and producer regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-humanoid --features mujoco mujoco_complete_contact_verifier --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_complete_contact_evidence --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_verified_support --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco --lib mujoco_contact_kinematics --locked -- --nocapture
+
+      - name: Strict feature-enabled Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --features mujoco --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001d5b3-evidence
+          cp "$RUNNER_TEMP/cargo-tree.txt" hum-wrench-001d5b3-evidence/cargo-tree.txt
+          {
+            echo "program=HUM-WRENCH-001D5B3"
+            echo "authority=prepared-contact-authority-mapping-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "d5b2_source=$D5B2_SOURCE"
+            echo "d5b_source=$D5B_SOURCE"
+            echo "independent_verifier_reexecuted=TRUE"
+            echo "prepared_token_publicly_constructible=FALSE"
+            echo "prepared_token_deserializable=FALSE"
+            echo "preparer_visibility=CRATE_INTERNAL"
+            echo "model_subject_binds_model_id=TRUE"
+            echo "model_subject_binds_compilation_signature=TRUE"
+            echo "contact_frame_binds_semantic_site=TRUE"
+            echo "contact_frame_binds_physical_geom=TRUE"
+            echo "contact_frame_binds_support_site=TRUE"
+            echo "contact_frame_binds_immutable_geometry=TRUE"
+            echo "static_ids_exclude_refreshable_dynamic_evidence=TRUE"
+            echo "dynamic_interaction_identity_retained=TRUE"
+            echo "dynamic_support_normal_identity_retained=TRUE"
+            echo "complete_J_plus_Jdotqdot_identity_retained=TRUE"
+            echo "source_class=SimulatorDerived"
+            echo "lineage_cryptographic_claim=NONE"
+            echo "d4_established_authority=NONE"
+            echo "qp_authority=NONE"
+            echo "hardware_contact_truth_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_mujoco=PASS"
+            echo "focused_tests=PASS"
+            echo "predecessor_regressions=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001d5b3-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001d5b3-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001d5b3-evidence/
+          if-no-files-found: error
