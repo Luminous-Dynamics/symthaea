@@ -14,6 +14,7 @@ mod audio_reactivity;
 mod browser_playback;
 pub mod comparison;
 pub mod comparison_capability;
+pub mod comparison_identity;
 pub mod comparison_switch;
 pub mod comparison_timeline;
 pub mod comparison_transport;
