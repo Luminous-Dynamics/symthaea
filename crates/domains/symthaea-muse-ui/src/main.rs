@@ -16,6 +16,7 @@ pub mod comparison;
 pub mod comparison_capability;
 pub mod comparison_switch;
 pub mod comparison_timeline;
+pub mod comparison_transport;
 mod create_page;
 mod evidence_view;
 mod harmony_view;
