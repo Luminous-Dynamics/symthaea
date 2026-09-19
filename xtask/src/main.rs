@@ -8,9 +8,14 @@ mod cargo_adapter_postflight;
 mod cargo_adapter_semantics;
 #[cfg(test)]
 mod cargo_adapter_state;
+mod cargo_context;
+mod cargo_context_verify;
 mod cargo_execution_attempt;
 mod cargo_execution_contract;
 mod cargo_execution_intent_v2;
+mod cargo_graph;
+mod cargo_impact;
+mod cargo_invocation;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -50,6 +55,51 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Emit a canonical, content-addressed snapshot of the locked Cargo resolve graph.
+    CargoGraph {
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Compare two Cargo graph snapshots for conservative per-package dependency impact.
+    CargoImpact {
+        /// Base snapshot emitted by `cargo-graph`.
+        #[arg(long)]
+        base: PathBuf,
+        /// Head snapshot emitted by `cargo-graph`.
+        #[arg(long)]
+        head: PathBuf,
+        /// Workspace package name, stable ID, or workspace-relative manifest path.
+        #[arg(long = "package", required = true)]
+        packages: Vec<String>,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Canonicalize a declared Cargo build-context spec and emit stable context/invocation IDs.
+    CargoContext {
+        /// Strict JSON build-context specification.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Rebuild and verify a stored Cargo build-context document before it is used as evidence.
+    CargoContextVerify {
+        /// Stored context document emitted by `cargo-context` or a successful parsed invocation.
+        #[arg(long)]
+        document: PathBuf,
+    },
+    /// Parse already-tokenized Cargo argv into a declared build context, failing closed on unknown semantics.
+    CargoInvocation {
+        /// Strict JSON containing exact raw argv plus non-argv toolchain/config fingerprints.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     /// Snapshot exact worktree source bytes for a declared repository scope.
     RepositorySnapshot {
@@ -261,6 +311,30 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::CargoGraph { output } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            cargo_graph::run(&root, output)?;
+        }
+        Commands::CargoImpact {
+            base,
+            head,
+            packages,
+            output,
+        } => {
+            cargo_impact::run(&base, &head, packages, output)?;
+        }
+        Commands::CargoContext { spec, output } => {
+            cargo_context::run(&spec, output)?;
+        }
+        Commands::CargoContextVerify { document } => {
+            cargo_context_verify::run(&document)?;
+        }
+        Commands::CargoInvocation { spec, output } => {
+            cargo_invocation::run(&spec, output)?;
         }
         Commands::RepositorySnapshot {
             include_ignored,
