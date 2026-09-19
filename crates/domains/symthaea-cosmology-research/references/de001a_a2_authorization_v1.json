@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A2-EXECUTION-AUTHORIZATION-v1",
+  "status": "preregistered-authorization-firewall",
+  "scientific_claim": "NONE",
+  "authority": "exact-optimizer-execution-authorization-only",
+  "required_a1x": {
+    "protocol": "DE-001A1X-CROSS-IMPLEMENTATION-v1",
+    "capsule_protocol": "DE-001A1X-COMPARISON-CAPSULE-v1",
+    "verdict": "AGREE",
+    "comparison_exit_code": "0",
+    "a2_execution_authorized": false
+  },
+  "required_a2m": {
+    "protocol": "DE-001A2M-OPTIMIZER-METHOD-BINDING-v1",
+    "capsule_protocol": "DE-001A2M-QUALIFICATION-CAPSULE-v1",
+    "verdict": "PASS",
+    "optimizer_execution_authorized": false,
+    "a2_execution_authorized": false
+  },
+  "required_a2r_qualification": {
+    "protocol": "DE-001A2R-QUALIFICATION-CAPSULE-v1",
+    "authority": "optimizer-parameter-role-binding-only",
+    "a2_execution_authorized": false
+  },
+  "lineage": {
+    "a1x_subject_head_must_equal_a2r_subject_head": true,
+    "a1x_subject_tree_must_equal_a2r_subject_tree": true,
+    "a2m_a2r_subject_head_must_equal_a2r_subject_head": true,
+    "a2m_receipt_must_match_a2m_capsule_hash": true,
+    "a2m_a0_a2r_a2g_hashes_must_match_capsule": true,
+    "a2r_receipt_hash_must_match_a2m_binding": true,
+    "effective_sampler_hash_must_match_a2m_capsule": true
+  },
+  "execution_budget": {
+    "optimizer_invocations_per_executor_process": 1,
+    "exact_effective_sampler_sha256_required": true,
+    "exact_sampled_coordinate_order_required": true,
+    "backend_substitution_allowed": false,
+    "method_substitution_allowed": false,
+    "option_addition_allowed": false,
+    "option_deletion_allowed": false,
+    "option_rewrite_allowed": false,
+    "coordinate_addition_allowed": false,
+    "coordinate_deletion_allowed": false,
+    "coordinate_reordering_allowed": false,
+    "normalization_or_migration_authorized": false,
+    "network_allowed": false,
+    "runtime_package_installation_allowed": false
+  },
+  "authorization_semantics": {
+    "stateful_global_single_use_claimed": false,
+    "executor_must_bind_authorization_receipt_sha256": true,
+    "executor_must_record_actual_optimizer_invocation_count": true,
+    "executor_must_refuse_invocation_count_other_than_one": true,
+    "executor_must_bind_exact_effective_sampler_sha256": true,
+    "executor_must_bind_exact_sampled_coordinate_order": true
+  },
+  "promotion": {
+    "optimizer_execution_authorized": true,
+    "a2_execution_authorized": true,
+    "scientific_claim": "NONE",
+    "permits": "one exact historical optimizer invocation per executor process",
+    "does_not_establish": [
+      "optimizer reproduction",
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "phenomenological dark-energy dynamics",
+      "physical mechanism"
+    ]
+  }
+}
