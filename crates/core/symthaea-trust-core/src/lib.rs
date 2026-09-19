@@ -11,6 +11,8 @@
 //! - append-only temporal key lifecycle histories that distinguish retirement,
 //!   prospective revocation, replacement, and retroactive compromise;
 //! - content-addressed key-to-principal/organization/region/role bindings;
+//! - frozen delegated trust-root policies and non-authorizing dual-threshold
+//!   rotation contracts;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
 //!   temporal lifecycle facts;
@@ -27,6 +29,7 @@ mod principal;
 mod revalidation;
 mod temporal_lifecycle;
 mod trust;
+mod trust_root;
 
 pub use attestation::*;
 pub use identity::*;
@@ -34,3 +37,4 @@ pub use principal::*;
 pub use revalidation::*;
 pub use temporal_lifecycle::*;
 pub use trust::*;
+pub use trust_root::*;
