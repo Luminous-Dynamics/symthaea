@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminous-dynamics.org/schemas/math-structural-extraction-receipt-v1.schema.json",
+  "title": "Math Structural Extraction Receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "authority",
+    "extraction_kind",
+    "target_commit",
+    "qualification",
+    "source_integrity",
+    "target_library",
+    "identity",
+    "delegation",
+    "development_compatibility",
+    "aggregate_compatibility",
+    "holdout_firewall",
+    "evidence_refs"
+  ],
+  "properties": {
+    "version": {"const": "math-structural-extraction-receipt-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "extraction_kind": {"const": "RelocationOnly"},
+    "target_commit": {"$ref": "#/$defs/sha40"},
+    "qualification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_commit", "workflow_run_id", "conclusion"],
+      "properties": {
+        "subject_commit": {"$ref": "#/$defs/sha40"},
+        "workflow_run_id": {"type": "integer", "minimum": 1},
+        "conclusion": {"const": "success"}
+      }
+    },
+    "source_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hdc_source_blob", "ast_source_blob", "development_fixture_blob", "holdout_source_blob"],
+      "properties": {
+        "hdc_source_blob": {"$ref": "#/$defs/sha40"},
+        "ast_source_blob": {"$ref": "#/$defs/sha40"},
+        "development_fixture_blob": {"$ref": "#/$defs/sha40"},
+        "holdout_source_blob": {"$ref": "#/$defs/sha40"}
+      }
+    },
+    "target_library": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_path", "hdc_type", "ast_type"],
+      "properties": {
+        "module_path": {"type": "string", "minLength": 1},
+        "hdc_type": {"type": "string", "minLength": 1},
+        "ast_type": {"type": "string", "minLength": 1}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hdc_encoder_id", "ast_encoder_id", "representation_rule_changed"],
+      "properties": {
+        "hdc_encoder_id": {"const": "symthaea-math-structural-hdc-v1"},
+        "ast_encoder_id": {"const": "canonical-ast-sparse-v1"},
+        "representation_rule_changed": {"const": false}
+      }
+    },
+    "delegation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["examples_delegate_to_library", "hdc_implementation_count", "ast_implementation_count"],
+      "properties": {
+        "examples_delegate_to_library": {"const": true},
+        "hdc_implementation_count": {"const": 1},
+        "ast_implementation_count": {"const": 1}
+      }
+    },
+    "development_compatibility": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/caseCompatibility"}
+    },
+    "aggregate_compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "predecessor_hdc_pairwise_sha256",
+        "extracted_hdc_pairwise_sha256",
+        "predecessor_sparse_cosine_sha256",
+        "extracted_sparse_cosine_sha256",
+        "predecessor_tie_order_sha256",
+        "extracted_tie_order_sha256"
+      ],
+      "properties": {
+        "predecessor_hdc_pairwise_sha256": {"$ref": "#/$defs/sha256"},
+        "extracted_hdc_pairwise_sha256": {"$ref": "#/$defs/sha256"},
+        "predecessor_sparse_cosine_sha256": {"$ref": "#/$defs/sha256"},
+        "extracted_sparse_cosine_sha256": {"$ref": "#/$defs/sha256"},
+        "predecessor_tie_order_sha256": {"$ref": "#/$defs/sha256"},
+        "extracted_tie_order_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "holdout_firewall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "holdout_id",
+        "source_blob",
+        "ranking_evaluated",
+        "scores_emitted",
+        "blind_predecessor_digest",
+        "blind_extracted_digest"
+      ],
+      "properties": {
+        "holdout_id": {"const": "math-structural-q0-holdout-v1"},
+        "source_blob": {"$ref": "#/$defs/sha40"},
+        "ranking_evaluated": {"const": false},
+        "scores_emitted": {"const": false},
+        "blind_predecessor_digest": {"$ref": "#/$defs/sha256"},
+        "blind_extracted_digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "sha40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "caseCompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "predecessor_hdc_vector_sha256",
+        "extracted_hdc_vector_sha256",
+        "predecessor_sparse_map_sha256",
+        "extracted_sparse_map_sha256",
+        "predecessor_ranking_sha256",
+        "extracted_ranking_sha256"
+      ],
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "predecessor_hdc_vector_sha256": {"$ref": "#/$defs/sha256"},
+        "extracted_hdc_vector_sha256": {"$ref": "#/$defs/sha256"},
+        "predecessor_sparse_map_sha256": {"$ref": "#/$defs/sha256"},
+        "extracted_sparse_map_sha256": {"$ref": "#/$defs/sha256"},
+        "predecessor_ranking_sha256": {"$ref": "#/$defs/sha256"},
+        "extracted_ranking_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
