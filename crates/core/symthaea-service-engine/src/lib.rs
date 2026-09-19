@@ -22,6 +22,8 @@ pub mod voice_control;
 pub mod voice_presenter;
 #[cfg(feature = "voice-tts")]
 pub mod voice_session_control;
+#[cfg(feature = "voice-tts")]
+pub mod voice_worker;
 pub mod voice_session;
 pub mod wire;
 
