@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use symthaea_interface_types::TurnId;
 use symthaea_service_runtime::{ProcessOrigin, ServiceCounters};
 
 use crate::cognitive_gate::MeasuredCognitiveGate;
@@ -20,6 +21,17 @@ use crate::wire::{
     LegacyIntrospectionPolicy, ServiceWireOutcome, ServiceWireResponse,
     legacy_introspection_response, partnership_response, status_response,
 };
+
+/// Owner-correlated query result kept outside the compatibility JSON surface.
+///
+/// `TurnId` comes from the semantic runtime lineage, while the wire outcome keeps
+/// the daemon's established response representation. Voice/session code can bind
+/// its own `UtteranceId` to this turn without conflating those identities.
+#[derive(Debug)]
+pub struct CorrelatedQueryOutcome {
+    pub turn_id: Option<TurnId>,
+    pub outcome: ServiceWireOutcome,
+}
 
 /// Daemon operational state that is not cognitive state.
 ///
@@ -125,6 +137,22 @@ impl ServiceProtocolCore {
         Ok(partnership_response(host.partnership()?))
     }
 
+    /// Owner-backed text query with the exact semantic turn identity retained for
+    /// correlation surfaces such as voice. This identity is deliberately not added
+    /// to the compatibility JSON response.
+    pub async fn query_correlated_with_origin(
+        &self,
+        host: &ServiceRuntimeHost,
+        content: impl Into<String>,
+        origin: ProcessOrigin,
+    ) -> Result<CorrelatedQueryOutcome, ServiceProtocolFailure> {
+        let started = Instant::now();
+        let reply = host.query(content, origin).await?;
+        let turn_id = reply.execution.turn_id.clone();
+        let outcome = ServiceWireOutcome::from_query(reply, started.elapsed());
+        Ok(CorrelatedQueryOutcome { turn_id, outcome })
+    }
+
     /// Owner-backed text query. `origin` lets voice/semantic-ear paths reuse the
     /// same bounded cognition owner without pretending every turn came from text UI.
     pub async fn query_with_origin(
@@ -133,9 +161,10 @@ impl ServiceProtocolCore {
         content: impl Into<String>,
         origin: ProcessOrigin,
     ) -> Result<ServiceWireOutcome, ServiceProtocolFailure> {
-        let started = Instant::now();
-        let reply = host.query(content, origin).await?;
-        Ok(ServiceWireOutcome::from_query(reply, started.elapsed()))
+        Ok(self
+            .query_correlated_with_origin(host, content, origin)
+            .await?
+            .outcome)
     }
 
     pub async fn query(
