@@ -3,10 +3,26 @@ name = "symthaea-service-engine"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Concrete Symthaea facade adapter for the single-owner service runtime"
+description = "Concrete Symthaea facade adapter and service runtime host"
+
+[features]
+default = []
+api_module = ["symthaea/api_module", "dep:base64"]
+voice-tts = ["symthaea/voice-tts", "dep:hound", "dep:symthaea-communication"]
+vision-manifold = ["symthaea/vision-manifold"]
+canvas = ["symthaea/canvas"]
 
 [dependencies]
 anyhow = { workspace = true }
+axum = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+wait-timeout = "0.2"
+
 symthaea = { path = "../../.." }
 symthaea-interface-events = { path = "../symthaea-interface-events" }
 symthaea-interface-runtime = { path = "../symthaea-interface-runtime" }
@@ -14,4 +30,10 @@ symthaea-interface-types = { path = "../symthaea-interface-types" }
 symthaea-runtime-owner = { path = "../symthaea-runtime-owner" }
 symthaea-service-events = { path = "../symthaea-service-events" }
 symthaea-service-runtime = { path = "../symthaea-service-runtime" }
-tokio = { workspace = true }
+
+base64 = { version = "0.22", optional = true }
+hound = { workspace = true, optional = true }
+symthaea-communication = { workspace = true, optional = true }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
