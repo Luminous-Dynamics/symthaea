@@ -1,5 +1,6 @@
 # Keep JNI native bindings (must not be obfuscated/removed)
 -keep class io.symthaea.soma.NativeBindings { *; }
+-keep class io.symthaea.soma.AssuranceNativeBindings { *; }
 
 # Keep serializable data classes (kotlinx.serialization)
 -keep class io.symthaea.soma.CycleResult { *; }

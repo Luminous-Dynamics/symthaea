@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the JNI C glue layer (soma_jni.c) into libsoma_jni.so.
+# Build the JNI C glue layer into libsoma_jni.so.
 #
 # Prerequisites: ANDROID_NDK_HOME set (nix develop provides this).
 # This script also builds the Rust .so if not already present.
@@ -7,7 +7,8 @@
 # Output: src/main/jniLibs/arm64-v8a/libsoma_jni.so
 #         src/main/jniLibs/arm64-v8a/libsymthaea_soma.so (copied from Rust build)
 #
-# NOTE: JNI symbol names are soma_engine_* (renamed from spore_engine_* in Phase 4).
+# NOTE: legacy JNI remains in soma_jni.c; assurance-only JNI is isolated in
+# soma_assurance_jni.c so checked semantics cannot silently replace old symbols.
 
 set -euo pipefail
 
@@ -65,15 +66,16 @@ export RUSTFLAGS="-C link-arg=-z -C link-arg=max-page-size=16384 -C link-arg=-L$
 # On-device language uses LiteRT (gemma4:e2b) instead of native Broca.
 cargo build --target "$TARGET" --release -p symthaea-soma --features native-ffi,screen-vision,litert,prism-search
 
-# Copy Rust .so (soma_jni.c links against -lsymthaea_soma)
+# Copy Rust .so (JNI glue links against -lsymthaea_soma)
 cp "$RUST_SO" "$JNILIBS/libsymthaea_soma.so"
 echo "  Copied: libsymthaea_soma.so ($(du -h "$JNILIBS/libsymthaea_soma.so" | cut -f1))"
 
-# Step 2: Compile JNI C glue
-echo "=== Building JNI glue (soma_jni.c) ==="
+# Step 2: Compile legacy + assurance JNI C glue into one JNI library.
+echo "=== Building JNI glue (legacy + assurance) ==="
 "$CC" -shared -o "$JNILIBS/libsoma_jni.so" \
     -I"$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include" \
     "$SCRIPT_DIR/src/main/cpp/soma_jni.c" \
+    "$SCRIPT_DIR/src/main/cpp/soma_assurance_jni.c" \
     -L"$JNILIBS" -lsymthaea_soma \
     -llog \
     -fPIC -O2 -Wall -Werror \

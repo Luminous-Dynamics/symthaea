@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 project(soma_jni C)
 
-# JNI C glue — thin layer between Kotlin and the Rust cdylib
-add_library(soma_jni SHARED soma_jni.c)
+# JNI C glue — legacy compatibility surface + isolated assurance-only checked surface.
+add_library(soma_jni SHARED
+    soma_jni.c
+    soma_assurance_jni.c
+)
 
 # Link against pre-built Rust library (cross-compiled per ABI)
 add_library(symthaea_soma SHARED IMPORTED)
