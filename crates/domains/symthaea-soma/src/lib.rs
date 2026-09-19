@@ -107,6 +107,11 @@ pub mod assurance_android_attention_policy;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_motion_event;
 
+// Current policy must also admit the exact MotionEvent requirement; a caller may
+// not retain valid attention policy while weakening obscuration/pointer rules.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_motion_policy;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
