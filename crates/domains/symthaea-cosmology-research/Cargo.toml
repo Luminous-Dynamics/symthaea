@@ -45,3 +45,7 @@ path = "src/a1e_environment.rs"
 [[bin]]
 name = "de001a-a1c-authorize"
 path = "src/a1c_authorize.rs"
+
+[[bin]]
+name = "de001a-a1c-result-qualify"
+path = "src/a1c_result_qualify.rs"
