@@ -8,6 +8,8 @@ pub mod benchmark_manifest;
 pub mod benchmark_mirex;
 #[path = "benchmark_symbolic_metrics.rs"]
 pub mod benchmark_symbolic_metrics;
+#[path = "benchmark_symbolic_parity.rs"]
+pub mod benchmark_symbolic_parity;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
