@@ -83,7 +83,7 @@ recovery_eligibility_verifier_blob="$(manifest_value "$PROMOTION_MANIFEST_PATH" 
 for value in "$authorized_recovery_head" "$promoted_main_head" "$promoted_main_tree" "$promotion_smoke_workflow_blob" "$promotion_arc3_qualifier_workflow_blob" "$promotion_se001q_recovery_workflow_blob" "$promotion_se001q_replay_helper_blob" "$promotion_ci_rust_shell_blob" "$promotion_runner_module_blob" "$promotion_routing_policy_blob" "$recovery_eligibility_verifier_blob"; do
   [[ "$value" =~ ^[0-9a-f]{40}$ ]]
 done
-for pass_key in promotion_ancestry_checked promotion_tree_identity_checked promotion_diff_surface_checked promotion_artifact_blobs_checked se001q_recovery_artifacts_checked promotion_local_checkout_checked promotion_refs_stable; do
+for pass_key in recovery_verifier_syntax_checked promotion_ancestry_checked promotion_tree_identity_checked promotion_diff_surface_checked promotion_artifact_blobs_checked se001q_recovery_artifacts_checked promotion_local_checkout_checked promotion_refs_stable; do
   [[ "$(manifest_value "$PROMOTION_MANIFEST_PATH" "$pass_key")" == 'PASS' ]]
 done
 [[ "$(manifest_value "$PROMOTION_MANIFEST_PATH" evidence_scope)" == 'stage-d-smoke-eligibility-only' ]]
@@ -186,6 +186,7 @@ se001q_recovery_workflow_blob=$promotion_se001q_recovery_workflow_blob
 se001q_replay_helper_blob=$promotion_se001q_replay_helper_blob
 ci_rust_shell_blob=$promotion_ci_rust_shell_blob
 recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
+recovery_verifier_syntax_checked=PASS
 promotion_smoke_join_checked=PASS
 current_main_identity_checked=PASS
 current_recovery_identity_checked=PASS
