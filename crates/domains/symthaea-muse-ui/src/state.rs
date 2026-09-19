@@ -37,7 +37,8 @@ use crate::audio_reactivity;
 use crate::journey::{JourneyArtifact, JourneyCommand, JourneyEffect, JourneyPolicy, JourneyState};
 use crate::palette;
 use crate::playback::{
-    PlaybackEffect, PlaybackEvent, PlaybackPhase, PlaybackSource, PlaybackState,
+    PlaybackEffect, PlaybackEvent, PlaybackPhase, PlaybackPresentation, PlaybackSource,
+    PlaybackState,
 };
 
 /// The Listen mode: how the *hero* visualizer (the big piece-map canvas)
@@ -90,6 +91,14 @@ impl TimelineMode {
             TimelineMode::Wave => "Wave",
         }
     }
+}
+
+/// Where a candidate audition entered the shared transport. The origin affects
+/// transport capabilities but not the candidate's content identity.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CandidateOrigin {
+    Journey,
+    Create,
 }
 
 /// A per-page-load identifier for `JourneyState::journey_id` — only needs
@@ -197,12 +206,15 @@ fn candidate_playback_source(
     candidate_id: u64,
     identity: Option<&symthaea_muse_protocol::ArtifactIdentity>,
     duration_hint_seconds: f64,
+    presentation: PlaybackPresentation,
 ) -> PlaybackSource {
+    let advance_on_end = presentation.can_advance_journey();
     PlaybackSource {
         rendition_id: identity.map(|identity| identity.rendition.clone()),
         audio_url: api::audio_url(api::DEFAULT_BACKEND, candidate_id),
         duration_hint_seconds: Some(duration_hint_seconds.max(0.0)),
-        advance_on_end: true,
+        advance_on_end,
+        presentation,
     }
 }
 
@@ -265,8 +277,8 @@ pub struct MuseState {
     pub composing: RwSignal<bool>,
     pub kept: RwSignal<bool>,
     pub audio_ref: NodeRef<leptos::html::Audio>,
-    /// The playback reducer's state — phase, position, duration, load
-    /// epoch. See this module's doc comment and `playback.rs`.
+    /// The playback reducer's state — including the exact audible source and
+    /// its presentation/capability contract. See `playback.rs`.
     pub playback: RwSignal<PlaybackState>,
     /// 0.0-1.0, bound bidirectionally to `audio.volume` — read on mount and
     /// written on every slider change (see `player_bar.rs`). Not part of
@@ -381,8 +393,7 @@ impl MuseState {
         }
     }
 
-    /// Restart the current piece from 0:00 — the honest "previous" action
-    /// given there's no navigable play history (see `icons::RestartIcon`).
+    /// Restart the current audible source from 0:00.
     pub fn restart(self) {
         self.dispatch(PlaybackEvent::SeekRequested { seconds: 0.0 });
         self.dispatch(PlaybackEvent::PlayRequested);
@@ -394,17 +405,30 @@ impl MuseState {
         self.dispatch(PlaybackEvent::SeekRequested { seconds });
     }
 
-    /// Make one server candidate the active Listen piece and load its audio.
-    /// Both the Listen journey and Create hand-off use this boundary so they
-    /// cannot drift on playback identity, duration hints, keep state, or load
-    /// epoch behavior.
-    pub fn activate_candidate(self, c: Candidate, autoplay: bool) {
+    /// Make one server candidate the canonical current piece and load it into
+    /// the shared transport. `origin` controls only audition/transport behavior;
+    /// it never changes the candidate's content identity.
+    pub fn activate_candidate(self, c: Candidate, autoplay: bool, origin: CandidateOrigin) {
         self.kept.set(false);
         self.current_style.set(c.style.clone());
+        let subtitle = format!("{} · {}/4 · {:.0}s", c.style, c.meter, c.duration_secs);
+        let presentation = match origin {
+            CandidateOrigin::Journey => PlaybackPresentation::journey_candidate(
+                c.title.clone(),
+                subtitle,
+                c.style.clone(),
+            ),
+            CandidateOrigin::Create => PlaybackPresentation::created_candidate(
+                c.title.clone(),
+                subtitle,
+                c.style.clone(),
+            ),
+        };
         let source = candidate_playback_source(
             c.id,
             c.identity.as_ref(),
             c.duration_secs.max(0.0) as f64,
+            presentation,
         );
         self.current.set(Some(c));
         // `LoadRequested` bumps the load epoch and returns a `Load`
@@ -435,7 +459,7 @@ impl MuseState {
             return;
         };
         self.status.set(String::new());
-        self.activate_candidate(candidate, autoplay);
+        self.activate_candidate(candidate, autoplay, CandidateOrigin::Journey);
     }
 
     /// Apply every effect a journey dispatch produced. `CurrentChanged`
@@ -593,6 +617,15 @@ impl MuseState {
     }
 
     pub fn keep(self) {
+        let can_keep = self
+            .playback
+            .get_untracked()
+            .source
+            .as_ref()
+            .is_some_and(|source| source.presentation.can_keep());
+        if !can_keep {
+            return;
+        }
         let Some(c) = self.current.get_untracked() else {
             return;
         };
@@ -629,7 +662,16 @@ mod tests {
     fn candidate_source_uses_server_rendition_identity_not_runtime_id() {
         let real_rendition = "a".repeat(64);
         let identity = identity(&real_rendition);
-        let source = candidate_playback_source(42, Some(&identity), 12.5);
+        let source = candidate_playback_source(
+            42,
+            Some(&identity),
+            12.5,
+            PlaybackPresentation::journey_candidate(
+                "Journey".into(),
+                "Classical".into(),
+                "Classical".into(),
+            ),
+        );
 
         assert_eq!(
             source.rendition_id.as_ref().map(|id| id.0.as_str()),
@@ -645,9 +687,19 @@ mod tests {
 
     #[test]
     fn candidate_without_content_identity_does_not_fabricate_one() {
-        let source = candidate_playback_source(7, None, 8.0);
+        let source = candidate_playback_source(
+            7,
+            None,
+            8.0,
+            PlaybackPresentation::created_candidate(
+                "Created".into(),
+                "Sonata".into(),
+                "Sonata".into(),
+            ),
+        );
         assert!(source.rendition_id.is_none());
         assert!(source.audio_url.ends_with("/api/audio/7"));
+        assert!(!source.advance_on_end);
     }
 
     #[test]
