@@ -1,0 +1,30 @@
+name: Math Retrieval Representation Wire
+
+on:
+  pull_request:
+    paths:
+      - '.github/schemas/math-canonical-sparse-wire-v1.schema.json'
+      - '.github/schemas/math-binary-hdc-wire-v1.schema.json'
+      - '.github/scripts/validate-math-retrieval-representation-wire.py'
+      - '.github/workflows/math-retrieval-representation-wire.yml'
+      - 'docs/research/MATH_RET_REP_WIRE_001A.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Validate deterministic representation wire formats
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse JSON schemas
+        run: |
+          python -m json.tool .github/schemas/math-canonical-sparse-wire-v1.schema.json >/dev/null
+          python -m json.tool .github/schemas/math-binary-hdc-wire-v1.schema.json >/dev/null
+      - name: Compile validator
+        run: python -m py_compile .github/scripts/validate-math-retrieval-representation-wire.py
+      - name: Run adversarial wire qualification
+        run: python .github/scripts/validate-math-retrieval-representation-wire.py --self-test
