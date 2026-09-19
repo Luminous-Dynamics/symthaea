@@ -1,0 +1,13 @@
+{
+  "schema": "symthaea.research-program-profile.v1",
+  "program": "SCI-008A",
+  "expected_rust": "1.96.0",
+  "packages": [
+    "symthaea-science-research",
+    "symthaea-aesthetic-science"
+  ],
+  "source_paths": [
+    "crates/core/symthaea-science-research",
+    "crates/domains/symthaea-aesthetic-science"
+  ]
+}
