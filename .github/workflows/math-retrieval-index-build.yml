@@ -1,0 +1,41 @@
+name: Math Retrieval Exact Index Build
+
+on:
+  pull_request:
+    paths:
+      - '.github/schemas/math-retrieval-exact-index-artifact-v1.schema.json'
+      - '.github/schemas/math-retrieval-index-build-receipt-v1.schema.json'
+      - '.github/schemas/math-retrieval-index-build-validation-report-v1.schema.json'
+      - '.github/scripts/validate-math-retrieval-index-build.py'
+      - '.github/scripts/test-math-retrieval-index-build.py'
+      - '.github/scripts/validate-math-retrieval-source-coverage.py'
+      - '.github/scripts/validate-math-retrieval-index.py'
+      - '.github/workflows/math-retrieval-index-build.yml'
+      - 'docs/research/MATH_RET_INDEX_BUILD_001A.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Validate transparent exact index build receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate schemas parse
+        run: |
+          python -m json.tool .github/schemas/math-retrieval-exact-index-artifact-v1.schema.json >/dev/null
+          python -m json.tool .github/schemas/math-retrieval-index-build-receipt-v1.schema.json >/dev/null
+          python -m json.tool .github/schemas/math-retrieval-index-build-validation-report-v1.schema.json >/dev/null
+      - name: Compile validators
+        run: |
+          python -m py_compile .github/scripts/validate-math-retrieval-index-build.py
+          python -m py_compile .github/scripts/test-math-retrieval-index-build.py
+      - name: Re-run dependency self-tests
+        run: |
+          python .github/scripts/validate-math-retrieval-index.py --self-test
+          python .github/scripts/validate-math-retrieval-source-coverage.py --self-test
+      - name: Run adversarial exact-index build qualification
+        run: python .github/scripts/test-math-retrieval-index-build.py
