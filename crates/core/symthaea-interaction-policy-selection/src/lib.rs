@@ -634,7 +634,7 @@ mod tests {
             bundle,
             engine,
             digest(0xd0),
-            with_currentness.then(|| digest(0xd1)),
+            with_currentness.then_some(digest(0xd1)),
             PolicyDecisionOutcome::AllowCandidate,
             vec![
                 PolicyRuleId::new("egress.external-content").expect("rule"),
@@ -811,7 +811,7 @@ mod tests {
         let base_time = time(1_800_000_123_456, 0xf1);
         let baseline = base_snapshot.assess(&decision, &base_time).unwrap();
 
-        let changed_snapshot = PolicySelectionSnapshotV1::new(
+        let changed_epoch = PolicySelectionSnapshotV1::new(
             "org-egress-selection/v1",
             8,
             PolicySelectionStatus::Active,
@@ -822,14 +822,46 @@ mod tests {
             revisions(),
         )
         .unwrap();
-        let changed_time = time(1_800_000_123_456, 0xf2);
+        let changed_source = PolicySelectionSnapshotV1::new(
+            "org-egress-selection/v1",
+            7,
+            PolicySelectionStatus::Active,
+            CurrentnessReferenceRequirement::Required,
+            1_800_000_000_000,
+            1_800_086_400_000,
+            digest(0xf3),
+            revisions(),
+        )
+        .unwrap();
+        let changed_time_evidence = time(1_800_000_123_456, 0xf2);
+        let changed_time_profile = PolicyTimeObservationV1::new(
+            1_800_000_123_456,
+            "other-clock/v1",
+            digest(0xf1),
+        )
+        .unwrap();
+
         assert_ne!(
             baseline.digest(),
-            changed_snapshot.assess(&decision, &base_time).unwrap().digest()
+            changed_epoch.assess(&decision, &base_time).unwrap().digest()
         );
         assert_ne!(
             baseline.digest(),
-            base_snapshot.assess(&decision, &changed_time).unwrap().digest()
+            changed_source.assess(&decision, &base_time).unwrap().digest()
+        );
+        assert_ne!(
+            baseline.digest(),
+            base_snapshot
+                .assess(&decision, &changed_time_evidence)
+                .unwrap()
+                .digest()
+        );
+        assert_ne!(
+            baseline.digest(),
+            base_snapshot
+                .assess(&decision, &changed_time_profile)
+                .unwrap()
+                .digest()
         );
     }
 
