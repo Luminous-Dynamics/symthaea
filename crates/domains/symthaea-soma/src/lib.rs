@@ -122,6 +122,11 @@ pub mod assurance_android_touch_join;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_policy_bundle;
 
+// Install, replace, revoke, and verify one exact 529 policy bundle in a monotonic
+// Rust-owned session before event-time JNI can reference it.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_session;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
