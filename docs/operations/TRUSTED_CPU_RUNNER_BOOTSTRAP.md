@@ -51,6 +51,7 @@ The validator independently requires:
 - exact runner/routing/smoke/ARC3-qualifier/CI-shell/bootstrap/promotion/recovery-eligibility/lifecycle artifact identities;
 - runner-policy and routing-policy Nix evaluation;
 - pinned minimal Rust environment with locked Cargo metadata and compilation;
+- syntax-valid trusted SE-001Q replay helper under the pinned Python environment, with bytecode redirected outside the repository;
 - unchanged source commit/tree;
 - unchanged public `main` and recovery refs across the complete validation interval.
 
@@ -74,6 +75,8 @@ and a SHA-256 of the exact manifest bytes. Retain **both** the manifest and prin
 - nixpkgs/Rust/lock/toolchain provenance;
 - host Nix system/version;
 - PASS states for authorization, policy evaluation, locked Rust validation and ref stability.
+
+The exact recovery source tree plus reviewed path-set digest transitively bind every staged Stage-F harness, including the SE-001Q workflow and trusted replay helper. Adding or modifying a recovery path creates a new recovery generation and requires fresh operator authorization and Stage-A evidence.
 
 If either public ref moves or any reviewed artifact changes, Stage A is stale. Review/authorize the new recovery generation and rerun.
 
@@ -222,7 +225,11 @@ Recovery harnesses must:
 - verify source and harness immutability;
 - make no performance-equivalence claim.
 
-Proceed one prerequisite at a time. Recovery-target priority is an **operator authorization decision**, not something inferred from branch age or queue duration. The historical first RCA target remains exact PR #578 canonical-lineage generation; ARC3 protocol subject `6ea96737aff361920c181891a71f80a9f481ddef` is now also staged as a separately reviewed exact correctness target through `.github/workflows/arc3-protocol-trusted-cpu-qualify.yml`. Do not dispatch both merely because both are eligible; authorize one exact target at a time. Do not prepare or dispatch #531/#555/#582/#585/#588 recovery in parallel.
+Proceed one prerequisite at a time. Recovery-target priority is an **operator authorization decision**, not something inferred from branch age or queue duration. The historical first RCA target remains exact PR #578 canonical-lineage generation; ARC3 protocol subject `6ea96737aff361920c181891a71f80a9f481ddef` is staged as a separately reviewed exact correctness target through `.github/workflows/arc3-protocol-trusted-cpu-qualify.yml`; and frozen SE-001 subject `47de7f2a306cffb66b5505786220590aa5f42e90` is staged through `.github/workflows/self-hosted-se001q-evidence-recovery.yml` only as an **independent provider observation** while hosted EV2.4 remains unavailable.
+
+The SE-001Q recovery lane has an additional boundary: the unmerged EV2.4 verifier implementation is authenticated only as reference data and is never executed on the trusted host. Trusted `main` code parses the authenticated experiment/classifier JSON as inert data, proves the exact five gate vectors and negative-control semantics match, and then captures a provider-specific observation. A trusted-CPU SE-001Q result therefore does **not** replace hosted EV2.4, does **not** qualify SE-001, and does **not** mint a RepairGrant.
+
+Do not dispatch multiple Stage-F targets merely because they are eligible. Authorize one exact target at a time. Do not prepare or dispatch #531/#555/#582/#585/#588 recovery in parallel.
 
 ## Failure semantics
 
@@ -236,6 +243,8 @@ promotion PASS != smoke PASS
 smoke PASS != recovery eligibility
 recovery eligibility != scientific qualification
 trusted CPU correctness PASS != performance equivalence
+trusted CPU SE-001Q observation != hosted EV2.4 observation
+independent provider observation != qualification != RepairGrant
 current branch head != operator authorization
 runner process ephemeral != host ephemeral
 content-similar landing != exact qualified tree
