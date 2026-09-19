@@ -166,6 +166,7 @@ pub enum Sem3ExperimentError {
     MissingThreshold { context_dimension: usize },
     MissingCandidate,
     CorpusIdentityOverlap,
+    CorpusCountMismatch,
     CandidateOutsideNominalSupport,
     QueryOutsideNominalSupport,
     CalibrationTargetMismatch,
@@ -192,72 +193,104 @@ impl From<SemanticNullCalibrationError> for Sem3ExperimentError {
 }
 
 #[derive(Clone)]
-struct Candidate {
-    dimension: usize,
-    context: Vec<f32>,
-    identity: ContextIdentity,
-    semantic_key: BinaryHV,
-    support: SemanticContextSupport,
+pub(super) struct Sem3Candidate {
+    pub(super) dimension: usize,
+    pub(super) context: Vec<f32>,
+    pub(super) identity: ContextIdentity,
+    pub(super) semantic_key: BinaryHV,
+    pub(super) support: SemanticContextSupport,
 }
 
 #[derive(Debug, Clone)]
-struct LabelledQuery {
-    dimension: usize,
-    context: Vec<f32>,
-    target: ContextIdentity,
+pub(super) struct Sem3LabelledQuery {
+    pub(super) dimension: usize,
+    pub(super) context: Vec<f32>,
+    pub(super) target: ContextIdentity,
 }
 
 #[derive(Debug, Clone)]
-struct AmbiguousQuery {
-    dimension: usize,
-    context: Vec<f32>,
-    left_parent: ContextIdentity,
-    right_parent: ContextIdentity,
+pub(super) struct Sem3AmbiguousQuery {
+    pub(super) dimension: usize,
+    pub(super) context: Vec<f32>,
+    pub(super) left_parent: ContextIdentity,
+    pub(super) right_parent: ContextIdentity,
 }
 
 #[derive(Debug, Clone)]
-struct UnlabelledQuery {
-    dimension: usize,
-    context: Vec<f32>,
+pub(super) struct Sem3UnlabelledQuery {
+    pub(super) dimension: usize,
+    pub(super) context: Vec<f32>,
+}
+
+#[derive(Clone)]
+pub(super) struct Sem3Corpus {
+    pub(super) encoder: SemanticContextEncoder,
+    pub(super) candidates: Vec<Sem3Candidate>,
+    pub(super) calibration: Vec<Sem3LabelledQuery>,
+    pub(super) clean: Vec<Sem3LabelledQuery>,
+    pub(super) ambiguous: Vec<Sem3AmbiguousQuery>,
+    pub(super) unrelated: Vec<Sem3UnlabelledQuery>,
+    pub(super) ood: Vec<Sem3UnlabelledQuery>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct Sem3SetObservation {
+    pub(super) identities: HashSet<ContextIdentity>,
+    pub(super) margin: f32,
+    pub(super) exact_tie: bool,
+    pub(super) specificity: f32,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct Sem3CleanObservation {
+    pub(super) base: Sem3SetObservation,
+    pub(super) target_included: bool,
+    pub(super) singleton_correct: bool,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct Sem3AmbiguousObservation {
+    pub(super) base: Sem3SetObservation,
+    pub(super) at_least_one_parent: bool,
+    pub(super) both_parents: bool,
+    pub(super) singleton_forced_choice: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
-struct SetObservation {
-    set_size: usize,
-    margin: f32,
-    exact_tie: bool,
-    specificity: f32,
+pub(super) struct Sem3OodObservation {
+    pub(super) support_rejected: bool,
+    pub(super) top1_similarity: f32,
+    pub(super) exact_tie: bool,
+    pub(super) specificity: f32,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct CleanObservation {
-    base: SetObservation,
-    target_included: bool,
-    singleton_correct: bool,
+#[derive(Debug, Clone)]
+pub(super) struct Sem3Evaluation {
+    pub(super) dimension_metrics: Vec<Sem3DimensionMetrics>,
+    pub(super) clean: Vec<Sem3CleanObservation>,
+    pub(super) ambiguous: Vec<Sem3AmbiguousObservation>,
+    pub(super) unrelated: Vec<Sem3SetObservation>,
+    pub(super) ood: Vec<Sem3OodObservation>,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct AmbiguousObservation {
-    base: SetObservation,
-    at_least_one_parent: bool,
-    both_parents: bool,
-    singleton_forced_choice: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-struct OodObservation {
-    support_rejected: bool,
-    top1_similarity: f32,
-    exact_tie: bool,
-    specificity: f32,
-}
-
-#[derive(Debug)]
-struct RankedSet {
-    identities: HashSet<ContextIdentity>,
-    margin: f32,
-    exact_tie: bool,
-    specificity: f32,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct Sem3PrimarySummary {
+    pub(super) clean_target_coverage: f64,
+    pub(super) clean_mean_set_size: f64,
+    pub(super) ambiguous_at_least_one_parent_inclusion: f64,
+    pub(super) ambiguous_dual_parent_inclusion: f64,
+    pub(super) ambiguous_singleton_forced_choice_rate: f64,
+    pub(super) unrelated_nonempty_set_rate: f64,
+    pub(super) ood_support_rejection_rate: f64,
+    pub(super) clean_coverage_passed: bool,
+    pub(super) per_dimension_clean_coverage_passed: bool,
+    pub(super) clean_set_size_guard_passed: bool,
+    pub(super) ambiguous_parent_guard_passed: bool,
+    pub(super) ambiguous_dual_parent_guard_passed: bool,
+    pub(super) ambiguous_singleton_guard_passed: bool,
+    pub(super) unrelated_guard_passed: bool,
+    pub(super) ood_support_guard_passed: bool,
+    pub(super) disposition: Sem3Disposition,
 }
 
 /// Execute the preregistered SEM-003 synthetic benchmark.
@@ -266,8 +299,98 @@ struct RankedSet {
 /// qualification of `subject_sha` and grants no evidence/confidence authority.
 pub fn run_sym_rsi_sem_003(subject_sha: &str) -> Result<Sem3Receipt, Sem3ExperimentError> {
     validate_subject_sha(subject_sha)?;
-    let encoder = SemanticContextEncoder::default();
+    let corpus = prepare_sem3_corpus()?;
+    let thresholds = calibrate_sem3_thresholds(&corpus, &corpus.calibration)?;
+    let semantic_null = build_semantic_null(&corpus)?;
+    let evaluation = evaluate_sem3_with_thresholds(&corpus, &semantic_null, &thresholds)?;
+    let primary = summarize_sem3_primary(&evaluation);
 
+    let clean_set_size_histogram = set_size_histogram(
+        &evaluation
+            .clean
+            .iter()
+            .map(|observation| observation.base.identities.len())
+            .collect::<Vec<_>>(),
+    );
+    let ambiguous_set_size_histogram = set_size_histogram(
+        &evaluation
+            .ambiguous
+            .iter()
+            .map(|observation| observation.base.identities.len())
+            .collect::<Vec<_>>(),
+    );
+    let unrelated_set_size_histogram = set_size_histogram(
+        &evaluation
+            .unrelated
+            .iter()
+            .map(|observation| observation.identities.len())
+            .collect::<Vec<_>>(),
+    );
+
+    let clean_diagnostics = regime_diagnostics(
+        &evaluation
+            .clean
+            .iter()
+            .map(|observation| &observation.base)
+            .collect::<Vec<_>>(),
+    );
+    let ambiguous_diagnostics = regime_diagnostics(
+        &evaluation
+            .ambiguous
+            .iter()
+            .map(|observation| &observation.base)
+            .collect::<Vec<_>>(),
+    );
+    let unrelated_refs = evaluation.unrelated.iter().collect::<Vec<_>>();
+    let unrelated_diagnostics = regime_diagnostics(&unrelated_refs);
+    let ood_diagnostics = ood_diagnostics(&evaluation.ood);
+
+    let mut receipt = Sem3Receipt {
+        schema: SYM_RSI_SEM_003_SCHEMA,
+        generator_version: SYM_RSI_SEM_003_GENERATOR_VERSION,
+        preregistration_sha: SYM_RSI_SEM_003_PREREGISTRATION_SHA,
+        amendment_1_sha: SYM_RSI_SEM_003_AMENDMENT_1_SHA,
+        subject_sha: subject_sha.to_owned(),
+        candidate_bank_digest: candidate_bank_digest(&corpus.candidates),
+        calibration_query_digest: labelled_query_digest("calibration", &corpus.calibration),
+        clean_query_digest: labelled_query_digest("clean", &corpus.clean),
+        ambiguous_query_digest: ambiguous_query_digest(&corpus.ambiguous),
+        unrelated_query_digest: unlabelled_query_digest("unrelated", &corpus.unrelated),
+        ood_query_digest: unlabelled_query_digest("ood", &corpus.ood),
+        semantic_null_calibration_digest: semantic_null.identity().digest,
+        thresholds,
+        dimension_metrics: evaluation.dimension_metrics,
+        clean_set_size_histogram,
+        ambiguous_set_size_histogram,
+        unrelated_set_size_histogram,
+        clean_diagnostics,
+        ambiguous_diagnostics,
+        unrelated_diagnostics,
+        ood_diagnostics,
+        clean_target_coverage: primary.clean_target_coverage,
+        clean_mean_set_size: primary.clean_mean_set_size,
+        ambiguous_at_least_one_parent_inclusion: primary.ambiguous_at_least_one_parent_inclusion,
+        ambiguous_dual_parent_inclusion: primary.ambiguous_dual_parent_inclusion,
+        ambiguous_singleton_forced_choice_rate: primary.ambiguous_singleton_forced_choice_rate,
+        unrelated_nonempty_set_rate: primary.unrelated_nonempty_set_rate,
+        ood_support_rejection_rate: primary.ood_support_rejection_rate,
+        clean_coverage_passed: primary.clean_coverage_passed,
+        per_dimension_clean_coverage_passed: primary.per_dimension_clean_coverage_passed,
+        clean_set_size_guard_passed: primary.clean_set_size_guard_passed,
+        ambiguous_parent_guard_passed: primary.ambiguous_parent_guard_passed,
+        ambiguous_dual_parent_guard_passed: primary.ambiguous_dual_parent_guard_passed,
+        ambiguous_singleton_guard_passed: primary.ambiguous_singleton_guard_passed,
+        unrelated_guard_passed: primary.unrelated_guard_passed,
+        ood_support_guard_passed: primary.ood_support_guard_passed,
+        disposition: primary.disposition,
+        evidence_digest: [0; 32],
+    };
+    receipt.evidence_digest = receipt_digest(&receipt);
+    Ok(receipt)
+}
+
+pub(super) fn prepare_sem3_corpus() -> Result<Sem3Corpus, Sem3ExperimentError> {
+    let encoder = SemanticContextEncoder::default();
     let candidates = candidate_bank(encoder)?;
     let calibration = calibration_queries(&candidates)?;
     let clean = clean_queries(&candidates)?;
@@ -275,6 +398,14 @@ pub fn run_sym_rsi_sem_003(subject_sha: &str) -> Result<Sem3Receipt, Sem3Experim
     let unrelated = unrelated_queries();
     let ood = ood_queries(&candidates)?;
 
+    validate_expected_counts(
+        &candidates,
+        &calibration,
+        &clean,
+        &ambiguous,
+        &unrelated,
+        &ood,
+    )?;
     validate_exact_disjointness(
         &candidates,
         &calibration,
@@ -284,9 +415,87 @@ pub fn run_sym_rsi_sem_003(subject_sha: &str) -> Result<Sem3Receipt, Sem3Experim
         &ood,
     )?;
 
-    let thresholds = calibrate_thresholds(encoder, &candidates, &calibration)?;
-    let semantic_null = build_semantic_null(encoder, &candidates)?;
+    Ok(Sem3Corpus {
+        encoder,
+        candidates,
+        calibration,
+        clean,
+        ambiguous,
+        unrelated,
+        ood,
+    })
+}
 
+pub(super) fn calibrate_sem3_thresholds(
+    corpus: &Sem3Corpus,
+    queries: &[Sem3LabelledQuery],
+) -> Result<Vec<Sem3Threshold>, Sem3ExperimentError> {
+    let mut thresholds = Vec::with_capacity(SYM_RSI_SEM_003_DIMENSIONS.len());
+    for dimension in SYM_RSI_SEM_003_DIMENSIONS {
+        let bank = corpus
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.dimension == dimension)
+            .collect::<Vec<_>>();
+        let dim_queries = queries
+            .iter()
+            .filter(|query| query.dimension == dimension)
+            .collect::<Vec<_>>();
+        if dim_queries.is_empty() {
+            return Err(Sem3ExperimentError::InvalidCalibration);
+        }
+
+        let mut scores = Vec::with_capacity(dim_queries.len());
+        for query in dim_queries {
+            require_query_support(corpus.encoder, &query.context)?;
+            let target = bank
+                .iter()
+                .find(|candidate| candidate.identity == query.target)
+                .ok_or(Sem3ExperimentError::CalibrationTargetMismatch)?;
+            if !target.support.within_nominal_support() {
+                return Err(Sem3ExperimentError::CandidateOutsideNominalSupport);
+            }
+            let query_key = corpus.encoder.encode(&query.context)?;
+            let similarity = query_key.similarity(&target.semantic_key);
+            scores.push((1.0 - similarity).clamp(0.0, 1.0));
+        }
+
+        scores.sort_by(|left, right| left.total_cmp(right));
+        let n = scores.len();
+        let rank = (((n + 1) as f64 * (1.0 - SYM_RSI_SEM_003_ALPHA)).ceil() as usize)
+            .clamp(1, n);
+        thresholds.push(Sem3Threshold {
+            context_dimension: dimension,
+            calibration_count: n,
+            nonconformity_threshold: scores[rank - 1],
+        });
+    }
+    Ok(thresholds)
+}
+
+pub(super) fn build_semantic_null(
+    corpus: &Sem3Corpus,
+) -> Result<SemanticNullCalibration, Sem3ExperimentError> {
+    let contexts = corpus
+        .candidates
+        .iter()
+        .map(|candidate| candidate.context.clone())
+        .collect::<Vec<_>>();
+    Ok(SemanticNullCalibration::build(
+        &contexts,
+        corpus.encoder,
+        SemanticNullConfig {
+            max_reference_contexts_per_dimension: SYM_RSI_SEM_003_CANDIDATES_PER_DIMENSION,
+            min_null_pairs_per_dimension: 128,
+        },
+    )?)
+}
+
+pub(super) fn evaluate_sem3_with_thresholds(
+    corpus: &Sem3Corpus,
+    semantic_null: &SemanticNullCalibration,
+    thresholds: &[Sem3Threshold],
+) -> Result<Sem3Evaluation, Sem3ExperimentError> {
     let mut dimension_metrics = Vec::with_capacity(SYM_RSI_SEM_003_DIMENSIONS.len());
     let mut all_clean = Vec::new();
     let mut all_ambiguous = Vec::new();
@@ -294,98 +503,125 @@ pub fn run_sym_rsi_sem_003(subject_sha: &str) -> Result<Sem3Receipt, Sem3Experim
     let mut all_ood = Vec::new();
 
     for dimension in SYM_RSI_SEM_003_DIMENSIONS {
-        let threshold = threshold_for(dimension, &thresholds)?;
-        let bank = candidates
+        let threshold = threshold_for(dimension, thresholds)?;
+        let bank = corpus
+            .candidates
             .iter()
             .filter(|candidate| candidate.dimension == dimension)
             .collect::<Vec<_>>();
 
-        let clean_observations = clean
+        let clean = corpus
+            .clean
             .iter()
             .filter(|query| query.dimension == dimension)
-            .map(|query| evaluate_clean_query(encoder, &semantic_null, &bank, query, threshold))
+            .map(|query| evaluate_clean_query(corpus.encoder, semantic_null, &bank, query, threshold))
             .collect::<Result<Vec<_>, _>>()?;
-        let ambiguous_observations = ambiguous
+        let ambiguous = corpus
+            .ambiguous
             .iter()
             .filter(|query| query.dimension == dimension)
-            .map(|query| evaluate_ambiguous_query(encoder, &semantic_null, &bank, query, threshold))
+            .map(|query| {
+                evaluate_ambiguous_query(corpus.encoder, semantic_null, &bank, query, threshold)
+            })
             .collect::<Result<Vec<_>, _>>()?;
-        let unrelated_observations = unrelated
+        let unrelated = corpus
+            .unrelated
             .iter()
             .filter(|query| query.dimension == dimension)
-            .map(|query| evaluate_unrelated_query(encoder, &semantic_null, &bank, query, threshold))
+            .map(|query| {
+                evaluate_unrelated_query(corpus.encoder, semantic_null, &bank, query, threshold)
+            })
             .collect::<Result<Vec<_>, _>>()?;
-        let ood_observations = ood
+        let ood = corpus
+            .ood
             .iter()
             .filter(|query| query.dimension == dimension)
-            .map(|query| evaluate_ood_query(encoder, &semantic_null, &bank, query))
+            .map(|query| evaluate_ood_query(corpus.encoder, semantic_null, &bank, query))
             .collect::<Result<Vec<_>, _>>()?;
 
         dimension_metrics.push(build_dimension_metrics(
             dimension,
-            &clean_observations,
-            &ambiguous_observations,
-            &unrelated_observations,
-            &ood_observations,
+            &clean,
+            &ambiguous,
+            &unrelated,
+            &ood,
         ));
 
-        all_clean.extend(clean_observations);
-        all_ambiguous.extend(ambiguous_observations);
-        all_unrelated.extend(unrelated_observations);
-        all_ood.extend(ood_observations);
+        all_clean.extend(clean);
+        all_ambiguous.extend(ambiguous);
+        all_unrelated.extend(unrelated);
+        all_ood.extend(ood);
     }
 
+    Ok(Sem3Evaluation {
+        dimension_metrics,
+        clean: all_clean,
+        ambiguous: all_ambiguous,
+        unrelated: all_unrelated,
+        ood: all_ood,
+    })
+}
+
+pub(super) fn summarize_sem3_primary(evaluation: &Sem3Evaluation) -> Sem3PrimarySummary {
     let clean_target_coverage = rate(
-        all_clean
+        evaluation
+            .clean
             .iter()
             .filter(|observation| observation.target_included)
             .count(),
-        all_clean.len(),
+        evaluation.clean.len(),
     );
     let clean_mean_set_size = mean_usize(
-        &all_clean
+        &evaluation
+            .clean
             .iter()
-            .map(|observation| observation.base.set_size)
+            .map(|observation| observation.base.identities.len())
             .collect::<Vec<_>>(),
     );
     let ambiguous_at_least_one_parent_inclusion = rate(
-        all_ambiguous
+        evaluation
+            .ambiguous
             .iter()
             .filter(|observation| observation.at_least_one_parent)
             .count(),
-        all_ambiguous.len(),
+        evaluation.ambiguous.len(),
     );
     let ambiguous_dual_parent_inclusion = rate(
-        all_ambiguous
+        evaluation
+            .ambiguous
             .iter()
             .filter(|observation| observation.both_parents)
             .count(),
-        all_ambiguous.len(),
+        evaluation.ambiguous.len(),
     );
     let ambiguous_singleton_forced_choice_rate = rate(
-        all_ambiguous
+        evaluation
+            .ambiguous
             .iter()
             .filter(|observation| observation.singleton_forced_choice)
             .count(),
-        all_ambiguous.len(),
+        evaluation.ambiguous.len(),
     );
     let unrelated_nonempty_set_rate = rate(
-        all_unrelated
+        evaluation
+            .unrelated
             .iter()
-            .filter(|observation| observation.set_size > 0)
+            .filter(|observation| !observation.identities.is_empty())
             .count(),
-        all_unrelated.len(),
+        evaluation.unrelated.len(),
     );
     let ood_support_rejection_rate = rate(
-        all_ood
+        evaluation
+            .ood
             .iter()
             .filter(|observation| observation.support_rejected)
             .count(),
-        all_ood.len(),
+        evaluation.ood.len(),
     );
 
     let clean_coverage_passed = clean_target_coverage + RATE_EPSILON >= 0.90;
-    let per_dimension_clean_coverage_passed = dimension_metrics
+    let per_dimension_clean_coverage_passed = evaluation
+        .dimension_metrics
         .iter()
         .all(|metrics| metrics.clean_target_coverage + RATE_EPSILON >= 0.85);
     let clean_set_size_guard_passed = clean_mean_set_size <= 2.0 + RATE_EPSILON;
@@ -416,62 +652,7 @@ pub fn run_sym_rsi_sem_003(subject_sha: &str) -> Result<Sem3Receipt, Sem3Experim
         Sem3Disposition::NotEstablished
     };
 
-    let clean_set_size_histogram = set_size_histogram(
-        &all_clean
-            .iter()
-            .map(|observation| observation.base.set_size)
-            .collect::<Vec<_>>(),
-    );
-    let ambiguous_set_size_histogram = set_size_histogram(
-        &all_ambiguous
-            .iter()
-            .map(|observation| observation.base.set_size)
-            .collect::<Vec<_>>(),
-    );
-    let unrelated_set_size_histogram = set_size_histogram(
-        &all_unrelated
-            .iter()
-            .map(|observation| observation.set_size)
-            .collect::<Vec<_>>(),
-    );
-
-    let clean_diagnostics = regime_diagnostics(
-        &all_clean
-            .iter()
-            .map(|observation| observation.base)
-            .collect::<Vec<_>>(),
-    );
-    let ambiguous_diagnostics = regime_diagnostics(
-        &all_ambiguous
-            .iter()
-            .map(|observation| observation.base)
-            .collect::<Vec<_>>(),
-    );
-    let unrelated_diagnostics = regime_diagnostics(&all_unrelated);
-    let ood_diagnostics = ood_diagnostics(&all_ood);
-
-    let mut receipt = Sem3Receipt {
-        schema: SYM_RSI_SEM_003_SCHEMA,
-        generator_version: SYM_RSI_SEM_003_GENERATOR_VERSION,
-        preregistration_sha: SYM_RSI_SEM_003_PREREGISTRATION_SHA,
-        amendment_1_sha: SYM_RSI_SEM_003_AMENDMENT_1_SHA,
-        subject_sha: subject_sha.to_owned(),
-        candidate_bank_digest: candidate_bank_digest(&candidates),
-        calibration_query_digest: labelled_query_digest("calibration", &calibration),
-        clean_query_digest: labelled_query_digest("clean", &clean),
-        ambiguous_query_digest: ambiguous_query_digest(&ambiguous),
-        unrelated_query_digest: unlabelled_query_digest("unrelated", &unrelated),
-        ood_query_digest: unlabelled_query_digest("ood", &ood),
-        semantic_null_calibration_digest: semantic_null.identity().digest,
-        thresholds,
-        dimension_metrics,
-        clean_set_size_histogram,
-        ambiguous_set_size_histogram,
-        unrelated_set_size_histogram,
-        clean_diagnostics,
-        ambiguous_diagnostics,
-        unrelated_diagnostics,
-        ood_diagnostics,
+    Sem3PrimarySummary {
         clean_target_coverage,
         clean_mean_set_size,
         ambiguous_at_least_one_parent_inclusion,
@@ -488,13 +669,10 @@ pub fn run_sym_rsi_sem_003(subject_sha: &str) -> Result<Sem3Receipt, Sem3Experim
         unrelated_guard_passed,
         ood_support_guard_passed,
         disposition,
-        evidence_digest: [0; 32],
-    };
-    receipt.evidence_digest = receipt_digest(&receipt);
-    Ok(receipt)
+    }
 }
 
-fn candidate_bank(encoder: SemanticContextEncoder) -> Result<Vec<Candidate>, Sem3ExperimentError> {
+fn candidate_bank(encoder: SemanticContextEncoder) -> Result<Vec<Sem3Candidate>, Sem3ExperimentError> {
     let mut candidates = Vec::with_capacity(
         SYM_RSI_SEM_003_DIMENSIONS.len() * SYM_RSI_SEM_003_CANDIDATES_PER_DIMENSION,
     );
@@ -505,7 +683,7 @@ fn candidate_bank(encoder: SemanticContextEncoder) -> Result<Vec<Candidate>, Sem
             if !support.within_nominal_support() {
                 return Err(Sem3ExperimentError::CandidateOutsideNominalSupport);
             }
-            candidates.push(Candidate {
+            candidates.push(Sem3Candidate {
                 dimension,
                 identity: ContextIdentity::from_context(&context)?,
                 semantic_key: encoder.encode(&context)?,
@@ -517,25 +695,9 @@ fn candidate_bank(encoder: SemanticContextEncoder) -> Result<Vec<Candidate>, Sem
     Ok(candidates)
 }
 
-fn build_semantic_null(
-    encoder: SemanticContextEncoder,
-    candidates: &[Candidate],
-) -> Result<SemanticNullCalibration, Sem3ExperimentError> {
-    let contexts = candidates
-        .iter()
-        .map(|candidate| candidate.context.clone())
-        .collect::<Vec<_>>();
-    Ok(SemanticNullCalibration::build(
-        &contexts,
-        encoder,
-        SemanticNullConfig {
-            max_reference_contexts_per_dimension: SYM_RSI_SEM_003_CANDIDATES_PER_DIMENSION,
-            min_null_pairs_per_dimension: 128,
-        },
-    )?)
-}
-
-fn calibration_queries(candidates: &[Candidate]) -> Result<Vec<LabelledQuery>, Sem3ExperimentError> {
+fn calibration_queries(
+    candidates: &[Sem3Candidate],
+) -> Result<Vec<Sem3LabelledQuery>, Sem3ExperimentError> {
     labelled_perturbation_queries(
         candidates,
         0,
@@ -545,7 +707,9 @@ fn calibration_queries(candidates: &[Candidate]) -> Result<Vec<LabelledQuery>, S
     )
 }
 
-fn clean_queries(candidates: &[Candidate]) -> Result<Vec<LabelledQuery>, Sem3ExperimentError> {
+fn clean_queries(
+    candidates: &[Sem3Candidate],
+) -> Result<Vec<Sem3LabelledQuery>, Sem3ExperimentError> {
     labelled_perturbation_queries(
         candidates,
         SYM_RSI_SEM_003_CALIBRATION_QUERIES_PER_DIMENSION,
@@ -556,12 +720,12 @@ fn clean_queries(candidates: &[Candidate]) -> Result<Vec<LabelledQuery>, Sem3Exp
 }
 
 fn labelled_perturbation_queries(
-    candidates: &[Candidate],
+    candidates: &[Sem3Candidate],
     skip: usize,
     take: usize,
     magnitude: f32,
     salt: usize,
-) -> Result<Vec<LabelledQuery>, Sem3ExperimentError> {
+) -> Result<Vec<Sem3LabelledQuery>, Sem3ExperimentError> {
     let mut queries = Vec::new();
     for dimension in SYM_RSI_SEM_003_DIMENSIONS {
         let bank = candidates
@@ -570,7 +734,7 @@ fn labelled_perturbation_queries(
             .collect::<Vec<_>>();
         for target in bank.iter().skip(skip).take(take) {
             let target_index = candidate_index(&bank, target.identity)?;
-            queries.push(LabelledQuery {
+            queries.push(Sem3LabelledQuery {
                 dimension,
                 context: perturb_context(&target.context, target_index, magnitude, salt),
                 target: target.identity,
@@ -580,7 +744,9 @@ fn labelled_perturbation_queries(
     Ok(queries)
 }
 
-fn ambiguous_queries(candidates: &[Candidate]) -> Result<Vec<AmbiguousQuery>, Sem3ExperimentError> {
+fn ambiguous_queries(
+    candidates: &[Sem3Candidate],
+) -> Result<Vec<Sem3AmbiguousQuery>, Sem3ExperimentError> {
     let mut queries = Vec::new();
     for dimension in SYM_RSI_SEM_003_DIMENSIONS {
         let bank = candidates
@@ -600,7 +766,7 @@ fn ambiguous_queries(candidates: &[Candidate]) -> Result<Vec<AmbiguousQuery>, Se
                 .zip(&right.context)
                 .map(|(left_value, right_value)| (left_value + right_value) * 0.5)
                 .collect::<Vec<_>>();
-            queries.push(AmbiguousQuery {
+            queries.push(Sem3AmbiguousQuery {
                 dimension,
                 context,
                 left_parent: left.identity,
@@ -611,11 +777,11 @@ fn ambiguous_queries(candidates: &[Candidate]) -> Result<Vec<AmbiguousQuery>, Se
     Ok(queries)
 }
 
-fn unrelated_queries() -> Vec<UnlabelledQuery> {
+fn unrelated_queries() -> Vec<Sem3UnlabelledQuery> {
     let mut queries = Vec::new();
     for dimension in SYM_RSI_SEM_003_DIMENSIONS {
         for index in 0..SYM_RSI_SEM_003_UNRELATED_QUERIES_PER_DIMENSION {
-            queries.push(UnlabelledQuery {
+            queries.push(Sem3UnlabelledQuery {
                 dimension,
                 context: unrelated_context(dimension, index),
             });
@@ -624,7 +790,9 @@ fn unrelated_queries() -> Vec<UnlabelledQuery> {
     queries
 }
 
-fn ood_queries(candidates: &[Candidate]) -> Result<Vec<UnlabelledQuery>, Sem3ExperimentError> {
+fn ood_queries(
+    candidates: &[Sem3Candidate],
+) -> Result<Vec<Sem3UnlabelledQuery>, Sem3ExperimentError> {
     let mut queries = Vec::new();
     for dimension in SYM_RSI_SEM_003_DIMENSIONS {
         let bank = candidates
@@ -642,120 +810,72 @@ fn ood_queries(candidates: &[Candidate]) -> Result<Vec<UnlabelledQuery>, Sem3Exp
             } else {
                 -1.5 - source.context[coordinate].abs()
             };
-            queries.push(UnlabelledQuery { dimension, context });
+            queries.push(Sem3UnlabelledQuery { dimension, context });
         }
     }
     Ok(queries)
 }
 
-fn calibrate_thresholds(
-    encoder: SemanticContextEncoder,
-    candidates: &[Candidate],
-    queries: &[LabelledQuery],
-) -> Result<Vec<Sem3Threshold>, Sem3ExperimentError> {
-    let mut thresholds = Vec::with_capacity(SYM_RSI_SEM_003_DIMENSIONS.len());
-    for dimension in SYM_RSI_SEM_003_DIMENSIONS {
-        let bank = candidates
-            .iter()
-            .filter(|candidate| candidate.dimension == dimension)
-            .collect::<Vec<_>>();
-        let dim_queries = queries
-            .iter()
-            .filter(|query| query.dimension == dimension)
-            .collect::<Vec<_>>();
-        if dim_queries.is_empty() {
-            return Err(Sem3ExperimentError::InvalidCalibration);
-        }
-
-        let mut scores = Vec::with_capacity(dim_queries.len());
-        for query in dim_queries {
-            require_query_support(encoder, &query.context)?;
-            let target = bank
-                .iter()
-                .find(|candidate| candidate.identity == query.target)
-                .ok_or(Sem3ExperimentError::CalibrationTargetMismatch)?;
-            if !target.support.within_nominal_support() {
-                return Err(Sem3ExperimentError::CandidateOutsideNominalSupport);
-            }
-            let query_key = encoder.encode(&query.context)?;
-            let similarity = query_key.similarity(&target.semantic_key);
-            scores.push((1.0 - similarity).clamp(0.0, 1.0));
-        }
-
-        scores.sort_by(|left, right| left.total_cmp(right));
-        let n = scores.len();
-        let rank = (((n + 1) as f64 * (1.0 - SYM_RSI_SEM_003_ALPHA)).ceil() as usize)
-            .clamp(1, n);
-        thresholds.push(Sem3Threshold {
-            context_dimension: dimension,
-            calibration_count: n,
-            nonconformity_threshold: scores[rank - 1],
-        });
-    }
-    Ok(thresholds)
-}
-
 fn evaluate_clean_query(
     encoder: SemanticContextEncoder,
     semantic_null: &SemanticNullCalibration,
-    bank: &[&Candidate],
-    query: &LabelledQuery,
+    bank: &[&Sem3Candidate],
+    query: &Sem3LabelledQuery,
     threshold: f32,
-) -> Result<CleanObservation, Sem3ExperimentError> {
+) -> Result<Sem3CleanObservation, Sem3ExperimentError> {
     require_query_support(encoder, &query.context)?;
     let ranked = candidate_set_and_diagnostics(encoder, semantic_null, bank, &query.context, threshold)?;
     let target_included = ranked.identities.contains(&query.target);
-    Ok(CleanObservation {
-        base: SetObservation::from_ranked(&ranked),
-        target_included,
+    Ok(Sem3CleanObservation {
         singleton_correct: target_included && ranked.identities.len() == 1,
+        target_included,
+        base: ranked,
     })
 }
 
 fn evaluate_ambiguous_query(
     encoder: SemanticContextEncoder,
     semantic_null: &SemanticNullCalibration,
-    bank: &[&Candidate],
-    query: &AmbiguousQuery,
+    bank: &[&Sem3Candidate],
+    query: &Sem3AmbiguousQuery,
     threshold: f32,
-) -> Result<AmbiguousObservation, Sem3ExperimentError> {
+) -> Result<Sem3AmbiguousObservation, Sem3ExperimentError> {
     require_query_support(encoder, &query.context)?;
     let ranked = candidate_set_and_diagnostics(encoder, semantic_null, bank, &query.context, threshold)?;
     let left = ranked.identities.contains(&query.left_parent);
     let right = ranked.identities.contains(&query.right_parent);
-    Ok(AmbiguousObservation {
-        base: SetObservation::from_ranked(&ranked),
+    Ok(Sem3AmbiguousObservation {
+        singleton_forced_choice: ranked.identities.len() == 1,
         at_least_one_parent: left || right,
         both_parents: left && right,
-        singleton_forced_choice: ranked.identities.len() == 1,
+        base: ranked,
     })
 }
 
 fn evaluate_unrelated_query(
     encoder: SemanticContextEncoder,
     semantic_null: &SemanticNullCalibration,
-    bank: &[&Candidate],
-    query: &UnlabelledQuery,
+    bank: &[&Sem3Candidate],
+    query: &Sem3UnlabelledQuery,
     threshold: f32,
-) -> Result<SetObservation, Sem3ExperimentError> {
+) -> Result<Sem3SetObservation, Sem3ExperimentError> {
     require_query_support(encoder, &query.context)?;
-    let ranked = candidate_set_and_diagnostics(encoder, semantic_null, bank, &query.context, threshold)?;
-    Ok(SetObservation::from_ranked(&ranked))
+    candidate_set_and_diagnostics(encoder, semantic_null, bank, &query.context, threshold)
 }
 
 fn evaluate_ood_query(
     encoder: SemanticContextEncoder,
     semantic_null: &SemanticNullCalibration,
-    bank: &[&Candidate],
-    query: &UnlabelledQuery,
-) -> Result<OodObservation, Sem3ExperimentError> {
+    bank: &[&Sem3Candidate],
+    query: &Sem3UnlabelledQuery,
+) -> Result<Sem3OodObservation, Sem3ExperimentError> {
     let support = assess_semantic_context_support(encoder, &query.context)?;
     let query_key = encoder.encode(&query.context)?;
     let (top1, _, exact_tie) = top_two_similarities(&query_key, bank)?;
     let specificity = semantic_null
         .assess(query.dimension, top1)?
         .retrieval_specificity;
-    Ok(OodObservation {
+    Ok(Sem3OodObservation {
         support_rejected: !support.within_nominal_support(),
         top1_similarity: top1,
         exact_tie,
@@ -763,24 +883,36 @@ fn evaluate_ood_query(
     })
 }
 
-impl SetObservation {
-    fn from_ranked(ranked: &RankedSet) -> Self {
-        Self {
-            set_size: ranked.identities.len(),
-            margin: ranked.margin,
-            exact_tie: ranked.exact_tie,
-            specificity: ranked.specificity,
-        }
-    }
+pub(super) fn sem3_candidate_set_identities(
+    corpus: &Sem3Corpus,
+    semantic_null: &SemanticNullCalibration,
+    dimension: usize,
+    context: &[f32],
+    threshold: f32,
+) -> Result<HashSet<ContextIdentity>, Sem3ExperimentError> {
+    require_query_support(corpus.encoder, context)?;
+    let bank = corpus
+        .candidates
+        .iter()
+        .filter(|candidate| candidate.dimension == dimension)
+        .collect::<Vec<_>>();
+    Ok(candidate_set_and_diagnostics(
+        corpus.encoder,
+        semantic_null,
+        &bank,
+        context,
+        threshold,
+    )?
+    .identities)
 }
 
 fn candidate_set_and_diagnostics(
     encoder: SemanticContextEncoder,
     semantic_null: &SemanticNullCalibration,
-    bank: &[&Candidate],
+    bank: &[&Sem3Candidate],
     query: &[f32],
     threshold: f32,
-) -> Result<RankedSet, Sem3ExperimentError> {
+) -> Result<Sem3SetObservation, Sem3ExperimentError> {
     let query_key = encoder.encode(query)?;
     let mut identities = HashSet::new();
     for candidate in bank {
@@ -796,7 +928,7 @@ fn candidate_set_and_diagnostics(
     let specificity = semantic_null
         .assess(query.len(), top1)?
         .retrieval_specificity;
-    Ok(RankedSet {
+    Ok(Sem3SetObservation {
         identities,
         margin: (top1 - runner_up).max(0.0),
         exact_tie,
@@ -806,7 +938,7 @@ fn candidate_set_and_diagnostics(
 
 fn top_two_similarities(
     query_key: &BinaryHV,
-    bank: &[&Candidate],
+    bank: &[&Sem3Candidate],
 ) -> Result<(f32, f32, bool), Sem3ExperimentError> {
     if bank.len() < 2 {
         return Err(Sem3ExperimentError::InsufficientCandidates);
@@ -833,14 +965,14 @@ fn require_query_support(
 
 fn build_dimension_metrics(
     dimension: usize,
-    clean: &[CleanObservation],
-    ambiguous: &[AmbiguousObservation],
-    unrelated: &[SetObservation],
-    ood: &[OodObservation],
+    clean: &[Sem3CleanObservation],
+    ambiguous: &[Sem3AmbiguousObservation],
+    unrelated: &[Sem3SetObservation],
+    ood: &[Sem3OodObservation],
 ) -> Sem3DimensionMetrics {
     let clean_sizes = clean
         .iter()
-        .map(|observation| observation.base.set_size)
+        .map(|observation| observation.base.identities.len())
         .collect::<Vec<_>>();
     Sem3DimensionMetrics {
         context_dimension: dimension,
@@ -849,10 +981,7 @@ fn build_dimension_metrics(
         unrelated_count: unrelated.len(),
         ood_count: ood.len(),
         clean_target_coverage: rate(
-            clean
-                .iter()
-                .filter(|observation| observation.target_included)
-                .count(),
+            clean.iter().filter(|observation| observation.target_included).count(),
             clean.len(),
         ),
         clean_singleton_correct_rate: rate(
@@ -888,27 +1017,22 @@ fn build_dimension_metrics(
         ambiguous_mean_set_size: mean_usize(
             &ambiguous
                 .iter()
-                .map(|observation| observation.base.set_size)
+                .map(|observation| observation.base.identities.len())
                 .collect::<Vec<_>>(),
         ),
         unrelated_nonempty_set_rate: rate(
             unrelated
                 .iter()
-                .filter(|observation| observation.set_size > 0)
+                .filter(|observation| !observation.identities.is_empty())
                 .count(),
             unrelated.len(),
         ),
         ood_support_rejection_rate: rate(
-            ood.iter()
-                .filter(|observation| observation.support_rejected)
-                .count(),
+            ood.iter().filter(|observation| observation.support_rejected).count(),
             ood.len(),
         ),
         mean_clean_margin: mean_f32(
-            &clean
-                .iter()
-                .map(|observation| observation.base.margin)
-                .collect::<Vec<_>>(),
+            &clean.iter().map(|observation| observation.base.margin).collect::<Vec<_>>(),
         ),
         mean_ambiguous_margin: mean_f32(
             &ambiguous
@@ -917,24 +1041,16 @@ fn build_dimension_metrics(
                 .collect::<Vec<_>>(),
         ),
         mean_unrelated_margin: mean_f32(
-            &unrelated
-                .iter()
-                .map(|observation| observation.margin)
-                .collect::<Vec<_>>(),
+            &unrelated.iter().map(|observation| observation.margin).collect::<Vec<_>>(),
         ),
         mean_ood_raw_similarity: mean_f32(
-            &ood.iter()
-                .map(|observation| observation.top1_similarity)
-                .collect::<Vec<_>>(),
+            &ood.iter().map(|observation| observation.top1_similarity).collect::<Vec<_>>(),
         ),
     }
 }
 
-fn regime_diagnostics(observations: &[SetObservation]) -> Sem3RegimeDiagnostics {
-    let margins = observations
-        .iter()
-        .map(|observation| observation.margin)
-        .collect::<Vec<_>>();
+fn regime_diagnostics(observations: &[&Sem3SetObservation]) -> Sem3RegimeDiagnostics {
+    let margins = observations.iter().map(|observation| observation.margin).collect::<Vec<_>>();
     let specificities = observations
         .iter()
         .map(|observation| observation.specificity)
@@ -943,10 +1059,7 @@ fn regime_diagnostics(observations: &[SetObservation]) -> Sem3RegimeDiagnostics 
         query_count: observations.len(),
         mean_margin: mean_f32(&margins),
         p95_margin: percentile_f32(&margins, 0.95),
-        exact_tie_count: observations
-            .iter()
-            .filter(|observation| observation.exact_tie)
-            .count(),
+        exact_tie_count: observations.iter().filter(|observation| observation.exact_tie).count(),
         mean_specificity: mean_f32(&specificities),
         p05_specificity: percentile_f32(&specificities, 0.05),
         p50_specificity: percentile_f32(&specificities, 0.50),
@@ -954,7 +1067,7 @@ fn regime_diagnostics(observations: &[SetObservation]) -> Sem3RegimeDiagnostics 
     }
 }
 
-fn ood_diagnostics(observations: &[OodObservation]) -> Sem3OodDiagnostics {
+fn ood_diagnostics(observations: &[Sem3OodObservation]) -> Sem3OodDiagnostics {
     let similarities = observations
         .iter()
         .map(|observation| observation.top1_similarity)
@@ -975,10 +1088,7 @@ fn ood_diagnostics(observations: &[OodObservation]) -> Sem3OodDiagnostics {
         max_top1_similarity: max_f32(&similarities),
         mean_specificity: mean_f32(&specificities),
         max_specificity: max_f32(&specificities),
-        exact_tie_count: observations
-            .iter()
-            .filter(|observation| observation.exact_tie)
-            .count(),
+        exact_tie_count: observations.iter().filter(|observation| observation.exact_tie).count(),
     }
 }
 
@@ -993,7 +1103,7 @@ fn set_size_histogram(values: &[usize]) -> Vec<Sem3SetSizeBin> {
         .collect()
 }
 
-fn threshold_for(
+pub(super) fn threshold_for(
     dimension: usize,
     thresholds: &[Sem3Threshold],
 ) -> Result<f32, Sem3ExperimentError> {
@@ -1001,13 +1111,11 @@ fn threshold_for(
         .iter()
         .find(|threshold| threshold.context_dimension == dimension)
         .map(|threshold| threshold.nonconformity_threshold)
-        .ok_or(Sem3ExperimentError::MissingThreshold {
-            context_dimension: dimension,
-        })
+        .ok_or(Sem3ExperimentError::MissingThreshold { context_dimension: dimension })
 }
 
 fn candidate_index(
-    bank: &[&Candidate],
+    bank: &[&Sem3Candidate],
     identity: ContextIdentity,
 ) -> Result<usize, Sem3ExperimentError> {
     bank.iter()
@@ -1020,8 +1128,7 @@ fn candidate_context(dimension: usize, index: usize) -> Vec<f32> {
     let side = index % 2;
     let mut context = family_center(dimension, family);
     let coordinate = (family * 5 + dimension) % dimension;
-    let delta = if side == 0 { -0.08 } else { 0.08 };
-    context[coordinate] += delta;
+    context[coordinate] += if side == 0 { -0.08 } else { 0.08 };
     context
 }
 
@@ -1059,13 +1166,35 @@ fn perturb_context(source: &[f32], index: usize, magnitude: f32, salt: usize) ->
     query
 }
 
+fn validate_expected_counts(
+    candidates: &[Sem3Candidate],
+    calibration: &[Sem3LabelledQuery],
+    clean: &[Sem3LabelledQuery],
+    ambiguous: &[Sem3AmbiguousQuery],
+    unrelated: &[Sem3UnlabelledQuery],
+    ood: &[Sem3UnlabelledQuery],
+) -> Result<(), Sem3ExperimentError> {
+    let dimensions = SYM_RSI_SEM_003_DIMENSIONS.len();
+    let valid = candidates.len() == dimensions * SYM_RSI_SEM_003_CANDIDATES_PER_DIMENSION
+        && calibration.len() == dimensions * SYM_RSI_SEM_003_CALIBRATION_QUERIES_PER_DIMENSION
+        && clean.len() == dimensions * SYM_RSI_SEM_003_CLEAN_QUERIES_PER_DIMENSION
+        && ambiguous.len() == dimensions * SYM_RSI_SEM_003_AMBIGUOUS_QUERIES_PER_DIMENSION
+        && unrelated.len() == dimensions * SYM_RSI_SEM_003_UNRELATED_QUERIES_PER_DIMENSION
+        && ood.len() == dimensions * SYM_RSI_SEM_003_OOD_QUERIES_PER_DIMENSION;
+    if valid {
+        Ok(())
+    } else {
+        Err(Sem3ExperimentError::CorpusCountMismatch)
+    }
+}
+
 fn validate_exact_disjointness(
-    candidates: &[Candidate],
-    calibration: &[LabelledQuery],
-    clean: &[LabelledQuery],
-    ambiguous: &[AmbiguousQuery],
-    unrelated: &[UnlabelledQuery],
-    ood: &[UnlabelledQuery],
+    candidates: &[Sem3Candidate],
+    calibration: &[Sem3LabelledQuery],
+    clean: &[Sem3LabelledQuery],
+    ambiguous: &[Sem3AmbiguousQuery],
+    unrelated: &[Sem3UnlabelledQuery],
+    ood: &[Sem3UnlabelledQuery],
 ) -> Result<(), Sem3ExperimentError> {
     let mut seen = HashSet::<[u8; 32]>::new();
     for candidate in candidates {
@@ -1102,7 +1231,7 @@ fn insert_query_identity(
     Ok(())
 }
 
-fn candidate_bank_digest(candidates: &[Candidate]) -> [u8; 32] {
+pub(super) fn candidate_bank_digest(candidates: &[Sem3Candidate]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi-sem-003.candidate-bank.v1");
     for candidate in candidates {
@@ -1114,7 +1243,7 @@ fn candidate_bank_digest(candidates: &[Candidate]) -> [u8; 32] {
     *hasher.finalize().as_bytes()
 }
 
-fn labelled_query_digest(domain: &str, queries: &[LabelledQuery]) -> [u8; 32] {
+pub(super) fn labelled_query_digest(domain: &str, queries: &[Sem3LabelledQuery]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi-sem-003.labelled-queries.v1");
     hash_string(&mut hasher, domain);
@@ -1126,7 +1255,7 @@ fn labelled_query_digest(domain: &str, queries: &[LabelledQuery]) -> [u8; 32] {
     *hasher.finalize().as_bytes()
 }
 
-fn ambiguous_query_digest(queries: &[AmbiguousQuery]) -> [u8; 32] {
+pub(super) fn ambiguous_query_digest(queries: &[Sem3AmbiguousQuery]) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi-sem-003.ambiguous-queries.v1");
     for query in queries {
@@ -1138,7 +1267,10 @@ fn ambiguous_query_digest(queries: &[AmbiguousQuery]) -> [u8; 32] {
     *hasher.finalize().as_bytes()
 }
 
-fn unlabelled_query_digest(domain: &str, queries: &[UnlabelledQuery]) -> [u8; 32] {
+pub(super) fn unlabelled_query_digest(
+    domain: &str,
+    queries: &[Sem3UnlabelledQuery],
+) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea.sym-rsi-sem-003.unlabelled-queries.v1");
     hash_string(&mut hasher, domain);
@@ -1282,7 +1414,7 @@ fn hash_support(hasher: &mut blake3::Hasher, support: SemanticContextSupport) {
     hasher.update(&support.mean_overflow_abs.to_bits().to_le_bytes());
 }
 
-fn hash_context(hasher: &mut blake3::Hasher, context: &[f32]) {
+pub(super) fn hash_context(hasher: &mut blake3::Hasher, context: &[f32]) {
     hasher.update(&(context.len() as u64).to_le_bytes());
     for value in context {
         hasher.update(&value.to_bits().to_le_bytes());
@@ -1294,7 +1426,7 @@ fn hash_string(hasher: &mut blake3::Hasher, value: &str) {
     hasher.update(value.as_bytes());
 }
 
-fn disposition_tag(disposition: Sem3Disposition) -> u8 {
+pub(super) fn disposition_tag(disposition: Sem3Disposition) -> u8 {
     match disposition {
         Sem3Disposition::Pass => 1,
         Sem3Disposition::Tradeoff => 2,
@@ -1354,102 +1486,6 @@ fn percentile_f32(values: &[f32], probability: f64) -> f32 {
 fn validate_subject_sha(subject_sha: &str) -> Result<(), Sem3ExperimentError> {
     if subject_sha.len() != 40 || !subject_sha.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(Sem3ExperimentError::InvalidSubjectSha);
-    }
-    Ok(())
-}
-
-fn candidate_index(
-    bank: &[&Candidate],
-    identity: ContextIdentity,
-) -> Result<usize, Sem3ExperimentError> {
-    bank.iter()
-        .position(|candidate| candidate.identity == identity)
-        .ok_or(Sem3ExperimentError::MissingCandidate)
-}
-
-fn candidate_context(dimension: usize, index: usize) -> Vec<f32> {
-    let family = index / 2;
-    let side = index % 2;
-    let mut context = family_center(dimension, family);
-    let coordinate = (family * 5 + dimension) % dimension;
-    let delta = if side == 0 { -0.08 } else { 0.08 };
-    context[coordinate] += delta;
-    context
-}
-
-fn family_center(dimension: usize, family: usize) -> Vec<f32> {
-    (0..dimension)
-        .map(|coordinate| {
-            let mixed = dimension
-                .wrapping_mul(131)
-                .wrapping_add(family.wrapping_mul(47))
-                .wrapping_add(coordinate.wrapping_mul(31))
-                .wrapping_add(coordinate.wrapping_mul(coordinate).wrapping_mul(7));
-            (mixed % 1201) as f32 / 1000.0 - 0.6
-        })
-        .collect()
-}
-
-fn unrelated_context(dimension: usize, index: usize) -> Vec<f32> {
-    (0..dimension)
-        .map(|coordinate| {
-            let mixed = 0x9e37usize
-                .wrapping_add(dimension.wrapping_mul(173))
-                .wrapping_add(index.wrapping_mul(89))
-                .wrapping_add(coordinate.wrapping_mul(61))
-                .wrapping_add(coordinate.wrapping_mul(coordinate).wrapping_mul(13));
-            (mixed % 1201) as f32 / 1000.0 - 0.6
-        })
-        .collect()
-}
-
-fn perturb_context(source: &[f32], index: usize, magnitude: f32, salt: usize) -> Vec<f32> {
-    let mut query = source.to_vec();
-    let coordinate = (index.wrapping_mul(7).wrapping_add(salt)) % query.len();
-    let direction = if (index + salt) % 2 == 0 { 1.0 } else { -1.0 };
-    query[coordinate] = (query[coordinate] + direction * magnitude).clamp(-0.95, 0.95);
-    query
-}
-
-fn validate_exact_disjointness(
-    candidates: &[Candidate],
-    calibration: &[LabelledQuery],
-    clean: &[LabelledQuery],
-    ambiguous: &[AmbiguousQuery],
-    unrelated: &[UnlabelledQuery],
-    ood: &[UnlabelledQuery],
-) -> Result<(), Sem3ExperimentError> {
-    let mut seen = HashSet::<[u8; 32]>::new();
-    for candidate in candidates {
-        if !seen.insert(candidate.identity.exact_digest) {
-            return Err(Sem3ExperimentError::CorpusIdentityOverlap);
-        }
-    }
-    for query in calibration {
-        insert_query_identity(&mut seen, &query.context)?;
-    }
-    for query in clean {
-        insert_query_identity(&mut seen, &query.context)?;
-    }
-    for query in ambiguous {
-        insert_query_identity(&mut seen, &query.context)?;
-    }
-    for query in unrelated {
-        insert_query_identity(&mut seen, &query.context)?;
-    }
-    for query in ood {
-        insert_query_identity(&mut seen, &query.context)?;
-    }
-    Ok(())
-}
-
-fn insert_query_identity(
-    seen: &mut HashSet<[u8; 32]>,
-    context: &[f32],
-) -> Result<(), Sem3ExperimentError> {
-    let identity = ContextIdentity::from_context(context)?;
-    if !seen.insert(identity.exact_digest) {
-        return Err(Sem3ExperimentError::CorpusIdentityOverlap);
     }
     Ok(())
 }
@@ -1523,15 +1559,26 @@ mod tests {
 
     #[test]
     fn sem3_calibration_queries_pass_support_gate() {
-        let encoder = SemanticContextEncoder::default();
-        let candidates = candidate_bank(encoder).unwrap();
-        let calibration = calibration_queries(&candidates).unwrap();
-        for query in &calibration {
-            require_query_support(encoder, &query.context).unwrap();
+        let corpus = prepare_sem3_corpus().unwrap();
+        for query in &corpus.calibration {
+            require_query_support(corpus.encoder, &query.context).unwrap();
         }
-        let thresholds = calibrate_thresholds(encoder, &candidates, &calibration).unwrap();
+        let thresholds = calibrate_sem3_thresholds(&corpus, &corpus.calibration).unwrap();
         assert!(thresholds.iter().all(|threshold| {
             threshold.calibration_count == SYM_RSI_SEM_003_CALIBRATION_QUERIES_PER_DIMENSION
         }));
+    }
+
+    #[test]
+    fn sem3_primary_summary_matches_receipt_surface() {
+        let corpus = prepare_sem3_corpus().unwrap();
+        let thresholds = calibrate_sem3_thresholds(&corpus, &corpus.calibration).unwrap();
+        let semantic_null = build_semantic_null(&corpus).unwrap();
+        let evaluation = evaluate_sem3_with_thresholds(&corpus, &semantic_null, &thresholds).unwrap();
+        let primary = summarize_sem3_primary(&evaluation);
+        let receipt = run_sym_rsi_sem_003(SUBJECT).unwrap();
+        assert_eq!(primary.clean_target_coverage, receipt.clean_target_coverage);
+        assert_eq!(primary.clean_mean_set_size, receipt.clean_mean_set_size);
+        assert_eq!(primary.disposition, receipt.disposition);
     }
 }
