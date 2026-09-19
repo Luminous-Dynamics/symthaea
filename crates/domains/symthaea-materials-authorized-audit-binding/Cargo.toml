@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-materials-authorized-audit-binding"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-materials-corpus-audit = { path = "../symthaea-materials-corpus-audit" }
+symthaea-materials-history-tool = { path = "../symthaea-materials-history-tool" }
+symthaea-materials-target-set = { path = "../symthaea-materials-target-set" }
