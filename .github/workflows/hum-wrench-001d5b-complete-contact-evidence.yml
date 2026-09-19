@@ -1,0 +1,217 @@
+name: HUM-WRENCH-001D5B Complete Contact Evidence
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/**"
+      - ".github/workflows/hum-wrench-001d5b-complete-contact-evidence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001d5b-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 156ed01855b2c6fd89118b5ac4063282added0cb
+  INTEGRATION_BASE: 64f043102e2d2b4c0d8f20a9d138d983eb0c5db1
+  D5A_SOURCE: b64e62287cfb49797d280369545672cff87b48dd
+  DYN_SOURCE: 67107f337ee454d4d9da859b7fd4dea8628cedf2
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-complete-contact-evidence-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 16
+          persist-credentials: false
+
+      - name: Bind exact qualifier parent and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001d5b-complete-contact-evidence.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind exact two-parent integration ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "$INTEGRATION_BASE^{commit}"
+          git cat-file -e "$D5A_SOURCE^{commit}"
+          git cat-file -e "$DYN_SOURCE^{commit}"
+          test "$(git show -s --format=%P "$INTEGRATION_BASE")" = "$D5A_SOURCE $DYN_SOURCE"
+          git merge-base --is-ancestor "$D5A_SOURCE" "$EXPECTED_PARENT"
+          git merge-base --is-ancestor "$DYN_SOURCE" "$EXPECTED_PARENT"
+          git merge-base --is-ancestor "$INTEGRATION_BASE" "$EXPECTED_PARENT"
+
+      - name: Bind frozen source, manifest, and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Verify typed complete-contact authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/mujoco_complete_contact_evidence.rs
+          test -f "$src"
+          grep -F 'pub struct CompleteContactEstablishmentEvidenceV1' "$src"
+          grep -F 'pub(crate) fn bind_complete_mujoco_contact_evidence_v1' "$src"
+          grep -F 'SpatialContactJacobian' "$src"
+          grep -F 'VerifiedMujocoContactBiasEvidenceV1' "$src"
+          grep -F 'VerifiedSurfaceSupportEvidenceV1' "$src"
+          grep -F 'support.model_signature(),' "$src"
+          grep -F 'bias_evidence.model_signature(),' "$src"
+          grep -F '.find(|contact| contact.site_id.as_str() == support.support_site_name())' "$src"
+          grep -F '.bias_for_site(support.support_site_name())' "$src"
+          grep -F 'contact_bias.source != ContactBiasAccelerationSource::SimulatorSolver' "$src"
+          grep -F 'jacobian_bits(&jacobian.rows)' "$src"
+          grep -F 'f64_bits_list(&bias.spatial_bias_acceleration)' "$src"
+          grep -F 'has_complete_contact_kinematics_evidence' "$src"
+          ! grep -F 'EstablishedContactEvidenceV1' "$src"
+          ! grep -F 'ContactAuthorityStateMachineV1' "$src"
+          ! grep -F 'floating_base_inverse_dynamics' "$src"
+          ! grep -F 'csc_qp' "$src"
+          ! grep -F 'osqp' "$src"
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-humanoid/src/mujoco_complete_contact_evidence.rs').read_text()
+          prefix, rest = text.split('pub struct CompleteContactEstablishmentEvidenceV1 {', 1)
+          fields = rest.split('\n}\n\nimpl CompleteContactEstablishmentEvidenceV1', 1)[0]
+          for field in (
+              'support', 'contact_jacobian', 'contact_bias',
+              'generalized_velocity_count', 'contact_kinematics_lineage_id',
+              'complete_lineage_id', 'source_class',
+          ):
+              assert f'pub {field}:' not in fields, field
+          derive_lines = prefix.splitlines()[-3:]
+          assert any('Serialize' in line for line in derive_lines), derive_lines
+          assert not any('Deserialize' in line for line in derive_lines), derive_lines
+          assert 'pub fn contact_jacobian(&self) -> &SpatialContactJacobian' in text
+          assert 'pub fn contact_bias(&self) -> &ContactAccelerationBiasV1' in text
+          assert '#[allow(dead_code, reason = "A later D4 adapter will consume the complete evidence token")]' in text
+          PY
+
+      - name: Verify pinned MuJoCo dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'mujoco-rs = { version = "4.0.1"' crates/domains/symthaea-humanoid/Cargo.toml
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --no-deps --format-version 1 >/dev/null
+          cargo tree -p symthaea-humanoid --features mujoco --locked | tee "$RUNNER_TEMP/cargo-tree.txt"
+          grep -F 'mujoco-rs v4.0.1' "$RUNNER_TEMP/cargo-tree.txt"
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked MuJoCo all-target compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Execute D5B complete-contact regressions
+        run: cargo test -p symthaea-humanoid --features mujoco mujoco_complete_contact_evidence --locked -- --nocapture
+
+      - name: Re-execute support and dynamics predecessor regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-humanoid --features mujoco mujoco_verified_support --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_support_normal_verifier --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco --lib contact_kinematics --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco --lib mujoco_contact_kinematics --locked -- --nocapture
+
+      - name: Strict feature-enabled Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --features mujoco --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001d5b-evidence
+          cp "$RUNNER_TEMP/cargo-tree.txt" hum-wrench-001d5b-evidence/cargo-tree.txt
+          {
+            echo "program=HUM-WRENCH-001D5B"
+            echo "authority=complete-contact-kinematics-evidence-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "integration_base=$INTEGRATION_BASE"
+            echo "d5a_source=$D5A_SOURCE"
+            echo "dyn_source=$DYN_SOURCE"
+            echo "two_parent_integration_bound=TRUE"
+            echo "token_publicly_constructible=FALSE"
+            echo "token_deserializable=FALSE"
+            echo "binder_visibility=CRATE_INTERNAL"
+            echo "exact_model_signature_bound=TRUE"
+            echo "exact_model_identity_bound=TRUE"
+            echo "exact_sample_time_bound=TRUE"
+            echo "exact_support_site_bound=TRUE"
+            echo "contact_jacobian_retained=TRUE"
+            echo "contact_bias_retained=TRUE"
+            echo "jacobian_exact_float_bits_bound=TRUE"
+            echo "bias_exact_float_bits_bound=TRUE"
+            echo "complete_J_plus_Jdotqdot_evidence=TRUE"
+            echo "source_class=SimulatorDerived"
+            echo "bias_source=SimulatorSolver"
+            echo "lineage_cryptographic_claim=NONE"
+            echo "d4_established_authority=NONE"
+            echo "qp_authority=NONE"
+            echo "hardware_contact_truth_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_mujoco=PASS"
+            echo "focused_tests=PASS"
+            echo "predecessor_regressions=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001d5b-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001d5b-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001d5b-evidence/
+          if-no-files-found: error
