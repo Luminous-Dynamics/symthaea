@@ -43,6 +43,8 @@ pub mod mujoco_complete_contact_verifier;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_prepared_contact_authority;
 #[cfg(feature = "mujoco")]
+pub mod mujoco_prepared_contact_verifier;
+#[cfg(feature = "mujoco")]
 pub mod mujoco_contact_interaction;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_contact_kinematics;
@@ -112,6 +114,8 @@ pub use mujoco_complete_contact_evidence::*;
 pub use mujoco_complete_contact_verifier::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_prepared_contact_authority::*;
+#[cfg(feature = "mujoco")]
+pub use mujoco_prepared_contact_verifier::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_contact_interaction::*;
 #[cfg(feature = "mujoco")]
