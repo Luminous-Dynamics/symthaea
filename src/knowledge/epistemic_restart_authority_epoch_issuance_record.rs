@@ -9,6 +9,9 @@
 //! that result, but deliberately provides no production constructor, executor,
 //! validator against a live transaction, epoch issuer, or mutation authority.
 
+#[path = "epistemic_restart_activation_evidence_validation.rs"]
+pub mod runtime_validation;
+
 use crate::knowledge::epistemic_restart_continuity::activation_transaction_contract::{
     AtomicActivationPhaseV1, AtomicActivationTransactionContractError,
     AtomicActivationTransactionContractV1,
