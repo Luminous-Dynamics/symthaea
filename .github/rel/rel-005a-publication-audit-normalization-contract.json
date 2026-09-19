@@ -1,0 +1,43 @@
+{
+  "authority": "PublicationAuditNormalizationContractOnly",
+  "authority_boundary": {
+    "may_apply_scientific_thresholds": false,
+    "may_change_qualification_result": false,
+    "may_read_execution_logs": false,
+    "may_read_raw_scientific_observation": false,
+    "may_rename_verified_metric_free_receipts": true
+  },
+  "claims": {
+    "normalization_completed": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_fail": false,
+    "scientific_pass": false
+  },
+  "relation": "REL-005A",
+  "rules": {
+    "byte_preserving_copy_required": true,
+    "duplicate_json_keys_rejected": true,
+    "exact_output_census_required": true,
+    "exact_source_census_required": true,
+    "json_mutation_forbidden": true,
+    "source_receipts_must_make_no_qualification_or_scientific_claims": true,
+    "transport_identity_is_scientific_authority": false
+  },
+  "schema": "symthaea.rel.publication-audit-normalization-contract.v1",
+  "source_artifact_name": "rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+  "source_files": {
+    "authority-receipt-extraction.json": {
+      "authority": "AuthorityReceiptExtractionOnly",
+      "canonical_name": "authority-receipt-extraction.json",
+      "schema": "symthaea.rel.authority-receipt-extraction-receipt.v2"
+    },
+    "sealed-manifest-replay.json": {
+      "authority": "SealedManifestReplayOnly",
+      "canonical_name": "sealed-manifest-replay-receipt.json",
+      "schema": "symthaea.rel.sealed-manifest-replay-receipt.v1"
+    }
+  },
+  "source_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+  "source_run_id": 35439414230
+}
