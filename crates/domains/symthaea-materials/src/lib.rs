@@ -18,6 +18,7 @@ pub mod encoder;
 pub mod evidence;
 pub mod haptic_prober;
 pub mod hea_screening;
+pub mod irradiation_evidence;
 pub mod mining;
 pub mod properties;
 pub mod strategic;
@@ -34,6 +35,12 @@ pub use evidence::{
 pub use hea_screening::{
     ClassicHeaScreeningFlags, HeaElementDescriptor, HeaScreeningDescriptors, HeaScreeningError,
     PairMixingEnthalpy, VecStructureTendency, calculate_hea_descriptors,
+};
+pub use irradiation_evidence::{
+    CompositionDpaEvidence, DamageMetricModel, DisplacementCrossSectionBin,
+    ElementDisplacementCurve, ElementDpaContribution, IRRADIATION_COMPOSITION_PPM_TOTAL,
+    IrradiationCompositionComponent, IrradiationEvidenceError, IrradiationEvidenceInput,
+    NeutronSpectrumBin, calculate_composition_dpa_evidence,
 };
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
