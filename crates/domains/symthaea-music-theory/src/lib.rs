@@ -87,6 +87,7 @@ pub mod temporal_map;
 pub mod temporal_midi_projection;
 pub mod temporal_score;
 pub mod thematic_identity;
+pub mod thematic_retrograde_evidence;
 pub mod thematic_score_evidence;
 pub mod voicing;
 pub mod work_obligation;
@@ -189,6 +190,11 @@ pub use thematic_identity::{
     THEMATIC_IDENTITY_GRAPH_VERSION, ThematicDerivationV1, ThematicGraphErrorV1,
     ThematicIdentityGraphV1, ThematicIdentityV1, ThematicOriginV1,
     ThematicTransformationClassV1,
+};
+pub use thematic_retrograde_evidence::{
+    THEMATIC_RETROGRADE_EVIDENCE_VERSION, ThematicRetrogradeEvidenceSetV1,
+    ThematicRetrogradeEvidenceV1, ThematicRetrogradeStatusV1,
+    measure_thematic_retrograde_evidence,
 };
 pub use thematic_score_evidence::{
     MIN_THEMATIC_MELODY_NOTES, THEMATIC_SCORE_EVIDENCE_VERSION,
