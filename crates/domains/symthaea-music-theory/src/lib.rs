@@ -133,6 +133,11 @@ pub use obligation::{
 };
 pub use phrase::{Period, Phrase};
 pub use pitch::{Interval, IntervalQuality, Pitch, PitchClass};
+pub use prog_suite::{
+    PROG_SUITE_BARS_PER_SECTION, PROG_SUITE_PLAN_VERSION, ProgSuitePlanErrorV1,
+    ProgSuitePlanV1, ProgSuiteRealizationV1, ProgSuiteSectionPlanV1, ProgSuiteTransformV1,
+    plan_prog_suite, realize_prog_suite_with_plan,
+};
 pub use rhythm::Duration;
 pub use rhythmic_identity::{RhythmicIdentityReport, rhythmic_identity_report};
 pub use scale::{Mode, Scale};
