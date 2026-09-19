@@ -1,13 +1,20 @@
 diff --git a/src/action/mod.rs b/src/action/mod.rs
 --- a/src/action/mod.rs
 +++ b/src/action/mod.rs
-@@ -1,39 +1,81 @@
+@@ -1,39 +1,95 @@
              ActionIR::WasmSandbox {
                  module_path,
                  function_name,
-                 input_data: _,
+-                input_data: _,
++                input_data,
              } => match self.mode {
                  ExecutionMode::Simulated => {
++                    if !input_data.is_empty() {
++                        return Err(ExecutionError::Unsupported(
++                            "WasmSandbox input_data ABI is not defined; refusing non-empty input"
++                                .to_string(),
++                        ));
++                    }
                      println!(
                          "🧪 WASM Sandbox: Simulating verification of module {:?}::{}()",
                          module_path, function_name
@@ -20,7 +27,7 @@ diff --git a/src/action/mod.rs b/src/action/mod.rs
                  ExecutionMode::Real => {
                      #[cfg(feature = "wasm-sandbox")]
                      {
-+                        use std::io::Read as _;
+                         use std::io::Read as _;
                          use wasmtime::*;
 -                        let engine = Engine::default();
 -                        let module = Module::from_file(&engine, module_path)
@@ -29,6 +36,16 @@ diff --git a/src/action/mod.rs b/src/action/mod.rs
 +                        const WASM_MODULE_MAX_BYTES: u64 = 16 * 1024 * 1024;
 +                        const WASM_MEMORY_LIMIT_BYTES: usize = 64 * 1024 * 1024;
 +                        const WASM_TABLE_ELEMENT_LIMIT: usize = 65_536;
++
++                        // `input_data` is currently part of ActionIR but no guest ABI carries it.
++                        // Refuse non-empty input rather than silently claiming those bytes were
++                        // verified by a no-argument guest function.
++                        if !input_data.is_empty() {
++                            return Err(ExecutionError::Unsupported(
++                                "WasmSandbox input_data ABI is not defined; refusing non-empty input"
++                                    .to_string(),
++                            ));
++                        }
 +
 +                        // Module paths are capabilities too. Resolve the requested module through
 +                        // the caller-owned SandboxRoot before opening any host file.
@@ -97,6 +114,12 @@ diff --git a/src/action/mod.rs b/src/action/mod.rs
                      }
                      #[cfg(not(feature = "wasm-sandbox"))]
                      {
++                        if !input_data.is_empty() {
++                            return Err(ExecutionError::Unsupported(
++                                "WasmSandbox input_data ABI is not defined; refusing non-empty input"
++                                    .to_string(),
++                            ));
++                        }
                          ActionOutcome::WasmResult {
                              output: vec![0],
                              logs: vec!["Error: wasm-sandbox feature not enabled.".to_string()],
