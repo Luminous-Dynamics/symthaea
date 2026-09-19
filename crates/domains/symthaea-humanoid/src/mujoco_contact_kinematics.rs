@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn articulated_velocity_produces_same_subject_nonzero_bias() {
         let morphology = HumanoidMorphology::Dmc21;
-        let mut sim = MuJoHumanoidSimulator::for_morphology(morphology).unwrap();
+        let mut sim = MuJoCoHumanoidSimulator::for_morphology(morphology).unwrap();
         let qpos = sim.data_mut().qpos().to_vec();
         let nv = sim.model_arc().ffi().nv as usize;
         let mut qvel = vec![0.0; nv];
