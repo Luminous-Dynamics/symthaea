@@ -1,0 +1,450 @@
+name: DE-001A1C Cobaya Fixed-Point Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      a1r_run_id:
+        description: Exact successful A1R/A1Q workflow run ID for this same subject head
+        required: true
+        type: string
+      environment_run_id:
+        description: Exact successful DE-001A environment-v3 workflow run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      a1r_run_id:
+        required: true
+        type: string
+      environment_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a1c-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: A1C exact-head result qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPECTED_HEAD: ${{ github.sha }}
+      A1R_RUN_ID: ${{ inputs.a1r_run_id }}
+      ENVIRONMENT_RUN_ID: ${{ inputs.environment_run_id }}
+
+    steps:
+      - name: Check out exact A1C subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind subject and evidence paths
+        id: subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$EXPECTED_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a1c-evidence" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A1R=$RUNNER_TEMP/de001a-upstream-a1r" >> "$GITHUB_ENV"
+          echo "UPSTREAM_ENV=$RUNNER_TEMP/de001a-upstream-environment" >> "$GITHUB_ENV"
+          echo "A0_LINK=$RUNNER_TEMP/de001a-a0-artifacts" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a1c-evidence" \
+            "$RUNNER_TEMP/de001a-upstream-a1r" \
+            "$RUNNER_TEMP/de001a-upstream-environment"
+
+      - name: Download exact A1R/A1Q evidence run
+        id: download_a1r
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a1r-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a1r
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a1r_run_id }}
+
+      - name: Download exact environment-v3 evidence run
+        id: download_env
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-environment-receipt-*
+          path: ${{ runner.temp }}/de001a-upstream-environment
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.environment_run_id }}
+
+      - name: Verify explicit upstream run identities
+        id: upstream
+        if: steps.download_a1r.outcome == 'success' && steps.download_env.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$A1R_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+          case "$ENVIRONMENT_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A1R_RUN_ID" > "$EVIDENCE_DIR/a1r-run.json"
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$ENVIRONMENT_RUN_ID" > "$EVIDENCE_DIR/environment-run.json"
+
+          python3 - "$EVIDENCE_DIR/a1r-run.json" "$A1R_RUN_ID" "$EXPECTED_HEAD" <<'PY'
+          import json, sys
+          path, expected_id, expected_head = sys.argv[1:]
+          run = json.load(open(path, encoding="utf-8"))
+          assert str(run["id"]) == expected_id
+          assert run["status"] == "completed"
+          assert run["conclusion"] == "success"
+          assert run["head_sha"] == expected_head
+          PY
+
+          python3 - "$EVIDENCE_DIR/environment-run.json" "$ENVIRONMENT_RUN_ID" <<'PY'
+          import json, sys
+          path, expected_id = sys.argv[1:]
+          run = json.load(open(path, encoding="utf-8"))
+          assert str(run["id"]) == expected_id
+          assert run["status"] == "completed"
+          assert run["conclusion"] == "success"
+          PY
+
+          for required in \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$UPSTREAM_A1R/a1r-primary.json" \
+            "$UPSTREAM_A1R/qualification-capsule.json" \
+            "$UPSTREAM_ENV/de001a-environment-receipt.txt" \
+            "$UPSTREAM_ENV/de001a-environment-versions.json"
+          do
+            test -f "$required"
+          done
+
+          python3 - \
+            "$UPSTREAM_A1R/qualification-capsule.json" \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$A1R_RUN_ID" \
+            "$EXPECTED_HEAD" <<'PY'
+          import hashlib, json, sys
+          capsule_path, a1q_path, expected_run, expected_head = sys.argv[1:]
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+          assert capsule["protocol"] == "DE-001A1R-QUALIFICATION-CAPSULE-v2"
+          assert capsule["subject_head"] == expected_head
+          assert capsule["workflow"]["run_id"] == expected_run
+          assert capsule["workflow"]["a1q_exit_code"] == "0"
+          assert capsule["workflow"]["postflight_outcome"] == "success"
+          actual = hashlib.sha256(open(a1q_path, "rb").read()).hexdigest()
+          assert capsule["receipt_sha256"]["a1q"] == actual
+          PY
+
+          grep -Fx "protocol=DE-001A-ENVIRONMENT-QUALIFICATION-v3" \
+            "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+          grep -Fx "verdict=PASS" "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+          grep -Fx "workflow_run_id=$ENVIRONMENT_RUN_ID" \
+            "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+          grep -Fx "job_status=success" "$UPSTREAM_ENV/de001a-environment-receipt.txt"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Nix 2.34.7
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3
+        with:
+          enable_kvm: false
+          extra_nix_config: |
+            sandbox = true
+            experimental-features = nix-command flakes
+
+      - name: Qualify and build exact A1C software subject
+        id: software
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          nix --version | grep -Fx 'nix (Nix) 2.34.7'
+
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/domains/symthaea-cosmology-research/scripts/de001a_a1c_execute.py")
+          compile(path.read_text(encoding="utf-8"), str(path), "exec")
+          PY
+
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bins --release --locked
+
+          for binary in \
+            de001a-a1e-environment \
+            de001a-a1c-contract \
+            de001a-a1c-authorize \
+            de001a-a1c-result-qualify
+          do
+            test -x "target/release/$binary"
+            sha256sum "target/release/$binary" > "$EVIDENCE_DIR/$binary.sha256"
+          done
+          sha256sum crates/domains/symthaea-cosmology-research/scripts/de001a_a1c_execute.py \
+            > "$EVIDENCE_DIR/de001a_a1c_execute.py.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+
+      - name: Requalify reusable environment through A1E
+        id: a1e
+        if: steps.upstream.outcome == 'success' && steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a1e-environment \
+            "$UPSTREAM_ENV/de001a-environment-receipt.txt" \
+            "$UPSTREAM_ENV/de001a-environment-versions.json" \
+            > "$EVIDENCE_DIR/a1e.json"
+          python3 - "$EVIDENCE_DIR/a1e.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A1E-ENVIRONMENT-EVIDENCE-v1"
+          assert value["verdict"] == "PASS"
+          assert value["environment_reuse_authorized"] is True
+          assert value["a1c_execution_authorized"] is False
+          PY
+
+      - name: Validate A1C frozen contract
+        id: contract
+        if: steps.a1e.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          REF=crates/domains/symthaea-cosmology-research/references
+          target/release/de001a-a1c-contract \
+            "$REF/de001a_a1c_cobaya_fixed_point_v1.json" \
+            "$REF/de001a_a1r_oracle_v1.json" \
+            > "$EVIDENCE_DIR/a1c-contract.json"
+          python3 - "$EVIDENCE_DIR/a1c-contract.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A1C-CONTRACT-CONSISTENCY-v1"
+          assert value["verdict"] == "PASS"
+          assert value["execution_authorized"] is False
+          PY
+
+      - name: Authorize exactly one A1C fixed-point call
+        id: authorization
+        if: steps.contract.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a1c-authorize \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$EVIDENCE_DIR/a1e.json" \
+            "$EVIDENCE_DIR/a1c-contract.json" \
+            > "$EVIDENCE_DIR/a1c-authorization.json"
+          python3 - "$EVIDENCE_DIR/a1c-authorization.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A1C-EXECUTION-AUTHORIZATION-v1"
+          assert value["verdict"] == "PASS"
+          assert value["a1c_execution_authorized"] is True
+          assert value["likelihood_call_budget"] == 1
+          PY
+
+      - name: Realize exact A0 data artifacts
+        id: a0
+        if: steps.authorization.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAKE=./crates/domains/symthaea-cosmology-research/nix
+          nix build "$FLAKE#checks.x86_64-linux.a0-artifacts" --no-update-lock-file --no-link
+          nix build "$FLAKE#a0-artifacts" --no-update-lock-file --out-link "$A0_LINK"
+          store_path="$(realpath "$A0_LINK")"
+          nar_hash="$(nix hash path "$store_path")"
+          closure_size="$(nix path-info -S "$store_path" | awk '{print $2}')"
+          printf '%s\n' "$store_path" > "$EVIDENCE_DIR/a0-store-path.txt"
+          printf '%s\n' "$nar_hash" > "$EVIDENCE_DIR/a0-nar-hash.txt"
+          printf '%s\n' "$closure_size" > "$EVIDENCE_DIR/a0-closure-size.txt"
+
+      - name: Execute one released-Cobaya fixed-point likelihood call
+        id: a1c
+        if: steps.a0.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          env_path="$(python3 - "$EVIDENCE_DIR/a1e.json" <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["realized_environment_store_path"])
+          PY
+          )"
+          test -x "$env_path/bin/python"
+
+          set +e
+          "$env_path/bin/python" \
+            crates/domains/symthaea-cosmology-research/scripts/de001a_a1c_execute.py \
+            "$EVIDENCE_DIR/a1c-authorization.json" \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$EVIDENCE_DIR/a1e.json" \
+            "$EVIDENCE_DIR/a1c-contract.json" \
+            "$A0_LINK/dataset-mean" \
+            "$A0_LINK/dataset-covariance" \
+            > "$EVIDENCE_DIR/a1c-result.json" \
+            2> "$EVIDENCE_DIR/a1c-result.stderr"
+          code=$?
+          set -e
+          echo "reproduction_exit_code=$code" >> "$GITHUB_OUTPUT"
+          cat "$EVIDENCE_DIR/a1c-result.json"
+          if [[ "$code" != "0" && "$code" != "1" ]]; then
+            exit "$code"
+          fi
+
+      - name: Qualify A1C result integrity
+        id: result_qualification
+        if: steps.a1c.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a1c-result-qualify \
+            "$EVIDENCE_DIR/a1c-result.json" \
+            "$EVIDENCE_DIR/a1c-authorization.json" \
+            "$UPSTREAM_A1R/a1q.json" \
+            "$EVIDENCE_DIR/a1e.json" \
+            "$EVIDENCE_DIR/a1c-contract.json" \
+            > "$EVIDENCE_DIR/a1c-qualification.json"
+          python3 - "$EVIDENCE_DIR/a1c-qualification.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A1C-RESULT-QUALIFICATION-v1"
+          assert value["verdict"] == "PASS"
+          assert value["a1x_comparison_authorized"] is True
+          assert value["a2_execution_authorized"] is False
+          PY
+
+      - name: Postflight immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.subject.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write A1C qualification capsule
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+
+          hash_or_unavailable() {
+            if [[ -f "$1" ]]; then
+              sha256sum "$1" | awk '{print $1}'
+            else
+              printf '%s' 'UNAVAILABLE'
+            fi
+          }
+          value_or_unavailable() {
+            local file="$1" key="$2"
+            if [[ -f "$file" ]]; then
+              python3 - "$file" "$key" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          print(value.get(sys.argv[2], "UNAVAILABLE"))
+          PY
+            else
+              printf '%s\n' 'UNAVAILABLE'
+            fi
+          }
+
+          cat > "$EVIDENCE_DIR/qualification-capsule.json" <<EOF
+          {
+            "protocol": "DE-001A1C-QUALIFICATION-CAPSULE-v1",
+            "scientific_claim": "NONE",
+            "authority": "a1c-result-integrity-only",
+            "subject_head": "${{ steps.subject.outputs.head }}",
+            "subject_tree": "${{ steps.subject.outputs.tree }}",
+            "upstream_runs": {
+              "a1r_a1q": "$A1R_RUN_ID",
+              "environment_v3": "$ENVIRONMENT_RUN_ID"
+            },
+            "workflow": {
+              "run_id": "${GITHUB_RUN_ID}",
+              "attempt": "${GITHUB_RUN_ATTEMPT}",
+              "download_a1r_outcome": "${{ steps.download_a1r.outcome }}",
+              "download_env_outcome": "${{ steps.download_env.outcome }}",
+              "upstream_outcome": "${{ steps.upstream.outcome }}",
+              "software_outcome": "${{ steps.software.outcome }}",
+              "a1e_outcome": "${{ steps.a1e.outcome }}",
+              "contract_outcome": "${{ steps.contract.outcome }}",
+              "authorization_outcome": "${{ steps.authorization.outcome }}",
+              "a0_outcome": "${{ steps.a0.outcome }}",
+              "a1c_outcome": "${{ steps.a1c.outcome }}",
+              "a1c_reproduction_exit_code": "${{ steps.a1c.outputs.reproduction_exit_code }}",
+              "result_qualification_outcome": "${{ steps.result_qualification.outcome }}",
+              "postflight_outcome": "${{ steps.postflight.outcome }}"
+            },
+            "reproduction_verdict": "$(value_or_unavailable "$EVIDENCE_DIR/a1c-result.json" verdict)",
+            "receipt_sha256": {
+              "a1q": "$(hash_or_unavailable "$UPSTREAM_A1R/a1q.json")",
+              "a1e": "$(hash_or_unavailable "$EVIDENCE_DIR/a1e.json")",
+              "a1c_contract": "$(hash_or_unavailable "$EVIDENCE_DIR/a1c-contract.json")",
+              "authorization": "$(hash_or_unavailable "$EVIDENCE_DIR/a1c-authorization.json")",
+              "a1c_result": "$(hash_or_unavailable "$EVIDENCE_DIR/a1c-result.json")",
+              "a1c_qualification": "$(hash_or_unavailable "$EVIDENCE_DIR/a1c-qualification.json")"
+            },
+            "a0_artifact_store": {
+              "path_sha256": "$(hash_or_unavailable "$EVIDENCE_DIR/a0-store-path.txt")",
+              "nar_hash_sha256": "$(hash_or_unavailable "$EVIDENCE_DIR/a0-nar-hash.txt")"
+            }
+          }
+          EOF
+          cat "$EVIDENCE_DIR/qualification-capsule.json"
+
+      - name: Upload A1C evidence capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a1c-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a1c-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce A1C qualification integrity
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_a1r.outcome }}" = "success"
+          test "${{ steps.download_env.outcome }}" = "success"
+          test "${{ steps.upstream.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.a1e.outcome }}" = "success"
+          test "${{ steps.contract.outcome }}" = "success"
+          test "${{ steps.authorization.outcome }}" = "success"
+          test "${{ steps.a0.outcome }}" = "success"
+          test "${{ steps.a1c.outcome }}" = "success"
+          case "${{ steps.a1c.outputs.reproduction_exit_code }}" in 0|1) ;; *) exit 1 ;; esac
+          test "${{ steps.result_qualification.outcome }}" = "success"
+          test "${{ steps.postflight.outcome }}" = "success"
