@@ -7,17 +7,18 @@
 //! identities, bounded authority, evidence classes, independence descriptors,
 //! scientific subjects, claims, polarity-aware adjudication, semantic
 //! evidence-to-claim binding, protocol-scoped evidence accounting and corpus
-//! decision binding, non-authorizing qualification eligibility and review-ready
-//! capabilities, lifecycle-authenticated qualification-profile and claim-decision
-//! authority, typed provenance graphs, frozen study protocols, immutable
-//! execution/conformance records, adversarial falsification campaigns, explicit
-//! scientific uncertainty budgets, and provenance-checked replication lineage
-//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
-//! formal provers, or network operations.
+//! decision binding, qualification eligibility and review readiness,
+//! lifecycle-authenticated qualification-profile and claim-decision authority,
+//! non-forgeable qualified-claim capabilities, typed provenance graphs, frozen
+//! study protocols, immutable execution/conformance records, adversarial
+//! falsification campaigns, explicit scientific uncertainty budgets, and
+//! provenance-checked replication lineage assessments. It does not run
+//! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
+//! operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
-//! Final scientific qualification is reserved for a later capability that consumes
-//! an authenticated claim decision.
+//! Scientific qualification exists only as a private capability after the exact
+//! authenticated qualification lineage has passed.
 
 pub mod authority;
 pub mod claim;
@@ -38,6 +39,7 @@ mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
 pub mod qualification_profile_authority;
 pub mod qualification_review;
+pub mod qualified_claim;
 pub mod replication;
 pub mod subject;
 pub mod uncertainty;
@@ -73,6 +75,7 @@ pub use qualification_eligibility::{
 pub use qualification_eligibility_gate::*;
 pub use qualification_profile_authority::*;
 pub use qualification_review::*;
+pub use qualified_claim::*;
 pub use replication::*;
 pub use subject::*;
 pub use uncertainty::*;
