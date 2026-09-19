@@ -56,6 +56,8 @@ pub mod perceptual_enrollment_coordinator;
 pub mod perceptual_enrollment_witness_recovery;
 #[path = "perceptual_enrollment_witness_provider.rs"]
 pub mod perceptual_enrollment_witness_provider;
+#[path = "perceptual_enrollment_orchestrator.rs"]
+pub mod perceptual_enrollment_orchestrator;
 #[cfg(test)]
 #[path = "perceptual_enrollment_coordinator_tests.rs"]
 mod perceptual_enrollment_coordinator_tests;
