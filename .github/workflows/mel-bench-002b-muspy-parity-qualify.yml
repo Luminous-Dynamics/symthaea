@@ -1,0 +1,194 @@
+name: MEL-BENCH-002B exact MusPy parity qualification
+
+on:
+  push:
+    branches:
+      - qualify/mel-bench-002b-7578fd6
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-bench-002b-exact-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  MEL_BENCH_002B_SUBJECT: 7578fd662c1ef7054cadb83f77a68ecf5de8388c
+  MEL_BENCH_002B_BASE: 6688d31697c943a643e2cd049c2d3bd6e5139d99
+  MUSPY_REVISION: 2e1dc660dde6974c1693147f528d7437019d9580
+  MUSPY_METRICS_BLOB: b428fe331f7a8b64380a7d9a12f028e4f12c3033
+
+jobs:
+  qualify:
+    name: Execute frozen MusPy pitch parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact Melothaea subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEL_BENCH_002B_SUBJECT }}
+          fetch-depth: 0
+          path: subject
+
+      - name: Checkout exact external MusPy reference
+        uses: actions/checkout@v4
+        with:
+          repository: salu133445/muspy
+          ref: ${{ env.MUSPY_REVISION }}
+          fetch-depth: 1
+          path: external/muspy
+
+      - name: Bind exact subject and external source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C subject rev-parse HEAD)" = "$MEL_BENCH_002B_SUBJECT"
+          test "$(git -C subject merge-base "$MEL_BENCH_002B_BASE" HEAD)" = "$MEL_BENCH_002B_BASE"
+          git -C subject diff --name-only "$MEL_BENCH_002B_BASE"..HEAD | sort > /tmp/mel_bench_002b_changed
+          cat > /tmp/mel_bench_002b_allowed <<'EOF'
+          crates/domains/symthaea-muse/src/benchmark_symbolic_parity.rs
+          crates/domains/symthaea-muse/src/evidence_digest.rs
+          scripts/mel_bench_002b_muspy_reference.py
+          EOF
+          sort -o /tmp/mel_bench_002b_allowed /tmp/mel_bench_002b_allowed
+          diff -u /tmp/mel_bench_002b_allowed /tmp/mel_bench_002b_changed
+          test "$(git -C external/muspy rev-parse HEAD)" = "$MUSPY_REVISION"
+          test "$(git -C external/muspy hash-object muspy/metrics/metrics.py)" = "$MUSPY_METRICS_BLOB"
+          test -z "$(git -C subject status --porcelain=v1)"
+          test -z "$(git -C external/muspy status --porcelain=v1)"
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Python qualification runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.11'
+          cache: pip
+          cache-dependency-path: subject/scripts/mel_bench_002b_muspy_reference.py
+
+      - name: Install exact Python metric dependency
+        run: python3 -m pip install --disable-pip-version-check 'numpy==2.2.6'
+
+      - name: Install Muse system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libasound2-dev
+
+      - name: Generate raw external reference bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-002b"
+          mkdir -p "$out"
+          python3 subject/scripts/mel_bench_002b_muspy_reference.py \
+            --muspy-root external/muspy \
+            --output "$out/muspy-reference.json" \
+            --self-test
+          python3 -m json.tool "$out/muspy-reference.json" >/dev/null
+
+      - name: Capture execution environment
+        shell: bash
+        working-directory: subject
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-002b"
+          {
+            echo 'schema=melothaea.mel-bench-002b.external-parity.v1'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "base_sha=$MEL_BENCH_002B_BASE"
+            echo "muspy_revision=$MUSPY_REVISION"
+            echo "muspy_metrics_blob=$MUSPY_METRICS_BLOB"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            rustc -Vv
+            cargo -V
+            python3 -c "import numpy,platform; print('python_implementation='+platform.python_implementation()); print('python_version='+platform.python_version()); print('numpy_version='+numpy.__version__)"
+          } > "$out/environment.txt"
+          cp /tmp/mel_bench_002b_changed "$out/changed-files.txt"
+
+      - name: Focused formatting gate
+        working-directory: subject
+        run: cargo fmt --check -p symthaea-muse
+
+      - name: Native parity-contract regressions
+        working-directory: subject
+        run: cargo test -p symthaea-muse --lib --features theory benchmark_symbolic_parity
+
+      - name: Execute exactly one external-reference parity regression
+        shell: bash
+        working-directory: subject
+        env:
+          MEL_BENCH_002B_REFERENCE: ${{ runner.temp }}/mel-bench-002b/muspy-reference.json
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-002b/external-parity-test.txt"
+          cargo test -p symthaea-muse --lib --features theory \
+            external_reference_bundle_is_executed_when_qualification_requests_it \
+            -- --nocapture 2>&1 | tee "$out"
+          grep -F 'test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured;' "$out" >/dev/null
+
+      - name: Theory all-targets compile gate
+        working-directory: subject
+        run: cargo check -p symthaea-muse --features theory --all-targets
+
+      - name: Theory all-targets Clippy gate
+        working-directory: subject
+        run: cargo clippy -p symthaea-muse --features theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal bounded parity receipt
+        shell: bash
+        working-directory: subject
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-bench-002b"
+          {
+            echo 'status=MEL_BENCH_002B_FROZEN_FIXTURE_PARITY_PASS'
+            echo 'authority=external-metric-fixture-parity-only'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "reference_bundle_sha256=$(sha256sum "$out/muspy-reference.json" | awk '{print $1}')"
+            echo "external_test_log_sha256=$(sha256sum "$out/external-parity-test.txt" | awk '{print $1}')"
+            echo 'external_parity_tests_executed=1'
+            echo 'fixture_population_claimed=true'
+            echo 'all_scores_parity_claimed=false'
+            echo 'mgeval_parity_claimed=false'
+            echo 'corpus_similarity_claimed=false'
+            echo 'musical_quality_claimed=false'
+            echo 'human_preference_claimed=false'
+            echo 'product_authority_claimed=false'
+          } > "$out/receipt.txt"
+          sha256sum \
+            "$out/muspy-reference.json" \
+            "$out/external-parity-test.txt" \
+            "$out/environment.txt" \
+            "$out/changed-files.txt" \
+            "$out/receipt.txt" \
+            > "$out/SHA256SUMS"
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C subject rev-parse HEAD)" = "$MEL_BENCH_002B_SUBJECT"
+          test "$(git -C external/muspy rev-parse HEAD)" = "$MUSPY_REVISION"
+          test "$(git -C external/muspy hash-object muspy/metrics/metrics.py)" = "$MUSPY_METRICS_BLOB"
+          test -z "$(git -C subject status --porcelain=v1)"
+          test -z "$(git -C external/muspy status --porcelain=v1)"
+
+      - name: Upload exact external parity evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-bench-002b-${{ env.MEL_BENCH_002B_SUBJECT }}
+          path: ${{ runner.temp }}/mel-bench-002b/
+          retention-days: 90
