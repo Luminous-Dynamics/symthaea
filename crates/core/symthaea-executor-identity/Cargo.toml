@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-executor-identity"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Provider-neutral executor identity requirement, challenge, and opaque verified-binding ABI for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["agents", "identity", "attestation", "security"]
+categories = ["authentication", "data-structures"]
+
+[dependencies]
+sha2 = { workspace = true }
+symthaea-interaction-core = { path = "../symthaea-interaction-core" }

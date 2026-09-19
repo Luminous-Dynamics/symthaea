@@ -1,0 +1,166 @@
+name: Executor Identity ABI V1 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/executor-identity-v1-qualification.yml'
+      - 'crates/core/symthaea-executor-identity/**'
+      - 'crates/core/symthaea-interaction-core/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: executor-identity-v1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  executor-identity-v1:
+    name: Exact-head executor identity ABI v1
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact PR head and required interaction-core parent
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          REQUIRED_PARENT: 48de9f575a3bb6a70834c6d7b9a1080d37774d93
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+          fi
+          git cat-file -e "${REQUIRED_PARENT}^{commit}"
+          test "$(git merge-base HEAD "${REQUIRED_PARENT}")" = "${REQUIRED_PARENT}"
+          git merge-base --is-ancestor "${REQUIRED_PARENT}" HEAD
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce neutral opaque identity boundary
+        run: |
+          set -euo pipefail
+          MANIFEST=crates/core/symthaea-executor-identity/Cargo.toml
+          SOURCE=crates/core/symthaea-executor-identity/src/lib.rs
+
+          grep -Fq 'symthaea-interaction-core = { path = "../symthaea-interaction-core" }' "${MANIFEST}"
+          grep -Fq 'sha2 = { workspace = true }' "${MANIFEST}"
+          if grep -Eiq 'symthaea-authority|symthaea-action|serde|reqwest|hyper|tokio|holochain|hdk|hdi|xenia|spiffe|spire|rats|eat|tpm|wasmtime|keyring|secret-service' "${MANIFEST}"; then
+            echo 'authority/provider/runtime/serialization dependency leaked into neutral executor identity ABI' >&2
+            exit 1
+          fi
+
+          grep -Fq 'symthaea.executor.identity.requirement.v1\0' "${SOURCE}"
+          grep -Fq 'symthaea.executor.identity.challenge.v1\0' "${SOURCE}"
+          grep -Fq 'symthaea.executor.identity.binding.v1\0' "${SOURCE}"
+          grep -Fq 'pub struct ExecutorIdentityRequirement' "${SOURCE}"
+          grep -Fq 'pub struct ExecutorIdentityChallenge' "${SOURCE}"
+          grep -Fq 'pub struct VerifiedExecutorBinding' "${SOURCE}"
+          grep -Fq 'pub enum ExecutorIdentityDimension' "${SOURCE}"
+          grep -Fq 'pub enum ExecutorIdentityProfile' "${SOURCE}"
+          grep -Fq 'fn profile_mandatory_dimensions_fail_closed' "${SOURCE}"
+          grep -Fq 'fn missing_dimension_rejects' "${SOURCE}"
+          grep -Fq 'fn runtime_incarnation_changes_challenge_identity' "${SOURCE}"
+          grep -Fq 'no public constructor' "${SOURCE}"
+
+          if grep -Eq 'pub[[:space:]]+trait[[:space:]].*(Verifier|Provider|Attestation)|pub[[:space:]]+fn[[:space:]]+(compose|verify|mint)_.*binding' "${SOURCE}"; then
+            echo 'arbitrary public verifier/composer surface would weaken the trusted composition boundary' >&2
+            exit 1
+          fi
+          if grep -Eq 'impl[[:space:]]+VerifiedExecutorBinding[[:space:]]*\{' "${SOURCE}"; then
+            python3 - <<'PY'
+          from pathlib import Path
+          source = Path('crates/core/symthaea-executor-identity/src/lib.rs').read_text()
+          start = source.index('impl VerifiedExecutorBinding {')
+          end = source.index('\n}\n\nstruct Transcript', start)
+          block = source[start:end]
+          forbidden = (
+              'pub fn new(',
+              'pub fn from_',
+              'pub const fn new(',
+              'pub const fn from_',
+          )
+          if any(item in block for item in forbidden):
+              raise SystemExit('public VerifiedExecutorBinding constructor is forbidden in EXEC-ID-001A')
+          PY
+          fi
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          source = Path('crates/core/symthaea-executor-identity/src/lib.rs').read_text()
+          match = re.search(
+              r'#\[derive\(([^)]*)\)\]\s*pub struct VerifiedExecutorBinding',
+              source,
+          )
+          if match is None:
+              raise SystemExit('VerifiedExecutorBinding derive shape not found')
+          derives = {item.strip() for item in match.group(1).split(',')}
+          if 'Clone' in derives or 'Copy' in derives:
+              raise SystemExit('live VerifiedExecutorBinding must not derive Clone/Copy')
+          if re.search(r'\bSerialize\b|\bDeserialize\b', source):
+              raise SystemExit('live executor identity ABI must not expose serde state')
+          PY
+
+          if grep -Eq 'use .*CapabilityGrant|use .*DispatchPermit|use .*VerifiedAuthority|std::net::|std::fs::|std::process::|Command::new' "${SOURCE}"; then
+            echo 'authority/runtime I/O leaked into neutral executor identity ABI' >&2
+            exit 1
+          fi
+
+      - name: Independent executor identity oracle
+        run: |
+          set -euo pipefail
+          python3 crates/core/symthaea-executor-identity/scripts/executor_identity_oracle.py
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-executor-identity -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-executor-identity --all-targets
+          cargo test -p symthaea-executor-identity
+          cargo clippy -p symthaea-executor-identity --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-executor-identity --all-targets
+          cargo test --locked -p symthaea-executor-identity
+          cargo clippy --locked -p symthaea-executor-identity --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
