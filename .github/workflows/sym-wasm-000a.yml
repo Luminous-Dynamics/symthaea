@@ -1,0 +1,137 @@
+name: SYM-WASM-000A Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "src/action/**"
+      - ".github/workflows/sym-wasm-000a.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    # Preserve repository-wide draft safety: draft PRs allocate no runner.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: "1"
+      RUSTC_WRAPPER: ""
+      SCCACHE_DISABLE: "1"
+      EXPECTED_HEAD: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.EXPECTED_HEAD }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Attest exact source subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          actual_tree="$(git rev-parse 'HEAD^{tree}')"
+          test "$actual_head" = "$EXPECTED_HEAD"
+          test -z "$(git status --porcelain --untracked-files=no)"
+          printf '%s\n' "$actual_head" > /tmp/sym-wasm-000a-head
+          printf '%s\n' "$actual_tree" > /tmp/sym-wasm-000a-tree
+          echo "subject_head=$actual_head"
+          echo "subject_tree=$actual_tree"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.96.0 --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Install native build dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libssl-dev libclang-dev cmake
+
+      - name: Check focused formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check src/action/mod.rs src/action/wasm_sandbox_tests.rs
+
+      - name: Check bounded Wasm feature build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea --lib --no-default-features --features wasm-sandbox
+
+      - name: Execute ActionIR Wasm adversarial corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --locked -p symthaea --lib --no-default-features --features wasm-sandbox \
+            action::wasm_sandbox_tests:: -- --nocapture
+
+      - name: Clippy affected library feature surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy --locked -p symthaea --lib --no-default-features --features wasm-sandbox -- -D warnings
+
+      - name: Emit qualification context
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(cat /tmp/sym-wasm-000a-head)"
+          tree="$(cat /tmp/sym-wasm-000a-tree)"
+          lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          toolchain_sha="$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+          wasmtime_version="$(awk '
+            /^\[\[package\]\]$/ { in_package=0; is_wasmtime=0 }
+            /^name = "wasmtime"$/ { is_wasmtime=1; next }
+            is_wasmtime && /^version = / { gsub(/"/, "", $3); print $3; exit }
+          ' Cargo.lock)"
+          rustc_version="$(rustc --version)"
+          {
+            echo "SYM-WASM-000A focused execution context"
+            echo "subject_head=$head"
+            echo "subject_tree=$tree"
+            echo "cargo_lock_sha256=$lock_sha"
+            echo "rust_toolchain_sha256=$toolchain_sha"
+            echo "wasmtime_version=$wasmtime_version"
+            echo "rustc=$rustc_version"
+            echo "claim=bounded raw-Wasm ActionIR execution only; no WASI/Component Model/authority claim"
+          } | tee /tmp/sym-wasm-000a-receipt.txt
+          {
+            echo '### SYM-WASM-000A focused execution context'
+            echo '```text'
+            cat /tmp/sym-wasm-000a-receipt.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Postflight tracked-source immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$(cat /tmp/sym-wasm-000a-tree)"
+          git diff --exit-code -- . ':(exclude)target'
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=no)"
