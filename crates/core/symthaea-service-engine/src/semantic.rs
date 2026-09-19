@@ -11,7 +11,7 @@ use std::fmt;
 use symthaea::Symthaea;
 use symthaea_interface_events::EventPlaneError;
 use symthaea_interface_runtime::StatePlaneError;
-use symthaea_interface_types::{ErrorCode, RuntimeEventKind, RuntimeId, TurnId};
+use symthaea_interface_types::{ErrorCode, RuntimeId, TurnId};
 use symthaea_runtime_owner::{
     HandlerFuture, OwnerCommandContext, OwnerSubmitError, RuntimeCommandTicket,
     RuntimeOwnerConfigError, RuntimeOwnerExit, RuntimeOwnerHandle, spawn_runtime_owner,
@@ -104,12 +104,7 @@ impl ServiceMutationExecutor<Symthaea> for SemanticSymthaeaQueryExecutor {
 
             let mut lifecycle_started = false;
             if let Some(turn_id) = turn_id.as_ref() {
-                match self.events.emit(
-                    None,
-                    RuntimeEventKind::ResponseStarted {
-                        turn_id: turn_id.clone(),
-                    },
-                ) {
+                match self.events.response_started_turn(turn_id.clone(), None) {
                     Ok(_) => lifecycle_started = true,
                     Err(error) => event_issues.push(SemanticQueryEventIssue {
                         stage: SemanticQueryEventStage::ResponseStarted,
@@ -126,12 +121,7 @@ impl ServiceMutationExecutor<Symthaea> for SemanticSymthaeaQueryExecutor {
 
             if lifecycle_started && execution.is_ok() {
                 if let Some(turn_id) = turn_id.as_ref()
-                    && let Err(error) = self.events.emit(
-                        None,
-                        RuntimeEventKind::ResponseFinished {
-                            turn_id: turn_id.clone(),
-                        },
-                    )
+                    && let Err(error) = self.events.response_finished(turn_id.clone(), None)
                 {
                     event_issues.push(SemanticQueryEventIssue {
                         stage: SemanticQueryEventStage::ResponseFinished,
@@ -141,7 +131,10 @@ impl ServiceMutationExecutor<Symthaea> for SemanticSymthaeaQueryExecutor {
             } else if lifecycle_started {
                 match ErrorCode::new("query_process_failed") {
                     Ok(code) => {
-                        if let Err(error) = self.events.emit(None, RuntimeEventKind::Error { code }) {
+                        if let Some(turn_id) = turn_id.as_ref()
+                            && let Err(error) =
+                                self.events.response_failed(turn_id.clone(), None, code)
+                        {
                             event_issues.push(SemanticQueryEventIssue {
                                 stage: SemanticQueryEventStage::Error,
                                 error,
