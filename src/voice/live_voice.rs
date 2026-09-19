@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
 
-use super::audio_out::{AudioOutput, AudioOutputPurgeHandle};
+use super::audio_out::{AudioOutput, AudioOutputPurgeHandle, TrackedAudioProducer};
 use super::formant_targets::FormantDatabase;
 use super::repl_voice::SimpleG2P;
 use super::vocal_tract_controller::train_controller_on_phoneme_db;
@@ -52,9 +52,10 @@ pub enum LiveVoiceSpeakOutcome {
 
 /// Cloneable, capability-narrow stop control for the current live utterance.
 ///
-/// This intentionally exposes only interruption state. It cannot synthesize audio,
-/// mutate cognitive prosody, access the device/ring buffer, or start a new utterance.
-/// A caller may therefore retain it on another thread without sharing `&mut LiveVoice`.
+/// This intentionally exposes only interruption/playback state. It cannot synthesize
+/// audio, mutate cognitive prosody, access the device/ring buffer producer, or start
+/// a new utterance. A caller may therefore retain it on another thread without
+/// sharing `&mut LiveVoice`.
 #[derive(Debug, Clone)]
 pub struct LiveVoiceStopHandle {
     speaking: Arc<AtomicBool>,
@@ -76,9 +77,19 @@ impl LiveVoiceStopHandle {
         self.purge.request_purge();
     }
 
-    /// Whether the shared live utterance state still reports active synthesis/push.
+    /// Whether the live backend is still synthesizing or pushing PCM.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
+    }
+
+    /// Number of mono samples still queued in the software audio ring.
+    pub fn queued_samples(&self) -> usize {
+        self.purge.queued_samples()
+    }
+
+    /// Whether synthesis/push is active OR software-buffered PCM remains pending.
+    pub fn is_playing(&self) -> bool {
+        self.is_speaking() || self.purge.has_queued_audio()
     }
 
     /// Whether queued PCM purge is still waiting for the realtime callback.
@@ -109,7 +120,14 @@ impl SpeakHandle {
         self.speaking.load(Ordering::SeqCst)
     }
 
-    /// Block until the utterance finishes (or is stopped).
+    /// Whether synthesis/push is active OR software-buffered PCM remains pending.
+    pub fn is_playing(&self) -> bool {
+        self.is_speaking() || self.purge.has_queued_audio()
+    }
+
+    /// Block until the synthesis/push thread finishes (or is stopped).
+    /// This does not wait for the device to consume every queued sample; use
+    /// [`Self::is_playing`] when playback-drain lifetime matters.
     pub fn join(mut self) -> Result<()> {
         if let Some(handle) = self.thread.take() {
             handle
@@ -423,6 +441,11 @@ impl LiveVoice {
         self.speaking.load(Ordering::SeqCst)
     }
 
+    /// Whether synthesis/push is active OR software-buffered PCM remains pending.
+    pub fn is_playing(&self) -> bool {
+        self.is_speaking() || self.audio.purge_handle().has_queued_audio()
+    }
+
     /// Return a typed, cloneable interruption capability for this live voice.
     ///
     /// Unlike exposing the atomic directly, this handle grants only stop/status
@@ -499,18 +522,9 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
     Ok(())
 }
 
-/// Push samples to a ring buffer producer (used by background thread).
-fn push_samples_to_producer(producer: &mut ringbuf::HeapProd<f32>, samples: &[f32]) -> usize {
-    use ringbuf::traits::Producer;
-    let mut written = 0;
-    for &s in samples {
-        if producer.try_push(s).is_ok() {
-            written += 1;
-        } else {
-            break;
-        }
-    }
-    written
+/// Push samples through the tracked producer used by the background path.
+fn push_samples_to_producer(producer: &mut TrackedAudioProducer, samples: &[f32]) -> usize {
+    producer.push_samples(samples)
 }
 
 #[cfg(test)]
@@ -552,10 +566,13 @@ mod tests {
         let second = first.clone();
 
         assert!(first.is_speaking());
+        assert!(first.is_playing());
         assert!(second.is_speaking());
+        assert_eq!(first.queued_samples(), 0);
         assert!(!purge.is_pending());
         second.stop();
         assert!(!first.is_speaking());
+        assert!(!first.is_playing());
         assert!(!flag.load(Ordering::SeqCst));
         assert!(purge.is_pending());
         assert!(first.purge_pending());
@@ -572,6 +589,7 @@ mod tests {
 
         assert_eq!(outcome, LiveVoiceSpeakOutcome::Cancelled);
         assert!(!voice.is_speaking());
+        assert!(!voice.is_playing());
     }
 
     #[test]
