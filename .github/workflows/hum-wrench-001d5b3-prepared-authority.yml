@@ -33,14 +33,16 @@ jobs:
           fetch-depth: 16
           persist-credentials: false
 
-      - name: Bind exact qualifier parent and workflow-only scope
+      - name: Bind exact qualifier subject and workflow-only scope
         shell: bash
         run: |
           set -euo pipefail
           actual_head="$(git rev-parse HEAD)"
           expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual_head" = "$expected_head"
-          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          # The qualifier may contain more than one workflow-only repair commit;
+          # bind its frozen source by ancestry and exact diff, not HEAD^.
+          git merge-base --is-ancestor "$EXPECTED_PARENT" HEAD
           test -z "$(git status --porcelain=v1)"
           mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
           expected=(".github/workflows/hum-wrench-001d5b3-prepared-authority.yml")
@@ -75,6 +77,12 @@ jobs:
           from pathlib import Path
           text = Path('crates/domains/symthaea-humanoid/src/mujoco_prepared_contact_authority.rs').read_text()
           production = text.split('#[cfg(test)]', 1)[0]
+          # Documentation accurately names forbidden authority types as nonclaims.
+          # Remove line comments before checking actual production code usage.
+          code = '\n'.join(
+              line for line in production.splitlines()
+              if not line.lstrip().startswith('//')
+          )
 
           forbidden = (
               'EstablishedContactEvidenceV1',
@@ -84,7 +92,7 @@ jobs:
               'osqp',
           )
           for needle in forbidden:
-              assert needle not in production, needle
+              assert needle not in code, needle
 
           prefix, rest = production.split('pub struct PreparedContactAuthorityEvidenceV1 {', 1)
           fields = rest.split('\n}\n\nimpl PreparedContactAuthorityEvidenceV1', 1)[0]
