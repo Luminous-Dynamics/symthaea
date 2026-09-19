@@ -12,7 +12,7 @@ keywords = ["authorization", "checkpoint", "safety", "agents"]
 categories = ["authentication", "development-tools"]
 
 [lib]
-path = "src/strict.rs"
+path = "src/hardened.rs"
 
 [dependencies]
 serde = { workspace = true }

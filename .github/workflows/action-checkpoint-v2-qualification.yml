@@ -55,18 +55,26 @@ jobs:
           set -euo pipefail
           test -z "$(git status --porcelain=v1)"
 
-      - name: Enforce checkpoint identity and transition ratchets
+      - name: Enforce checkpoint identity, transition, and no-refund ratchets
         run: |
           set -euo pipefail
           IDENTITY=crates/core/symthaea-action-checkpoint/src/lib.rs
           STRICT=crates/core/symthaea-action-checkpoint/src/strict.rs
+          HARDENED=crates/core/symthaea-action-checkpoint/src/hardened.rs
           grep -Fq 'symthaea.action-checkpoint.v2\0' "${IDENTITY}"
           grep -Fq 'verify_successor_of' "${STRICT}"
           grep -Fq 'NewReservationNotReserved' "${STRICT}"
           grep -Fq 'ReservationRemoved' "${STRICT}"
           grep -Fq 'NonEmptyGenesis' "${STRICT}"
-          if grep -Eq 'bincode|serde_json::to_|postcard|rmp_serde' "${IDENTITY}" "${STRICT}"; then
+          grep -Fq 'OutcomeUnknownReleaseRequiresProof' "${HARDENED}"
+          grep -Fq 'forbid_unproven_uncertain_release' "${HARDENED}"
+          grep -Fq 'path = "src/hardened.rs"' crates/core/symthaea-action-checkpoint/Cargo.toml
+          if grep -Eq 'bincode|serde_json::to_|postcard|rmp_serde' "${IDENTITY}" "${STRICT}" "${HARDENED}"; then
             echo 'serializer-derived checkpoint identity is forbidden' >&2
+            exit 1
+          fi
+          if grep -Eq 'OutcomeUnknown[^\n]*=>[^\n]*.*Released' "${HARDENED}"; then
+            echo 'ordinary durable OutcomeUnknown -> Released transition is forbidden' >&2
             exit 1
           fi
 
