@@ -50,22 +50,68 @@ impl ContactAuthorityPolicyV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Sealed runtime token representing a complete contact-establishment lineage.
+///
+/// Fields are private and this type intentionally does not implement
+/// `Deserialize`. External callers therefore cannot manufacture an Established
+/// token from JSON or by filling public identity strings. A later verified
+/// adapter must construct this token from the exact typed evidence chain.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct EstablishedContactEvidenceV1 {
-    pub site: ContactSite,
-    pub model_id: String,
-    pub sampled_at_s: f64,
-    pub geometry_id: String,
-    pub interaction_id: String,
-    pub support_normal_policy_id: String,
-    pub support_normal_evidence_id: String,
-    pub support_normal_verification_id: String,
-    pub contact_acceleration_evidence_id: String,
-    pub source_class: ContactEvidenceClassV1,
+    site: ContactSite,
+    model_id: String,
+    sampled_at_s: f64,
+    geometry_id: String,
+    interaction_id: String,
+    support_normal_policy_id: String,
+    support_normal_evidence_id: String,
+    support_normal_verification_id: String,
+    contact_acceleration_evidence_id: String,
+    source_class: ContactEvidenceClassV1,
 }
 
 impl EstablishedContactEvidenceV1 {
-    pub fn validate(&self) -> bool {
+    pub fn site(&self) -> ContactSite {
+        self.site
+    }
+
+    pub fn model_id(&self) -> &str {
+        &self.model_id
+    }
+
+    pub fn sampled_at_s(&self) -> f64 {
+        self.sampled_at_s
+    }
+
+    pub fn geometry_id(&self) -> &str {
+        &self.geometry_id
+    }
+
+    pub fn interaction_id(&self) -> &str {
+        &self.interaction_id
+    }
+
+    pub fn support_normal_policy_id(&self) -> &str {
+        &self.support_normal_policy_id
+    }
+
+    pub fn support_normal_evidence_id(&self) -> &str {
+        &self.support_normal_evidence_id
+    }
+
+    pub fn support_normal_verification_id(&self) -> &str {
+        &self.support_normal_verification_id
+    }
+
+    pub fn contact_acceleration_evidence_id(&self) -> &str {
+        &self.contact_acceleration_evidence_id
+    }
+
+    pub fn source_class(&self) -> ContactEvidenceClassV1 {
+        self.source_class
+    }
+
+    fn validate(&self) -> bool {
         self.sampled_at_s.is_finite()
             && self.sampled_at_s >= 0.0
             && nonempty(&self.model_id)
@@ -80,9 +126,10 @@ impl EstablishedContactEvidenceV1 {
     pub fn lineage_id(&self) -> Option<String> {
         self.validate().then(|| {
             format!(
-                "contact-establishment-v1:site:{:?}:model:{}:geometry:{}:interaction:{}:normal-policy:{}:normal-evidence:{}:normal-verification:{}:contact-acceleration:{}:source:{:?}",
+                "contact-establishment-v1:site:{:?}:model:{}:sampled-at:{:.17e}:geometry:{}:interaction:{}:normal-policy:{}:normal-evidence:{}:normal-verification:{}:contact-acceleration:{}:source:{:?}",
                 self.site,
                 self.model_id,
+                self.sampled_at_s,
                 self.geometry_id,
                 self.interaction_id,
                 self.support_normal_policy_id,
@@ -659,7 +706,7 @@ mod tests {
         assert_eq!(state.last_reason_id(), "evidence-established");
         assert!(state.surface_wrench_eligible_at(1.0));
         assert_eq!(
-            state.established_evidence().unwrap().source_class,
+            state.established_evidence().unwrap().source_class(),
             ContactEvidenceClassV1::SimulatorDerived
         );
     }
@@ -669,6 +716,13 @@ mod tests {
         let state = established(1.0);
         assert!(!state.surface_wrench_eligible_at(0.999));
         assert!(state.surface_wrench_eligible_at(1.0));
+    }
+
+    #[test]
+    fn evidence_lineage_binds_the_exact_sample_time() {
+        let first = evidence(1.0).lineage_id().unwrap();
+        let second = evidence(1.001).lineage_id().unwrap();
+        assert_ne!(first, second);
     }
 
     #[test]
@@ -750,10 +804,27 @@ mod tests {
         );
         assert_eq!(state.establishment_epoch(), epoch);
         assert_eq!(
-            state.established_evidence().unwrap().interaction_id,
-            refreshed.interaction_id
+            state.established_evidence().unwrap().interaction_id(),
+            refreshed.interaction_id()
         );
         assert!(state.surface_wrench_eligible_at(1.01));
+    }
+
+    #[test]
+    fn new_acquisition_increments_epoch_and_sequence() {
+        let mut state = established(1.0);
+        let first_epoch = state.establishment_epoch();
+        let first_sequence = state.transition_sequence();
+        state.invalidate(1.01, "lost").unwrap();
+        state.reset_lost(1.01, "reset").unwrap();
+        state.schedule(1.01, "plan-2").unwrap();
+        state.begin_acquisition(1.01, "acquire-2").unwrap();
+        let transition = state
+            .establish(1.01, "re-established", evidence(1.01))
+            .unwrap();
+        assert_eq!(state.establishment_epoch(), first_epoch + 1);
+        assert!(state.transition_sequence() > first_sequence);
+        assert_eq!(transition.establishment_epoch, state.establishment_epoch());
     }
 
     #[test]
