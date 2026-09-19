@@ -1,0 +1,44 @@
+name: Math Retrieval Ranking Replay
+
+on:
+  pull_request:
+    paths:
+      - '.github/schemas/math-retrieval-scoring-replay-policy-v1.schema.json'
+      - '.github/schemas/math-retrieval-ranking-replay-*.json'
+      - '.github/scripts/math-retrieval-ranking-replay-core.py'
+      - '.github/scripts/validate-math-retrieval-ranking-replay.py'
+      - '.github/scripts/test-math-retrieval-ranking-replay.py'
+      - '.github/scripts/validate-math-retrieval-query-representation.py'
+      - '.github/scripts/validate-math-retrieval-representation-wire.py'
+      - '.github/scripts/validate-math-retrieval-index.py'
+      - '.github/scripts/validate-math-retrieval-index-build.py'
+      - '.github/workflows/math-retrieval-ranking-replay.yml'
+      - 'docs/research/MATH_RET_RANK_REPLAY_001A.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify exact ranking replay mechanics
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile replay stack
+        run: |
+          python -m py_compile .github/scripts/math-retrieval-ranking-replay-core.py
+          python -m py_compile .github/scripts/validate-math-retrieval-ranking-replay.py
+          python -m py_compile .github/scripts/test-math-retrieval-ranking-replay.py
+          python -m py_compile .github/scripts/validate-math-retrieval-representation-wire.py
+          python -m py_compile .github/scripts/validate-math-retrieval-query-representation.py
+          python -m py_compile .github/scripts/validate-math-retrieval-index.py
+          python -m py_compile .github/scripts/validate-math-retrieval-index-build.py
+      - name: Run prerequisite self-tests
+        run: |
+          python .github/scripts/validate-math-retrieval-representation-wire.py --self-test
+          python .github/scripts/validate-math-retrieval-query-representation.py --self-test
+          python .github/scripts/validate-math-retrieval-index.py --self-test
+      - name: Run ranking replay adversarial integration
+        run: python .github/scripts/test-math-retrieval-ranking-replay.py
