@@ -8,6 +8,8 @@
 //! - validated SHA-256 identities;
 //! - canonical purpose identifiers;
 //! - lifecycle-aware, sequence-numbered trust snapshots;
+//! - append-only temporal key lifecycle histories that distinguish retirement,
+//!   prospective revocation, replacement, and retroactive compromise;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - explicit attestation expectations that fail closed on substitution; and
 //! - private-field verified capabilities that cannot be deserialized into
@@ -18,8 +20,10 @@
 
 mod attestation;
 mod identity;
+mod temporal_lifecycle;
 mod trust;
 
 pub use attestation::*;
 pub use identity::*;
+pub use temporal_lifecycle::*;
 pub use trust::*;
