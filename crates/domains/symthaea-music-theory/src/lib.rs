@@ -70,6 +70,7 @@ pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_work_bridge;
+pub mod prog_suite_work_evidence;
 pub mod renaissance;
 pub mod rhythm;
 pub mod rhythmic_identity;
@@ -144,6 +145,12 @@ pub use prog_suite_work_bridge::{
     PROG_SUITE_WORK_BRIDGE_VERSION, ProgSuiteMeterProjectionV1,
     ProgSuiteSectionWorkBindingV1, ProgSuiteWorkBindingV1, ProgSuiteWorkBridgeErrorV1,
     ProgSuiteWorkRealizationBindingV1, bind_prog_suite_realization, bridge_prog_suite_plan,
+};
+pub use prog_suite_work_evidence::{
+    PROG_SUITE_WORK_EVIDENCE_VERSION, TONIC_ANCHOR_MIN_DURATION_SHARE,
+    ProgSuiteTonalCenterProjectionV1, ProgSuiteTonicAnchorEvidenceV1,
+    ProgSuiteWorkEvidenceErrorV1, ProgSuiteWorkEvidenceRecordV1, ProgSuiteWorkEvidenceSourceV1,
+    ProgSuiteWorkEvidenceV1, derive_prog_suite_work_evidence,
 };
 pub use rhythm::Duration;
 pub use rhythmic_identity::{RhythmicIdentityReport, rhythmic_identity_report};
