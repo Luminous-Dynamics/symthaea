@@ -21,6 +21,17 @@ pub trait VoiceStopCapability: Send + Sync + 'static {
     fn is_speaking(&self) -> bool;
 }
 
+#[cfg(feature = "live-voice")]
+impl VoiceStopCapability for symthaea::voice::live_voice::LiveVoiceStopHandle {
+    fn stop(&self) {
+        symthaea::voice::live_voice::LiveVoiceStopHandle::stop(self);
+    }
+
+    fn is_speaking(&self) -> bool {
+        symthaea::voice::live_voice::LiveVoiceStopHandle::is_speaking(self)
+    }
+}
+
 struct ActivePresentation {
     generation: u64,
     stop: Arc<dyn VoiceStopCapability>,
