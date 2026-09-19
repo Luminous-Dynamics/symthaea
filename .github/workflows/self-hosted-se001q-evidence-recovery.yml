@@ -524,7 +524,7 @@ jobs:
             echo "- Qualified host boot: \`${QUALIFIED_HOST_BOOT_ID:-unavailable}\`"
             echo "- Stage-F authorization: \`${STAGE_F_AUTHORIZATION_SHA256:-unavailable}\`"
             echo "- Stage-F nonce: \`${STAGE_F_AUTHORIZATION_NONCE:-unavailable}\`"
-            echo "- Authorization consumed: \`${STAGE_F_AUTHORIZATION_CONSUMED:-NO}\`"
+            echo "- Authorization consumed: \`${STAGE_F_AUTHORIZATION_CONSUMED:-NOT_DEMONSTRATED}\`"
             echo '- Authority: `NONE`'
             echo '- Qualification: `NONE`'
             echo '- Repair authority: `NONE`'
@@ -574,7 +574,7 @@ jobs:
 
           evidence = Path(sys.argv[1]).resolve()
           rejection = {
-              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v3",
+              "schema": "symthaea.se001q.trusted-cpu-partial-rejection.v4",
               "result": "REJECTED_OR_INCOMPLETE",
               "qualification_claim": "NONE",
               "repair_authority_claim": "NONE",
@@ -589,7 +589,7 @@ jobs:
               "recovery_eligibility_manifest_sha256": os.environ.get("RECOVERY_ELIGIBILITY_MANIFEST_SHA256", ""),
               "stage_f_authorization_sha256": os.environ.get("STAGE_F_AUTHORIZATION_SHA256", ""),
               "stage_f_authorization_nonce": os.environ.get("STAGE_F_AUTHORIZATION_NONCE", ""),
-              "stage_f_authorization_consumed": os.environ.get("STAGE_F_AUTHORIZATION_CONSUMED", "NO"),
+              "stage_f_authorization_consumed": os.environ.get("STAGE_F_AUTHORIZATION_CONSUMED", "NOT_DEMONSTRATED"),
               "stage_f_consumption_receipt_sha256": os.environ.get("STAGE_F_CONSUMPTION_RECEIPT_SHA256", ""),
               "evidence_scope": "independent-provider-rejection-only",
           }
@@ -604,7 +604,7 @@ jobs:
                   "sha256": hashlib.sha256(data).hexdigest(),
                   "bytes": len(data),
               })
-          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v3", "entries": entries}
+          identity = {"schema": "symthaea.se001q.trusted-cpu-partial-manifest.v4", "entries": entries}
           manifest_id = "sha256:" + hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
           manifest = dict(identity)
           manifest["manifest_id"] = manifest_id
