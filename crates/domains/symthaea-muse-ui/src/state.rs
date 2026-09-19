@@ -206,6 +206,14 @@ fn candidate_playback_source(
     }
 }
 
+/// A journey artifact is persistent identity-bearing state. Missing identity
+/// is therefore an error, never an invitation to synthesize empty hashes.
+fn require_artifact_identity(
+    identity: Option<symthaea_muse_protocol::ArtifactIdentity>,
+) -> Result<symthaea_muse_protocol::ArtifactIdentity, &'static str> {
+    identity.ok_or("composer returned a candidate without artifact identity")
+}
+
 #[derive(Clone, Copy)]
 pub struct MuseState {
     pub current: RwSignal<Option<Candidate>>,
@@ -462,39 +470,53 @@ impl MuseState {
                             match api::compose_listen_piece(api::DEFAULT_BACKEND, &style, renderer)
                                 .await
                             {
-                                Ok(c) => {
-                                    let selected = JourneyArtifact {
-                                        identity: c.identity.clone().unwrap_or_default(),
-                                        candidate_id: c.id,
-                                        title: c.title.clone(),
-                                        style: c.style.clone(),
-                                        relation_from_previous: relation_from_previous(
-                                            previous_style.as_deref(),
-                                            &c.style,
-                                        ),
-                                    };
-                                    self.recent_styles.update(|recent| {
-                                        recent.push(c.style.clone());
-                                        const RECENT_STYLES_CAP: usize = 5;
-                                        if recent.len() > RECENT_STYLES_CAP {
-                                            let excess = recent.len() - RECENT_STYLES_CAP;
-                                            recent.drain(..excess);
-                                        }
-                                    });
-                                    self.candidate_cache.update(|cache| {
-                                        cache.insert(c.id, c);
-                                    });
-                                    self.status.set(String::new());
-                                    self.journey.try_update(|j| {
-                                        j.reduce(JourneyCommand::PrefetchCompleted {
-                                            composition_request_id: request
-                                                .composition_request_id
-                                                .clone(),
-                                            prefetch_epoch: request.prefetch_epoch,
-                                            selected,
+                                Ok(c) => match require_artifact_identity(c.identity.clone()) {
+                                    Ok(identity) => {
+                                        let selected = JourneyArtifact {
+                                            identity,
+                                            candidate_id: c.id,
+                                            title: c.title.clone(),
+                                            style: c.style.clone(),
+                                            relation_from_previous: relation_from_previous(
+                                                previous_style.as_deref(),
+                                                &c.style,
+                                            ),
+                                        };
+                                        self.recent_styles.update(|recent| {
+                                            recent.push(c.style.clone());
+                                            const RECENT_STYLES_CAP: usize = 5;
+                                            if recent.len() > RECENT_STYLES_CAP {
+                                                let excess = recent.len() - RECENT_STYLES_CAP;
+                                                recent.drain(..excess);
+                                            }
+                                        });
+                                        self.candidate_cache.update(|cache| {
+                                            cache.insert(c.id, c);
+                                        });
+                                        self.status.set(String::new());
+                                        self.journey.try_update(|j| {
+                                            j.reduce(JourneyCommand::PrefetchCompleted {
+                                                composition_request_id: request
+                                                    .composition_request_id
+                                                    .clone(),
+                                                prefetch_epoch: request.prefetch_epoch,
+                                                selected,
+                                            })
                                         })
-                                    })
-                                }
+                                    }
+                                    Err(message) => {
+                                        self.status.set(message.to_string());
+                                        self.journey.try_update(|j| {
+                                            j.reduce(JourneyCommand::CompositionFailed {
+                                                composition_request_id: request
+                                                    .composition_request_id
+                                                    .clone(),
+                                                prefetch_epoch: request.prefetch_epoch,
+                                                message: message.to_string(),
+                                            })
+                                        })
+                                    }
+                                },
                                 Err(e) => {
                                     self.status
                                         .set(format!("couldn't reach the composer — {e}"));
@@ -626,5 +648,19 @@ mod tests {
         let source = candidate_playback_source(7, None, 8.0);
         assert!(source.rendition_id.is_none());
         assert!(source.audio_url.ends_with("/api/audio/7"));
+    }
+
+    #[test]
+    fn missing_journey_identity_fails_closed() {
+        assert!(require_artifact_identity(None).is_err());
+    }
+
+    #[test]
+    fn present_journey_identity_is_preserved_exactly() {
+        let expected = identity(&"b".repeat(64));
+        assert_eq!(
+            require_artifact_identity(Some(expected.clone())),
+            Ok(expected)
+        );
     }
 }
