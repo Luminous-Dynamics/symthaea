@@ -20,6 +20,7 @@ pub mod haptic_prober;
 pub mod mining;
 pub mod properties;
 pub mod strategic;
+pub mod thermodynamic_evidence;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
 pub use database::{MaterialDatabase, MaterialSearchResult};
@@ -36,4 +37,8 @@ pub use properties::{MaterialCategory, MaterialProperty};
 pub use strategic::{
     STRATEGIC_HORIZON_LABELS, STRATEGIC_HORIZONS, StrategicFepAction, StrategicFepAgent,
     StrategicHdcEncoder, StrategicPredictor, StrategicReading,
+};
+pub use thermodynamic_evidence::{
+    NormalizedThermodynamicEvidence, ThermodynamicDatabase, ThermodynamicEvidenceError,
+    ThermodynamicEvidenceOrigin,
 };
