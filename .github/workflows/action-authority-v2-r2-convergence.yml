@@ -1,0 +1,169 @@
+name: Action Authority V2 R2 Convergence
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-authority-v2-r2-convergence.yml'
+      - '.github/workflows/action-frontier-v2-r2-convergence.yml'
+      - '.github/workflows/verified-authority-state-v02-qualification.yml'
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'crates/bridges/symthaea-action-frontier/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-authority-v2-r2-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  convergence:
+    name: Exact repaired authority/action lineage
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact convergence merge ancestry
+        env:
+          CONVERGENCE_MERGE: 992a0be7a557819251f8bb1a63b27060d776dabe
+          V2C_R2: 38fc60874fb86883c5c5a79adf6d6a5167f1bd89
+          AUTH_STATE_R2: 3650bbac8b22900a5c9dca804fc85d8d761532ba
+        run: |
+          set -euo pipefail
+          for commit in "${CONVERGENCE_MERGE}" "${V2C_R2}" "${AUTH_STATE_R2}"; do
+            git cat-file -e "${commit}^{commit}"
+          done
+          test "$(git rev-parse "${CONVERGENCE_MERGE}^1")" = "${V2C_R2}"
+          test "$(git rev-parse "${CONVERGENCE_MERGE}^2")" = "${AUTH_STATE_R2}"
+          test "$(git rev-list --parents -n 1 "${CONVERGENCE_MERGE}" | wc -w)" -eq 3
+          git merge-base --is-ancestor "${CONVERGENCE_MERGE}" HEAD
+
+      - name: Verify convergence-only child scope
+        env:
+          CONVERGENCE_MERGE: 992a0be7a557819251f8bb1a63b27060d776dabe
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+
+          merge = '992a0be7a557819251f8bb1a63b27060d776dabe'
+          allowed = {'.github/workflows/action-authority-v2-r2-convergence.yml'}
+          changed = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--name-only', f'{merge}..HEAD'], text=True
+              ).splitlines()
+          )
+          unexpected = sorted(changed - allowed)
+          if unexpected:
+              raise SystemExit('unexpected post-convergence paths: ' + ', '.join(unexpected))
+          if '.github/workflows/action-authority-v2-r2-convergence.yml' not in changed:
+              raise SystemExit('missing convergence canary')
+          PY
+
+      - name: Verify exact authority-state and time objects
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .github/workflows/verified-authority-state-v02-qualification.yml)" = '88d793502e403532f3b38d481ab77d249de24374'
+          test "$(git hash-object crates/bridges/symthaea-authority-state/Cargo.toml)" = '3281d4b35d71eded91806e624abf314bb94bd111'
+          test "$(git hash-object crates/bridges/symthaea-authority-state/src/lib.rs)" = 'f6d65199f50da910c39c2f74c2551ca0a797f91f'
+          test "$(git hash-object crates/bridges/symthaea-authority-state/src/tests.rs)" = 'c482641d7b0291941a5cdd04be636bf67262c0d7'
+          test "$(git hash-object crates/bridges/symthaea-authority-time/Cargo.toml)" = '82e38a36fccc6498ea023bca598de90a53bec6d1'
+          test "$(git hash-object crates/bridges/symthaea-authority-time/src/lib.rs)" = 'f5b5708afec73d94bbf71ebd0a7dad718c742623'
+          test "$(git hash-object docs/architecture/VERIFIED_AUTHORITY_STATE_V02.md)" = '89088434fbdd02327312920020bc9dab62aa604f'
+
+      - name: Verify repaired V2C-R2 objects survived convergence
+        run: |
+          set -euo pipefail
+          test "$(git hash-object crates/core/symthaea-authority/src/lib.rs)" = 'a1ad0c6f944c2ede4fcb6ade100818c3899285e2'
+          test "$(git hash-object crates/core/symthaea-action-runtime/src/lib.rs)" = '07c53c73874b5ac30f9992133ce00bc13e269034'
+          test "$(git hash-object crates/core/symthaea-action-checkpoint/src/strict.rs)" = '270fa8d7c32a23ab8c410abaf1bd3be47422d9d9'
+          test "$(git hash-object crates/core/symthaea-action-checkpoint/src/hardened.rs)" = '7edf6e83281909164908c0ff8396af1e9e8bae9e'
+          test "$(git hash-object crates/bridges/symthaea-action-frontier/Cargo.toml)" = 'a1c554c4946b24021c3dd97b093ee6714a305b8c'
+          test "$(git hash-object crates/bridges/symthaea-action-frontier/src/lib.rs)" = '601350015ce8e750fe12c77d45362b2edf181a85'
+          test "$(git hash-object .github/workflows/action-frontier-v2-r2-convergence.yml)" = '827a2d2bf2f4df5715bf432b77ea789727ddf385'
+
+      - name: Verify repaired authority boundaries remain closed
+        run: |
+          set -euo pipefail
+          RUNTIME=crates/core/symthaea-action-runtime/src/lib.rs
+          FRONTIER=crates/bridges/symthaea-action-frontier/src/lib.rs
+          CHECKPOINT=crates/core/symthaea-action-checkpoint/src/hardened.rs
+          grep -Fq 'fn current_head(&mut self)' "${FRONTIER}"
+          grep -Fq 'StoreFrontierChanged' "${FRONTIER}"
+          grep -Fq 'StoreNotEmpty' "${FRONTIER}"
+          grep -Fq 'OutcomeUnknownReleaseRequiresProof' "${CHECKPOINT}"
+          if grep -Fq 'pub fn resume_from_expected_current' "${FRONTIER}"; then
+            echo 'writable frontier restart regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn into_inner' "${FRONTIER}"; then
+            echo 'containment/store escape regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn cancel_before_dispatch' "${RUNTIME}"; then
+            echo 'ordinary pre-dispatch refund API regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn reconcile_not_applied' "${RUNTIME}"; then
+            echo 'ordinary uncertain refund API regression' >&2
+            exit 1
+          fi
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Format exact convergence surface
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier -- --check
+
+      - name: Focused compile test and strict Clippy
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier --all-targets
+          cargo test -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier
+          cargo clippy -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier --all-targets
+          cargo test --locked -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier
+          cargo clippy --locked -p symthaea-authority -p symthaea-authority-time -p symthaea-authority-state -p symthaea-action-runtime -p symthaea-action-checkpoint -p symthaea-action-frontier --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
