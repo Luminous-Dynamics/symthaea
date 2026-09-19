@@ -6,16 +6,21 @@
 #
 # This module intentionally exposes a very small API. Trust-boundary properties
 # are fixed rather than configurable: repository scope, ephemeral lifecycle,
-# access-token registration, default-label suppression, and the unique CPU
-# capability label cannot be weakened by a host configuration typo.
+# access-token registration, default-label suppression, the unique CPU
+# capability label, and the Stage-F one-time authorization consumer cannot be
+# weakened by a host configuration typo.
 
 { config, lib, ... }:
 
 let
   cfg = config.services.symthaea-ci-runner;
   runnerKey = "symthaea-validation";
+  runnerService = "github-runner-${runnerKey}";
   repositoryUrl = "https://github.com/Luminous-Dynamics/symthaea";
   capabilityLabel = "symthaea-trusted-cpu-v1";
+  authorizationGroup = "symthaea-stage-f-authorization";
+  authorizationLedgerDir = "/var/lib/symthaea-stage-f-authorizations";
+  authorizationSocket = "/run/symthaea-stage-f-authorization.sock";
 in
 {
   options.services.symthaea-ci-runner = {
@@ -58,6 +63,94 @@ in
       }
     ];
 
+    users.groups.${authorizationGroup} = { };
+
+    # The ledger is deliberately outside the upstream runner StateDirectory,
+    # because ephemeral runner startup wipes that state before re-registration.
+    # Only the root-owned socket consumer can mutate ledger entries.
+    systemd.tmpfiles.rules = [
+      "d ${authorizationLedgerDir} 0700 root root - -"
+    ];
+
+    systemd.sockets.symthaea-stage-f-authorization = {
+      description = "Symthaea Stage-F one-time authorization socket";
+      wantedBy = [ "sockets.target" ];
+      socketConfig = {
+        ListenStream = authorizationSocket;
+        SocketUser = "root";
+        SocketGroup = authorizationGroup;
+        SocketMode = "0660";
+        RemoveOnStop = true;
+        Accept = true;
+      };
+    };
+
+    # One root-owned process per local socket connection. The protocol is tiny:
+    #   BOOT_ID
+    #   CONSUME <64-hex nonce> <64-hex authorization-sha256>
+    # A successful CONSUME atomically creates a root-owned nonce directory.
+    # Reusing the nonce therefore fails closed even across runner re-registration.
+    systemd.services."symthaea-stage-f-authorization@" = {
+      description = "Consume one Symthaea Stage-F authorization";
+      script = ''
+        set -euo pipefail
+        umask 077
+        IFS= read -r request
+        read -r operation nonce authorization_sha extra <<< "$request"
+        boot_id="$(< /proc/sys/kernel/random/boot_id)"
+
+        case "$operation" in
+          BOOT_ID)
+            [[ -z "${nonce:-}" && -z "${authorization_sha:-}" && -z "${extra:-}" ]]
+            [[ "$boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+            printf 'BOOT_ID %s\n' "$boot_id"
+            ;;
+          CONSUME)
+            [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
+            [[ -z "${extra:-}" ]]
+            marker="${authorizationLedgerDir}/$nonce"
+            if mkdir --mode=0700 -- "$marker" 2>/dev/null; then
+              printf '%s\n' "$authorization_sha" > "$marker/authorization-sha256"
+              chmod 0400 "$marker/authorization-sha256"
+              printf 'CONSUMED %s %s %s\n' "$nonce" "$authorization_sha" "$boot_id"
+            else
+              printf 'ALREADY_CONSUMED %s %s\n' "$nonce" "$boot_id"
+              exit 73
+            fi
+            ;;
+          *)
+            echo 'INVALID_REQUEST' >&2
+            exit 64
+            ;;
+        esac
+      '';
+      serviceConfig = {
+        Type = "simple";
+        User = "root";
+        Group = "root";
+        UMask = "0077";
+        StandardInput = "socket";
+        StandardOutput = "socket";
+        StandardError = "journal";
+        NoNewPrivileges = true;
+        PrivateDevices = true;
+        PrivateTmp = true;
+        ProtectHome = true;
+        ProtectSystem = "strict";
+        ProtectKernelLogs = true;
+        ProtectKernelModules = true;
+        ProtectKernelTunables = true;
+        ProtectControlGroups = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        RestrictAddressFamilies = [ "AF_UNIX" ];
+        ReadWritePaths = [ authorizationLedgerDir ];
+      };
+    };
+
     services.github-runners.${runnerKey} = {
       enable = true;
       url = repositoryUrl;
@@ -81,5 +174,11 @@ in
       # live in a pinned per-job Nix shell.
       extraPackages = [ ];
     };
+
+    # The DynamicUser runner can reach only the local authorization socket via a
+    # fixed supplementary group. It has no direct filesystem access to the
+    # root-owned persistent ledger.
+    systemd.services.${runnerService}.serviceConfig.SupplementaryGroups =
+      lib.mkAfter [ authorizationGroup ];
   };
 }
