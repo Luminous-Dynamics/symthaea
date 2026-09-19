@@ -15,3 +15,6 @@ categories = ["data-structures", "development-tools"]
 sha2 = { workspace = true }
 symthaea-interaction-core = { path = "../symthaea-interaction-core" }
 symthaea-interaction-egress = { path = "../symthaea-interaction-egress" }
+
+[dev-dependencies]
+symthaea-interaction-lineage = { path = "../symthaea-interaction-lineage" }
