@@ -22,6 +22,7 @@ mod harmony_view;
 mod icons;
 mod journey;
 mod keeper_api;
+pub mod keeper_semantic;
 mod liked_page;
 mod motifs_view;
 mod orchestration_view;
