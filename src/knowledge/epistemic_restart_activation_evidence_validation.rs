@@ -12,6 +12,9 @@
 //! not establish that the provider itself is trustworthy, mint an authority
 //! epoch, construct operational receipts, or expose mutation/activation power.
 
+#[path = "epistemic_restart_activation_verifier_trust_review.rs"]
+pub mod trust_review;
+
 use super::{
     ActivationCommitReceiptDigestV1, AtomicActivationPhaseEvidenceV1,
     RestartAuthorityEpochDigestV1, RestartAuthorityEpochIssuanceRecordDigestV1,
