@@ -1,0 +1,57 @@
+{
+  "schema": "symthaea.se001q.lock-delta-experiment.v1",
+  "experiment_id": "SE-001Q-LOCK-DIAG-001",
+  "mode": "diagnostic-only",
+  "subject": {
+    "sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+    "tree": "7abdf2ede579b2b729b057ca64470d11eb551031"
+  },
+  "parent_evidence": {
+    "verifier_sha": "3dd33625162ec7137ef06c8079794a8d2aecc95d",
+    "github_run_id": "35440131926",
+    "artifact_id": "10591990496",
+    "artifact_zip_sha256": "sha256:6b9f2566e762b3064b0925d4ffbc86d8b3bdb4dd81b9c0863379b2b19362d78e",
+    "evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731"
+  },
+  "toolchain_channel": "1.96.0",
+  "expected_inputs": {
+    "Cargo.lock": "sha256:d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f",
+    "Cargo.toml": "sha256:0d6214b14f6f695eddcee4a8aa2454f1330a891fbc172f08c1891f6ee79107c9",
+    "crates/domains/symthaea-se-model/Cargo.toml": "sha256:7aadf110322fb9d3a84e5ea9b16c1db047ca1e8f09ce6fce1dee13abafddf51a",
+    "crates/domains/symthaea-se-model/src/lib.rs": "sha256:f4e6f000b1ae62c2a125d161e431829591ff181b977451de46aa8d9337a8ba38"
+  },
+  "resolution_probes": [
+    {
+      "id": "online-all-targets",
+      "argv": ["cargo", "check", "-p", "symthaea-se-model", "--all-targets"]
+    },
+    {
+      "id": "offline-reproduction-all-targets",
+      "argv": ["cargo", "check", "-p", "symthaea-se-model", "--all-targets", "--offline"]
+    }
+  ],
+  "counterfactual_locked_gates": [
+    {
+      "id": "focused-all-targets",
+      "argv": ["cargo", "check", "-p", "symthaea-se-model", "--locked", "--all-targets"]
+    },
+    {
+      "id": "focused-tests",
+      "argv": ["cargo", "test", "-p", "symthaea-se-model", "--locked"]
+    },
+    {
+      "id": "focused-clippy",
+      "argv": ["cargo", "clippy", "-p", "symthaea-se-model", "--locked", "--all-targets", "--", "-D", "warnings"]
+    }
+  ],
+  "invariants": [
+    "the frozen source checkout remains byte-identical and clean",
+    "probe worktrees may change only Cargo.lock among tracked files",
+    "online and warmed-cache offline resolution must produce byte-identical Cargo.lock before a reproducible lock delta is claimed",
+    "counterfactual locked gates must not mutate the generated Cargo.lock",
+    "a lock-delta witness is diagnostic evidence only and grants no repair authority",
+    "no source, manifest, or frozen-subject commit is modified"
+  ],
+  "qualification_claim": "NONE",
+  "repair_authority_claim": "NONE"
+}

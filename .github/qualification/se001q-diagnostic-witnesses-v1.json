@@ -1,0 +1,151 @@
+{
+  "identity": {
+    "domain": "symthaea.diagnostic-witness-set.v1",
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE",
+    "source_evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731",
+    "subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+    "verifier_sha": "3dd33625162ec7137ef06c8079794a8d2aecc95d",
+    "witness_ids": [
+      "sha256:f3abb0c5d1687b7a0ba353c077b06e8df1d0987c83fc36bade0a705512a88e01",
+      "sha256:0d8fca3617854d36684bcfaa3874113f3f44d08231adafe26082dfd39a037295",
+      "sha256:e841297900c3da1074a06cb7fe0e59652603de992985a0e54e5198f46699890a"
+    ]
+  },
+  "schema": "symthaea.diagnostic-witness-set.v1",
+  "set_id": "sha256:0a7a16301a164334ef9b4097f019f7d6e8890c7a3c83d7548dd25cc6eaf09216",
+  "witnesses": [
+    {
+      "identity": {
+        "conclusion": {
+          "confidence": "EXACT_RETAINED_BYTE_MATCH",
+          "failure_class": "CARGO_LOCKFILE_UPDATE_REQUIRED",
+          "qualification_claim": "NONE",
+          "repair_authority_claim": "NONE"
+        },
+        "domain": "symthaea.diagnostic-witness.v1",
+        "evidence": {
+          "byte_range": {
+            "end_exclusive": 188,
+            "start": 62
+          },
+          "excerpt_base64": "Y2Fubm90IHVwZGF0ZSB0aGUgbG9jayBmaWxlIC9ob21lL3J1bm5lci93b3JrL3N5bXRoYWVhL3N5bXRoYWVhL3N1YmplY3QvQ2FyZ28ubG9jayBiZWNhdXNlIC0tbG9ja2VkIHdhcyBwYXNzZWQgdG8gcHJldmVudCB0aGlz",
+          "excerpt_sha256": "sha256:b772d771c2c88c2c2db117d9edd64618ccea0790c7315bdbe6fcb53525db9643",
+          "exit_code": 101,
+          "stream": "stderr",
+          "stream_sha256": "sha256:9a285d932d9af9739f39e000cf4723521e92bf76505f69e54619493686a17ca9"
+        },
+        "rule": {
+          "required_excerpt_utf8_suffix": " because --locked was passed to prevent this",
+          "required_exit_code": 101,
+          "rule_id": "cargo-locked-update-required-v1"
+        },
+        "source": {
+          "classification_id": "sha256:8d2e2b202860f5b09b7f261b6933d52116c7994eb49fc9718cf9307b9ea00299",
+          "gate_id": "focused-all-targets",
+          "observation_id": "sha256:4f6407a26096030e585e9a0a65c8a8ae68a1a1324257fe9a1926e9ed9d0cfdb7",
+          "original_classification_state": "FAIL_UNCLASSIFIED",
+          "subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+          "verifier_sha": "3dd33625162ec7137ef06c8079794a8d2aecc95d"
+        }
+      },
+      "provenance": {
+        "artifact_id": "10591990496",
+        "artifact_zip_sha256": "sha256:6b9f2566e762b3064b0925d4ffbc86d8b3bdb4dd81b9c0863379b2b19362d78e",
+        "evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731",
+        "github_run_attempt": "1",
+        "github_run_id": "35440131926"
+      },
+      "schema": "symthaea.diagnostic-witness.v1",
+      "witness_id": "sha256:f3abb0c5d1687b7a0ba353c077b06e8df1d0987c83fc36bade0a705512a88e01"
+    },
+    {
+      "identity": {
+        "conclusion": {
+          "confidence": "EXACT_RETAINED_BYTE_MATCH",
+          "failure_class": "CARGO_LOCKFILE_UPDATE_REQUIRED",
+          "qualification_claim": "NONE",
+          "repair_authority_claim": "NONE"
+        },
+        "domain": "symthaea.diagnostic-witness.v1",
+        "evidence": {
+          "byte_range": {
+            "end_exclusive": 146,
+            "start": 20
+          },
+          "excerpt_base64": "Y2Fubm90IHVwZGF0ZSB0aGUgbG9jayBmaWxlIC9ob21lL3J1bm5lci93b3JrL3N5bXRoYWVhL3N5bXRoYWVhL3N1YmplY3QvQ2FyZ28ubG9jayBiZWNhdXNlIC0tbG9ja2VkIHdhcyBwYXNzZWQgdG8gcHJldmVudCB0aGlz",
+          "excerpt_sha256": "sha256:b772d771c2c88c2c2db117d9edd64618ccea0790c7315bdbe6fcb53525db9643",
+          "exit_code": 101,
+          "stream": "stderr",
+          "stream_sha256": "sha256:fa80c21a1891d3c3a5aad7eef2362f063c5d8c384a3bdc06fb3058a415620631"
+        },
+        "rule": {
+          "required_excerpt_utf8_suffix": " because --locked was passed to prevent this",
+          "required_exit_code": 101,
+          "rule_id": "cargo-locked-update-required-v1"
+        },
+        "source": {
+          "classification_id": "sha256:3eb078beb9e422591a9c51e76b66a283e11095e8d12721a6875f9343598e6e19",
+          "gate_id": "focused-tests",
+          "observation_id": "sha256:c3fa9db6e1bece3ca65a45a3131aca090698c306920624a63d5af7976e74d180",
+          "original_classification_state": "FAIL_UNCLASSIFIED",
+          "subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+          "verifier_sha": "3dd33625162ec7137ef06c8079794a8d2aecc95d"
+        }
+      },
+      "provenance": {
+        "artifact_id": "10591990496",
+        "artifact_zip_sha256": "sha256:6b9f2566e762b3064b0925d4ffbc86d8b3bdb4dd81b9c0863379b2b19362d78e",
+        "evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731",
+        "github_run_attempt": "1",
+        "github_run_id": "35440131926"
+      },
+      "schema": "symthaea.diagnostic-witness.v1",
+      "witness_id": "sha256:0d8fca3617854d36684bcfaa3874113f3f44d08231adafe26082dfd39a037295"
+    },
+    {
+      "identity": {
+        "conclusion": {
+          "confidence": "EXACT_RETAINED_BYTE_MATCH",
+          "failure_class": "CARGO_LOCKFILE_UPDATE_REQUIRED",
+          "qualification_claim": "NONE",
+          "repair_authority_claim": "NONE"
+        },
+        "domain": "symthaea.diagnostic-witness.v1",
+        "evidence": {
+          "byte_range": {
+            "end_exclusive": 146,
+            "start": 20
+          },
+          "excerpt_base64": "Y2Fubm90IHVwZGF0ZSB0aGUgbG9jayBmaWxlIC9ob21lL3J1bm5lci93b3JrL3N5bXRoYWVhL3N5bXRoYWVhL3N1YmplY3QvQ2FyZ28ubG9jayBiZWNhdXNlIC0tbG9ja2VkIHdhcyBwYXNzZWQgdG8gcHJldmVudCB0aGsz",
+          "excerpt_sha256": "sha256:b772d771c2c88c2c2db117d9edd64618ccea0790c7315bdbe6fcb53525db9643",
+          "exit_code": 101,
+          "stream": "stderr",
+          "stream_sha256": "sha256:fa80c21a1891d3c3a5aad7eef2362f063c5d8c384a3bdc06fb3058a415620631"
+        },
+        "rule": {
+          "required_excerpt_utf8_suffix": " because --locked was passed to prevent this",
+          "required_exit_code": 101,
+          "rule_id": "cargo-locked-update-required-v1"
+        },
+        "source": {
+          "classification_id": "sha256:afab2b2ad486367c552b9119f43421de7ce79baed1d0df61d154c9dd9d797c2e",
+          "gate_id": "focused-clippy",
+          "observation_id": "sha256:a2496d6ceabb8b1384a79360af85aabddc118b7948a9df494e99c83a9e9c9d16",
+          "original_classification_state": "FAIL_UNCLASSIFIED",
+          "subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+          "verifier_sha": "3dd33625162ec7137ef06c8079794a8d2aecc95d"
+        }
+      },
+      "provenance": {
+        "artifact_id": "10591990496",
+        "artifact_zip_sha256": "sha256:6b9f2566e762b3064b0925d4ffbc86d8b3bdb4dd81b9c0863379b2b19362d78e",
+        "evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731",
+        "github_run_attempt": "1",
+        "github_run_id": "35440131926"
+      },
+      "schema": "symthaea.diagnostic-witness.v1",
+      "witness_id": "sha256:e841297900c3da1074a06cb7fe0e59652603de992985a0e54e5198f46699890a"
+    }
+  ]
+}

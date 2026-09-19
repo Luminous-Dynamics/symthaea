@@ -1,0 +1,137 @@
+name: Systems Engineering SE-001Q Lock Diagnostic v1
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/systems-engineering-se001q-lock-delta-diagnostic.yml'
+      - '.github/qualification/se001q-diagnostic-witnesses-v1.json'
+      - '.github/qualification/se001q-lock-delta-experiment-v1.json'
+      - '.github/scripts/se001q_verify_diagnostic_witnesses.py'
+      - '.github/scripts/se001q_lock_delta_probe.py'
+      - '.github/scripts/se001q_verify_lock_delta.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: se001q-lock-diagnostic-v1-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  RUST_BACKTRACE: 1
+  SE001_SUBJECT: 47de7f2a306cffb66b5505786220590aa5f42e90
+
+jobs:
+  lock-diagnostic:
+    name: Diagnose frozen SE-001 lock resolution
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout diagnostic verifier lineage
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: verifier
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Checkout frozen SE-001 subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ env.SE001_SUBJECT }}
+          path: subject
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Install same Rust channel as EV2.4
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Verify EV2.4 diagnostic witnesses
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p witness-verification
+          python3 verifier/.github/scripts/se001q_verify_diagnostic_witnesses.py \
+            verifier/.github/qualification/se001q-diagnostic-witnesses-v1.json \
+            | tee witness-verification/verification.json
+
+      - name: Capture lock-resolution diagnostic
+        id: capture
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 verifier/.github/scripts/se001q_lock_delta_probe.py \
+            --subject subject \
+            --experiment verifier/.github/qualification/se001q-lock-delta-experiment-v1.json \
+            --output lock-diagnostic \
+            --work-root "$RUNNER_TEMP/se001q-lock-probe" \
+            | tee lock-diagnostic-capture.json
+
+      - name: Independently verify lock diagnostic capsule
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p lock-diagnostic-verification
+          python3 verifier/.github/scripts/se001q_verify_lock_delta.py \
+            --evidence lock-diagnostic \
+            | tee lock-diagnostic-verification/verification.json
+
+      - name: Publish diagnostic summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### SE-001Q diagnostic witnesses'
+            echo
+            echo '```json'
+            cat witness-verification/verification.json 2>/dev/null || true
+            echo '```'
+            echo
+            echo '### Lock-resolution diagnostic'
+            echo
+            echo '```json'
+            cat lock-diagnostic/summary.json 2>/dev/null || true
+            echo '```'
+            if [[ -f lock-diagnostic/lock-delta-witness.json ]]; then
+              echo
+              echo '### LockDeltaWitness (diagnostic only)'
+              echo
+              echo '```json'
+              cat lock-diagnostic/lock-delta-witness.json
+              echo '```'
+            fi
+            echo
+            echo 'This workflow grants no qualification or repair authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload diagnostic capsule
+        id: upload-diagnostic
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: se001q-lock-diagnostic-v1-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            verifier/.github/qualification/se001q-diagnostic-witnesses-v1.json
+            witness-verification/
+            lock-diagnostic/
+            lock-diagnostic-verification/
+            lock-diagnostic-capture.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record uploaded diagnostic identity
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo
+            echo '### Uploaded diagnostic identity'
+            echo
+            echo 'artifact-id: `${{ steps.upload-diagnostic.outputs.artifact-id }}`'
+            echo 'artifact-digest: `${{ steps.upload-diagnostic.outputs.artifact-digest }}`'
+          } >> "$GITHUB_STEP_SUMMARY"
