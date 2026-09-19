@@ -15,6 +15,7 @@ mod browser_playback;
 pub mod comparison;
 pub mod comparison_blind;
 pub mod comparison_blind_controller;
+pub mod comparison_browser_events;
 pub mod comparison_capability;
 pub mod comparison_duration_exposure;
 pub mod comparison_identity;
