@@ -24,6 +24,7 @@ pub enum KeeperSemanticStoreError {
     InvalidArtifactKey,
     AudioKeyMismatch,
     AlreadyExists,
+    SymlinkNotAllowed(&'static str),
     Io(String),
     Serialize(String),
     Parse(String),
@@ -38,6 +39,9 @@ impl fmt::Display for KeeperSemanticStoreError {
                 "keeper semantic bundle audio_key does not match the requested keeper"
             ),
             Self::AlreadyExists => write!(f, "keeper semantic sidecar already exists"),
+            Self::SymlinkNotAllowed(label) => {
+                write!(f, "keeper semantic {label} must not be a symbolic link")
+            }
             Self::Io(error) => write!(f, "keeper semantic storage I/O failed: {error}"),
             Self::Serialize(error) => {
                 write!(f, "keeper semantic bundle serialization failed: {error}")
@@ -54,6 +58,11 @@ impl std::error::Error for KeeperSemanticStoreError {}
 /// The sidecar is create-once: an existing path is never truncated or replaced.
 /// A partial new file is removed if writing or syncing fails. The caller should
 /// publish the entire staging directory only after this succeeds.
+///
+/// On Unix, syncing the staging directory after the sidecar also persists the
+/// directory entries for audio/recipe/MIDI files the caller wrote before this
+/// function. That makes this helper suitable as the final write step before the
+/// existing atomic keeper-directory rename.
 pub fn write_semantic_bundle_to_staging(
     staging_dir: &Path,
     expected_audio_key: &str,
@@ -63,15 +72,20 @@ pub fn write_semantic_bundle_to_staging(
     if bundle.audio_key != expected_audio_key {
         return Err(KeeperSemanticStoreError::AudioKeyMismatch);
     }
-    if !staging_dir.is_dir() {
-        return Err(KeeperSemanticStoreError::Io(
-            "keeper staging directory does not exist".to_string(),
-        ));
-    }
+    require_real_directory(staging_dir, "staging directory")?;
 
     let bytes = serde_json::to_vec_pretty(bundle)
         .map_err(|error| KeeperSemanticStoreError::Serialize(error.to_string()))?;
     let path = staging_dir.join(KEEPER_SEMANTIC_FILENAME);
+    match std::fs::symlink_metadata(&path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            return Err(KeeperSemanticStoreError::SymlinkNotAllowed("sidecar"));
+        }
+        Ok(_) => return Err(KeeperSemanticStoreError::AlreadyExists),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(KeeperSemanticStoreError::Io(error.to_string())),
+    }
+
     let mut file = match std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -84,7 +98,10 @@ pub fn write_semantic_bundle_to_staging(
         Err(error) => return Err(KeeperSemanticStoreError::Io(error.to_string())),
     };
 
-    let result = file.write_all(&bytes).and_then(|()| file.sync_all());
+    let result = file
+        .write_all(&bytes)
+        .and_then(|()| file.sync_all())
+        .and_then(|()| sync_directory(staging_dir));
     if let Err(error) = result {
         drop(file);
         let _ = std::fs::remove_file(&path);
@@ -97,18 +114,47 @@ pub fn write_semantic_bundle_to_staging(
 ///
 /// `Ok(None)` means there is no stored sidecar (for example, a legacy keeper).
 /// There is deliberately no reconstruction fallback from recipe, score, audio,
-/// or the current engine version.
+/// or the current engine version. The trusted `root` itself may be a deployment
+/// symlink, but the untrusted key-selected keeper directory and sidecar may not.
 pub fn read_persisted_semantic_bundle(
     root: &Path,
     audio_key: &str,
 ) -> Result<Option<KeeperSemanticBundleV1>, KeeperSemanticStoreError> {
     validate_key(audio_key)?;
-    let path = semantic_bundle_path(root, audio_key);
-    let bytes = match std::fs::read(&path) {
-        Ok(bytes) => bytes,
+    let keeper_dir = root.join(audio_key);
+    let keeper_metadata = match std::fs::symlink_metadata(&keeper_dir) {
+        Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(KeeperSemanticStoreError::Io(error.to_string())),
     };
+    if keeper_metadata.file_type().is_symlink() {
+        return Err(KeeperSemanticStoreError::SymlinkNotAllowed(
+            "keeper directory",
+        ));
+    }
+    if !keeper_metadata.is_dir() {
+        return Err(KeeperSemanticStoreError::Io(
+            "keeper artifact path is not a directory".to_string(),
+        ));
+    }
+
+    let path = keeper_dir.join(KEEPER_SEMANTIC_FILENAME);
+    let metadata = match std::fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(KeeperSemanticStoreError::Io(error.to_string())),
+    };
+    if metadata.file_type().is_symlink() {
+        return Err(KeeperSemanticStoreError::SymlinkNotAllowed("sidecar"));
+    }
+    if !metadata.is_file() {
+        return Err(KeeperSemanticStoreError::Io(
+            "keeper semantic sidecar is not a regular file".to_string(),
+        ));
+    }
+
+    let bytes = std::fs::read(&path)
+        .map_err(|error| KeeperSemanticStoreError::Io(error.to_string()))?;
     let bundle = serde_json::from_slice::<KeeperSemanticBundleV1>(&bytes)
         .map_err(|error| KeeperSemanticStoreError::Parse(error.to_string()))?;
     if bundle.audio_key != audio_key {
@@ -119,6 +165,40 @@ pub fn read_persisted_semantic_bundle(
 
 pub fn semantic_bundle_path(root: &Path, audio_key: &str) -> PathBuf {
     root.join(audio_key).join(KEEPER_SEMANTIC_FILENAME)
+}
+
+fn require_real_directory(
+    path: &Path,
+    label: &'static str,
+) -> Result<(), KeeperSemanticStoreError> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            KeeperSemanticStoreError::Io(format!("keeper {label} does not exist"))
+        } else {
+            KeeperSemanticStoreError::Io(error.to_string())
+        }
+    })?;
+    if metadata.file_type().is_symlink() {
+        return Err(KeeperSemanticStoreError::SymlinkNotAllowed(label));
+    }
+    if !metadata.is_dir() {
+        return Err(KeeperSemanticStoreError::Io(format!(
+            "keeper {label} is not a directory"
+        )));
+    }
+    Ok(())
+}
+
+fn sync_directory(path: &Path) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        std::fs::File::open(path)?.sync_all()
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        Ok(())
+    }
 }
 
 fn validate_key(key: &str) -> Result<(), KeeperSemanticStoreError> {
@@ -300,5 +380,46 @@ mod tests {
             read_persisted_semantic_bundle(&root, ""),
             Err(KeeperSemanticStoreError::InvalidArtifactKey)
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_staging_or_persisted_paths_are_rejected() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_root("symlink");
+        let real_staging = root.join("real-staging");
+        let linked_staging = root.join("linked-staging");
+        std::fs::create_dir_all(&real_staging).unwrap();
+        symlink(&real_staging, &linked_staging).unwrap();
+        assert_eq!(
+            write_semantic_bundle_to_staging(&linked_staging, "keeper-a", &bundle("keeper-a")),
+            Err(KeeperSemanticStoreError::SymlinkNotAllowed(
+                "staging directory"
+            ))
+        );
+
+        let keeper = root.join("keeper-a");
+        std::fs::create_dir_all(&keeper).unwrap();
+        let external = root.join("external.json");
+        std::fs::write(&external, serde_json::to_vec(&bundle("keeper-a")).unwrap()).unwrap();
+        symlink(&external, keeper.join(KEEPER_SEMANTIC_FILENAME)).unwrap();
+        assert_eq!(
+            read_persisted_semantic_bundle(&root, "keeper-a"),
+            Err(KeeperSemanticStoreError::SymlinkNotAllowed("sidecar"))
+        );
+
+        let real_keeper = root.join("real-keeper");
+        std::fs::create_dir_all(&real_keeper).unwrap();
+        write_semantic_bundle_to_staging(&real_keeper, "keeper-linked", &bundle("keeper-linked"))
+            .unwrap();
+        symlink(&real_keeper, root.join("keeper-linked")).unwrap();
+        assert_eq!(
+            read_persisted_semantic_bundle(&root, "keeper-linked"),
+            Err(KeeperSemanticStoreError::SymlinkNotAllowed(
+                "keeper directory"
+            ))
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
 }
