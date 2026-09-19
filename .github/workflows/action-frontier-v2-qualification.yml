@@ -9,6 +9,7 @@ on:
       - 'crates/core/symthaea-action-checkpoint/**'
       - 'crates/core/symthaea-action-runtime/**'
       - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/ACTION_FRONTIER_V02_CONVERGENCE.md'
       - 'Cargo.lock'
   workflow_dispatch:
 
@@ -60,11 +61,23 @@ jobs:
         run: |
           set -euo pipefail
           SRC=crates/bridges/symthaea-action-frontier/src/lib.rs
+          grep -Fq 'fn current_head(&mut self)' "${SRC}"
           grep -Fq 'compare_and_swap' "${SRC}"
           grep -Fq 'persist_new_reservation' "${SRC}"
           grep -Fq 'arm_outcome_unknown' "${SRC}"
           grep -Fq 'PersistedReservationHeadMismatch' "${SRC}"
           grep -Fq 'AcknowledgedWrongHead' "${SRC}"
+          grep -Fq 'StoreFrontierChanged' "${SRC}"
+          grep -Fq 'StoreNotEmpty' "${SRC}"
+          grep -Fq 'expected_head' "${SRC}"
+          if grep -Fq 'pub fn resume_from_expected_current' "${SRC}"; then
+            echo 'caller-supplied expected heads must not recreate a writable frontier' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn into_inner' "${SRC}"; then
+            echo 'frontier containment must not expose a production store escape hatch' >&2
+            exit 1
+          fi
           if grep -Eq '#\[derive\([^]]*(Clone|Serialize|Deserialize)[^]]*\)\][[:space:]]*pub struct (PersistedReservationV2|DurablyArmedReservationV2)' "${SRC}"; then
             echo 'affine persistence tokens must not become Clone/Serde' >&2
             exit 1

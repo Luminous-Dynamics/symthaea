@@ -7,6 +7,7 @@ on:
       - '.github/workflows/action-runtime-v2-qualification.yml'
       - 'crates/core/symthaea-action-runtime/**'
       - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/ACTION_FRONTIER_V02_CONVERGENCE.md'
       - 'Cargo.lock'
   workflow_dispatch:
 
@@ -32,6 +33,7 @@ jobs:
       - name: Checkout exact event subject
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -67,13 +69,21 @@ jobs:
               'pub fn restore(',
               'DelegatedGrantRequiresVerifiedChain',
               'ReservationState::OutcomeUnknown',
+              'ReservationState::Released',
+              'future verifier-owned exact-attempt',
           ]
           for needle in required:
               if needle not in source:
                   raise SystemExit(f'missing required runtime authority ratchet: {needle}')
 
-          if 'pub fn from_snapshot' in source:
-              raise SystemExit('forbidden snapshot-only live-account restoration API')
+          forbidden_apis = [
+              'pub fn from_snapshot',
+              'pub fn cancel_before_dispatch',
+              'pub fn reconcile_not_applied',
+          ]
+          for needle in forbidden_apis:
+              if needle in source:
+                  raise SystemExit(f'forbidden authority-return/runtime API: {needle}')
 
           match = re.search(
               r'#\[derive\((.*?)\)\]\s*pub struct GrantAccountV2',

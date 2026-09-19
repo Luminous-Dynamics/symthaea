@@ -8,6 +8,7 @@ on:
       - 'crates/core/symthaea-action-checkpoint/**'
       - 'crates/core/symthaea-action-runtime/**'
       - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/ACTION_FRONTIER_V02_CONVERGENCE.md'
       - 'Cargo.lock'
   workflow_dispatch:
 
@@ -65,6 +66,25 @@ jobs:
           grep -Fq 'NewReservationNotReserved' "${STRICT}"
           grep -Fq 'ReservationRemoved' "${STRICT}"
           grep -Fq 'NonEmptyGenesis' "${STRICT}"
+          grep -Fq 'future verifier-owned reconciliation constructor' "${STRICT}"
+          grep -Fq 'ordinary_successor_cannot_refund_reserved_authority' "${STRICT}"
+          grep -Fq 'ordinary_successor_cannot_refund_unknown_authority' "${STRICT}"
+          if grep -Fq 'ReservationState::Released' "${STRICT}"; then
+            python3 - <<'PY'
+          from pathlib import Path
+          source = Path('crates/core/symthaea-action-checkpoint/src/strict.rs').read_text()
+          start = source.index('fn allowed_state_transition')
+          end = source.index('\nfn identity_error', start)
+          ordinary = source[start:end]
+          forbidden = [
+              'ReservationState::Reserved | ReservationState::Released',
+              'ReservationState::OutcomeUnknown | ReservationState::Released',
+              '| ReservationState::Released',
+          ]
+          if any(item in ordinary for item in forbidden):
+              raise SystemExit('ordinary checkpoint successor must not create Released')
+          PY
+          fi
           if grep -Eq 'bincode|serde_json::to_|postcard|rmp_serde' "${IDENTITY}" "${STRICT}"; then
             echo 'serializer-derived checkpoint identity is forbidden' >&2
             exit 1
