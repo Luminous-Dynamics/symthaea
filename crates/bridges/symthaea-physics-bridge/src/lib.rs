@@ -50,6 +50,8 @@ pub mod discovery;
 pub mod equation_ast;
 pub mod integrated_discovery;
 pub mod lyapunov;
+pub mod model_contract;
+pub mod model_validation;
 pub mod noise_robustness;
 pub mod pde_wave_stage_a;
 pub mod pde_wave_stage_b;
@@ -68,6 +70,16 @@ pub use catalog::PhysicsCatalog;
 pub use dimensional::DimensionalEncoder;
 pub use dimensional_inference::{InferenceResult, UnitMap, infer_dimensions};
 pub use equation_ast::EquationEncoder;
+pub use model_contract::{
+    ContractClosure, ContractFinding, DimensionAssessment, ObligationEvaluation,
+    ObligationKind, ObligationOutcome, PhysicalModelContract, PhysicalModelContractIssue,
+    PhysicalModelReport, PhysicalObligationSpec, FrozenPhysicalModelContract,
+    evaluate_physical_model,
+};
+pub use model_validation::{
+    PHYSICAL_MODEL_REPORT_SCHEMA, PhysicalModelEvaluationInput, SatisfiedPhysicalModel,
+    evaluate_satisfied_physical_model, physical_model_report_digest,
+};
 pub use query::{PhysicsSearchEngine, SearchWeights};
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
