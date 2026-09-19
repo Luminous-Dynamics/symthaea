@@ -1,5 +1,5 @@
 {
-  "schema": "symthaea.rel.qualification-durability-contract.v2",
+  "schema": "symthaea.rel.qualification-durability-contract.v3",
   "authority": "QualificationDurabilityContractOnly",
   "relation": "REL-005A",
   "source_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
@@ -8,10 +8,7 @@
   "qualification_firewall_head": "952ca3d7754a043f03da0875cf63b8665e63bf91",
   "comparison_subject_head": "a47efccf80fa66bacbdfa9930f59c8439be7ee38",
   "comparison_source_run_id": 35349750595,
-  "allowed_comparison_results": [
-    "ALL_PREDICATES_PASS",
-    "PREDICATE_FAILURES"
-  ],
+  "allowed_comparison_results": ["ALL_PREDICATES_PASS", "PREDICATE_FAILURES"],
   "selected_comparison_result": null,
   "outcome_independent": true,
   "authority_order": [
@@ -19,6 +16,7 @@
     "QualificationOnly",
     "PostQualificationFirewallOnly",
     "QualificationEvidencePersistenceOnly",
+    "QualificationEvidencePersistenceVerificationOnly",
     "QualificationCapsulePackagingOnly",
     "AttestationOnly"
   ],
@@ -26,6 +24,7 @@
     "qualification_job_ends_after_durable_evidence": true,
     "capsule_packaging_runs_in_fresh_downstream_job": true,
     "capsule_job_may_receive_only_durable_qualification_evidence": true,
+    "capsule_job_must_verify_persistence_receipt_before_build": true,
     "attestation_runs_in_fresh_downstream_job": true,
     "attestation_job_may_receive_only_final_capsule": true
   },
@@ -53,22 +52,20 @@
     "persistence_receipt_must_hash_every_payload_file": true,
     "persistence_receipt_must_record_every_payload_byte_length": true,
     "persistence_receipt_must_not_interpret_scientific_result": true,
+    "persistence_receipt_verification_required_before_packaging": true,
+    "packaging_may_not_substitute_transport_digest_for_inner_verification": true,
     "upload_must_complete_before_capsule_packaging": true
   },
   "failure_semantics": {
     "persistence_failure_before_durable_artifact": "QUALIFICATION_EVIDENCE_NOT_DURABLE",
+    "persistence_verification_failure": "DURABLE_EVIDENCE_VERIFICATION_FAILED",
     "capsule_failure_after_durable_artifact_mutates_qualification_result": false,
     "attestation_failure_after_durable_artifact_mutates_qualification_result": false,
     "workflow_conclusion_is_scientific_authority": false,
     "downstream_packaging_may_not_rewrite_qualification_only_json": true
   },
   "forbidden_result_dependent_durability_policy": true,
-  "forbidden_direct_inputs": [
-    "raw observation JSON",
-    "execution logs",
-    "individual metric values",
-    "scientific thresholds"
-  ],
+  "forbidden_direct_inputs": ["raw observation JSON", "execution logs", "individual metric values", "scientific thresholds"],
   "claims": {
     "durability_implemented": false,
     "qualification_completed": false,
