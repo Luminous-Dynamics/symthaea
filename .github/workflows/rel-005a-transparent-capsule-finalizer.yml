@@ -20,12 +20,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_PARENT: 2dbf4858eb5303390cdb5425638ac7e875081d8b
+  EXPECTED_PARENT: 5eb7a300d5db2cfcc0e426050c1bba35a6043b27
   SOURCE_WORKFLOW_NAME: REL-005A Qualification Pipeline V3
-  SOURCE_PIPELINE_HEAD: 10d21aad940f7702d477fc861a94549b4f4e202f
-  QUALIFICATION_ARTIFACT_NAME: rel-005a-qualification-evidence-10d21aad940f7702d477fc861a94549b4f4e202f
-  AUDIT_ARTIFACT_NAME: rel-005a-authority-extraction-audit-10d21aad940f7702d477fc861a94549b4f4e202f
-  FINALIZER_CONTRACT_BLOB: b2bf58cdfc650600df61c20495af24996a3cc954
+  SOURCE_PIPELINE_HEAD: 460b4c8a8f457f4bbf22820716ed6057d260d4fd
+  QUALIFICATION_ARTIFACT_NAME: rel-005a-qualification-evidence-460b4c8a8f457f4bbf22820716ed6057d260d4fd
+  AUDIT_ARTIFACT_NAME: rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd
+  FINALIZER_CONTRACT_BLOB: 1701ed5e99d9b5455b94ab4ca3d3817cf0d41040
   ATTESTATION_CONTRACT_BLOB: 2e9cc309ec41527795cc052b5ff05969bc33aa71
   CAPSULE_BUILDER_BLOB: ddb674825e890334dcd71863656788bec55ee56a
   OFFLINE_VERIFIER_BLOB: e51d570d57ef6cc001cc334a4f7f1ee26a31a0a0
@@ -70,6 +70,38 @@ jobs:
           )
           mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
           test "${changed[*]}" = "${expected_sorted[*]}"
+
+      - name: Validate publication-only contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, pathlib
+          p = pathlib.Path('.github/rel/rel-005a-transparent-capsule-finalizer-contract.json')
+          c = json.loads(p.read_text())
+          assert c['schema'] == 'symthaea.rel.transparent-capsule-finalizer-contract.v3'
+          assert c['authority'] == 'TransparentCapsuleFinalizerContractOnly'
+          assert c['source_workflow']['name'] == os.environ['SOURCE_WORKFLOW_NAME']
+          assert c['source_workflow']['head_sha'] == os.environ['SOURCE_PIPELINE_HEAD']
+          assert c['source_workflow']['qualification_evidence_artifact'] == os.environ['QUALIFICATION_ARTIFACT_NAME']
+          assert c['source_workflow']['authority_audit_artifact'] == os.environ['AUDIT_ARTIFACT_NAME']
+          assert c['input_files']['audit_evidence_source'] == [
+              'sealed-manifest-replay.json',
+              'authority-receipt-extraction.json',
+          ]
+          assert c['input_files']['audit_source_to_capsule'] == {
+              'sealed-manifest-replay.json': 'sealed-manifest-replay-receipt.json',
+              'authority-receipt-extraction.json': 'authority-receipt-extraction.json',
+          }
+          assert c['capsule']['input_member_count'] == 9
+          assert c['capsule']['total_member_count_with_manifest'] == 10
+          assert c['capsule']['outcome_neutral'] is True
+          assert c['transport_semantics']['artifact_transport_identity_is_scientific_authority'] is False
+          assert c['authority_boundary']['may_change_qualification_result'] is False
+          assert c['authority_boundary']['may_apply_scientific_thresholds'] is False
+          assert c['authority_boundary']['may_read_raw_scientific_observation'] is False
+          assert not any(c['claims'].values())
+          PY
 
       - name: Resolve exact successful source run and transport artifacts
         id: source
@@ -137,31 +169,42 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import pathlib, shutil, os
+          import json, pathlib, shutil, os
           qroot = pathlib.Path(os.environ['RUNNER_TEMP'])/'qualification-source'
           aroot = pathlib.Path(os.environ['RUNNER_TEMP'])/'audit-source'
           out = pathlib.Path(os.environ['RUNNER_TEMP'])/'transparent-input'
           out.mkdir()
-          q_expected = {
-            'predicate-contract-receipt.json',
-            'execution-v3-receipt.json',
-            'observation-seal-v3.json',
-            'comparison-only-qualification-receipt.json',
-            'qualification-input-manifest.json',
-            'qualification-assembly-receipt.json',
-            'qualification-only.json',
+          contract = json.loads(pathlib.Path('.github/rel/rel-005a-transparent-capsule-finalizer-contract.json').read_text())
+          q_expected = set(contract['input_files']['qualification_evidence'])
+          source_map = contract['input_files']['audit_source_to_capsule']
+          a_expected = set(contract['input_files']['audit_evidence_source'])
+          assert set(source_map) == a_expected
+          assert len(set(source_map.values())) == len(source_map)
+          assert set(source_map.values()) == {
+              'sealed-manifest-replay-receipt.json',
+              'authority-receipt-extraction.json',
           }
-          a_expected = {'sealed-manifest-replay-receipt.json','authority-receipt-extraction.json'}
-          def collect(root, expected):
+
+          def census(root):
               files = [p for p in root.rglob('*') if p.is_file()]
               names = [p.name for p in files]
               assert len(names) == len(set(names)), 'duplicate source basename'
-              assert set(names) == expected, (sorted(names), sorted(expected))
-              for p in files:
-                  shutil.copy2(p, out/p.name)
-          collect(qroot, q_expected)
-          collect(aroot, a_expected)
-          assert {p.name for p in out.iterdir() if p.is_file()} == q_expected | a_expected
+              return files, set(names)
+
+          qfiles, qnames = census(qroot)
+          afiles, anames = census(aroot)
+          assert qnames == q_expected, (sorted(qnames), sorted(q_expected))
+          assert anames == a_expected, (sorted(anames), sorted(a_expected))
+
+          for p in qfiles:
+              shutil.copy2(p, out/p.name)
+          for p in afiles:
+              shutil.copy2(p, out/source_map[p.name])
+
+          canonical = q_expected | set(source_map.values())
+          actual = {p.name for p in out.iterdir() if p.is_file()}
+          assert actual == canonical, (sorted(actual), sorted(canonical))
+          assert len(actual) == 9
           PY
 
       - name: Build deterministic transparent qualification capsule
@@ -232,7 +275,7 @@ jobs:
           python3 - <<'PY'
           import json, os, pathlib
           receipt = {
-            'schema':'symthaea.rel.transparent-capsule-finalizer-receipt.v2',
+            'schema':'symthaea.rel.transparent-capsule-finalizer-receipt.v3',
             'authority':'TransparentCapsuleFinalizerOnly',
             'finalizer_workflow_sha':os.environ['CALLED_WORKFLOW_SHA'],
             'source_workflow':os.environ['SOURCE_WORKFLOW_NAME'],
@@ -247,6 +290,10 @@ jobs:
               'id':int(os.environ['AUDIT_ARTIFACT_ID']),
               'name':os.environ['AUDIT_ARTIFACT_NAME'],
               'digest':os.environ['AUDIT_ARTIFACT_DIGEST'],
+            },
+            'audit_source_filename_mapping':{
+              'sealed-manifest-replay.json':'sealed-manifest-replay-receipt.json',
+              'authority-receipt-extraction.json':'authority-receipt-extraction.json',
             },
             'capsule_name':os.environ['CAPSULE_NAME'],
             'capsule_sha256':os.environ['CAPSULE_SHA256'],

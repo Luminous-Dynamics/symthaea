@@ -1,13 +1,13 @@
 {
-  "schema": "symthaea.rel.transparent-capsule-finalizer-contract.v2",
+  "schema": "symthaea.rel.transparent-capsule-finalizer-contract.v3",
   "authority": "TransparentCapsuleFinalizerContractOnly",
   "relation": "REL-005A",
   "source_workflow": {
     "name": "REL-005A Qualification Pipeline V3",
-    "head_sha": "10d21aad940f7702d477fc861a94549b4f4e202f",
+    "head_sha": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
     "required_conclusion": "success",
-    "qualification_evidence_artifact": "rel-005a-qualification-evidence-10d21aad940f7702d477fc861a94549b4f4e202f",
-    "authority_audit_artifact": "rel-005a-authority-extraction-audit-10d21aad940f7702d477fc861a94549b4f4e202f"
+    "qualification_evidence_artifact": "rel-005a-qualification-evidence-460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "authority_audit_artifact": "rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd"
   },
   "dispatch_architecture": {
     "execution_surface": "reusable_workflow",
@@ -27,10 +27,14 @@
       "qualification-assembly-receipt.json",
       "qualification-only.json"
     ],
-    "audit_evidence": [
-      "sealed-manifest-replay-receipt.json",
+    "audit_evidence_source": [
+      "sealed-manifest-replay.json",
       "authority-receipt-extraction.json"
-    ]
+    ],
+    "audit_source_to_capsule": {
+      "sealed-manifest-replay.json": "sealed-manifest-replay-receipt.json",
+      "authority-receipt-extraction.json": "authority-receipt-extraction.json"
+    }
   },
   "forbidden_inputs": [
     "raw ExecutionOnly observation",
@@ -49,7 +53,8 @@
     "offline_verifier_required_before_attestation": true,
     "network_required_for_internal_capsule_verification": false,
     "audit_receipt_hash_links_must_recompute": true,
-    "metric_leakage_must_be_absent": true
+    "metric_leakage_must_be_absent": true,
+    "source_audit_filename_mapping_must_be_exact": true
   },
   "transport_semantics": {
     "resolve_source_artifacts_at_runtime": true,
