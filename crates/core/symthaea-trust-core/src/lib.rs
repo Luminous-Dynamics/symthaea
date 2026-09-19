@@ -11,8 +11,9 @@
 //! - append-only temporal key lifecycle histories that distinguish retirement,
 //!   prospective revocation, replacement, and retroactive compromise;
 //! - content-addressed key-to-principal/organization/region/role bindings;
-//! - frozen delegated trust-root policies and non-authorizing dual-threshold
-//!   rotation contracts;
+//! - frozen delegated trust-root policies and dual-threshold rotation contracts;
+//! - role-aware root authority capabilities that reuse cryptographic attestation
+//!   verification and independently enforce principal/org/region quorum geometry;
 //! - bounded interval-based time evidence with explicit source strength;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
@@ -28,15 +29,20 @@ mod attestation;
 mod identity;
 mod principal;
 mod revalidation;
+mod root_authority;
 mod temporal_lifecycle;
 mod time;
 mod trust;
 mod trust_root;
 
+#[cfg(test)]
+mod root_authority_tests;
+
 pub use attestation::*;
 pub use identity::*;
 pub use principal::*;
 pub use revalidation::*;
+pub use root_authority::*;
 pub use temporal_lifecycle::*;
 pub use time::*;
 pub use trust::*;
