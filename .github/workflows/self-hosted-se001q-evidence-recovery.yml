@@ -48,7 +48,8 @@ jobs:
           SOURCE_DIR="$RUNNER_TEMP/frozen-se001"
           RECIPE_DIR="$RUNNER_TEMP/hosted-se001q-recipe"
           EVIDENCE_DIR="$RUNNER_TEMP/se001q-trusted-recovery-evidence"
-          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR"
+          BUNDLE_PATH="$RUNNER_TEMP/se001q-trusted-cpu-observation-v2.zip"
+          rm -rf -- "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR" "$BUNDLE_PATH"
           mkdir -p "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR" "$EVIDENCE_DIR"
 
           git -C "$HARNESS_DIR" init
@@ -71,13 +72,10 @@ jobs:
           EOF
           )"
           test "$actual_paths" = "$expected_paths"
-
           git -C "$SOURCE_DIR" checkout --detach "$TARGET_COMMIT"
-          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
-          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
 
-          # Reference verifier bytes are authenticated as data only. Nothing from
-          # this unmerged verifier checkout is executed on the trusted runner.
+          # Authenticate EV2.4 as reference data only. No script or Action from
+          # this unmerged verifier lineage is executed on the trusted host.
           git -C "$RECIPE_DIR" init
           git -C "$RECIPE_DIR" remote add origin https://github.com/Luminous-Dynamics/symthaea.git
           git -C "$RECIPE_DIR" -c protocol.version=2 fetch --no-tags --depth=1 origin "$HOSTED_VERIFIER_COMMIT"
@@ -96,6 +94,7 @@ jobs:
             printf 'SOURCE_DIR=%s\n' "$SOURCE_DIR"
             printf 'RECIPE_DIR=%s\n' "$RECIPE_DIR"
             printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR"
+            printf 'BUNDLE_PATH=%s\n' "$BUNDLE_PATH"
           } >> "$GITHUB_ENV"
 
       - name: Evaluate trusted runner policy
@@ -111,7 +110,7 @@ jobs:
             --impure \
             --expr 'let f = builtins.getFlake (toString ./.); pkgs = import f.inputs.nixpkgs { system = builtins.currentSystem; }; in import ./nix/tests/eval-trusted-runner-routing.nix { inherit pkgs; }'
 
-      - name: Reobserve every frozen SE-001 gate and retain diagnostics
+      - name: Capture independent provider evidence under pinned Rust and Python
         shell: bash
         run: |
           set -euo pipefail
@@ -121,84 +120,7 @@ jobs:
 
           export CARGO_HOME="$RUNNER_TEMP/se001q-cargo-home"
           export CARGO_TARGET_DIR="$RUNNER_TEMP/se001q-cargo-target"
-          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR" "$EVIDENCE_DIR"
-
-          sha256sum \
-            Cargo.lock \
-            Cargo.toml \
-            crates/domains/symthaea-se-model/Cargo.toml \
-            crates/domains/symthaea-se-model/src/lib.rs \
-            > "$EVIDENCE_DIR/input-sha256.before"
-
-          replay_script="$RUNNER_TEMP/se001q-trusted-replay.sh"
-          cat > "$replay_script" <<'BASH'
-          #!/usr/bin/env bash
-          set -u -o pipefail
-
-          run_gate() {
-            local gate="$1"
-            shift
-            local dir="$EVIDENCE_DIR/$gate"
-            mkdir -p "$dir"
-            printf '%q ' "$@" > "$dir/command.txt"
-            printf '\n' >> "$dir/command.txt"
-
-            set +e
-            "$@" >"$dir/stdout.log" 2>"$dir/stderr.log"
-            local rc=$?
-            set -e
-            printf '%s\n' "$rc" > "$dir/exit-code.txt"
-
-            local state failure_class
-            if [[ "$rc" -eq 0 ]]; then
-              state='PASS'
-              failure_class=''
-            elif [[ "$gate" == 'focused-format' ]] && \
-                 cat "$dir/stdout.log" "$dir/stderr.log" | grep -Fq 'Diff in '; then
-              state='CLASSIFIED_FAIL'
-              failure_class='FORMAT_DIVERGENCE'
-            else
-              state='FAIL_UNCLASSIFIED'
-              failure_class=''
-            fi
-
-            {
-              printf 'state=%s\n' "$state"
-              printf 'failure_class=%s\n' "$failure_class"
-            } > "$dir/classification.txt"
-
-            sha256sum "$dir/command.txt" "$dir/stdout.log" "$dir/stderr.log" \
-              "$dir/exit-code.txt" "$dir/classification.txt" > "$dir/SHA256SUMS"
-          }
-
-          set -e
-          rustc --version > "$EVIDENCE_DIR/rustc-version.txt"
-          cargo --version > "$EVIDENCE_DIR/cargo-version.txt"
-          rustfmt --version > "$EVIDENCE_DIR/rustfmt-version.txt"
-          cargo clippy --version > "$EVIDENCE_DIR/clippy-version.txt"
-
-          run_gate focused-format \
-            rustfmt --edition 2024 --check \
-            crates/domains/symthaea-se-model/src/lib.rs
-
-          run_gate locked-metadata \
-            cargo metadata --locked --no-deps --format-version 1
-
-          run_gate focused-all-targets \
-            cargo check -p symthaea-se-model --locked --all-targets
-
-          run_gate focused-tests \
-            cargo test -p symthaea-se-model --locked
-
-          run_gate focused-clippy \
-            cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
-
-          grep -qx 'state=CLASSIFIED_FAIL' \
-            "$EVIDENCE_DIR/focused-format/classification.txt"
-          grep -qx 'failure_class=FORMAT_DIVERGENCE' \
-            "$EVIDENCE_DIR/focused-format/classification.txt"
-          BASH
-          chmod 0700 "$replay_script"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
 
           nix develop --no-write-lock-file \
             --impure \
@@ -212,116 +134,32 @@ jobs:
               toolchainFile = ./rust-toolchain.toml;
               system = builtins.currentSystem;
             }' \
-            --command bash "$replay_script"
+            --command python3 "$HARNESS_DIR/nix/ci/se001q-trusted-replay.py" \
+              --source "$SOURCE_DIR" \
+              --harness "$HARNESS_DIR" \
+              --recipe "$RECIPE_DIR" \
+              --evidence "$EVIDENCE_DIR" \
+              --bundle "$BUNDLE_PATH"
 
-          sha256sum -c "$EVIDENCE_DIR/input-sha256.before"
-          cp "$EVIDENCE_DIR/input-sha256.before" "$EVIDENCE_DIR/input-sha256.after"
-
-      - name: Verify immutability and emit provider-specific evidence capsule
+      - name: Publish concise provider boundary
         shell: bash
         run: |
           set -euo pipefail
-
-          for dir in "$HARNESS_DIR" "$SOURCE_DIR" "$RECIPE_DIR"; do
-            git -C "$dir" diff --exit-code
-            git -C "$dir" diff --cached --exit-code
-            test -z "$(git -C "$dir" status --porcelain=v1 --untracked-files=all --ignored=matching)"
-          done
-          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$GITHUB_SHA"
-          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TARGET_COMMIT"
-          test "$(git -C "$SOURCE_DIR" rev-parse HEAD^{tree})" = "$TARGET_TREE"
-          test "$(git -C "$RECIPE_DIR" rev-parse HEAD)" = "$HOSTED_VERIFIER_COMMIT"
-
-          for command in awk sha256sum base64 wc tr tar find sort xargs; do
-            command -v "$command" >/dev/null 2>&1
-          done
-
-          gate_state() {
-            awk -F= '$1 == "state" { print $2 }' \
-              "$EVIDENCE_DIR/$1/classification.txt"
-          }
-          gate_class() {
-            awk -F= '$1 == "failure_class" { print $2 }' \
-              "$EVIDENCE_DIR/$1/classification.txt"
-          }
-
-          format_state="$(gate_state focused-format)"
-          format_class="$(gate_class focused-format)"
-          metadata_state="$(gate_state locked-metadata)"
-          all_targets_state="$(gate_state focused-all-targets)"
-          tests_state="$(gate_state focused-tests)"
-          clippy_state="$(gate_state focused-clippy)"
-
-          harness_tree="$(git -C "$HARNESS_DIR" rev-parse HEAD^{tree})"
-          recovery_workflow_blob="$(git -C "$HARNESS_DIR" rev-parse HEAD:.github/workflows/self-hosted-se001q-evidence-recovery.yml)"
-
-          cat > "$EVIDENCE_DIR/summary.txt" <<EOF
-          schema=symthaea.se001q.trusted-cpu-observation.v1
-          result=EVIDENCE_CAPTURE_COMPLETE
-          qualification_claim=NONE
-          repair_authority_claim=NONE
-          provider=trusted-cpu-v1
-          github_run_id=$GITHUB_RUN_ID
-          github_run_attempt=$GITHUB_RUN_ATTEMPT
-          runner_name=${RUNNER_NAME:-unknown}
-          runner_os=${RUNNER_OS:-unknown}
-          runner_arch=${RUNNER_ARCH:-unknown}
-          harness_commit=$GITHUB_SHA
-          harness_tree=$harness_tree
-          recovery_workflow_blob=$recovery_workflow_blob
-          target_commit=$TARGET_COMMIT
-          target_tree=$TARGET_TREE
-          target_base=$TARGET_BASE
-          hosted_verifier_commit=$HOSTED_VERIFIER_COMMIT
-          hosted_verifier_tree=$HOSTED_VERIFIER_TREE
-          hosted_workflow_blob=$HOSTED_WORKFLOW_BLOB
-          hosted_experiment_blob=$HOSTED_EXPERIMENT_BLOB
-          hosted_classifier_blob=$HOSTED_CLASSIFIER_BLOB
-          hosted_capture_blob=$HOSTED_CAPTURE_BLOB
-          hosted_verify_blob=$HOSTED_VERIFY_BLOB
-          hosted_attest_blob=$HOSTED_ATTEST_BLOB
-          focused_format_state=$format_state
-          focused_format_failure_class=$format_class
-          locked_metadata_state=$metadata_state
-          focused_all_targets_state=$all_targets_state
-          focused_tests_state=$tests_state
-          focused_clippy_state=$clippy_state
-          source_immutability_checked=PASS
-          hosted_recipe_executed=false
-          evidence_scope=independent-provider-observation-only
-          EOF
-
-          (
-            cd "$EVIDENCE_DIR"
-            find . -type f ! -name SHA256SUMS -print0 \
-              | LC_ALL=C sort -z \
-              | xargs -0 sha256sum > SHA256SUMS
-          )
-
-          bundle="$RUNNER_TEMP/se001q-trusted-cpu-observation-v1.tar.gz"
-          tar -C "$EVIDENCE_DIR" -czf "$bundle" .
-          bundle_sha256="$(sha256sum "$bundle" | awk '{print $1}')"
-          bundle_bytes="$(wc -c < "$bundle" | tr -d '[:space:]')"
-          bundle_base64="$(base64 < "$bundle" | tr -d '\n')"
-
-          cat "$EVIDENCE_DIR/summary.txt"
-          printf 'evidence_bundle_sha256=%s\n' "$bundle_sha256"
-          printf 'evidence_bundle_bytes=%s\n' "$bundle_bytes"
-          printf 'evidence_bundle_base64=%s\n' "$bundle_base64"
-
+          test -s "$EVIDENCE_DIR/summary.json"
+          test -s "$EVIDENCE_DIR/manifest.json"
+          test -s "$BUNDLE_PATH"
           {
             echo '## SE-001Q trusted CPU reobservation'
             echo
             echo "- Frozen subject: \`$TARGET_COMMIT\` / \`$TARGET_TREE\`"
             echo "- Hosted EV2.4 recipe reference: \`$HOSTED_VERIFIER_COMMIT\`"
-            echo "- Provider: \`trusted-cpu-v1\`"
-            echo "- Format: \`$format_state / $format_class\`"
-            echo "- Locked metadata: \`$metadata_state\`"
-            echo "- All targets: \`$all_targets_state\`"
-            echo "- Tests: \`$tests_state\`"
-            echo "- Clippy: \`$clippy_state\`"
-            echo "- Evidence bundle SHA-256: \`$bundle_sha256\`"
-            echo "- Evidence bundle bytes: \`$bundle_bytes\`"
+            echo '- Provider: `trusted-cpu-v1`'
+            echo '- Authority: `independent-provider-observation-only`'
             echo
-            echo 'This is an independent provider observation. It does not replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.'
+            echo '```json'
+            cat "$EVIDENCE_DIR/summary.json"
+            echo '```'
+            echo
+            echo 'Exact evidence-bundle bytes are emitted as numbered base64 chunks in the preceding job step.'
+            echo 'This run cannot replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.'
           } >> "$GITHUB_STEP_SUMMARY"
