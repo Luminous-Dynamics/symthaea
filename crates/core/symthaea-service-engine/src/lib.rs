@@ -7,6 +7,7 @@
 //! still rejects unsupported mutation variants defensively.
 
 pub mod semantic;
+pub mod service;
 
 use std::fmt;
 
