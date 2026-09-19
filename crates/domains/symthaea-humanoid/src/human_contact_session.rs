@@ -63,6 +63,7 @@ pub struct HumanContactAuthoritySessionV1 {
     session_id: String,
     state: HumanContactConsentSessionState,
     highest_terminal_consent_epoch: u64,
+    active_scope: Option<HumanContactConsentScopeV1>,
 }
 
 impl HumanContactAuthoritySessionV1 {
@@ -83,6 +84,7 @@ impl HumanContactAuthoritySessionV1 {
             session_id,
             state: HumanContactConsentSessionState::Idle,
             highest_terminal_consent_epoch: 0,
+            active_scope: None,
         })
     }
 
@@ -133,10 +135,25 @@ impl HumanContactAuthoritySessionV1 {
             return Err(HumanContactSessionError::StaleConsentEpoch);
         }
 
+        self.active_scope = Some(scope.clone());
         self.state = HumanContactConsentSessionState::Active {
             consent_epoch: scope.consent_epoch(),
         };
         Ok(())
+    }
+
+    /// Whether this exact semantic scope is the currently admitted live scope.
+    ///
+    /// Epoch equality alone is deliberately insufficient: a different scope with
+    /// the same epoch must not be able to substitute broader regions/sites.
+    pub fn is_exact_scope_active(
+        &self,
+        scope: &HumanContactConsentScopeV1,
+        now_ns: u64,
+    ) -> bool {
+        self.is_active()
+            && scope.is_live_at(now_ns)
+            && self.active_scope.as_ref().is_some_and(|active| active == scope)
     }
 
     /// Latch revocation of the currently active consent epoch.
@@ -151,6 +168,7 @@ impl HumanContactAuthoritySessionV1 {
             HumanContactConsentSessionState::Active { consent_epoch } => {
                 self.highest_terminal_consent_epoch =
                     self.highest_terminal_consent_epoch.max(consent_epoch);
+                self.active_scope = None;
                 self.state = HumanContactConsentSessionState::WithdrawRequired {
                     revoked_consent_epoch: consent_epoch,
                     reason,
@@ -222,18 +240,42 @@ mod tests {
     #[test]
     fn live_scope_can_enter_active_state() {
         let mut session = HumanContactAuthoritySessionV1::new("p", "s").unwrap();
-        session.admit_scope(&scope("p", "s", 1, 0, 100, 200), 150).unwrap();
+        let admitted = scope("p", "s", 1, 0, 100, 200);
+        session.admit_scope(&admitted, 150).unwrap();
         assert_eq!(
             session.state(),
             HumanContactConsentSessionState::Active { consent_epoch: 1 }
         );
         assert!(session.is_active());
+        assert!(session.is_exact_scope_active(&admitted, 150));
+    }
+
+    #[test]
+    fn same_epoch_scope_substitution_is_not_exactly_active() {
+        let mut session = HumanContactAuthoritySessionV1::new("p", "s").unwrap();
+        let admitted = scope("p", "s", 2, 1, 100, 200);
+        let substituted = HumanContactConsentScopeV1::new(
+            "p",
+            "s",
+            2,
+            1,
+            HumanContactClass::Social,
+            [HumanBodyRegion::Hand, HumanBodyRegion::Shoulder],
+            [site("right_hand"), site("left_hand")],
+            100,
+            200,
+        )
+        .unwrap();
+        session.admit_scope(&admitted, 150).unwrap();
+        assert!(session.is_exact_scope_active(&admitted, 150));
+        assert!(!session.is_exact_scope_active(&substituted, 150));
     }
 
     #[test]
     fn explicit_revocation_latches_and_removes_active_eligibility() {
         let mut session = HumanContactAuthoritySessionV1::new("p", "s").unwrap();
-        session.admit_scope(&scope("p", "s", 2, 1, 100, 200), 150).unwrap();
+        let admitted = scope("p", "s", 2, 1, 100, 200);
+        session.admit_scope(&admitted, 150).unwrap();
         assert!(session
             .revoke_active(HumanContactRevocationReason::ExplicitWithdrawal)
             .unwrap());
@@ -245,6 +287,7 @@ mod tests {
             }
         );
         assert!(!session.is_active());
+        assert!(!session.is_exact_scope_active(&admitted, 150));
     }
 
     #[test]
