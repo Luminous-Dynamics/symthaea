@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod cargo_execution_contract;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -79,6 +80,45 @@ enum Commands {
         /// Strict repository effect-policy JSON.
         #[arg(long)]
         policy: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Canonicalize and identify a Cargo execution intent for assurance admission.
+    CargoExecutionIntent {
+        /// Strict Cargo execution-intent input JSON spec.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Validated repository-source subject to bind before execution.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Exact repository effect policy to bind before execution.
+        #[arg(long = "effect-policy")]
+        effect_policy: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Cross-bind a frozen Cargo intent to observed build/effect evidence.
+    CargoExecutionResult {
+        /// Frozen Cargo execution intent emitted by `cargo-execution-intent`.
+        #[arg(long)]
+        intent: PathBuf,
+        /// Frozen repository-source subject verified before execution.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Frozen repository-source subject captured after execution.
+        #[arg(long = "post-snapshot")]
+        post_snapshot: PathBuf,
+        /// Raw Cargo build observation emitted by the Cargo observation layer.
+        #[arg(long)]
+        observation: PathBuf,
+        /// Exact repository effect policy admitted before execution.
+        #[arg(long = "effect-policy")]
+        effect_policy: PathBuf,
+        /// Optional companion Git worktree-state subject after execution.
+        #[arg(long = "git-worktree-state-after")]
+        git_worktree_state_after: Option<String>,
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
@@ -222,6 +262,33 @@ fn main() -> anyhow::Result<()> {
             output,
         } => {
             repository_effect_policy::run(&base, &head, &policy, output)?;
+        }
+        Commands::CargoExecutionIntent {
+            spec,
+            pre_snapshot,
+            effect_policy,
+            output,
+        } => {
+            cargo_execution_contract::run_intent(&spec, &pre_snapshot, &effect_policy, output)?;
+        }
+        Commands::CargoExecutionResult {
+            intent,
+            pre_snapshot,
+            post_snapshot,
+            observation,
+            effect_policy,
+            git_worktree_state_after,
+            output,
+        } => {
+            cargo_execution_contract::run_result(
+                &intent,
+                &pre_snapshot,
+                &post_snapshot,
+                &observation,
+                &effect_policy,
+                git_worktree_state_after,
+                output,
+            )?;
         }
     }
     Ok(())
