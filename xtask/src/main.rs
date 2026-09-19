@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 mod cargo_graph;
+mod cargo_impact;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -39,6 +40,21 @@ enum Commands {
     },
     /// Emit a canonical, content-addressed snapshot of the locked Cargo resolve graph.
     CargoGraph {
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Compare two Cargo graph snapshots for conservative per-package dependency impact.
+    CargoImpact {
+        /// Base snapshot emitted by `cargo xtask cargo-graph`.
+        #[arg(long)]
+        base: PathBuf,
+        /// Head snapshot emitted by `cargo xtask cargo-graph`.
+        #[arg(long)]
+        head: PathBuf,
+        /// Workspace package name, stable ID, or workspace-relative manifest path.
+        #[arg(long = "package", required = true)]
+        packages: Vec<String>,
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
@@ -161,6 +177,14 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask always lives one level below the workspace root")
                 .to_path_buf();
             cargo_graph::run(&root, output)?;
+        }
+        Commands::CargoImpact {
+            base,
+            head,
+            packages,
+            output,
+        } => {
+            cargo_impact::run(&base, &head, packages, output)?;
         }
     }
     Ok(())
