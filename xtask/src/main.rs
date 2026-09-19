@@ -10,6 +10,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod rhn_sweep;
+mod rust_diagnostics;
 
 #[derive(Parser)]
 struct Cli {
@@ -86,6 +87,18 @@ enum Commands {
         #[arg(long)]
         spec: PathBuf,
         /// Exact stdout transcript from Cargo `--message-format=json`.
+        #[arg(long)]
+        messages: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Extract rustc diagnostic spans and compiler-authored repair suggestions from a bound Cargo observation.
+    RustDiagnostics {
+        /// Strict JSON binding this extraction to an observation ID + stdout digest.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Exact Cargo JSONL transcript previously bound by `cargo-observation`.
         #[arg(long)]
         messages: PathBuf,
         /// Write JSON to this path instead of stdout.
@@ -231,6 +244,13 @@ fn main() -> anyhow::Result<()> {
             output,
         } => {
             cargo_observation::run(&spec, &messages, output)?;
+        }
+        Commands::RustDiagnostics {
+            spec,
+            messages,
+            output,
+        } => {
+            rust_diagnostics::run(&spec, &messages, output)?;
         }
     }
     Ok(())
