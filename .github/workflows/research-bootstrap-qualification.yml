@@ -51,6 +51,10 @@ jobs:
       manifest_path: ${{ steps.manifest.outputs.manifest_path }}
       expected_rust: ${{ steps.manifest.outputs.expected_rust }}
       manifest_sha256: ${{ steps.manifest.outputs.manifest_sha256 }}
+      program_profile_path: ${{ steps.profile.outputs.program_profile_path }}
+      program_profile_git_blob: ${{ steps.profile.outputs.program_profile_git_blob }}
+      program_profile_file_sha256: ${{ steps.profile.outputs.program_profile_file_sha256 }}
+      program_profile_canonical_sha256: ${{ steps.profile.outputs.program_profile_canonical_sha256 }}
     env:
       TRUSTED_ROOT: ${{ github.workspace }}/trusted
       CANDIDATE_ROOT: ${{ github.workspace }}/candidate
@@ -85,6 +89,10 @@ jobs:
           python3 "$TRUSTED_ROOT/scripts/validate-research-qualification-subject.py" --self-test
           python3 -m py_compile "$TRUSTED_ROOT/scripts/seal-research-qualification-binding.py"
           python3 "$TRUSTED_ROOT/scripts/seal-research-qualification-binding.py" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/validate-research-program-profile.py"
+          python3 "$TRUSTED_ROOT/scripts/validate-research-program-profile.py" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/seal-research-program-profile.py"
+          python3 "$TRUSTED_ROOT/scripts/seal-research-program-profile.py" --self-test
 
       - name: Authenticate live PR before admission
         if: github.event_name == 'pull_request_target'
@@ -121,6 +129,20 @@ jobs:
           python3 "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py" resolve \
             --candidate-root "$CANDIDATE_ROOT" \
             --manifest "$manifest_path" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Resolve trusted canonical program profile
+        id: profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/validate-research-program-profile.py" \
+            --trusted-root "$TRUSTED_ROOT" \
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ steps.manifest.outputs.manifest_path }}" \
             --expected-head "$EXPECTED_HEAD" \
             --expected-base "$EXPECTED_BASE" \
             --github-output "$GITHUB_OUTPUT"
@@ -173,6 +195,30 @@ jobs:
             --github-output "$GITHUB_OUTPUT"
           test "${{ needs.admit.outputs.expected_rust }}" = "${{ steps.manifest.outputs.expected_rust }}"
           test "${{ needs.admit.outputs.manifest_sha256 }}" = "${{ steps.manifest.outputs.manifest_sha256 }}"
+
+      - name: Re-derive canonical program profile before candidate execution
+        id: profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/validate-research-program-profile.py" \
+            --trusted-root "$TRUSTED_ROOT" \
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Require admitted canonical profile identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.admit.outputs.expected_rust }}" = "${{ steps.profile.outputs.expected_rust }}"
+          test "${{ needs.admit.outputs.program_profile_path }}" = "${{ steps.profile.outputs.program_profile_path }}"
+          test "${{ needs.admit.outputs.program_profile_git_blob }}" = "${{ steps.profile.outputs.program_profile_git_blob }}"
+          test "${{ needs.admit.outputs.program_profile_file_sha256 }}" = "${{ steps.profile.outputs.program_profile_file_sha256 }}"
+          test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.profile.outputs.program_profile_canonical_sha256 }}"
 
       - name: Install manifest-pinned Rust toolchain
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
@@ -266,6 +312,30 @@ jobs:
           test "${{ needs.admit.outputs.expected_rust }}" = "${{ steps.manifest.outputs.expected_rust }}"
           test "${{ needs.admit.outputs.manifest_sha256 }}" = "${{ steps.manifest.outputs.manifest_sha256 }}"
 
+      - name: Re-derive canonical profile before authenticated seal
+        id: profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/validate-research-program-profile.py" \
+            --trusted-root "$TRUSTED_ROOT" \
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Require admitted canonical profile identity before sealing
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ needs.admit.outputs.expected_rust }}" = "${{ steps.profile.outputs.expected_rust }}"
+          test "${{ needs.admit.outputs.program_profile_path }}" = "${{ steps.profile.outputs.program_profile_path }}"
+          test "${{ needs.admit.outputs.program_profile_git_blob }}" = "${{ steps.profile.outputs.program_profile_git_blob }}"
+          test "${{ needs.admit.outputs.program_profile_file_sha256 }}" = "${{ steps.profile.outputs.program_profile_file_sha256 }}"
+          test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.profile.outputs.program_profile_canonical_sha256 }}"
+
       - name: Seal adapter binding after authenticated postflight
         shell: bash
         env:
@@ -288,6 +358,28 @@ jobs:
             args+=(--repo "$GITHUB_REPOSITORY" --pr-number "${{ github.event.pull_request.number }}")
           fi
           python3 "$TRUSTED_ROOT/scripts/seal-research-qualification-binding.py" "${args[@]}"
+
+      - name: Seal canonical program-profile binding
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.event_name == 'pull_request_target' && github.token || '' }}
+        run: |
+          set -euo pipefail
+          args=(
+            --trusted-root "$TRUSTED_ROOT"
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA"
+            --candidate-root "$CANDIDATE_ROOT"
+            --manifest "${{ needs.admit.outputs.manifest_path }}"
+            --expected-head "$EXPECTED_HEAD"
+            --expected-base "$EXPECTED_BASE"
+            --final-dir "$EVIDENCE_DIR"
+            --github-run-id "$GITHUB_RUN_ID"
+            --github-run-attempt "$GITHUB_RUN_ATTEMPT"
+          )
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+            args+=(--repo "$GITHUB_REPOSITORY" --pr-number "${{ github.event.pull_request.number }}")
+          fi
+          python3 "$TRUSTED_ROOT/scripts/seal-research-program-profile.py" "${args[@]}"
 
       - name: Upload sealed bootstrap evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
