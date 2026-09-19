@@ -4,15 +4,16 @@
 //! Lock-free audio output via cpal + ring buffer.
 //!
 //! Producer/consumer architecture:
-//!   Synthesis thread → HeapRb<f32> → cpal output callback (audio thread)
+//!   Synthesis thread(s) → serialized producer handle → HeapRb<f32>
+//!   HeapRb<f32> → cpal output callback (audio thread)
 //!
-//! The ring buffer decouples synthesis timing from audio device timing while keeping
-//! only a bounded near-term acoustic horizon. On underrun, the callback writes silence
-//! (no click/pop). Barge-in may request consumer-owned queued-audio invalidation.
+//! The CPAL consumer remains lock-free. Producer-side serialization is allowed because
+//! synthesis/push workers are not the real-time callback. The ring keeps only a bounded
+//! near-term acoustic horizon; on underrun the callback writes silence.
 //!
 //! Feature-gated under `live-voice`.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
@@ -33,6 +34,72 @@ pub const DEFAULT_BUFFER_AHEAD_MS: u32 = 250;
 fn buffer_capacity_samples(sample_rate: u32, buffer_ahead_ms: u32) -> usize {
     let samples = (u64::from(sample_rate) * u64::from(buffer_ahead_ms)) / 1000;
     samples.max(1) as usize
+}
+
+/// Cloneable producer-side capability for live audio.
+///
+/// Multiple synthesis/push workers may retain this handle, but actual producer access
+/// is serialized through a small producer-side mutex. The CPAL consumer callback does
+/// not touch this mutex and remains lock-free.
+#[derive(Clone)]
+pub struct AudioProducerHandle {
+    producer: Arc<Mutex<ringbuf::HeapProd<f32>>>,
+}
+
+impl AudioProducerHandle {
+    fn new(producer: ringbuf::HeapProd<f32>) -> Self {
+        Self {
+            producer: Arc::new(Mutex::new(producer)),
+        }
+    }
+
+    /// Push as many samples as fit while `keep_going` remains true.
+    ///
+    /// The producer lock is acquired once for the slice, avoiding per-sample mutex
+    /// traffic while still letting callers observe interruption between samples.
+    pub fn push_samples_while<F>(&self, samples: &[f32], mut keep_going: F) -> usize
+    where
+        F: FnMut() -> bool,
+    {
+        let Ok(mut producer) = self.producer.lock() else {
+            return 0;
+        };
+        let mut written = 0;
+        for &sample in samples {
+            if !keep_going() {
+                break;
+            }
+            if producer.try_push(sample).is_ok() {
+                written += 1;
+            } else {
+                break;
+            }
+        }
+        written
+    }
+
+    /// Push as many samples as currently fit.
+    pub fn push_samples(&self, samples: &[f32]) -> usize {
+        self.push_samples_while(samples, || true)
+    }
+
+    /// Approximate remaining ring space. Returns 0 if the producer mutex is poisoned.
+    pub fn available_space(&self) -> usize {
+        self.producer
+            .lock()
+            .map(|producer| producer.vacant_len())
+            .unwrap_or(0)
+    }
+
+    fn try_into_raw(self) -> Result<ringbuf::HeapProd<f32>, Self> {
+        match Arc::try_unwrap(self.producer) {
+            Ok(mutex) => Ok(match mutex.into_inner() {
+                Ok(producer) => producer,
+                Err(poisoned) => poisoned.into_inner(),
+            }),
+            Err(producer) => Err(Self { producer }),
+        }
+    }
 }
 
 /// Cloneable, capability-narrow request to discard queued live audio.
@@ -63,10 +130,6 @@ impl AudioFlushHandle {
 }
 
 /// Apply one pending flush request on the consumer-owning thread.
-///
-/// `Consumer::clear()` removes the complete occupied region while advancing the
-/// consumer read index once. The atomic is consumed only after the callback has
-/// exclusive access to the consumer, so control threads never touch ring state.
 fn flush_consumer_if_requested<C>(consumer: &mut C, requested: &AtomicBool) -> usize
 where
     C: Consumer<Item = f32>,
@@ -79,12 +142,9 @@ where
 }
 
 /// Real-time audio output via cpal + ring buffer.
-///
-/// Can be in either `Live` mode (real audio device) or `Dummy` mode
-/// (for headless/CI use with `speak_to_file()`).
 pub struct AudioOutput {
     _stream: Option<cpal::Stream>,
-    producer: Option<ringbuf::HeapProd<f32>>,
+    producer: Option<AudioProducerHandle>,
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
@@ -93,8 +153,7 @@ pub struct AudioOutput {
 }
 
 impl AudioOutput {
-    /// Open the default audio output device with the default conversational
-    /// ahead-of-playback budget.
+    /// Open the default audio output device with the default conversational budget.
     pub fn new() -> Result<Self> {
         Self::with_buffer_ahead_ms(DEFAULT_BUFFER_AHEAD_MS)
     }
@@ -135,8 +194,6 @@ impl AudioOutput {
     }
 
     /// Create a dummy output (no device). `push_samples()` discards all data.
-    ///
-    /// Used by [`super::live_voice::LiveVoice::new_headless()`] for `speak_to_file()`.
     pub fn new_dummy(sample_rate: u32) -> Self {
         Self {
             _stream: None,
@@ -159,6 +216,7 @@ impl AudioOutput {
         let buffer_capacity = buffer_capacity_samples(sample_rate, buffer_ahead_ms);
         let rb = HeapRb::<f32>::new(buffer_capacity);
         let (producer, mut consumer) = rb.split();
+        let producer = AudioProducerHandle::new(producer);
         let flush_requested = Arc::new(AtomicBool::new(false));
         let callback_flush = Arc::clone(&flush_requested);
 
@@ -169,18 +227,16 @@ impl AudioOutput {
             .build_output_stream(
                 &stream_config,
                 move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                    // Barge-in invalidation runs on the consumer-owning callback.
-                    // No mutex is acquired and control threads never touch `consumer`.
                     let _ = flush_consumer_if_requested(&mut consumer, &callback_flush);
 
                     for sample in data.chunks_mut(ch as usize) {
                         if let Some(s) = consumer.try_pop() {
                             for out in sample.iter_mut() {
-                                *out = s; // Mono → all channels
+                                *out = s;
                             }
                         } else {
                             for out in sample.iter_mut() {
-                                *out = 0.0; // Underrun → silence
+                                *out = 0.0;
                             }
                         }
                     }
@@ -204,31 +260,32 @@ impl AudioOutput {
     }
 
     /// Push audio samples into the ring buffer (non-blocking).
-    ///
-    /// Returns the number of samples actually written. If the buffer is full,
-    /// remaining samples are dropped. Returns 0 on dummy output.
     pub fn push_samples(&mut self, samples: &[f32]) -> usize {
-        let producer = match &mut self.producer {
-            Some(p) => p,
-            None => return 0,
-        };
-        let mut written = 0;
-        for &s in samples {
-            if producer.try_push(s).is_ok() {
-                written += 1;
-            } else {
-                break;
-            }
-        }
-        written
+        self.producer
+            .as_ref()
+            .map(|producer| producer.push_samples(samples))
+            .unwrap_or(0)
     }
 
-    /// Take the ring buffer producer for use on a background thread.
+    /// Return a cloneable producer-side capability without consuming `AudioOutput`.
+    pub fn producer_handle(&self) -> Option<AudioProducerHandle> {
+        self.producer.clone()
+    }
+
+    /// Take the raw producer when no cloneable producer capability has been shared.
     ///
-    /// After calling this, `push_samples()` becomes a no-op until a new
-    /// AudioOutput is created. Returns `None` if already taken or dummy.
+    /// New code should prefer [`Self::producer_handle`]. This compatibility method
+    /// returns `None` rather than invalidating existing producer handles.
+    #[deprecated(note = "prefer producer_handle(); raw producer ownership is one-shot")]
     pub fn take_producer(&mut self) -> Option<ringbuf::HeapProd<f32>> {
-        self.producer.take()
+        let handle = self.producer.take()?;
+        match handle.try_into_raw() {
+            Ok(producer) => Some(producer),
+            Err(handle) => {
+                self.producer = Some(handle);
+                None
+            }
+        }
     }
 
     /// Return a cloneable request-only handle for queued-audio invalidation.
@@ -241,35 +298,30 @@ impl AudioOutput {
         self.flush_requested.store(true, Ordering::Release);
     }
 
-    /// Audio sample rate negotiated with the device (or headless default).
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
     }
 
-    /// Number of output channels.
     pub fn channels(&self) -> u16 {
         self.channels
     }
 
-    /// Ring buffer total capacity in mono samples.
     pub fn buffer_capacity(&self) -> usize {
         self.buffer_capacity
     }
 
-    /// Configured ahead-of-playback horizon in milliseconds. Dummy outputs report 0.
     pub fn buffer_ahead_ms(&self) -> u32 {
         self.buffer_ahead_ms
     }
 
     /// Approximate space remaining in the ring buffer. Returns 0 on dummy output.
     pub fn available_space(&self) -> usize {
-        match &self.producer {
-            Some(p) => p.vacant_len(),
-            None => 0,
-        }
+        self.producer
+            .as_ref()
+            .map(AudioProducerHandle::available_space)
+            .unwrap_or(0)
     }
 
-    /// Whether this is a live audio device (not dummy).
     pub fn is_live(&self) -> bool {
         self._stream.is_some()
     }
@@ -294,6 +346,43 @@ mod tests {
     }
 
     #[test]
+    fn cloneable_producer_handle_reuses_one_ring() {
+        let rb = HeapRb::<f32>::new(8);
+        let (producer, mut consumer) = rb.split();
+        let first = AudioProducerHandle::new(producer);
+        let second = first.clone();
+
+        assert_eq!(first.push_samples(&[0.1, 0.2]), 2);
+        assert_eq!(consumer.try_pop(), Some(0.1));
+        assert_eq!(consumer.try_pop(), Some(0.2));
+
+        assert_eq!(second.push_samples(&[0.3, 0.4]), 2);
+        assert_eq!(consumer.try_pop(), Some(0.3));
+        assert_eq!(consumer.try_pop(), Some(0.4));
+    }
+
+    #[test]
+    fn producer_handle_can_stop_mid_slice_without_consumer_locking() {
+        let rb = HeapRb::<f32>::new(8);
+        let (producer, mut consumer) = rb.split();
+        let handle = AudioProducerHandle::new(producer);
+        let mut allowed = 2usize;
+        let written = handle.push_samples_while(&[1.0, 2.0, 3.0, 4.0], || {
+            if allowed == 0 {
+                false
+            } else {
+                allowed -= 1;
+                true
+            }
+        });
+
+        assert_eq!(written, 2);
+        assert_eq!(consumer.try_pop(), Some(1.0));
+        assert_eq!(consumer.try_pop(), Some(2.0));
+        assert!(consumer.try_pop().is_none());
+    }
+
+    #[test]
     fn test_dummy_output() {
         let mut dummy = AudioOutput::new_dummy(24000);
         assert_eq!(dummy.sample_rate(), 24000);
@@ -301,8 +390,8 @@ mod tests {
         assert_eq!(dummy.buffer_ahead_ms(), 0);
         assert_eq!(dummy.available_space(), 0);
         assert!(!dummy.is_live());
+        assert!(dummy.producer_handle().is_none());
 
-        // push_samples on dummy returns 0
         let samples = vec![0.5f32; 100];
         assert_eq!(dummy.push_samples(&samples), 0);
 
@@ -328,13 +417,10 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Requires audio device
+    #[ignore]
     fn test_audio_output_creation() {
         let output = AudioOutput::new();
-        assert!(
-            output.is_ok(),
-            "AudioOutput should create on a system with audio"
-        );
+        assert!(output.is_ok());
         let output = output.unwrap();
         assert!(output.sample_rate() > 0);
         assert!(output.channels() > 0);
