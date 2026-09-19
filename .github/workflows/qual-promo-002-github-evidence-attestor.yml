@@ -1,0 +1,118 @@
+name: QUAL-PROMO-002 Collect Exact GitHub Qualification Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: qual-promo-002-external-attestation
+  cancel-in-progress: false
+
+env:
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  collect-exact-predecessor-evidence:
+    runs-on: ubuntu-slim
+    timeout-minutes: 20
+    steps:
+      - name: Check out collector source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate collector syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check .github/scripts/qual-promo-002-collector.cjs
+
+      - name: Collect exact GitHub Actions evidence
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const collector = require('./.github/scripts/qual-promo-002-collector.cjs');
+            await collector.collect({ github, context, core });
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Canonicalize and structurally verify manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run -p symthaea-humanoid \
+            --bin symthaea_qualification_manifest_verify \
+            --locked -- \
+            qual-promo-002-evidence/records.json \
+            qual-promo-002-evidence/manifest.json
+
+      - name: Bind collector outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            qual-promo-002-evidence/records.json \
+            qual-promo-002-evidence/manifest.json \
+            qual-promo-002-evidence/github-api-evidence.json \
+            > qual-promo-002-evidence/sha256sums.txt
+          {
+            echo "program=QUAL-PROMO-002"
+            echo "authority=github-actions-exact-predecessor-evidence-attestation-only"
+            echo "github_actions_exact_predecessor_evidence_attested=TRUE"
+            echo "predecessor_count=8"
+            echo "qualifier_pr_current_head_base_bound=TRUE"
+            echo "run_identity_bound=TRUE"
+            echo "run_attempt_bound=TRUE"
+            echo "focused_job_identity_bound=TRUE"
+            echo "focused_jobs_executed_successfully=TRUE"
+            echo "focused_steps_executed_successfully=TRUE"
+            echo "artifact_identity_bound=TRUE"
+            echo "artifact_repository_bound=TRUE"
+            echo "artifact_nonexpired=TRUE"
+            echo "artifact_digest_source=GitHubActionsREST"
+            echo "manifest_structural_verification=PASS"
+            echo "d4_established_authority=NONE"
+            echo "live_epoch_freshness_binding=NONE"
+            echo "qp_authority=NONE"
+            echo "hardware_contact_truth_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "collector_head_sha=$GITHUB_SHA"
+            echo "collector_ref=$GITHUB_REF"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+          } > qual-promo-002-evidence/receipt.txt
+          sha256sum qual-promo-002-evidence/receipt.txt >> qual-promo-002-evidence/sha256sums.txt
+
+      - name: Upload external attestation evidence
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qual-promo-002-${{ github.sha }}
+          path: qual-promo-002-evidence/
+          if-no-files-found: error
+
+      - name: Record uploaded attestation digest
+        shell: bash
+        env:
+          ARTIFACT_DIGEST: ${{ steps.upload.outputs.digest }}
+        run: |
+          set -euo pipefail
+          test -n "$ARTIFACT_DIGEST"
+          echo "QUAL-PROMO-002 uploaded evidence digest: $ARTIFACT_DIGEST" >> "$GITHUB_STEP_SUMMARY"
