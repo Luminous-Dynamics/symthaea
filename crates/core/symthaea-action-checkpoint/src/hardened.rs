@@ -2,18 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Hardened public checkpoint facade for action authority v0.2.
 //!
-//! The predecessor `strict.rs` already protects canonical identity, genesis,
-//! reservation preservation, and forward state motion. This facade removes one
-//! remaining transition from ordinary persistence:
+//! The R1 predecessor `strict.rs` protects canonical identity, genesis,
+//! reservation preservation, forward state motion, and forbids ordinary
+//! creation of `Released`. This facade preserves V2B's more specific theorem:
 //!
 //! ```text
 //! OutcomeUnknown -> Released
+//!     requires a separately verified reconciliation proof
 //! ```
 //!
-//! Once dispatch may have happened, unused authority must not reappear merely
-//! because a caller claims the effect did not occur. A future reconciliation
-//! layer must prove both non-application and the absence/finality of every live
-//! dispatch capability before it can introduce a separately typed release path.
+//! Returning capacity is authority-increasing. Ordinary runtime/checkpoint APIs
+//! do not perform that transition. A future verifier-owned reconciliation path
+//! must prove both exact-attempt non-application and that no live/delayed
+//! dispatch capability can still cross the effect boundary.
 
 #![deny(unsafe_code)]
 
@@ -30,8 +31,9 @@ pub use predecessor::{ACTION_CHECKPOINT_DOMAIN, ACTION_CHECKPOINT_SCHEMA_VERSION
 /// Public checkpoint type with non-refundable uncertain-state semantics.
 ///
 /// Serialization is storage-only. The canonical digest remains the exact frozen
-/// predecessor transcript and independent oracle; this wrapper changes only
-/// which semantic successors may become public durable history.
+/// predecessor transcript and independent oracle; this wrapper preserves the
+/// explicit `OutcomeUnknownReleaseRequiresProof` claim while the predecessor
+/// forbids every ordinary transition that newly creates `Released`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GrantAccountCheckpointV2 {
@@ -98,8 +100,8 @@ impl GrantAccountCheckpointV2 {
         self.inner.verify_genesis(grant).map_err(predecessor_error)
     }
 
-    /// Head-shape validation only. As before, an expected head is ordinary data
-    /// unless a stronger layer authenticates/currentizes it.
+    /// Head-shape validation only. An expected head is ordinary data unless a
+    /// stronger layer authenticates/currentizes it.
     pub fn verify_shape_against_expected_head(
         &self,
         grant: &CapabilityGrant,
@@ -110,8 +112,8 @@ impl GrantAccountCheckpointV2 {
             .map_err(predecessor_error)
     }
 
-    /// Verify exact predecessor identity, the predecessor state machine, and the
-    /// additional non-refundable `OutcomeUnknown` invariant.
+    /// Verify exact predecessor identity, the R1 no-refund state machine, and
+    /// the explicit V2B `OutcomeUnknown` claim ceiling.
     pub fn verify_successor_of(
         &self,
         previous: &Self,
@@ -125,7 +127,8 @@ impl GrantAccountCheckpointV2 {
 }
 
 /// Verify a supplied history without treating its final head as externally current.
-/// Every edge additionally rejects ordinary `OutcomeUnknown -> Released` refund.
+/// Every edge preserves R1's no-ordinary-release theorem and V2B's explicit
+/// uncertain-release claim ceiling.
 pub fn verify_supplied_chain(
     grant: &CapabilityGrant,
     checkpoints: &[GrantAccountCheckpointV2],
@@ -176,7 +179,9 @@ pub enum CheckpointV2Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_action_runtime::{AttemptId, EffectBindingDigest, EffectIntentId};
+    use symthaea_action_runtime::{
+        AttemptId, EffectBindingDigest, EffectIntentId, GrantAccountSnapshotV2,
+    };
     use symthaea_authority::{
         AuthorityContextRef, AuthorityEpoch, Operation, PrincipalId, PurposeId, ResourceRef,
         RiskBudget,
@@ -205,8 +210,48 @@ mod tests {
         grant
     }
 
+    fn unknown_account(
+        grant: &CapabilityGrant,
+    ) -> (GrantAccountCheckpointV2, GrantAccountV2, symthaea_action_runtime::ReservationId) {
+        let mut account = GrantAccountV2::new_root(grant).unwrap();
+        let genesis = GrantAccountCheckpointV2::first(grant, &account).unwrap();
+        let reservation = account
+            .reserve_execution(
+                EffectIntentId(digest(2)),
+                AttemptId(digest(3)),
+                EffectBindingDigest(digest(4)),
+                RiskBudget {
+                    mutation_units: 1,
+                    ..RiskBudget::default()
+                },
+            )
+            .unwrap();
+        let reserved = GrantAccountCheckpointV2::successor(&genesis, grant, &account).unwrap();
+        account.mark_outcome_unknown(reservation).unwrap();
+        let unknown = GrantAccountCheckpointV2::successor(&reserved, grant, &account).unwrap();
+        (unknown, account, reservation)
+    }
+
     #[test]
     fn ordinary_checkpoint_path_cannot_refund_outcome_unknown() {
+        let grant = grant();
+        let (unknown, account, reservation) = unknown_account(&grant);
+
+        // Persisted snapshots are ordinary data. Construct a malicious/future-
+        // shaped snapshot that claims Released and prove the public ordinary
+        // checkpoint path still cannot publish that authority increase.
+        let mut forged: GrantAccountSnapshotV2 = account.snapshot();
+        forged.reservations.get_mut(&reservation).unwrap().state = ReservationState::Released;
+        let forged_account = GrantAccountV2::restore(&grant, forged).unwrap();
+
+        assert!(matches!(
+            GrantAccountCheckpointV2::successor(&unknown, &grant, &forged_account),
+            Err(CheckpointV2Error::OutcomeUnknownReleaseRequiresProof)
+        ));
+    }
+
+    #[test]
+    fn strict_predecessor_blocks_reserved_to_released_too() {
         let grant = grant();
         let mut account = GrantAccountV2::new_root(&grant).unwrap();
         let genesis = GrantAccountCheckpointV2::first(&grant, &account).unwrap();
@@ -222,38 +267,19 @@ mod tests {
             )
             .unwrap();
         let reserved = GrantAccountCheckpointV2::successor(&genesis, &grant, &account).unwrap();
-        account.mark_outcome_unknown(reservation).unwrap();
-        let unknown = GrantAccountCheckpointV2::successor(&reserved, &grant, &account).unwrap();
-
-        // Runtime mechanics can represent independently-proven-not-applied, but
-        // ordinary durable authority cannot publish that refund without the
-        // future stronger proof object.
-        account.reconcile_not_applied(reservation).unwrap();
+        let mut forged = account.snapshot();
+        forged.reservations.get_mut(&reservation).unwrap().state = ReservationState::Released;
+        let forged_account = GrantAccountV2::restore(&grant, forged).unwrap();
         assert!(matches!(
-            GrantAccountCheckpointV2::successor(&unknown, &grant, &account),
-            Err(CheckpointV2Error::OutcomeUnknownReleaseRequiresProof)
+            GrantAccountCheckpointV2::successor(&reserved, &grant, &forged_account),
+            Err(CheckpointV2Error::Predecessor(_))
         ));
     }
 
     #[test]
     fn committed_forward_transition_remains_available() {
         let grant = grant();
-        let mut account = GrantAccountV2::new_root(&grant).unwrap();
-        let genesis = GrantAccountCheckpointV2::first(&grant, &account).unwrap();
-        let reservation = account
-            .reserve_execution(
-                EffectIntentId(digest(2)),
-                AttemptId(digest(3)),
-                EffectBindingDigest(digest(4)),
-                RiskBudget {
-                    mutation_units: 1,
-                    ..RiskBudget::default()
-                },
-            )
-            .unwrap();
-        let reserved = GrantAccountCheckpointV2::successor(&genesis, &grant, &account).unwrap();
-        account.mark_outcome_unknown(reservation).unwrap();
-        let unknown = GrantAccountCheckpointV2::successor(&reserved, &grant, &account).unwrap();
+        let (unknown, mut account, reservation) = unknown_account(&grant);
         account.reconcile_applied(reservation).unwrap();
         assert!(GrantAccountCheckpointV2::successor(&unknown, &grant, &account).is_ok());
     }

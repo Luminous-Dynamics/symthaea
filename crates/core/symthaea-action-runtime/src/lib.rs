@@ -4,7 +4,8 @@
 //!
 //! This crate owns deterministic accounting mechanics only. It does not
 //! authenticate current authority state, persist checkpoints, provide a CAS
-//! store, mint dispatch authority, or execute effects.
+//! store, mint dispatch authority, execute effects, or authenticate authority
+//! refunds.
 //!
 //! Core separation:
 //!
@@ -14,13 +15,20 @@
 //!     != GrantAccountV2
 //!     != reserved use
 //!     != durable reserved use
+//!     != verified reconciliation
 //!     != dispatch permit
 //!     != effect
 //! ```
 //!
-//! Persisted snapshots are ordinary data. Restoring a live account always
-//! requires the externally supplied exact `CapabilityGrant` v2 and full
-//! invariant revalidation.
+//! Persisted snapshots are ordinary data. Restoring an account always requires
+//! the externally supplied exact `CapabilityGrant` v2 and full invariant
+//! revalidation. The account is still not execution authority by itself.
+//!
+//! `ReservationState::Released` remains part of the frozen V2 representation so
+//! a future verifier-owned reconciliation protocol can represent a proven
+//! not-applied attempt. This crate intentionally exposes no ordinary transition
+//! that creates `Released`: returning capacity is an authority-increasing act
+//! and requires proof outside this deterministic accounting layer.
 
 #![deny(unsafe_code)]
 
@@ -39,7 +47,8 @@ const RESERVATION_ID_DOMAIN: &[u8] = b"symthaea.action-runtime.reservation.v2\0"
 /// Semantic consequence intended by the caller/domain adapter.
 ///
 /// This identity may remain stable across a retry only after an earlier attempt
-/// is independently proven not dispatched/applied.
+/// is independently proven not dispatched/applied by a future reconciliation
+/// layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct EffectIntentId(pub Digest32);
 
@@ -68,7 +77,9 @@ pub enum ReservationState {
     OutcomeUnknown,
     /// The effect is independently known to have been applied.
     Committed,
-    /// The attempt is independently known not to have produced the effect.
+    /// Capacity returned only after a future verifier-owned exact-attempt
+    /// reconciliation proves the effect was not applied. Ordinary runtime APIs
+    /// in this schema cannot create this state.
     Released,
 }
 
@@ -85,8 +96,9 @@ pub struct ExecutionReservationV2 {
 
 /// Persistable deterministic account state.
 ///
-/// This is audit/recovery data only. It does not recreate a live account by
-/// itself; [`GrantAccountV2::restore`] requires the exact external grant again.
+/// This is audit/recovery data only. It does not recreate a live/current
+/// authority fact by itself; [`GrantAccountV2::restore`] requires the exact
+/// external grant again, while trusted checkpoint/frontier lineage is separate.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GrantAccountSnapshotV2 {
     pub schema_version: u16,
@@ -100,7 +112,7 @@ pub struct GrantAccountSnapshotV2 {
 ///
 /// Deliberately not `Clone`, `Serialize`, or `Deserialize`: duplicating an
 /// in-process account must not become a way to multiply authority state. Cross-
-/// process durability/concurrency requires the later checkpoint/CAS tranches.
+/// process durability/concurrency requires checkpoint/CAS tranches.
 #[derive(Debug)]
 pub struct GrantAccountV2 {
     snapshot: GrantAccountSnapshotV2,
@@ -126,6 +138,11 @@ impl GrantAccountV2 {
 
     /// Restore ordinary persisted data only after rebinding it to the exact
     /// externally supplied root grant and re-deriving every invariant.
+    ///
+    /// A restored account remains ordinary deterministic state. In particular,
+    /// this function does not prove checkpoint currentness or authorize a
+    /// `Released` transition that was not already part of an independently
+    /// qualified persisted lineage.
     pub fn restore(
         grant: &CapabilityGrant,
         snapshot: GrantAccountSnapshotV2,
@@ -145,8 +162,8 @@ impl GrantAccountV2 {
 
     /// Derive the pure authority-core use state from the exact account state.
     ///
-    /// Higher verified-authority composition should call this; callers must not
-    /// substitute an independently authored `GrantUseState` for this account.
+    /// Higher verified-authority composition may derive from this exact account;
+    /// callers must not substitute independently authored counters.
     pub fn authority_use_state(&self) -> Result<GrantUseState, RuntimeV2Error> {
         let mut committed = 0u32;
         let mut reserved = 0u32;
@@ -232,19 +249,6 @@ impl GrantAccountV2 {
         Ok(reservation_id)
     }
 
-    /// Pre-effect cancellation. Only a still-`Reserved` attempt can take this
-    /// path; once dispatch may have happened, independent reconciliation is
-    /// required instead.
-    pub fn cancel_before_dispatch(
-        &mut self,
-        reservation_id: ReservationId,
-    ) -> Result<(), RuntimeV2Error> {
-        let reservation = self.reservation_mut(reservation_id)?;
-        require_state(reservation.state, ReservationState::Reserved)?;
-        reservation.state = ReservationState::Released;
-        self.validate_invariants()
-    }
-
     /// Arm the conservative uncertainty state before any future dispatch permit
     /// is minted. `OutcomeUnknown` remains fully charged across crashes/restart.
     pub fn mark_outcome_unknown(
@@ -259,6 +263,9 @@ impl GrantAccountV2 {
 
     /// Reconcile an uncertain attempt that is independently known to have been
     /// applied. A `Reserved` record cannot jump directly to `Committed`.
+    ///
+    /// This transition never returns capacity, so it is safe for this
+    /// deterministic accounting layer to expose directly.
     pub fn reconcile_applied(
         &mut self,
         reservation_id: ReservationId,
@@ -266,17 +273,6 @@ impl GrantAccountV2 {
         let reservation = self.reservation_mut(reservation_id)?;
         require_state(reservation.state, ReservationState::OutcomeUnknown)?;
         reservation.state = ReservationState::Committed;
-        self.validate_invariants()
-    }
-
-    /// Reconcile an uncertain attempt independently proven not applied.
-    pub fn reconcile_not_applied(
-        &mut self,
-        reservation_id: ReservationId,
-    ) -> Result<(), RuntimeV2Error> {
-        let reservation = self.reservation_mut(reservation_id)?;
-        require_state(reservation.state, ReservationState::OutcomeUnknown)?;
-        reservation.state = ReservationState::Released;
         self.validate_invariants()
     }
 
@@ -673,29 +669,12 @@ mod tests {
     }
 
     #[test]
-    fn proven_not_applied_allows_new_attempt_for_same_effect() {
-        let grant = grant(1, risk(1));
-        let mut account = GrantAccountV2::new_root(&grant).unwrap();
-        let first = account
-            .reserve_execution(intent(1), attempt(11), binding(21), risk(1))
-            .unwrap();
-        account.mark_outcome_unknown(first).unwrap();
-        account.reconcile_not_applied(first).unwrap();
-
-        let second = account
-            .reserve_execution(intent(1), attempt(12), binding(21), risk(1))
-            .unwrap();
-        assert_ne!(first, second);
-    }
-
-    #[test]
-    fn attempt_identity_cannot_be_reused_for_another_effect() {
+    fn attempt_identity_cannot_be_reused_while_original_attempt_is_charged() {
         let grant = grant(2, risk(2));
         let mut account = GrantAccountV2::new_root(&grant).unwrap();
-        let first = account
+        account
             .reserve_execution(intent(1), attempt(11), binding(21), risk(1))
             .unwrap();
-        account.cancel_before_dispatch(first).unwrap();
         assert_eq!(
             account.reserve_execution(intent(2), attempt(11), binding(22), risk(1)),
             Err(RuntimeV2Error::AttemptIdAlreadyUsed)
@@ -773,6 +752,26 @@ mod tests {
             GrantAccountV2::restore(&grant, snapshot).unwrap_err(),
             RuntimeV2Error::ReservationIdentityMismatch
         );
+    }
+
+    #[test]
+    fn released_snapshot_is_data_not_a_runtime_refund_proof() {
+        let grant = grant(1, risk(1));
+        let mut account = GrantAccountV2::new_root(&grant).unwrap();
+        let id = account
+            .reserve_execution(intent(1), attempt(11), binding(21), risk(1))
+            .unwrap();
+        account.mark_outcome_unknown(id).unwrap();
+
+        let mut snapshot = account.snapshot();
+        snapshot.reservations.get_mut(&id).unwrap().state = ReservationState::Released;
+        let restored = GrantAccountV2::restore(&grant, snapshot).unwrap();
+
+        // Structural restore deliberately does not authenticate how Released was
+        // earned. The strict checkpoint/frontier layer must reject an ordinary
+        // OutcomeUnknown -> Released successor; future verified reconciliation
+        // will own that transition.
+        assert_eq!(restored.authority_use_state().unwrap(), GrantUseState::default());
     }
 
     proptest! {
