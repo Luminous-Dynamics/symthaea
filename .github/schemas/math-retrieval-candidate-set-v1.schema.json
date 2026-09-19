@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-candidate-set-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Candidate Set v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "candidate_set_id",
+    "authority",
+    "corpus_snapshot_sha256",
+    "knowledge_boundary_sha256",
+    "candidate_eligibility_policy_sha256",
+    "source_identity_kind",
+    "canonical_order",
+    "candidate_count",
+    "candidates"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-candidate-set-v1"},
+    "candidate_set_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority": {"const": "MeasurementOnly"},
+    "corpus_snapshot_sha256": {"$ref": "#/$defs/sha256"},
+    "knowledge_boundary_sha256": {"$ref": "#/$defs/sha256"},
+    "candidate_eligibility_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "source_identity_kind": {"const": "SourceObjectDigest"},
+    "canonical_order": {"const": "SourceObjectDigestAscending"},
+    "candidate_count": {"type": "integer", "minimum": 1},
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/sha256"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
