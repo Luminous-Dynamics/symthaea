@@ -13,10 +13,11 @@
 //! historical qualification, witnessed transparency publication of exact
 //! qualification ratifications and lifecycle events, append-only authenticated
 //! qualification lifecycle records, observed-view currentness assessments,
-//! complete-tail lifecycle publication freshness assessments, typed provenance
-//! graphs, frozen study protocols, immutable execution/conformance records,
-//! adversarial falsification campaigns, explicit scientific uncertainty budgets,
-//! and provenance-checked replication lineage assessments. It does not run
+//! complete-tail lifecycle publication freshness assessments, authenticated
+//! frozen-protocol evidence freshness assessments, typed provenance graphs,
+//! frozen study protocols, immutable execution/conformance records, adversarial
+//! falsification campaigns, explicit scientific uncertainty budgets, and
+//! provenance-checked replication lineage assessments. It does not run
 //! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
 //! operations.
 //!
@@ -26,7 +27,8 @@
 //! separate append-only authority and never rewrites historical qualification.
 //! Delegated-root ratification is also distinct from claiming that an older
 //! qualification was originally issued under the newer root architecture, and
-//! public/observed currentness is distinct from global current validity or truth.
+//! public/observed currentness or freshness is distinct from global current
+//! validity or scientific truth.
 
 pub mod authority;
 pub mod claim;
@@ -36,6 +38,7 @@ pub mod evidence;
 mod evidence_coverage;
 pub mod evidence_coverage_binding;
 pub mod evidence_coverage_gate;
+pub mod evidence_freshness;
 pub mod execution;
 pub mod falsification;
 pub mod identity;
@@ -72,6 +75,7 @@ pub use evidence_coverage::{
 };
 pub use evidence_coverage_binding::*;
 pub use evidence_coverage_gate::*;
+pub use evidence_freshness::*;
 pub use execution::*;
 pub use falsification::*;
 pub use identity::*;
