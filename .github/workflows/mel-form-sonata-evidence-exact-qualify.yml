@@ -1,0 +1,123 @@
+name: MEL-FORM Sonata work evidence exact qualification
+
+on:
+  push:
+    branches:
+      - qualify/mel-form-sonata-evidence-ce9e446
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-form-sonata-evidence-exact-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  MEL_FORM_SONATA_SUBJECT: ce9e4465400cbb875678847172b3457d380d9346
+  MEL_FORM_SONATA_BASE: ef01a3d4c4f75b9b5d8ea1d7ce14d7e159df589b
+
+jobs:
+  qualify:
+    name: Execute frozen Sonata bridge + evidence subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEL_FORM_SONATA_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Bind exact subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_FORM_SONATA_SUBJECT"
+          test "$(git merge-base "$MEL_FORM_SONATA_BASE" HEAD)" = "$MEL_FORM_SONATA_BASE"
+          git diff --name-only "$MEL_FORM_SONATA_BASE"..HEAD | sort > /tmp/mel_form_sonata_changed
+          cat > /tmp/mel_form_sonata_allowed <<'EOF'
+          crates/domains/symthaea-music-theory/src/lib.rs
+          crates/domains/symthaea-music-theory/src/sonata_work_bridge.rs
+          crates/domains/symthaea-music-theory/src/sonata_work_evidence.rs
+          EOF
+          sort -o /tmp/mel_form_sonata_allowed /tmp/mel_form_sonata_allowed
+          diff -u /tmp/mel_form_sonata_allowed /tmp/mel_form_sonata_changed
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Capture preflight identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mel-form-sonata-evidence"
+          {
+            echo 'schema=melothaea.mel-form-sonata-evidence.qualification.v1'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "base_sha=$MEL_FORM_SONATA_BASE"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            rustc -Vv
+            cargo -V
+          } > "$RUNNER_TEMP/mel-form-sonata-evidence/environment.txt"
+          cp /tmp/mel_form_sonata_changed "$RUNNER_TEMP/mel-form-sonata-evidence/changed-files.txt"
+
+      - name: Formatting gate
+        run: cargo fmt --check -p symthaea-music-theory
+
+      - name: Sonata work bridge regressions
+        run: cargo test -p symthaea-music-theory sonata_work_bridge
+
+      - name: Sonata work evidence regressions
+        run: cargo test -p symthaea-music-theory sonata_work_evidence
+
+      - name: All-targets compile gate
+        run: cargo check -p symthaea-music-theory --all-targets
+
+      - name: All-targets Clippy gate
+        run: cargo clippy -p symthaea-music-theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal bounded qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-form-sonata-evidence"
+          {
+            echo 'status=MEL_FORM_SONATA_EVIDENCE_ENGINEERING_PASS'
+            echo 'authority=sonata-work-bridge-and-score-evidence-only'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo 'human_perception_claimed=false'
+            echo 'artistic_quality_claimed=false'
+            echo 'unmeasured_work_promises_upgraded=false'
+            echo 'cached_verification_trusted=false'
+            echo 'cadential_projection_loss_explicit=true'
+          } > "$out/receipt.txt"
+          sha256sum \
+            "$out/environment.txt" \
+            "$out/changed-files.txt" \
+            "$out/receipt.txt" \
+            > "$out/SHA256SUMS"
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_FORM_SONATA_SUBJECT"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload exact qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-form-sonata-evidence-${{ env.MEL_FORM_SONATA_SUBJECT }}
+          path: ${{ runner.temp }}/mel-form-sonata-evidence/
+          retention-days: 90
