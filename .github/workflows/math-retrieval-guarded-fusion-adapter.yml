@@ -1,0 +1,52 @@
+name: Math Retrieval Guarded Fusion Adapter
+
+on:
+  pull_request:
+    paths:
+      - 'tools/math-retrieval-runtime-guard/**'
+      - 'tools/math-retrieval-runtime-seam/**'
+      - '.github/schemas/math-retrieval-*.json'
+      - '.github/scripts/validate-math-retrieval-*.py'
+      - '.github/workflows/math-retrieval-guarded-fusion-adapter.yml'
+      - 'docs/research/MATH_RET_RUNTIME_GUARDED_FUSION_V1.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify guarded F-arm fusion evidence chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check guard package formatting
+        run: cargo fmt --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml -- --check
+      - name: Check guard package
+        run: cargo check --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml --locked
+      - name: Run guard mechanical canaries
+        run: cargo test --manifest-path tools/math-retrieval-runtime-guard/Cargo.toml --locked
+      - name: Compile fusion adapter
+        run: python -m py_compile tools/math-retrieval-runtime-guard/qualify_guarded_fusion.py
+      - name: Re-run normative validator self-tests
+        run: |
+          python .github/scripts/validate-math-retrieval-graph-v1.1.py --self-test
+          python .github/scripts/validate-math-retrieval-trace.py --self-test
+          python .github/scripts/validate-math-retrieval-payload-audit.py --self-test
+          python .github/scripts/validate-math-retrieval-candidate-set.py --self-test
+          python .github/scripts/validate-math-retrieval-candidate-membership.py --self-test
+      - name: Qualify guarded F-arm fusion end-to-end
+        run: python tools/math-retrieval-runtime-guard/qualify_guarded_fusion.py
+      - name: Upload exact qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: math-ret-runtime-001e-${{ github.sha }}
+          path: tools/math-retrieval-runtime-guard/target/guarded-fusion-fixture
+          if-no-files-found: warn
+          retention-days: 30
