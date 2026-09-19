@@ -1,0 +1,93 @@
+{
+  "schema": "symthaea.rel.transparent-capsule-finalizer-contract.v5",
+  "authority": "TransparentCapsuleFinalizerContractOnly",
+  "relation": "REL-005A",
+  "source_workflow": {
+    "name": "REL-005A Qualification Pipeline V3",
+    "head_sha": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "required_conclusion": "success",
+    "qualification_evidence_artifact": "rel-005a-qualification-evidence-460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "authority_audit_artifact": "rel-005a-authority-extraction-audit-460b4c8a8f457f4bbf22820716ed6057d260d4fd"
+  },
+  "attestation_contract": {
+    "schema": "symthaea.rel.attestation-contract.v6",
+    "blob": "5f009027eb7ed1fa791df87d472a4cfe800a2a90",
+    "parent_pipeline_head": "460b4c8a8f457f4bbf22820716ed6057d260d4fd",
+    "must_match_source_workflow_head": true
+  },
+  "dispatch_architecture": {
+    "execution_surface": "reusable_workflow",
+    "workflow_call_required": true,
+    "default_branch_dispatcher_required": true,
+    "dispatcher_must_pin_called_workflow_by_exact_sha": true,
+    "called_workflow_self_identity": "job.workflow_sha",
+    "github_sha_is_not_called_workflow_authority": true
+  },
+  "input_files": {
+    "qualification_evidence": [
+      "predicate-contract-receipt.json",
+      "execution-v3-receipt.json",
+      "observation-seal-v3.json",
+      "comparison-only-qualification-receipt.json",
+      "qualification-input-manifest.json",
+      "qualification-assembly-receipt.json",
+      "qualification-only.json"
+    ],
+    "audit_evidence": [
+      "sealed-manifest-replay-receipt.json",
+      "authority-receipt-extraction.json"
+    ]
+  },
+  "forbidden_inputs": [
+    "raw ExecutionOnly observation",
+    "execution stdout/stderr",
+    "detailed ComparisonOnly predicate array",
+    "scientific threshold table"
+  ],
+  "capsule": {
+    "name": "rel-005a-qualification-capsule.tar",
+    "input_member_count": 9,
+    "total_member_count_with_manifest": 10,
+    "manifest_schema": "symthaea.rel.qualification-capsule-manifest.v2",
+    "outcome_neutral": true
+  },
+  "verification": {
+    "offline_verifier_required_before_attestation": true,
+    "network_required_for_internal_capsule_verification": false,
+    "audit_receipt_hash_links_must_recompute": true,
+    "metric_leakage_must_be_absent": true
+  },
+  "transport_semantics": {
+    "resolve_source_artifacts_at_runtime": true,
+    "require_unique_unexpired_exact_name_artifacts": true,
+    "verify_zip_digest_before_extraction": true,
+    "artifact_transport_identity_is_scientific_authority": false
+  },
+  "attestation": {
+    "action_commit": "1e69f48acb82d1966a394da916b4c1698aa569d6",
+    "mode": "provenance",
+    "subject_name": "rel-005a-qualification-capsule.tar",
+    "subject_input": "subject-digest",
+    "subject_digest_algorithm": "sha256",
+    "subject_digest_must_equal_offline_verified_capsule_digest": true,
+    "bundle_must_be_archived": true,
+    "bundle_sha256_must_be_recorded": true,
+    "offline_verification_must_precede_attestation": true
+  },
+  "authority_boundary": {
+    "may_change_qualification_result": false,
+    "may_apply_scientific_thresholds": false,
+    "may_read_raw_scientific_observation": false,
+    "may_package_verified_metric_free_authority_receipts": true,
+    "may_attest_capsule_provenance": true
+  },
+  "claims": {
+    "capsule_built": false,
+    "offline_verified": false,
+    "attestation_created": false,
+    "qualification_completed": false,
+    "rel_005a_qualified": false,
+    "scientific_pass": false,
+    "scientific_fail": false
+  }
+}
