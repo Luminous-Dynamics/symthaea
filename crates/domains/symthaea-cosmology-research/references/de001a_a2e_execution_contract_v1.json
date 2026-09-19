@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A2E-EXECUTION-CONTRACT-v1",
+  "status": "preregistered-executor-contract-only",
+  "scientific_claim": "NONE",
+  "authority": "raw-optimizer-execution-contract-only",
+  "required_authorization": {
+    "protocol": "DE-001A2-EXECUTION-AUTHORIZATION-v1",
+    "verdict": "PASS",
+    "authority": "exact-optimizer-execution-authorization-only",
+    "optimizer_execution_authorized": true,
+    "a2_execution_authorized": true,
+    "normalization_or_migration_authorized": false,
+    "optimizer_invocation_budget": 1,
+    "exact_effective_sampler_required": true,
+    "exact_sampled_coordinate_order_required": true,
+    "backend_substitution_allowed": false,
+    "method_substitution_allowed": false,
+    "option_rewrite_allowed": false,
+    "network_allowed": false,
+    "runtime_package_installation_allowed": false
+  },
+  "execution_policy": {
+    "optimizer_invocations_per_executor_process": 1,
+    "preflight_optimizer_invocation_allowed": false,
+    "dry_run_optimizer_invocation_allowed": false,
+    "automatic_retry_allowed": false,
+    "retry_requires_new_authorization_receipt": true,
+    "exact_effective_sampler_sha256_required": true,
+    "exact_sampled_coordinate_order_required": true,
+    "exact_authenticated_configuration_bytes_required": true,
+    "configuration_mutation_allowed": false,
+    "backend_substitution_allowed": false,
+    "method_substitution_allowed": false,
+    "option_addition_allowed": false,
+    "option_deletion_allowed": false,
+    "option_rewrite_allowed": false,
+    "coordinate_addition_allowed": false,
+    "coordinate_deletion_allowed": false,
+    "coordinate_reordering_allowed": false,
+    "normalization_or_migration_allowed": false,
+    "network_allowed": false,
+    "runtime_package_installation_allowed": false
+  },
+  "required_raw_result": {
+    "protocol": "DE-001A2E-RAW-OPTIMIZER-EXECUTION-v1",
+    "allowed_execution_states": [
+      "EXECUTED",
+      "EXECUTION_ERROR",
+      "INVALID"
+    ],
+    "reproduction_verdict": "UNASSESSED",
+    "must_bind_authorization_receipt_sha256": true,
+    "must_bind_execution_contract_receipt_sha256": true,
+    "must_bind_effective_sampler_sha256": true,
+    "must_bind_sampled_coordinate_order": true,
+    "must_record_actual_optimizer_invocation_count": true,
+    "must_record_process_exit_code": true,
+    "must_record_command_argv_sha256": true,
+    "must_record_stdout_sha256": true,
+    "must_record_stderr_sha256": true,
+    "must_record_result_file_manifest": true,
+    "must_record_postflight_identity": true
+  },
+  "interpretation_boundary": {
+    "executor_may_classify_reproduction": false,
+    "executor_may_change_historical_tolerances": false,
+    "executor_may_select_success_metric": false,
+    "a2q_execution_authorized": false,
+    "does_not_establish": [
+      "optimizer reproduction",
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "phenomenological dark-energy dynamics",
+      "physical mechanism"
+    ]
+  }
+}

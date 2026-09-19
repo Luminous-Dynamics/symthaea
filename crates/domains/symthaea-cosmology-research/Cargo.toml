@@ -57,3 +57,7 @@ path = "src/a1x_compare.rs"
 [[bin]]
 name = "de001a-a2-authorize"
 path = "src/a2_authorize.rs"
+
+[[bin]]
+name = "de001a-a2e-contract"
+path = "src/a2e_contract.rs"
