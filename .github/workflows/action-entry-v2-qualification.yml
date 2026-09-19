@@ -1,0 +1,131 @@
+name: Action Entry V2 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-entry-v2-qualification.yml'
+      - 'crates/bridges/symthaea-action-entry/**'
+      - 'crates/bridges/symthaea-action-admission/**'
+      - 'crates/bridges/symthaea-action-frontier/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-entry-v2-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  action-entry-v2:
+    name: Exact-head action entry v2
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce point-of-entry authority ratchets
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-action-entry/src/lib.rs
+          TESTS=crates/bridges/symthaea-action-entry/src/tests.rs
+
+          grep -Fq 'dispatch_once_v2' "${SRC}"
+          grep -Fq 'executor_principal' "${SRC}"
+          grep -Fq 'state.ensure_fresh' "${SRC}"
+          grep -Fq 'dispatch_state_policy_digest' "${SRC}"
+          grep -Fq 'dispatch_time_policy_digest' "${SRC}"
+          grep -Fq 'StateSequenceRollback' "${SRC}"
+          grep -Fq 'StateSequenceContradiction' "${SRC}"
+          grep -Fq 'SourceFrontierRollback' "${SRC}"
+          grep -Fq 'SourceFrontierContradiction' "${SRC}"
+          grep -Fq 'permit.allocation_use_state()' "${SRC}"
+          grep -Fq 'evaluate_authority' "${SRC}"
+
+          if grep -Eq '(^|[^[:alnum:]_])(saturating_sub|checked_sub)[[:space:]]*\(' "${SRC}"; then
+            echo 'entry currentness must not refund/subtract the owned reservation' >&2
+            exit 1
+          fi
+          if grep -Fq 'GrantUseState {' "${SRC}"; then
+            echo 'entry firewall must not construct caller-selected GrantUseState counters' >&2
+            exit 1
+          fi
+          if grep -Eq 'pub struct (LiveDispatch|EffectEntryPermit|EntryPermit)' "${SRC}"; then
+            echo 'V2E must not mint another free-floating generic dispatch authority token' >&2
+            exit 1
+          fi
+
+          grep -Fq 'revocation_after_mint_blocks_executor_entry' "${TESTS}"
+          grep -Fq 'freshly_signed_older_state_is_still_rollback' "${TESTS}"
+          grep -Fq 'same_sequence_conflicting_snapshot_fails_closed' "${TESTS}"
+          grep -Fq 'newer_state_with_older_source_frontier_is_rejected' "${TESTS}"
+          grep -Fq 'newer_state_with_same_frontier_sequence_conflicting_digest_is_rejected' "${TESTS}"
+          grep -Fq 'changed_state_policy_cannot_reauthorize_old_permit' "${TESTS}"
+          grep -Fq 'changed_time_policy_cannot_reauthorize_old_permit' "${TESTS}"
+          grep -Fq 'executor_error_does_not_refund_outcome_unknown' "${TESTS}"
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-entry -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-action-entry --all-targets
+          cargo test -p symthaea-action-entry
+          cargo clippy -p symthaea-action-entry --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-entry --all-targets
+          cargo test --locked -p symthaea-action-entry
+          cargo clippy --locked -p symthaea-action-entry --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
