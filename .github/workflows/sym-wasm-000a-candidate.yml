@@ -1,0 +1,75 @@
+name: SYM-WASM-000A candidate
+
+on:
+  pull_request:
+    paths:
+      - 'patches/sym-wasm-000a-bounded-executor.patch'
+      - '.github/workflows/sym-wasm-000a-candidate.yml'
+      - 'scripts/qualify-sym-wasm-000a.py'
+      - 'scripts/qualify-sym-wasm-000a-candidate.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-candidate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Attest candidate subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'candidate_head=%s\ncandidate_tree=%s\n' "$actual" "$(git rev-parse HEAD^{tree})" | tee /tmp/sym-wasm-000a-candidate-subject.txt
+
+      - name: Apply candidate patch in disposable worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check patches/sym-wasm-000a-bounded-executor.patch
+          git apply patches/sym-wasm-000a-bounded-executor.patch
+          git diff --check
+          git diff -- src/action/mod.rs
+
+      - name: Run frozen parent qualification over patched tree
+        run: python3 scripts/qualify-sym-wasm-000a.py
+
+      - name: Run stricter candidate admission qualification
+        run: python3 scripts/qualify-sym-wasm-000a-candidate.py
+
+      - name: Install exact Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup default 1.96.0
+          rustc --version --verbose
+          cargo --version
+
+      - name: Check patched root crate with wasm sandbox enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo check --locked --lib --features wasm-sandbox
+
+      - name: Format check patched source
+        run: cargo fmt --all -- --check
+
+      - name: Prove only the candidate patch changed the worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- . ':(exclude)src/action/mod.rs'
+          test -n "$(git diff -- src/action/mod.rs)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
