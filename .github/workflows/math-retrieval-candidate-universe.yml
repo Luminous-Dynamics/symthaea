@@ -1,0 +1,48 @@
+name: Math Retrieval Candidate Universe
+
+on:
+  pull_request:
+    paths:
+      - '.github/schemas/math-retrieval-candidate-set-v1.schema.json'
+      - '.github/schemas/math-retrieval-candidate-membership-validation-report-v1.schema.json'
+      - '.github/scripts/validate-math-retrieval-candidate-set.py'
+      - '.github/scripts/validate-math-retrieval-candidate-membership.py'
+      - 'docs/research/MATH_RET_CANDIDATE_001A.md'
+      - '.github/workflows/math-retrieval-candidate-universe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify candidate-universe contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate JSON schema syntax
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for path in (
+              '.github/schemas/math-retrieval-candidate-set-v1.schema.json',
+              '.github/schemas/math-retrieval-candidate-membership-validation-report-v1.schema.json',
+          ):
+              json.loads(Path(path).read_text(encoding='utf-8'))
+              print(f'{path}: JSON OK')
+          PY
+
+      - name: Compile validators
+        run: |
+          python -m py_compile \
+            .github/scripts/validate-math-retrieval-candidate-set.py \
+            .github/scripts/validate-math-retrieval-candidate-membership.py
+
+      - name: Candidate-set adversarial self-test
+        run: python .github/scripts/validate-math-retrieval-candidate-set.py --self-test
+
+      - name: Candidate-membership adversarial self-test
+        run: python .github/scripts/validate-math-retrieval-candidate-membership.py --self-test

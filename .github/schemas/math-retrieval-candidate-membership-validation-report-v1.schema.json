@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-candidate-membership-report-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Candidate Membership Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "authority",
+    "candidate_set_sha256",
+    "candidate_count",
+    "trace_sha256",
+    "checked_rank_occurrences",
+    "unique_returned_sources",
+    "all_returned_sources_are_members",
+    "all_checks_passed"
+  ],
+  "properties": {
+    "version": {"const": "math-retrieval-candidate-membership-report-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "candidate_set_sha256": {"$ref": "#/$defs/sha256"},
+    "candidate_count": {"type": "integer", "minimum": 1},
+    "trace_sha256": {"$ref": "#/$defs/sha256"},
+    "checked_rank_occurrences": {"type": "integer", "minimum": 0},
+    "unique_returned_sources": {"type": "integer", "minimum": 0},
+    "all_returned_sources_are_members": {"const": true},
+    "all_checks_passed": {"const": true}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
