@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A1X-CROSS-IMPLEMENTATION-v1",
+  "status": "preregistered-comparator-only",
+  "scientific_claim": "NONE",
+  "authority": "cross-implementation-fixed-point-agreement-only",
+  "inputs": {
+    "a1q_protocol": "DE-001A1Q-BUNDLE-INTEGRITY-v1",
+    "a1r_protocol": "DE-001A1R-RUST-ORACLE-v1",
+    "a1c_protocol": "DE-001A1C-COBAYA-RESULT-v1",
+    "a1c_qualification_protocol": "DE-001A1C-RESULT-QUALIFICATION-v1",
+    "accepted_lane_verdicts": ["PASS", "NEGATIVE"]
+  },
+  "lineage": {
+    "a1r_sha_must_equal_a1q_primary_receipt_sha": true,
+    "a1c_qualification_must_bind_a1c_result_sha": true,
+    "a1c_qualification_must_bind_same_a1q_receipt": true,
+    "a1c_subject_must_equal_a1q_subject": true,
+    "a1c_qualification_subject_must_equal_a1q_subject": true,
+    "a1q_reproduction_verdict_must_equal_a1r_verdict": true,
+    "a1c_embedded_a1q_verdict_must_equal_a1q_verdict": true,
+    "a1r_and_a1c_must_share_a0_receipt": true,
+    "a1r_and_a1c_must_share_point_manifest": true
+  },
+  "subject": {
+    "row_count": 13,
+    "omega_m": 0.29717787,
+    "h_r_d_mpc": 101.54786,
+    "reference_chi2_bao": 10.282299,
+    "absolute_reproduction_tolerance": 0.01,
+    "dataset_mean_sha256": "9ac154ab583ce759c0f7eef3c978c7c70a6ead2d18774caceadf1a350a640585",
+    "dataset_covariance_sha256": "252a143274c8a07c78694c119617d36594f6d7965d00319ca611c6ffb886e509"
+  },
+  "agreement_thresholds": {
+    "max_prediction_absolute_delta": 1e-8,
+    "max_prediction_relative_delta": 1e-10,
+    "max_chi2_absolute_delta": 1e-8,
+    "require_same_reproduction_verdict": true,
+    "relative_delta_definition": "abs(a-b)/max(abs(a),abs(b)); zero when both values are zero"
+  },
+  "outcomes": {
+    "AGREE": "both qualified fixed-point lanes share one lineage and satisfy every preregistered implementation-agreement threshold",
+    "DISAGREE": "both lanes are qualified but differ in reproduction verdict, prediction vector, or chi2 beyond a preregistered implementation-agreement threshold",
+    "INVALID": "qualification, lineage, schema, subject, identity, or numerical-integrity validation failed"
+  },
+  "promotion": {
+    "agree_authority": "fixed-point implementation agreement only",
+    "disagree_authority": "implementation-disagreement diagnosis only",
+    "a2_execution_authorized": false,
+    "does_not_establish": [
+      "optimizer reproduction",
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "phenomenological dark-energy dynamics",
+      "physical mechanism"
+    ]
+  }
+}

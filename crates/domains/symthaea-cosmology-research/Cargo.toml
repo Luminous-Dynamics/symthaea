@@ -49,3 +49,7 @@ path = "src/a1c_authorize.rs"
 [[bin]]
 name = "de001a-a1c-result-qualify"
 path = "src/a1c_result_qualify.rs"
+
+[[bin]]
+name = "de001a-a1x-compare"
+path = "src/a1x_compare.rs"
