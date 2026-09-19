@@ -127,6 +127,11 @@ pub mod assurance_android_policy_bundle;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_policy_session;
 
+// Own the active 529 bundle and 530 session state behind one Rust boundary so
+// event-time code cannot supply alternate policy evidence during verification.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_store;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
