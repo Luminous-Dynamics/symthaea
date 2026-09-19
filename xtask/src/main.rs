@@ -5,6 +5,7 @@ use std::path::PathBuf;
 mod cargo_adapter_postflight;
 #[cfg(test)]
 mod cargo_adapter_state;
+mod cargo_execution_attempt;
 mod cargo_execution_contract;
 mod crate_status;
 mod duplicate_scan;
