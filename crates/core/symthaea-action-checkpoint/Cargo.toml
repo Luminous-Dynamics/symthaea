@@ -11,6 +11,9 @@ homepage = "https://luminousdynamics.org"
 keywords = ["authorization", "checkpoint", "safety", "agents"]
 categories = ["authentication", "development-tools"]
 
+[lib]
+path = "src/strict.rs"
+
 [dependencies]
 serde = { workspace = true }
 sha2 = { workspace = true }
