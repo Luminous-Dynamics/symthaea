@@ -6,8 +6,9 @@
 //! Producer/consumer architecture:
 //!   Synthesis thread → HeapRb<f32> → cpal output callback (audio thread)
 //!
-//! The ring buffer decouples synthesis timing from audio device timing.
-//! On underrun, the callback writes silence (no click/pop).
+//! The ring buffer decouples synthesis timing from audio device timing while keeping
+//! only a bounded near-term acoustic horizon. On underrun, the callback writes silence
+//! (no click/pop). Barge-in may request consumer-owned queued-audio invalidation.
 //!
 //! Feature-gated under `live-voice`.
 
@@ -20,6 +21,19 @@ use ringbuf::{
     HeapRb,
     traits::{Consumer, Observer, Producer, Split},
 };
+
+/// Default maximum amount of synthesized speech allowed to sit ahead of device
+/// playback in the live ring buffer.
+///
+/// This is an engineering default, not a measured optimum. It replaces the historical
+/// ~2 second queue with a conversationally bounded horizon while remaining configurable
+/// for devices that need more underrun tolerance.
+pub const DEFAULT_BUFFER_AHEAD_MS: u32 = 250;
+
+fn buffer_capacity_samples(sample_rate: u32, buffer_ahead_ms: u32) -> usize {
+    let samples = (u64::from(sample_rate) * u64::from(buffer_ahead_ms)) / 1000;
+    samples.max(1) as usize
+}
 
 /// Cloneable, capability-narrow request to discard queued live audio.
 ///
@@ -74,23 +88,39 @@ pub struct AudioOutput {
     sample_rate: u32,
     channels: u16,
     buffer_capacity: usize,
+    buffer_ahead_ms: u32,
     flush_requested: Arc<AtomicBool>,
 }
 
 impl AudioOutput {
-    /// Open the default audio output device and start streaming.
-    ///
-    /// Creates a ring buffer of `sample_rate * 2` capacity (~2 seconds).
+    /// Open the default audio output device with the default conversational
+    /// ahead-of-playback budget.
     pub fn new() -> Result<Self> {
+        Self::with_buffer_ahead_ms(DEFAULT_BUFFER_AHEAD_MS)
+    }
+
+    /// Open the default audio device with an explicit ring-buffer horizon.
+    pub fn with_buffer_ahead_ms(buffer_ahead_ms: u32) -> Result<Self> {
+        if buffer_ahead_ms == 0 {
+            anyhow::bail!("audio buffer ahead budget must be greater than zero");
+        }
         let host = cpal::default_host();
         let device = host
             .default_output_device()
             .context("No audio output device found")?;
-        Self::from_device(device)
+        Self::from_device(device, buffer_ahead_ms)
     }
 
-    /// Open a specific audio output device by name.
+    /// Open a specific audio output device by name using the default buffer horizon.
     pub fn with_device(device_name: &str) -> Result<Self> {
+        Self::with_device_buffer_ahead_ms(device_name, DEFAULT_BUFFER_AHEAD_MS)
+    }
+
+    /// Open a specific output device with an explicit ahead-of-playback budget.
+    pub fn with_device_buffer_ahead_ms(device_name: &str, buffer_ahead_ms: u32) -> Result<Self> {
+        if buffer_ahead_ms == 0 {
+            anyhow::bail!("audio buffer ahead budget must be greater than zero");
+        }
         let host = cpal::default_host();
         let device = host
             .output_devices()
@@ -101,7 +131,7 @@ impl AudioOutput {
                     .unwrap_or(false)
             })
             .with_context(|| format!("No output device matching '{device_name}'"))?;
-        Self::from_device(device)
+        Self::from_device(device, buffer_ahead_ms)
     }
 
     /// Create a dummy output (no device). `push_samples()` discards all data.
@@ -114,18 +144,19 @@ impl AudioOutput {
             sample_rate,
             channels: 1,
             buffer_capacity: 0,
+            buffer_ahead_ms: 0,
             flush_requested: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    fn from_device(device: cpal::Device) -> Result<Self> {
+    fn from_device(device: cpal::Device, buffer_ahead_ms: u32) -> Result<Self> {
         let supported = device
             .default_output_config()
             .context("No supported output config")?;
         let sample_rate = supported.sample_rate();
         let channels = supported.channels();
 
-        let buffer_capacity = sample_rate as usize * 2;
+        let buffer_capacity = buffer_capacity_samples(sample_rate, buffer_ahead_ms);
         let rb = HeapRb::<f32>::new(buffer_capacity);
         let (producer, mut consumer) = rb.split();
         let flush_requested = Arc::new(AtomicBool::new(false));
@@ -167,6 +198,7 @@ impl AudioOutput {
             sample_rate,
             channels,
             buffer_capacity,
+            buffer_ahead_ms,
             flush_requested,
         })
     }
@@ -219,9 +251,14 @@ impl AudioOutput {
         self.channels
     }
 
-    /// Ring buffer total capacity in samples.
+    /// Ring buffer total capacity in mono samples.
     pub fn buffer_capacity(&self) -> usize {
         self.buffer_capacity
+    }
+
+    /// Configured ahead-of-playback horizon in milliseconds. Dummy outputs report 0.
+    pub fn buffer_ahead_ms(&self) -> u32 {
+        self.buffer_ahead_ms
     }
 
     /// Approximate space remaining in the ring buffer. Returns 0 on dummy output.
@@ -243,10 +280,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_buffer_capacity_calculation() {
-        let sample_rate: u32 = 48000;
-        let expected_capacity = sample_rate as usize * 2;
-        assert_eq!(expected_capacity, 96000);
+    fn default_buffer_budget_is_explicit_and_bounded() {
+        assert_eq!(DEFAULT_BUFFER_AHEAD_MS, 250);
+        assert_eq!(buffer_capacity_samples(48_000, DEFAULT_BUFFER_AHEAD_MS), 12_000);
+        assert_eq!(buffer_capacity_samples(24_000, DEFAULT_BUFFER_AHEAD_MS), 6_000);
+    }
+
+    #[test]
+    fn custom_buffer_budget_scales_with_sample_rate() {
+        assert_eq!(buffer_capacity_samples(48_000, 100), 4_800);
+        assert_eq!(buffer_capacity_samples(44_100, 500), 22_050);
+        assert_eq!(buffer_capacity_samples(24_000, 1), 24);
     }
 
     #[test]
@@ -254,6 +298,7 @@ mod tests {
         let mut dummy = AudioOutput::new_dummy(24000);
         assert_eq!(dummy.sample_rate(), 24000);
         assert_eq!(dummy.channels(), 1);
+        assert_eq!(dummy.buffer_ahead_ms(), 0);
         assert_eq!(dummy.available_space(), 0);
         assert!(!dummy.is_live());
 
@@ -293,6 +338,7 @@ mod tests {
         let output = output.unwrap();
         assert!(output.sample_rate() > 0);
         assert!(output.channels() > 0);
+        assert_eq!(output.buffer_ahead_ms(), DEFAULT_BUFFER_AHEAD_MS);
         assert!(output.available_space() > 0);
         assert!(output.is_live());
     }
