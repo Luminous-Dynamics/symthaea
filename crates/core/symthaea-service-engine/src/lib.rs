@@ -8,6 +8,7 @@
 
 pub mod host;
 pub mod protocol;
+pub mod protocol_error;
 pub mod read_wire;
 pub mod semantic;
 pub mod service;

@@ -12,7 +12,8 @@ use std::time::{Duration, Instant};
 
 use symthaea_service_runtime::{ProcessOrigin, ServiceCounters};
 
-use crate::host::{ServiceHostCommandError, ServiceHostReadError, ServiceRuntimeHost};
+use crate::host::ServiceRuntimeHost;
+use crate::protocol_error::ServiceProtocolFailure;
 use crate::read_wire::MeasuredIntrospectionV2;
 use crate::wire::{
     LegacyIntrospectionPolicy, ServiceWireOutcome, ServiceWireResponse,
@@ -81,7 +82,7 @@ impl ServiceProtocolCore {
     pub fn status(
         &self,
         host: &ServiceRuntimeHost,
-    ) -> Result<ServiceWireResponse, ServiceHostReadError> {
+    ) -> Result<ServiceWireResponse, ServiceProtocolFailure> {
         Ok(status_response(host.status()?, self.counters(), self.uptime()))
     }
 
@@ -91,7 +92,7 @@ impl ServiceProtocolCore {
     pub fn introspection_v2(
         &self,
         host: &ServiceRuntimeHost,
-    ) -> Result<MeasuredIntrospectionV2, ServiceHostReadError> {
+    ) -> Result<MeasuredIntrospectionV2, ServiceProtocolFailure> {
         Ok(MeasuredIntrospectionV2::from(host.introspection()?))
     }
 
@@ -101,7 +102,7 @@ impl ServiceProtocolCore {
         &self,
         host: &ServiceRuntimeHost,
         policy: LegacyIntrospectionPolicy,
-    ) -> Result<ServiceWireResponse, ServiceHostReadError> {
+    ) -> Result<ServiceWireResponse, ServiceProtocolFailure> {
         Ok(legacy_introspection_response(host.introspection()?, policy))
     }
 
@@ -109,7 +110,7 @@ impl ServiceProtocolCore {
     pub fn partnership(
         &self,
         host: &ServiceRuntimeHost,
-    ) -> Result<ServiceWireResponse, ServiceHostReadError> {
+    ) -> Result<ServiceWireResponse, ServiceProtocolFailure> {
         Ok(partnership_response(host.partnership()?))
     }
 
@@ -120,7 +121,7 @@ impl ServiceProtocolCore {
         host: &ServiceRuntimeHost,
         content: impl Into<String>,
         origin: ProcessOrigin,
-    ) -> Result<ServiceWireOutcome, ServiceHostCommandError> {
+    ) -> Result<ServiceWireOutcome, ServiceProtocolFailure> {
         let started = Instant::now();
         let reply = host.query(content, origin).await?;
         Ok(ServiceWireOutcome::from_query(reply, started.elapsed()))
@@ -130,7 +131,7 @@ impl ServiceProtocolCore {
         &self,
         host: &ServiceRuntimeHost,
         content: impl Into<String>,
-    ) -> Result<ServiceWireOutcome, ServiceHostCommandError> {
+    ) -> Result<ServiceWireOutcome, ServiceProtocolFailure> {
         self.query_with_origin(host, content, ProcessOrigin::ServiceQuery)
             .await
     }
@@ -138,7 +139,7 @@ impl ServiceProtocolCore {
     pub async fn sleep(
         &self,
         host: &ServiceRuntimeHost,
-    ) -> Result<ServiceWireOutcome, ServiceHostCommandError> {
+    ) -> Result<ServiceWireOutcome, ServiceProtocolFailure> {
         let reply = host.sleep().await?;
         if reply.result.is_ok() {
             let _ = self
@@ -154,7 +155,7 @@ impl ServiceProtocolCore {
         &self,
         host: &ServiceRuntimeHost,
         requested_path: Option<String>,
-    ) -> Result<ServiceWireOutcome, ServiceHostCommandError> {
+    ) -> Result<ServiceWireOutcome, ServiceProtocolFailure> {
         let path = self.resolve_save_path(requested_path);
         let reply = host.save(path).await?;
         Ok(ServiceWireOutcome::from_save(reply))
@@ -166,7 +167,7 @@ impl ServiceProtocolCore {
     pub async fn shutdown(
         &self,
         host: &ServiceRuntimeHost,
-    ) -> Result<ServiceWireOutcome, ServiceHostCommandError> {
+    ) -> Result<ServiceWireOutcome, ServiceProtocolFailure> {
         let reply = host.shutdown_persist(self.state_file.clone()).await?;
         Ok(ServiceWireOutcome::from_shutdown(reply))
     }
