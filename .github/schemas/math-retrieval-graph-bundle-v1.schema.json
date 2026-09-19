@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-graph-bundle-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Graph Bundle v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "bundle_id", "authority", "artifacts"],
+  "properties": {
+    "version": {"const": "math-retrieval-graph-bundle-v1"},
+    "bundle_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority": {"const": "MeasurementOnly"},
+    "artifacts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 512,
+      "items": {"$ref": "#/$defs/artifact"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "sha256"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "ExperimentManifest",
+            "RetrievalBinding",
+            "RetrievalIndex",
+            "FusionPolicy",
+            "ContextPacker"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[^/].*$"
+        },
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
