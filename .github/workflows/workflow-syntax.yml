@@ -128,6 +128,12 @@ jobs:
             -pyflakes "" \
             "${files[@]}"
 
+      - name: Enforce repository-wide draft runner admission
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-workflow-draft-safety.py
+
       - name: Parse-check changed GitHub shell helpers
         if: steps.changed.outputs.shells == 'true'
         shell: bash
@@ -165,6 +171,7 @@ jobs:
             echo "actionlint_version=1.7.12"
             echo "actionlint_archive_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
             echo "changed_workflows_only_on_pr=true"
+            echo "repository_wide_draft_runner_ratchet=true"
             echo "changed_github_shell_scripts_bash_n=true"
             echo "showroom_hygiene_self_test_when_changed=true"
             echo "shellcheck_integration=false"
