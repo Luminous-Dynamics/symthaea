@@ -138,6 +138,37 @@ pub mod assurance_android_policy_store;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_policy_journal;
 
+// Canonical, strict, versioned persistence bytes for 532 journal/checkpoint state.
+// Decoding is bounded and must survive semantic replay plus exact re-encoding.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_codec;
+
+// Exact journal equality is exact ordered-entry equality. This is useful for
+// canonical codec roundtrips and does not imply authority or currentness.
+#[cfg(feature = "screen-vision")]
+impl PartialEq for assurance_android_policy_journal::AndroidTouchPolicyJournal {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries() == other.entries()
+    }
+}
+
+#[cfg(feature = "screen-vision")]
+impl Eq for assurance_android_policy_journal::AndroidTouchPolicyJournal {}
+
+// Receipt decoding exposes 530 validation failures directly. Keep the codec's
+// public error surface compact by preserving those failures through the existing
+// 532 journal error chain rather than flattening them into a generic parse error.
+#[cfg(feature = "screen-vision")]
+impl From<assurance_android_policy_session::AndroidTouchPolicySessionError>
+    for assurance_android_policy_codec::AndroidTouchPolicyCodecError
+{
+    fn from(value: assurance_android_policy_session::AndroidTouchPolicySessionError) -> Self {
+        Self::Journal(assurance_android_policy_journal::AndroidTouchPolicyJournalError::Session(
+            value,
+        ))
+    }
+}
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
