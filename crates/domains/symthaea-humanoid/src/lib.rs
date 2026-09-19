@@ -43,6 +43,8 @@ pub mod mujoco_contact_patch;
 pub mod mujoco_support_normal;
 #[cfg(feature = "mujoco")]
 pub mod mujoco_support_normal_verifier;
+#[cfg(feature = "mujoco")]
+pub mod mujoco_verified_support;
 pub mod mujoco_oracle_protocol;
 pub mod multi_contact;
 pub mod oracle_dataset;
@@ -102,6 +104,8 @@ pub use mujoco_contact_patch::*;
 pub use mujoco_support_normal::*;
 #[cfg(feature = "mujoco")]
 pub use mujoco_support_normal_verifier::*;
+#[cfg(feature = "mujoco")]
+pub use mujoco_verified_support::*;
 pub use mujoco_oracle_protocol::*;
 pub use multi_contact::*;
 pub use oracle_dataset::*;
