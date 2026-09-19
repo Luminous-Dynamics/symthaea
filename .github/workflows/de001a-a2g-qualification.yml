@@ -1,0 +1,302 @@
+name: DE-001A2G Configuration Resolution Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      a2r_run_id:
+        description: Exact successful DE-001A2R qualification run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      a2r_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a2g-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: A2G deterministic configuration-resolution qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GUARD_HEAD: ${{ github.sha }}
+      A2R_RUN_ID: ${{ inputs.a2r_run_id }}
+
+    steps:
+      - name: Check out exact A2G guard
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.GUARD_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind guard identity and paths
+        id: guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$GUARD_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a2g-evidence" >> "$GITHUB_ENV"
+          echo "UPSTREAM_A2R=$RUNNER_TEMP/de001a-upstream-a2r" >> "$GITHUB_ENV"
+          echo "A0_LINK=$RUNNER_TEMP/de001a-a2g-a0-artifacts" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a2g-evidence" \
+            "$RUNNER_TEMP/de001a-upstream-a2r"
+
+      - name: Download exact A2R qualification evidence
+        id: download_a2r
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a2r-evidence-*
+          path: ${{ runner.temp }}/de001a-upstream-a2r
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.a2r_run_id }}
+
+      - name: Verify explicit A2R run and capsule
+        id: upstream
+        if: steps.download_a2r.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$A2R_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$A2R_RUN_ID" \
+            > "$EVIDENCE_DIR/a2r-run.json"
+
+          for required in \
+            "$UPSTREAM_A2R/a0.json" \
+            "$UPSTREAM_A2R/a2r.json" \
+            "$UPSTREAM_A2R/qualification-capsule.json"
+          do
+            test -f "$required"
+          done
+
+          python3 - \
+            "$EVIDENCE_DIR/a2r-run.json" \
+            "$UPSTREAM_A2R/qualification-capsule.json" \
+            "$UPSTREAM_A2R/a0.json" \
+            "$UPSTREAM_A2R/a2r.json" \
+            "$A2R_RUN_ID" \
+            "$EVIDENCE_DIR/a2r-subject-head.txt" <<'PY'
+          import hashlib, json, sys
+          run_path, capsule_path, a0_path, a2r_path, expected_run, subject_out = sys.argv[1:]
+          run = json.load(open(run_path, encoding="utf-8"))
+          capsule = json.load(open(capsule_path, encoding="utf-8"))
+          assert str(run["id"]) == expected_run
+          assert run["status"] == "completed"
+          assert run["conclusion"] == "success"
+          assert capsule["protocol"] == "DE-001A2R-QUALIFICATION-CAPSULE-v1"
+          assert capsule["scientific_claim"] == "NONE"
+          assert capsule["authority"] == "optimizer-parameter-role-binding-only"
+          assert capsule["a2_execution_authorized"] is False
+          assert capsule["subject_head"] == run["head_sha"]
+          assert capsule["workflow"]["run_id"] == expected_run
+          for key in ("software_outcome", "a1e_outcome", "a0_artifacts_outcome",
+                      "a0_outcome", "a2r_outcome", "postflight_outcome"):
+              assert capsule["workflow"][key] == "success"
+          a0_sha = hashlib.sha256(open(a0_path, "rb").read()).hexdigest()
+          a2r_sha = hashlib.sha256(open(a2r_path, "rb").read()).hexdigest()
+          assert capsule["receipt_sha256"]["a0"] == a0_sha
+          assert capsule["receipt_sha256"]["a2r"] == a2r_sha
+          open(subject_out, "w", encoding="utf-8").write(run["head_sha"] + "\n")
+          PY
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3
+        with:
+          enable_kvm: false
+          extra_nix_config: |
+            sandbox = true
+            experimental-features = nix-command flakes
+
+      - name: Qualify A2G software subject
+        id: software
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          nix --version | grep -Fx 'nix (Nix) 2.34.7'
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("crates/domains/symthaea-cosmology-research/scripts/de001a_a2g_config_guard.py")
+          compile(path.read_text(encoding="utf-8"), str(path), "exec")
+          PY
+          sha256sum \
+            crates/domains/symthaea-cosmology-research/scripts/de001a_a2g_config_guard.py \
+            > "$EVIDENCE_DIR/de001a_a2g_config_guard.py.sha256"
+          sha256sum \
+            crates/domains/symthaea-cosmology-research/references/de001a_a2g_config_guard_v1.json \
+            > "$EVIDENCE_DIR/de001a_a2g_config_guard_v1.json.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+
+      - name: Realize exact A0 fixed-output artifacts
+        id: a0_artifacts
+        if: steps.upstream.outcome == 'success' && steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAKE=./crates/domains/symthaea-cosmology-research/nix
+          nix build "$FLAKE#checks.x86_64-linux.a0-artifacts" \
+            --no-update-lock-file --no-link
+          nix build "$FLAKE#a0-artifacts" \
+            --no-update-lock-file --out-link "$A0_LINK"
+          store_path="$(realpath "$A0_LINK")"
+          nar_hash="$(nix hash path "$store_path")"
+          closure_size="$(nix path-info -S "$store_path" | awk '{print $2}')"
+          printf '%s\n' "$store_path" > "$EVIDENCE_DIR/a0-store-path.txt"
+          printf '%s\n' "$nar_hash" > "$EVIDENCE_DIR/a0-nar-hash.txt"
+          printf '%s\n' "$closure_size" > "$EVIDENCE_DIR/a0-closure-size.txt"
+
+      - name: Enforce deterministic configuration resolution
+        id: a2g
+        if: steps.a0_artifacts.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 \
+            crates/domains/symthaea-cosmology-research/scripts/de001a_a2g_config_guard.py \
+            "$UPSTREAM_A2R/a0.json" \
+            "$UPSTREAM_A2R/a2r.json" \
+            "$A0_LINK/reference-input-configuration" \
+            "$A0_LINK/reference-expanded-configuration" \
+            "$A0_LINK/reference-minimizer-configuration" \
+            > "$EVIDENCE_DIR/a2g.json"
+
+          python3 - "$EVIDENCE_DIR/a2g.json" <<'PY'
+          import json, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A2G-CONFIG-RESOLUTION-GUARD-v1"
+          assert value["verdict"] == "PASS"
+          assert value["scientific_claim"] == "NONE"
+          assert value["authority"] == "configuration-resolution-determinism-only"
+          assert value["a2m_execution_authorized"] is False
+          assert value["a2_execution_authorized"] is False
+          for config_audit in value["marker_absence"].values():
+              assert all(config_audit.values())
+          PY
+
+      - name: Postflight immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.guard.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.guard.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write A2G qualification capsule
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+
+          hash_or_unavailable() {
+            if [[ -f "$1" ]]; then
+              sha256sum "$1" | awk '{print $1}'
+            else
+              printf '%s' 'UNAVAILABLE'
+            fi
+          }
+          text_or_unavailable() {
+            if [[ -f "$1" ]]; then
+              tr -d '\n' < "$1"
+            else
+              printf '%s' 'UNAVAILABLE'
+            fi
+          }
+
+          cat > "$EVIDENCE_DIR/qualification-capsule.json" <<EOF
+          {
+            "protocol": "DE-001A2G-QUALIFICATION-CAPSULE-v1",
+            "scientific_claim": "NONE",
+            "authority": "configuration-resolution-determinism-only",
+            "a2m_execution_authorized": false,
+            "a2_execution_authorized": false,
+            "guard_head": "${{ steps.guard.outputs.head }}",
+            "guard_tree": "${{ steps.guard.outputs.tree }}",
+            "a2r_subject_head": "$(text_or_unavailable "$EVIDENCE_DIR/a2r-subject-head.txt")",
+            "a2r_run_id": "$A2R_RUN_ID",
+            "workflow": {
+              "run_id": "${GITHUB_RUN_ID}",
+              "attempt": "${GITHUB_RUN_ATTEMPT}",
+              "download_a2r_outcome": "${{ steps.download_a2r.outcome }}",
+              "upstream_outcome": "${{ steps.upstream.outcome }}",
+              "software_outcome": "${{ steps.software.outcome }}",
+              "a0_artifacts_outcome": "${{ steps.a0_artifacts.outcome }}",
+              "a2g_outcome": "${{ steps.a2g.outcome }}",
+              "postflight_outcome": "${{ steps.postflight.outcome }}"
+            },
+            "receipt_sha256": {
+              "a0": "$(hash_or_unavailable "$UPSTREAM_A2R/a0.json")",
+              "a2r": "$(hash_or_unavailable "$UPSTREAM_A2R/a2r.json")",
+              "a2g": "$(hash_or_unavailable "$EVIDENCE_DIR/a2g.json")"
+            },
+            "implementation_sha256": {
+              "a2g_script": "$(hash_or_unavailable crates/domains/symthaea-cosmology-research/scripts/de001a_a2g_config_guard.py)",
+              "a2g_spec": "$(hash_or_unavailable crates/domains/symthaea-cosmology-research/references/de001a_a2g_config_guard_v1.json)",
+              "cargo_lock": "$(hash_or_unavailable Cargo.lock)"
+            },
+            "a0_artifact_store": {
+              "path": "$(text_or_unavailable "$EVIDENCE_DIR/a0-store-path.txt")",
+              "nar_hash": "$(text_or_unavailable "$EVIDENCE_DIR/a0-nar-hash.txt")",
+              "closure_size": "$(text_or_unavailable "$EVIDENCE_DIR/a0-closure-size.txt")"
+            }
+          }
+          EOF
+          cat "$EVIDENCE_DIR/qualification-capsule.json"
+
+      - name: Upload A2G qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a2g-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a2g-evidence
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce valid A2G qualification
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_a2r.outcome }}" = "success"
+          test "${{ steps.upstream.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.a0_artifacts.outcome }}" = "success"
+          test "${{ steps.a2g.outcome }}" = "success"
+          test "${{ steps.postflight.outcome }}" = "success"
