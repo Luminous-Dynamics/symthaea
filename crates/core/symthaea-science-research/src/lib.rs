@@ -7,15 +7,16 @@
 //! identities, bounded authority, evidence classes, independence descriptors,
 //! scientific subjects, claims, polarity-aware adjudication, semantic
 //! evidence-to-claim binding, protocol-scoped evidence accounting and corpus
-//! decision binding, non-authorizing qualification eligibility manifests, typed
-//! provenance graphs, frozen study protocols, immutable execution/conformance
-//! records, adversarial falsification campaigns, explicit scientific uncertainty
-//! budgets, and provenance-checked replication lineage assessments. It does not
-//! run experiments, solvers, LLMs, HDC, statistics, formal provers, or network
-//! operations.
+//! decision binding, non-authorizing qualification eligibility and review-ready
+//! capabilities, typed provenance graphs, frozen study protocols, immutable
+//! execution/conformance records, adversarial falsification campaigns, explicit
+//! scientific uncertainty budgets, and provenance-checked replication lineage
+//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
+//! formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
-//! Qualification is intentionally reserved for a later non-forgeable wrapper.
+//! Qualification is intentionally reserved for a later independently authenticated
+//! capability boundary.
 
 pub mod authority;
 pub mod claim;
@@ -33,6 +34,7 @@ pub mod protocol;
 pub mod provenance;
 mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
+pub mod qualification_review;
 pub mod replication;
 pub mod subject;
 pub mod uncertainty;
@@ -65,6 +67,7 @@ pub use qualification_eligibility::{
     QualificationEligibilityProfileIssue,
 };
 pub use qualification_eligibility_gate::*;
+pub use qualification_review::*;
 pub use replication::*;
 pub use subject::*;
 pub use uncertainty::*;
