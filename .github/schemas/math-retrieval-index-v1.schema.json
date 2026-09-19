@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-index-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Index Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "index_id",
+    "authority",
+    "candidate_universe",
+    "representation",
+    "index",
+    "retrieval_output"
+  ],
+  "properties": {
+    "version": { "const": "math-retrieval-index-v1" },
+    "index_id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "authority": { "const": "MeasurementOnly" },
+    "candidate_universe": { "$ref": "#/$defs/candidateUniverse" },
+    "representation": { "$ref": "#/$defs/representation" },
+    "index": { "$ref": "#/$defs/index" },
+    "retrieval_output": { "$ref": "#/$defs/output" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "candidateUniverse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corpus_snapshot_sha256",
+        "knowledge_boundary_sha256",
+        "candidate_eligibility_policy_sha256",
+        "candidate_set_sha256",
+        "candidate_count",
+        "exclude_query_source_item",
+        "exclude_solution_artifacts",
+        "source_identity_kind",
+        "dedup_policy",
+        "canonical_candidate_order"
+      ],
+      "properties": {
+        "corpus_snapshot_sha256": { "$ref": "#/$defs/sha256" },
+        "knowledge_boundary_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_eligibility_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_set_sha256": { "$ref": "#/$defs/sha256" },
+        "candidate_count": { "type": "integer", "minimum": 1 },
+        "exclude_query_source_item": { "const": true },
+        "exclude_solution_artifacts": { "const": true },
+        "source_identity_kind": { "const": "SourceObjectDigest" },
+        "dedup_policy": { "const": "OneEntryPerSourceObject" },
+        "canonical_candidate_order": { "const": "SourceObjectDigestAscending" }
+      }
+    },
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel",
+        "representation_family",
+        "representation_sha256",
+        "item_serialization_sha256",
+        "serialization_encoding",
+        "max_serialized_item_bytes",
+        "oversize_policy",
+        "control_transform"
+      ],
+      "properties": {
+        "channel": { "enum": ["None", "Syntax", "ExactNormalForm"] },
+        "representation_family": { "enum": ["None", "Lexical", "CanonicalSparse", "HDC"] },
+        "representation_sha256": { "$ref": "#/$defs/sha256" },
+        "normalization_contract_sha256": { "$ref": "#/$defs/sha256" },
+        "normalization_implementation_sha256": { "$ref": "#/$defs/sha256" },
+        "item_serialization_sha256": { "$ref": "#/$defs/sha256" },
+        "serialization_encoding": { "const": "UTF-8" },
+        "max_serialized_item_bytes": { "type": "integer", "minimum": 1 },
+        "oversize_policy": { "enum": ["RejectItem", "DeterministicTruncate"] },
+        "truncation_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "control_transform": { "enum": ["None", "RandomRetrieval", "ShuffledHdcVectors", "PermutedChallengeAssociations"] },
+        "control_seed": { "type": "integer", "minimum": 0 },
+        "control_artifact_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "search_mode",
+        "index_build_policy_sha256",
+        "index_artifact_sha256",
+        "index_seed",
+        "top_k_supported",
+        "scoring_metric",
+        "scoring_policy_sha256",
+        "score_precision_policy_sha256",
+        "query_normalization_policy_sha256",
+        "tie_break",
+        "deterministic"
+      ],
+      "properties": {
+        "search_mode": { "enum": ["ExactDeterministic", "ApproximateDeterministic"] },
+        "index_build_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "index_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "index_seed": { "type": "integer", "minimum": 0 },
+        "top_k_supported": { "type": "integer", "minimum": 1 },
+        "scoring_metric": { "enum": ["Cosine", "HammingSimilarity", "Jaccard", "BM25", "ExactMatch", "RandomDeterministic", "Custom"] },
+        "scoring_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "score_precision_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "query_normalization_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "tie_break": { "const": "SourceObjectDigestAscending" },
+        "deterministic": { "const": true },
+        "approximation_validation_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "minimum_exact_recall_at_k": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "order_policy",
+        "source_provenance_required",
+        "item_byte_accounting",
+        "partial_item_policy"
+      ],
+      "properties": {
+        "order_policy": { "const": "ScoreDescendingThenSourceObjectDigest" },
+        "source_provenance_required": { "const": true },
+        "item_byte_accounting": { "const": "CanonicalUtf8Bytes" },
+        "partial_item_policy": { "const": "RejectWholeItem" }
+      }
+    }
+  }
+}
