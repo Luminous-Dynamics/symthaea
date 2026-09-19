@@ -50,6 +50,10 @@ schema="$(manifest_value schema)"
 result="$(manifest_value result)"
 repository="$(manifest_value repository)"
 recovery_branch="$(manifest_value recovery_branch)"
+operator_authorization_sha256="$(manifest_value operator_authorization_sha256)"
+operator_authorization_schema="$(manifest_value operator_authorization_schema)"
+operator_authorization_scope="$(manifest_value operator_authorization_scope)"
+operator_authorization_stage_f_authority="$(manifest_value operator_authorization_stage_f_authority)"
 operator_authorized_head="$(manifest_value operator_authorized_head)"
 recovery_head="$(manifest_value recovery_head)"
 source_tree="$(manifest_value source_tree)"
@@ -70,10 +74,14 @@ promotion_verifier_blob="$(manifest_value promotion_verifier_blob)"
 recovery_eligibility_verifier_blob="$(manifest_value recovery_eligibility_verifier_blob)"
 host_lifecycle_contract_blob="$(manifest_value host_lifecycle_contract_blob)"
 
-[[ "$schema" == 'symthaea.trusted-runner.bootstrap.v8' ]]
+[[ "$schema" == 'symthaea.trusted-runner.bootstrap.v9' ]]
 [[ "$result" == 'PASS' ]]
 [[ "$repository" == "$REPOSITORY_URL" ]]
 [[ "$recovery_branch" == "$RECOVERY_BRANCH" ]]
+[[ "$operator_authorization_sha256" =~ ^[0-9a-f]{64}$ ]]
+[[ "$operator_authorization_schema" == 'symthaea.trusted-runner.bootstrap-authorization.v1' ]]
+[[ "$operator_authorization_scope" == 'trusted-runner-bootstrap-only' ]]
+[[ "$operator_authorization_stage_f_authority" == 'NONE' ]]
 [[ "$operator_authorized_head" =~ ^[0-9a-f]{40}$ ]]
 [[ "$recovery_head" == "$operator_authorized_head" ]]
 [[ "$promotion_required_ancestor" == "$operator_authorized_head" ]]
@@ -85,7 +93,7 @@ host_lifecycle_contract_blob="$(manifest_value host_lifecycle_contract_blob)"
 for blob in "$runner_module_blob" "$routing_policy_blob" "$smoke_workflow_blob" "$arc3_protocol_qualifier_workflow_blob" "$se001q_recovery_workflow_blob" "$se001q_replay_helper_blob" "$ci_rust_shell_blob" "$bootstrap_validator_blob" "$promotion_verifier_blob" "$recovery_eligibility_verifier_blob" "$host_lifecycle_contract_blob"; do
   [[ "$blob" =~ ^[0-9a-f]{40}$ ]]
 done
-for pass_key in operator_authorization_checked runner_policy_eval routing_policy_eval minimal_locked_rust_check se001q_helper_syntax_checked recovery_verifier_syntax_checked refs_unchanged_during_validation; do
+for pass_key in operator_authorization_checked operator_authorization_external runner_policy_eval routing_policy_eval minimal_locked_rust_check se001q_helper_syntax_checked recovery_verifier_syntax_checked refs_unchanged_during_validation; do
   [[ "$(manifest_value "$pass_key")" == 'PASS' ]]
 done
 [[ "$(manifest_value evidence_scope)" == 'runner-bootstrap-correctness-only' ]]
@@ -154,11 +162,15 @@ git diff --exit-code
 git diff --cached --exit-code
 test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
 
-promotion_manifest="$(mktemp /tmp/symthaea-trusted-runner-promotion-v4.XXXXXX)"
+promotion_manifest="$(mktemp /tmp/symthaea-trusted-runner-promotion-v5.XXXXXX)"
 cat > "$promotion_manifest" <<EOF
-schema=symthaea.trusted-runner.promotion.v4
+schema=symthaea.trusted-runner.promotion.v5
 result=PASS
 bootstrap_manifest_sha256=$actual_manifest_sha256
+operator_authorization_sha256=$operator_authorization_sha256
+operator_authorization_schema=$operator_authorization_schema
+operator_authorization_scope=$operator_authorization_scope
+operator_authorization_stage_f_authority=$operator_authorization_stage_f_authority
 authorized_recovery_head=$operator_authorized_head
 promoted_main_head=$public_main
 promoted_main_tree=$public_main_tree
@@ -171,6 +183,7 @@ runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
 promotion_verifier_blob=$promotion_verifier_blob
 recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
+operator_authorization_continuity_checked=PASS
 recovery_verifier_syntax_checked=PASS
 promotion_ancestry_checked=PASS
 promotion_tree_identity_checked=PASS
