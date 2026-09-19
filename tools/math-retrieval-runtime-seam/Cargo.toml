@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-math-retrieval-runtime-seam"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Owner-independent qualified mathematical retrieval execution seam and deterministic evidence-emission fixture"
+
+# Deliberately standalone for MATH-RET-RUNTIME-001A. This avoids changing the
+# monorepo workspace/Cargo.lock while the seam is being qualified in isolation.
+[workspace]

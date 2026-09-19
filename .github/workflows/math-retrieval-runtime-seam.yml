@@ -1,0 +1,33 @@
+name: Math Retrieval Runtime Seam
+
+on:
+  pull_request:
+    paths:
+      - 'tools/math-retrieval-runtime-seam/**'
+      - '.github/workflows/math-retrieval-runtime-seam.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify standalone retrieval seam
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml -- --check
+
+      - name: Check exact locked package
+        run: cargo check --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml --locked
+
+      - name: Run mechanical canaries
+        run: cargo test --manifest-path tools/math-retrieval-runtime-seam/Cargo.toml --locked
