@@ -9,16 +9,17 @@
 //! evidence-to-claim binding, protocol-scoped evidence accounting and corpus
 //! decision binding, qualification eligibility and review readiness,
 //! lifecycle-authenticated qualification-profile and claim-decision authority,
-//! non-forgeable qualified-claim capabilities, typed provenance graphs, frozen
-//! study protocols, immutable execution/conformance records, adversarial
-//! falsification campaigns, explicit scientific uncertainty budgets, and
-//! provenance-checked replication lineage assessments. It does not run
-//! experiments, solvers, LLMs, HDC, statistics, formal provers, or network
-//! operations.
+//! non-forgeable qualified-claim capabilities, append-only authenticated
+//! qualification lifecycle records, typed provenance graphs, frozen study
+//! protocols, immutable execution/conformance records, adversarial falsification
+//! campaigns, explicit scientific uncertainty budgets, and provenance-checked
+//! replication lineage assessments. It does not run experiments, solvers, LLMs,
+//! HDC, statistics, formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Scientific qualification exists only as a private capability after the exact
-//! authenticated qualification lineage has passed.
+//! authenticated qualification lineage has passed. Qualification lifecycle is a
+//! separate append-only authority and never rewrites historical qualification.
 
 pub mod authority;
 pub mod claim;
@@ -37,6 +38,7 @@ pub mod provenance;
 pub mod qualification_decision_authority;
 mod qualification_eligibility;
 pub mod qualification_eligibility_gate;
+pub mod qualification_lifecycle;
 pub mod qualification_profile_authority;
 pub mod qualification_review;
 pub mod qualified_claim;
@@ -73,6 +75,7 @@ pub use qualification_eligibility::{
     QualificationEligibilityProfileIssue,
 };
 pub use qualification_eligibility_gate::*;
+pub use qualification_lifecycle::*;
 pub use qualification_profile_authority::*;
 pub use qualification_review::*;
 pub use qualified_claim::*;
