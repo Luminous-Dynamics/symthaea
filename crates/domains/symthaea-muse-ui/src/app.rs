@@ -17,6 +17,7 @@ use leptos_router::path;
 use web_sys::HtmlAudioElement;
 
 use crate::atlas_page::AtlasPage;
+use crate::browser_playback::dispatch_browser_event;
 use crate::liked_page::LikedPage;
 use crate::pages::{CreatePage, ListenPage, ResearchPage};
 use crate::playback::PlaybackEvent;
@@ -34,13 +35,10 @@ pub fn App() -> impl IntoView {
             <div class="app-shell">
                 <GlobalHeader muse=muse />
                 // Outside <Routes> so navigating between modes never
-                // unmounts it — see state.rs's module doc. Every handler
-                // here just relays the browser's own event into the
-                // playback reducer (`muse.dispatch`) tagged with the load
-                // epoch it currently believes it's playing — the reducer
-                // itself decides whether a late event from an already-
-                // superseded piece should be ignored (see `playback.rs`).
-                // Nothing here mutates transport state directly.
+                // unmounts it — see state.rs's module doc. Browser media
+                // callbacks first pass through `browser_playback`'s exact
+                // epoch + phase admission boundary, then accepted events enter
+                // the pure reducer through `MuseState::dispatch`.
                 <audio
                     node_ref=muse.audio_ref
                     // Required for the Web Audio analyser tap
@@ -61,50 +59,68 @@ pub fn App() -> impl IntoView {
                         if let Some(audio) = muse.audio_ref.get_untracked() {
                             let audio: HtmlAudioElement = audio.into();
                             let load_epoch = muse.playback.get_untracked().load_epoch;
-                            muse.dispatch(PlaybackEvent::MetadataLoaded {
-                                load_epoch,
-                                duration_seconds: audio.duration(),
-                            });
+                            dispatch_browser_event(
+                                muse,
+                                PlaybackEvent::MetadataLoaded {
+                                    load_epoch,
+                                    duration_seconds: audio.duration(),
+                                },
+                            );
                         }
                     }
                     on:play=move |_| {
                         let load_epoch = muse.playback.get_untracked().load_epoch;
-                        muse.dispatch(PlaybackEvent::PlaybackStarted { load_epoch });
+                        dispatch_browser_event(
+                            muse,
+                            PlaybackEvent::PlaybackStarted { load_epoch },
+                        );
                     }
                     on:pause=move |_| {
                         let load_epoch = muse.playback.get_untracked().load_epoch;
-                        muse.dispatch(PlaybackEvent::PlaybackPaused { load_epoch });
+                        dispatch_browser_event(
+                            muse,
+                            PlaybackEvent::PlaybackPaused { load_epoch },
+                        );
                     }
                     on:timeupdate=move |_| {
                         if let Some(audio) = muse.audio_ref.get_untracked() {
                             let audio: HtmlAudioElement = audio.into();
                             let load_epoch = muse.playback.get_untracked().load_epoch;
-                            muse.dispatch(PlaybackEvent::TimeAdvanced {
-                                load_epoch,
-                                seconds: audio.current_time(),
-                            });
+                            dispatch_browser_event(
+                                muse,
+                                PlaybackEvent::TimeAdvanced {
+                                    load_epoch,
+                                    seconds: audio.current_time(),
+                                },
+                            );
                         }
                     }
                     on:seeked=move |_| {
                         if let Some(audio) = muse.audio_ref.get_untracked() {
                             let audio: HtmlAudioElement = audio.into();
                             let load_epoch = muse.playback.get_untracked().load_epoch;
-                            muse.dispatch(PlaybackEvent::SeekCompleted {
-                                load_epoch,
-                                seconds: audio.current_time(),
-                            });
+                            dispatch_browser_event(
+                                muse,
+                                PlaybackEvent::SeekCompleted {
+                                    load_epoch,
+                                    seconds: audio.current_time(),
+                                },
+                            );
                         }
                     }
                     on:ended=move |_| {
                         let load_epoch = muse.playback.get_untracked().load_epoch;
-                        muse.dispatch(PlaybackEvent::Ended { load_epoch });
+                        dispatch_browser_event(muse, PlaybackEvent::Ended { load_epoch });
                     }
                     on:error=move |_| {
                         let load_epoch = muse.playback.get_untracked().load_epoch;
-                        muse.dispatch(PlaybackEvent::PlaybackFailed {
-                            load_epoch,
-                            message: "the browser could not play this audio".to_string(),
-                        });
+                        dispatch_browser_event(
+                            muse,
+                            PlaybackEvent::PlaybackFailed {
+                                load_epoch,
+                                message: "the browser could not play this audio".to_string(),
+                            },
+                        );
                     }
                 ></audio>
                 <div class="page-body">
