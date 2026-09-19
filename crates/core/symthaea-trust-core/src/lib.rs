@@ -15,6 +15,7 @@
 //! - role-aware root authority capabilities that reuse cryptographic attestation
 //!   verification and independently enforce principal/org/region quorum geometry;
 //! - bounded interval-based time evidence with explicit source strength;
+//! - authenticated trusted-time capabilities over root-authorized time sources;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
 //!   temporal lifecycle facts;
@@ -34,9 +35,12 @@ mod temporal_lifecycle;
 mod time;
 mod trust;
 mod trust_root;
+mod trusted_time;
 
 #[cfg(test)]
 mod root_authority_tests;
+#[cfg(test)]
+mod trusted_time_tests;
 
 pub use attestation::*;
 pub use identity::*;
@@ -47,3 +51,4 @@ pub use temporal_lifecycle::*;
 pub use time::*;
 pub use trust::*;
 pub use trust_root::*;
+pub use trusted_time::*;
