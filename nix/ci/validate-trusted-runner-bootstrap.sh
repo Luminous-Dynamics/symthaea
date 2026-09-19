@@ -122,6 +122,8 @@ runner_module_blob="$(git rev-parse "$recovery_head_start:nix/modules/github-act
 routing_policy_blob="$(git rev-parse "$recovery_head_start:nix/tests/eval-trusted-runner-routing.nix")"
 smoke_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-runner-smoke.yml")"
 arc3_protocol_qualifier_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/arc3-protocol-trusted-cpu-qualify.yml")"
+se001q_recovery_workflow_blob="$(git rev-parse "$recovery_head_start:.github/workflows/self-hosted-se001q-evidence-recovery.yml")"
+se001q_replay_helper_blob="$(git rev-parse "$recovery_head_start:nix/ci/se001q-trusted-replay.py")"
 ci_rust_shell_blob="$(git rev-parse "$recovery_head_start:nix/ci-rust-shell.nix")"
 bootstrap_validator_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-bootstrap.sh")"
 promotion_verifier_blob="$(git rev-parse "$recovery_head_start:nix/ci/validate-trusted-runner-promotion.sh")"
@@ -149,6 +151,8 @@ printf 'bootstrap_host_nix_system=%s\n' "$host_nix_system"
 printf 'bootstrap_host_nix_version=%s\n' "$host_nix_version"
 printf 'bootstrap_host_lifecycle_contract_blob=%s\n' "$host_lifecycle_contract_blob"
 printf 'bootstrap_arc3_protocol_qualifier_workflow_blob=%s\n' "$arc3_protocol_qualifier_workflow_blob"
+printf 'bootstrap_se001q_recovery_workflow_blob=%s\n' "$se001q_recovery_workflow_blob"
+printf 'bootstrap_se001q_replay_helper_blob=%s\n' "$se001q_replay_helper_blob"
 printf 'bootstrap_ci_rust_shell_blob=%s\n' "$ci_rust_shell_blob"
 printf 'bootstrap_promotion_verifier_blob=%s\n' "$promotion_verifier_blob"
 printf 'bootstrap_recovery_eligibility_verifier_blob=%s\n' "$recovery_eligibility_verifier_blob"
@@ -203,9 +207,9 @@ fi
 [[ "$initial_head" == "$recovery_head_end" ]]
 git merge-base --is-ancestor "$main_head_end" "$recovery_head_end"
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v7.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-bootstrap-v8.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.bootstrap.v7
+schema=symthaea.trusted-runner.bootstrap.v8
 result=PASS
 repository=$REPOSITORY_URL
 recovery_branch=$RECOVERY_BRANCH
@@ -221,6 +225,8 @@ runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
 smoke_workflow_blob=$smoke_workflow_blob
 arc3_protocol_qualifier_workflow_blob=$arc3_protocol_qualifier_workflow_blob
+se001q_recovery_workflow_blob=$se001q_recovery_workflow_blob
+se001q_replay_helper_blob=$se001q_replay_helper_blob
 ci_rust_shell_blob=$ci_rust_shell_blob
 bootstrap_validator_blob=$bootstrap_validator_blob
 promotion_verifier_blob=$promotion_verifier_blob
@@ -236,6 +242,7 @@ operator_authorization_checked=PASS
 runner_policy_eval=PASS
 routing_policy_eval=PASS
 minimal_locked_rust_check=PASS
+se001q_helper_syntax_checked=PASS
 refs_unchanged_during_validation=PASS
 evidence_scope=runner-bootstrap-correctness-only
 EOF
