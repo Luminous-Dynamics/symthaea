@@ -23,6 +23,7 @@ arc3-protocol-trusted-cpu-qualify.yml
 self-hosted-ai-assurance-foundation-recovery.yml
 self-hosted-rca-canonical-lineage-recovery.yml
 self-hosted-runner-smoke.yml
+self-hosted-se001q-evidence-recovery.yml
 self-hosted-sym-arch-002a-core-recovery.yml
 EOF
 )"
@@ -97,6 +98,52 @@ EOF
   grep -F -- 'test "$(git rev-parse HEAD)" = "$GITHUB_SHA"' "$arc3" >/dev/null
   grep -F -- 'result=CANDIDATE_PASS' "$arc3" >/dev/null
   grep -F -- 'scope=correctness-only' "$arc3" >/dev/null
+
+  se001q="$workflows/self-hosted-se001q-evidence-recovery.yml"
+
+  # SE-001Q is an independent-provider observation lane, not a generic command
+  # runner. Its four inputs are exact evidence/authority bytes and hashes only.
+  grep -F -- 'recovery_eligibility_manifest_base64:' "$se001q" >/dev/null
+  grep -F -- 'recovery_eligibility_manifest_sha256:' "$se001q" >/dev/null
+  grep -F -- 'stage_f_authorization_base64:' "$se001q" >/dev/null
+  grep -F -- 'stage_f_authorization_sha256:' "$se001q" >/dev/null
+  input_count="$(grep -Ec '^[[:space:]]{6}(recovery_eligibility_manifest_base64|recovery_eligibility_manifest_sha256|stage_f_authorization_base64|stage_f_authorization_sha256):' "$se001q")"
+  test "$input_count" = '4'
+
+  if grep -Eq '^[[:space:]]+-[[:space:]]+uses:' "$se001q"; then
+    echo 'SE-001Q trusted recovery gained a third-party/local Action' >&2
+    exit 1
+  fi
+  if grep -Eq '^[[:space:]]*(GH_TOKEN|GITHUB_TOKEN):' "$se001q"; then
+    echo 'SE-001Q trusted recovery gained an explicit GitHub token' >&2
+    exit 1
+  fi
+
+  # Freeze exact subject/reference identity and the provider-authority boundary.
+  grep -F -- 'TARGET_COMMIT: 47de7f2a306cffb66b5505786220590aa5f42e90' "$se001q" >/dev/null
+  grep -F -- 'TARGET_TREE: 7abdf2ede579b2b729b057ca64470d11eb551031' "$se001q" >/dev/null
+  grep -F -- 'HOSTED_VERIFIER_COMMIT: 3dd33625162ec7137ef06c8079794a8d2aecc95d' "$se001q" >/dev/null
+  grep -F -- "test \"\$ELIGIBILITY_SCHEMA\" = 'symthaea.trusted-runner.recovery-eligibility.v5'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_SCHEMA\" = 'symthaea.trusted-runner.stage-f-authorization.v2'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_MAX_USES\" = '1'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_CONSUMPTION_MODE\" = 'root-owned-host-ledger-v1'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_SCOPE\" = 'se001q-independent-provider-reobservation-only'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_QUALIFICATION_CLAIM\" = 'NONE'" "$se001q" >/dev/null
+  grep -F -- "test \"\$AUTH_REPAIR_CLAIM\" = 'NONE'" "$se001q" >/dev/null
+
+  # One-use authority and boot binding are mandatory before the Rust replay.
+  grep -F -- 'socket=/run/symthaea-stage-f-authorization.sock' "$se001q" >/dev/null
+  grep -F -- 'request("BOOT_ID\\n")' "$se001q" >/dev/null
+  grep -F -- 'request(f"CONSUME {nonce} {authorization_sha256}\\n")' "$se001q" >/dev/null
+  grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED=PASS' "$se001q" >/dev/null
+  grep -F -- 'test "${STAGE_F_AUTHORIZATION_CONSUMED:-}" = '\''PASS'\''' "$se001q" >/dev/null
+  grep -F -- 'symthaea.trusted-runner.stage-f-consumption.v1' "$se001q" >/dev/null
+  grep -F -- 'symthaea.se001q.trusted-cpu-execution-binding.v2' "$se001q" >/dev/null
+
+  # The trusted helper remains the only implementation of the frozen Rust gate
+  # capture; unmerged EV2.4 Python is authenticated as reference data, not run.
+  grep -F -- '--command python3 "$HARNESS_DIR/nix/ci/se001q-trusted-replay.py"' "$se001q" >/dev/null
+  grep -F -- 'This run cannot replace the hosted EV2.4 run, qualify SE-001, or grant repair authority.' "$se001q" >/dev/null
 
   touch "$out"
 ''
