@@ -9,5 +9,7 @@ use crate::knowledge::epistemic_restart_continuity::authority_epoch_contract::is
 
 #[path = "epistemic_restart_activation_verifier_currentness.rs"]
 mod implementation;
-
 pub use implementation::*;
+
+#[path = "epistemic_restart_epoch_issuance_evidence_chain.rs"]
+pub mod epoch_issuance_evidence_chain;
