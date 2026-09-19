@@ -21,6 +21,8 @@
 //! - authenticated, time-bound transparency checkpoints with monotonic tracking;
 //! - principal-bound transparency witness observations and configured diversity
 //!   quorums whose identity metadata derives from the authorized trust root;
+//! - monitor receipts that detect witnessed equivocation and verify append-only
+//!   growth within one exact root-authority lineage;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
 //!   temporal lifecycle facts;
@@ -40,6 +42,7 @@ mod temporal_lifecycle;
 mod time;
 mod transparency;
 mod transparency_checkpoint;
+mod transparency_monitor;
 mod transparency_witness;
 mod trust;
 mod trust_root;
@@ -59,6 +62,7 @@ pub use temporal_lifecycle::*;
 pub use time::*;
 pub use transparency::*;
 pub use transparency_checkpoint::*;
+pub use transparency_monitor::*;
 pub use transparency_witness::*;
 pub use trust::*;
 pub use trust_root::*;
