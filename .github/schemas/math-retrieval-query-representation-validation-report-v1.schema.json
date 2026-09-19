@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-query-representation-validation-report-v1.schema.json",
+  "title": "Symthaea Query Representation Validation Report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version","authority","receipt_sha256","query_id","query_source_object_sha256","input_stage","input_object_sha256","representation_sha256","item_serialization_sha256","wire_kind","query_wire_sha256","serialized_bytes","all_checks_passed"],
+  "properties": {
+    "version": {"const": "math-retrieval-query-representation-validation-report-v1"},
+    "authority": {"const": "MeasurementOnly"},
+    "receipt_sha256": {"$ref": "#/$defs/sha256"},
+    "query_id": {"type": "string", "minLength": 1},
+    "query_source_object_sha256": {"$ref": "#/$defs/sha256"},
+    "input_stage": {"enum": ["SourceObject", "ParsedFolFormulaExt", "ExactNormalForm"]},
+    "input_object_sha256": {"$ref": "#/$defs/sha256"},
+    "representation_sha256": {"$ref": "#/$defs/sha256"},
+    "item_serialization_sha256": {"$ref": "#/$defs/sha256"},
+    "wire_kind": {"enum": ["CanonicalSparseV1", "BinaryHV16K"]},
+    "query_wire_sha256": {"$ref": "#/$defs/sha256"},
+    "serialized_bytes": {"type": "integer", "minimum": 1},
+    "all_checks_passed": {"const": true}
+  },
+  "$defs": {"sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+}

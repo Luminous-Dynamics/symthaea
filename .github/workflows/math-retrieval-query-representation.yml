@@ -1,0 +1,30 @@
+name: Math Retrieval Query Representation
+
+on:
+  pull_request:
+    paths:
+      - '.github/schemas/math-retrieval-query-representation*.json'
+      - '.github/scripts/validate-math-retrieval-query-representation.py'
+      - '.github/scripts/validate-math-retrieval-representation-wire.py'
+      - '.github/workflows/math-retrieval-query-representation.yml'
+      - 'docs/research/MATH_RET_QUERY_REP_001A.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify query representation receipt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile validators
+        run: |
+          python -m py_compile .github/scripts/validate-math-retrieval-representation-wire.py
+          python -m py_compile .github/scripts/validate-math-retrieval-query-representation.py
+      - name: Run wire adversarial self-test
+        run: python .github/scripts/validate-math-retrieval-representation-wire.py --self-test
+      - name: Run query-representation adversarial self-test
+        run: python .github/scripts/validate-math-retrieval-query-representation.py --self-test
