@@ -14,9 +14,11 @@ use std::collections::{BTreeMap, BTreeSet};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use symthaea_authority::{
-    AuthorityContextRef, AuthorityEpoch, AuthorityEvaluationInput, CapabilityGrant, Digest32,
-    GrantUseState, GrantValidationError, NegativeAuthorityFact, PrincipalId, ResourceRef,
+    AuthorityContextRef, AuthorityEpoch, CapabilityGrant, Digest32, GrantValidationError,
+    NegativeAuthorityFact, PrincipalId, ResourceRef,
 };
+#[cfg(test)]
+use symthaea_authority::{AuthorityEvaluationInput, GrantUseState};
 use symthaea_authority_time::{AuthorityTimeError, VerifiedAuthorityTime};
 use thiserror::Error;
 
@@ -308,11 +310,11 @@ impl VerifiedAuthorityStateV2 {
         Ok(())
     }
 
-    /// Build pure evaluator input from verified current state and separately
-    /// supplied crash-conservative use accounting. This still grants no effect.
-    /// A verified absence of an active context fails closed rather than being
-    /// converted into a placeholder context identity.
-    pub fn evaluation_input(
+    /// Test-only composition helper. Production code must not combine verified
+    /// state with caller-supplied use counters; a later accounting verifier must
+    /// provide exact-grant-bound durable use state first.
+    #[cfg(test)]
+    fn evaluation_input(
         &self,
         grant: &CapabilityGrant,
         time: &VerifiedAuthorityTime,

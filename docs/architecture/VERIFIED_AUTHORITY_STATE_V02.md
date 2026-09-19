@@ -40,26 +40,42 @@ Witnesses report `Option<AuthorityContextRef>` from their authoritative source:
 `None` is committed directly into the signed snapshot. It is not represented by an all-zero digest,
 a magic namespace, or another synthetic placeholder.
 
-A threshold-verified `None` is auditable evidence, but `evaluation_input()` fails with
-`NoCurrentAuthorityContext`. It cannot be converted into positive grant eligibility.
+A threshold-verified `None` is auditable evidence, but it cannot be turned into positive grant
+eligibility. Production code receives only the verified state facts; it does not receive a helper
+that manufactures evaluator input.
 
 ## Context rotation
 
 The challenge does not tell witnesses which context to sign. A current context different from the
-grant is a valid verified observation. Downstream pure evaluation then returns `ContextMismatch`,
-so context rotation invalidates old grants without verifier-side rewriting.
+grant is a valid verified observation. A later admission/composition layer may compare that verified
+context with the grant; an old grant bound to a different context must be denied.
 
-## Evaluation bridge
+## Accounting boundary
 
-`VerifiedAuthorityStateV2::evaluation_input()` combines:
+A bare `GrantUseState { committed, reserved }` is not grant-bound evidence. The two counters do not
+prove which grant/account they came from, whether they came from the latest durable checkpoint, or
+whether crash-conservative reservations and delegation escrow were included.
 
-- verified authority time for the exact grant and time policy;
-- verified current epoch;
-- a verified active authority context;
-- separately supplied `GrantUseState`.
+Therefore this production crate deliberately does **not** expose:
 
-The result is still only `AuthorityEvaluationInput`. It is not execution admission. If the verified
-state contains no active context, the bridge refuses to construct evaluator input.
+```text
+VerifiedAuthorityStateV2 + caller-supplied GrantUseState -> AuthorityEvaluationInput
+```
+
+The small composition helper used by unit tests exists only under `#[cfg(test)]` so the pure evaluator
+can be exercised without creating a production authority path.
+
+The next accounting/admission tranche must instead establish an opaque exact-grant-bound accounting
+proof before composition. The intended identity theorem is:
+
+```text
+grant.digest()
+    == verified_state.grant_digest()
+    == verified_accounting.grant_digest()
+```
+
+Only a separate admission/composition boundary may then construct evaluator input, and doing so still
+does not itself execute an effect.
 
 ## Protocol non-equivalence
 
@@ -75,6 +91,6 @@ while draft and becomes eligible only after an explicit ready-for-review transit
 
 ## Non-claims
 
-This tranche does not verify delegation ancestry, reserve uses, authenticate a Xenia ledger, mint a
-live capability, authorize motor execution, alter embodiment behavior, or turn cognitive/scientific
-confidence into authority.
+This tranche does not verify delegation ancestry, verify durable use accounting, reserve uses,
+authenticate a Xenia ledger, mint a live capability, authorize motor execution, alter embodiment
+behavior, or turn cognitive/scientific confidence into authority.
