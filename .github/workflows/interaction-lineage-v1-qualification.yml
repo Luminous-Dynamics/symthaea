@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
           test -z "$(git status --porcelain=v1)"
 
-      - name: Enforce pure-lineage and monotone-restriction ratchets
+      - name: Enforce pure-lineage and monotone information-flow ratchets
         run: |
           set -euo pipefail
           MANIFEST=crates/core/symthaea-interaction-lineage/Cargo.toml
@@ -72,8 +72,13 @@ jobs:
           grep -Fq 'DataLineage' "${SOURCE}"
           grep -Fq 'DisclosureBinding' "${SOURCE}"
           grep -Fq 'restrictions.extend_from_slice(&parent.restrictions)' "${SOURCE}"
-          if grep -Eq 'pub[[:space:]]+fn[[:space:]]+(declass|remove_restriction|clear_restriction)' "${SOURCE}"; then
-            echo 'unverified restriction-removal API is forbidden in lineage v1' >&2
+          grep -Fq 'dispositions.extend_from_slice(&parent.dispositions)' "${SOURCE}"
+          grep -Fq 'ContentDisposition::InternalDerived' "${SOURCE}"
+          grep -Fq 'transcript.disposition_set(&self.dispositions)' "${SOURCE}"
+          grep -Fq 'derived_lineage_preserves_external_disposition_locally' "${SOURCE}"
+
+          if grep -Eq 'pub[[:space:]]+fn[[:space:]]+(declass|declassify|remove_restriction|clear_restriction|remove_disposition|clear_disposition|promote_control_plane)' "${SOURCE}"; then
+            echo 'unverified declassification/disposition-removal API is forbidden in lineage v1' >&2
             exit 1
           fi
           if grep -Eq 'DispatchPermit|CapabilityGrant|std::net|std::fs|std::process|Command::new' "${SOURCE}"; then
