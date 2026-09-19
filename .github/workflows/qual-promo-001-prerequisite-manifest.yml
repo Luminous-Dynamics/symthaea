@@ -1,0 +1,166 @@
+name: QUAL-PROMO-001 Typed Promotion Prerequisites R1
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/**"
+      - ".github/workflows/qual-promo-001-prerequisite-manifest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-promo-001-r1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 58c299cce926aa66dad319e6856e595eff11cdc6
+  D5B5_SOURCE: 792ead8e08565995b0bfc5e3f6ab5ebbde6aa8df
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-typed-promotion-prerequisites-r1:
+    runs-on: ubuntu-slim
+    timeout-minutes: 55
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 32
+          persist-credentials: false
+
+      - name: Bind exact qualifier parent and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/qual-promo-001-prerequisite-manifest.yml")
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source and D5B5 ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+          git merge-base --is-ancestor "$D5B5_SOURCE" "$EXPECTED_PARENT"
+          test "$(git rev-list --count "$D5B5_SOURCE".."$EXPECTED_PARENT")" = "1"
+
+      - name: Verify hardened v1 structural contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/qualification_promotion.rs
+          test -f "$src"
+          grep -F 'record.run_attempt != 1' "$src"
+          grep -F 'EvidenceArtifactNameMismatch' "$src"
+          grep -F 'record.evidence_artifact_name != expected.artifact_name' "$src"
+          grep -F "record.evidence_artifact_sha256.bytes().all(|byte| byte == b'0')" "$src"
+          grep -F 'fn non_first_run_attempt_fails_closed()' "$src"
+          grep -F '2_u32' "$src"
+          grep -F 'fn passed_record_requires_exact_artifact_identity_and_digest()' "$src"
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-humanoid/src/qualification_promotion.rs').read_text()
+          production = text.split('#[cfg(test)]', 1)[0]
+          expected_artifacts = (
+              'hum-wrench-001d4-4210a5e51127f6c8a6c663766dc6d130bf4224df',
+              'hum-wrench-001d5a-32b49ed10987e7b3a48ed54dd8dd7b551d1731e8',
+              'hum-dyn-002c-0b222328a6123a87716c8a535cb21179dc8e6774',
+              'hum-wrench-001d5b-3d69c5f7006fc300ae538effde87ebec9b43486e',
+              'hum-wrench-001d5b2-75e91066db405daf49d1b78f9630d68e4ff72eeb',
+              'hum-wrench-001d5b3-66343eb1f9d57fb9d22458bb22252c2059cbe469',
+              'hum-wrench-001d5b4-bb4f2029e13308067660e4f0f0b59bdb6c77a984',
+              'hum-wrench-001d5b5-015f82ff0df8746a0c0c06f14a00ba6b25e70ed6',
+          )
+          for artifact in expected_artifacts:
+              assert artifact in production, artifact
+          assert 'run_attempt: u32' in production
+          assert 'artifact_name:' in production
+          assert 'record.execution_state != QualificationExecutionStateV1::ExecutablePassed' in production
+          assert 'ordered.sort_by_key(|record| record.role)' in production
+          forbidden = (
+              'ContactAuthorityStateMachineV1', 'EstablishedContactEvidenceV1',
+              'floating_base_inverse_dynamics', 'csc_qp', 'osqp_backend',
+          )
+          for needle in forbidden:
+              assert needle not in production, needle
+          PY
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked default all-target compile
+        run: cargo check -p symthaea-humanoid --all-targets --locked
+
+      - name: Locked MuJoCo integration compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Execute focused promotion prerequisite regressions
+        run: cargo test -p symthaea-humanoid qualification_promotion --locked -- --nocapture
+
+      - name: Strict default Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qual-promo-001-r1-evidence
+          {
+            echo "program=QUAL-PROMO-001Q-R1"
+            echo "authority=qualification-prerequisite-checker-source-qualification-only"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "d5b5_source=$D5B5_SOURCE"
+            echo "run_attempt_policy=EXACTLY_1"
+            echo "exact_artifact_name_required=TRUE"
+            echo "all_zero_artifact_digest_promotable=FALSE"
+            echo "predecessor_executable_pass_inherited=NONE"
+            echo "external_execution_truth_attested=FALSE"
+            echo "manifest_is_runtime_capability=FALSE"
+            echo "d4_established_authority=NONE"
+            echo "qp_authority=NONE"
+            echo "physical_claim=NONE"
+            echo "format=PASS"
+            echo "compile_default=PASS"
+            echo "compile_mujoco_integration=PASS"
+            echo "focused_tests=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > qual-promo-001-r1-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qual-promo-001-r1-${{ github.event.pull_request.head.sha || github.sha }}
+          path: qual-promo-001-r1-evidence/
+          if-no-files-found: error
