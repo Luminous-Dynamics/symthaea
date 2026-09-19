@@ -14,6 +14,7 @@
 use super::dream_feedback::{DreamFeedbackBridge, DreamInsight};
 use super::semantic_context::{ContextIdentity, SemanticContextError};
 use super::semantic_prior::{SemanticPriorError, SemanticPriorMemory};
+use super::semantic_support::{IntegrityBoundSemanticPriorError, IntegrityBoundSemanticPriorMemory};
 use super::semantic_supported_retrieval::{
     SemanticQuerySupportError, SupportBoundSemanticPriorMemory,
 };
@@ -59,6 +60,28 @@ impl From<SemanticQuerySupportError> for DreamSupportBoundCoordinatorError {
     }
 }
 
+/// Error for the v2 coordinator that commits cryptographically bound support
+/// provenance together with exact dream feedback.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DreamIntegrityBoundCoordinatorError {
+    Context(SemanticContextError),
+    ContextHashMismatch { expected: u64, observed: u64 },
+    MissingPriorAfterAcceptance,
+    SemanticPrior(IntegrityBoundSemanticPriorError),
+}
+
+impl From<SemanticContextError> for DreamIntegrityBoundCoordinatorError {
+    fn from(value: SemanticContextError) -> Self {
+        Self::Context(value)
+    }
+}
+
+impl From<IntegrityBoundSemanticPriorError> for DreamIntegrityBoundCoordinatorError {
+    fn from(value: IntegrityBoundSemanticPriorError) -> Self {
+        Self::SemanticPrior(value)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DreamSemanticOutcome {
     /// The dream bridge rejected the generated insight under its existing policy.
@@ -69,11 +92,6 @@ pub enum DreamSemanticOutcome {
 
 /// Process one dream insight and, if accepted, index the resulting action prior
 /// under the collision-resistant semantic context identity.
-///
-/// Accepted prior state is committed only after semantic indexing succeeds. A
-/// bridge-policy rejection preserves the bridge's existing rejection telemetry but
-/// creates no exact or semantic prior. Any semantic indexing error after acceptance
-/// rolls back the staged bridge update as well.
 pub fn process_semantic_insight_atomically(
     bridge: &mut DreamFeedbackBridge,
     semantic_memory: &mut SemanticPriorMemory,
@@ -92,8 +110,6 @@ pub fn process_semantic_insight_atomically(
     let mut staged_memory = semantic_memory.clone();
 
     if !staged_bridge.process_insight(insight) {
-        // Preserve the legacy bridge's accounting of rejected generated insights,
-        // while still guaranteeing that no prior/semantic state was created.
         *bridge = staged_bridge;
         return Ok(DreamSemanticOutcome::RejectedByDreamPolicy);
     }
@@ -141,6 +157,47 @@ pub fn process_support_bound_semantic_insight_atomically(
     let prior = staged_bridge
         .get_prior(identity.fast_hash)
         .ok_or(DreamSupportBoundCoordinatorError::MissingPriorAfterAcceptance)?;
+    let indexed_identity = staged_memory.index_prior(context, prior)?;
+    debug_assert_eq!(identity, indexed_identity);
+
+    *bridge = staged_bridge;
+    *semantic_memory = staged_memory;
+
+    Ok(DreamSemanticOutcome::Indexed { identity })
+}
+
+/// V2 atomic path that commits exact dream feedback, semantic indexing, and a
+/// cryptographic support binding as one transaction.
+///
+/// The support binding commits to the exact context identity, semantic encoder
+/// configuration, and complete support diagnostics. A clamp-saturated source can
+/// still be recorded as exact generated provenance, but integrity-bound strict
+/// retrieval will not treat it as nominally supported semantic memory.
+pub fn process_integrity_bound_semantic_insight_atomically(
+    bridge: &mut DreamFeedbackBridge,
+    semantic_memory: &mut IntegrityBoundSemanticPriorMemory,
+    context: &[f32],
+    insight: DreamInsight,
+) -> Result<DreamSemanticOutcome, DreamIntegrityBoundCoordinatorError> {
+    let identity = ContextIdentity::from_context(context)?;
+    if identity.fast_hash != insight.context_hash {
+        return Err(DreamIntegrityBoundCoordinatorError::ContextHashMismatch {
+            expected: insight.context_hash,
+            observed: identity.fast_hash,
+        });
+    }
+
+    let mut staged_bridge = bridge.clone();
+    let mut staged_memory = semantic_memory.clone();
+
+    if !staged_bridge.process_insight(insight) {
+        *bridge = staged_bridge;
+        return Ok(DreamSemanticOutcome::RejectedByDreamPolicy);
+    }
+
+    let prior = staged_bridge
+        .get_prior(identity.fast_hash)
+        .ok_or(DreamIntegrityBoundCoordinatorError::MissingPriorAfterAcceptance)?;
     let indexed_identity = staged_memory.index_prior(context, prior)?;
     debug_assert_eq!(identity, indexed_identity);
 
@@ -345,6 +402,80 @@ mod tests {
                 SemanticQuerySupportError::Prior(SemanticPriorError::EmptyPreferredDirection)
             ))
         );
+        assert_eq!(bridge.num_priors(), 0);
+        assert_eq!(bridge.stats().total_insights, 0);
+        assert!(semantic_memory.is_empty());
+    }
+
+    #[test]
+    fn integrity_bound_coordinator_commits_binding_with_exact_prior() {
+        let context = [0.2, -0.1, 0.7];
+        let mut bridge = DreamFeedbackBridge::new();
+        let mut semantic_memory = IntegrityBoundSemanticPriorMemory::new();
+
+        let outcome = process_integrity_bound_semantic_insight_atomically(
+            &mut bridge,
+            &mut semantic_memory,
+            &context,
+            insight(&context, vec![0.4, 0.5, 0.6], 0.4),
+        )
+        .unwrap();
+
+        let DreamSemanticOutcome::Indexed { identity } = outcome else {
+            panic!("accepted insight was not indexed");
+        };
+        assert!(bridge.get_prior(identity.fast_hash).is_some());
+        let binding = semantic_memory.source_binding(identity).unwrap();
+        binding.validate_self().unwrap();
+        binding
+            .validate_against_context(semantic_memory.context_encoder(), &context)
+            .unwrap();
+    }
+
+    #[test]
+    fn integrity_bound_coordinator_preserves_non_nominal_source_without_semantic_use() {
+        let context = [2.0];
+        let mut bridge = DreamFeedbackBridge::new();
+        let mut semantic_memory = IntegrityBoundSemanticPriorMemory::new();
+
+        let outcome = process_integrity_bound_semantic_insight_atomically(
+            &mut bridge,
+            &mut semantic_memory,
+            &context,
+            insight(&context, vec![0.4], 0.4),
+        )
+        .unwrap();
+
+        let DreamSemanticOutcome::Indexed { identity } = outcome else {
+            panic!("accepted insight was not indexed");
+        };
+        let binding = semantic_memory.source_binding(identity).unwrap();
+        assert!(!binding.within_nominal_support());
+        assert!(
+            semantic_memory
+                .retrieve_integrity_bound(&[1.0], 0.0, 10)
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn integrity_bound_semantic_failure_rolls_back_exact_prior_and_binding() {
+        let context = [0.2, -0.1, 0.7];
+        let mut bridge = DreamFeedbackBridge::new();
+        let mut semantic_memory = IntegrityBoundSemanticPriorMemory::new();
+
+        let result = process_integrity_bound_semantic_insight_atomically(
+            &mut bridge,
+            &mut semantic_memory,
+            &context,
+            insight(&context, Vec::new(), 0.4),
+        );
+
+        assert!(matches!(
+            result,
+            Err(DreamIntegrityBoundCoordinatorError::SemanticPrior(_))
+        ));
         assert_eq!(bridge.num_priors(), 0);
         assert_eq!(bridge.stats().total_insights, 0);
         assert!(semantic_memory.is_empty());
