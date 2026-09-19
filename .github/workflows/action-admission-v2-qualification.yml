@@ -1,0 +1,142 @@
+name: Action Admission V2 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-admission-v2-qualification.yml'
+      - 'crates/bridges/symthaea-action-admission/**'
+      - 'crates/bridges/symthaea-action-frontier/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-admission-v2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  action-admission-v2:
+    name: Exact-head action admission v2
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Enforce admission authority ratchets
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-action-admission/src/lib.rs
+          CHECKPOINT=crates/core/symthaea-action-checkpoint/src/hardened.rs
+
+          grep -Fq 'authorize_and_persist_reservation' "${SRC}"
+          grep -Fq 'arm_authorized_reservation' "${SRC}"
+          grep -Fq 'mint_dispatch_permit' "${SRC}"
+          grep -Fq 'allocation_use_state' "${SRC}"
+          grep -Fq 'evaluate_authority' "${SRC}"
+          grep -Fq 'state.ensure_fresh' "${SRC}"
+          grep -Fq 'mark_outcome_unknown' "${SRC}"
+
+          # Composition invariant: V2D may qualify only on the hardened checkpoint
+          # facade where uncertain execution cannot be durably refunded by the
+          # ordinary successor path.
+          test -f "${CHECKPOINT}"
+          grep -Fq 'OutcomeUnknownReleaseRequiresProof' "${CHECKPOINT}"
+          grep -Fq 'forbid_unproven_uncertain_release' "${CHECKPOINT}"
+          grep -Fq 'ordinary_checkpoint_path_cannot_refund_outcome_unknown' "${CHECKPOINT}"
+
+          if grep -Eq '(^|[^[:alnum:]_])(saturating_sub|checked_sub)[[:space:]]*\(' "${SRC}"; then
+            echo 'owned-reservation currentness must not be implemented by counter subtraction' >&2
+            exit 1
+          fi
+          if grep -Fq 'GrantUseState {' "${SRC}"; then
+            echo 'production admission must not construct caller-selected GrantUseState counters' >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          src = Path('crates/bridges/symthaea-action-admission/src/lib.rs').read_text()
+          affine = (
+              'AuthorizedPersistedReservationV2',
+              'AuthorizedDurablyArmedReservationV2',
+              'DispatchPermitV2',
+          )
+          for name in affine:
+              m = re.search(r'#\[derive\(([^)]*)\)\]\s*pub struct\s+' + re.escape(name), src, re.S)
+              if not m:
+                  raise SystemExit(f'missing explicit derive declaration for affine type {name}')
+              derives = {x.strip() for x in m.group(1).split(',')}
+              forbidden = {'Clone', 'Serialize', 'Deserialize'} & derives
+              if forbidden:
+                  raise SystemExit(f'{name} must remain affine/non-Serde; found {sorted(forbidden)}')
+          if re.search(r'pub\s+fn\s+(new|from_|deserialize)[A-Za-z0-9_]*\s*\([^)]*DispatchPermitV2', src, re.S):
+              raise SystemExit('DispatchPermitV2 must not gain a public reconstruction constructor')
+          PY
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-admission -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-action-admission --all-targets
+          cargo test -p symthaea-action-admission
+          cargo clippy -p symthaea-action-admission --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-admission --all-targets
+          cargo test --locked -p symthaea-action-admission
+          cargo clippy --locked -p symthaea-action-admission --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
