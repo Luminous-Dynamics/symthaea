@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-action-checkpoint"
+version = "0.2.0"
+edition.workspace = true
+license.workspace = true
+description = "Grant-bound anti-rollback checkpoints and verified accounting proof for Symthaea authority"
+publish = false
+
+[dependencies]
+bincode = { workspace = true }
+blake3 = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+symthaea-authority = { path = "../symthaea-authority" }
+symthaea-action-runtime = { path = "../symthaea-action-runtime" }

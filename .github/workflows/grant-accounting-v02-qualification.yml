@@ -1,0 +1,88 @@
+name: Grant Accounting v0.2 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/grant-accounting-v02-qualification.yml'
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'docs/architecture/GRANT_BOUND_ACCOUNTING_V02.md'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: grant-accounting-v02-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  exact-head:
+    name: Exact-head grant accounting
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          git status --porcelain=v1
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-runtime -p symthaea-action-checkpoint -- --check
+
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-action-runtime -p symthaea-action-checkpoint --all-targets
+          cargo test -p symthaea-action-runtime -p symthaea-action-checkpoint
+          cargo clippy -p symthaea-action-runtime -p symthaea-action-checkpoint --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo "Cargo.lock requires committed reconciliation:" >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-runtime -p symthaea-action-checkpoint --all-targets
+          cargo test --locked -p symthaea-action-runtime -p symthaea-action-checkpoint
+          cargo clippy --locked -p symthaea-action-runtime -p symthaea-action-checkpoint --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
