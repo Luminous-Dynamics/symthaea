@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-action-checkpoint"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Canonical grant-bound checkpoints for Symthaea action authority v0.2"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["authorization", "checkpoint", "safety", "agents"]
+categories = ["authentication", "development-tools"]
+
+[dependencies]
+serde = { workspace = true }
+sha2 = { workspace = true }
+symthaea-action-runtime = { path = "../symthaea-action-runtime" }
+symthaea-authority = { path = "../symthaea-authority" }
+thiserror = { workspace = true }
