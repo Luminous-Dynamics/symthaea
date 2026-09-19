@@ -74,6 +74,7 @@ pub mod narrative_evidence;
 pub mod replay_policy;
 pub mod semantic_context;
 pub mod semantic_null_calibration;
+pub mod semantic_operational_memory;
 pub mod semantic_prior;
 pub mod semantic_support;
 pub mod semantic_supported_retrieval;
