@@ -137,8 +137,11 @@ EOF
   grep -F -- 'request(f"CONSUME {nonce} {authorization_sha256}\\n")' "$se001q" >/dev/null
   grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED=PASS' "$se001q" >/dev/null
   grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED:-' "$se001q" >/dev/null
+  grep -F -- 'NOT_DEMONSTRATED' "$se001q" >/dev/null
   grep -F -- 'symthaea.trusted-runner.stage-f-consumption.v1' "$se001q" >/dev/null
   grep -F -- 'symthaea.se001q.trusted-cpu-execution-binding.v2' "$se001q" >/dev/null
+  grep -F -- 'symthaea.se001q.trusted-cpu-partial-rejection.v4' "$se001q" >/dev/null
+  grep -F -- 'symthaea.se001q.trusted-cpu-partial-manifest.v4' "$se001q" >/dev/null
 
   # The trusted helper remains the only implementation of the frozen Rust gate
   # capture; unmerged EV2.4 Python is authenticated as reference data, not run.
