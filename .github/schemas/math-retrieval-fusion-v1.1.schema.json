@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-fusion-v1.1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Fusion Policy v1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "fusion_id", "authority", "inputs", "fusion", "global_budget", "output"],
+  "properties": {
+    "version": {"const": "math-retrieval-fusion-v1.1"},
+    "fusion_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority": {"const": "MeasurementOnly"},
+    "inputs": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/input"}},
+    "fusion": {"$ref": "#/$defs/fusion"},
+    "global_budget": {"$ref": "#/$defs/budget"},
+    "output": {"$ref": "#/$defs/output"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "index_manifest_sha256", "max_input_items", "max_input_bytes", "rank_weight"],
+      "properties": {
+        "channel": {"enum": ["Syntax", "ExactNormalForm"]},
+        "index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "max_input_items": {"type": "integer", "minimum": 1},
+        "max_input_bytes": {"type": "integer", "minimum": 1},
+        "rank_weight": {"const": 1}
+      }
+    },
+    "fusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method", "input_rank_interpretation", "tie_break", "dedup_key",
+        "duplicate_merge_policy", "channel_underfill_policy",
+        "unused_quota_reallocation", "deterministic"
+      ],
+      "properties": {
+        "method": {"enum": ["ReciprocalRankFusion", "DeterministicInterleave"]},
+        "input_rank_interpretation": {"const": "OneBasedAscendingIndexRank"},
+        "rrf_k": {"type": "integer", "minimum": 1},
+        "rrf_arithmetic": {"const": "ExactRational"},
+        "rrf_formula": {"const": "SumOneOverKPlusRank"},
+        "interleave_start_channel": {"enum": ["Syntax", "ExactNormalForm"]},
+        "interleave_step_policy": {"const": "StrictAlternatingByChannel"},
+        "duplicate_turn_policy": {"const": "DuplicateConsumesTurnNoBackfill"},
+        "exhausted_channel_policy": {"const": "ContinueOtherWithinFrozenInputQuota"},
+        "tie_break": {"const": "SourceObjectDigestAscending"},
+        "dedup_key": {"const": "SourceObjectDigest"},
+        "duplicate_merge_policy": {"const": "OneOutputUnionChannelProvenance"},
+        "channel_underfill_policy": {"const": "NoReallocation"},
+        "unused_quota_reallocation": {"const": false},
+        "deterministic": {"const": true}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"method": {"const": "ReciprocalRankFusion"}}, "required": ["method"]},
+          "then": {
+            "required": ["rrf_k", "rrf_arithmetic", "rrf_formula"],
+            "not": {"anyOf": [
+              {"required": ["interleave_start_channel"]},
+              {"required": ["interleave_step_policy"]},
+              {"required": ["duplicate_turn_policy"]},
+              {"required": ["exhausted_channel_policy"]}
+            ]}
+          }
+        },
+        {
+          "if": {"properties": {"method": {"const": "DeterministicInterleave"}}, "required": ["method"]},
+          "then": {
+            "required": ["interleave_start_channel", "interleave_step_policy", "duplicate_turn_policy", "exhausted_channel_policy"],
+            "not": {"anyOf": [
+              {"required": ["rrf_k"]},
+              {"required": ["rrf_arithmetic"]},
+              {"required": ["rrf_formula"]}
+            ]}
+          }
+        }
+      ]
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_output_items", "max_output_bytes", "max_output_item_bytes", "byte_accounting", "partial_item_policy", "packing_policy"],
+      "properties": {
+        "max_output_items": {"type": "integer", "minimum": 1},
+        "max_output_bytes": {"type": "integer", "minimum": 1},
+        "max_output_item_bytes": {"type": "integer", "minimum": 1},
+        "byte_accounting": {"const": "CanonicalUtf8Bytes"},
+        "partial_item_policy": {"const": "RejectWholeItem"},
+        "packing_policy": {"const": "FusedRankOrderWholeItems"}
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["payload_kind", "payload_serialization_sha256", "source_provenance_required", "channel_provenance_required", "duplicate_source_counts_once"],
+      "properties": {
+        "payload_kind": {"const": "CanonicalSourceObject"},
+        "payload_serialization_sha256": {"$ref": "#/$defs/sha256"},
+        "source_provenance_required": {"const": true},
+        "channel_provenance_required": {"const": true},
+        "duplicate_source_counts_once": {"const": true}
+      }
+    }
+  }
+}
