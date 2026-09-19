@@ -241,27 +241,11 @@ pub fn CreatePage() -> impl IntoView {
         });
     };
 
+    // Create-to-Listen handoff uses the same candidate activation boundary as
+    // the Listen journey. Runtime candidate ids may select `/api/audio/{id}`;
+    // only server-supplied ArtifactIdentity may populate rendition identity.
     let listen_to = move |c: Candidate| {
-        muse.current_style.set(c.style.clone());
-        muse.kept.set(false);
-        let source = crate::playback::PlaybackSource {
-            rendition_id: Some(symthaea_muse_protocol::RenditionArtifactId(
-                c.id.to_string(),
-            )),
-            audio_url: api::audio_url(api::DEFAULT_BACKEND, c.id),
-            duration_hint_seconds: Some(c.duration_secs.max(0.0) as f64),
-            advance_on_end: true,
-        };
-        muse.current.set(Some(c));
-        // Through the reducer, not a direct `audio.set_src`/`.play()` —
-        // otherwise the player bar's `load_epoch`-gated state (position,
-        // duration, playing/paused) would silently stop updating: the
-        // reducer would never learn a new source loaded, so every
-        // subsequent browser event (`app.rs`) fails its `accepts()` check.
-        muse.dispatch(crate::playback::PlaybackEvent::LoadRequested {
-            source,
-            autoplay: true,
-        });
+        muse.activate_candidate(c, true);
         navigate("/", Default::default());
     };
 

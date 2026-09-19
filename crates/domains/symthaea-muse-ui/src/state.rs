@@ -187,6 +187,25 @@ fn pick_style_for_policy(
     result.unwrap_or_else(|| palette::random_style().to_string())
 }
 
+/// Build playback state for a server candidate while keeping runtime lookup
+/// identity (`candidate_id`) separate from content identity (`rendition`).
+///
+/// The numeric candidate id is allowed to select the server audio endpoint,
+/// but it must never be promoted into `RenditionArtifactId`. Only the
+/// server-supplied `ArtifactIdentity` can populate that field.
+fn candidate_playback_source(
+    candidate_id: u64,
+    identity: Option<&symthaea_muse_protocol::ArtifactIdentity>,
+    duration_hint_seconds: f64,
+) -> PlaybackSource {
+    PlaybackSource {
+        rendition_id: identity.map(|identity| identity.rendition.clone()),
+        audio_url: api::audio_url(api::DEFAULT_BACKEND, candidate_id),
+        duration_hint_seconds: Some(duration_hint_seconds.max(0.0)),
+        advance_on_end: true,
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct MuseState {
     pub current: RwSignal<Option<Candidate>>,
@@ -367,26 +386,18 @@ impl MuseState {
         self.dispatch(PlaybackEvent::SeekRequested { seconds });
     }
 
-    fn show_piece(self, c: Candidate, autoplay: bool) {
+    /// Make one server candidate the active Listen piece and load its audio.
+    /// Both the Listen journey and Create hand-off use this boundary so they
+    /// cannot drift on playback identity, duration hints, keep state, or load
+    /// epoch behavior.
+    pub fn activate_candidate(self, c: Candidate, autoplay: bool) {
         self.kept.set(false);
         self.current_style.set(c.style.clone());
-        let source = PlaybackSource {
-            // Real content-hash identity now that /api/compose populates
-            // it (see MUSE_JOURNEY_WIRING_PLAN_2026-07-24.md step 1) --
-            // previously a synthetic `c.id.to_string()`.
-            rendition_id: c
-                .identity
-                .as_ref()
-                .map(|identity| identity.rendition.clone()),
-            audio_url: api::audio_url(api::DEFAULT_BACKEND, c.id),
-            // A provisional hint so the seek bar isn't zero-max before
-            // real `<audio>` metadata arrives — the reducer overwrites
-            // this with the real duration on `MetadataLoaded`, per its
-            // own doc comment on why: the actual rendered file can differ
-            // slightly from the composed estimate.
-            duration_hint_seconds: Some(c.duration_secs.max(0.0) as f64),
-            advance_on_end: true,
-        };
+        let source = candidate_playback_source(
+            c.id,
+            c.identity.as_ref(),
+            c.duration_secs.max(0.0) as f64,
+        );
         self.current.set(Some(c));
         // `LoadRequested` bumps the load epoch and returns a `Load`
         // effect; if `autoplay` is set, the reducer's own `MetadataLoaded`
@@ -416,7 +427,7 @@ impl MuseState {
             return;
         };
         self.status.set(String::new());
-        self.show_piece(candidate, autoplay);
+        self.activate_candidate(candidate, autoplay);
     }
 
     /// Apply every effect a journey dispatch produced. `CurrentChanged`
@@ -574,5 +585,46 @@ impl MuseState {
 impl Default for MuseState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_muse_protocol::{
+        ArtifactIdentity, CompositionArtifactId, RenditionArtifactId, ScoreContentArtifactId,
+    };
+
+    fn identity(rendition: &str) -> ArtifactIdentity {
+        ArtifactIdentity {
+            score_content: ScoreContentArtifactId("1".repeat(64)),
+            composition: CompositionArtifactId("2".repeat(64)),
+            rendition: RenditionArtifactId(rendition.to_string()),
+        }
+    }
+
+    #[test]
+    fn candidate_source_uses_server_rendition_identity_not_runtime_id() {
+        let real_rendition = "a".repeat(64);
+        let identity = identity(&real_rendition);
+        let source = candidate_playback_source(42, Some(&identity), 12.5);
+
+        assert_eq!(
+            source.rendition_id.as_ref().map(|id| id.0.as_str()),
+            Some(real_rendition.as_str())
+        );
+        assert_ne!(
+            source.rendition_id.as_ref().map(|id| id.0.as_str()),
+            Some("42")
+        );
+        assert!(source.audio_url.ends_with("/api/audio/42"));
+        assert!(source.advance_on_end);
+    }
+
+    #[test]
+    fn candidate_without_content_identity_does_not_fabricate_one() {
+        let source = candidate_playback_source(7, None, 8.0);
+        assert!(source.rendition_id.is_none());
+        assert!(source.audio_url.ends_with("/api/audio/7"));
     }
 }
