@@ -10,6 +10,8 @@ pub mod intervention_effect_panel;
 pub mod rendered_attack_evidence;
 #[path = "rendered_attack_gate.rs"]
 pub mod rendered_attack_gate;
+#[path = "rendered_attack_panel.rs"]
+pub mod rendered_attack_panel;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
