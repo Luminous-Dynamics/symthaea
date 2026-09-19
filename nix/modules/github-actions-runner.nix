@@ -88,10 +88,14 @@ in
     # One root-owned process per local socket connection. The protocol is tiny:
     #   BOOT_ID
     #   CONSUME <64-hex nonce> <64-hex authorization-sha256>
-    # A successful CONSUME atomically creates a root-owned nonce directory.
-    # Reusing the nonce therefore fails closed even across runner re-registration.
+    #   STATUS  <64-hex nonce> <64-hex authorization-sha256>
+    # A successful CONSUME atomically reserves the nonce directory, then writes
+    # an atomic immutable record. STATUS is read-only: it can prove UNUSED,
+    # CONSUMED_STATUS, CONSUMED_DIFFERENT, or INCOMPLETE without reopening
+    # authority. Reusing the nonce therefore fails closed even across runner
+    # re-registration, while a lost CONSUME response remains auditable.
     systemd.services."symthaea-stage-f-authorization@" = {
-      description = "Consume one Symthaea Stage-F authorization";
+      description = "Consume or inspect one Symthaea Stage-F authorization";
       script = ''
         set -euo pipefail
         umask 077
@@ -110,13 +114,62 @@ in
             [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
             [[ -z "$extra" ]]
             marker="${authorizationLedgerDir}/$nonce"
+            record="$marker/consumption-record"
             if mkdir --mode=0700 -- "$marker" 2>/dev/null; then
-              printf '%s\n' "$authorization_sha" > "$marker/authorization-sha256"
-              chmod 0400 "$marker/authorization-sha256"
+              tmp="$marker/.consumption-record"
+              {
+                printf 'authorization_sha256=%s\n' "$authorization_sha"
+                printf 'boot_id=%s\n' "$boot_id"
+              } > "$tmp"
+              chmod 0400 "$tmp"
+              mv -T -- "$tmp" "$record"
               printf 'CONSUMED %s %s %s\n' "$nonce" "$authorization_sha" "$boot_id"
             else
               printf 'ALREADY_CONSUMED %s %s\n' "$nonce" "$boot_id"
               exit 73
+            fi
+            ;;
+          STATUS)
+            [[ "$nonce" =~ ^[0-9a-f]{64}$ ]]
+            [[ "$authorization_sha" =~ ^[0-9a-f]{64}$ ]]
+            [[ -z "$extra" ]]
+            marker="${authorizationLedgerDir}/$nonce"
+            record="$marker/consumption-record"
+            if [[ ! -d "$marker" ]]; then
+              printf 'UNUSED %s %s\n' "$nonce" "$boot_id"
+              exit 0
+            fi
+            if [[ ! -f "$record" ]]; then
+              printf 'INCOMPLETE %s %s\n' "$nonce" "$boot_id"
+              exit 0
+            fi
+
+            line1=''
+            line2=''
+            line3=''
+            {
+              IFS= read -r line1 || true
+              IFS= read -r line2 || true
+              IFS= read -r line3 || true
+            } < "$record"
+            key1=''
+            stored_authorization_sha=''
+            extra1=''
+            key2=''
+            stored_boot_id=''
+            extra2=''
+            IFS='=' read -r key1 stored_authorization_sha extra1 <<< "$line1"
+            IFS='=' read -r key2 stored_boot_id extra2 <<< "$line2"
+
+            if [[ "$key1" != 'authorization_sha256' || ! "$stored_authorization_sha" =~ ^[0-9a-f]{64}$ || -n "$extra1" || "$key2" != 'boot_id' || ! "$stored_boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ || -n "$extra2" || -n "$line3" ]]; then
+              printf 'INCOMPLETE %s %s\n' "$nonce" "$boot_id"
+              exit 0
+            fi
+
+            if [[ "$stored_authorization_sha" == "$authorization_sha" ]]; then
+              printf 'CONSUMED_STATUS %s %s %s\n' "$nonce" "$stored_authorization_sha" "$stored_boot_id"
+            else
+              printf 'CONSUMED_DIFFERENT %s %s\n' "$nonce" "$stored_boot_id"
             fi
             ;;
           *)
