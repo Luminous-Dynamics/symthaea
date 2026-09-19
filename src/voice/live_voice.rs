@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::Result;
 use symthaea_core::genesis::GenesisSeed;
 
-use super::audio_out::AudioOutput;
+use super::audio_out::{AudioFlushHandle, AudioOutput};
 use super::formant_targets::FormantDatabase;
 use super::repl_voice::SimpleG2P;
 use super::vocal_tract_controller::train_controller_on_phoneme_db;
@@ -53,23 +53,28 @@ pub enum LiveVoiceSpeakOutcome {
 /// Cloneable, capability-narrow stop control for the current live utterance.
 ///
 /// This intentionally exposes only interruption state. It cannot synthesize audio,
-/// mutate cognitive prosody, access the device/ring buffer, or start a new utterance.
-/// A caller may therefore retain it on another thread without sharing `&mut LiveVoice`.
+/// mutate cognitive prosody, access the producer, or start a new utterance. Stop
+/// requests halt further synthesis/push and request consumer-owned queued-audio
+/// invalidation at the next callback boundary.
 #[derive(Debug, Clone)]
 pub struct LiveVoiceStopHandle {
     speaking: Arc<AtomicBool>,
+    flush: AudioFlushHandle,
 }
 
 impl LiveVoiceStopHandle {
-    fn new(speaking: Arc<AtomicBool>) -> Self {
-        Self { speaking }
+    fn new(speaking: Arc<AtomicBool>, flush: AudioFlushHandle) -> Self {
+        Self { speaking, flush }
     }
 
-    /// Request that the live synthesis/push loops stop at their next cancellation
-    /// check. This does not claim that already-buffered device audio is instantly
-    /// silent; the ring buffer drains according to the audio backend.
+    /// Request stop and invalidate queued stale speech.
+    ///
+    /// The audio consumer remains owned by the CPAL callback; this method only
+    /// changes atomics. Audible silence is therefore bounded by callback/device
+    /// scheduling rather than by draining the entire ring buffer.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.flush.request_flush();
     }
 
     /// Whether the shared live utterance state still reports active synthesis/push.
@@ -85,15 +90,17 @@ impl LiveVoiceStopHandle {
 pub struct SpeakHandle {
     thread: Option<std::thread::JoinHandle<Result<()>>>,
     speaking: Arc<AtomicBool>,
+    flush: AudioFlushHandle,
 }
 
 impl SpeakHandle {
-    /// Stop the background utterance. The ring buffer drains naturally to silence.
+    /// Stop the background utterance and request queued-audio invalidation.
     pub fn stop(&self) {
         self.speaking.store(false, Ordering::SeqCst);
+        self.flush.request_flush();
     }
 
-    /// Whether the background thread is still synthesizing.
+    /// Whether the background thread is still synthesizing/pushing.
     pub fn is_speaking(&self) -> bool {
         self.speaking.load(Ordering::SeqCst)
     }
@@ -172,7 +179,6 @@ impl LiveVoice {
 
         // AudioOutput::new() would fail headless, so we create a dummy.
         // speak() and speak_async() will fail if called, but speak_to_file() works.
-        // We use a separate struct field to track this.
         Self {
             streaming,
             audio: AudioOutput::new_dummy(sample_rate),
@@ -197,8 +203,9 @@ impl LiveVoice {
     ///
     /// The probe should remain `true` once cancellation is observed. It is checked
     /// before activation, immediately after activation (closing stop-before-start),
-    /// and throughout phoneme/frame generation. The existing stop handle remains a
-    /// second fast-path signal and is checked alongside the probe.
+    /// and throughout phoneme/frame generation. The typed stop handle remains a
+    /// second fast-path signal and requests queued-audio invalidation in addition to
+    /// lowering the shared speaking flag.
     pub fn speak_cancellable<F>(
         &mut self,
         text: &str,
@@ -209,12 +216,14 @@ impl LiveVoice {
     {
         if cancelled() {
             self.speaking.store(false, Ordering::SeqCst);
+            self.audio.request_flush();
             return Ok(LiveVoiceSpeakOutcome::Cancelled);
         }
 
         self.speaking.store(true, Ordering::SeqCst);
         if cancelled() {
             self.speaking.store(false, Ordering::SeqCst);
+            self.audio.request_flush();
             return Ok(LiveVoiceSpeakOutcome::Cancelled);
         }
 
@@ -235,7 +244,7 @@ impl LiveVoice {
                 Some(timed.phoneme.as_str())
             };
 
-            // Apply prosody modulation
+            // Apply prosody modulation.
             let mut state = self.cognitive_state.lock().clone();
             self.apply_prosody(&mut state, &prosody);
 
@@ -246,7 +255,10 @@ impl LiveVoice {
                 }
 
                 let chunk = self.streaming.tick(&state, None, DT, phoneme_str);
-                self.push_with_backpressure(&chunk);
+                if !self.push_with_backpressure_cancellable(&chunk) {
+                    was_cancelled = true;
+                    break 'phonemes;
+                }
             }
         }
 
@@ -255,15 +267,19 @@ impl LiveVoice {
         }
         self.speaking.store(false, Ordering::SeqCst);
 
-        Ok(if was_cancelled {
-            LiveVoiceSpeakOutcome::Cancelled
+        if was_cancelled {
+            // A first flush may have raced with the producer's final in-flight frame.
+            // At this point the producer has quiesced, so a second request guarantees
+            // that any tail which landed after the first callback clear is invalidated
+            // on the next callback boundary.
+            self.audio.request_flush();
+            Ok(LiveVoiceSpeakOutcome::Cancelled)
         } else {
-            LiveVoiceSpeakOutcome::Completed
-        })
+            Ok(LiveVoiceSpeakOutcome::Completed)
+        }
     }
 
-    fn analyze_prosody(&self, text: &str) -> ProsodyAnalysis {
-        // Analyze sentence structure, emphasis, etc.
+    fn analyze_prosody(&self, _text: &str) -> ProsodyAnalysis {
         ProsodyAnalysis {
             pitch_range: 1.0,
             speaking_rate: 1.0,
@@ -271,7 +287,7 @@ impl LiveVoice {
         }
     }
 
-    fn apply_prosody(&self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
+    fn apply_prosody(&mut self, state: &mut VoiceCognitiveState, prosody: &ProsodyAnalysis) {
         state.emotional_arousal = prosody.pitch_range.clamp(0.0, 1.0);
         self.modulate_tau(1.0 / prosody.speaking_rate);
     }
@@ -318,8 +334,10 @@ impl LiveVoice {
         }
 
         // Push synthesized audio to the ring buffer on a background thread
-        // (backpressure may block, so we don't want to block the caller)
+        // (backpressure may block, so we don't want to block the caller).
         let speaking_bg = Arc::clone(&self.speaking);
+        let flush = self.audio.flush_handle();
+        let flush_bg = flush.clone();
         let mut audio = self.audio.take_producer();
 
         let thread = std::thread::Builder::new()
@@ -331,16 +349,28 @@ impl LiveVoice {
                         break;
                     }
                     if let Some(ref mut producer) = audio {
-                        let written = push_samples_to_producer(producer, &all_samples[offset..]);
+                        let written =
+                            push_samples_to_producer_while_speaking(
+                                producer,
+                                &all_samples[offset..],
+                                &speaking_bg,
+                            );
                         offset += written;
-                        if offset < all_samples.len() {
+                        if offset < all_samples.len() && speaking_bg.load(Ordering::SeqCst) {
                             std::thread::sleep(std::time::Duration::from_millis(1));
                         }
                     } else {
                         break;
                     }
                 }
+
+                let interrupted = offset < all_samples.len();
                 speaking_bg.store(false, Ordering::SeqCst);
+                if interrupted {
+                    // Producer is now quiescent; catch any samples that raced with
+                    // the immediate stop-side flush request.
+                    flush_bg.request_flush();
+                }
                 Ok(())
             })
             .expect("failed to spawn speak thread");
@@ -348,6 +378,7 @@ impl LiveVoice {
         SpeakHandle {
             thread: Some(thread),
             speaking: Arc::clone(&self.speaking),
+            flush,
         }
     }
 
@@ -380,21 +411,31 @@ impl LiveVoice {
         Ok(all_samples.len())
     }
 
-    /// Push samples to the ring buffer with simple backpressure.
-    fn push_with_backpressure(&mut self, samples: &[f32]) {
+    /// Push one motor frame while the utterance remains active.
+    ///
+    /// Returns false as soon as the stop signal is observed, so an interrupted
+    /// producer does not continue filling the ring while waiting for backpressure.
+    fn push_with_backpressure_cancellable(&mut self, samples: &[f32]) -> bool {
         let mut offset = 0;
         while offset < samples.len() {
+            if !self.speaking.load(Ordering::SeqCst) {
+                return false;
+            }
             let written = self.audio.push_samples(&samples[offset..]);
             offset += written;
             if offset < samples.len() {
+                if !self.speaking.load(Ordering::SeqCst) {
+                    return false;
+                }
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
         }
+        true
     }
 
-    /// Stop speaking immediately. The ring buffer drains naturally to silence.
+    /// Stop speaking and request queued-audio invalidation.
     pub fn stop(&self) {
-        self.speaking.store(false, Ordering::SeqCst);
+        self.stop_handle().stop();
     }
 
     /// Whether `speak()` or `speak_async()` is currently running.
@@ -404,16 +445,17 @@ impl LiveVoice {
 
     /// Return a typed, cloneable interruption capability for this live voice.
     ///
-    /// Unlike exposing the atomic directly, this handle grants only stop/status
-    /// operations and can safely be retained by an interface control plane.
+    /// The handle grants only stop/status operations. Stop combines producer halt
+    /// with consumer-owned queued-audio invalidation.
     pub fn stop_handle(&self) -> LiveVoiceStopHandle {
-        LiveVoiceStopHandle::new(Arc::clone(&self.speaking))
+        LiveVoiceStopHandle::new(Arc::clone(&self.speaking), self.audio.flush_handle())
     }
 
     /// Get a clone of the stop flag for cross-thread interruption.
     ///
     /// Prefer [`Self::stop_handle`] for new capability-oriented callers. This raw
-    /// form remains for compatibility with existing internal code.
+    /// form remains for compatibility with existing internal code and does not by
+    /// itself request queued-audio invalidation.
     pub fn stop_flag(&self) -> Arc<AtomicBool> {
         Arc::clone(&self.speaking)
     }
@@ -478,11 +520,18 @@ fn write_wav(path: &Path, samples: &[f32], sample_rate: u32) -> Result<()> {
     Ok(())
 }
 
-/// Push samples to a ring buffer producer (used by background thread).
-fn push_samples_to_producer(producer: &mut ringbuf::HeapProd<f32>, samples: &[f32]) -> usize {
+/// Push samples to a ring-buffer producer while the shared utterance is active.
+fn push_samples_to_producer_while_speaking(
+    producer: &mut ringbuf::HeapProd<f32>,
+    samples: &[f32],
+    speaking: &AtomicBool,
+) -> usize {
     use ringbuf::traits::Producer;
     let mut written = 0;
     for &s in samples {
+        if !speaking.load(Ordering::SeqCst) {
+            break;
+        }
         if producer.try_push(s).is_ok() {
             written += 1;
         } else {
@@ -523,22 +572,27 @@ mod tests {
     }
 
     #[test]
-    fn typed_stop_handle_is_cloneable_and_capability_narrow() {
+    fn typed_stop_handle_stops_and_requests_flush() {
         let flag = Arc::new(AtomicBool::new(true));
-        let first = LiveVoiceStopHandle::new(Arc::clone(&flag));
+        let audio = AudioOutput::new_dummy(24000);
+        let flush = audio.flush_handle();
+        let first = LiveVoiceStopHandle::new(Arc::clone(&flag), flush.clone());
         let second = first.clone();
 
         assert!(first.is_speaking());
         assert!(second.is_speaking());
+        assert!(!flush.is_pending());
         second.stop();
         assert!(!first.is_speaking());
         assert!(!flag.load(Ordering::SeqCst));
+        assert!(flush.is_pending());
     }
 
     #[test]
-    fn cancellable_speak_honors_pre_start_cancellation_without_audio() {
+    fn cancellable_speak_honors_pre_start_cancellation_and_requests_flush() {
         let genesis = GenesisSeed::from_phrase("test-pre-cancel");
         let mut voice = LiveVoice::new_headless(&genesis);
+        let flush = voice.audio.flush_handle();
 
         let outcome = voice
             .speak_cancellable("this must never begin", || true)
@@ -546,6 +600,23 @@ mod tests {
 
         assert_eq!(outcome, LiveVoiceSpeakOutcome::Cancelled);
         assert!(!voice.is_speaking());
+        assert!(flush.is_pending());
+    }
+
+    #[test]
+    fn background_push_stops_at_shared_signal() {
+        let rb = ringbuf::HeapRb::<f32>::new(8);
+        let (mut producer, mut consumer) = ringbuf::traits::Split::split(rb);
+        let speaking = AtomicBool::new(false);
+
+        let written = push_samples_to_producer_while_speaking(
+            &mut producer,
+            &[0.1, 0.2, 0.3],
+            &speaking,
+        );
+        assert_eq!(written, 0);
+        use ringbuf::traits::Consumer;
+        assert!(consumer.try_pop().is_none());
     }
 
     #[test]
