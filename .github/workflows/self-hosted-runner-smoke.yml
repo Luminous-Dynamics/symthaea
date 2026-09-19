@@ -89,8 +89,44 @@ jobs:
               cargo check --locked -p symthaea-psych-bench --lib
             '
 
+      - name: Verify Stage-F authorization consumer and host boot identity
+        id: authorization_consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          socket=/run/symthaea-stage-f-authorization.sock
+          test -S "$socket"
+          export CARGO_HOME="$RUNNER_TEMP/consumer-cargo-home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/consumer-target"
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR"
+
+          response="$(nix develop --no-write-lock-file \
+            --impure \
+            --expr 'let f = builtins.getFlake (toString ./.); in import ./nix/ci-rust-shell.nix { nixpkgs = f.inputs.nixpkgs; rust-overlay = f.inputs.rust-overlay; system = builtins.currentSystem; }' \
+            --command python3 -c '
+import socket
+path = "/run/symthaea-stage-f-authorization.sock"
+s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+s.connect(path)
+s.sendall(b"BOOT_ID\n")
+data = b""
+while True:
+    chunk = s.recv(4096)
+    if not chunk:
+        break
+    data += chunk
+print(data.decode("ascii").strip())
+')"
+          [[ "$response" =~ ^BOOT_ID\ ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$ ]]
+          host_boot_id="${BASH_REMATCH[1]}"
+          test "$host_boot_id" = "$(cat /proc/sys/kernel/random/boot_id)"
+          printf 'host_boot_id=%s\n' "$host_boot_id"
+          printf 'host_boot_id=%s\n' "$host_boot_id" >> "$GITHUB_OUTPUT"
+
       - name: Verify immutability and emit smoke evidence
         shell: bash
+        env:
+          HOST_BOOT_ID: ${{ steps.authorization_consumer.outputs.host_boot_id }}
         run: |
           set -euo pipefail
           command -v base64 >/dev/null 2>&1
@@ -99,6 +135,8 @@ jobs:
           test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
           test "$GITHUB_REF" = 'refs/heads/main'
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          [[ "$HOST_BOOT_ID" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
+          test "$HOST_BOOT_ID" = "$(cat /proc/sys/kernel/random/boot_id)"
           git diff --exit-code
           git diff --cached --exit-code
           test -z "$(git status --porcelain=v1 --untracked-files=all --ignored=matching)"
@@ -114,9 +152,9 @@ jobs:
           host_nix_system="$(nix eval --raw --impure --expr builtins.currentSystem)"
           host_nix_version="$(nix --version | awk '{print $3}')"
 
-          manifest="$RUNNER_TEMP/symthaea-trusted-runner-smoke-v1.txt"
+          manifest="$RUNNER_TEMP/symthaea-trusted-runner-smoke-v2.txt"
           cat > "$manifest" <<EOF
-          schema=symthaea.trusted-runner.smoke.v1
+          schema=symthaea.trusted-runner.smoke.v2
           result=PASS
           github_run_id=$GITHUB_RUN_ID
           github_run_attempt=$GITHUB_RUN_ATTEMPT
@@ -128,6 +166,7 @@ jobs:
           runner_name=${RUNNER_NAME:-unknown}
           runner_os=${RUNNER_OS:-unknown}
           runner_arch=${RUNNER_ARCH:-unknown}
+          host_boot_id=$HOST_BOOT_ID
           smoke_workflow_blob=$smoke_workflow_blob
           runner_module_blob=$runner_module_blob
           routing_policy_blob=$routing_policy_blob
@@ -140,6 +179,7 @@ jobs:
           runner_policy_eval=PASS
           routing_policy_eval=PASS
           minimal_locked_rust_check=PASS
+          stage_f_authorization_consumer=PASS
           source_immutability_checked=PASS
           evidence_scope=trusted-cpu-correctness-smoke-only
           EOF
@@ -160,6 +200,7 @@ jobs:
             echo "- GitHub run: \`$GITHUB_RUN_ID\` attempt \`$GITHUB_RUN_ATTEMPT\`"
             echo "- Main commit: \`$GITHUB_SHA\`"
             echo "- Main tree: \`$source_tree\`"
+            echo "- Host boot: \`$HOST_BOOT_ID\`"
             echo "- Runner: \`${RUNNER_NAME:-unknown}\` / \`${RUNNER_OS:-unknown}\` / \`${RUNNER_ARCH:-unknown}\`"
             echo "- Smoke manifest SHA-256: \`$smoke_sha256\`"
             echo "- Smoke manifest bytes: \`$smoke_bytes\`"
