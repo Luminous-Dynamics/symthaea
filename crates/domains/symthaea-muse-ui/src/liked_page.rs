@@ -7,29 +7,30 @@
 //! isn't mounted wouldn't otherwise show up), then renders one card per
 //! saved artifact with MIDI/WAV/Recipe downloads.
 //!
-//! Kept artifacts remain independent of `MuseState::current`. Audition now uses
-//! the one persistent shared transport, so opening a keeper cannot create a
-//! second concurrent `<audio>` universe and can return to the exact source/time
-//! that was audible before the Library audition.
+//! Kept artifacts remain independent of `MuseState::current`. Audition uses
+//! the one persistent shared transport, while `keeper_api` also preserves the
+//! identity handles already present in newer keeper-log rows instead of silently
+//! discarding them at the client boundary.
 
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use leptos_router::components::A;
 
-use crate::api::{self, KeeperEntry};
+use crate::api;
+use crate::keeper_api::{self, KeeperRecord};
 use crate::state::MuseState;
 
 #[component]
 pub fn LikedPage() -> impl IntoView {
     let muse = use_context::<MuseState>().expect("MuseState provided by App");
-    let entries = RwSignal::new(Vec::<KeeperEntry>::new());
+    let entries = RwSignal::new(Vec::<KeeperRecord>::new());
     let status = RwSignal::new(String::new());
     let loaded = RwSignal::new(false);
 
     let reload = move || {
         status.set("loading…".to_string());
         spawn_local(async move {
-            match api::fetch_keepers(api::DEFAULT_BACKEND).await {
+            match keeper_api::fetch_keeper_records(api::DEFAULT_BACKEND).await {
                 Ok(v) => {
                     entries.set(v);
                     status.set(String::new());
@@ -56,7 +57,7 @@ pub fn LikedPage() -> impl IntoView {
             <div class="liked-header">
                 <h2>"Library"</h2>
                 <p class="muted small">
-                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Auditions use the persistent player, so Return restores whatever you were hearing before. Private symbolic import remains a separate surface while unified indexing is a later tranche."
+                    "Every ♥ keeper, with the actual audio you heard — not a recomposed guess. Auditions use the persistent player, so Return restores whatever you were hearing before. Newer keeper records also preserve their stored genealogy/score identity handles; legacy entries remain valid without inventing them."
                 </p>
                 <A href="/library/import" attr:class="link-btn">"Import music"</A>
                 <button type="button" on:click=move |_| reload()>"Refresh"</button>
@@ -74,7 +75,10 @@ pub fn LikedPage() -> impl IntoView {
                 } else {
                     view! {
                         <div class="candidate-grid">
-                            {entries.get().into_iter().map(|e| {
+                            {entries.get().into_iter().map(|record| {
+                                let identity_linked = record.genealogy_id.is_some()
+                                    && record.score_sha256.is_some();
+                                let e = record.entry;
                                 let when = if e.ts > 0 {
                                     format_timestamp(e.ts)
                                 } else {
@@ -101,6 +105,11 @@ pub fn LikedPage() -> impl IntoView {
                                         <h3>{heading}</h3>
                                         <p class="muted">{meta}</p>
                                         <p class="muted">{grammar_line}</p>
+                                        {identity_linked.then(|| view! {
+                                            <p class="muted small" title="This keeper row carries both a stored genealogy id and score SHA-256 handle.">
+                                                "identity-linked"
+                                            </p>
+                                        })}
                                         {(!when.is_empty()).then(|| view! { <p class="muted small">{when}</p> })}
                                         <div class="candidate-actions">
                                             <button
