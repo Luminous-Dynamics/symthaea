@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 mod crate_status;
 mod duplicate_scan;
+mod git_worktree_state;
 mod manifest;
 mod repository_snapshot;
 mod repository_snapshot_receipt;
@@ -53,6 +54,15 @@ enum Commands {
         /// Frozen snapshot emitted by `repository-snapshot`.
         #[arg(long)]
         snapshot: PathBuf,
+    },
+    /// Bind Git index/runtime operational state separately from repository source bytes.
+    GitWorktreeState {
+        /// Validated repository-source receipt this Git state accompanies.
+        #[arg(long = "source-snapshot")]
+        source_snapshot: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -182,6 +192,16 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask always lives one level below the workspace root")
                 .to_path_buf();
             repository_snapshot_verify::run(&root, &snapshot)?;
+        }
+        Commands::GitWorktreeState {
+            source_snapshot,
+            output,
+        } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            git_worktree_state::run(&root, &source_snapshot, output)?;
         }
     }
     Ok(())
