@@ -410,10 +410,23 @@ mod tests {
         assert!(candidate.prepared_verification().verified());
         assert_eq!(candidate.source_class(), ContactEvidenceClassV1::SimulatorDerived);
         assert!(!candidate.candidate_lineage_id().is_empty());
+
+        let retained_jacobian = candidate.complete().contact_jacobian();
+        let original_jacobian = complete.contact_jacobian();
+        assert_eq!(retained_jacobian.site_id, original_jacobian.site_id);
         assert_eq!(
-            candidate.complete().contact_jacobian(),
-            complete.contact_jacobian()
+            retained_jacobian.confidence.to_bits(),
+            original_jacobian.confidence.to_bits()
         );
+        for axis in 0..6 {
+            assert_eq!(retained_jacobian.rows[axis].len(), original_jacobian.rows[axis].len());
+            for (retained, original) in retained_jacobian.rows[axis]
+                .iter()
+                .zip(&original_jacobian.rows[axis])
+            {
+                assert_eq!(retained.to_bits(), original.to_bits());
+            }
+        }
         assert_eq!(candidate.complete().contact_bias(), complete.contact_bias());
     }
 
