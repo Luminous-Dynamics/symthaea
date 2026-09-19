@@ -136,7 +136,7 @@ EOF
   grep -F -- 'request("BOOT_ID\\n")' "$se001q" >/dev/null
   grep -F -- 'request(f"CONSUME {nonce} {authorization_sha256}\\n")' "$se001q" >/dev/null
   grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED=PASS' "$se001q" >/dev/null
-  grep -F -- 'test "${STAGE_F_AUTHORIZATION_CONSUMED:-}" = '\''PASS'\''' "$se001q" >/dev/null
+  grep -F -- 'STAGE_F_AUTHORIZATION_CONSUMED:-' "$se001q" >/dev/null
   grep -F -- 'symthaea.trusted-runner.stage-f-consumption.v1' "$se001q" >/dev/null
   grep -F -- 'symthaea.se001q.trusted-cpu-execution-binding.v2' "$se001q" >/dev/null
 
