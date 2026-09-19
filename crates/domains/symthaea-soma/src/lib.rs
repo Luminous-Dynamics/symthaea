@@ -132,6 +132,12 @@ pub mod assurance_android_policy_session;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_policy_store;
 
+// Append-only, replay-verified recovery history for the 531 policy store. This
+// closes full-session authorization replay and defines rollback/fork checkpoints;
+// durable storage and rollback-resistant anchoring remain platform boundaries.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_policy_journal;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
