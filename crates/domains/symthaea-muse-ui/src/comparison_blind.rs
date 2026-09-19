@@ -10,6 +10,9 @@
 
 use crate::comparison::{ComparisonSession, ComparisonSide};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct BlindTrialId(pub u64);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlindLabel {
     A,
@@ -81,16 +84,24 @@ pub struct RevealedBlindAssignment {
 /// constructed for a new trial, but this instance only transitions forward.
 #[derive(Debug, PartialEq, Eq)]
 pub struct BlindComparisonState {
+    trial_id: BlindTrialId,
     assignment: BlindAssignment,
     reveal_state: BlindRevealState,
+    judgment_recorded: bool,
 }
 
 impl BlindComparisonState {
-    pub const fn new(swapped: bool) -> Self {
+    pub const fn new(trial_id: BlindTrialId, swapped: bool) -> Self {
         Self {
+            trial_id,
             assignment: BlindAssignment::new(swapped),
             reveal_state: BlindRevealState::Blinded,
+            judgment_recorded: false,
         }
+    }
+
+    pub const fn trial_id(&self) -> BlindTrialId {
+        self.trial_id
     }
 
     pub const fn reveal_state(&self) -> BlindRevealState {
@@ -99,6 +110,10 @@ impl BlindComparisonState {
 
     pub const fn is_blinded(&self) -> bool {
         matches!(self.reveal_state, BlindRevealState::Blinded)
+    }
+
+    pub const fn has_recorded_judgment(&self) -> bool {
+        self.judgment_recorded
     }
 
     pub fn visible_subjects(&self, session: &ComparisonSession) -> [BlindSubjectView; 2] {
@@ -120,6 +135,16 @@ impl BlindComparisonState {
         self.assignment.side_for_label(label)
     }
 
+    /// Used by the judgment boundary only after all judgment validations pass.
+    /// Returns false if this trial already has a recorded judgment.
+    pub(crate) fn mark_judgment_recorded(&mut self) -> bool {
+        if self.judgment_recorded {
+            return false;
+        }
+        self.judgment_recorded = true;
+        true
+    }
+
     /// Reveal the mapping exactly once. Repeated calls are idempotent but there
     /// is deliberately no inverse operation.
     pub fn reveal(&mut self) -> RevealedBlindAssignment {
@@ -137,6 +162,8 @@ mod tests {
     use crate::comparison::ComparisonSubject;
     use crate::playback::{PlaybackPresentation, PlaybackSource};
 
+    const TRIAL: BlindTrialId = BlindTrialId(17);
+
     fn source(title: &str) -> PlaybackSource {
         PlaybackSource {
             rendition_id: None,
@@ -151,6 +178,13 @@ mod tests {
         let a = ComparisonSubject::new(source("descriptive-title-a"), None).unwrap();
         let b = ComparisonSubject::new(source("descriptive-title-b"), None).unwrap();
         ComparisonSession::new(a, b).unwrap()
+    }
+
+    #[test]
+    fn blind_state_preserves_explicit_trial_identity() {
+        let blind = BlindComparisonState::new(TRIAL, false);
+        assert_eq!(blind.trial_id(), TRIAL);
+        assert!(!blind.has_recorded_judgment());
     }
 
     #[test]
@@ -174,7 +208,7 @@ mod tests {
     #[test]
     fn blind_view_contains_no_subject_metadata() {
         let session = session();
-        let blind = BlindComparisonState::new(true);
+        let blind = BlindComparisonState::new(TRIAL, true);
         assert_eq!(
             blind.visible_subjects(&session),
             [
@@ -193,7 +227,7 @@ mod tests {
     #[test]
     fn active_indicator_follows_underlying_transport_through_assignment() {
         let mut session = session();
-        let blind = BlindComparisonState::new(true);
+        let blind = BlindComparisonState::new(TRIAL, true);
         assert!(blind.visible_subjects(&session)[1].active);
 
         session.switch_to(ComparisonSide::B);
@@ -204,7 +238,7 @@ mod tests {
 
     #[test]
     fn reveal_is_explicit_and_irreversible_on_the_state_instance() {
-        let mut blind = BlindComparisonState::new(true);
+        let mut blind = BlindComparisonState::new(TRIAL, true);
         assert!(blind.is_blinded());
 
         let revealed = blind.reveal();
@@ -220,8 +254,8 @@ mod tests {
 
     #[test]
     fn assignment_policy_is_external_and_therefore_reproducible() {
-        let first = BlindComparisonState::new(true);
-        let second = BlindComparisonState::new(true);
+        let first = BlindComparisonState::new(TRIAL, true);
+        let second = BlindComparisonState::new(TRIAL, true);
         for label in [BlindLabel::A, BlindLabel::B] {
             assert_eq!(
                 first.side_for_transport(label),
