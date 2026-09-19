@@ -9,6 +9,7 @@ description = "Concrete Symthaea facade adapter and service runtime host"
 default = []
 api_module = ["symthaea/api_module", "dep:base64"]
 voice-tts = ["symthaea/voice-tts", "dep:hound", "dep:symthaea-communication"]
+live-voice = ["voice-tts", "symthaea/live-voice"]
 vision-manifold = ["symthaea/vision-manifold"]
 canvas = ["symthaea/canvas"]
 
