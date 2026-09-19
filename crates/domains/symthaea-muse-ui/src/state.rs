@@ -226,6 +226,16 @@ fn require_artifact_identity(
     identity.ok_or("composer returned a candidate without artifact identity")
 }
 
+/// Cold-start Listen has no source yet and must be allowed to request the first
+/// journey piece. Once a source is audible, however, only an actual journey
+/// candidate may advance journey state. Review and authored Create auditions
+/// therefore fail closed even if a stale view still calls `next_piece()`.
+fn source_allows_journey_advance(source: Option<&PlaybackSource>) -> bool {
+    source
+        .map(|source| source.presentation.can_advance_journey())
+        .unwrap_or(true)
+}
+
 #[derive(Clone, Copy)]
 pub struct MuseState {
     pub current: RwSignal<Option<Candidate>>,
@@ -563,10 +573,17 @@ impl MuseState {
     }
 
     /// Advance to a new piece: prefer whatever the journey already
-    /// prefetched, else compose fresh. `autoplay` starts playback
-    /// immediately (used by "Next Piece" and auto-advance-on-end); the
-    /// very first piece on load stays paused until the user acts.
+    /// prefetched, else compose fresh. Cold-start Listen is allowed with no
+    /// source yet; once anything is audible, the source capability contract
+    /// decides whether journey state may advance.
     pub fn next_piece(self, autoplay: bool) {
+        let playback = self.playback.get_untracked();
+        if !source_allows_journey_advance(playback.source.as_ref()) {
+            self.status
+                .set("journey advance is unavailable for this audition".to_string());
+            return;
+        }
+
         self.pending_autoplay.set(autoplay);
         let effects = self
             .journey
@@ -714,5 +731,45 @@ mod tests {
             require_artifact_identity(Some(expected.clone())),
             Ok(expected)
         );
+    }
+
+    #[test]
+    fn cold_start_can_request_first_journey_piece() {
+        assert!(source_allows_journey_advance(None));
+    }
+
+    #[test]
+    fn only_journey_auditions_can_advance_existing_journey() {
+        let journey = candidate_playback_source(
+            1,
+            Some(&identity(&"c".repeat(64))),
+            10.0,
+            PlaybackPresentation::journey_candidate(
+                "Journey".into(),
+                "Classical".into(),
+                "Classical".into(),
+            ),
+        );
+        let created = candidate_playback_source(
+            2,
+            Some(&identity(&"d".repeat(64))),
+            10.0,
+            PlaybackPresentation::created_candidate(
+                "Created".into(),
+                "Sonata".into(),
+                "Sonata".into(),
+            ),
+        );
+        let review = PlaybackSource {
+            rendition_id: None,
+            audio_url: "/review.wav".into(),
+            duration_hint_seconds: None,
+            advance_on_end: false,
+            presentation: PlaybackPresentation::review("Review".into()),
+        };
+
+        assert!(source_allows_journey_advance(Some(&journey)));
+        assert!(!source_allows_journey_advance(Some(&created)));
+        assert!(!source_allows_journey_advance(Some(&review)));
     }
 }
