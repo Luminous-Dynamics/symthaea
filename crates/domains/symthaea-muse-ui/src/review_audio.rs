@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Review-audio playback adapter for non-canonical audition surfaces.
 //!
-//! Imported works, teaching etudes, qualification artifacts, and future
-//! Studio alternatives may be auditioned without becoming the current Listen
-//! candidate. Review sources therefore carry no fabricated rendition identity,
-//! never advance the Listen journey, and carry their own player presentation.
+//! Imported works, teaching etudes, qualification artifacts, persisted keepers,
+//! and future Studio alternatives may be auditioned without becoming the current
+//! Listen candidate. Review sources never advance the Listen journey and carry
+//! their own player presentation. A rendition identity is present only when a
+//! caller has already established a real content-addressed hash; ordinary review
+//! audio remains identity-less rather than fabricating one.
 
 use leptos::prelude::*;
+use symthaea_muse_protocol::RenditionArtifactId;
 use web_sys::HtmlAudioElement;
 
 use crate::playback::{
@@ -15,9 +18,13 @@ use crate::playback::{
 };
 use crate::state::MuseState;
 
-fn review_source(audio_url: String, title: String) -> PlaybackSource {
+fn review_source(
+    audio_url: String,
+    title: String,
+    rendition_id: Option<RenditionArtifactId>,
+) -> PlaybackSource {
     PlaybackSource {
-        rendition_id: None,
+        rendition_id,
         audio_url,
         duration_hint_seconds: None,
         advance_on_end: false,
@@ -47,15 +54,30 @@ fn review_exit_action(playback: &PlaybackState) -> Option<ReviewExitAction> {
 }
 
 impl MuseState {
-    /// Temporarily audition an auxiliary/review artifact through the shared
-    /// transport without replacing the canonical candidate or advancing Listen.
-    ///
-    /// `AuditionRequested` preserves the first source being left behind, along
-    /// with its position/play state, so a later return can restore that exact
-    /// transport context under a fresh load epoch.
+    /// Temporarily audition auxiliary/review audio with no asserted rendition
+    /// identity. This is the correct path for imported reconstructions,
+    /// teaching etudes, and legacy persisted artifacts whose content hash has
+    /// not been verified in the current client flow.
     pub fn play_review_audio(self, audio_url: String, title: String) {
         self.dispatch(PlaybackEvent::AuditionRequested {
-            source: review_source(audio_url, title),
+            source: review_source(audio_url, title, None),
+            autoplay: true,
+        });
+    }
+
+    /// Temporarily audition review audio whose rendered bytes have already been
+    /// bound to a verified content hash by an upstream evidence check (for
+    /// example `keeper_api::fetch_verified_keeper_identity`). This does not make
+    /// the artifact canonical; it only lets the transport carry the truthful
+    /// rendition identity it has actually earned.
+    pub fn play_identity_bound_review_audio(
+        self,
+        audio_url: String,
+        title: String,
+        rendition_id: RenditionArtifactId,
+    ) {
+        self.dispatch(PlaybackEvent::AuditionRequested {
+            source: review_source(audio_url, title, Some(rendition_id)),
             autoplay: true,
         });
     }
@@ -91,7 +113,6 @@ impl MuseState {
 mod tests {
     use super::*;
     use crate::playback::{PlaybackPhase, PlaybackState};
-    use symthaea_muse_protocol::RenditionArtifactId;
 
     fn journey_source() -> PlaybackSource {
         PlaybackSource {
@@ -108,8 +129,8 @@ mod tests {
     }
 
     #[test]
-    fn review_source_has_no_fabricated_rendition_identity_or_candidate_capabilities() {
-        let source = review_source("/review/example.wav".into(), "Imported work".into());
+    fn ordinary_review_source_has_no_fabricated_rendition_identity_or_candidate_capabilities() {
+        let source = review_source("/review/example.wav".into(), "Imported work".into(), None);
         assert!(source.rendition_id.is_none());
         assert_eq!(source.audio_url, "/review/example.wav");
         assert!(source.duration_hint_seconds.is_none());
@@ -122,10 +143,23 @@ mod tests {
     }
 
     #[test]
+    fn identity_bound_review_preserves_exact_verified_rendition_hash() {
+        let expected = RenditionArtifactId("c".repeat(64));
+        let source = review_source(
+            "/api/keeper-audio/keeper-a".into(),
+            "Keeper A".into(),
+            Some(expected.clone()),
+        );
+        assert_eq!(source.rendition_id, Some(expected));
+        assert_eq!(source.presentation.kind, PlaybackSubjectKind::Review);
+        assert!(!source.advance_on_end);
+    }
+
+    #[test]
     fn review_source_ends_without_advancing_the_listen_journey() {
         let mut state = PlaybackState::default();
         state.reduce(PlaybackEvent::AuditionRequested {
-            source: review_source("/review/example.wav".into(), "Review".into()),
+            source: review_source("/review/example.wav".into(), "Review".into(), None),
             autoplay: true,
         });
         let load_epoch = state.load_epoch;
@@ -147,7 +181,7 @@ mod tests {
             autoplay: false,
         });
         state.reduce(PlaybackEvent::AuditionRequested {
-            source: review_source("/review/b.wav".into(), "Review B".into()),
+            source: review_source("/review/b.wav".into(), "Review B".into(), None),
             autoplay: true,
         });
         assert_eq!(
@@ -160,7 +194,7 @@ mod tests {
     fn unbookmarked_review_exits_by_clearing_only_the_review_source() {
         let mut state = PlaybackState::default();
         state.reduce(PlaybackEvent::AuditionRequested {
-            source: review_source("/review/solo.wav".into(), "Solo review".into()),
+            source: review_source("/review/solo.wav".into(), "Solo review".into(), None),
             autoplay: true,
         });
         assert!(state.return_bookmark.is_none());
