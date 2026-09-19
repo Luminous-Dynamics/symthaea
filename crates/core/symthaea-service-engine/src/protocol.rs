@@ -13,10 +13,10 @@ use std::time::{Duration, Instant};
 use symthaea_service_runtime::{ProcessOrigin, ServiceCounters};
 
 use crate::host::{ServiceHostCommandError, ServiceHostReadError, ServiceRuntimeHost};
+use crate::read_wire::MeasuredIntrospectionV2;
 use crate::wire::{
     LegacyIntrospectionPolicy, ServiceWireOutcome, ServiceWireResponse,
-    legacy_introspection_response, measured_introspection_response, partnership_response,
-    status_response,
+    legacy_introspection_response, partnership_response, status_response,
 };
 
 /// Daemon operational state that is not cognitive state.
@@ -85,12 +85,14 @@ impl ServiceProtocolCore {
         Ok(status_response(host.status()?, self.counters(), self.uptime()))
     }
 
-    /// Measurement-only introspection for protocol-v2/new clients.
+    /// Measurement-only introspection for protocol-v2/new clients. Runtime activity
+    /// and snapshot provenance remain explicit so a responsive client can distinguish
+    /// current processing from the freshness of the last completed cognitive state.
     pub fn introspection_v2(
         &self,
         host: &ServiceRuntimeHost,
-    ) -> Result<ServiceWireResponse, ServiceHostReadError> {
-        Ok(measured_introspection_response(host.introspection()?))
+    ) -> Result<MeasuredIntrospectionV2, ServiceHostReadError> {
+        Ok(MeasuredIntrospectionV2::from(host.introspection()?))
     }
 
     /// Explicit daemon-v1 compatibility projection. The heuristics remain a
