@@ -14,9 +14,9 @@ pub mod read_wire;
 pub mod semantic;
 pub mod service;
 pub mod telemetry;
-#[cfg(feature = "voice-tts")]
+#[cfg(any(feature = "voice-tts", feature = "live-voice"))]
 pub mod voice_control;
-#[cfg(feature = "voice-tts")]
+#[cfg(any(feature = "voice-tts", feature = "live-voice"))]
 pub mod voice_presenter;
 pub mod voice_session;
 pub mod wire;

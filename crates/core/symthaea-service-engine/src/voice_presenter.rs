@@ -4,10 +4,19 @@
 //!
 //! This module deliberately owns no cognition and mints no semantic authority. Its
 //! job is narrower: consume the voice presentation token before handing text to a
-//! renderer, so a turn cancelled before presentation cannot accidentally begin TTS.
-//! Mid-stream cancellation requires an interruptible renderer and is a separate
-//! capability; this gate does not claim to close the check-to-play race by itself.
+//! renderer. For the live backend it additionally binds the generation to the
+//! race-safe active-presentation control and uses the same token as a monotonic
+//! per-frame cancellation probe.
 
+#[cfg(feature = "live-voice")]
+use std::fmt;
+#[cfg(feature = "live-voice")]
+use std::sync::Arc;
+
+#[cfg(feature = "live-voice")]
+use crate::voice_control::{
+    VoicePresentationControl, VoiceRegistrationError, VoiceStopCapability,
+};
 use crate::voice_session::VoicePresentationToken;
 use crate::wire::{ServiceWireOutcome, ServiceWireResponse};
 
@@ -22,6 +31,7 @@ pub trait VoiceRenderer {
     fn speak(&mut self, text: &str) -> Result<(), Self::Error>;
 }
 
+#[cfg(feature = "voice-tts")]
 impl VoiceRenderer for symthaea::voice::VoiceConversation {
     type Error = anyhow::Error;
 
@@ -33,21 +43,31 @@ impl VoiceRenderer for symthaea::voice::VoiceConversation {
 /// Truthful result of one presentation attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VoicePresentationDisposition {
-    /// TTS was invoked for the query response.
+    /// TTS completed without observing cancellation.
     Presented,
     /// Presentation had already been cancelled before the renderer was invoked.
     SuppressedCancelled,
+    /// Live rendering began but cancellation was observed while it was active.
+    Interrupted,
     /// The runtime outcome does not contain non-empty query response text.
     NoSpeakableResponse,
+}
+
+fn speakable_content(outcome: &ServiceWireOutcome) -> Option<&str> {
+    match &outcome.response {
+        ServiceWireResponse::QueryResponse { content, .. } if !content.trim().is_empty() => {
+            Some(content)
+        }
+        _ => None,
+    }
 }
 
 /// Present a completed runtime outcome only when its voice generation is still
 /// eligible.
 ///
-/// The token is checked before response extraction and again immediately before the
-/// renderer call. This guarantees that an already-cancelled turn is never handed to
-/// TTS. A cancellation racing with a renderer that has already started requires the
-/// renderer-side stop capability introduced by the next seam.
+/// This compatibility path guarantees that an already-cancelled turn is never
+/// handed to TTS. Renderers that need race-safe mid-stream barge-in should use the
+/// live controlled path below or provide an equivalent stop capability.
 pub fn present_voice_outcome<R: VoiceRenderer>(
     renderer: &mut R,
     presentation: &VoicePresentationToken,
@@ -57,9 +77,8 @@ pub fn present_voice_outcome<R: VoiceRenderer>(
         return Ok(VoicePresentationDisposition::SuppressedCancelled);
     }
 
-    let content = match &outcome.response {
-        ServiceWireResponse::QueryResponse { content, .. } if !content.trim().is_empty() => content,
-        _ => return Ok(VoicePresentationDisposition::NoSpeakableResponse),
+    let Some(content) = speakable_content(outcome) else {
+        return Ok(VoicePresentationDisposition::NoSpeakableResponse);
     };
 
     if presentation.is_cancelled() {
@@ -68,6 +87,88 @@ pub fn present_voice_outcome<R: VoiceRenderer>(
 
     renderer.speak(content)?;
     Ok(VoicePresentationDisposition::Presented)
+}
+
+/// Failure of the race-safe live presentation path.
+#[cfg(feature = "live-voice")]
+#[derive(Debug)]
+pub enum LiveVoicePresentationError {
+    Registration(VoiceRegistrationError),
+    Renderer(anyhow::Error),
+}
+
+#[cfg(feature = "live-voice")]
+impl fmt::Display for LiveVoicePresentationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Registration(error) => write!(f, "live voice registration failed: {error}"),
+            Self::Renderer(error) => write!(f, "live voice rendering failed: {error}"),
+        }
+    }
+}
+
+#[cfg(feature = "live-voice")]
+impl std::error::Error for LiveVoicePresentationError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Registration(error) => Some(error),
+            Self::Renderer(error) => Some(error.as_ref()),
+        }
+    }
+}
+
+/// Present one response through the real-time live backend with generation-safe
+/// registration and monotonic cancellation.
+///
+/// The active registration lease is held for the complete `speak_cancellable`
+/// call. Barge-in may therefore request stop through [`VoicePresentationControl`]
+/// without borrowing mutable voice state. The presentation token is also passed as
+/// the live backend's monotonic cancellation probe, closing the stop-before-start
+/// race even if cancellation wins immediately before backend activation.
+#[cfg(feature = "live-voice")]
+pub fn present_live_voice_outcome(
+    renderer: &mut symthaea::voice::LiveVoice,
+    control: &VoicePresentationControl,
+    presentation: &VoicePresentationToken,
+    outcome: &ServiceWireOutcome,
+) -> Result<VoicePresentationDisposition, LiveVoicePresentationError> {
+    if presentation.is_cancelled() {
+        return Ok(VoicePresentationDisposition::SuppressedCancelled);
+    }
+
+    let Some(content) = speakable_content(outcome) else {
+        return Ok(VoicePresentationDisposition::NoSpeakableResponse);
+    };
+
+    let generation = presentation.generation();
+    let stop: Arc<dyn VoiceStopCapability> = Arc::new(renderer.stop_handle());
+    let _lease = match control.try_register(generation, stop) {
+        Ok(lease) => lease,
+        Err(VoiceRegistrationError::Cancelled { .. }) => {
+            return Ok(VoicePresentationDisposition::SuppressedCancelled);
+        }
+        Err(error) => return Err(LiveVoicePresentationError::Registration(error)),
+    };
+
+    // Cancellation can race between the first eligibility check and registration.
+    // Record it in the shared control plane as well as relying on the monotonic probe.
+    if presentation.is_cancelled() {
+        let _ = control.interrupt_through(generation);
+        return Ok(VoicePresentationDisposition::SuppressedCancelled);
+    }
+
+    let result = renderer
+        .speak_cancellable(content, || presentation.is_cancelled())
+        .map_err(LiveVoicePresentationError::Renderer)?;
+
+    match result {
+        symthaea::voice::live_voice::LiveVoiceSpeakOutcome::Completed => {
+            Ok(VoicePresentationDisposition::Presented)
+        }
+        symthaea::voice::live_voice::LiveVoiceSpeakOutcome::Cancelled => {
+            Ok(VoicePresentationDisposition::Interrupted)
+        }
+    }
 }
 
 #[cfg(test)]
