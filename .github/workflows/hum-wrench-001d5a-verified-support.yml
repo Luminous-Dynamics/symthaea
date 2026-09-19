@@ -1,0 +1,185 @@
+name: HUM-WRENCH-001D5A Verified Surface Support
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-humanoid/src/mujoco_verified_support.rs"
+      - "crates/domains/symthaea-humanoid/src/lib.rs"
+      - ".github/workflows/hum-wrench-001d5a-verified-support.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hum-wrench-001d5a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: b64e62287cfb49797d280369545672cff87b48dd
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-verified-surface-support-qualification:
+    runs-on: ubuntu-slim
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact head, parent, and workflow-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/hum-wrench-001d5a-verified-support.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source, manifest, and lock bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Verify pinned MuJoCo dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'mujoco-rs = { version = "4.0.1"' crates/domains/symthaea-humanoid/Cargo.toml
+
+      - name: Static support-token authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/mujoco_verified_support.rs
+          test -f "$src"
+          grep -F 'pub struct VerifiedSurfaceSupportEvidenceV1' "$src"
+          grep -F 'pub(crate) fn bind_verified_mujoco_surface_support_v1' "$src"
+          grep -F 'verify_support_normal_evidence_v1(normal_region)' "$src"
+          grep -F 'ContactEvidenceClassV1::SimulatorDerived' "$src"
+          grep -F 'physical_geom_name: patch_record.physical_geom_name.clone()' "$src"
+          grep -F 'physical_geom_id: patch_record.geom_id' "$src"
+          grep -F 'support_site_name: patch_record.support_site_name.clone()' "$src"
+          grep -F 'support_site_id: patch_record.support_site_id' "$src"
+          grep -F 'xy_bits_list(&region.hull_vertices_local_xy_m)' "$src"
+          grep -F 'xy_bits_list(&verification.recomputed_hull_vertices_local_xy_m)' "$src"
+          grep -F 'self.support_normal_policy_id == self.verification.policy_id' "$src"
+          ! grep -F 'EstablishedContactEvidenceV1' "$src"
+          ! grep -F 'ContactAccelerationBiasV1' "$src"
+          ! grep -F 'BiasQualifiedFloatingBaseDynamicsV1' "$src"
+          python - <<'PY'
+          from pathlib import Path
+          text = Path('crates/domains/symthaea-humanoid/src/mujoco_verified_support.rs').read_text()
+          token_prefix, rest = text.split('pub struct VerifiedSurfaceSupportEvidenceV1 {', 1)
+          fields = rest.split('\n}\n\nimpl VerifiedSurfaceSupportEvidenceV1', 1)[0]
+          for field in (
+              'site', 'model_id', 'model_signature', 'sampled_at_s',
+              'physical_geom_name', 'physical_geom_id',
+              'support_site_name', 'support_site_id', 'placed_patch',
+          ):
+              assert f'pub {field}:' not in fields, field
+          derive_lines = token_prefix.splitlines()[-3:]
+          assert not any('Deserialize' in line for line in derive_lines), derive_lines
+          assert 'pub fn support_site_name(&self) -> &str' in text
+          assert 'pub fn support_site_id(&self) -> usize' in text
+          assert 'pub fn physical_geom_name(&self) -> &str' in text
+          assert 'pub fn physical_geom_id(&self) -> usize' in text
+          assert '#[allow(dead_code, reason = "HUM-WRENCH-001D5B will become the first non-test consumer")]' in text
+          PY
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked MuJoCo compile
+        run: cargo check -p symthaea-humanoid --all-targets --features mujoco --locked
+
+      - name: Focused verified-support regressions
+        run: cargo test -p symthaea-humanoid --features mujoco mujoco_verified_support --locked -- --nocapture
+
+      - name: Predecessor semantic regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-humanoid --features mujoco mujoco_contact_patch --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_contact_interaction --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_support_normal --locked -- --nocapture
+          cargo test -p symthaea-humanoid --features mujoco mujoco_support_normal_verifier --locked -- --nocapture
+
+      - name: Strict MuJoCo Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --features mujoco --locked -- -D warnings
+
+      - name: Source postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- crates/domains/symthaea-humanoid
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- Cargo.toml Cargo.lock
+
+      - name: Write qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p hum-wrench-001d5a-evidence
+          {
+            echo "program=HUM-WRENCH-001D5A"
+            echo "authority=verified-mujoco-surface-support-source-qualification-only"
+            echo "predecessor_qualification_inherited=NONE"
+            echo "token_publicly_constructible=FALSE"
+            echo "token_deserializable=FALSE"
+            echo "binder_visibility=CRATE_INTERNAL"
+            echo "independent_support_normal_verifier_reexecuted=TRUE"
+            echo "simulator_source_class_preserved=TRUE"
+            echo "source_class=SimulatorDerived"
+            echo "physical_geom_identity_bound=TRUE"
+            echo "support_site_identity_bound=TRUE"
+            echo "live_hull_exact_float_bits_bound=TRUE"
+            echo "support_normal_policy_verification_bound=TRUE"
+            echo "lineage_cryptographic_claim=NONE"
+            echo "contact_acceleration_claim=NONE"
+            echo "contact_establishment_authority=NONE"
+            echo "freshness_policy_thresholds_qualified=NONE"
+            echo "qp_authority=NONE"
+            echo "hardware_contact_truth_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo "format=PASS"
+            echo "compile_mujoco=PASS"
+            echo "focused_tests=PASS"
+            echo "predecessor_semantic_regressions=PASS"
+            echo "clippy_mujoco=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > hum-wrench-001d5a-evidence/receipt.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: hum-wrench-001d5a-${{ github.event.pull_request.head.sha || github.sha }}
+          path: hum-wrench-001d5a-evidence/
+          if-no-files-found: error
