@@ -79,6 +79,9 @@ pub mod assurance_trusted_surface;
 /// Linear one-use confirmation semantics for qualified current surface deliveries.
 #[allow(missing_docs)]
 pub mod assurance_confirmation_use;
+/// Causal interaction-lineage binding from trusted presentation delivery to confirmation input.
+#[allow(missing_docs)]
+pub mod assurance_interaction_continuity;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
