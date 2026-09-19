@@ -32,27 +32,46 @@ def write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+def git_sha(path: Path) -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=path,
+            check=True,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        return {"sha": result.stdout.strip(), "error": None}
+    except Exception as exc:  # Durable infrastructure rejection evidence.
+        return {"sha": None, "error": f"{type(exc).__name__}: {exc}"}
 
 
-def git_text(path: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args],
-        cwd=path,
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.strip()
-
-
-def optional_json_identity(path: Path, key: str) -> tuple[str | None, str | None]:
+def json_reference(path: Path, identity_key: str) -> dict[str, Any]:
     if not path.is_file():
-        return None, None
-    value = load_json(path)
-    identity = value.get(key) if isinstance(value, dict) else None
-    return identity, sha256_file(path)
+        return {
+            "present": False,
+            "sha256": None,
+            "identity": None,
+            "parse_error": None,
+        }
+    digest = sha256_file(path)
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+        identity = value.get(identity_key) if isinstance(value, dict) else None
+        return {
+            "present": True,
+            "sha256": digest,
+            "identity": identity,
+            "parse_error": None,
+        }
+    except Exception as exc:  # Preserve malformed evidence as a referenced byte object.
+        return {
+            "present": True,
+            "sha256": digest,
+            "identity": None,
+            "parse_error": f"{type(exc).__name__}: {exc}",
+        }
 
 
 def main() -> int:
@@ -121,17 +140,26 @@ def main() -> int:
         f"{completed.returncode}\n", encoding="utf-8"
     )
 
-    evidence_manifest_id, evidence_manifest_sha = optional_json_identity(
-        evidence / "manifest.json", "manifest_id"
-    )
-    summary_id, summary_sha = optional_json_identity(evidence / "summary.json", "summary_id")
+    manifest_ref = json_reference(evidence / "manifest.json", "manifest_id")
+    summary_ref = json_reference(evidence / "summary.json", "summary_id")
+    subject_identity = git_sha(subject)
+    verifier_identity = git_sha(verifier)
 
-    subject_sha = git_text(subject, "rev-parse", "HEAD")
-    verifier_sha = git_text(verifier, "rev-parse", "HEAD")
+    reference_complete = (
+        manifest_ref["present"]
+        and manifest_ref["parse_error"] is None
+        and manifest_ref["identity"] is not None
+        and summary_ref["present"]
+        and summary_ref["parse_error"] is None
+        and summary_ref["identity"] is not None
+        and subject_identity["sha"] is not None
+        and verifier_identity["sha"] is not None
+    )
+
     body: dict[str, Any] = {
         "schema": ATTESTATION_SCHEMA,
-        "subject_sha": subject_sha,
-        "verifier_sha": verifier_sha,
+        "subject": subject_identity,
+        "verifier": verifier_identity,
         "qualification_claim": "NONE",
         "repair_authority_claim": "NONE",
         "verification": {
@@ -150,10 +178,9 @@ def main() -> int:
             },
         },
         "evidence": {
-            "manifest_id": evidence_manifest_id,
-            "manifest_sha256": evidence_manifest_sha,
-            "summary_id": summary_id,
-            "summary_sha256": summary_sha,
+            "manifest": manifest_ref,
+            "summary": summary_ref,
+            "reference_complete": reference_complete,
         },
         "provenance": {
             "github_run_id": os.environ.get("GITHUB_RUN_ID"),
@@ -174,9 +201,9 @@ def main() -> int:
         files.append({"path": path.name, "sha256": sha256_file(path)})
     manifest_body = {
         "schema": ATTESTATION_MANIFEST_SCHEMA,
-        "subject_sha": subject_sha,
-        "verifier_sha": verifier_sha,
-        "evidence_manifest_id": evidence_manifest_id,
+        "subject_sha": subject_identity["sha"],
+        "verifier_sha": verifier_identity["sha"],
+        "evidence_manifest_id": manifest_ref["identity"],
         "verification_attestation_id": attestation["attestation_id"],
         "qualification_claim": "NONE",
         "repair_authority_claim": "NONE",
@@ -190,6 +217,7 @@ def main() -> int:
 
     print(
         f"SE-001Q independent verification attested: exit={completed.returncode} "
+        f"references_complete={reference_complete} "
         f"attestation_id={attestation['attestation_id']} "
         f"manifest_id={verification_manifest['manifest_id']}"
     )

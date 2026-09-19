@@ -1,4 +1,4 @@
-name: Systems Engineering SE-001Q Evidence Replay v2.3
+name: Systems Engineering SE-001Q Evidence Replay v2.4
 
 on:
   pull_request:
@@ -25,7 +25,7 @@ env:
 
 jobs:
   frozen-subject-evidence-replay:
-    name: Frozen SE-001 evidence replay v2.3
+    name: Frozen SE-001 evidence replay v2.4
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -84,7 +84,7 @@ jobs:
         run: |
           if [[ -f evidence/summary.json ]]; then
             {
-              echo '### SE-001Q evidence replay v2.3'
+              echo '### SE-001Q evidence replay v2.4'
               echo
               echo '```json'
               cat evidence/summary.json
@@ -111,7 +111,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: se001q-evidence-v2_3-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: se001q-evidence-v2_4-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             evidence/
             attestation/
