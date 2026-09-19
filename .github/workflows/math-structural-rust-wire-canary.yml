@@ -1,0 +1,85 @@
+name: Math Structural Rust Wire Canary
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/math_structural_compat_wire_v1.rs"
+      - ".github/workflows/math-structural-rust-wire-canary.yml"
+      - "docs/research/MATH_STRUCTURAL_RUST_WIRE_CANARY_V1.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cross-language-wire-canary:
+    name: Cross-language structural wire canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Re-run independent Python reference oracle
+        run: >-
+          python3 .github/scripts/math_structural_compat_wire_v1.py
+          --vectors data/benchmarks/math_structural_compat_wire_vectors_v1.json
+          --self-test
+
+      - name: Compile stdlib-only Rust byte generator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/math-structural-rust-wire
+          rustc --edition=2024 \
+            .github/scripts/math_structural_compat_wire_v1.rs \
+            -o target/math-structural-rust-wire/generator
+
+      - name: Emit Rust canonical wires
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/math-structural-rust-wire/generator \
+            target/math-structural-rust-wire/bytes
+
+      - name: Verify Rust wires against frozen SHA-256 known answers
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd target/math-structural-rust-wire/bytes
+
+          check_sha() {
+            local expected="$1"
+            local file="$2"
+            printf '%s  %s\n' "$expected" "$file" | sha256sum --check --strict -
+          }
+
+          check_sha 81c9cda09e0f3ef0cc32f6f43d3318d794977cc5e35262e2c61b4fd11a1feff7 hdc-zero.wire
+          check_sha 3e3a0111be583bc2d92a56d2612f7a045257254efe4841b99aafc3ea748f2c48 hdc-ff.wire
+          check_sha 20a2c860d0bba7f47ca4a8396270ae5be14d76122d629cafe9464fecb2178f7e sparse-a.wire
+          check_sha 20a2c860d0bba7f47ca4a8396270ae5be14d76122d629cafe9464fecb2178f7e sparse-b.wire
+          check_sha 35e08a76c4cc6b80d683acd191e121805195414b606c217a6adba4832e83a137 ranking-a1-a2-a3.wire
+          check_sha 8fb61bd7b1bfb252a7d124c5a1e03099f2a6d7713c4f13863cc2ebda0661dcfa hdc-f32.wire
+          check_sha 30cae1cd15fe58a8581de5ab8ece40eedc8cf81b1ff9e462f0e694462107215b ast-f64.wire
+          check_sha dfd99cdbe1c3a4a883b767ef8ff0c3bc668104de0b74b66a2336a55042adb103 holdout-blind.wire
+
+          cmp -s sparse-a.wire sparse-b.wire
+          if cmp -s ranking-a1-a2-a3.wire ranking-a2-a1-a3.wire; then
+            echo 'FAIL: ranking order did not change canonical bytes' >&2
+            exit 1
+          fi
+
+          echo 'PASS: Rust and Python independently reproduce math-structural-compat-wire-v1'
+
+      - name: Verify canary has no representation or holdout execution dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          rust=.github/scripts/math_structural_compat_wire_v1.rs
+          workflow=.github/workflows/math-structural-rust-wire-canary.yml
+          ! grep -E 'math_structural_hdc_q0|math_structural_retrieval_q0|math_structural_q0_holdout_v1' "$rust" "$workflow"
+          ! grep -E 'symthaea_core|symthaea-core|cargo (run|test)' "$rust" "$workflow"
+          echo 'PASS: Rust wire canary remains serialization-only'
