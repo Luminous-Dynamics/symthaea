@@ -18,6 +18,7 @@
 //! - authenticated trusted-time capabilities over root-authorized time sources;
 //! - structural append-only Merkle transparency with inclusion and compact
 //!   consistency proofs;
+//! - authenticated, time-bound transparency checkpoints with monotonic tracking;
 //! - detached signatures over already content-addressed subjects/payloads;
 //! - structural reassessment of historical authority under newly learned
 //!   temporal lifecycle facts;
@@ -36,6 +37,7 @@ mod root_authority;
 mod temporal_lifecycle;
 mod time;
 mod transparency;
+mod transparency_checkpoint;
 mod trust;
 mod trust_root;
 mod trusted_time;
@@ -53,6 +55,7 @@ pub use root_authority::*;
 pub use temporal_lifecycle::*;
 pub use time::*;
 pub use transparency::*;
+pub use transparency_checkpoint::*;
 pub use trust::*;
 pub use trust_root::*;
 pub use trusted_time::*;
