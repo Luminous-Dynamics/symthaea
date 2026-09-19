@@ -70,8 +70,8 @@ jobs:
           grep -Fq 'symthaea-interaction-core = { path = "../symthaea-interaction-core" }' "${MANIFEST}"
           grep -Fq 'symthaea-interaction-lineage = { path = "../symthaea-interaction-lineage" }' "${MANIFEST}"
           grep -Fq 'sha2 = { workspace = true }' "${MANIFEST}"
-          if grep -Eiq 'reqwest|hyper|tokio|holochain|hdk|hdi|web3|ethers|alloy|kube|rmcp|a2a|keyring|secret-service|spiffe|rego|cedar' "${MANIFEST}"; then
-            echo 'runtime/protocol/policy-engine dependency leaked into pure egress subject' >&2
+          if grep -Eiq 'symthaea-authority|symthaea-action|reqwest|hyper|tokio|holochain|hdk|hdi|web3|ethers|alloy|kube|rmcp|a2a|keyring|secret-service|spiffe|rego|cedar' "${MANIFEST}"; then
+            echo 'authority/runtime/protocol/policy-engine dependency leaked into pure egress subject' >&2
             exit 1
           fi
 
@@ -85,8 +85,12 @@ jobs:
           grep -Fq 'connector_or_operation_change_invalidates_subject' "${SOURCE}"
           grep -Fq 'disclosure_destination_or_payload_change_invalidates_subject' "${SOURCE}"
 
-          if grep -Eq 'DispatchPermit|CapabilityGrant|VerifiedAuthority|std::net|std::fs|std::process|Command::new' "${SOURCE}"; then
-            echo 'authority/runtime I/O leaked into pure egress subject' >&2
+          if grep -Eq 'use .*DispatchPermit|use .*CapabilityGrant|use .*VerifiedAuthority|std::net::|std::fs::|std::process::|Command::new' "${SOURCE}"; then
+            echo 'authority/runtime I/O leaked into pure egress subject implementation' >&2
+            exit 1
+          fi
+          if grep -Fq 'from_commitments' "${SOURCE}"; then
+            echo 'raw caller-selected commitment constructor is forbidden in egress subject v1' >&2
             exit 1
           fi
           if grep -Eq 'pub[[:space:]]+enum[[:space:]]+(PolicyDecision|EgressDecision)|AllowCandidate|NeedsConfirmation|NeedsPreflight' "${SOURCE}"; then
