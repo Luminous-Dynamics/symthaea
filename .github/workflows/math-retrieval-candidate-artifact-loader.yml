@@ -1,0 +1,74 @@
+name: Math Retrieval Candidate Artifact Loader
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/math-retrieval-candidate-artifact-loader.yml"
+      - "docs/research/MATH_RET_RUNTIME_002A.md"
+      - "tools/math-retrieval-candidate-loader/**"
+      - "tools/math-retrieval-runtime-guard/**"
+      - "tools/math-retrieval-runtime-seam/**"
+      - ".github/schemas/math-retrieval-candidate-set-v1.schema.json"
+      - ".github/scripts/validate-math-retrieval-candidate-set.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-candidate-artifact-loader:
+    name: Qualify immutable candidate artifact loader
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Install frozen Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify frozen predecessor objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:${path}")"
+            printf '%s  %s\n' "$actual" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_blob \
+            .github/schemas/math-retrieval-candidate-set-v1.schema.json \
+            db6e419006e7440a5e4ecec479eaa627df845b6a
+          check_blob \
+            .github/scripts/validate-math-retrieval-candidate-set.py \
+            0df763bc73af6f5c9c09a56b9427263381aa9b61
+          check_blob \
+            tools/math-retrieval-runtime-guard/src/lib.rs \
+            8cb65af8bb6af6170b8c627239d0dcb686d0cb4c
+          check_blob \
+            tools/math-retrieval-runtime-seam/src/lib.rs \
+            29c949a9331fbe8e912cd0d03a048595bc354d7b
+
+      - name: Re-run frozen Python candidate-set semantics
+        shell: bash
+        run: python3 .github/scripts/validate-math-retrieval-candidate-set.py --self-test
+
+      - name: Check standalone lock is sufficient
+        shell: bash
+        run: cargo metadata --manifest-path tools/math-retrieval-candidate-loader/Cargo.toml --locked --format-version 1 >/dev/null
+
+      - name: Format candidate artifact loader
+        shell: bash
+        run: cargo fmt --manifest-path tools/math-retrieval-candidate-loader/Cargo.toml -- --check
+
+      - name: Check candidate artifact loader
+        shell: bash
+        run: cargo check --manifest-path tools/math-retrieval-candidate-loader/Cargo.toml --locked
+
+      - name: Test candidate artifact loader
+        shell: bash
+        run: cargo test --manifest-path tools/math-retrieval-candidate-loader/Cargo.toml --locked
