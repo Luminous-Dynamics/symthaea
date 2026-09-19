@@ -73,6 +73,9 @@ pub mod assurance_render_artifact;
 /// Conservative currentness binding for authority-bearing presentations.
 #[allow(missing_docs)]
 pub mod assurance_presentation_currentness;
+/// Qualified surface-delivery binding for current authority-bearing presentations.
+#[allow(missing_docs)]
+pub mod assurance_trusted_surface;
 /// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
 #[allow(missing_docs)]
 pub mod consciousness_metrics;
