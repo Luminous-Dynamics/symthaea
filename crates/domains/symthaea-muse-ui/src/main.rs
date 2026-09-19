@@ -11,6 +11,7 @@ mod api;
 mod app;
 mod atlas_page;
 mod audio_reactivity;
+mod browser_playback;
 mod create_page;
 mod evidence_view;
 mod harmony_view;
