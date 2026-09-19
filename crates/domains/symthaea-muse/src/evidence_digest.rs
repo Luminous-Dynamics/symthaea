@@ -20,6 +20,8 @@ pub mod rendered_attack_crosscheck;
 pub mod acoustic_window_dependency;
 #[path = "rendered_spectral_window_evidence.rs"]
 pub mod rendered_spectral_window_evidence;
+#[path = "rendered_spectral_window_panel.rs"]
+pub mod rendered_spectral_window_panel;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
