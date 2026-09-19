@@ -43,6 +43,9 @@ const DT: f32 = 1.0 / FRAME_RATE as f32;
 /// Base phoneme duration (seconds) for G2P timing.
 const BASE_PHONEME_DURATION: f32 = 0.06;
 
+/// Maximum detached-producer write after one stop check. At 24 kHz this is ~5.3 ms.
+const ASYNC_PUSH_CHUNK_SAMPLES: usize = 128;
+
 /// Outcome of a cancellation-aware synchronous live utterance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LiveVoiceSpeakOutcome {
@@ -351,8 +354,9 @@ impl LiveVoice {
             }
         }
 
-        // Push synthesized audio to the ring buffer on a background thread
-        // (backpressure may block, so we don't want to block the caller)
+        // Push synthesized audio to the ring buffer on a background thread.
+        // Writes are deliberately bounded between stop checks so an interrupt that
+        // races with this block cannot refill seconds of PCM after purge.
         let speaking_bg = Arc::clone(&self.speaking);
         let purge = self.audio.purge_handle();
         let mut audio = self.audio.take_producer();
@@ -366,7 +370,8 @@ impl LiveVoice {
                         break;
                     }
                     if let Some(ref mut producer) = audio {
-                        let written = push_samples_to_producer(producer, &all_samples[offset..]);
+                        let end = (offset + ASYNC_PUSH_CHUNK_SAMPLES).min(all_samples.len());
+                        let written = push_samples_to_producer(producer, &all_samples[offset..end]);
                         offset += written;
                         if offset < all_samples.len() {
                             std::thread::sleep(std::time::Duration::from_millis(1));
@@ -555,6 +560,12 @@ mod tests {
 
         flag.store(false, Ordering::SeqCst);
         assert!(!flag.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn async_push_chunk_bounds_one_racy_write_to_single_digit_milliseconds_at_24khz() {
+        let millis = ASYNC_PUSH_CHUNK_SAMPLES as f64 / 24_000.0 * 1_000.0;
+        assert!(millis < 6.0, "late push bound was {millis:.3} ms");
     }
 
     #[test]
