@@ -124,6 +124,16 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
     exit 1
   fi
 
+  # Freeze the authorization protocol itself. STATUS is read-only and the
+  # durable consumption record is published by same-directory atomic rename.
+  grep -F -- 'STATUS)' '${module}' >/dev/null
+  grep -F -- 'consumption-record' '${module}' >/dev/null
+  grep -F -- 'mv -T -- "$tmp" "$record"' '${module}' >/dev/null
+  grep -F -- 'CONSUMED_STATUS %s %s %s' '${module}' >/dev/null
+  grep -F -- 'CONSUMED_DIFFERENT %s %s' '${module}' >/dev/null
+  grep -F -- 'INCOMPLETE %s %s' '${module}' >/dev/null
+  grep -F -- 'UNUSED %s %s' '${module}' >/dev/null
+
   # Pinned nixpkgs systemd hardening contract.
   test '${if service.serviceConfig.DynamicUser then "true" else "false"}' = 'true'
   test '${if service.serviceConfig.PrivateDevices then "true" else "false"}' = 'true'
