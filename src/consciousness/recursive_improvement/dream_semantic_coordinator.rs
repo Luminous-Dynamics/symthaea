@@ -14,6 +14,9 @@
 use super::dream_feedback::{DreamFeedbackBridge, DreamInsight};
 use super::semantic_context::{ContextIdentity, SemanticContextError};
 use super::semantic_prior::{SemanticPriorError, SemanticPriorMemory};
+use super::semantic_supported_retrieval::{
+    SemanticQuerySupportError, SupportBoundSemanticPriorMemory,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DreamSemanticCoordinatorError {
@@ -31,6 +34,27 @@ impl From<SemanticContextError> for DreamSemanticCoordinatorError {
 
 impl From<SemanticPriorError> for DreamSemanticCoordinatorError {
     fn from(value: SemanticPriorError) -> Self {
+        Self::SemanticPrior(value)
+    }
+}
+
+/// Error for the stricter coordinator that also binds candidate-source support.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DreamSupportBoundCoordinatorError {
+    Context(SemanticContextError),
+    ContextHashMismatch { expected: u64, observed: u64 },
+    MissingPriorAfterAcceptance,
+    SemanticPrior(SemanticQuerySupportError),
+}
+
+impl From<SemanticContextError> for DreamSupportBoundCoordinatorError {
+    fn from(value: SemanticContextError) -> Self {
+        Self::Context(value)
+    }
+}
+
+impl From<SemanticQuerySupportError> for DreamSupportBoundCoordinatorError {
+    fn from(value: SemanticQuerySupportError) -> Self {
         Self::SemanticPrior(value)
     }
 }
@@ -77,6 +101,46 @@ pub fn process_semantic_insight_atomically(
     let prior = staged_bridge
         .get_prior(identity.fast_hash)
         .ok_or(DreamSemanticCoordinatorError::MissingPriorAfterAcceptance)?;
+    let indexed_identity = staged_memory.index_prior(context, prior)?;
+    debug_assert_eq!(identity, indexed_identity);
+
+    *bridge = staged_bridge;
+    *semantic_memory = staged_memory;
+
+    Ok(DreamSemanticOutcome::Indexed { identity })
+}
+
+/// Strict atomic path that also captures candidate-source support at indexing time.
+///
+/// This function does **not** reject an accepted exact dream prior merely because the
+/// semantic encoder would clamp its source context. Instead the strict semantic
+/// memory records that non-nominal support state, and fully-supported retrieval will
+/// exclude it. Exact provenance is preserved without granting unsupported HDC use.
+pub fn process_support_bound_semantic_insight_atomically(
+    bridge: &mut DreamFeedbackBridge,
+    semantic_memory: &mut SupportBoundSemanticPriorMemory,
+    context: &[f32],
+    insight: DreamInsight,
+) -> Result<DreamSemanticOutcome, DreamSupportBoundCoordinatorError> {
+    let identity = ContextIdentity::from_context(context)?;
+    if identity.fast_hash != insight.context_hash {
+        return Err(DreamSupportBoundCoordinatorError::ContextHashMismatch {
+            expected: insight.context_hash,
+            observed: identity.fast_hash,
+        });
+    }
+
+    let mut staged_bridge = bridge.clone();
+    let mut staged_memory = semantic_memory.clone();
+
+    if !staged_bridge.process_insight(insight) {
+        *bridge = staged_bridge;
+        return Ok(DreamSemanticOutcome::RejectedByDreamPolicy);
+    }
+
+    let prior = staged_bridge
+        .get_prior(identity.fast_hash)
+        .ok_or(DreamSupportBoundCoordinatorError::MissingPriorAfterAcceptance)?;
     let indexed_identity = staged_memory.index_prior(context, prior)?;
     debug_assert_eq!(identity, indexed_identity);
 
@@ -212,5 +276,77 @@ mod tests {
             .unwrap();
         assert_eq!(candidates.len(), 1);
         assert!(candidates[0].effective_search_strength <= candidates[0].prior_strength);
+    }
+
+    #[test]
+    fn support_bound_coordinator_commits_support_receipt_with_exact_prior() {
+        let context = [0.2, -0.1, 0.7];
+        let mut bridge = DreamFeedbackBridge::new();
+        let mut semantic_memory = SupportBoundSemanticPriorMemory::new();
+
+        let outcome = process_support_bound_semantic_insight_atomically(
+            &mut bridge,
+            &mut semantic_memory,
+            &context,
+            insight(&context, vec![0.4, 0.5, 0.6], 0.4),
+        )
+        .unwrap();
+
+        let DreamSemanticOutcome::Indexed { identity } = outcome else {
+            panic!("accepted insight was not indexed");
+        };
+        assert!(bridge.get_prior(identity.fast_hash).is_some());
+        let support = semantic_memory.source_support(identity).unwrap();
+        assert!(support.within_nominal_support());
+    }
+
+    #[test]
+    fn clamp_saturated_source_is_recorded_but_not_mislabelled_supported() {
+        let context = [2.0];
+        let mut bridge = DreamFeedbackBridge::new();
+        let mut semantic_memory = SupportBoundSemanticPriorMemory::new();
+
+        let outcome = process_support_bound_semantic_insight_atomically(
+            &mut bridge,
+            &mut semantic_memory,
+            &context,
+            insight(&context, vec![0.4], 0.4),
+        )
+        .unwrap();
+
+        let DreamSemanticOutcome::Indexed { identity } = outcome else {
+            panic!("accepted insight was not indexed");
+        };
+        assert!(bridge.get_prior(identity.fast_hash).is_some());
+        let support = semantic_memory.source_support(identity).unwrap();
+        assert!(!support.within_nominal_support());
+        assert!(matches!(
+            semantic_memory.retrieve_fully_supported(&context, 0.0, 1),
+            Err(SemanticQuerySupportError::QueryOutsideNominalSupport { .. })
+        ));
+    }
+
+    #[test]
+    fn support_bound_semantic_failure_rolls_back_exact_prior_mutation() {
+        let context = [0.2, -0.1, 0.7];
+        let mut bridge = DreamFeedbackBridge::new();
+        let mut semantic_memory = SupportBoundSemanticPriorMemory::new();
+
+        let result = process_support_bound_semantic_insight_atomically(
+            &mut bridge,
+            &mut semantic_memory,
+            &context,
+            insight(&context, Vec::new(), 0.4),
+        );
+
+        assert_eq!(
+            result,
+            Err(DreamSupportBoundCoordinatorError::SemanticPrior(
+                SemanticQuerySupportError::Prior(SemanticPriorError::EmptyPreferredDirection)
+            ))
+        );
+        assert_eq!(bridge.num_priors(), 0);
+        assert_eq!(bridge.stats().total_insights, 0);
+        assert!(semantic_memory.is_empty());
     }
 }
