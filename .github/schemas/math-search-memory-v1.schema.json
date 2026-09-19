@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-search-memory-v1.schema.json",
+  "title": "Symthaea Mathematical Result/Search Memory v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "research_graph_ref", "result_memory", "search_memory"],
+  "properties": {
+    "schema_version": {"const": "symthaea.math-memory.v1"},
+    "research_graph_ref": {"type": "string", "minLength": 1},
+    "result_memory": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/resultEpisode"}
+    },
+    "search_memory": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/searchEpisode"}
+    }
+  },
+  "$defs": {
+    "score": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+    "stringList": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "resultEpisode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id", "claim_id", "result_kind", "evidence_state", "evidence_refs",
+        "method", "representation", "dependency_claim_ids", "timestamp",
+        "retrieval_embedding_ref", "phi_search_score"
+      ],
+      "properties": {
+        "episode_id": {"type": "string", "minLength": 1},
+        "claim_id": {"type": "string", "minLength": 1},
+        "result_kind": {
+          "enum": [
+            "NumericalComputation", "SymbolicIdentity", "ExhaustiveFiniteResult",
+            "SmtResult", "FormalLemma", "FormalTheorem", "Counterexample",
+            "EquivalentFormulation", "Bound", "SpecialCase"
+          ]
+        },
+        "evidence_state": {
+          "enum": [
+            "Unqualified", "NumericallyCorroborated", "ExhaustiveFinite",
+            "SymbolicallyChecked", "SmtChecked", "KernelAccepted",
+            "ComparatorAccepted", "IndependentlyChecked"
+          ]
+        },
+        "evidence_refs": {"$ref": "#/$defs/stringList"},
+        "method": {"type": "string", "minLength": 1},
+        "representation": {"type": "string", "minLength": 1},
+        "dependency_claim_ids": {"$ref": "#/$defs/stringList"},
+        "timestamp": {"type": "integer", "minimum": 0},
+        "retrieval_embedding_ref": {"type": "string", "minLength": 1},
+        "phi_search_score": {"$ref": "#/$defs/score"}
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wall_ms", "cpu_ms", "proof_calls", "solver_calls", "search_nodes"],
+      "properties": {
+        "wall_ms": {"type": "integer", "minimum": 0},
+        "cpu_ms": {"type": "integer", "minimum": 0},
+        "proof_calls": {"type": "integer", "minimum": 0},
+        "solver_calls": {"type": "integer", "minimum": 0},
+        "search_nodes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "searchEpisode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id", "research_program_id", "problem_ref", "strategy", "representation",
+        "tactic_family", "parameters_ref", "budget_ref", "outcome", "failure_class", "cost",
+        "useful_artifact_refs", "source_provenance_refs", "transfer_context", "timestamp",
+        "retrieval_embedding_ref", "phi_search_score"
+      ],
+      "properties": {
+        "episode_id": {"type": "string", "minLength": 1},
+        "research_program_id": {"type": "string", "minLength": 1},
+        "problem_ref": {"type": "string", "minLength": 1},
+        "subgoal_ref": {"type": ["string", "null"], "minLength": 1},
+        "strategy": {"type": "string", "minLength": 1},
+        "representation": {"type": "string", "minLength": 1},
+        "tactic_family": {"type": "string", "minLength": 1},
+        "parameters_ref": {"type": "string", "minLength": 1},
+        "budget_ref": {"type": "string", "minLength": 1},
+        "outcome": {
+          "enum": [
+            "Succeeded", "Refuted", "CounterexampleFound", "Timeout", "ResourceExhausted",
+            "Unsupported", "NoProgress", "Abandoned", "Superseded", "RepresentationMismatch",
+            "SolverUnknown"
+          ]
+        },
+        "failure_class": {"type": ["string", "null"]},
+        "cost": {"$ref": "#/$defs/cost"},
+        "useful_artifact_refs": {"$ref": "#/$defs/stringList"},
+        "source_provenance_refs": {"$ref": "#/$defs/stringList"},
+        "transfer_context": {"type": "object"},
+        "timestamp": {"type": "integer", "minimum": 0},
+        "retrieval_embedding_ref": {"type": "string", "minLength": 1},
+        "phi_search_score": {"$ref": "#/$defs/score"}
+      }
+    }
+  }
+}
