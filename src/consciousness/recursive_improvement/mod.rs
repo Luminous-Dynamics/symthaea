@@ -76,6 +76,7 @@ pub mod semantic_context;
 pub mod semantic_null_calibration;
 pub mod semantic_operational_memory;
 pub mod semantic_prior;
+pub mod semantic_retrieval_ambiguity;
 pub mod semantic_support;
 pub mod semantic_supported_retrieval;
 pub mod sym_rsi_candidate_family;
