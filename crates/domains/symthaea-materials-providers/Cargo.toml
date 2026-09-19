@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-materials-providers"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Offline-reproducible external data adapters for Symthaea materials discovery"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+
+[dependencies]
+symthaea-materials = { path = "../symthaea-materials" }
+symthaea-epistemic-types = { path = "../symthaea-epistemic-types" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
