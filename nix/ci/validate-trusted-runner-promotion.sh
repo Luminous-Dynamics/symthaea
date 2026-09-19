@@ -85,7 +85,7 @@ host_lifecycle_contract_blob="$(manifest_value host_lifecycle_contract_blob)"
 for blob in "$runner_module_blob" "$routing_policy_blob" "$smoke_workflow_blob" "$arc3_protocol_qualifier_workflow_blob" "$se001q_recovery_workflow_blob" "$se001q_replay_helper_blob" "$ci_rust_shell_blob" "$bootstrap_validator_blob" "$promotion_verifier_blob" "$recovery_eligibility_verifier_blob" "$host_lifecycle_contract_blob"; do
   [[ "$blob" =~ ^[0-9a-f]{40}$ ]]
 done
-for pass_key in operator_authorization_checked runner_policy_eval routing_policy_eval minimal_locked_rust_check se001q_helper_syntax_checked refs_unchanged_during_validation; do
+for pass_key in operator_authorization_checked runner_policy_eval routing_policy_eval minimal_locked_rust_check se001q_helper_syntax_checked recovery_verifier_syntax_checked refs_unchanged_during_validation; do
   [[ "$(manifest_value "$pass_key")" == 'PASS' ]]
 done
 [[ "$(manifest_value evidence_scope)" == 'runner-bootstrap-correctness-only' ]]
@@ -171,6 +171,7 @@ runner_module_blob=$runner_module_blob
 routing_policy_blob=$routing_policy_blob
 promotion_verifier_blob=$promotion_verifier_blob
 recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
+recovery_verifier_syntax_checked=PASS
 promotion_ancestry_checked=PASS
 promotion_tree_identity_checked=PASS
 promotion_diff_surface_checked=PASS
