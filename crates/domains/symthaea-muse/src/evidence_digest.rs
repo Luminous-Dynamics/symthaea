@@ -26,6 +26,8 @@ pub mod rendered_spectral_window_panel;
 pub mod rendered_multimodal_attack_evidence;
 #[path = "rendered_multimodal_attack_panel.rs"]
 pub mod rendered_multimodal_attack_panel;
+#[path = "perceptual_study_protocol.rs"]
+pub mod perceptual_study_protocol;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
