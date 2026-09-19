@@ -42,6 +42,8 @@ pub mod perceptual_collection_evidence;
 pub mod perceptual_unblinding;
 #[path = "perceptual_model_input.rs"]
 pub mod perceptual_model_input;
+#[path = "perceptual_glmm_result.rs"]
+pub mod perceptual_glmm_result;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
