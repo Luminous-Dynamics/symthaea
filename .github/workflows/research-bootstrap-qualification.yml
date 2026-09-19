@@ -55,6 +55,8 @@ jobs:
       program_profile_git_blob: ${{ steps.profile.outputs.program_profile_git_blob }}
       program_profile_file_sha256: ${{ steps.profile.outputs.program_profile_file_sha256 }}
       program_profile_canonical_sha256: ${{ steps.profile.outputs.program_profile_canonical_sha256 }}
+      package_root_count: ${{ steps.package_roots.outputs.package_root_count }}
+      package_root_closure_sha256: ${{ steps.package_roots.outputs.package_root_closure_sha256 }}
     env:
       TRUSTED_ROOT: ${{ github.workspace }}/trusted
       CANDIDATE_ROOT: ${{ github.workspace }}/candidate
@@ -81,6 +83,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git -C "$TRUSTED_ROOT" rev-parse HEAD)" = "$TRUSTED_POLICY_SHA"
+          python3 -c 'import sys; assert sys.version_info >= (3, 11)'
           bash -n "$TRUSTED_ROOT/scripts/qualify-research-crate.sh"
           "$TRUSTED_ROOT/scripts/qualify-research-crate.sh" --self-test
           python3 -m py_compile "$TRUSTED_ROOT/scripts/run-research-qualification-manifest.py"
@@ -93,6 +96,10 @@ jobs:
           python3 "$TRUSTED_ROOT/scripts/validate-research-program-profile.py" --self-test
           python3 -m py_compile "$TRUSTED_ROOT/scripts/seal-research-program-profile.py"
           python3 "$TRUSTED_ROOT/scripts/seal-research-program-profile.py" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/validate-research-package-root-closure.py"
+          python3 "$TRUSTED_ROOT/scripts/validate-research-package-root-closure.py" --self-test
+          python3 -m py_compile "$TRUSTED_ROOT/scripts/seal-research-package-root-closure.py"
+          python3 "$TRUSTED_ROOT/scripts/seal-research-package-root-closure.py" --self-test
 
       - name: Authenticate live PR before admission
         if: github.event_name == 'pull_request_target'
@@ -146,6 +153,21 @@ jobs:
             --expected-head "$EXPECTED_HEAD" \
             --expected-base "$EXPECTED_BASE" \
             --github-output "$GITHUB_OUTPUT"
+
+      - name: Resolve package-to-source-root closure
+        id: package_roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/validate-research-package-root-closure.py" \
+            --trusted-root "$TRUSTED_ROOT" \
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ steps.manifest.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+          test "${{ steps.profile.outputs.program_profile_canonical_sha256 }}" = "${{ steps.package_roots.outputs.program_profile_canonical_sha256 }}"
 
   execute:
     name: Execute candidate theorem without repository-token postflight
@@ -219,6 +241,23 @@ jobs:
           test "${{ needs.admit.outputs.program_profile_git_blob }}" = "${{ steps.profile.outputs.program_profile_git_blob }}"
           test "${{ needs.admit.outputs.program_profile_file_sha256 }}" = "${{ steps.profile.outputs.program_profile_file_sha256 }}"
           test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.profile.outputs.program_profile_canonical_sha256 }}"
+
+      - name: Re-derive package-root closure before candidate execution
+        id: package_roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/validate-research-package-root-closure.py" \
+            --trusted-root "$TRUSTED_ROOT" \
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+          test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.package_roots.outputs.program_profile_canonical_sha256 }}"
+          test "${{ needs.admit.outputs.package_root_count }}" = "${{ steps.package_roots.outputs.package_root_count }}"
+          test "${{ needs.admit.outputs.package_root_closure_sha256 }}" = "${{ steps.package_roots.outputs.package_root_closure_sha256 }}"
 
       - name: Install manifest-pinned Rust toolchain
         uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
@@ -336,6 +375,23 @@ jobs:
           test "${{ needs.admit.outputs.program_profile_file_sha256 }}" = "${{ steps.profile.outputs.program_profile_file_sha256 }}"
           test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.profile.outputs.program_profile_canonical_sha256 }}"
 
+      - name: Re-derive package-root closure before authenticated seal
+        id: package_roots
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$TRUSTED_ROOT/scripts/validate-research-package-root-closure.py" \
+            --trusted-root "$TRUSTED_ROOT" \
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA" \
+            --candidate-root "$CANDIDATE_ROOT" \
+            --manifest "${{ needs.admit.outputs.manifest_path }}" \
+            --expected-head "$EXPECTED_HEAD" \
+            --expected-base "$EXPECTED_BASE" \
+            --github-output "$GITHUB_OUTPUT"
+          test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.package_roots.outputs.program_profile_canonical_sha256 }}"
+          test "${{ needs.admit.outputs.package_root_count }}" = "${{ steps.package_roots.outputs.package_root_count }}"
+          test "${{ needs.admit.outputs.package_root_closure_sha256 }}" = "${{ steps.package_roots.outputs.package_root_closure_sha256 }}"
+
       - name: Seal adapter binding after authenticated postflight
         shell: bash
         env:
@@ -380,6 +436,28 @@ jobs:
             args+=(--repo "$GITHUB_REPOSITORY" --pr-number "${{ github.event.pull_request.number }}")
           fi
           python3 "$TRUSTED_ROOT/scripts/seal-research-program-profile.py" "${args[@]}"
+
+      - name: Seal package-root closure binding
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.event_name == 'pull_request_target' && github.token || '' }}
+        run: |
+          set -euo pipefail
+          args=(
+            --trusted-root "$TRUSTED_ROOT"
+            --trusted-policy-sha "$TRUSTED_POLICY_SHA"
+            --candidate-root "$CANDIDATE_ROOT"
+            --manifest "${{ needs.admit.outputs.manifest_path }}"
+            --expected-head "$EXPECTED_HEAD"
+            --expected-base "$EXPECTED_BASE"
+            --final-dir "$EVIDENCE_DIR"
+            --github-run-id "$GITHUB_RUN_ID"
+            --github-run-attempt "$GITHUB_RUN_ATTEMPT"
+          )
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
+            args+=(--repo "$GITHUB_REPOSITORY" --pr-number "${{ github.event.pull_request.number }}")
+          fi
+          python3 "$TRUSTED_ROOT/scripts/seal-research-package-root-closure.py" "${args[@]}"
 
       - name: Upload sealed bootstrap evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
