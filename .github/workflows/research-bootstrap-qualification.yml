@@ -167,6 +167,11 @@ jobs:
             --expected-head "$EXPECTED_HEAD" \
             --expected-base "$EXPECTED_BASE" \
             --github-output "$GITHUB_OUTPUT"
+
+      - name: Require profile/package-root agreement
+        shell: bash
+        run: |
+          set -euo pipefail
           test "${{ steps.profile.outputs.program_profile_canonical_sha256 }}" = "${{ steps.package_roots.outputs.program_profile_canonical_sha256 }}"
 
   execute:
@@ -255,6 +260,11 @@ jobs:
             --expected-head "$EXPECTED_HEAD" \
             --expected-base "$EXPECTED_BASE" \
             --github-output "$GITHUB_OUTPUT"
+
+      - name: Require admitted package-root closure identity
+        shell: bash
+        run: |
+          set -euo pipefail
           test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.package_roots.outputs.program_profile_canonical_sha256 }}"
           test "${{ needs.admit.outputs.package_root_count }}" = "${{ steps.package_roots.outputs.package_root_count }}"
           test "${{ needs.admit.outputs.package_root_closure_sha256 }}" = "${{ steps.package_roots.outputs.package_root_closure_sha256 }}"
@@ -388,6 +398,11 @@ jobs:
             --expected-head "$EXPECTED_HEAD" \
             --expected-base "$EXPECTED_BASE" \
             --github-output "$GITHUB_OUTPUT"
+
+      - name: Require admitted package-root closure identity before sealing
+        shell: bash
+        run: |
+          set -euo pipefail
           test "${{ needs.admit.outputs.program_profile_canonical_sha256 }}" = "${{ steps.package_roots.outputs.program_profile_canonical_sha256 }}"
           test "${{ needs.admit.outputs.package_root_count }}" = "${{ steps.package_roots.outputs.package_root_count }}"
           test "${{ needs.admit.outputs.package_root_closure_sha256 }}" = "${{ steps.package_roots.outputs.package_root_closure_sha256 }}"
