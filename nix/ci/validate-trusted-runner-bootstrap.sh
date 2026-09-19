@@ -88,6 +88,7 @@ expected_paths="$(cat <<'EOF'
 .github/workflows/self-hosted-ai-assurance-foundation-recovery.yml
 .github/workflows/self-hosted-rca-canonical-lineage-recovery.yml
 .github/workflows/self-hosted-runner-smoke.yml
+.github/workflows/self-hosted-se001q-evidence-recovery.yml
 .github/workflows/self-hosted-sym-arch-002a-core-recovery.yml
 docs/operations/AI_ASSURANCE_TRUSTED_RECOVERY.md
 docs/operations/GITHUB_ACTIONS_NIXOS_RUNNER.md
