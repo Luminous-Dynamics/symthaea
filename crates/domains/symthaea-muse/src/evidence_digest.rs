@@ -36,6 +36,8 @@ pub mod perceptual_stimulus_pack;
 pub mod perceptual_participant_schedule;
 #[path = "perceptual_participant_identity.rs"]
 pub mod perceptual_participant_identity;
+#[path = "perceptual_enrollment_lifecycle.rs"]
+pub mod perceptual_enrollment_lifecycle;
 #[path = "perceptual_schedule_reveal.rs"]
 pub mod perceptual_schedule_reveal;
 
