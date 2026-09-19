@@ -328,7 +328,7 @@ fn expiry_attenuates(child: Option<u64>, parent: Option<u64>) -> bool {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Error)]
 pub enum GrantValidationError {
     #[error("unsupported capability schema")]
     UnsupportedSchema,
@@ -470,20 +470,22 @@ pub fn evaluate_authority(
         return AuthorityDecision::Deny(DenyReason::UseBudgetExhausted);
     }
 
-    let digest = grant.digest();
+    let grant_digest = grant.digest();
     for fact in negative_facts {
         match fact {
-            NegativeAuthorityFact::RevokeGrant { grant_digest } if *grant_digest == digest => {
+            NegativeAuthorityFact::RevokeGrant { grant_digest: revoked }
+                if *revoked == grant_digest =>
+            {
                 return AuthorityDecision::Deny(DenyReason::ExplicitlyRevoked);
             }
             NegativeAuthorityFact::RevokeContext { context: revoked }
-                if *revoked == grant.authority_context =>
+                if revoked == &grant.authority_context =>
             {
                 return AuthorityDecision::Deny(DenyReason::ContextRevoked);
             }
             NegativeAuthorityFact::TombstonePrincipal { principal }
-                if *principal == grant.subject
-                    || *principal == grant.issuer
+                if principal == &grant.subject
+                    || principal == &grant.issuer
                     || grant.audience.as_ref() == Some(principal) =>
             {
                 return AuthorityDecision::Deny(DenyReason::SubjectTombstoned);
@@ -546,41 +548,48 @@ impl LiveGrant {
         &self.receipt
     }
 
-    /// Verify that this in-memory admission still belongs to the current runtime
-    /// and authority state. Higher layers should call this immediately before
-    /// effect-specific admission or reservation.
+    /// Revalidate this in-memory authority against fresh current authority state.
+    ///
+    /// This intentionally re-runs expiry, use-budget, context, epoch, and negative
+    /// fact checks so a once-admitted handle cannot survive revocation or other
+    /// authority changes merely because it remains in memory.
     pub fn validate_current(
         &self,
         runtime_epoch: RuntimeEpoch,
-        authority_epoch: AuthorityEpoch,
-        authority_context: &AuthorityContextRef,
-    ) -> Result<(), LiveGrantStaleReason> {
+        authority: &AuthorityEvaluationContext,
+        negative_facts: &[NegativeAuthorityFact],
+    ) -> Result<(), LiveGrantInvalidReason> {
         if runtime_epoch != self.receipt.runtime_epoch {
-            return Err(LiveGrantStaleReason::RuntimeEpochChanged);
-        }
-        if authority_epoch != self.receipt.authority_epoch {
-            return Err(LiveGrantStaleReason::AuthorityEpochChanged);
-        }
-        if authority_context != &self.receipt.authority_context {
-            return Err(LiveGrantStaleReason::AuthorityContextChanged);
+            return Err(LiveGrantInvalidReason::RuntimeEpochChanged);
         }
         if self.grant.digest() != self.receipt.grant_digest {
-            return Err(LiveGrantStaleReason::GrantCommitmentChanged);
+            return Err(LiveGrantInvalidReason::GrantCommitmentChanged);
         }
-        Ok(())
+        match evaluate_authority(&self.grant, authority, negative_facts) {
+            AuthorityDecision::Allow => Ok(()),
+            AuthorityDecision::Deny(reason) => {
+                Err(LiveGrantInvalidReason::AuthorityDenied(reason))
+            }
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
-pub enum LiveGrantStaleReason {
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum LiveGrantInvalidReason {
     #[error("runtime epoch changed")]
     RuntimeEpochChanged,
-    #[error("authority epoch changed")]
-    AuthorityEpochChanged,
-    #[error("authority context changed")]
-    AuthorityContextChanged,
     #[error("grant commitment no longer matches admission receipt")]
     GrantCommitmentChanged,
+    #[error("current authority no longer admits this live grant: {0:?}")]
+    AuthorityDenied(DenyReason),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum AdmissionError {
+    #[error("runtime epoch zero is reserved")]
+    ZeroRuntimeEpoch,
+    #[error("grant denied during runtime admission: {0:?}")]
+    Denied(DenyReason),
 }
 
 /// Admit one serialized grant record into runtime-local live authority.
@@ -591,7 +600,10 @@ pub fn admit_live_grant(
     grant: CapabilityGrant,
     context: &RuntimeAdmissionContext,
     negative_facts: &[NegativeAuthorityFact],
-) -> Result<LiveGrant, DenyReason> {
+) -> Result<LiveGrant, AdmissionError> {
+    if context.runtime_epoch.0 == 0 {
+        return Err(AdmissionError::ZeroRuntimeEpoch);
+    }
     match evaluate_authority(&grant, &context.authority, negative_facts) {
         AuthorityDecision::Allow => {
             let receipt = AdmissionReceipt {
@@ -603,7 +615,7 @@ pub fn admit_live_grant(
             };
             Ok(LiveGrant { grant, receipt })
         }
-        AuthorityDecision::Deny(reason) => Err(reason),
+        AuthorityDecision::Deny(reason) => Err(AdmissionError::Denied(reason)),
     }
 }
 
@@ -716,16 +728,20 @@ mod tests {
         grant
     }
 
+    fn authority_evaluation_context() -> AuthorityEvaluationContext {
+        AuthorityEvaluationContext {
+            now_unix_s: 100,
+            current_epoch: AuthorityEpoch(5),
+            current_authority_context: authority_context(1),
+            use_state: GrantUseState::default(),
+        }
+    }
+
     fn admission_context() -> RuntimeAdmissionContext {
         RuntimeAdmissionContext {
             runtime_epoch: RuntimeEpoch(7),
             admitted_at_tick: 150,
-            authority: AuthorityEvaluationContext {
-                now_unix_s: 100,
-                current_epoch: AuthorityEpoch(5),
-                current_authority_context: authority_context(1),
-                use_state: GrantUseState::default(),
-            },
+            authority: authority_evaluation_context(),
         }
     }
 
@@ -745,22 +761,36 @@ mod tests {
         context.authority.current_authority_context = authority_context(2);
         assert_eq!(
             admit_live_grant(grant, &context, &[]).unwrap_err(),
-            DenyReason::ContextMismatch
+            AdmissionError::Denied(DenyReason::ContextMismatch)
         );
     }
 
     #[test]
     fn live_authority_is_runtime_epoch_bound() {
         let context = admission_context();
-        let authority_ref = context.authority.current_authority_context.clone();
         let live = admit_live_grant(robot_grant(), &context, &[]).unwrap();
         assert_eq!(
-            live.validate_current(RuntimeEpoch(8), AuthorityEpoch(5), &authority_ref),
-            Err(LiveGrantStaleReason::RuntimeEpochChanged)
+            live.validate_current(RuntimeEpoch(8), &context.authority, &[]),
+            Err(LiveGrantInvalidReason::RuntimeEpochChanged)
         );
         assert!(
-            live.validate_current(RuntimeEpoch(7), AuthorityEpoch(5), &authority_ref)
+            live.validate_current(RuntimeEpoch(7), &context.authority, &[])
                 .is_ok()
+        );
+    }
+
+    #[test]
+    fn revocation_after_admission_invalidates_live_authority() {
+        let context = admission_context();
+        let live = admit_live_grant(robot_grant(), &context, &[]).unwrap();
+        let negative = NegativeAuthorityFact::RevokeGrant {
+            grant_digest: live.grant().digest(),
+        };
+        assert_eq!(
+            live.validate_current(RuntimeEpoch(7), &context.authority, &[negative]),
+            Err(LiveGrantInvalidReason::AuthorityDenied(
+                DenyReason::ExplicitlyRevoked
+            ))
         );
     }
 
@@ -772,7 +802,7 @@ mod tests {
         };
         assert_eq!(
             admit_live_grant(grant, &admission_context(), &[negative]).unwrap_err(),
-            DenyReason::ExplicitlyRevoked
+            AdmissionError::Denied(DenyReason::ExplicitlyRevoked)
         );
     }
 
@@ -786,7 +816,7 @@ mod tests {
         };
         assert_eq!(
             admit_live_grant(grant, &context, &[]).unwrap_err(),
-            DenyReason::UseBudgetExhausted
+            AdmissionError::Denied(DenyReason::UseBudgetExhausted)
         );
     }
 
@@ -797,7 +827,18 @@ mod tests {
         context.authority.current_epoch = AuthorityEpoch(6);
         assert_eq!(
             admit_live_grant(grant, &context, &[]).unwrap_err(),
-            DenyReason::EpochStale
+            AdmissionError::Denied(DenyReason::EpochStale)
+        );
+    }
+
+    #[test]
+    fn zero_runtime_epoch_cannot_create_live_authority() {
+        let grant = robot_grant();
+        let mut context = admission_context();
+        context.runtime_epoch = RuntimeEpoch(0);
+        assert_eq!(
+            admit_live_grant(grant, &context, &[]).unwrap_err(),
+            AdmissionError::ZeroRuntimeEpoch
         );
     }
 
@@ -849,7 +890,9 @@ mod tests {
         grant.operations.clear();
         assert_eq!(
             admit_live_grant(grant, &admission_context(), &[]).unwrap_err(),
-            DenyReason::InvalidGrant(GrantValidationError::EmptyOperations)
+            AdmissionError::Denied(DenyReason::InvalidGrant(
+                GrantValidationError::EmptyOperations
+            ))
         );
     }
 
