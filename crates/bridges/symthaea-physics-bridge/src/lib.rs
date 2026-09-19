@@ -57,6 +57,9 @@ pub mod pde_wave_stage_a;
 pub mod pde_wave_stage_b;
 pub mod query;
 pub mod recognize;
+mod solver_federation;
+pub mod solver_federation_evidence;
+mod solver_federation_gate;
 pub mod strict_dimensional_inference;
 pub mod symmetry;
 pub mod symmetry_inference;
@@ -83,6 +86,18 @@ pub use model_validation::{
 pub use query::{PhysicsSearchEngine, SearchWeights};
 pub use recognize::{
     RecognitionReport, expr_to_equation_node, recognize_expr, recognize_expr_with_units,
+};
+pub use solver_federation::{
+    FederationCoverage, FederationFinding, FrozenSolverFederationSpec, PairLineage,
+    PairwiseAgreement, SolverAgreementState, SolverFederationReport, SolverFederationSpec,
+    SolverMethodFamily, SolverPairComparison, SolverReceipt,
+};
+pub use solver_federation_evidence::{
+    SolverFederationEvidence, evaluate_solver_federation_evidence,
+};
+pub use solver_federation_gate::{
+    SolverFederationGateIssue, SolverReceiptBindingIssue, ValidatedSolverFederationReport,
+    ValidatedSolverReceipt, bind_solver_receipt,
 };
 pub use strict_dimensional_inference::{
     StrictInferenceFailure, StrictInferenceResult, infer_dimensions_strict,
