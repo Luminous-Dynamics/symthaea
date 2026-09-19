@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-process-file-io"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-process-capture = { path = "../symthaea-process-capture" }
+symthaea-process-stdin = { path = "../symthaea-process-stdin" }
+
+[[bin]]
+name = "symthaea-process-file-io-launcher"
+path = "src/bin/file_io_launcher.rs"
