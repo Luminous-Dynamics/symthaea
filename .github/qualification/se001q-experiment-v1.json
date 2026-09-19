@@ -3,6 +3,7 @@
   "experiment_id": "SE-001Q",
   "mode": "evidence-replay",
   "qualification_claim": "NONE",
+  "repair_authority_claim": "NONE",
   "subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
   "toolchain": "1.96.0",
   "working_directory": ".",
@@ -15,7 +16,8 @@
   "protected_inputs": [
     {
       "path": "Cargo.lock",
-      "rule": "BYTE_IDENTICAL"
+      "rule": "BYTE_IDENTICAL",
+      "basis": "historical Cargo reconciliation produced NO_LOCK_DELTA"
     },
     {
       "path": "Cargo.toml",
@@ -35,12 +37,7 @@
         "2024",
         "--check",
         "crates/domains/symthaea-se-model/src/lib.rs"
-      ],
-      "failure_policy": {
-        "state": "CLASSIFIED_FAIL",
-        "failure_class": "FORMAT_DIVERGENCE",
-        "repair_authority": "RUSTFMT_ONLY"
-      }
+      ]
     },
     {
       "id": "locked-metadata",
@@ -51,12 +48,7 @@
         "--no-deps",
         "--format-version",
         "1"
-      ],
-      "failure_policy": {
-        "state": "FAIL_UNCLASSIFIED",
-        "failure_class": null,
-        "repair_authority": "NONE"
-      }
+      ]
     },
     {
       "id": "focused-all-targets",
@@ -67,12 +59,7 @@
         "symthaea-se-model",
         "--locked",
         "--all-targets"
-      ],
-      "failure_policy": {
-        "state": "FAIL_UNCLASSIFIED",
-        "failure_class": null,
-        "repair_authority": "NONE"
-      }
+      ]
     },
     {
       "id": "focused-tests",
@@ -82,12 +69,7 @@
         "-p",
         "symthaea-se-model",
         "--locked"
-      ],
-      "failure_policy": {
-        "state": "FAIL_UNCLASSIFIED",
-        "failure_class": null,
-        "repair_authority": "NONE"
-      }
+      ]
     },
     {
       "id": "focused-clippy",
@@ -101,25 +83,23 @@
         "--",
         "-D",
         "warnings"
-      ],
-      "failure_policy": {
-        "state": "FAIL_UNCLASSIFIED",
-        "failure_class": null,
-        "repair_authority": "NONE"
-      }
+      ]
     }
   ],
   "negative_controls": [
     {
       "gate_id": "focused-format",
-      "predicate": "exit_code != 0",
+      "expected_state": "CLASSIFIED_FAIL",
+      "expected_failure_class": "FORMAT_DIVERGENCE",
       "meaning": "The frozen SE-001 subject must continue to demonstrate the historical formatting defect under the pinned experiment."
     }
   ],
   "invariants": [
     "capture every gate even after an earlier nonzero exit",
     "never mutate the frozen subject",
-    "a failed gate without complete durable diagnostics grants no repair authority",
+    "observation records execution facts and never grants repair authority",
+    "classification interprets retained evidence and never grants repair authority",
+    "a failed gate without a matched deterministic classifier rule remains FAIL_UNCLASSIFIED",
     "evidence replay success does not imply subject qualification"
   ]
 }

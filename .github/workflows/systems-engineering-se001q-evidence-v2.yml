@@ -1,10 +1,11 @@
-name: Systems Engineering SE-001Q Evidence Replay v2
+name: Systems Engineering SE-001Q Evidence Replay v2.1
 
 on:
   pull_request:
     paths:
       - '.github/workflows/systems-engineering-se001q-evidence-v2.yml'
       - '.github/qualification/se001q-experiment-v1.json'
+      - '.github/qualification/se001q-classifier-v1.json'
       - '.github/scripts/se001q_capture.py'
   workflow_dispatch:
 
@@ -19,7 +20,7 @@ env:
 
 jobs:
   frozen-subject-evidence-replay:
-    name: Frozen SE-001 evidence replay v2
+    name: Frozen SE-001 evidence replay v2.1
     runs-on: ubuntu-latest
     steps:
       - name: Checkout verifier lineage
@@ -41,7 +42,7 @@ jobs:
         with:
           components: rustfmt,clippy
 
-      - name: Replay every gate with durable observation envelopes
+      - name: Replay every gate with immutable observations and separate classifications
         shell: bash
         run: |
           set -euo pipefail
@@ -49,6 +50,7 @@ jobs:
             --subject subject \
             --verifier verifier \
             --experiment verifier/.github/qualification/se001q-experiment-v1.json \
+            --classifier verifier/.github/qualification/se001q-classifier-v1.json \
             --workflow verifier/.github/workflows/systems-engineering-se001q-evidence-v2.yml \
             --output evidence
 
@@ -58,7 +60,7 @@ jobs:
         run: |
           if [[ -f evidence/summary.json ]]; then
             {
-              echo '### SE-001Q evidence replay v2'
+              echo '### SE-001Q evidence replay v2.1'
               echo
               echo '```json'
               cat evidence/summary.json
@@ -72,7 +74,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: se001q-evidence-v2-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: se001q-evidence-v2_1-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence/
           if-no-files-found: error
           retention-days: 30
