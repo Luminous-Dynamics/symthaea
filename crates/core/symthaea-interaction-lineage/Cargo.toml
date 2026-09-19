@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-interaction-lineage"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Pure content-addressed data-lineage and disclosure identity contracts for Symthaea interactions"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["agents", "provenance", "information-flow", "security"]
+categories = ["data-structures", "development-tools"]
+
+[dependencies]
+sha2 = { workspace = true }
+symthaea-interaction-core = { path = "../symthaea-interaction-core" }
