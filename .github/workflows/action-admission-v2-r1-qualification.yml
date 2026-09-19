@@ -1,0 +1,213 @@
+name: Action Admission V2 R1 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/action-admission-v2-r1-qualification.yml'
+      - 'crates/bridges/symthaea-action-admission/**'
+      - '.github/workflows/action-authority-v2-r2-convergence.yml'
+      - '.github/workflows/action-frontier-v2-r2-convergence.yml'
+      - 'crates/bridges/symthaea-action-frontier/**'
+      - 'crates/core/symthaea-action-checkpoint/**'
+      - 'crates/core/symthaea-action-runtime/**'
+      - 'crates/core/symthaea-authority/**'
+      - 'crates/bridges/symthaea-authority-state/**'
+      - 'crates/bridges/symthaea-authority-time/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-admission-v2-r1-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  action-admission-v2-r1:
+    name: Exact repaired V2D same-object admission
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact repaired convergence predecessor and scope
+        env:
+          REQUIRED_BASE: fbd8845147412fe8d8a7e13f26147791196e205d
+        run: |
+          set -euo pipefail
+          git cat-file -e "${REQUIRED_BASE}^{commit}"
+          test "$(git merge-base HEAD "${REQUIRED_BASE}")" = "${REQUIRED_BASE}"
+          git merge-base --is-ancestor "${REQUIRED_BASE}" HEAD
+          python3 - <<'PY'
+          import subprocess
+
+          base = 'fbd8845147412fe8d8a7e13f26147791196e205d'
+          allowed = {
+              '.github/workflows/action-admission-v2-r1-qualification.yml',
+              'crates/bridges/symthaea-action-admission/Cargo.toml',
+              'crates/bridges/symthaea-action-admission/src/lib.rs',
+              'crates/bridges/symthaea-action-admission/src/tests.rs',
+          }
+          changed = set(
+              subprocess.check_output(
+                  ['git', 'diff', '--name-only', f'{base}...HEAD'], text=True
+              ).splitlines()
+          )
+          unexpected = sorted(changed - allowed)
+          if unexpected:
+              raise SystemExit('unexpected V2D-R1 paths: ' + ', '.join(unexpected))
+          missing = sorted(allowed - changed)
+          if missing:
+              raise SystemExit('missing V2D-R1 paths: ' + ', '.join(missing))
+          PY
+
+      - name: Verify repaired predecessor objects remain exact
+        run: |
+          set -euo pipefail
+          test "$(git hash-object .github/workflows/action-authority-v2-r2-convergence.yml)" = 'a56a9639655ebf460ba5fbc063c5e722dd1cf3d7'
+          test "$(git hash-object crates/core/symthaea-authority/src/lib.rs)" = 'a1ad0c6f944c2ede4fcb6ade100818c3899285e2'
+          test "$(git hash-object crates/bridges/symthaea-authority-state/src/lib.rs)" = 'f6d65199f50da910c39c2f74c2551ca0a797f91f'
+          test "$(git hash-object crates/bridges/symthaea-authority-time/src/lib.rs)" = 'f5b5708afec73d94bbf71ebd0a7dad718c742623'
+          test "$(git hash-object crates/core/symthaea-action-runtime/src/lib.rs)" = '07c53c73874b5ac30f9992133ce00bc13e269034'
+          test "$(git hash-object crates/core/symthaea-action-checkpoint/src/strict.rs)" = '270fa8d7c32a23ab8c410abaf1bd3be47422d9d9'
+          test "$(git hash-object crates/core/symthaea-action-checkpoint/src/hardened.rs)" = '7edf6e83281909164908c0ff8396af1e9e8bae9e'
+          test "$(git hash-object crates/bridges/symthaea-action-frontier/src/lib.rs)" = '601350015ce8e750fe12c77d45362b2edf181a85'
+
+      - name: Enforce repaired frontier and admission ratchets
+        run: |
+          set -euo pipefail
+          SRC=crates/bridges/symthaea-action-admission/src/lib.rs
+          TESTS=crates/bridges/symthaea-action-admission/src/tests.rs
+          FRONTIER=crates/bridges/symthaea-action-frontier/src/lib.rs
+          RUNTIME=crates/core/symthaea-action-runtime/src/lib.rs
+          CHECKPOINT=crates/core/symthaea-action-checkpoint/src/hardened.rs
+
+          grep -Fq 'authorize_and_persist_reservation' "${SRC}"
+          grep -Fq 'arm_authorized_reservation' "${SRC}"
+          grep -Fq 'mint_dispatch_permit' "${SRC}"
+          grep -Fq 'allocation_use_state' "${SRC}"
+          grep -Fq 'evaluate_authority' "${SRC}"
+          grep -Fq 'state.ensure_fresh' "${SRC}"
+          grep -Fq 'mark_outcome_unknown' "${SRC}"
+          grep -Fq 'frontier.expected_checkpoint()' "${SRC}"
+          grep -Fq 'frontier.grant_digest() != grant.digest()' "${SRC}"
+          grep -Fq 'frontier.persist_new_reservation(successor)' "${SRC}"
+          grep -Fq 'frontier.arm_outcome_unknown(persisted, successor)' "${SRC}"
+
+          grep -Fq 'fn current_head(&mut self)' "${FRONTIER}"
+          grep -Fq 'StoreFrontierChanged' "${FRONTIER}"
+          grep -Fq 'StoreNotEmpty' "${FRONTIER}"
+          grep -Fq 'OutcomeUnknownReleaseRequiresProof' "${CHECKPOINT}"
+          grep -Fq 'post_cas_frontier_drift_returns_no_authorized_token_and_contains_writer' "${TESTS}"
+          grep -Fq 'frontier_grant_substitution_fails_before_account_mutation' "${TESTS}"
+
+          if grep -Fq 'frontier.current_checkpoint()' "${SRC}"; then
+            echo 'regressed adapter-local frontier API' >&2
+            exit 1
+          fi
+          if grep -Fq 'persist_new_reservation(grant' "${SRC}"; then
+            echo 'caller-supplied grant reintroduced at reservation CAS boundary' >&2
+            exit 1
+          fi
+          if grep -Fq 'arm_outcome_unknown(grant' "${SRC}"; then
+            echo 'caller-supplied grant reintroduced at arming CAS boundary' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn resume_from_expected_current' "${FRONTIER}"; then
+            echo 'writable frontier restart regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn into_inner' "${FRONTIER}"; then
+            echo 'containment/store escape regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn cancel_before_dispatch' "${RUNTIME}"; then
+            echo 'ordinary pre-dispatch authority-return API regression' >&2
+            exit 1
+          fi
+          if grep -Fq 'pub fn reconcile_not_applied' "${RUNTIME}"; then
+            echo 'ordinary uncertain authority-return API regression' >&2
+            exit 1
+          fi
+          if grep -Eq '(^|[^[:alnum:]_])(saturating_sub|checked_sub)[[:space:]]*\(' "${SRC}"; then
+            echo 'owned-reservation currentness must not be implemented by counter subtraction' >&2
+            exit 1
+          fi
+          if grep -Fq 'GrantUseState {' "${SRC}"; then
+            echo 'production admission must not construct caller-selected GrantUseState counters' >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          src = Path('crates/bridges/symthaea-action-admission/src/lib.rs').read_text()
+          for name in (
+              'AuthorizedPersistedReservationV2',
+              'AuthorizedDurablyArmedReservationV2',
+              'DispatchPermitV2',
+          ):
+              m = re.search(r'#\[derive\(([^)]*)\)\]\s*pub struct\s+' + re.escape(name), src, re.S)
+              if not m:
+                  raise SystemExit(f'missing explicit derive declaration for affine type {name}')
+              derives = {item.strip() for item in m.group(1).split(',')}
+              forbidden = {'Clone', 'Copy', 'Serialize', 'Deserialize'} & derives
+              if forbidden:
+                  raise SystemExit(f'{name} must remain affine/non-Serde; found {sorted(forbidden)}')
+          if re.search(r'impl\s+DispatchPermitV2\s*\{[^}]*pub\s+fn\s+(new|from_|deserialize)', src, re.S):
+              raise SystemExit('DispatchPermitV2 must not gain a public reconstruction constructor')
+          PY
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          cp Cargo.lock /tmp/Cargo.lock.before
+
+      - name: Format
+        run: |
+          set -euo pipefail
+          cargo fmt -p symthaea-action-admission -- --check
+
+      - name: Focused compile test and strict Clippy
+        run: |
+          set -euo pipefail
+          cargo check -p symthaea-action-admission --all-targets
+          cargo test -p symthaea-action-admission
+          cargo clippy -p symthaea-action-admission --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-action-admission --all-targets
+          cargo test --locked -p symthaea-action-admission
+          cargo clippy --locked -p symthaea-action-admission --all-targets -- -D warnings
+
+      - name: Prove qualification did not mutate source
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
