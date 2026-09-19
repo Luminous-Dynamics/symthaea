@@ -1,0 +1,77 @@
+{
+  "authority": "optimizer-parameter-role-binding-only",
+  "forbidden_operations": {
+    "configuration_mutation": true,
+    "coordinate_selection_by_name": true,
+    "likelihood_evaluation": true,
+    "network": true,
+    "optimization": true,
+    "sampler_execution": true
+  },
+  "outputs": [
+    "Cobaya sampled/fixed/derived/input/output/dropped role sets",
+    "sampled coordinate order",
+    "sampled-coordinate best-fit target values",
+    "best-fit objective columns",
+    "omm/omegam/hrdrag review snapshot",
+    "input/expanded/minimizer sampler blocks",
+    "raw evidence hashes"
+  ],
+  "promotion": {
+    "a2_execution_authorized": false,
+    "does_not_establish": [
+      "optimizer method binding",
+      "optimizer execution",
+      "optimizer reproduction",
+      "LambdaCDM validity",
+      "dynamic dark energy",
+      "observational anomaly",
+      "physical mechanism"
+    ],
+    "pass_authority": "parameter-role binding only"
+  },
+  "protocol": "DE-001A2R-PARAMETER-ROLE-BINDING-v1",
+  "required_a0_artifacts": {
+    "reference-bestfit-text": {
+      "sha256": "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358",
+      "size": 902
+    },
+    "reference-expanded-configuration": {
+      "sha256": "c4c23032d1695635aaea6eb47fabd909006ff32df0a27eadbf64b36c89f31ba1",
+      "size": 3969
+    },
+    "reference-input-configuration": {
+      "sha256": "34499cb78ecaec78db44da9f06f61cd9c9ee497dc5c541b72b48cda54091c6ef",
+      "size": 2381
+    },
+    "reference-minimizer-configuration": {
+      "sha256": "6b51048b359e4b9d646de09379ca273a8d6a1bc1b5a88f585a09d8f2e61f290c",
+      "size": 2484
+    }
+  },
+  "role_policy": {
+    "every_sampled_coordinate_must_exist_in_bestfit_table": true,
+    "manual_coordinate_additions_forbidden": true,
+    "manual_coordinate_deletions_forbidden": true,
+    "manual_coordinate_renames_forbidden": true,
+    "manual_coordinate_reordering_forbidden": true,
+    "named_review_does_not_prejudge_roles": true,
+    "named_review_only": [
+      "omm",
+      "omegam",
+      "hrdrag"
+    ],
+    "sampled_coordinates_source": "complete ordered Parameterization.sampled_params() from the exact expanded configuration"
+  },
+  "runtime": {
+    "cobaya_source_commit": "899f30a49f85de610dac321e91a1af50018e56aa",
+    "cobaya_version": "3.6.2",
+    "role_engine": "cobaya.parameterization.Parameterization",
+    "yaml_loader": "cobaya.yaml.yaml_load_file"
+  },
+  "schema_version": 1,
+  "scientific_claim": "NONE",
+  "script_path": "crates/domains/symthaea-cosmology-research/scripts/de001a_a2r_parameter_roles.py",
+  "script_sha256": "ef6e141ad559a237f7d8b89d3ec3f740cb64a5e54e3539a7f175ba9378073fda",
+  "status": "implementation-frozen-unqualified"
+}
