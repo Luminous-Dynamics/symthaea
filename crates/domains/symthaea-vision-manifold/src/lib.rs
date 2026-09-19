@@ -29,7 +29,6 @@
 //! - **TemporalPredictor**: Implements the shared trait for cross-domain integration.
 
 pub mod attention;
-pub mod belief_export;
 pub mod bridge;
 pub mod camera;
 pub mod checkpoint;
@@ -37,17 +36,11 @@ pub mod encoder;
 pub mod manifold;
 pub mod predictive;
 pub mod spectrum;
+pub mod tracker_export;
 pub mod training;
 pub mod types;
 
 pub use attention::SurpriseMap;
-pub use belief_export::{
-    ConfidenceUnavailableReasonV1, ObservationLineageUnavailableReasonV1,
-    VISUAL_BELIEF_EXPORT_SCHEMA_ID, VISUAL_BELIEF_EXPORT_SCHEMA_VERSION,
-    VisualBeliefConfidenceV1, VisualBeliefExportError, VisualBeliefExportV1,
-    VisualBeliefLifecycleV1, VisualCoordinateFrameV1, VisualEntityBeliefV1,
-    VisualEvidenceOriginV1, VisualGridKinematicsV1, VisualObservationLineageV1,
-};
 pub use bridge::{
     CROSS_MANIFOLD_PREDICTOR_STATE_SCHEMA_VERSION, CognitiveGoalSignal, CognitiveGoalSignalState,
     CrossManifoldPredictor, CrossManifoldPredictorState, VISION_BRIDGE_STATE_SCHEMA_VERSION,
@@ -103,6 +96,11 @@ pub use predictive::{PredictiveCodingHierarchy, PredictiveOutput};
 pub use spectrum::{
     BandProbeEvidence, BandProbeScore, MultiSpectralEncoder, MultiSpectralEncoderState,
     MultiSpectralFrame, SpectralBandEncoderState, SpectralLayer, SpectrumBand,
+};
+pub use tracker_export::{
+    VISUAL_TRACKER_STATE_EXPORT_SCHEMA_ID, VISUAL_TRACKER_STATE_EXPORT_SCHEMA_VERSION,
+    VisualTrackPresenceV1, VisualTrackStateV1, VisualTrackerCoordinateFrameV1,
+    VisualTrackerKinematicsV1, VisualTrackerStateExportError, VisualTrackerStateExportV1,
 };
 pub use training::{BpttResult, ManifoldTrainer};
 pub use types::{
