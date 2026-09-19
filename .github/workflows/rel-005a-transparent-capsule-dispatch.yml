@@ -1,0 +1,27 @@
+name: REL-005A Transparent Capsule Dispatch
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Exact successful REL-005A Qualification Pipeline V3 run ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+concurrency:
+  group: rel-005a-transparent-capsule-dispatch-${{ inputs.source_run_id }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Invoke exact frozen REL-005A transparent finalizer
+    uses: Luminous-Dynamics/symthaea/.github/workflows/rel-005a-transparent-capsule-finalizer.yml@177e16e693496beee00feba42aa7f3acf1ad8c17
+    with:
+      source_run_id: ${{ inputs.source_run_id }}
