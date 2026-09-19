@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-scoring-replay-policy-v1.schema.json",
+  "title": "Symthaea Retrieval Scoring Replay Policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "authority",
+    "wire_kind",
+    "scoring",
+    "precision",
+    "query_normalization"
+  ],
+  "properties": {
+    "version": {
+      "const": "math-retrieval-scoring-replay-policy-v1"
+    },
+    "authority": {
+      "const": "MeasurementOnly"
+    },
+    "wire_kind": {
+      "enum": [
+        "CanonicalSparseV1",
+        "BinaryHV16K"
+      ]
+    },
+    "scoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "metric",
+        "ordering",
+        "candidate_population",
+        "query_source_exclusion",
+        "threshold_policy",
+        "tie_break",
+        "top_k_policy"
+      ],
+      "properties": {
+        "version": {
+          "const": "math-retrieval-scoring-semantics-v1"
+        },
+        "metric": {
+          "enum": [
+            "Cosine",
+            "HammingSimilarity"
+          ]
+        },
+        "ordering": {
+          "enum": [
+            "SparseCosineExactOrder",
+            "HammingDistanceAscending"
+          ]
+        },
+        "candidate_population": {
+          "const": "AllEligibleFromExactIndex"
+        },
+        "query_source_exclusion": {
+          "const": "Required"
+        },
+        "threshold_policy": {
+          "const": "None"
+        },
+        "tie_break": {
+          "const": "SourceObjectDigestAscending"
+        },
+        "top_k_policy": {
+          "const": "MinRequestedKEligibleCount"
+        }
+      }
+    },
+    "precision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "arithmetic",
+        "floating_point_ordering",
+        "score_display"
+      ],
+      "properties": {
+        "version": {
+          "const": "math-retrieval-score-precision-semantics-v1"
+        },
+        "arithmetic": {
+          "enum": [
+            "ExactIntegerCrossProduct",
+            "ExactIntegerPopcount"
+          ]
+        },
+        "floating_point_ordering": {
+          "const": "Forbidden"
+        },
+        "score_display": {
+          "const": "NonAuthoritative"
+        }
+      }
+    },
+    "query_normalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "mode",
+        "transform"
+      ],
+      "properties": {
+        "version": {
+          "const": "math-retrieval-query-normalization-semantics-v1"
+        },
+        "mode": {
+          "const": "CanonicalWireValidationOnly"
+        },
+        "transform": {
+          "const": "None"
+        }
+      }
+    }
+  }
+}

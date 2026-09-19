@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-ranking-replay-witness-v1.schema.json",
+  "title": "Symthaea Retrieval Ranking Replay Witness v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "authority",
+    "metric",
+    "query_wire_sha256",
+    "entries"
+  ],
+  "properties": {
+    "version": {
+      "const": "math-retrieval-ranking-replay-witness-v1"
+    },
+    "authority": {
+      "const": "MeasurementOnly"
+    },
+    "metric": {
+      "enum": [
+        "Cosine",
+        "HammingSimilarity"
+      ]
+    },
+    "query_wire_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rank",
+          "source_object_sha256",
+          "score_witness"
+        ],
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source_object_sha256": {
+            "$ref": "#/$defs/sha256"
+          },
+          "score_witness": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "dot",
+                  "candidate_norm_sq"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "SparseCosineExact"
+                  },
+                  "dot": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "candidate_norm_sq": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "hamming_distance"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "BinaryHammingExact"
+                  },
+                  "hamming_distance": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 16384
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
