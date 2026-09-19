@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod repository_snapshot;
+mod repository_snapshot_receipt;
 mod repository_snapshot_verify;
 mod rhn_sweep;
 
