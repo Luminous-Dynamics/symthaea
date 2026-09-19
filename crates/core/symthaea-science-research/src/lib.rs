@@ -11,16 +11,17 @@
 //! lifecycle-authenticated qualification-profile and claim-decision authority,
 //! non-forgeable qualified-claim capabilities, delegated-root ratification of
 //! historical qualification, witnessed transparency publication of exact
-//! qualification ratifications, lifecycle events, currentness observations, and
-//! currentness-cadence policy, append-only authenticated qualification lifecycle
-//! records, observed-view currentness assessments, complete-tail lifecycle/
-//! currentness/cadence publication freshness assessments, cross-stream currentness/
-//! lifecycle rollback guards, authenticated per-qualification currentness cadence
-//! policy, non-weakening cadence-policy lineage proofs, replay-bound policy
-//! provenance for validity readiness, cadence-conformant currentness at one exact
-//! authenticated evaluation horizon, authenticated frozen-protocol evidence
-//! freshness assessments, aligned validity-readiness assessments, institution-
-//! scoped currentness-at-evaluation capabilities, monotonic currentness-observation
+//! qualification ratifications, lifecycle events, currentness observations,
+//! cadence-conformant currentness evaluations, and currentness-cadence policy,
+//! append-only authenticated qualification lifecycle records, observed-view
+//! currentness assessments, complete-tail lifecycle/currentness/cadence
+//! publication freshness assessments, cross-stream currentness/lifecycle rollback
+//! guards, authenticated per-qualification currentness cadence policy,
+//! non-weakening cadence-policy lineage proofs, replay-bound policy provenance for
+//! validity readiness, cadence-conformant currentness at one exact authenticated
+//! evaluation horizon, authenticated frozen-protocol evidence freshness
+//! assessments, aligned validity-readiness assessments, institution-scoped
+//! currentness-at-evaluation capabilities, monotonic currentness-observation
 //! tracking, typed provenance graphs, frozen study protocols, immutable
 //! execution/conformance records, adversarial falsification campaigns, explicit
 //! scientific uncertainty budgets, and provenance-checked replication lineage
@@ -52,6 +53,7 @@ pub mod independence;
 pub mod protocol;
 pub mod provenance;
 pub mod qualification_cadence_conformant_currentness;
+pub mod qualification_cadence_currentness_publication;
 pub mod qualification_currentness_cadence;
 pub mod qualification_currentness_cadence_change;
 pub mod qualification_currentness_cadence_head;
@@ -102,6 +104,7 @@ pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
 pub use qualification_cadence_conformant_currentness::*;
+pub use qualification_cadence_currentness_publication::*;
 pub use qualification_currentness_cadence::*;
 pub use qualification_currentness_cadence_change::*;
 pub use qualification_currentness_cadence_head::*;
