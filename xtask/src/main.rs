@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[cfg(test)]
+mod cargo_adapter_commit;
+#[cfg(test)]
 mod cargo_adapter_postflight;
 #[cfg(test)]
 mod cargo_adapter_state;
