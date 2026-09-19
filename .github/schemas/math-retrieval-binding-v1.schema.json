@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/math-retrieval-binding-v1.schema.json",
+  "title": "Symthaea Mathematical Retrieval Binding v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "binding_id", "authority", "arm_id", "mode", "context_packer_sha256"],
+  "properties": {
+    "version": {"const": "math-retrieval-binding-v1"},
+    "binding_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "authority": {"const": "MeasurementOnly"},
+    "arm_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._-]{0,63}$"},
+    "mode": {"enum": ["SingleIndex", "Fusion"]},
+    "context_packer_sha256": {"$ref": "#/$defs/sha256"},
+    "index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "syntax_index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "normal_form_index_manifest_sha256": {"$ref": "#/$defs/sha256"},
+    "fusion_policy_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"mode": {"const": "SingleIndex"}}, "required": ["mode"]},
+      "then": {
+        "required": ["index_manifest_sha256"],
+        "not": {"anyOf": [
+          {"required": ["syntax_index_manifest_sha256"]},
+          {"required": ["normal_form_index_manifest_sha256"]},
+          {"required": ["fusion_policy_sha256"]}
+        ]}
+      }
+    },
+    {
+      "if": {"properties": {"mode": {"const": "Fusion"}}, "required": ["mode"]},
+      "then": {
+        "required": ["syntax_index_manifest_sha256", "normal_form_index_manifest_sha256", "fusion_policy_sha256"],
+        "not": {"required": ["index_manifest_sha256"]}
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
