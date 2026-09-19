@@ -1,0 +1,62 @@
+name: Math Retrieval Materializer Identity
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/math-retrieval-materializer-identity.yml"
+      - "docs/research/MATH_RET_RUNTIME_002B.md"
+      - "tools/math-retrieval-materializer-identity/**"
+      - "tools/math-retrieval-runtime-seam/**"
+      - "tools/math-retrieval-candidate-loader/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-materializer-identity:
+    name: Qualify pre-fetch materializer identity binding
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact PR subject
+        uses: actions/checkout@v4
+
+      - name: Install frozen Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify frozen predecessor objects
+        shell: bash
+        run: |
+          set -euo pipefail
+          check_blob() {
+            local path="$1"
+            local expected="$2"
+            local actual
+            actual="$(git rev-parse "HEAD:${path}")"
+            printf '%s  %s\n' "$actual" "$path"
+            test "$actual" = "$expected"
+          }
+
+          check_blob \
+            tools/math-retrieval-runtime-seam/src/lib.rs \
+            29c949a9331fbe8e912cd0d03a048595bc354d7b
+          check_blob \
+            tools/math-retrieval-candidate-loader/src/lib.rs \
+            00716bee4333d32ff3ebfabdb0908acb95ff8bba
+
+      - name: Check standalone lock
+        shell: bash
+        run: cargo metadata --manifest-path tools/math-retrieval-materializer-identity/Cargo.toml --locked --format-version 1 >/dev/null
+
+      - name: Format materializer identity layer
+        shell: bash
+        run: cargo fmt --manifest-path tools/math-retrieval-materializer-identity/Cargo.toml -- --check
+
+      - name: Check materializer identity layer
+        shell: bash
+        run: cargo check --manifest-path tools/math-retrieval-materializer-identity/Cargo.toml --locked
+
+      - name: Test materializer identity layer
+        shell: bash
+        run: cargo test --manifest-path tools/math-retrieval-materializer-identity/Cargo.toml --locked
