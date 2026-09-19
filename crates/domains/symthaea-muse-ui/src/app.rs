@@ -20,7 +20,7 @@ use crate::atlas_page::AtlasPage;
 use crate::browser_playback::dispatch_browser_event;
 use crate::liked_page::LikedPage;
 use crate::pages::{CreatePage, ListenPage, ResearchPage};
-use crate::playback::PlaybackEvent;
+use crate::playback::{PlaybackEvent, PlaybackSubjectKind};
 use crate::player_bar::PlayerBar;
 use crate::state::MuseState;
 
@@ -123,7 +123,8 @@ pub fn App() -> impl IntoView {
                         );
                     }
                 ></audio>
-                <div class="page-body">
+                <div class="page-body" style="position: relative;">
+                    <ListenReviewInterlock muse=muse />
                     <Routes fallback=|| view! { <p>"Page not found"</p> }>
                         <Route path=path!("/") view=ListenPage />
                         <Route path=path!("/create") view=CreatePage />
@@ -135,6 +136,61 @@ pub fn App() -> impl IntoView {
                 <PlayerBar muse=muse />
             </div>
         </Router>
+    }
+}
+
+#[component]
+fn ListenReviewInterlock(muse: MuseState) -> impl IntoView {
+    let location = use_location();
+
+    move || {
+        if location.pathname.get() != "/" {
+            return None;
+        }
+        let playback = muse.playback.get();
+        let source = playback.source.as_ref()?;
+        if source.presentation.kind != PlaybackSubjectKind::Review {
+            return None;
+        }
+
+        let review_title = source.presentation.title.clone();
+        let action_label = playback
+            .return_bookmark
+            .as_ref()
+            .map(|bookmark| format!("Return to {}", bookmark.source.presentation.title))
+            .unwrap_or_else(|| "End audition".to_string());
+
+        Some(view! {
+            <div
+                role="status"
+                aria-live="polite"
+                style="position:absolute; inset:0; z-index:40; display:flex; align-items:flex-start; justify-content:center; padding:clamp(1rem,4vw,3rem); background:rgba(14,11,9,.88); backdrop-filter:blur(8px);"
+            >
+                <div class="panel" style="max-width:44rem; margin-top:clamp(1rem,8vh,5rem);">
+                    <p class="muted small">"Temporary audition"</p>
+                    <h2>{review_title}</h2>
+                    <p>
+                        "Listen is temporarily interlocked because its score, structure, section badges, downloads, and journey controls belong to the canonical candidate—not to the review audio currently playing."
+                    </p>
+                    <p class="muted">
+                        "This prevents the review clock from being presented as evidence about a different piece."
+                    </p>
+                    <button
+                        type="button"
+                        on:click=move |_| {
+                            muse.exit_review_audition();
+                            if muse.playback.get_untracked().source.is_none()
+                                && muse.current.get_untracked().is_none()
+                            {
+                                muse.next_piece(false);
+                            }
+                        }
+                    >
+                        {action_label}
+                    </button>
+                </div>
+            </div>
+        })
     }
 }
 
@@ -169,20 +225,30 @@ fn GlobalHeader(muse: MuseState) -> impl IntoView {
                         .unwrap_or_else(|| "Awaiting a piece".to_string())
                 }}</strong>
                 {move || {
-                    muse.playback.get().return_bookmark.map(|bookmark| {
-                        let return_title = bookmark.source.presentation.title;
-                        let aria_label = format!("Return to {return_title}");
-                        view! {
-                            <button
-                                type="button"
-                                class="link-btn"
-                                title=aria_label.clone()
-                                aria-label=aria_label
-                                on:click=move |_| muse.return_from_audition()
-                            >
-                                {format!("Return to {return_title}")}
-                            </button>
-                        }
+                    let playback = muse.playback.get();
+                    let is_review = playback
+                        .source
+                        .as_ref()
+                        .is_some_and(|source| source.presentation.kind == PlaybackSubjectKind::Review);
+                    if !is_review {
+                        return None;
+                    }
+                    let action_label = playback
+                        .return_bookmark
+                        .as_ref()
+                        .map(|bookmark| format!("Return to {}", bookmark.source.presentation.title))
+                        .unwrap_or_else(|| "End audition".to_string());
+                    let aria_label = action_label.clone();
+                    Some(view! {
+                        <button
+                            type="button"
+                            class="link-btn"
+                            title=aria_label.clone()
+                            aria-label=aria_label
+                            on:click=move |_| muse.exit_review_audition()
+                        >
+                            {action_label}
+                        </button>
                     })
                 }}
             </div>
