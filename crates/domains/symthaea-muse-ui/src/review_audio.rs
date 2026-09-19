@@ -21,15 +21,23 @@ fn review_source(audio_url: String, title: String) -> PlaybackSource {
 }
 
 impl MuseState {
-    /// Play an auxiliary/review artifact through the shared transport without
-    /// replacing the current canonical candidate or advancing Listen when it
-    /// finishes. Presentation travels with the audible source, so the global
-    /// player/header can never fall back to stale candidate metadata/actions.
+    /// Temporarily audition an auxiliary/review artifact through the shared
+    /// transport without replacing the canonical candidate or advancing Listen.
+    ///
+    /// `AuditionRequested` preserves the first source being left behind, along
+    /// with its position/play state, so a later return can restore that exact
+    /// transport context under a fresh load epoch.
     pub fn play_review_audio(self, audio_url: String, title: String) {
-        self.dispatch(PlaybackEvent::LoadRequested {
+        self.dispatch(PlaybackEvent::AuditionRequested {
             source: review_source(audio_url, title),
             autoplay: true,
         });
+    }
+
+    /// Return from a temporary review audition to the transport source that was
+    /// active before the first audition. No-op when there is no bookmark.
+    pub fn return_from_audition(self) {
+        self.dispatch(PlaybackEvent::ReturnToBookmarkedSource);
     }
 }
 
@@ -55,7 +63,7 @@ mod tests {
     #[test]
     fn review_source_ends_without_advancing_the_listen_journey() {
         let mut state = PlaybackState::default();
-        state.reduce(PlaybackEvent::LoadRequested {
+        state.reduce(PlaybackEvent::AuditionRequested {
             source: review_source("/review/example.wav".into(), "Review".into()),
             autoplay: true,
         });
