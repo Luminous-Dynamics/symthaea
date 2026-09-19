@@ -50,8 +50,24 @@ impl AuthorizedQualificationProfile {
         self.profile.profile_sha256()
     }
 
+    /// Identity of the raw signed envelope only. Downstream authority
+    /// composition should normally bind `authorization_authority_sha256()`.
     pub fn authorization_attestation_sha256(&self) -> &TrustSha256Digest {
         self.verified_attestation.attestation_sha256()
+    }
+
+    /// Identity of the actual authority grant: signed envelope + exact signature
+    /// policy + exact trust snapshot + evaluation time.
+    pub fn authorization_authority_sha256(&self) -> &TrustSha256Digest {
+        self.verified_attestation.authority_sha256()
+    }
+
+    pub fn authorization_policy_sha256(&self) -> &TrustSha256Digest {
+        self.verified_attestation.policy_sha256()
+    }
+
+    pub fn authorization_trust_snapshot_sha256(&self) -> &TrustSha256Digest {
+        self.verified_attestation.trust_snapshot_sha256()
     }
 
     /// This capability authorizes policy only; it never qualifies a claim.

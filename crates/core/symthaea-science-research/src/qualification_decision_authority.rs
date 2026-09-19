@@ -7,8 +7,8 @@
 //! decision may be authenticated only after a review-ready capability exists and
 //! the exact eligibility profile has already crossed its own authorization gate.
 //! The decision signature binds the review-ready capability as payload and the
-//! profile-authorization attestation as context, preventing policy-lineage
-//! substitution.
+//! exact profile *authority grant* as context, including the policy/trust lineage
+//! that authorized that profile.
 //!
 //! This module still does not expose a `QualifiedScientificClaim`; that final
 //! capability is minted separately from a verified decision.
@@ -31,6 +31,10 @@ pub enum QualificationDecisionAuthorityError {
     ProfileMismatch,
     ReviewReadyAlreadyClaimsQualification,
     ProfileAuthorityAlreadyClaimsQualification,
+    DecisionPredatesProfileAuthorization {
+        profile_authorized_at_unix_s: u64,
+        decision_evaluated_at_unix_s: u64,
+    },
     AttestationRejected(AttestationVerificationReport),
 }
 
@@ -59,8 +63,23 @@ impl VerifiedQualificationDecision {
         &self.verified_attestation
     }
 
+    /// Raw signed-envelope identity only.
     pub fn decision_attestation_sha256(&self) -> &TrustSha256Digest {
         self.verified_attestation.attestation_sha256()
+    }
+
+    /// Full decision authority identity: envelope + exact signature policy +
+    /// trust snapshot + evaluation time.
+    pub fn decision_authority_sha256(&self) -> &TrustSha256Digest {
+        self.verified_attestation.authority_sha256()
+    }
+
+    pub fn decision_policy_sha256(&self) -> &TrustSha256Digest {
+        self.verified_attestation.policy_sha256()
+    }
+
+    pub fn decision_trust_snapshot_sha256(&self) -> &TrustSha256Digest {
+        self.verified_attestation.trust_snapshot_sha256()
     }
 
     pub const fn decision_authenticated(&self) -> bool {
@@ -94,12 +113,24 @@ pub fn verify_qualification_decision_authority(
         );
     }
 
+    let profile_authorized_at_unix_s = authorized_profile
+        .verified_attestation()
+        .evaluation_time_unix_s();
+    if trust.evaluation_time_unix_s < profile_authorized_at_unix_s {
+        return Err(
+            QualificationDecisionAuthorityError::DecisionPredatesProfileAuthorization {
+                profile_authorized_at_unix_s,
+                decision_evaluated_at_unix_s: trust.evaluation_time_unix_s,
+            },
+        );
+    }
+
     let purpose = qualification_decision_usage();
     let subject_sha256 = bridge_digest(
         &authorized_profile.profile().profile().subject_sha256,
     );
     let payload_sha256 = bridge_digest(review_ready.readiness_sha256());
-    let context_sha256 = authorized_profile.authorization_attestation_sha256().clone();
+    let context_sha256 = authorized_profile.authorization_authority_sha256().clone();
 
     let verified_attestation = verify_attestation_authority(
         envelope,
