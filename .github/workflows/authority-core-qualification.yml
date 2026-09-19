@@ -1,0 +1,90 @@
+name: Authority Core Qualification
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/core/symthaea-authority/**'
+      - 'docs/architecture/BOUNDED_AGENCY_AUTHORITY_V02.md'
+      - '.github/workflows/authority-core-qualification.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  authority-core:
+    name: Exact-head authority core
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact subject
+        env:
+          EXPECTED_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SHA" || {
+            echo "expected exact subject: $EXPECTED_SHA"
+            echo "checked out subject:    $actual"
+            exit 1
+          }
+          echo "exact_subject=$actual"
+
+      - name: Set up pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format authority core
+        run: cargo fmt -p symthaea-authority -- --check
+
+      - name: Check authority core
+        run: cargo check -p symthaea-authority --all-targets
+
+      - name: Test authority core
+        run: cargo test -p symthaea-authority
+
+      - name: Clippy authority core
+        run: cargo clippy -p symthaea-authority --all-targets --no-deps -- -D warnings
+
+      - name: Reject uncommitted dependency reconciliation
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- Cargo.lock; then
+            echo "Cargo.lock changed while qualifying this exact candidate."
+            echo "The generated reconciliation is evidence for a follow-up commit, not qualification."
+            git --no-pager diff -- Cargo.lock
+            exit 1
+          fi
+
+      - name: Recheck with committed lock
+        run: |
+          cargo check --locked -p symthaea-authority --all-targets
+          cargo test --locked -p symthaea-authority
+          cargo clippy --locked -p symthaea-authority --all-targets --no-deps -- -D warnings
+
+      - name: Verify source tree remained unchanged
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet; then
+            echo "qualification commands modified the exact candidate working tree"
+            git --no-pager diff
+            exit 1
+          fi
