@@ -76,6 +76,10 @@ pub mod touch_body;
 #[cfg(feature = "screen-vision")]
 pub mod assurance_soma_interaction;
 
+// Recompute measured interaction evidence from exact raw framebuffer/touch inputs.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_soma_interaction_verify;
+
 // Decentralized positioning (GPS-independent)
 #[cfg(feature = "positioning")]
 pub mod positioning_bridge;
