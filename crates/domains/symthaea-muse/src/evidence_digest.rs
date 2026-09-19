@@ -28,6 +28,8 @@ pub mod rendered_multimodal_attack_evidence;
 pub mod rendered_multimodal_attack_panel;
 #[path = "perceptual_study_protocol.rs"]
 pub mod perceptual_study_protocol;
+#[path = "perceptual_analysis_plan.rs"]
+pub mod perceptual_analysis_plan;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
