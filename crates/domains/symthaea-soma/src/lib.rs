@@ -174,6 +174,11 @@ impl From<assurance_android_policy_session::AndroidTouchPolicySessionError>
 #[cfg(feature = "screen-vision")]
 pub mod assurance_android_policy_durability;
 
+// Android-specific capability admission for 534. AtomicFile, Keystore, StrongBox,
+// and external monotonic anchors keep their actual guarantees distinct.
+#[cfg(feature = "screen-vision")]
+pub mod assurance_android_storage_capabilities;
+
 // Versioned checked C ABI that routes accepted native input through the strict ingress contract.
 #[cfg(all(feature = "native-ffi", feature = "screen-vision"))]
 pub mod assurance_native_ingress;
