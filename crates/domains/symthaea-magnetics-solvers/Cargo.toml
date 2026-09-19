@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-magnetics-solvers"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Reproducibility capsules and capability guards for magnetic solver adapters"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/luminous-dynamics/symthaea"
+
+[dependencies]
+symthaea-magnetics = { path = "../symthaea-magnetics" }
+serde = { workspace = true }
+thiserror = { workspace = true }
