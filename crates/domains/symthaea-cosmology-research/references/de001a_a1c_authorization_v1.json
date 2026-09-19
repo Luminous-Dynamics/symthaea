@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A1C-EXECUTION-AUTHORIZATION-v1",
+  "scientific_claim": "NONE",
+  "authority": "fixed-point-execution-authorization-only",
+  "status": "preregistered-authorization-firewall",
+  "required_a1q": {
+    "protocol": "DE-001A1Q-BUNDLE-INTEGRITY-v1",
+    "verdict": "PASS",
+    "authority": "evidence-bundle-integrity-only",
+    "accepted_reproduction_verdicts": ["PASS", "NEGATIVE"],
+    "subject_scope": "current-exact-head-and-tree"
+  },
+  "required_a1e": {
+    "protocol": "DE-001A1E-ENVIRONMENT-EVIDENCE-v1",
+    "verdict": "PASS",
+    "authority": "environment-evidence-reuse-only",
+    "environment_reuse_authorized": true,
+    "a1c_execution_authorized": false,
+    "environment_scope": "current-environment-definition"
+  },
+  "required_a1c_contract": {
+    "protocol": "DE-001A1C-CONTRACT-CONSISTENCY-v1",
+    "verdict": "PASS",
+    "authority": "contract-consistency-only",
+    "execution_authorized": false
+  },
+  "execution_budget": {
+    "likelihood_calls": 1,
+    "sampler_allowed": false,
+    "minimizer_allowed": false,
+    "optimization_allowed": false,
+    "parameter_mutation_allowed": false,
+    "network_allowed": false,
+    "camb_allowed": false,
+    "runtime_package_installation_allowed": false
+  },
+  "authorization_semantics": {
+    "scope": "one-fixed-point-executor-process",
+    "stateful_global_single_use_claimed": false,
+    "executor_must_bind_authorization_receipt_sha256": true,
+    "executor_must_record_actual_likelihood_call_count": true,
+    "executor_must_refuse_call_count_other_than_one": true
+  },
+  "promotion": {
+    "scientific_claim": "NONE",
+    "permits": "A1C fixed-point execution only",
+    "does_not_permit": [
+      "sampling",
+      "minimization",
+      "optimization",
+      "parameter search",
+      "A1X promotion",
+      "A2 optimizer reproduction",
+      "cosmological interpretation"
+    ]
+  }
+}
