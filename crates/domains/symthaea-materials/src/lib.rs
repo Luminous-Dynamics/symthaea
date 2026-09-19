@@ -17,6 +17,7 @@ pub mod database;
 pub mod encoder;
 pub mod evidence;
 pub mod haptic_prober;
+pub mod hea_screening;
 pub mod mining;
 pub mod properties;
 pub mod strategic;
@@ -28,6 +29,10 @@ pub use encoder::MaterialHdcEncoder;
 pub use evidence::{
     MaterialsClaimAuthority, MaterialsEvidenceChain, MaterialsEvidenceError, MaterialsEvidenceKind,
     MaterialsEvidenceRecord, MaterialsEvidenceStage,
+};
+pub use hea_screening::{
+    ClassicHeaScreeningFlags, HeaElementDescriptor, HeaScreeningDescriptors, HeaScreeningError,
+    PairMixingEnthalpy, VecStructureTendency, calculate_hea_descriptors,
 };
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
