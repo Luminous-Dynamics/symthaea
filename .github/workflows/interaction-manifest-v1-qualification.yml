@@ -1,0 +1,96 @@
+name: Interaction Manifest V1 Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/interaction-manifest-v1-qualification.yml'
+      - 'crates/core/symthaea-interaction-core/**'
+      - 'crates/core/symthaea-interaction-manifest/**'
+      - 'Cargo.lock'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interaction-manifest-v1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  interaction-manifest-v1:
+    name: Exact-head interaction manifest v1
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact event subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify PR head identity
+        if: github.event_name == 'pull_request'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${EXPECTED_HEAD}"
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Record clean source baseline
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+      - name: Enforce pure manifest authority boundary
+        run: |
+          set -euo pipefail
+          M=crates/core/symthaea-interaction-manifest/Cargo.toml
+          S=crates/core/symthaea-interaction-manifest/src/lib.rs
+          grep -Fq 'symthaea-interaction-core = { path = "../symthaea-interaction-core" }' "$M"
+          if grep -Eiq 'reqwest|hyper|tokio|holochain|hdk|hdi|web3|ethers|alloy|kube|rmcp|a2a|keyring|secret-service|symthaea-authority|symthaea-action-runtime' "$M"; then
+            echo 'runtime/protocol/authority dependency leaked into pure connector manifest' >&2; exit 1
+          fi
+          grep -Fq 'symthaea.interaction.connector-manifest.v1\0' "$S"
+          grep -Fq 'IndependentVerificationAvailable' "$S"
+          if grep -Eq 'serde_json::to_|bincode|postcard|rmp_serde|std::net|std::fs|std::process|Command::new' "$S"; then
+            echo 'serializer/runtime I/O leaked into manifest semantics' >&2; exit 1
+          fi
+          if grep -Eq 'use[[:space:]]+symthaea_authority|use[[:space:]]+symthaea_action_runtime|impl[[:space:]]+From<ConnectorManifest.*(Grant|Authority|DispatchPermit)' "$S"; then
+            echo 'manifest imported or converted into execution authority' >&2; exit 1
+          fi
+          if grep -Fq 'IndependentlyVerified' "$S"; then
+            echo 'manifest may declare verification capability but may not manufacture verification state' >&2; exit 1
+          fi
+      - name: Independent canonical commitment oracle
+        run: python3 crates/core/symthaea-interaction-manifest/scripts/manifest_oracle.py
+      - name: Format
+        run: cargo fmt -p symthaea-interaction-manifest -- --check
+      - name: Resolve candidate and execute focused gates
+        run: |
+          set -euo pipefail
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo check -p symthaea-interaction-manifest --all-targets
+          cargo test -p symthaea-interaction-manifest
+          cargo clippy -p symthaea-interaction-manifest --all-targets -- -D warnings
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo 'Cargo.lock requires committed reconciliation:' >&2
+            diff -u /tmp/Cargo.lock.before Cargo.lock || true
+            exit 1
+          fi
+      - name: Locked replay
+        run: |
+          set -euo pipefail
+          cargo check --locked -p symthaea-interaction-manifest --all-targets
+          cargo test --locked -p symthaea-interaction-manifest
+          cargo clippy --locked -p symthaea-interaction-manifest --all-targets -- -D warnings
+      - name: Prove qualification did not mutate source
+        run: test -z "$(git status --porcelain=v1)"
