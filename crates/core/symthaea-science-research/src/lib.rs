@@ -6,12 +6,12 @@
 //! This crate is intentionally dependency-light and non-executing. It defines
 //! identities, bounded authority, evidence classes, independence descriptors,
 //! scientific subjects, claims, polarity-aware adjudication, semantic
-//! evidence-to-claim binding, protocol-scoped evidence accounting, typed
-//! provenance graphs, frozen study protocols, immutable execution/conformance
-//! records, adversarial falsification campaigns, explicit scientific uncertainty
-//! budgets, and provenance-checked replication lineage assessments. It does not
-//! run experiments, solvers, LLMs, HDC, statistics, formal provers, or network
-//! operations.
+//! evidence-to-claim binding, protocol-scoped evidence accounting and corpus
+//! decision binding, typed provenance graphs, frozen study protocols, immutable
+//! execution/conformance records, adversarial falsification campaigns, explicit
+//! scientific uncertainty budgets, and provenance-checked replication lineage
+//! assessments. It does not run experiments, solvers, LLMs, HDC, statistics,
+//! formal provers, or network operations.
 //!
 //! Ordinary records can express only `None / Declared / Bound` authority.
 //! Qualification is intentionally reserved for a later non-forgeable wrapper.
@@ -22,6 +22,7 @@ pub mod claim_adjudication;
 pub mod claim_binding;
 pub mod evidence;
 mod evidence_coverage;
+pub mod evidence_coverage_binding;
 pub mod evidence_coverage_gate;
 pub mod execution;
 pub mod falsification;
@@ -45,6 +46,7 @@ pub use evidence_coverage::{
     EvidenceSourceSpec, FrozenEvidenceCoverageProtocol, RetrievalOutcome,
     SourceRetrievalReceipt,
 };
+pub use evidence_coverage_binding::*;
 pub use evidence_coverage_gate::*;
 pub use execution::*;
 pub use falsification::*;
