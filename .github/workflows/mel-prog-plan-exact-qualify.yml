@@ -1,0 +1,119 @@
+name: MEL ProgSuite plan exact qualification
+
+on:
+  push:
+    branches:
+      - qualify/mel-prog-plan-78fd0d8
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-prog-plan-exact-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  MEL_PROG_SUBJECT: 78fd0d8607da57d588e8d8b77eb548b802c0f2ec
+  MEL_PROG_BASE: a372c6e045c570401d0f84762c3e2cc424f59813
+
+jobs:
+  qualify:
+    name: Execute frozen ProgSuite plan subject
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MEL_PROG_SUBJECT }}
+          fetch-depth: 0
+
+      - name: Bind exact subject surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_PROG_SUBJECT"
+          test "$(git merge-base "$MEL_PROG_BASE" HEAD)" = "$MEL_PROG_BASE"
+          git diff --name-only "$MEL_PROG_BASE"..HEAD | sort > /tmp/mel_prog_changed
+          cat > /tmp/mel_prog_allowed <<'EOF'
+          crates/domains/symthaea-music-theory/src/lib.rs
+          crates/domains/symthaea-music-theory/src/prog_suite.rs
+          EOF
+          sort -o /tmp/mel_prog_allowed /tmp/mel_prog_allowed
+          diff -u /tmp/mel_prog_allowed /tmp/mel_prog_changed
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Install Rust 1.96 qualification toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Capture preflight identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mel-prog-plan"
+          {
+            echo 'schema=melothaea.mel-prog-plan.qualification.v1'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo "base_sha=$MEL_PROG_BASE"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "runner_os=$RUNNER_OS"
+            echo "runner_arch=$RUNNER_ARCH"
+            rustc -Vv
+            cargo -V
+          } > "$RUNNER_TEMP/mel-prog-plan/environment.txt"
+          cp /tmp/mel_prog_changed "$RUNNER_TEMP/mel-prog-plan/changed-files.txt"
+
+      - name: Formatting gate
+        run: cargo fmt --check -p symthaea-music-theory
+
+      - name: ProgSuite regressions
+        run: cargo test -p symthaea-music-theory prog_suite
+
+      - name: All-targets compile gate
+        run: cargo check -p symthaea-music-theory --all-targets
+
+      - name: All-targets Clippy gate
+        run: cargo clippy -p symthaea-music-theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal bounded qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/mel-prog-plan"
+          {
+            echo 'status=MEL_PROG_PLAN_ENGINEERING_PASS'
+            echo 'authority=prog-suite-plan-realization-engineering-only'
+            echo "subject_sha=$(git rev-parse HEAD)"
+            echo "subject_tree=$(git rev-parse HEAD^{tree})"
+            echo 'listener_form_claimed=false'
+            echo 'progressive_genre_authenticity_claimed=false'
+            echo 'artistic_quality_claimed=false'
+            echo 'legacy_surface_preserved_by_regression=true'
+            echo 'frozen_plan_controls_realization=true'
+          } > "$out/receipt.txt"
+          sha256sum \
+            "$out/environment.txt" \
+            "$out/changed-files.txt" \
+            "$out/receipt.txt" \
+            > "$out/SHA256SUMS"
+
+      - name: Postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$MEL_PROG_SUBJECT"
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Upload exact qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-prog-plan-${{ env.MEL_PROG_SUBJECT }}
+          path: ${{ runner.temp }}/mel-prog-plan/
+          retention-days: 90
