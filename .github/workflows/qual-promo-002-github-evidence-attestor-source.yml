@@ -1,0 +1,246 @@
+name: QUAL-PROMO-002 GitHub Evidence Attestor Source R2
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/qual-promo-002-collector.cjs"
+      - ".github/workflows/qual-promo-002-github-evidence-attestor.yml"
+      - ".github/workflows/qual-promo-002-github-evidence-attestor-source.yml"
+      - "crates/domains/symthaea-humanoid/src/bin/symthaea_qualification_manifest_verify.rs"
+      - "crates/domains/symthaea-humanoid/src/qualification_promotion.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-promo-002-source-r2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  EXPECTED_PARENT: 9fe82026c2dfa5827e843ae0ea68a38497cc1004
+  PROMO001_SOURCE: 58c299cce926aa66dad319e6856e595eff11cdc6
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-github-evidence-attestor-source-r2:
+    runs-on: ubuntu-slim
+    timeout-minutes: 35
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 4
+          persist-credentials: false
+
+      - name: Bind exact source and workflow-only qualifier delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          test "$(git rev-parse "$EXPECTED_PARENT^")" = "$PROMO001_SOURCE"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$EXPECTED_PARENT" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/qual-promo-002-github-evidence-attestor-source.yml")
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Bind frozen source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- \
+            .github/scripts/qual-promo-002-collector.cjs \
+            .github/workflows/qual-promo-002-github-evidence-attestor.yml \
+            crates/domains/symthaea-humanoid/src/bin/symthaea_qualification_manifest_verify.rs \
+            crates/domains/symthaea-humanoid/src/qualification_promotion.rs \
+            Cargo.toml Cargo.lock
+
+      - name: Verify manual read-only attestor workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          wf=.github/workflows/qual-promo-002-github-evidence-attestor.yml
+          grep -F 'workflow_dispatch:' "$wf"
+          ! grep -F 'pull_request:' "$wf"
+          ! grep -F 'push:' "$wf"
+          grep -F 'contents: read' "$wf"
+          grep -F 'actions: read' "$wf"
+          grep -F 'pull-requests: read' "$wf"
+          ! grep -Eq ':[[:space:]]*write([[:space:]]|$)' "$wf"
+          grep -F 'Require frozen first-attempt lineage' "$wf"
+          grep -F "record.get('run_attempt') != 1" "$wf"
+          grep -F 'run_attempt_policy=EXACTLY_1' "$wf"
+          grep -F 'symthaea_qualification_manifest_verify' "$wf"
+          grep -F 'd4_established_authority=NONE' "$wf"
+          grep -F 'qp_authority=NONE' "$wf"
+          grep -F 'physical_claim=NONE' "$wf"
+
+      - name: Verify collector syntax and exact v1 semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=.github/scripts/qual-promo-002-collector.cjs
+          node --check "$src"
+          grep -F 'run.run_attempt === 1' "$src"
+          grep -F 'attempt_number: 1' "$src"
+          grep -F 'run_attempt: 1' "$src"
+          grep -F '!/^0{64}$/.test(digestMatch[1])' "$src"
+          for needle in \
+            "currentPr.head?.sha === item.qualifierSha" \
+            "currentPr.base?.sha === item.sourceSha" \
+            "run.head_sha === item.qualifierSha" \
+            "run.status === 'completed'" \
+            "run.conclusion === 'success'" \
+            "jobs.length === 1" \
+            "job.name === item.jobName" \
+            "job.status === 'completed' && job.conclusion === 'success'" \
+            "step.status === 'completed' && step.conclusion === 'success'" \
+            "matches.length === 1" \
+            "!artifact.expired" \
+            "artifact.workflow_run?.head_sha === item.qualifierSha" \
+            "artifact.workflow_run?.repository_id === repository.id" \
+            "artifact.workflow_run?.head_repository_id === repository.id" \
+            "execution_state: 'ExecutablePassed'"; do
+            grep -F "$needle" "$src"
+          done
+          node <<'NODE'
+          const { EXPECTED } = require('./.github/scripts/qual-promo-002-collector.cjs');
+          if (EXPECTED.length !== 8) throw new Error(`expected 8 roles, found ${EXPECTED.length}`);
+          if (new Set(EXPECTED.map(x => x.role)).size !== 8) throw new Error('duplicate predecessor role');
+          for (const item of EXPECTED) {
+            if (!/^[0-9a-f]{40}$/.test(item.sourceSha)) throw new Error(`bad source SHA for ${item.role}`);
+            if (!/^[0-9a-f]{40}$/.test(item.qualifierSha)) throw new Error(`bad qualifier SHA for ${item.role}`);
+            if (!item.artifactName.endsWith(item.qualifierSha)) throw new Error(`artifact name not qualifier-bound for ${item.role}`);
+          }
+          NODE
+
+      - name: Verify Rust bridge remains non-network and non-authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=crates/domains/symthaea-humanoid/src/bin/symthaea_qualification_manifest_verify.rs
+          grep -F 'verify_authority_promotion_prerequisites_v1' "$src"
+          grep -F '!verification.verifies_external_execution_truth()' "$src"
+          grep -F '!verification.establishes_runtime_authority()' "$src"
+          ! grep -Ei 'reqwest|octocrab|github\.rest|ContactAuthorityStateMachineV1|EstablishedContactEvidenceV1|inverse_dynamics|qp_' "$src"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Verify locked graph
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Rustfmt
+        run: cargo fmt --check -p symthaea-humanoid
+
+      - name: Locked default all-target compile
+        run: cargo check -p symthaea-humanoid --all-targets --locked
+
+      - name: Exercise canonical manifest bridge and fail-closed negatives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/qual-promo-002"
+          node <<'NODE'
+          const fs = require('fs');
+          const { EXPECTED } = require('./.github/scripts/qual-promo-002-collector.cjs');
+          const digest = '0123456789abcdef'.repeat(4);
+          const records = EXPECTED.map((item, index) => ({
+            role: item.role,
+            source_sha: item.sourceSha,
+            qualifier_sha: item.qualifierSha,
+            workflow_name: item.workflowName,
+            workflow_id: item.workflowId,
+            run_id: item.runId,
+            run_attempt: 1,
+            execution_state: 'ExecutablePassed',
+            evidence_artifact_id: 1000 + index,
+            evidence_artifact_name: item.artifactName,
+            evidence_artifact_sha256: digest,
+          }));
+          fs.writeFileSync(process.env.RUNNER_TEMP + '/qual-promo-002/pass.json', JSON.stringify(records, null, 2));
+          for (const [name, mutate] of [
+            ['queued', r => { r[7].execution_state = 'QueuedInfrastructure'; }],
+            ['attempt2', r => { r[4].run_attempt = 2; }],
+            ['artifact-name', r => { r[3].evidence_artifact_name += '-substituted'; }],
+            ['zero-digest', r => { r[3].evidence_artifact_sha256 = '0'.repeat(64); }],
+          ]) {
+            const invalid = structuredClone(records);
+            mutate(invalid);
+            fs.writeFileSync(`${process.env.RUNNER_TEMP}/qual-promo-002/${name}.json`, JSON.stringify(invalid, null, 2));
+          }
+          NODE
+          cargo run -p symthaea-humanoid --bin symthaea_qualification_manifest_verify --locked -- \
+            "$RUNNER_TEMP/qual-promo-002/pass.json" "$RUNNER_TEMP/qual-promo-002/manifest.json"
+          for bad in queued attempt2 artifact-name zero-digest; do
+            if cargo run -p symthaea-humanoid --bin symthaea_qualification_manifest_verify --locked -- \
+              "$RUNNER_TEMP/qual-promo-002/$bad.json" "$RUNNER_TEMP/qual-promo-002/invalid-$bad.json"; then
+              echo "$bad fixture unexpectedly promoted" >&2
+              exit 1
+            fi
+          done
+
+      - name: Strict default Clippy
+        run: cargo clippy -p symthaea-humanoid --all-targets --locked -- -D warnings
+
+      - name: Source and lock postflight immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          git diff --quiet "$EXPECTED_PARENT" HEAD -- \
+            .github/scripts/qual-promo-002-collector.cjs \
+            .github/workflows/qual-promo-002-github-evidence-attestor.yml \
+            crates/domains/symthaea-humanoid \
+            Cargo.toml Cargo.lock
+
+      - name: Write source qualification receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qual-promo-002q-r2-evidence
+          {
+            echo "program=QUAL-PROMO-002Q-R2"
+            echo "authority=github-evidence-attestor-source-qualification-only"
+            echo "promo001_source=$PROMO001_SOURCE"
+            echo "attestor_source=$EXPECTED_PARENT"
+            echo "run_attempt_policy=EXACTLY_1"
+            echo "collector_attempt_query=EXACTLY_1"
+            echo "all_zero_artifact_digest_promotable=FALSE"
+            echo "predecessor_executable_pass_inherited=NONE"
+            echo "live_github_attestation_performed=FALSE"
+            echo "collector_manual_only=TRUE"
+            echo "collector_permissions=READ_ONLY"
+            echo "queued_infrastructure_negative_fixture=PASS"
+            echo "attempt2_negative_fixture=PASS"
+            echo "artifact_name_negative_fixture=PASS"
+            echo "zero_digest_negative_fixture=PASS"
+            echo "d4_established_authority=NONE"
+            echo "qp_authority=NONE"
+            echo "physical_claim=NONE"
+            echo "subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "format=PASS"
+            echo "compile_default=PASS"
+            echo "strict_clippy=PASS"
+            echo "postflight_source_immutable=PASS"
+          } > qual-promo-002q-r2-evidence/receipt.txt
+
+      - name: Upload source qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: qual-promo-002q-r2-${{ github.event.pull_request.head.sha || github.sha }}
+          path: qual-promo-002q-r2-evidence/
+          if-no-files-found: error
