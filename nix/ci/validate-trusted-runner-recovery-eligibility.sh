@@ -4,7 +4,7 @@
 # Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 #
 # Queue-neutral Stage-E eligibility verifier. It joins the exact promotion.v5
-# and smoke.v1 evidence objects before any trusted recovery workload is eligible.
+# and smoke.v2 evidence objects before any trusted recovery workload is eligible.
 
 set -euo pipefail
 umask 077
@@ -107,20 +107,22 @@ smoke_main_tree="$(manifest_value "$SMOKE_MANIFEST_PATH" source_tree)"
 smoke_workflow_blob="$(manifest_value "$SMOKE_MANIFEST_PATH" smoke_workflow_blob)"
 smoke_runner_module_blob="$(manifest_value "$SMOKE_MANIFEST_PATH" runner_module_blob)"
 smoke_routing_policy_blob="$(manifest_value "$SMOKE_MANIFEST_PATH" routing_policy_blob)"
+smoke_host_boot_id="$(manifest_value "$SMOKE_MANIFEST_PATH" host_boot_id)"
 runner_name="$(manifest_value "$SMOKE_MANIFEST_PATH" runner_name)"
 runner_os="$(manifest_value "$SMOKE_MANIFEST_PATH" runner_os)"
 runner_arch="$(manifest_value "$SMOKE_MANIFEST_PATH" runner_arch)"
 
-[[ "$smoke_schema" == 'symthaea.trusted-runner.smoke.v1' ]]
+[[ "$smoke_schema" == 'symthaea.trusted-runner.smoke.v2' ]]
 [[ "$smoke_result" == 'PASS' ]]
 [[ "$smoke_repository" == 'Luminous-Dynamics/symthaea' ]]
 [[ "$smoke_ref" == 'refs/heads/main' ]]
 [[ "$smoke_run_id" =~ ^[0-9]+$ ]]
 [[ "$smoke_run_attempt" =~ ^[0-9]+$ ]]
+[[ "$smoke_host_boot_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$ ]]
 for value in "$smoke_main_head" "$smoke_main_tree" "$smoke_workflow_blob" "$smoke_runner_module_blob" "$smoke_routing_policy_blob"; do
   [[ "$value" =~ ^[0-9a-f]{40}$ ]]
 done
-for pass_key in runner_policy_eval routing_policy_eval minimal_locked_rust_check source_immutability_checked; do
+for pass_key in runner_policy_eval routing_policy_eval minimal_locked_rust_check stage_f_authorization_consumer source_immutability_checked; do
   [[ "$(manifest_value "$SMOKE_MANIFEST_PATH" "$pass_key")" == 'PASS' ]]
 done
 [[ "$(manifest_value "$SMOKE_MANIFEST_PATH" evidence_scope)" == 'trusted-cpu-correctness-smoke-only' ]]
@@ -175,9 +177,9 @@ git -c protocol.version=2 fetch --no-tags origin \
 [[ "$(git rev-parse refs/remotes/origin/main)" == "$public_main" ]]
 [[ "$(git rev-parse "refs/remotes/origin/${RECOVERY_BRANCH}")" == "$public_recovery" ]]
 
-manifest="$(mktemp /tmp/symthaea-trusted-runner-recovery-eligibility-v4.XXXXXX)"
+manifest="$(mktemp /tmp/symthaea-trusted-runner-recovery-eligibility-v5.XXXXXX)"
 cat > "$manifest" <<EOF
-schema=symthaea.trusted-runner.recovery-eligibility.v4
+schema=symthaea.trusted-runner.recovery-eligibility.v5
 result=PASS
 promotion_manifest_sha256=$PROMOTION_MANIFEST_SHA256
 smoke_manifest_sha256=$SMOKE_MANIFEST_SHA256
@@ -188,6 +190,7 @@ operator_authorization_stage_f_authority=$promotion_operator_authorization_stage
 authorized_recovery_head=$authorized_recovery_head
 qualified_main_head=$public_main
 qualified_main_tree=$public_main_tree
+qualified_host_boot_id=$smoke_host_boot_id
 smoke_run_id=$smoke_run_id
 smoke_run_attempt=$smoke_run_attempt
 runner_name=$runner_name
@@ -201,6 +204,7 @@ recovery_eligibility_verifier_blob=$recovery_eligibility_verifier_blob
 operator_authorization_continuity_checked=PASS
 recovery_verifier_syntax_checked=PASS
 promotion_smoke_join_checked=PASS
+host_boot_identity_checked=PASS
 current_main_identity_checked=PASS
 current_recovery_identity_checked=PASS
 local_verifier_identity_checked=PASS
