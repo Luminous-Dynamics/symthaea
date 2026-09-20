@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "protocol": "DE-001A2EI-FIXTURE-EXECUTOR-v1",
+  "status": "implementation-frozen-unqualified",
+  "scientific_claim": "NONE",
+  "authority": "fixture-executor-implementation-only",
+  "request_protocol": "DE-001A2EI-FIXTURE-EXECUTION-REQUEST-v1",
+  "receipt_protocol": "DE-001A2EI-FIXTURE-EXECUTION-v1",
+  "execution_mode": "fixture-qualification-only",
+  "production_raw_result_protocol": "DE-001A2E-RAW-OPTIMIZER-EXECUTION-v1",
+  "executor_implementation_qualified": false,
+  "optimizer_execution_authorized": false,
+  "a2_execution_authorized": false,
+  "real_optimizer_execution_authorized": false,
+  "a2q_execution_authorized": false,
+  "reproduction_verdict": "UNASSESSED",
+  "process_policy": {
+    "process_invocations_per_executor_process": 1,
+    "automatic_retry_allowed": false,
+    "preflight_process_invocation_allowed": false,
+    "dry_run_process_invocation_allowed": false,
+    "environment_cleared": true,
+    "working_directory_is_exact_result_root": true,
+    "stdout_stderr_capture_bounded": true,
+    "max_capture_bytes_per_stream": 1048576,
+    "max_result_files": 64,
+    "max_result_file_bytes": 16777216,
+    "max_result_aggregate_bytes": 67108864
+  },
+  "fixed_environment": {
+    "LANG": "C",
+    "LC_ALL": "C",
+    "TZ": "UTC",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "RAYON_NUM_THREADS": "1"
+  },
+  "identity_policy": {
+    "request_sha256_pre_post_required": true,
+    "executor_sha256_pre_post_required": true,
+    "child_executable_sha256_pre_post_required": true,
+    "exact_argv_bytes_persisted": true,
+    "stdout_bytes_persisted": true,
+    "stderr_bytes_persisted": true,
+    "result_manifest_bytes_persisted": true
+  },
+  "filesystem_policy": {
+    "request_absolute_real_regular_file": true,
+    "executor_absolute_real_regular_file": true,
+    "child_executable_absolute_real_regular_file": true,
+    "result_root_absolute_real_directory": true,
+    "evidence_root_absolute_real_empty_directory": true,
+    "result_and_evidence_roots_disjoint": true,
+    "relative_result_paths_normal_segments_only": true,
+    "backslash_allowed_in_result_paths": false,
+    "duplicate_result_roles_allowed": false,
+    "duplicate_result_paths_allowed": false,
+    "preexisting_result_files_allowed": false,
+    "intermediate_symlinks_allowed": false,
+    "terminal_symlinks_allowed": false,
+    "terminal_non_regular_entries_allowed": false
+  },
+  "promotion_boundary": {
+    "fixture_execution_establishes_executor_implementation_qualification": false,
+    "fixture_execution_establishes_network_isolation": false,
+    "fixture_execution_establishes_real_optimizer_authority": false,
+    "scientific_claim": "NONE"
+  }
+}
