@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-scip-realization-receipt"
+version = "0.1.0"
+edition = "2024"
+description = "Opaque evidence receipts for transactionally accepted SCIP language surfaces"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea = { path = "../../..", default-features = false }
+symthaea-communication = { workspace = true }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+symthaea-scip-llm-adapter = { path = "../symthaea-scip-llm-adapter" }
+symthaea-scip-llm-transactional = { path = "../symthaea-scip-llm-transactional" }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+async-trait = "0.1"
+tokio = { workspace = true }
