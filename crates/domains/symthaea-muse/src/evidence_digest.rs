@@ -8,6 +8,8 @@ pub mod prog_suite_contextual_harmony_audio_evidence;
 pub mod prog_suite_contextual_harmony_audio_panel;
 #[path = "prog_suite_contextual_harmony_audio_protocol.rs"]
 pub mod prog_suite_contextual_harmony_audio_protocol;
+#[path = "prog_suite_contextual_harmony_section_audio.rs"]
+pub mod prog_suite_contextual_harmony_section_audio;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
