@@ -12,6 +12,7 @@
 #![warn(missing_docs)]
 
 pub mod aging;
+pub mod authority_firewall;
 pub mod compound_stability;
 pub mod conditioned_property;
 pub mod database;
@@ -33,6 +34,10 @@ pub mod thermodynamic_evidence;
 pub mod wolverine_ablation;
 
 pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialAgingModel};
+pub use authority_firewall::{
+    AcquisitionFeature, AdvisoryMaterialPrediction, AdvisoryPredictionKind, AdvisorySourceRef,
+    AuthorityFirewallError, ScientificEvaluationRef,
+};
 pub use conditioned_property::{
     ConditionedPropertyError, ConditionedPropertyObservation, PropertyArtifactRef,
     PropertyConditionTag, PropertyConditions, PropertyEvidenceClass, PropertyObservationMethod,
