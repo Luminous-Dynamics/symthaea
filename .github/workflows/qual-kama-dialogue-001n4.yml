@@ -1,0 +1,33 @@
+name: QUAL KAMA-DIALOGUE-001N4 exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/kama-dialogue-001n4-index-build-receipts
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head reflective index-build qualification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: 93c7783fc8a3c1d37868c29af5e977bc54d2b989
+          fetch-depth: 1
+      - name: Verify exact subject
+        run: test "$(git rev-parse HEAD)" = "93c7783fc8a3c1d37868c29af5e977bc54d2b989"
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: rustfmt
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: targeted tests
+        run: cargo test -p symthaea-communication --test reflective_memory_index_build
+      - name: clippy
+        run: cargo clippy -p symthaea-communication --test reflective_memory_index_build -- -D warnings
