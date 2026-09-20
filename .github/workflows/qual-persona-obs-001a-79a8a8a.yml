@@ -1,0 +1,38 @@
+name: QUAL PERSONA-OBS-001A exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/persona-obs-001a-continuity
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 79a8a8ae9d30571be6c8136213fa384923036efb
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "79a8a8ae9d30571be6c8136213fa384923036efb"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Exact persona observatory test
+        run: cargo test -p symthaea-communication --test persona_continuity_observatory
+
+      - name: Clippy exact persona observatory
+        run: cargo clippy -p symthaea-communication --test persona_continuity_observatory -- -D warnings
