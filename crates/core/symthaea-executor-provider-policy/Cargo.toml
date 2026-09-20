@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-executor-provider-policy"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.94"
+license.workspace = true
+description = "Canonical provider trust-policy manifests for Symthaea executor identity composition"
+publish = false
+
+[dependencies]
+sha2 = { workspace = true }
+symthaea-executor-identity = { path = "../symthaea-executor-identity" }
+symthaea-executor-subject-graph = { path = "../symthaea-executor-subject-graph" }
+symthaea-interaction-core = { path = "../symthaea-interaction-core" }
+thiserror = { workspace = true }
