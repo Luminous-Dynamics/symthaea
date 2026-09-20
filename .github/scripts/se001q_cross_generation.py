@@ -2,7 +2,7 @@
 import argparse, hashlib, json
 from pathlib import Path
 
-DOMAIN="symthaea.se001q.cross-generation-corroboration.v1"
+DOMAIN="symthaea.se001q.cross-generation-corroboration.v1.1"
 ACCEPTED={"symthaea.se001q.lock-delta-verification.v1","symthaea.se001q.lock-delta-verification.v2"}
 STRONG="symthaea.se001q.lock-delta-verification.v2"
 
@@ -62,6 +62,10 @@ def load(root_arg,verification_arg,prov):
     if v.get("observation_id")!=s["observation_id"] or v.get("manifest_id")!=m["manifest_id"] or v.get("lock_delta_witness_id")!=w["witness_id"]: die(f"{root}: verification bindings mismatch")
     si=s["identity"]; wi=w["identity"]
     if si.get("status")!="REPRODUCIBLE_LOCK_DELTA": die(f"{root}: summary status mismatch")
+    experiment_sha=si.get("experiment_sha256")
+    if not isinstance(experiment_sha,str) or not experiment_sha.startswith("sha256:"): die(f"{root}: missing experiment digest")
+    capture_protocol=si.get("capture_protocol")
+    if not isinstance(capture_protocol,str) or not capture_protocol: die(f"{root}: missing capture protocol")
     sl=source_lock(root); gl=generated_lock(root)
     if sha_file(sl)!=wi.get("source_lock_sha256") or sha_file(gl)!=wi.get("generated_lock_sha256"): die(f"{root}: retained lock bytes mismatch witness")
     for k in ("run_id","artifact_id","artifact_zip_sha256","verifier_sha"):
@@ -71,7 +75,7 @@ def load(root_arg,verification_arg,prov):
 
 def rec(label,c):
     si=c["summary"]["identity"]; p=c["prov"]
-    return {"label":label,"run_id":str(p["run_id"]),"artifact_id":str(p["artifact_id"]),"artifact_zip_sha256":p["artifact_zip_sha256"],"verifier_sha":p["verifier_sha"],"verification_schema":c["verification"]["schema"],"observation_id":c["summary"]["observation_id"],"manifest_id":c["manifest"]["manifest_id"],"lock_delta_witness_id":c["witness"]["witness_id"],"experiment_id":si["experiment_id"],"toolchain":si["toolchain"]}
+    return {"label":label,"run_id":str(p["run_id"]),"artifact_id":str(p["artifact_id"]),"artifact_zip_sha256":p["artifact_zip_sha256"],"verifier_sha":p["verifier_sha"],"verification_schema":c["verification"]["schema"],"observation_id":c["summary"]["observation_id"],"manifest_id":c["manifest"]["manifest_id"],"lock_delta_witness_id":c["witness"]["witness_id"],"experiment_id":si["experiment_id"],"experiment_sha256":si["experiment_sha256"],"capture_protocol":si["capture_protocol"],"toolchain":si["toolchain"]}
 
 def main():
     ap=argparse.ArgumentParser()
@@ -84,15 +88,16 @@ def main():
     a=load(ns.evidence_a,ns.verification_a,prov("a")); b=load(ns.evidence_b,ns.verification_b,prov("b"))
     ai=a["summary"]["identity"]; bi=b["summary"]["identity"]
     if ai.get("subject",{}).get("sha")!=bi.get("subject",{}).get("sha"): die("subject mismatch")
-    if ai.get("experiment_id")!=bi.get("experiment_id"): die("experiment mismatch")
+    if ai.get("experiment_id")!=bi.get("experiment_id"): die("experiment id mismatch")
+    if ai.get("experiment_sha256")!=bi.get("experiment_sha256"): die("experiment digest mismatch")
     if ai.get("toolchain")!=bi.get("toolchain"): die("toolchain mismatch")
     if a["source"].read_bytes()!=b["source"].read_bytes(): die("source lock mismatch")
     if a["generated"].read_bytes()!=b["generated"].read_bytes(): die("generated lock mismatch")
     ra,rb=rec("A",a),rec("B",b)
     if ra["run_id"]==rb["run_id"] or ra["artifact_id"]==rb["artifact_id"] or ra["verifier_sha"]==rb["verifier_sha"]: die("independence predicate failed")
     if sum(x["verification_schema"]==STRONG for x in (ra,rb))<1: die("at least one v2 verifier required")
-    ident={"domain":DOMAIN,"subject_sha":ai["subject"]["sha"],"experiment_id":ai["experiment_id"],"source_lock_sha256":sha_file(a["source"]),"generated_lock_sha256":sha_file(a["generated"]),"toolchain":ai["toolchain"],"runs":[ra,rb],"independence":{"distinct_run_ids":True,"distinct_artifact_ids":True,"distinct_verifier_generations":True,"strong_independent_verifier_present":True,"source_lock_bytes_identical":True,"generated_lock_bytes_identical":True},"result":"CORROBORATED_GENERATED_LOCK","authority":{"meaning":"cross-generation corroboration only","sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"}}
+    ident={"domain":DOMAIN,"subject_sha":ai["subject"]["sha"],"experiment_id":ai["experiment_id"],"experiment_sha256":ai["experiment_sha256"],"source_lock_sha256":sha_file(a["source"]),"generated_lock_sha256":sha_file(a["generated"]),"toolchain":ai["toolchain"],"runs":[ra,rb],"independence":{"distinct_run_ids":True,"distinct_artifact_ids":True,"distinct_verifier_generations":True,"strong_independent_verifier_present":True,"experiment_bytes_identical":True,"source_lock_bytes_identical":True,"generated_lock_bytes_identical":True},"result":"CORROBORATED_GENERATED_LOCK","authority":{"meaning":"cross-generation corroboration only","sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"}}
     out={"schema":DOMAIN,"corroboration_id":sha_bytes(canonical(ident)),"identity":ident}; reject_authority(out)
     p=Path(ns.output); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(out,indent=2,sort_keys=True)+"\n")
-    print(json.dumps({"schema":DOMAIN,"result":ident["result"],"corroboration_id":out["corroboration_id"],"generated_lock_sha256":ident["generated_lock_sha256"],"sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"},sort_keys=True))
+    print(json.dumps({"schema":DOMAIN,"result":ident["result"],"corroboration_id":out["corroboration_id"],"experiment_sha256":ident["experiment_sha256"],"generated_lock_sha256":ident["generated_lock_sha256"],"sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"},sort_keys=True))
 if __name__=="__main__": main()
