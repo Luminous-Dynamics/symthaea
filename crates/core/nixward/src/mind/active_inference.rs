@@ -315,11 +315,10 @@ impl NixActiveInference {
             1.0
         };
 
-        // Episodic valence: past outcomes for similar states, filtered by action category
-        let action_str = format!("{:?}", action);
+        // Episodic valence uses exact typed planner semantics, never Debug text.
         let episodic = self
             .episodic_memory
-            .predict_valence_for_action(self.world_model.system_state(), &action_str);
+            .predict_valence_for_planner_action(self.world_model.system_state(), action);
 
         // Expected free energy (lower = better)
         // EFE = -(pragmatic + curiosity * epistemic + episodic_weight * episodic)
@@ -351,7 +350,11 @@ impl NixActiveInference {
         self.world_model.observe(state);
     }
 
-    /// Learn from an observed action outcome.
+    /// Learn from an observed abstract planner-action outcome.
+    ///
+    /// This records the `ActionCategory` itself. It deliberately does not invent
+    /// package names, channels, systemd commands, or safety levels merely to make
+    /// the episode look executable. Command realization is a separate boundary.
     pub fn learn_from_outcome(
         &mut self,
         state_before: &ContinuousHV,
@@ -395,60 +398,17 @@ impl NixActiveInference {
             .learn_transition(state_before, action.clone(), state_after);
         self.world_model.observe(state_after.clone());
 
-        // Record in episodic memory (Φ-gated)
-        #[cfg(feature = "native")]
-        {
-            use crate::action::executor::NixOSCommand;
-            let cmd = match &action {
-                ActionCategory::Install => NixOSCommand::EnvInstall {
-                    packages: vec!["unknown".into()],
-                },
-                ActionCategory::Remove => NixOSCommand::EnvRemove {
-                    packages: vec!["unknown".into()],
-                },
-                ActionCategory::Rebuild => NixOSCommand::RebuildSwitch {
-                    flake: None,
-                    extra_args: vec![],
-                },
-                ActionCategory::Rollback => NixOSCommand::EnvRollback,
-                ActionCategory::GarbageCollect => NixOSCommand::CollectGarbage {
-                    older_than_days: None,
-                    delete_all: false,
-                },
-                ActionCategory::Update => NixOSCommand::Channel {
-                    operation: crate::action::executor::ChannelOperation::Update { channel: None },
-                },
-                _ => NixOSCommand::Custom {
-                    command: format!("{action:?}"),
-                    args: vec![],
-                    safety_level: crate::action::executor::SafetyLevel::ReadOnly,
-                },
-            };
-
-            self.episodic_memory.record_transition(
-                state_before.clone(),
-                &cmd,
-                state_after.clone(),
-                outcome.clone(),
-                phi,
-                prediction_error,
-            );
-        }
-        #[cfg(not(feature = "native"))]
-        {
-            // Without native, record a simplified episode directly
-            let episode = super::episodic_memory::SystemEpisode {
-                state_before: state_before.clone(),
-                action: format!("{action:?}"),
-                state_after: state_after.clone(),
-                outcome,
-                phi_at_encoding: phi,
-                prediction_error,
-                emotional_valence: 0.0,
-                timestamp: 0,
-            };
-            self.episodic_memory.record(episode);
-        }
+        // Record the abstract planner semantic directly (Φ-gated). This is the
+        // same path in native and non-native builds; feature selection cannot
+        // change action identity or fabricate a different command representation.
+        self.episodic_memory.record_planner_transition(
+            state_before.clone(),
+            action,
+            state_after.clone(),
+            outcome,
+            phi,
+            prediction_error,
+        );
     }
 
     /// All standard NixOS action categories.
@@ -556,7 +516,6 @@ mod tests {
     fn test_process_input_clear_goal() {
         let mut engine = NixActiveInference::new();
 
-        // Observe some initial state
         let initial_state = ContinuousHV::random(symthaea_core::hdc::HDC_DIMENSION, 1);
         engine.observe_state(initial_state);
 
@@ -581,7 +540,6 @@ mod tests {
         engine.observe_state(initial);
 
         let plan = engine.process_input("install nginx");
-        // Actions should be sorted by EFE (ascending)
         for window in plan.actions.windows(2) {
             assert!(
                 window[0].expected_free_energy <= window[1].expected_free_energy + 1e-10,
@@ -600,10 +558,8 @@ mod tests {
         let state_before = ContinuousHV::random(dim, 1);
         let _state_after = ContinuousHV::random(dim, 2);
 
-        // Observe initial state
         engine.observe_state(state_before.clone());
 
-        // Learn from multiple install transitions
         for i in 0..5 {
             let before = ContinuousHV::random(dim, i * 10 + 1);
             let after = ContinuousHV::random(dim, i * 10 + 2);
@@ -616,9 +572,39 @@ mod tests {
             );
         }
 
-        // After learning, the world model should have data for Install
         assert!(engine.world_model().has_learned(&ActionCategory::Install));
         assert!(engine.episode_count() > 0);
+    }
+
+    #[test]
+    fn test_learning_records_exact_planner_semantics() {
+        let dim = symthaea_core::hdc::HDC_DIMENSION;
+        let mut engine = NixActiveInference::new();
+        let before = ContinuousHV::random(dim, 700);
+        let after = ContinuousHV::random(dim, 701);
+
+        engine.learn_from_outcome(
+            &before,
+            ActionCategory::Enable,
+            &after,
+            EpisodeOutcome::Failure("enable failed".into()),
+            0.8,
+        );
+
+        assert_eq!(
+            engine
+                .episodic_memory()
+                .retrieve_by_planner_action(&ActionCategory::Enable)
+                .len(),
+            1
+        );
+        assert!(
+            engine
+                .episodic_memory()
+                .retrieve_by_planner_action(&ActionCategory::Custom("Enable".into()))
+                .is_empty(),
+            "Custom display text must not collide with the typed Enable category"
+        );
     }
 
     #[test]
@@ -643,23 +629,12 @@ mod tests {
         assert!(!plan.actions.is_empty());
     }
 
-    // ── Epistemic Modulation Tests ──────────────────────────────────────────
-    // These tests cover the conservative curiosity/prediction-error coupling
-    // introduced in `learn_from_outcome`. They are deliberately mechanical:
-    // no HDC similarity math — just clamp semantics and monotonicity.
-
-    /// A single high-surprise outcome MUST increase curiosity_weight, but
-    /// must never push it above the hard ceiling of 0.8.
     #[test]
     fn test_epistemic_high_surprise_increases_curiosity_bounded() {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
-        // Start at default weight (0.3)
         let mut engine = NixActiveInference::new();
         assert!((engine.curiosity_weight() - 0.3).abs() < 1e-9);
 
-        // Use seeds chosen so that random HVs have near-zero cosine similarity,
-        // guaranteeing prediction_error > 0.4 (HVs in 8192-D are ~orthogonal by
-        // construction; similarity ≈ 0, so error ≈ 1.0).
         let before = ContinuousHV::random(dim, 1);
         let after = ContinuousHV::random(dim, 999);
         engine.observe_state(before.clone());
@@ -677,12 +652,10 @@ mod tests {
         assert!(w <= 0.8, "curiosity must not exceed ceiling 0.8 (got {w})");
     }
 
-    /// Curiosity weight must NEVER exceed 0.8 even after many consecutive
-    /// high-surprise outcomes (saturation safety).
     #[test]
     fn test_epistemic_repeated_high_surprise_saturates_safely() {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
-        let mut engine = NixActiveInference::with_curiosity(0.7); // near ceiling
+        let mut engine = NixActiveInference::with_curiosity(0.7);
 
         for i in 0..40u64 {
             let before = ContinuousHV::random(dim, i * 2);
@@ -703,25 +676,18 @@ mod tests {
         }
     }
 
-    /// A single low-surprise outcome MUST decrease curiosity_weight, but
-    /// must never drop it below the hard floor of 0.1.
     #[test]
     fn test_epistemic_low_surprise_decreases_curiosity_bounded() {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
-        // Seed world model with a known Install transition so that
-        // the prediction has some non-trivial state (the actual cosine
-        // similarity at high dim will still likely be low, but we use
-        // identical vectors to guarantee zero error).
         let mut engine = NixActiveInference::new();
         let state = ContinuousHV::random(dim, 77);
         engine.observe_state(state.clone());
 
-        // Learn the same transition five times so the world model adapts.
         for _ in 0..5 {
             engine.learn_from_outcome(
                 &state,
                 ActionCategory::Install,
-                &state, // identical before/after → similarity = 1.0 → error = 0
+                &state,
                 EpisodeOutcome::Success,
                 0.5,
             );
@@ -738,12 +704,10 @@ mod tests {
         );
     }
 
-    /// Curiosity weight must NEVER fall below 0.1 even after many consecutive
-    /// low-surprise outcomes (stabilisation floor safety).
     #[test]
     fn test_epistemic_repeated_low_surprise_stabilises_safely() {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
-        let mut engine = NixActiveInference::with_curiosity(0.15); // near floor
+        let mut engine = NixActiveInference::with_curiosity(0.15);
         let state = ContinuousHV::random(dim, 42);
         engine.observe_state(state.clone());
 
@@ -751,7 +715,7 @@ mod tests {
             engine.learn_from_outcome(
                 &state,
                 ActionCategory::Update,
-                &state, // zero error
+                &state,
                 EpisodeOutcome::Success,
                 0.5,
             );
@@ -763,8 +727,6 @@ mod tests {
         }
     }
 
-    /// Action selection must be deterministic for identical observations and
-    /// goals (same seed, no interleaved learning).
     #[test]
     fn test_epistemic_action_selection_deterministic() {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
@@ -777,8 +739,6 @@ mod tests {
         engine_b.observe_state(ContinuousHV::random(dim, 7));
         let plan_b = engine_b.process_input("install vim");
 
-        // Both engines started from identical state; plans must agree on the
-        // top-ranked action category.
         assert_eq!(
             plan_a.actions.first().map(|a| &a.action),
             plan_b.actions.first().map(|a| &a.action),
@@ -818,33 +778,23 @@ mod tests {
         let dim = symthaea_core::hdc::HDC_DIMENSION;
         let mut engine = NixActiveInference::new();
 
-        // 1. Observe a state
         let state = ContinuousHV::random(dim, 100);
         engine.observe_state(state.clone());
 
-        // 2. Populate episodic memory with catastrophic failures for Rebuild
-        // (valence = -1.0) under this exact state.
         for i in 0..5 {
-            let episode = crate::mind::episodic_memory::SystemEpisode {
-                state_before: state.clone(),
-                action: format!("{:?}", ActionCategory::Rebuild),
-                state_after: ContinuousHV::random(dim, 200 + i),
-                outcome: EpisodeOutcome::Failure("segfault".into()),
-                phi_at_encoding: 0.8,
-                prediction_error: 0.8,
-                emotional_valence: -1.0,
-                timestamp: 0,
-            };
-            engine.episodic_memory_mut().record(episode);
+            assert!(engine.episodic_memory_mut().record_planner_transition(
+                state.clone(),
+                ActionCategory::Rebuild,
+                ContinuousHV::random(dim, 200 + i),
+                EpisodeOutcome::Failure("segfault".into()),
+                0.8,
+                0.8,
+            ));
         }
 
-        // 3. Process goal for this state.
-        // Even if Rebuild is predicted to lead to the goal, the safety override
-        // must penalize it because predicted valence is highly negative (< -0.7).
         let goal_state = ContinuousHV::random(dim, 300);
         let plan = engine.process_goal(&goal_state);
 
-        // Find the scored action for Rebuild
         let rebuild_score = plan
             .actions
             .iter()
@@ -873,7 +823,6 @@ mod tests {
         let risk_initial = engine.risk_aversion();
         assert_eq!(risk_initial, 0.2, "Initial risk aversion should be 0.2");
 
-        // 1. Simulate failure outcome -> risk aversion should increase
         engine.learn_from_outcome(
             &state_before,
             ActionCategory::Rebuild,
@@ -889,7 +838,6 @@ mod tests {
             risk_initial
         );
 
-        // 2. Simulate success outcomes -> risk aversion should decrease (optimism)
         for _ in 0..5 {
             engine.learn_from_outcome(
                 &state_before,
