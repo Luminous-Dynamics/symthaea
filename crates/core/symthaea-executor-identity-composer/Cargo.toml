@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-executor-identity-composer"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.94"
+license.workspace = true
+description = "Trusted ownership kernel for opaque live executor identity bindings in Symthaea"
+publish = false
+
+[dependencies]
+sha2 = { workspace = true }
+symthaea-executor-identity = { path = "../symthaea-executor-identity" }
+symthaea-executor-subject-graph = { path = "../symthaea-executor-subject-graph" }
+symthaea-interaction-core = { path = "../symthaea-interaction-core" }
+thiserror = { workspace = true }
