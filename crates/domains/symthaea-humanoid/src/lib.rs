@@ -3,6 +3,7 @@
 
 pub mod actuation;
 pub mod behavior_2026_observatory;
+pub mod behavior_2026_submission;
 pub mod capability_observatory;
 pub mod centroidal;
 pub mod contact;
@@ -61,6 +62,7 @@ pub mod vision_terrain;
 pub mod whole_body;
 pub use actuation::*;
 pub use behavior_2026_observatory::*;
+pub use behavior_2026_submission::*;
 pub use capability_observatory::*;
 pub use centroidal::*;
 pub use contact_inverse_dynamics::*;
