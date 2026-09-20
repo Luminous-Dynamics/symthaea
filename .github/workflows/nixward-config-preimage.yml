@@ -1,0 +1,45 @@
+name: Nixward Config Preimage
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/core/nixward/src/action/config_writer.rs"
+      - "crates/core/nixward/tests/config_writer_preimage.rs"
+      - "scripts/qualify_nixward_config_preimage.sh"
+      - ".github/workflows/nixward-config-preimage.yml"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  config-preimage:
+    # Deliberately executes for draft PRs. This is a focused exact-head
+    # state-binding regression lane, not repository-wide qualification.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Qualify ConfigWriter pre-image binding
+        run: bash scripts/qualify_nixward_config_preimage.sh
