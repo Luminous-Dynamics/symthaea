@@ -16,6 +16,7 @@ pub mod gc_manager;
 pub mod generation_manager;
 pub mod phi_gate;
 pub mod plan_executor;
+pub mod realization;
 pub mod service_manager;
 
 pub use authorization::{
@@ -34,4 +35,10 @@ pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
 pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
+pub use realization::{
+    ACTION_REALIZATION_PROFILE_V1, ActionRealizerV1, NixActionTargetV1,
+    ObservationWindowV1, RealizationDispositionV1, RealizationOutcomeV1,
+    RealizationReasonV1, TargetCurrentnessV1, TargetEvidenceErrorV1,
+    TargetEvidenceSourceV1, TargetEvidenceV1,
+};
 pub use service_manager::{ServiceManager, ServiceStatus};
