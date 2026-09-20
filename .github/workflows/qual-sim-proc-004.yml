@@ -1,0 +1,136 @@
+name: QUAL SIM-PROC-004 exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-sim-proc-004-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head content-addressed file-I/O qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: ba6b4c4cfd6976623ffeff46a64376a152014e86
+      SOURCE_PARENT: a1c44cf6d42cf6415fa17af6cf24d19f2d135015
+      PACKAGE: symthaea-process-file-io
+      CRATE: crates/bridges/symthaea-process-file-io
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: ba6b4c4cfd6976623ffeff46a64376a152014e86
+          fetch-depth: 2
+
+      - name: Verify exact source identity and semantic scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 4
+          test "${changed[0]}" = "$CRATE/Cargo.toml"
+          test "${changed[1]}" = "$CRATE/src/bin/file_io_launcher.rs"
+          test "${changed[2]}" = "$CRATE/src/lib.rs"
+          test "${changed[3]}" = "$CRATE/tests/file_io_binding.rs"
+          echo "qualified_subject=$SOURCE_SHA"
+          echo "qualified_parent=$SOURCE_PARENT"
+          echo "semantic_diff_paths=PASS"
+
+      - name: Prove create-new and content-addressed file contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          lib="$CRATE/src/lib.rs"
+          launcher="$CRATE/src/bin/file_io_launcher.rs"
+          tests="$CRATE/tests/file_io_binding.rs"
+          grep -Fq 'digest.finalize()' "$lib"
+          grep -Fq 'digest.finalize()' "$launcher"
+          grep -Fq 'verified_input_is_copied_to_create_new_output' "$tests"
+          grep -Fq 'wrong_input_identity_never_creates_output' "$tests"
+          grep -Fq 'existing_output_fails_before_launch' "$tests"
+          grep -Fq 'OpenOptions' "$launcher"
+          grep -Fq 'create_new(true)' "$launcher"
+          echo "file_content_identity_contract=PASS"
+          echo "create_new_output_contract=PASS"
+          echo "sha256_finalization_contract=PASS"
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/sim-proc-004-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+
+      - name: Rustfmt exact file-I/O crate
+        run: cargo fmt --manifest-path "$CRATE/Cargo.toml" -- --check
+
+      - name: Compile and run all file-I/O targets
+        run: cargo test -p "$PACKAGE" --all-targets
+
+      - name: Strict Clippy on file-I/O targets
+        run: cargo clippy -p "$PACKAGE" --all-targets -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- Cargo.lock "$CRATE"
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_CONTENT_ADDRESSED_FILE_IO"
+          echo "parent_source_qualification=EXTERNAL_DEPENDENCY_PR_5112"
+          echo "large_artifact_execution_claim=TEST_FIXTURES_ONLY"
+          echo "scientific_result_authority=NONE"
+          echo "materials_discovery_claim=NONE"
