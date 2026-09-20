@@ -102,6 +102,7 @@ pub mod thematic_score_evidence;
 pub mod thematic_source_material;
 pub mod voicing;
 pub mod work_obligation;
+pub mod work_obligation_evidence;
 pub mod work_plan;
 
 pub use accompaniment::Accompaniment;
@@ -284,6 +285,14 @@ pub use voicing::{lead_bass, lead_upper};
 pub use work_obligation::{
     ObligationDueWindowV2, WORK_OBLIGATION_PLAN_VERSION, WorkObligationErrorV2,
     WorkObligationKindV2, WorkObligationPlanV2, WorkObligationV2,
+};
+pub use work_obligation_evidence::{
+    WORK_OBLIGATION_EVIDENCE_PROJECTION_VERSION, WorkObligationEvidenceDispositionV1,
+    WorkObligationEvidencePreservationV1, WorkObligationEvidenceProjectionErrorV1,
+    WorkObligationEvidenceProjectionLossV1, WorkObligationEvidenceProjectionNonClaimV1,
+    WorkObligationEvidenceProjectionRecordV1, WorkObligationEvidenceProjectionSetV1,
+    WorkObligationEvidenceSourceIdentityV1,
+    required_work_obligation_evidence_projection_nonclaims,
 };
 pub use work_plan::{
     FormalFunctionV1, HIERARCHICAL_WORK_PLAN_VERSION, HierarchicalWorkPlanV1,
