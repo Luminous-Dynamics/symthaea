@@ -7,6 +7,10 @@
 //! what they physically accept; this adapter performs the conversion rather than
 //! allowing the same vector to silently mean torque in one simulator and joint
 //! position in another.
+//!
+//! Adapted payloads keep their morphology and target [`ActuationMode`] attached
+//! to the values. They deliberately do not convert back into [`HumanoidCommand`],
+//! because that type has canonical normalized-torque semantics.
 
 use crate::morphology::HumanoidMorphology;
 use crate::types::{ActuationMode, HumanoidCommand, HumanoidState};
@@ -16,14 +20,79 @@ pub enum ActuationAdaptationError {
     ActuatorCount { expected: usize, actual: usize },
     StateCount { expected: usize, actual: usize },
     NonFiniteValue { index: usize },
+    NonFiniteStateValue { index: usize },
 }
 
+/// Backend-ready actuator values whose physical interpretation cannot be
+/// detached from the payload.
+///
+/// There is intentionally no public generic `(mode, values)` constructor and
+/// no conversion into [`HumanoidCommand`]. Instances are created by
+/// [`ActuationAdapter`], which keeps normalized-torque policy intent separate
+/// from backend actuation semantics.
+#[derive(Debug, Clone)]
+pub struct AdaptedActuationCommand {
+    morphology: HumanoidMorphology,
+    mode: ActuationMode,
+    values: Vec<f32>,
+}
+
+impl AdaptedActuationCommand {
+    /// Exact morphology whose actuator ordering/count this payload uses.
+    pub fn morphology(&self) -> HumanoidMorphology {
+        self.morphology
+    }
+
+    /// Physical interpretation of every value in this payload.
+    pub fn mode(&self) -> ActuationMode {
+        self.mode
+    }
+
+    /// Borrow the actuator values without losing their attached mode.
+    pub fn values(&self) -> &[f32] {
+        &self.values
+    }
+
+    /// Number of actuator values carried by this command.
+    pub fn num_actuators(&self) -> usize {
+        self.values.len()
+    }
+}
+
+/// Result of explicitly adapting one canonical normalized-torque policy intent
+/// to one backend actuation mode.
+///
+/// This is a semantic conversion result only. It does **not** prove that the
+/// supplied [`HumanoidState`] came from physical sensors, is current, or is
+/// otherwise authoritative for real hardware.
 #[derive(Debug, Clone)]
 pub struct ActuationAdaptation {
-    pub command: HumanoidCommand,
-    pub source_mode: ActuationMode,
-    pub target_mode: ActuationMode,
-    pub clipped_joints: usize,
+    command: AdaptedActuationCommand,
+    source_mode: ActuationMode,
+    clipped_joints: usize,
+}
+
+impl ActuationAdaptation {
+    /// Backend-ready, mode-tagged payload.
+    pub fn command(&self) -> &AdaptedActuationCommand {
+        &self.command
+    }
+
+    /// Semantic mode of the policy input consumed by the adapter.
+    pub fn source_mode(&self) -> ActuationMode {
+        self.source_mode
+    }
+
+    /// Target mode is derived from the command itself; there is no detached
+    /// sidecar field that can disagree with the payload's meaning.
+    pub fn target_mode(&self) -> ActuationMode {
+        self.command.mode()
+    }
+
+    /// Number of target joints clipped to morphology limits while adapting.
+    pub fn clipped_joints(&self) -> usize {
+        self.clipped_joints
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +133,11 @@ impl ActuationAdapter {
         for (index, value) in intent.torques.iter().copied().enumerate() {
             if !value.is_finite() {
                 return Err(ActuationAdaptationError::NonFiniteValue { index });
+            }
+        }
+        for (index, value) in state.joint_angles.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(ActuationAdaptationError::NonFiniteStateValue { index });
             }
         }
 
@@ -110,10 +184,19 @@ impl ActuationAdapter {
             }
         }
 
+        for (index, value) in output.iter().copied().enumerate() {
+            if !value.is_finite() {
+                return Err(ActuationAdaptationError::NonFiniteValue { index });
+            }
+        }
+
         Ok(ActuationAdaptation {
-            command: HumanoidCommand { torques: output },
+            command: AdaptedActuationCommand {
+                morphology,
+                mode: target_mode,
+                values: output,
+            },
             source_mode: ActuationMode::NormalizedTorque,
-            target_mode,
             clipped_joints,
         })
     }
@@ -124,7 +207,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn torque_backend_preserves_normalized_intent() {
+    fn torque_backend_preserves_normalized_intent_and_mode() {
         let adapter = ActuationAdapter::default();
         let state = HumanoidState::standing();
         let intent = HumanoidCommand::from_raw(&vec![0.5; 21]);
@@ -136,11 +219,15 @@ mod tests {
                 ActuationMode::NormalizedTorque,
             )
             .unwrap();
-        assert_eq!(adapted.command.torques, intent.torques);
+        assert_eq!(adapted.command().values(), intent.torques.as_slice());
+        assert_eq!(adapted.command().mode(), ActuationMode::NormalizedTorque);
+        assert_eq!(adapted.target_mode(), adapted.command().mode());
+        assert_eq!(adapted.source_mode(), ActuationMode::NormalizedTorque);
+        assert_eq!(adapted.command().morphology(), HumanoidMorphology::Dmc21);
     }
 
     #[test]
-    fn position_backend_receives_radian_targets() {
+    fn position_backend_receives_mode_tagged_radian_targets() {
         let adapter = ActuationAdapter {
             max_position_step_rad: 0.1,
         };
@@ -154,7 +241,36 @@ mod tests {
                 ActuationMode::PositionTargetRadians,
             )
             .unwrap();
-        assert!((adapted.command.torques[0] - 0.05).abs() < 1.0e-6);
+        assert!((adapted.command().values()[0] - 0.05).abs() < 1.0e-6);
+        assert_eq!(
+            adapted.command().mode(),
+            ActuationMode::PositionTargetRadians
+        );
+    }
+
+    #[test]
+    fn normalized_position_backend_is_bounded_and_mode_tagged() {
+        let adapter = ActuationAdapter::default();
+        let state = HumanoidState::standing();
+        let intent = HumanoidCommand::from_raw(&vec![1.0; 21]);
+        let adapted = adapter
+            .adapt_normalized_torque_intent(
+                &intent,
+                &state,
+                HumanoidMorphology::Dmc21,
+                ActuationMode::NormalizedPosition,
+            )
+            .unwrap();
+
+        assert_eq!(adapted.target_mode(), ActuationMode::NormalizedPosition);
+        assert_eq!(adapted.command().num_actuators(), 21);
+        assert!(
+            adapted
+                .command()
+                .values()
+                .iter()
+                .all(|value| value.is_finite() && (-1.0..=1.0).contains(value))
+        );
     }
 
     #[test]
@@ -170,6 +286,69 @@ mod tests {
                 ActuationMode::TorqueNewtonMetres,
             )
             .unwrap();
-        assert!((adapted.command.torques[0] - 50.0).abs() < 1.0e-6);
+        assert!((adapted.command().values()[0] - 50.0).abs() < 1.0e-6);
+        assert_eq!(adapted.target_mode(), ActuationMode::TorqueNewtonMetres);
+    }
+
+    #[test]
+    fn rejects_non_finite_policy_intent() {
+        let adapter = ActuationAdapter::default();
+        let state = HumanoidState::standing();
+        let mut intent = HumanoidCommand::from_raw(&vec![0.0; 21]);
+        intent.torques[3] = f32::NAN;
+        let result = adapter.adapt_normalized_torque_intent(
+            &intent,
+            &state,
+            HumanoidMorphology::Dmc21,
+            ActuationMode::NormalizedPosition,
+        );
+        assert!(matches!(
+            result,
+            Err(ActuationAdaptationError::NonFiniteValue { index: 3 })
+        ));
+    }
+
+    #[test]
+    fn rejects_non_finite_state_used_for_position_adaptation() {
+        let adapter = ActuationAdapter::default();
+        let mut state = HumanoidState::standing();
+        state.joint_angles[4] = f64::NAN;
+        let intent = HumanoidCommand::from_raw(&vec![0.0; 21]);
+        let result = adapter.adapt_normalized_torque_intent(
+            &intent,
+            &state,
+            HumanoidMorphology::Dmc21,
+            ActuationMode::NormalizedPosition,
+        );
+        assert!(matches!(
+            result,
+            Err(ActuationAdaptationError::NonFiniteStateValue { index: 4 })
+        ));
+    }
+
+    #[test]
+    fn clipping_count_is_preserved_without_detaching_mode() {
+        let adapter = ActuationAdapter {
+            max_position_step_rad: 0.2,
+        };
+        let mut state = HumanoidState::standing();
+        let limits = HumanoidMorphology::Dmc21.joint_limits();
+        state.joint_angles[0] = limits[0][1];
+        let mut values = vec![0.0; 21];
+        values[0] = 1.0;
+        let intent = HumanoidCommand::from_raw(&values);
+
+        let adapted = adapter
+            .adapt_normalized_torque_intent(
+                &intent,
+                &state,
+                HumanoidMorphology::Dmc21,
+                ActuationMode::PositionTargetRadians,
+            )
+            .unwrap();
+
+        assert_eq!(adapted.clipped_joints(), 1);
+        assert_eq!(adapted.target_mode(), ActuationMode::PositionTargetRadians);
+        assert!((adapted.command().values()[0] as f64 - limits[0][1]).abs() < 1.0e-6);
     }
 }
