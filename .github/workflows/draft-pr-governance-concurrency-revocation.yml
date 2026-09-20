@@ -1,0 +1,23 @@
+name: Draft PR Governance Concurrency Revocation
+
+on:
+  pull_request:
+    types: [ready_for_review, converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event.action == 'converted_to_draft' && format('pr-governance-{0}', github.event.pull_request.number) || format('draft-pr-governance-revocation-noop-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event.action == 'converted_to_draft' }}
+
+jobs:
+  impossible-runner-state:
+    name: Runner must remain unallocated
+    if: github.event.action == 'converted_to_draft' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Fail closed on impossible event semantics
+        run: |
+          echo 'unexpected converted_to_draft event with draft=false' >&2
+          exit 86

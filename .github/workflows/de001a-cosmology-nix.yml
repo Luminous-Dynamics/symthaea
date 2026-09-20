@@ -2,6 +2,7 @@ name: DE-001A Cosmology Nix Closure
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-cosmology-research/nix/**"
       - "crates/domains/symthaea-cosmology-research/references/de001a_execution_closure_v2.json"
@@ -20,6 +21,7 @@ concurrency:
 jobs:
   closure:
     name: DE-001A Nix environment qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
