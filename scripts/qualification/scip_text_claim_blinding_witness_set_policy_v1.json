@@ -1,0 +1,40 @@
+{
+  "schema": "symthaea.scip-text-claim-blinding-witness-set-policy/v1",
+  "authority": "process-completeness-only",
+  "v22_blinding_witness_policy_sha256": "edb837213b56f4423bc096d3bb11c90dd07de03cf5b672398b1a17de2a6b6cc0",
+  "v21_case_admission_policy_sha256": "452f4201c230ca3278d1ddc744fb70bca5944fa0d77b89e494096cfbf9c3dfb9",
+  "composition": {
+    "required_role_slots_derived_from_v20_bundle": true,
+    "one_witness_per_required_role_slot": true,
+    "missing_role_slots_rejected": true,
+    "extra_role_slots_rejected": true,
+    "common_annotation_receipt_required": true,
+    "common_case_admission_receipt_required": true,
+    "common_public_claim_schema_sha256_required": true,
+    "distinct_session_ids_required": true,
+    "distinct_challenge_nonces_required": true,
+    "distinct_witness_receipts_required": true,
+    "distinct_session_manifest_roots_required": true,
+    "distinct_access_control_snapshot_roots_required": true,
+    "distinct_audit_capture_roots_required": true,
+    "canonical_role_slot_order_required": true
+  },
+  "receipt": {
+    "schema": "symthaea.scip-text-claim-blinding-witness-set/v1",
+    "algorithm": "sha256-domain-separated-canonical-json/v1",
+    "domain": "symthaea-scip-text-claim-blinding-witness-set-v1\u0000",
+    "self_hash_field_absent": true
+  },
+  "claim_boundary": {
+    "witness_set_completeness_does_not_recompute_v21_case_admission": true,
+    "witness_set_completeness_does_not_authenticate_evidence": true,
+    "witness_set_completeness_does_not_authenticate_actors": true,
+    "witness_set_completeness_does_not_prove_audit_truthfulness": true,
+    "witness_set_completeness_does_not_prove_audit_completeness_in_reality": true,
+    "witness_set_completeness_does_not_prove_human_independence": true,
+    "witness_set_completeness_does_not_prove_human_expertise": true,
+    "witness_set_completeness_does_not_prove_human_correctness": true,
+    "witness_set_completeness_does_not_establish_surface_fidelity": true,
+    "witness_set_completeness_does_not_authorize_confirmatory_execution": true
+  }
+}
