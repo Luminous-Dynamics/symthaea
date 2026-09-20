@@ -21,6 +21,8 @@ pub mod comparison_duration_exposure;
 pub mod comparison_evidence_envelope;
 #[cfg(target_arch = "wasm32")]
 pub mod comparison_evidence_indexed_db;
+#[cfg(all(test, target_arch = "wasm32"))]
+mod comparison_evidence_indexed_db_tests;
 pub mod comparison_evidence_record;
 pub mod comparison_evidence_store;
 pub mod comparison_evidence_validation;
