@@ -4,6 +4,8 @@
 
 #[path = "prog_suite_contextual_harmony_audio_evidence.rs"]
 pub mod prog_suite_contextual_harmony_audio_evidence;
+#[path = "prog_suite_contextual_harmony_audio_panel.rs"]
+pub mod prog_suite_contextual_harmony_audio_panel;
 #[path = "prog_suite_contextual_harmony_audio_protocol.rs"]
 pub mod prog_suite_contextual_harmony_audio_protocol;
 
