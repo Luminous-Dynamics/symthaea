@@ -1,0 +1,86 @@
+{
+  "schema": "symthaea.scip-text-claim-blinding-witness-policy/v1",
+  "authority": "process-attestation-only",
+  "v20_annotation_policy_sha256": "12a8431fd8a93dd8ba158758bb4089ef951960240fcab11a5178159e67f19bb9",
+  "v21_case_admission_policy_sha256": "452f4201c230ca3278d1ddc744fb70bca5944fa0d77b89e494096cfbf9c3dfb9",
+  "roles": {
+    "extraction-annotator": {
+      "allowed_artifact_classes": [
+        "surface-text",
+        "public-claim-schema"
+      ],
+      "forbidden_artifact_classes": [
+        "source-inventory",
+        "source-claim-ids",
+        "candidate-extractor-output",
+        "peer-extraction-annotation",
+        "alignment-evidence"
+      ]
+    },
+    "extraction-adjudicator": {
+      "allowed_artifact_classes": [
+        "surface-text",
+        "public-claim-schema",
+        "extraction-annotation-a",
+        "extraction-annotation-b"
+      ],
+      "forbidden_artifact_classes": [
+        "source-inventory",
+        "source-claim-ids",
+        "candidate-extractor-output",
+        "alignment-evidence"
+      ]
+    },
+    "alignment-annotator": {
+      "allowed_artifact_classes": [
+        "frozen-surface-inventory",
+        "source-inventory",
+        "public-claim-schema"
+      ],
+      "forbidden_artifact_classes": [
+        "candidate-extractor-output",
+        "peer-alignment-annotation"
+      ]
+    },
+    "alignment-adjudicator": {
+      "allowed_artifact_classes": [
+        "frozen-surface-inventory",
+        "source-inventory",
+        "public-claim-schema",
+        "alignment-annotation-a",
+        "alignment-annotation-b"
+      ],
+      "forbidden_artifact_classes": [
+        "candidate-extractor-output"
+      ]
+    }
+  },
+  "evidence": {
+    "session_manifest_required": true,
+    "access_control_snapshot_required": true,
+    "audit_capture_required": true,
+    "access_control_snapshot_bound_before_session": true,
+    "audit_capture_covers_full_session": true,
+    "audit_capture_complete": true,
+    "forbidden_access_event_count_zero": true,
+    "evidence_retained_outside_annotation_bundle": true,
+    "witness_issuer_distinct_from_participant": true
+  },
+  "receipt": {
+    "schema": "symthaea.scip-text-claim-blinding-witness/v1",
+    "algorithm": "sha256-domain-separated-canonical-json/v1",
+    "domain": "symthaea-scip-text-claim-blinding-witness-v1\u0000",
+    "self_hash_field_absent": true
+  },
+  "claim_boundary": {
+    "structural_witness_does_not_authenticate_actor": true,
+    "structural_witness_does_not_prove_audit_truthfulness": true,
+    "structural_witness_does_not_prove_audit_completeness_in_reality": true,
+    "structural_witness_does_not_prove_human_independence": true,
+    "structural_witness_does_not_prove_human_expertise": true,
+    "structural_witness_does_not_prove_human_correctness": true,
+    "structural_witness_does_not_establish_surface_fidelity": true,
+    "structural_witness_does_not_authorize_confirmatory_execution": true,
+    "structural_witness_does_not_recompute_v21_case_admission": true
+  }
+}
