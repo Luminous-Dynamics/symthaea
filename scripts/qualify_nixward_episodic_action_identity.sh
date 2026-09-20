@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+echo "== Nixward episodic action identity focused qualification =="
+echo "HEAD: $(git rev-parse HEAD)"
+echo "Rust: $(rustc --version)"
+echo "Cargo: $(cargo --version)"
+
+echo "-- formatting --"
+cargo fmt --all -- --check
+
+echo "-- compile nixward library --"
+cargo check -p nixward --lib
+
+echo "-- episodic memory semantic tests --"
+cargo test -p nixward --lib mind::episodic_memory::tests
+
+echo "-- active inference semantic tests --"
+cargo test -p nixward --lib mind::active_inference::tests
+
+echo "Nixward episodic action identity focused qualification: PASS"
