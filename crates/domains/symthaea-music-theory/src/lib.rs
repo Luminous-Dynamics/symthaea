@@ -72,6 +72,7 @@ pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_development_adjudication;
 pub mod prog_suite_development_program;
+pub mod prog_suite_obligation_citation;
 pub mod prog_suite_observed_relation;
 pub mod prog_suite_replay_evidence;
 pub mod prog_suite_subject_bound;
@@ -163,6 +164,13 @@ pub use prog_suite_development_adjudication::{
 pub use prog_suite_development_program::{
     PROG_SUITE_DEVELOPMENT_PROGRAM_VERSION, ProgSuiteDevelopmentProgramErrorV1,
     ProgSuiteDevelopmentProgramV1, derive_prog_suite_development_program,
+};
+pub use prog_suite_obligation_citation::{
+    PROG_SUITE_OBLIGATION_CITATION_PROFILE, PROG_SUITE_OBLIGATION_CITATION_VERSION,
+    ProgSuiteObligationCitationDispositionV1, ProgSuiteObligationCitationErrorV1,
+    ProgSuiteObligationCitationNonClaimV1, ProgSuiteObligationCitationProjectionLossV1,
+    ProgSuiteObligationEvidenceCitationRecordV1, ProgSuiteObligationEvidenceCitationSetV1,
+    cite_prog_suite_development_obligations,
 };
 pub use prog_suite_observed_relation::{
     PROG_SUITE_OBSERVED_RELATION_VERSION, ProgSuiteObservedMelodyEventV1,
