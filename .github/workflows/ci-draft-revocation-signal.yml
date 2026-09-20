@@ -1,0 +1,37 @@
+name: CI Draft Revocation Signal
+
+# Runnerless lifecycle signal for full CI.
+#
+# Automatic CI uses the workflow-level concurrency key:
+#   CI-${{ github.ref }}-auto
+#
+# GitHub concurrency groups are repository-wide. On converted_to_draft this
+# workflow deliberately joins that exact group with cancel-in-progress=true,
+# superseding any pending/running automatic full-CI run for the same PR ref
+# before any cancellation job needs a hosted runner.
+#
+# ready_for_review is subscribed only to preserve explicit lifecycle liveness
+# in the repository-wide draft-safety ratchet. It uses a unique inert group and
+# therefore cannot cancel or admit full CI.
+
+on:
+  pull_request:
+    types: [converted_to_draft, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event.action == 'converted_to_draft' && format('CI-{0}-auto', github.ref) || format('ci-draft-revocation-signal-{0}', github.run_id) }}
+  cancel-in-progress: true
+
+jobs:
+  runnerless-signal:
+    name: Runnerless full-CI draft revocation signal
+    # Intentionally impossible. The workflow-level concurrency side effect is
+    # the entire mechanism; this job exists only because Actions requires a job.
+    # Keep the canonical draft predicate visible so structural admission checks
+    # can prove that this workflow can never allocate a runner while draft.
+    if: github.event.pull_request.draft == false && github.event.pull_request.draft == true
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'unreachable by contract'

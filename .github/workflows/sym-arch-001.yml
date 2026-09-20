@@ -9,6 +9,7 @@ name: SYM-ARCH-001 Architecture Discrimination
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - '.github/workflows/sym-arch-001.yml'
       - 'crates/domains/symthaea-psych-bench/src/benchmarks/architecture.rs'
@@ -35,6 +36,7 @@ env:
 jobs:
   sym-arch-001:
     name: Historical experiment regression / reproduction
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
