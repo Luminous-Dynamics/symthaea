@@ -1,0 +1,81 @@
+{
+  "schema": "symthaea.scip-text-claim-corpus-manifest-policy/v1",
+  "authority": "manifest-contract-only",
+  "v18_preregistration_sha256": "96e2ec5e1fad213f4261405c22d1f80cb6f1d106fd5621481eb0e95a6cca4530",
+  "dimensions": [
+    "entity-reference",
+    "relation-direction",
+    "numeric-value-and-unit",
+    "polarity-and-negation",
+    "quantifier-and-cardinality",
+    "temporal-scope",
+    "epistemic-modality",
+    "attribution-and-source",
+    "causal-strength",
+    "unsupported-additions",
+    "required-detail-coverage"
+  ],
+  "discourse_families": [
+    "long-distance-coreference",
+    "cross-sentence-negation",
+    "nested-attribution",
+    "temporal-contrast",
+    "multiple-entities-same-type",
+    "multiple-numbers-same-unit",
+    "causal-versus-correlational-contrast",
+    "mixed-certain-and-uncertain-claims"
+  ],
+  "dimension_stratum": {
+    "cases_per_polarity": 52,
+    "calibration_per_polarity": 20,
+    "confirmatory_per_polarity": 32,
+    "polarities": [
+      "positive",
+      "negative"
+    ]
+  },
+  "discourse_stratum": {
+    "cases_per_family": 27,
+    "calibration_per_family": 11,
+    "confirmatory_per_family": 16
+  },
+  "totals": {
+    "calibration": 528,
+    "confirmatory": 832,
+    "all": 1360
+  },
+  "assignment": {
+    "algorithm": "hmac-sha256-sort-within-stratum/v1",
+    "seed_commitment_domain": "symthaea-scip-text-claim-seed-commitment-v1\u0000",
+    "rank_domain": "symthaea-scip-text-claim-split-rank-v1\u0000",
+    "seed_committed_before_case_generation": true,
+    "seed_revealed_only_after_manifest_seal": true,
+    "rank_tie_breaker": "assignment_key_sha256",
+    "seed_bytes": 32,
+    "assignment_key_bytes": 32
+  },
+  "leakage_controls": {
+    "no_assignment_key_reuse": true,
+    "no_case_id_reuse": true,
+    "no_template_hash_overlap_between_splits": true,
+    "no_named_entity_tuple_hash_overlap_between_splits": true,
+    "no_numeric_tuple_hash_overlap_between_splits": true,
+    "no_exact_sentence_hash_overlap_between_splits": true
+  },
+  "claim_boundary": {
+    "manifest_validation_does_not_establish_annotation_correctness": true,
+    "manifest_validation_does_not_establish_extractor_quality": true,
+    "manifest_validation_does_not_establish_surface_fidelity": true,
+    "manifest_validation_does_not_authorize_confirmatory_execution": true
+  },
+  "case_identity": {
+    "algorithm": "sha256-domain-separated-canonical-json/v1",
+    "domain": "symthaea-scip-text-claim-case-v1\u0000",
+    "split_excluded": true,
+    "assignment_key_excluded": true
+  },
+  "manifest_identity": {
+    "algorithm": "sha256-canonical-json/v1",
+    "self_hash_field_absent": true
+  }
+}

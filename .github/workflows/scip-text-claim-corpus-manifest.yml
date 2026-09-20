@@ -1,0 +1,92 @@
+name: SCIP Text Claim Corpus Manifest Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/scip_text_claim_corpus_manifest.py'
+      - 'scripts/test_scip_text_claim_corpus_manifest.py'
+      - 'scripts/qualification/scip_text_claim_corpus_manifest_policy_v1.json'
+      - 'docs/release/evidence/SCIP_TEXT_CLAIM_CORPUS_MANIFEST_V1.md'
+      - '.github/workflows/scip-text-claim-corpus-manifest.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest-contract:
+    name: Validate deterministic corpus sealing contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Prove exact five-file review surface
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          base="${BASE_SHA:-HEAD^1}"
+          git diff --name-only "$base" HEAD | LC_ALL=C sort > /tmp/actual.txt
+          cat > /tmp/expected.txt <<'EOF'
+          .github/workflows/scip-text-claim-corpus-manifest.yml
+          docs/release/evidence/SCIP_TEXT_CLAIM_CORPUS_MANIFEST_V1.md
+          scripts/qualification/scip_text_claim_corpus_manifest_policy_v1.json
+          scripts/scip_text_claim_corpus_manifest.py
+          scripts/test_scip_text_claim_corpus_manifest.py
+          EOF
+          diff -u /tmp/expected.txt /tmp/actual.txt
+
+      - name: Verify exact validator, policy, and hostile harness identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s  %s\n' \
+            cc36ce8a3e94ec44ca2b5f930062cea1c20e8fd457cd2cc5066a5580d3095612 \
+            scripts/scip_text_claim_corpus_manifest.py \
+            8bc4689a9de01482fafabf6c76d2b6baae621f97c4355a221f84998671205231 \
+            scripts/qualification/scip_text_claim_corpus_manifest_policy_v1.json \
+            > /tmp/scip-v19.sha256
+          sha256sum -c /tmp/scip-v19.sha256
+          test "$(git hash-object scripts/test_scip_text_claim_corpus_manifest.py)" = \
+            4c1865fc341a3d926799b8a245bb329ba9cccd61
+
+      - name: Compile tools without mutating checkout
+        env:
+          PYTHONPYCACHEPREFIX: /tmp/scip-v19-pycache
+        run: |
+          python3 -m py_compile \
+            scripts/scip_text_claim_corpus_manifest.py \
+            scripts/test_scip_text_claim_corpus_manifest.py
+
+      - name: Run independent self-test and final Git hostile-input harness
+        run: |
+          python3 -B scripts/scip_text_claim_corpus_manifest.py --self-test
+          python3 -B scripts/test_scip_text_claim_corpus_manifest.py
+
+      - name: Prove frozen policy identity and actual NUL domains
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          policy = json.loads(Path('scripts/qualification/scip_text_claim_corpus_manifest_policy_v1.json').read_text())
+          canonical = json.dumps(policy, ensure_ascii=False, sort_keys=True, separators=(',', ':')).encode()
+          assert hashlib.sha256(canonical).hexdigest() == '9a30ba36b3e872aaec349647f71433579bc0932f24c96335bb32afe77498ffc0'
+          assert policy['v18_preregistration_sha256'] == '96e2ec5e1fad213f4261405c22d1f80cb6f1d106fd5621481eb0e95a6cca4530'
+          assert policy['totals'] == {'calibration': 528, 'confirmatory': 832, 'all': 1360}
+          assert policy['assignment']['seed_commitment_domain'].endswith('\x00')
+          assert policy['assignment']['rank_domain'].endswith('\x00')
+          assert policy['case_identity']['domain'].endswith('\x00')
+          assert policy['claim_boundary']['manifest_validation_does_not_authorize_confirmatory_execution'] is True
+          PY
+
+      - name: Prove checkout remained byte-identical
+        run: test -z "$(git status --porcelain --untracked-files=all)"
