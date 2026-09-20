@@ -1,0 +1,138 @@
+name: QUAL MAT-016B exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-mat-016b-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head MAT-016B computational-admission qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: 700b6f11c265e9e633b17109d73db983dc45a2f3
+      SOURCE_PARENT: 12005f8eea32210e58e8ffc79c51fcc16f6036d6
+      PACKAGE: symthaea-materials
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: 700b6f11c265e9e633b17109d73db983dc45a2f3
+          fetch-depth: 2
+
+      - name: Verify exact source identity and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "crates/domains/symthaea-materials/src/computational_admission.rs"
+          test "${changed[1]}" = "crates/domains/symthaea-materials/src/lib.rs"
+          echo "semantic_scope=PASS"
+
+      - name: Prove admission contract is fail-closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          admission="crates/domains/symthaea-materials/src/computational_admission.rs"
+          grep -Fq 'ScientificEvaluationRef::from_sealed_evaluation(evaluation, seal)?' "$admission"
+          grep -Fq 'EvaluationOrigin::SurrogatePrediction' "$admission"
+          grep -Fq 'EvaluationMethodClass::Surrogate' "$admission"
+          grep -Fq 'EvaluationOrigin::LocalReproduction' "$admission"
+          grep -Fq 'EvaluationMethodClass::Dft' "$admission"
+          grep -Fq 'require_in_domain(evaluation)?;' "$admission"
+          grep -Fq 'FORMATION_ENERGY_PROPERTY_ID' "$admission"
+          grep -Fq 'EV_PER_ATOM_UNIT' "$admission"
+          grep -Fq 'evaluation.observation.value >= 0.0' "$admission"
+          grep -Fq 'UnsupportedStage' "$admission"
+          grep -Fq 'out_of_domain_surrogate_cannot_establish_ml_screened' "$admission"
+          grep -Fq 'out_of_domain_local_dft_cannot_advance_formation_stage' "$admission"
+          grep -Fq 'surrogate_with_negative_formation_number_cannot_impersonate_dft' "$admission"
+          grep -Fq 'hull_and_phonon_stages_are_not_silently_supported' "$admission"
+          echo "sealed_computational_admission_contract=PASS"
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/mat-016b-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+
+      - name: Rustfmt exact materials crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-materials/Cargo.toml -- --check
+
+      - name: Compile and run all materials targets
+        run: cargo test -p "$PACKAGE" --all-targets
+
+      - name: Strict Clippy on materials targets
+        run: cargo clippy -p "$PACKAGE" --all-targets -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- \
+            Cargo.lock \
+            crates/domains/symthaea-materials
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_SEALED_ML_AND_DFT_FORMATION_ADMISSION"
+          echo "parent_mat016a_qualification=EXTERNAL_DEPENDENCY_NOT_ESTABLISHED_BY_THIS_RUN"
+          echo "convex_hull_admission=UNSUPPORTED"
+          echo "phonon_admission=UNSUPPORTED"
+          echo "legacy_evidence_chain_authority=UNCHANGED"
+          echo "scientific_property_truth=NOT_ESTABLISHED"
+          echo "mat001_authority_advance=NONE"
