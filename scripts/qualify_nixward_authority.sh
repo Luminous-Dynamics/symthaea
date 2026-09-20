@@ -18,4 +18,10 @@ cargo check -p nixward --lib
 echo "-- authority tests --"
 cargo test -p nixward --lib action::authorization::tests
 
+echo "-- temporal tests --"
+cargo test -p nixward --lib action::temporal::tests
+
+echo "-- local approval tests --"
+cargo test -p nixward --lib action::local_approval::tests
+
 echo "Nixward authority focused qualification: PASS"
