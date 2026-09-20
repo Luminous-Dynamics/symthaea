@@ -90,8 +90,8 @@ pub use runtime::{
 };
 pub use sensor::{EmbeddedSensor, HalSensorAdapter, SensorDecoder};
 pub use servo::{
-    ActuationDisposition, EndpointActuationDisposition, ServoActuationFailure,
-    ServoActuationReceipt, ServoOutput,
+    ActuationDisposition, CommandReferenceKnowledge, EndpointActuationDisposition,
+    ServoActuationFailure, ServoActuationReceipt, ServoOutput,
 };
 
 /// Re-export `embedded_hal::i2c::I2c` so downstream crates don't need a direct dependency.
