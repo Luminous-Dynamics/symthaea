@@ -1,12 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Φ-Gated Action Execution
+//! NixOS action execution, rollback, and authority migration.
 //!
-//! All NixOS actions are routed through the consciousness-gated executor.
-//! Sub-modules produce `NixOSCommand` values; the executor checks Φ
-//! thresholds, handles rollback, and records outcomes for episodic memory.
+//! The legacy executor still contains historical Phi-threshold confirmation
+//! semantics during migration. New governed action work should use the typed
+//! action-intent/authorization records in `authorization` and must not treat
+//! Phi/confidence as execution authority.
 
+pub mod authorization;
 pub mod config_writer;
 pub mod executor;
 pub mod flake_ops;
@@ -16,6 +18,12 @@ pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
 
+pub use authorization::{
+    NixActionDescriptorV1, NixActionIntentV1, NixActionScopeV1,
+    NixAuthorizationDecisionV1, NixAuthorizationErrorV1, NixAuthorizationProfileV1,
+    NixExecutionAuthorizationRecordV1, NixExecutionReceiptV1, NixMechanicalResultV1,
+    NixPostconditionStatusV1,
+};
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
 pub use executor::{
     ChannelOperation, ExecutionRecord, ExecutionResult, FlakeOperation, NixOSCommand,

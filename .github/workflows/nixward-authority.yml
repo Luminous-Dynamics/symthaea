@@ -1,0 +1,48 @@
+name: Nixward Authority Focused
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/core/nixward/src/action/authorization.rs"
+      - "crates/core/nixward/src/action/mod.rs"
+      - "crates/core/nixward/src/action/executor.rs"
+      - "crates/core/nixward/src/action/plan_executor.rs"
+      - "crates/core/nixward/src/bin/nixward_daemon.rs"
+      - "crates/core/nixward/Cargo.toml"
+      - "scripts/qualify_nixward_authority.sh"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/nixward-authority.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  authority-primitives:
+    # Deliberately runs on draft PRs. This is a focused early correctness lane,
+    # not a substitute for repository-wide ready-for-review/main qualification.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Run checked-in focused qualification
+        run: bash scripts/qualify_nixward_authority.sh
