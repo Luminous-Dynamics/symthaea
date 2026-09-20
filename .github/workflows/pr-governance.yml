@@ -15,7 +15,8 @@ jobs:
   governance:
     name: Governance Check (Class A/B Changes)
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-slim
+    # Admission must not wait behind the historically scarce ubuntu-slim pool.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout PR merge context

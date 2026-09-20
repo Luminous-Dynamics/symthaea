@@ -31,7 +31,9 @@ jobs:
     permissions:
       actions: write
       pull-requests: read
-    runs-on: ubuntu-slim
+    # Lifecycle transitions gate CI admission and must not depend on the scarce
+    # ubuntu-slim runner pool.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Cancel matching current-head draft full CI
@@ -125,7 +127,8 @@ jobs:
     permissions:
       actions: write
       pull-requests: read
-    runs-on: ubuntu-slim
+    # Qualification dispatch must use the normal hosted-runner pool.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Dispatch full CI for current ready branch
