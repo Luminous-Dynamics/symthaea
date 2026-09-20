@@ -14,6 +14,7 @@
 pub mod aging;
 pub mod authority_firewall;
 pub mod compound_stability;
+pub mod computational_admission;
 pub mod conditioned_property;
 pub mod database;
 pub mod discovery_campaign;
@@ -37,6 +38,10 @@ pub use aging::{AGING_HORIZON_LABELS, AGING_HORIZONS, AgingPrediction, MaterialA
 pub use authority_firewall::{
     AcquisitionFeature, AdvisoryMaterialPrediction, AdvisoryPredictionKind, AdvisorySourceRef,
     AuthorityFirewallError, ScientificEvaluationRef,
+};
+pub use computational_admission::{
+    ComputationalAdmissionError, ComputationalEvidenceAdmission, admit_ml_screening,
+    admit_negative_dft_formation_energy,
 };
 pub use conditioned_property::{
     ConditionedPropertyError, ConditionedPropertyObservation, PropertyArtifactRef,
