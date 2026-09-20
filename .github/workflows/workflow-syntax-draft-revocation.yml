@@ -1,0 +1,26 @@
+name: Workflow Syntax Draft Revocation Signal
+
+# Runnerless lifecycle revocation for Workflow Syntax.
+#
+# Workflow Syntax groups automatic work by pull-request ref. On a transition
+# back to draft, this workflow enters that exact repository-wide concurrency
+# group and supersedes any queued/running ready-state syntax run before a
+# cancellation job can require hosted-runner capacity.
+
+on:
+  pull_request:
+    types: [converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: workflow-syntax-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runnerless-sentinel:
+    name: Runnerless Workflow Syntax revocation sentinel
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: true

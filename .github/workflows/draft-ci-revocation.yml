@@ -1,0 +1,165 @@
+name: Draft CI Revocation
+
+# Immediate lifecycle revocation for automatic pull-request work.
+#
+# Draft admission guards prevent new runner allocation while a PR is draft, but
+# they do not stop work that was already admitted while the PR was ready. This
+# trusted base-context transition closes that gap: when a same-repository PR is
+# converted back to draft, cancel every still-live automatic pull_request run for
+# the exact current head. Explicit workflow_dispatch evidence runs are excluded.
+#
+# pull_request_target is intentional. This workflow never checks out or executes
+# PR-head code; the cancellation logic comes from the trusted base branch.
+#
+# A converted_to_draft event can race Actions run materialization from an earlier
+# opened/ready event. Therefore revocation is a bounded convergence protocol, not
+# a one-shot snapshot: scan the exact head six times over ~50 seconds and cancel
+# newly visible automatic PR runs on every pass.
+
+on:
+  pull_request_target:
+    types: [converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: draft-ci-revocation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  revoke-current-head-pr-runs:
+    name: Revoke current-head automatic PR runs
+    permissions:
+      actions: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Converge exact-head automatic PR runs to zero
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+        with:
+          script: |
+            const eventPr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const fullName = `${owner}/${repo}`;
+
+            if (eventPr.head.repo.full_name !== fullName) {
+              core.notice(`PR #${eventPr.number} is from a fork; leaving its workflow runs untouched.`);
+              return;
+            }
+
+            const exactDraft = async () => {
+              const { data: pr } = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: eventPr.number,
+              });
+              const valid =
+                pr.state === 'open' &&
+                pr.draft &&
+                pr.head.repo.full_name === fullName &&
+                pr.head.sha === eventPr.head.sha &&
+                pr.head.ref === eventPr.head.ref;
+              return { pr, valid };
+            };
+
+            // The event records a transition, not immutable authority. Re-read
+            // before discovery and before every destructive action.
+            const initial = await exactDraft();
+            if (!initial.valid) {
+              core.notice(`PR #${eventPr.number} is no longer the exact open same-repo draft from this transition; no revocation.`);
+              return;
+            }
+            const subjectSha = initial.pr.head.sha;
+            const subjectBranch = initial.pr.head.ref;
+
+            const liveStatuses = new Set([
+              'queued',
+              'requested',
+              'waiting',
+              'pending',
+              'in_progress',
+            ]);
+            const attempted = new Set();
+            const maxPasses = 6;
+            const passDelayMs = 10_000;
+            const perTransitionCap = 100;
+            let cancelled = 0;
+            let alreadyGone = 0;
+            let eligibleObservations = 0;
+            const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            for (let pass = 1; pass <= maxPasses; pass += 1) {
+              const state = await exactDraft();
+              if (!state.valid || state.pr.head.sha !== subjectSha || state.pr.head.ref !== subjectBranch) {
+                core.notice(`Stopping revocation on pass ${pass}: PR #${eventPr.number} state or exact head changed.`);
+                break;
+              }
+
+              // GitHub's repository workflow-runs endpoint supports exact
+              // head_sha and event filters. Restrict to automatic pull_request
+              // runs so explicit workflow_dispatch evidence/qualification runs
+              // are never revoked merely because the associated PR is draft.
+              const runs = await github.paginate(
+                'GET /repos/{owner}/{repo}/actions/runs',
+                {
+                  owner,
+                  repo,
+                  event: 'pull_request',
+                  head_sha: subjectSha,
+                  per_page: 100,
+                },
+              );
+
+              const matching = runs
+                .filter(run => liveStatuses.has(run.status))
+                .filter(run => run.head_sha === subjectSha)
+                .filter(run => run.head_branch === subjectBranch)
+                .filter(run => {
+                  const numbers = (run.pull_requests ?? []).map(value => value.number);
+                  return numbers.length === 0 || numbers.includes(eventPr.number);
+                })
+                .sort((a, b) => a.id - b.id);
+
+              eligibleObservations += matching.length;
+              const candidates = matching
+                .filter(run => !attempted.has(run.id))
+                .slice(0, Math.max(0, perTransitionCap - attempted.size));
+
+              core.notice(`Draft revocation pass ${pass}/${maxPasses} for PR #${eventPr.number} at ${subjectSha}: live=${matching.length}; new_candidates=${candidates.length}; attempted=${attempted.size}.`);
+
+              for (const run of candidates) {
+                if (attempted.size >= perTransitionCap) break;
+                attempted.add(run.id);
+
+                const live = await exactDraft();
+                if (!live.valid || live.pr.head.sha !== subjectSha || live.pr.head.ref !== subjectBranch) {
+                  core.notice(`Stopping revocation during pass ${pass}: PR #${eventPr.number} state or exact head changed.`);
+                  core.notice(`Draft revocation accepted=${cancelled}; already_non_cancellable=${alreadyGone}; attempted=${attempted.size}; eligible_observations=${eligibleObservations}.`);
+                  return;
+                }
+
+                try {
+                  core.notice(`Cancelling ${run.status} ${run.name} run ${run.id} for draft PR #${eventPr.number}.`);
+                  await github.rest.actions.cancelWorkflowRun({ owner, repo, run_id: run.id });
+                  cancelled += 1;
+                } catch (error) {
+                  if (error.status === 409) {
+                    alreadyGone += 1;
+                  } else {
+                    throw error;
+                  }
+                }
+              }
+
+              if (attempted.size >= perTransitionCap) {
+                core.warning(`Revocation cap ${perTransitionCap} reached; no additional runs will be cancelled in this transition.`);
+                break;
+              }
+
+              if (pass < maxPasses) {
+                await sleep(passDelayMs);
+              }
+            }
+
+            core.notice(`Draft revocation converged window complete: accepted=${cancelled}; already_non_cancellable=${alreadyGone}; unique_attempted=${attempted.size}; eligible_observations=${eligibleObservations}; passes=${maxPasses}; delay_ms=${passDelayMs}; cap=${perTransitionCap}.`);
