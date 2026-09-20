@@ -14,6 +14,7 @@ pub mod executor;
 pub mod flake_ops;
 pub mod gc_manager;
 pub mod generation_manager;
+pub mod nix_mutation;
 pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
@@ -32,6 +33,10 @@ pub use executor::{
 pub use flake_ops::{FlakeCheckResult, FlakeMetadata, FlakeOps};
 pub use gc_manager::{GcAnalysis, GcManager, GcRecommendation};
 pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
+pub use nix_mutation::{
+    NixConfigMutationV1, NixMutationErrorV1, NixMutationProvenanceV1, NixOptionPathV1,
+    NixPrimitiveValueV1,
+};
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
