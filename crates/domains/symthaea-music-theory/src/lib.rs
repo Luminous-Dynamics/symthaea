@@ -92,6 +92,7 @@ pub mod temporal_score;
 pub mod thematic_identity;
 pub mod thematic_retrograde_evidence;
 pub mod thematic_score_evidence;
+pub mod thematic_source_material;
 pub mod voicing;
 pub mod work_obligation;
 pub mod work_plan;
@@ -219,6 +220,10 @@ pub use thematic_score_evidence::{
     ThematicIdentityObservationStatusV1, ThematicIdentityObservationV1,
     ThematicMelodyFingerprintV1, ThematicScoreEvidenceErrorV1, ThematicScoreEvidenceV1,
     ThematicTransformationMeasurementV1, measure_thematic_graph,
+};
+pub use thematic_source_material::{
+    THEMATIC_SOURCE_MATERIAL_PLAN_VERSION, ThematicSourceMaterialErrorV1,
+    ThematicSourceMaterialPlanV1, ThematicSourceMaterialV1,
 };
 pub use voicing::{lead_bass, lead_upper};
 pub use work_obligation::{
