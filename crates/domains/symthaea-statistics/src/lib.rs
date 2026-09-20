@@ -21,6 +21,8 @@
 //! - [`inference`] — one- and two-sample (Welch) t-tests, chi-square
 //!   goodness-of-fit, confidence intervals
 //! - [`regression`] — ordinary-least-squares simple linear regression
+//! - [`linear_model`] — checked multivariate least squares with explicit
+//!   numerical rank/conditioning disposition
 //! - [`bayes`] — Bayesian updating and binary-classifier / diagnostic metrics
 //!   (sensitivity, specificity, PPV, likelihood ratios) — the calibration hook
 //!
@@ -38,6 +40,7 @@ pub mod bayes;
 pub mod descriptive;
 pub mod distributions;
 pub mod inference;
+pub mod linear_model;
 pub mod regression;
 pub mod special;
 
@@ -50,5 +53,9 @@ pub use distributions::{
 pub use inference::{
     ChiSquare, Interval, TTest, chi_square_gof, one_sample_t_test, welch_t_test,
     z_confidence_interval_mean,
+};
+pub use linear_model::{
+    LINEAR_LEAST_SQUARES_METHOD_V1, LinearLeastSquaresDisposition, LinearLeastSquaresProfile,
+    LinearLeastSquaresResult, LinearModelError, try_linear_least_squares,
 };
 pub use regression::{LinearFit, linear_regression};
