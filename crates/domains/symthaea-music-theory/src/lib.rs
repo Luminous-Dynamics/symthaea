@@ -73,6 +73,7 @@ pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_contextual_harmony;
 pub mod prog_suite_contextual_harmony_comparison;
+pub mod prog_suite_contextual_harmony_panel;
 pub mod prog_suite_development_context;
 pub mod prog_suite_development_program;
 pub mod prog_suite_replay_evidence;
@@ -176,6 +177,15 @@ pub use prog_suite_contextual_harmony_comparison::{
     ProgSuiteEventDifferenceSummaryV1, ProgSuiteHarmonyComparisonAuthorityV1,
     ProgSuiteHarmonyComparisonNonClaimV1, ProgSuiteSectionHarmonyComparisonV1,
     ProgSuiteVoiceComparisonV1, derive_prog_suite_contextual_harmony_comparison,
+};
+pub use prog_suite_contextual_harmony_panel::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_PANEL_VERSION,
+    PROG_SUITE_CONTEXTUAL_HARMONY_PILOT_SEEDS, ProgSuiteContextualHarmonyPanelErrorV1,
+    ProgSuiteContextualHarmonyPanelV1, ProgSuiteHarmonyPanelNonClaimV1,
+    ProgSuiteHarmonyPanelSubjectV1, ProgSuiteHarmonyPanelSummaryV1,
+    ProgSuiteHarmonyPilotIntentV1, ProgSuiteHarmonyPilotSeedPolicyV1,
+    ProgSuiteHarmonySectionIncidenceV1, ProgSuiteHarmonyVoiceIncidenceV1,
+    derive_prog_suite_contextual_harmony_pilot_panel,
 };
 pub use prog_suite_development_context::{
     PROG_SUITE_DEVELOPMENT_CONTEXT_VERSION, ProgSuiteDevelopmentContextErrorV1,
