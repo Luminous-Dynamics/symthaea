@@ -1,0 +1,104 @@
+name: QUAL Melothaea ProgSuite Tonal Chain V1
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-melothaea-prog-suite-tonal-chain-v1-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+env:
+  CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
+  UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
+  MEL_TONAL_QUAL_RECEIPT: ${{ github.workspace }}/melothaea-prog-suite-tonal-chain-qualification-v1.tsv
+
+jobs:
+  qualify:
+    name: Portable tonal-chain qualification
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify pinned workflow actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc "uses: actions/checkout@$CHECKOUT_ACTION_SHA" .github/workflows/qual-melothaea-prog-suite-tonal-chain-hosted-v1.yml)" -eq 1
+          test "$(grep -Fc "uses: actions/upload-artifact@$UPLOAD_ARTIFACT_ACTION_SHA" .github/workflows/qual-melothaea-prog-suite-tonal-chain-hosted-v1.yml)" -eq 1
+          if grep -Eq 'uses: actions/(checkout|upload-artifact)@v[0-9]+' .github/workflows/qual-melothaea-prog-suite-tonal-chain-hosted-v1.yml; then
+            echo 'mutable major-version GitHub Action tag found' >&2
+            exit 1
+          fi
+
+      - name: Install repository-pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(sed -nE 's/^[[:space:]]*channel[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' rust-toolchain.toml | head -n1)"
+          test "$channel" = "1.96.0"
+          rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy --no-self-update
+          rustup override set "$channel"
+          test "$(rustc --version | awk '{print $2}')" = "$channel"
+          test "$(cargo --version | awk '{print $2}')" = "$channel"
+
+      - name: Install focused system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev libasound2-dev
+
+      - name: Run portable exact-subject qualifier
+        shell: bash
+        run: bash .github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh
+
+      - name: Verify qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f "$MEL_TONAL_QUAL_RECEIPT" ]]; then
+            echo 'qualification receipt missing' >&2
+            exit 1
+          fi
+          python3 .github/qualification/verify-melothaea-prog-suite-tonal-chain-receipt-v1.py "$MEL_TONAL_QUAL_RECEIPT"
+
+      - name: Publish receipt digest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f "$MEL_TONAL_QUAL_RECEIPT" ]]; then
+            digest="$(sha256sum "$MEL_TONAL_QUAL_RECEIPT" | awk '{print $1}')"
+            echo "melothaea tonal-chain receipt_sha256=$digest"
+            {
+              echo '## Melothaea Tonal-Chain Qualification'
+              echo
+              echo "- receipt SHA-256: \`$digest\`"
+              echo '- authority: engineering software contract only'
+              echo '- lockbox execution: not performed'
+              echo '- perceptual/artistic/product authority: none'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: melothaea-prog-suite-tonal-chain-v1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.MEL_TONAL_QUAL_RECEIPT }}
+          if-no-files-found: error
+          retention-days: 30
