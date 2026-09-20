@@ -75,6 +75,7 @@ pub mod prog_suite_development_program;
 pub mod prog_suite_obligation_citation;
 pub mod prog_suite_observed_relation;
 pub mod prog_suite_replay_evidence;
+pub mod prog_suite_section_coverage;
 pub mod prog_suite_subject_bound;
 pub mod prog_suite_work_bridge;
 pub mod prog_suite_work_evidence;
@@ -185,6 +186,12 @@ pub use prog_suite_replay_evidence::{
     ProgSuiteReplayEvidenceErrorV1, ProgSuiteReplayEvidenceV1, ProgSuiteReplayNonClaimV1,
     ProgSuiteScoreReplayDifferenceV1, ProgSuiteScoreReplayReceiptV1,
     ProgSuiteStageMechanismReceiptV1, derive_prog_suite_replay_evidence,
+};
+pub use prog_suite_section_coverage::{
+    PROG_SUITE_SECTION_COVERAGE_VERSION, ProgSuiteSectionCoverageErrorV1,
+    ProgSuiteSectionCoverageEvidenceV1, ProgSuiteSectionCoverageNonClaimV1,
+    ProgSuiteSectionCoverageRecordV1, ProgSuiteSectionCoverageStatusV1,
+    ProgSuiteSectionExpectedMelodyEventV1, measure_prog_suite_section_coverage,
 };
 pub use prog_suite_subject_bound::{
     PROG_SUITE_SUBJECT_BOUND_PLAN_VERSION, PROG_SUITE_SUBJECT_BOUND_REALIZATION_VERSION,
