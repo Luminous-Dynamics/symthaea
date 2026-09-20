@@ -53,6 +53,11 @@ pub enum NixOSCommand {
         older_than_days: Option<u32>,
         delete_all: bool,
     },
+    /// Exact systemd unit lifecycle operation.
+    Service {
+        operation: ServiceOperation,
+        unit: String,
+    },
     /// Custom command with safety classification
     Custom {
         command: String,
@@ -77,6 +82,30 @@ pub enum FlakeOperation {
     Lock { inputs: Vec<String> },
     Show,
     Check,
+}
+
+/// Closed systemd lifecycle vocabulary used by Nixward.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ServiceOperation {
+    Start,
+    Stop,
+    Restart,
+    Reload,
+    Enable,
+    Disable,
+}
+
+impl ServiceOperation {
+    pub const fn as_systemctl_verb(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Stop => "stop",
+            Self::Restart => "restart",
+            Self::Reload => "reload",
+            Self::Enable => "enable",
+            Self::Disable => "disable",
+        }
+    }
 }
 
 /// Safety levels for commands
@@ -107,6 +136,47 @@ impl SafetyLevel {
     }
 }
 
+const MAX_TYPED_SERVICE_UNIT_BYTES: usize = 256;
+
+/// Validate the conservative exact-unit profile used by typed service actions.
+///
+/// Nixward v1 intentionally accepts normalized ASCII systemd unit identifiers,
+/// including common escaped `\\xNN` forms, but rejects shorthand, whitespace,
+/// option-like names, path syntax, and wildcard/pattern forms. The executor passes
+/// service units as argv rather than through a shell; this check additionally
+/// prevents systemctl's own pattern/option semantics from turning an exact action
+/// into a broader request.
+pub(crate) fn validate_service_unit_name(unit: &str) -> Result<(), String> {
+    if unit.is_empty() {
+        return Err("typed service unit must not be empty".to_string());
+    }
+    if unit.trim() != unit {
+        return Err("typed service unit must not contain leading or trailing whitespace".to_string());
+    }
+    if unit.len() > MAX_TYPED_SERVICE_UNIT_BYTES {
+        return Err(format!(
+            "typed service unit exceeds Nixward v1 {}-byte bound",
+            MAX_TYPED_SERVICE_UNIT_BYTES
+        ));
+    }
+    if unit.starts_with('-') {
+        return Err("typed service unit must not be option-like".to_string());
+    }
+    if !unit.contains('.') || unit.ends_with('.') {
+        return Err("typed service unit must be normalized with an explicit unit suffix".to_string());
+    }
+    for ch in unit.chars() {
+        let allowed = ch.is_ascii_alphanumeric()
+            || matches!(ch, '.' | '_' | '-' | ':' | '@' | '\\');
+        if !allowed {
+            return Err(format!(
+                "typed service unit contains unsupported exact-name character {ch:?}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 impl NixOSCommand {
     /// Create a Custom command with auto-classified safety level.
     ///
@@ -124,6 +194,15 @@ impl NixOSCommand {
             command: command.to_string(),
             args,
             safety_level,
+        }
+    }
+
+    /// Validate command-specific shape invariants that must hold even on an
+    /// already-confirmed execution path.
+    pub(crate) fn validate_shape(&self) -> Result<(), String> {
+        match self {
+            Self::Service { unit, .. } => validate_service_unit_name(unit),
+            _ => Ok(()),
         }
     }
 
@@ -163,6 +242,7 @@ impl NixOSCommand {
 
             Self::RebuildTest { .. } => SafetyLevel::SystemModify,
             Self::RebuildBoot { .. } => SafetyLevel::SystemModify,
+            Self::Service { .. } => SafetyLevel::SystemModify,
 
             Self::RebuildSwitch { .. } => SafetyLevel::SystemCritical,
 
@@ -336,6 +416,10 @@ impl NixOSCommand {
                 }
                 ("nix-collect-garbage".to_string(), args)
             }
+            Self::Service { operation, unit } => (
+                "systemctl".to_string(),
+                vec![operation.as_systemctl_verb().to_string(), unit.clone()],
+            ),
             Self::Custom { command, args, .. } => (command.clone(), args.clone()),
         }
     }
@@ -455,6 +539,12 @@ impl NixOSExecutor {
     /// SYMTHAEA_NIXOS_MANAGEMENT_IMPROVEMENT_PLAN_2026-07-26.md Phase 1.
     pub async fn execute(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
         let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
         let required_phi = safety.required_phi();
 
         if phi < required_phi {
@@ -575,6 +665,13 @@ impl NixOSExecutor {
     /// a real gate elsewhere (e.g. an explicit human approval) — this
     /// function performs no safety check of its own.
     pub async fn execute_confirmed(&mut self, command: NixOSCommand, phi: f32) -> ExecutionResult {
+        let safety = command.safety_level();
+        if let Err(reason) = command.validate_shape() {
+            return ExecutionResult::Blocked {
+                reason,
+                safety_level: safety,
+            };
+        }
         let (cmd, args) = command.to_command();
 
         info!(
@@ -679,6 +776,12 @@ mod tests {
         };
         assert_eq!(install.safety_level(), SafetyLevel::UserModify);
 
+        let service = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        assert_eq!(service.safety_level(), SafetyLevel::SystemModify);
+
         let rebuild = NixOSCommand::RebuildSwitch {
             flake: None,
             extra_args: vec![],
@@ -708,6 +811,37 @@ mod tests {
         let (cmd, args) = search.to_command();
         assert_eq!(cmd, "nix");
         assert_eq!(args, vec!["search", "nixpkgs", "editor", "--json"]);
+    }
+
+    #[test]
+    fn test_typed_service_to_command_and_validation() {
+        let command = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            unit: "nginx.service".to_string(),
+        };
+        assert!(command.validate_shape().is_ok());
+        let (bin, args) = command.to_command();
+        assert_eq!(bin, "systemctl");
+        assert_eq!(args, vec!["restart", "nginx.service"]);
+    }
+
+    #[test]
+    fn test_typed_service_validation_rejects_non_exact_names() {
+        for unit in [
+            "",
+            "nginx",
+            " nginx.service",
+            "--now.service",
+            "nginx*.service",
+            "foo/bar.service",
+            "nginx.service ",
+        ] {
+            let command = NixOSCommand::Service {
+                operation: ServiceOperation::Restart,
+                unit: unit.to_string(),
+            };
+            assert!(command.validate_shape().is_err(), "unit should be rejected: {unit:?}");
+        }
     }
 
     #[test]
@@ -797,6 +931,26 @@ mod tests {
                 assert!(stdout.contains("[DRY-RUN]"));
             }
             other => panic!("Expected dry-run success, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_invalid_typed_service_is_blocked_even_when_confirmed() {
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let command = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            unit: "nginx*.service".to_string(),
+        };
+        let result = executor.execute_confirmed(command, 1.0).await;
+        match result {
+            ExecutionResult::Blocked {
+                safety_level,
+                reason,
+            } => {
+                assert_eq!(safety_level, SafetyLevel::SystemModify);
+                assert!(reason.contains("unsupported") || reason.contains("exact"));
+            }
+            other => panic!("Expected invalid service command to be blocked, got {other:?}"),
         }
     }
 

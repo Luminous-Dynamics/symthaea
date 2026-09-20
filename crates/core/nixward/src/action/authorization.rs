@@ -14,7 +14,10 @@
 //! Phi/confidence and command-risk classification remain advisory inputs and do not
 //! mint authorization here.
 
-use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel};
+use super::executor::{
+    ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel, ServiceOperation,
+    validate_service_unit_name,
+};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -86,12 +89,20 @@ pub enum NixActionDescriptorV1 {
         older_than_days: Option<u32>,
         delete_all: bool,
     },
+    Service {
+        operation: ServiceOperation,
+        unit: String,
+    },
 }
 
 impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
     type Error = NixAuthorizationErrorV1;
 
     fn try_from(value: &NixOSCommand) -> Result<Self, Self::Error> {
+        value
+            .validate_shape()
+            .map_err(|reason| NixAuthorizationErrorV1::InvalidTypedCommand { reason })?;
+
         Ok(match value {
             NixOSCommand::RebuildSwitch { flake, extra_args } => Self::RebuildSwitch {
                 flake: flake.clone(),
@@ -146,6 +157,10 @@ impl TryFrom<&NixOSCommand> for NixActionDescriptorV1 {
             } => Self::CollectGarbage {
                 older_than_days: *older_than_days,
                 delete_all: *delete_all,
+            },
+            NixOSCommand::Service { operation, unit } => Self::Service {
+                operation: *operation,
+                unit: unit.clone(),
             },
             NixOSCommand::Custom { .. } => {
                 return Err(NixAuthorizationErrorV1::UnsupportedCustomCommand)
@@ -435,6 +450,8 @@ pub enum NixAuthorizationErrorV1 {
     EmptyListItem { field: &'static str, index: usize },
     #[error("free-form custom commands are not supported by governed action-intent v1")]
     UnsupportedCustomCommand,
+    #[error("invalid typed command: {reason}")]
+    InvalidTypedCommand { reason: String },
     #[error("maximum scope {requested:?} is narrower than action minimum {minimum:?}")]
     ScopeTooNarrow {
         requested: NixActionScopeV1,
@@ -482,6 +499,10 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
         NixActionDescriptorV1::HomeManagerSwitch { flake } => {
             validate_optional_nonempty(flake.as_deref(), "home-manager flake ref")?
         }
+        NixActionDescriptorV1::Service { unit, .. } => {
+            validate_service_unit_name(unit)
+                .map_err(|reason| NixAuthorizationErrorV1::InvalidTypedCommand { reason })?;
+        }
         NixActionDescriptorV1::EnvRollback
         | NixActionDescriptorV1::ChannelList
         | NixActionDescriptorV1::FlakeShow
@@ -508,9 +529,9 @@ fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 
         | NixActionDescriptorV1::FlakeLock { .. }
         | NixActionDescriptorV1::HomeManagerSwitch { .. } => NixActionScopeV1::UserModify,
 
-        NixActionDescriptorV1::RebuildTest { .. } | NixActionDescriptorV1::RebuildBoot { .. } => {
-            NixActionScopeV1::SystemModify
-        }
+        NixActionDescriptorV1::RebuildTest { .. }
+        | NixActionDescriptorV1::RebuildBoot { .. }
+        | NixActionDescriptorV1::Service { .. } => NixActionScopeV1::SystemModify,
         NixActionDescriptorV1::RebuildSwitch { .. } => NixActionScopeV1::SystemCritical,
         NixActionDescriptorV1::CollectGarbage { .. } => NixActionScopeV1::Destructive,
     }
@@ -678,6 +699,22 @@ fn put_action(h: &mut Hasher, action: &NixActionDescriptorV1) {
             put_opt_u32(h, *older_than_days);
             put_bool(h, *delete_all);
         }
+        NixActionDescriptorV1::Service { operation, unit } => {
+            put_u8(h, 17);
+            put_u8(h, service_operation_tag(*operation));
+            put_str(h, unit);
+        }
+    }
+}
+
+fn service_operation_tag(value: ServiceOperation) -> u8 {
+    match value {
+        ServiceOperation::Start => 0,
+        ServiceOperation::Stop => 1,
+        ServiceOperation::Restart => 2,
+        ServiceOperation::Reload => 3,
+        ServiceOperation::Enable => 4,
+        ServiceOperation::Disable => 5,
     }
 }
 
@@ -737,6 +774,13 @@ mod tests {
         }
     }
 
+    fn restart_nginx() -> NixOSCommand {
+        NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            unit: "nginx.service".to_string(),
+        }
+    }
+
     #[test]
     fn action_intent_digest_is_deterministic_and_not_serde_based() {
         let intent = NixActionIntentV1::from_command(
@@ -783,6 +827,60 @@ mod tests {
         )
         .unwrap();
         assert_ne!(a.digest().unwrap(), c.digest().unwrap());
+    }
+
+    #[test]
+    fn typed_service_action_is_governed_and_exact() {
+        let restart = NixActionIntentV1::from_command(
+            "host:workstation",
+            Some("generation:42".to_string()),
+            &restart_nginx(),
+        )
+        .unwrap();
+        assert_eq!(restart.maximum_scope, NixActionScopeV1::SystemModify);
+        assert!(matches!(
+            restart.action,
+            NixActionDescriptorV1::Service {
+                operation: ServiceOperation::Restart,
+                ref unit,
+            } if unit == "nginx.service"
+        ));
+
+        let enable = NixOSCommand::Service {
+            operation: ServiceOperation::Enable,
+            unit: "nginx.service".to_string(),
+        };
+        let enable = NixActionIntentV1::from_command(
+            "host:workstation",
+            Some("generation:42".to_string()),
+            &enable,
+        )
+        .unwrap();
+        assert_ne!(restart.digest().unwrap(), enable.digest().unwrap());
+
+        let postgres = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            unit: "postgresql.service".to_string(),
+        };
+        let postgres = NixActionIntentV1::from_command(
+            "host:workstation",
+            Some("generation:42".to_string()),
+            &postgres,
+        )
+        .unwrap();
+        assert_ne!(restart.digest().unwrap(), postgres.digest().unwrap());
+    }
+
+    #[test]
+    fn invalid_typed_service_cannot_enter_governed_v1() {
+        let command = NixOSCommand::Service {
+            operation: ServiceOperation::Restart,
+            unit: "nginx*.service".to_string(),
+        };
+        assert!(matches!(
+            NixActionIntentV1::from_command("host:x", None, &command).unwrap_err(),
+            NixAuthorizationErrorV1::InvalidTypedCommand { .. }
+        ));
     }
 
     #[test]
