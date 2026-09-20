@@ -1,0 +1,41 @@
+name: QUAL KAMA-DIALOGUE-001H exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/qual-kama-dialogue-001h.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 86ac16f53ac6fa195652ce7d9add636aad25aa8e
+          fetch-depth: 0
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "86ac16f53ac6fa195652ce7d9add636aad25aa8e"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Rustfmt exact candidate
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Test candidate critic
+        run: cargo test -p symthaea-communication --test fantasy_candidate_critic
+
+      - name: Clippy candidate critic
+        run: cargo clippy -p symthaea-communication --test fantasy_candidate_critic -- -D warnings
