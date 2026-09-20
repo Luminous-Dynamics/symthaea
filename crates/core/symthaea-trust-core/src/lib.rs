@@ -67,6 +67,8 @@ mod trusted_time;
 #[cfg(test)]
 mod root_authority_tests;
 #[cfg(test)]
+mod root_authority_gate_tests;
+#[cfg(test)]
 mod trusted_time_tests;
 
 pub use attestation::*;
