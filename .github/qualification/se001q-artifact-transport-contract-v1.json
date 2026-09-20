@@ -1,0 +1,19 @@
+{
+  "authority": {
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE",
+    "sufficient_for_repair_grant": false
+  },
+  "domain": "symthaea.se001q.artifact-transport.v1",
+  "invariants": [
+    "GitHub artifact digest must equal exact downloaded ZIP bytes",
+    "ZIP evidence member set must equal retained evidence manifest file set plus manifest.json",
+    "ZIP evidence bytes must equal extracted evidence capsule bytes",
+    "ZIP verification bytes must equal extracted verification bytes",
+    "transport witness grants no qualification or repair authority"
+  ],
+  "required_provenance_schema": "symthaea.se001q.github-provenance.v1",
+  "required_zip_evidence_prefix": "lock-diagnostic",
+  "required_zip_verification_path": "lock-diagnostic-verification/verification.json",
+  "schema": "symthaea.se001q.artifact-transport-contract.v1"
+}

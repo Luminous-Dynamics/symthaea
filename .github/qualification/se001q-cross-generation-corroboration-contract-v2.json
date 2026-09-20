@@ -1,0 +1,22 @@
+{
+  "accepted_verification_schemas": [
+    "symthaea.se001q.lock-delta-verification.v1",
+    "symthaea.se001q.lock-delta-verification.v2"
+  ],
+  "authority": {
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE",
+    "sufficient_for_repair_grant": false
+  },
+  "domain": "symthaea.se001q.cross-generation-corroboration.v2",
+  "requirements": [
+    "same frozen subject, experiment, toolchain, source lock bytes, generated lock bytes",
+    "distinct run IDs, artifact IDs, and verifier generations",
+    "at least one v2 independent verifier",
+    "each capsule bound to GitHub provenance witness and artifact transport witness"
+  ],
+  "required_provenance_schema": "symthaea.se001q.github-provenance.v1",
+  "required_transport_schema": "symthaea.se001q.artifact-transport.v1",
+  "schema": "symthaea.se001q.cross-generation-corroboration-contract.v2",
+  "strong_verification_schema": "symthaea.se001q.lock-delta-verification.v2"
+}
