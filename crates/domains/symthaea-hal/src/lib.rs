@@ -28,7 +28,8 @@
 //! ```text
 //! explicit position intent / admitted mode-tagged adaptation
 //!   → PositionTargetRadiansCommand
-//!   → exact current calibration + local safety/interlock
+//!   → PositionTargetEnvelope admission
+//!   → exact current calibration + shared hardware safety/interlock
 //!   → ServoOutput
 //!   → PCA9685 boards (I2C → PWM → servos)
 //!
@@ -60,9 +61,9 @@
 //! assert_eq!(target.values().len(), 21);
 //! ```
 //!
-//! Constructing a typed command does not itself establish execution authority,
-//! calibration qualification, physical-state currentness, trajectory safety,
-//! or effect success.
+//! Constructing or envelope-admitting a typed command does not itself establish
+//! execution authority, calibration qualification, physical-state currentness,
+//! trajectory/workspace safety, or effect success.
 
 #![deny(unsafe_code)]
 
@@ -77,6 +78,7 @@ pub mod mock;
 pub mod motor_safety;
 pub mod pca9685;
 mod position_calibration;
+pub mod position_safety;
 pub mod recording;
 pub mod runtime;
 pub mod sensor;
@@ -93,6 +95,7 @@ pub use ina219::Ina219Decoder;
 pub use interlock::{SafetyConfig, SafetyInterlock};
 pub use motor_safety::MotorSafetyLevel;
 pub use pca9685::Pca9685;
+pub use position_safety::{EnvelopeAdmittedPositionCommand, PositionTargetEnvelope};
 pub use recording::{RecordingAdapter, ReplayAdapter, SensorRecording};
 pub use runtime::{
     AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, HealthStatus, RuntimeTelemetry,
