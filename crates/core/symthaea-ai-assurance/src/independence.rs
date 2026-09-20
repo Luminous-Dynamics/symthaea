@@ -838,9 +838,8 @@ mod tests {
         BudgetEnforcement, BudgetGuardedRuntime, BudgetProfile, BudgetQuantities,
         EffectGuardedRuntime, EnforcementClass, ObservedOutcome, PolicyDescriptor,
         PolicyGuardedRuntime, PolicyMode, PolicyResourceRuntime, ResolutionAuthorityDomain,
-        ResourceIdentity, ResourceResolverDomain, ResourceRuntime,
-        TemporalPolicyEvaluatorDomain, TemporalPolicyExecutionDomain, TemporalPolicyRules,
-        TrustedRuntime, Write,
+        ResourceIdentity, ResourceResolverDomain, ResourceRuntime, TemporalPolicyEvaluatorDomain,
+        TemporalPolicyExecutionDomain, TemporalPolicyRules, TrustedRuntime, Write,
     };
     use std::time::Duration;
 
