@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-math-retrieval-production-runtime"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Production composition boundary for qualified Symthaea mathematical retrieval"
+
+[dependencies]
+symthaea-math-retrieval-candidate-loader = { path = "../math-retrieval-candidate-loader" }
+symthaea-math-retrieval-membership-guard = { path = "../math-retrieval-runtime-guard" }
+symthaea-math-retrieval-materializer-identity = { path = "../math-retrieval-materializer-identity" }
+symthaea-math-retrieval-runtime-seam = { path = "../math-retrieval-runtime-seam" }
+
+# Standalone while the production retrieval composition is qualified.
+[workspace]
