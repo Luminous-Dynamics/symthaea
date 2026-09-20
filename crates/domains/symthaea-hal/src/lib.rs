@@ -3,24 +3,39 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! # symthaea-hal — Hardware Abstraction Layer
 //!
-//! Bridges Symthaea's cognitive loop to physical servos and sensors on a
-//! Raspberry Pi (or any Linux SBC with I2C). Targets 2× PCA9685 PWM boards
-//! driving 21 hobby servos, with I2C sensors (IMU) for proprioception.
+//! Bridges Symthaea's physical sensor/actuator adapters to hardware on a
+//! Raspberry Pi (or any Linux SBC with I2C). The current DMC21 backend targets
+//! 2× PCA9685 PWM boards driving 21 hobby servos, with I2C sensors for
+//! proprioception.
 //!
-//! ## Architecture
+//! ## Actuation semantics
+//!
+//! Physical command meaning must be explicit before calibration or PWM output.
+//! The preferred cross-layer position representation is
+//! [`PositionTargetRadiansCommand`]. [`NormalizedPositionCommand`] is narrower:
+//! its `[-1,+1]` values are relative to the exact HAL calibration profile and
+//! must not be confused with values normalized against another range (for
+//! example humanoid morphology limits).
+//!
+//! The legacy `HumanoidCommand -> SafetyInterlock -> ServoOutput` runtime path
+//! still exists while HAL-ACT-001 is being migrated. `HumanoidCommand` has
+//! canonical normalized-torque semantics, so that legacy path is **not** the
+//! strong physical actuation boundary and must not be used to justify a
+//! production torque→position theorem.
+//!
+//! Target architecture:
 //!
 //! ```text
-//! CognitiveLoop
-//!   → HumanoidCommand (21 torques, ±1)
-//!   → SafetyInterlock::filter_command()   ← watchdog, e-stop, bounds
-//!   → ServoOutput::apply()                ← calibration, slew-rate limit
-//!   → Pca9685 boards (I2C → PWM → servos)
+//! explicit position intent / admitted mode-tagged adaptation
+//!   → PositionTargetRadiansCommand
+//!   → exact current calibration + local safety/interlock
+//!   → ServoOutput
+//!   → PCA9685 boards (I2C → PWM → servos)
 //!
-//! IMU sensor (I2C)
-//!   → EmbeddedSensor<I2C, Mpu6050Decoder>
-//!   → HalSensorAdapter::read_raw()
-//!   → SensorInput bridge (in main crate)
-//!   → CognitiveLoop perception
+//! physical sensors / encoders
+//!   → typed observations with device/calibration/currentness provenance
+//!   → physical-state verifier / estimator
+//!   → cognition + actuation adaptation
 //! ```
 //!
 //! ## Board Layout
@@ -36,30 +51,22 @@
 //!   Without this feature, the crate compiles and tests with [`MockI2cBus`].
 //! - `calibrate`: Enables the `hal-calibrate` CLI binary (adds `clap` dep).
 //!
-//! ## Usage
+//! ## Semantic command example
 //!
-//! ```rust,no_run
-//! use symthaea_hal::{
-//!     CalibrationProfile, SafetyInterlock, ServoOutput,
-//!     mock::MockI2cBus,
-//! };
-//! use symthaea_humanoid::types::HumanoidCommand;
+//! ```rust
+//! use symthaea_hal::PositionTargetRadiansCommand;
 //!
-//! // Create servo output with mock buses (testing)
-//! let cal = CalibrationProfile::default_21();
-//! let mut servo = ServoOutput::new(MockI2cBus::new(), MockI2cBus::new(), cal);
-//! servo.init(50.0).unwrap();
-//! servo.enable().unwrap();
-//!
-//! // Safety interlock filters commands
-//! let mut safety = SafetyInterlock::new();
-//! let cmd = HumanoidCommand::zero();
-//! let safe_cmd = safety.filter_command(&cmd).unwrap();
-//! servo.apply(&safe_cmd).unwrap();
+//! let target = PositionTargetRadiansCommand::try_from_array([0.0; 21]).unwrap();
+//! assert_eq!(target.values().len(), 21);
 //! ```
+//!
+//! Constructing a typed command does not itself establish execution authority,
+//! calibration qualification, physical-state currentness, trajectory safety,
+//! or effect success.
 
 #![deny(unsafe_code)]
 
+pub mod actuation;
 pub mod calibration;
 pub mod error;
 pub mod gpio_estop;
@@ -76,6 +83,7 @@ pub mod servo;
 
 // ── Public re-exports ────────────────────────────────────────────────
 
+pub use actuation::{NormalizedPositionCommand, PositionTargetRadiansCommand};
 pub use calibration::{CalibrationProfile, JointCalibration};
 pub use error::{HalError, HalResult};
 pub use gpio_estop::{EstopPoller, GpioEstop};
