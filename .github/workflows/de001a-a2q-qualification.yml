@@ -1,0 +1,384 @@
+name: DE-001A2Q Optimizer Reproduction Qualification
+
+on:
+  workflow_dispatch:
+    inputs:
+      raw_execution_run_id:
+        description: Exact successful DE-001A2E raw optimizer execution run ID
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      raw_execution_run_id:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: de001a-a2q-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: A2Q optimizer reproduction qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      QUALIFIER_HEAD: ${{ github.sha }}
+      RAW_EXECUTION_RUN_ID: ${{ inputs.raw_execution_run_id }}
+
+    steps:
+      - name: Check out exact A2Q qualifier
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: ${{ env.QUALIFIER_HEAD }}
+          fetch-depth: 0
+
+      - name: Bind qualifier identity and paths
+        id: qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          head="$(git rev-parse HEAD)"
+          tree="$(git rev-parse HEAD^{tree})"
+          test "$head" = "$QUALIFIER_HEAD"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          echo "tree=$tree" >> "$GITHUB_OUTPUT"
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/de001a-a2q" >> "$GITHUB_ENV"
+          echo "UPSTREAM_RAW=$RUNNER_TEMP/de001a-upstream-a2e-raw" >> "$GITHUB_ENV"
+          echo "A0_LINK=$RUNNER_TEMP/de001a-a2q-a0" >> "$GITHUB_ENV"
+          mkdir -p \
+            "$RUNNER_TEMP/de001a-a2q" \
+            "$RUNNER_TEMP/de001a-upstream-a2e-raw"
+
+      - name: Download exact raw optimizer execution evidence
+        id: download_raw
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          pattern: de001a-a2e-raw-execution-*
+          path: ${{ runner.temp }}/de001a-upstream-a2e-raw
+          merge-multiple: true
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.raw_execution_run_id }}
+
+      - name: Verify explicit raw execution run and transitive A2E evidence
+        id: upstream
+        if: steps.download_raw.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$RAW_EXECUTION_RUN_ID" in (*[!0-9]*|'') exit 2;; esac
+
+          gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$RAW_EXECUTION_RUN_ID" > "$EVIDENCE_DIR/raw-run.json"
+
+          test -f "$UPSTREAM_RAW/raw-execution.json"
+          test -f "$UPSTREAM_RAW/upstream-a2e/a2e-contract.json"
+          test -f "$UPSTREAM_RAW/upstream-a2e/qualification-capsule.json"
+          test -f "$UPSTREAM_RAW/upstream-a2e/upstream-authorization/a2-authorization.json"
+          mkdir -p "$UPSTREAM_RAW/result-files"
+
+          python3 - \
+            "$EVIDENCE_DIR/raw-run.json" \
+            "$UPSTREAM_RAW/raw-execution.json" \
+            "$UPSTREAM_RAW/upstream-a2e/a2e-contract.json" \
+            "$UPSTREAM_RAW/upstream-a2e/qualification-capsule.json" \
+            "$UPSTREAM_RAW/upstream-a2e/upstream-authorization/a2-authorization.json" \
+            "$RAW_EXECUTION_RUN_ID" <<'PY'
+          import hashlib, json, re, sys
+          run_path, raw_path, a2e_path, a2e_cap_path, auth_path, expected_run = sys.argv[1:]
+          run = json.load(open(run_path, encoding="utf-8"))
+          raw = json.load(open(raw_path, encoding="utf-8"))
+          a2e = json.load(open(a2e_path, encoding="utf-8"))
+          cap = json.load(open(a2e_cap_path, encoding="utf-8"))
+          auth = json.load(open(auth_path, encoding="utf-8"))
+
+          assert str(run["id"]) == expected_run
+          assert run["status"] == "completed" and run["conclusion"] == "success"
+
+          assert raw["protocol"] == "DE-001A2E-RAW-OPTIMIZER-EXECUTION-v1"
+          assert raw["scientific_claim"] == "NONE"
+          assert raw["authority"] == "exact-optimizer-raw-execution-only"
+          assert raw["reproduction_verdict"] == "UNASSESSED"
+          assert raw["execution_state"] in {"EXECUTED", "EXECUTION_ERROR", "INVALID"}
+          assert raw["optimizer_invocation_count"] == 1
+          assert isinstance(raw["process_exit_code"], int)
+          assert re.fullmatch(r"[0-9a-f]{64}", raw["effective_sampler_sha256"])
+          sampled = raw["sampled_coordinate_order"]
+          assert isinstance(sampled, list) and sampled and len(sampled) == len(set(sampled))
+          for key in ("authorization_receipt_sha256", "execution_contract_receipt_sha256", "command_argv_sha256", "stdout_sha256", "stderr_sha256"):
+              assert re.fullmatch(r"[0-9a-f]{64}", raw[key])
+          postflight = raw["postflight"]
+          assert postflight["immutable"] is True
+          assert postflight["executor_head"] == run["head_sha"]
+          assert re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", postflight["executor_tree"])
+
+          assert a2e["protocol"] == "DE-001A2E-EXECUTION-CONTRACT-v1"
+          assert a2e["verdict"] == "PASS"
+          assert a2e["scientific_claim"] == "NONE"
+          assert a2e["authority"] == "raw-optimizer-execution-contract-only"
+          assert a2e["optimizer_execution_contract_valid"] is True
+          assert a2e["executor_implementation_authorized"] is False
+          assert a2e["reproduction_verdict"] == "UNASSESSED"
+          assert a2e["a2q_execution_authorized"] is False
+
+          assert auth["protocol"] == "DE-001A2-EXECUTION-AUTHORIZATION-v1"
+          assert auth["verdict"] == "PASS"
+          assert auth["optimizer_execution_authorized"] is True
+          assert auth["a2_execution_authorized"] is True
+          assert auth["normalization_or_migration_authorized"] is False
+
+          a2e_sha = hashlib.sha256(open(a2e_path, "rb").read()).hexdigest()
+          auth_sha = hashlib.sha256(open(auth_path, "rb").read()).hexdigest()
+          assert raw["execution_contract_receipt_sha256"] == a2e_sha
+          assert raw["authorization_receipt_sha256"] == auth_sha
+          assert a2e["authorization_receipt_sha256"] == auth_sha
+          assert raw["scientific_subject_head"] == a2e["scientific_subject_head"] == auth["scientific_subject_head"]
+          assert raw["scientific_subject_tree"] == a2e["scientific_subject_tree"] == auth["scientific_subject_tree"]
+          assert raw["effective_sampler_sha256"] == a2e["effective_sampler_sha256"] == auth["effective_sampler_sha256"]
+          assert raw["sampled_coordinate_order"] == a2e["sampled_coordinate_order"] == auth["sampled_coordinate_order"]
+
+          assert cap["protocol"] == "DE-001A2E-CONTRACT-QUALIFICATION-CAPSULE-v1"
+          assert cap["scientific_claim"] == "NONE"
+          assert cap["authority"] == "raw-optimizer-execution-contract-only"
+          assert cap["executor_implementation_authorized"] is False
+          assert cap["reproduction_verdict"] == "UNASSESSED"
+          assert cap["a2q_execution_authorized"] is False
+          assert cap["scientific_subject_head"] == raw["scientific_subject_head"]
+          assert cap["scientific_subject_tree"] == raw["scientific_subject_tree"]
+          assert cap["effective_sampler_sha256"] == raw["effective_sampler_sha256"]
+          assert cap["receipt_sha256"]["a2e_contract"] == a2e_sha
+          assert cap["receipt_sha256"]["authorization"] == auth_sha
+          assert cap["workflow"]["a2e_outcome"] == "success"
+          assert cap["workflow"]["postflight_outcome"] == "success"
+          PY
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Nix 2.34.7
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3
+        with:
+          enable_kvm: false
+          extra_nix_config: |
+            sandbox = true
+            experimental-features = nix-command flakes
+
+      - name: Qualify A2Q software subject
+        id: software
+        if: steps.upstream.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version | grep -E '^rustc 1\.96\.0 '
+          nix --version | grep -Fx 'nix (Nix) 2.34.7'
+          cargo fmt -p symthaea-cosmology-research -- --check
+          cargo check -p symthaea-cosmology-research --all-targets --locked
+          cargo test -p symthaea-cosmology-research --all-targets --locked
+          cargo clippy -p symthaea-cosmology-research --all-targets --locked -- -D warnings
+          cargo build -p symthaea-cosmology-research --bin de001a-a2q-qualify --release --locked
+          test -x target/release/de001a-a2q-qualify
+          sha256sum target/release/de001a-a2q-qualify > "$EVIDENCE_DIR/de001a-a2q-qualify.sha256"
+          sha256sum Cargo.lock > "$EVIDENCE_DIR/Cargo.lock.sha256"
+          sha256sum crates/domains/symthaea-cosmology-research/references/de001a_a2q_result_qualification_v1.json > "$EVIDENCE_DIR/de001a_a2q_result_qualification_v1.json.sha256"
+          sha256sum crates/domains/symthaea-cosmology-research/references/de001a_desi_dr2_bao_flat_lcdm_v1.json > "$EVIDENCE_DIR/de001a_desi_dr2_bao_flat_lcdm_v1.json.sha256"
+
+      - name: Independently realize exact historical reference best fit
+        id: a0_reference
+        if: steps.software.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAKE=./crates/domains/symthaea-cosmology-research/nix
+          nix build "$FLAKE#checks.x86_64-linux.a0-artifacts" --no-update-lock-file --no-link
+          nix build "$FLAKE#a0-artifacts" --no-update-lock-file --out-link "$A0_LINK"
+          store_path="$(realpath "$A0_LINK")"
+          printf '%s\n' "$store_path" > "$EVIDENCE_DIR/a0-store-path.txt"
+          nix hash path "$store_path" > "$EVIDENCE_DIR/a0-nar-hash.txt"
+          nix path-info -S "$store_path" | awk '{print $2}' > "$EVIDENCE_DIR/a0-closure-size.txt"
+          cp "$A0_LINK/reference-bestfit-text" "$EVIDENCE_DIR/reference-bestfit-text"
+          test "$(sha256sum "$EVIDENCE_DIR/reference-bestfit-text" | awk '{print $1}')" = "bf8e35e2380ef35b137a77645dcb351af2ed2a93ca8da16c1fd71cb5dd7a1358"
+
+      - name: Assemble self-contained A2Q evidence
+        id: assemble
+        if: steps.a0_reference.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR/upstream-raw"
+          cp -a "$UPSTREAM_RAW/." "$EVIDENCE_DIR/upstream-raw/"
+
+      - name: Qualify optimizer reproduction result
+        id: a2q
+        if: steps.assemble.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target/release/de001a-a2q-qualify \
+            "$EVIDENCE_DIR/upstream-raw/raw-execution.json" \
+            "$EVIDENCE_DIR/upstream-raw/upstream-a2e/a2e-contract.json" \
+            "$EVIDENCE_DIR/upstream-raw/upstream-a2e/upstream-authorization/a2-authorization.json" \
+            "$EVIDENCE_DIR/reference-bestfit-text" \
+            "$EVIDENCE_DIR/upstream-raw/result-files" \
+            > "$EVIDENCE_DIR/a2q.json"
+
+          python3 - "$EVIDENCE_DIR/a2q.json" <<'PY'
+          import json, re, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert value["protocol"] == "DE-001A2Q-RESULT-QUALIFICATION-v1"
+          assert value["verdict"] == "PASS"
+          assert value["reproduction_verdict"] in {"PASS", "NEGATIVE", "UNASSESSED"}
+          assert value["scientific_claim"] == "NONE"
+          assert value["authority"] == "optimizer-reproduction-qualification-only"
+          assert value["a3_execution_authorized"] is False
+          assert value["optimizer_invocation_count"] == 1
+          assert re.fullmatch(r"[0-9a-f]{64}", value["effective_sampler_sha256"])
+          sampled = value["sampled_coordinate_order"]
+          assert isinstance(sampled, list) and sampled and len(sampled) == len(set(sampled))
+          if value["execution_state"] == "EXECUTED":
+              assert value["reproduction_verdict"] in {"PASS", "NEGATIVE"}
+              assert len(value["criteria"]) == 3
+          elif value["execution_state"] == "EXECUTION_ERROR":
+              assert value["reproduction_verdict"] == "UNASSESSED"
+              assert value["criteria"] == []
+          else:
+              raise AssertionError("qualified A2Q receipt has unsupported execution state")
+          PY
+
+      - name: Postflight qualifier immutability
+        id: postflight
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ steps.qualifier.outputs.head }}"
+          test "$(git rev-parse HEAD^{tree})" = "${{ steps.qualifier.outputs.tree }}"
+          git diff --exit-code
+          git diff --cached --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+      - name: Write A2Q qualification capsule
+        if: always()
+        env:
+          QUALIFIER_HEAD_OUT: ${{ steps.qualifier.outputs.head }}
+          QUALIFIER_TREE_OUT: ${{ steps.qualifier.outputs.tree }}
+          DOWNLOAD_OUTCOME: ${{ steps.download_raw.outcome }}
+          UPSTREAM_OUTCOME: ${{ steps.upstream.outcome }}
+          SOFTWARE_OUTCOME: ${{ steps.software.outcome }}
+          A0_REFERENCE_OUTCOME: ${{ steps.a0_reference.outcome }}
+          ASSEMBLE_OUTCOME: ${{ steps.assemble.outcome }}
+          A2Q_OUTCOME: ${{ steps.a2q.outcome }}
+          POSTFLIGHT_OUTCOME: ${{ steps.postflight.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          python3 - "$EVIDENCE_DIR" <<'PY'
+          import hashlib, json, os, pathlib, sys
+          root = pathlib.Path(sys.argv[1])
+
+          def digest(path):
+              p = pathlib.Path(path)
+              return hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "UNAVAILABLE"
+
+          q = {}
+          if (root / "a2q.json").is_file():
+              try:
+                  q = json.loads((root / "a2q.json").read_text(encoding="utf-8"))
+              except Exception:
+                  q = {}
+          run = {}
+          if (root / "raw-run.json").is_file():
+              try:
+                  run = json.loads((root / "raw-run.json").read_text(encoding="utf-8"))
+              except Exception:
+                  run = {}
+
+          capsule = {
+              "protocol": "DE-001A2Q-QUALIFICATION-CAPSULE-v1",
+              "scientific_claim": "NONE",
+              "authority": "optimizer-reproduction-qualification-only",
+              "qualification_verdict": q.get("verdict", "UNAVAILABLE"),
+              "reproduction_verdict": q.get("reproduction_verdict", "UNAVAILABLE"),
+              "execution_state": q.get("execution_state", "UNAVAILABLE"),
+              "a3_execution_authorized": False,
+              "qualifier_head": os.environ.get("QUALIFIER_HEAD_OUT", "UNAVAILABLE"),
+              "qualifier_tree": os.environ.get("QUALIFIER_TREE_OUT", "UNAVAILABLE"),
+              "raw_execution_run_id": os.environ["RAW_EXECUTION_RUN_ID"],
+              "raw_executor_head": run.get("head_sha", "UNAVAILABLE"),
+              "scientific_subject_head": q.get("scientific_subject_head", "UNAVAILABLE"),
+              "scientific_subject_tree": q.get("scientific_subject_tree", "UNAVAILABLE"),
+              "effective_sampler_sha256": q.get("effective_sampler_sha256", "UNAVAILABLE"),
+              "criteria": q.get("criteria", []),
+              "workflow": {
+                  "run_id": os.environ["GITHUB_RUN_ID"],
+                  "attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+                  "download_raw_outcome": os.environ.get("DOWNLOAD_OUTCOME", "UNAVAILABLE"),
+                  "upstream_outcome": os.environ.get("UPSTREAM_OUTCOME", "UNAVAILABLE"),
+                  "software_outcome": os.environ.get("SOFTWARE_OUTCOME", "UNAVAILABLE"),
+                  "a0_reference_outcome": os.environ.get("A0_REFERENCE_OUTCOME", "UNAVAILABLE"),
+                  "assemble_outcome": os.environ.get("ASSEMBLE_OUTCOME", "UNAVAILABLE"),
+                  "a2q_outcome": os.environ.get("A2Q_OUTCOME", "UNAVAILABLE"),
+                  "postflight_outcome": os.environ.get("POSTFLIGHT_OUTCOME", "UNAVAILABLE"),
+              },
+              "receipt_sha256": {
+                  "raw_execution": digest(root / "upstream-raw/raw-execution.json"),
+                  "a2e_contract": digest(root / "upstream-raw/upstream-a2e/a2e-contract.json"),
+                  "authorization": digest(root / "upstream-raw/upstream-a2e/upstream-authorization/a2-authorization.json"),
+                  "a2q": digest(root / "a2q.json"),
+              },
+              "implementation_sha256": {
+                  "a2q_spec": digest(pathlib.Path("crates/domains/symthaea-cosmology-research/references/de001a_a2q_result_qualification_v1.json")),
+                  "known_answer_target": digest(pathlib.Path("crates/domains/symthaea-cosmology-research/references/de001a_desi_dr2_bao_flat_lcdm_v1.json")),
+                  "cargo_lock": digest(pathlib.Path("Cargo.lock")),
+                  "qualifier_binary_record": digest(root / "de001a-a2q-qualify.sha256"),
+                  "reference_bestfit": digest(root / "reference-bestfit-text"),
+              },
+              "a0_reference": {
+                  "store_path": (root / "a0-store-path.txt").read_text(encoding="utf-8").strip() if (root / "a0-store-path.txt").is_file() else "UNAVAILABLE",
+                  "nar_hash": (root / "a0-nar-hash.txt").read_text(encoding="utf-8").strip() if (root / "a0-nar-hash.txt").is_file() else "UNAVAILABLE",
+                  "closure_size": (root / "a0-closure-size.txt").read_text(encoding="utf-8").strip() if (root / "a0-closure-size.txt").is_file() else "UNAVAILABLE",
+              },
+          }
+          (root / "qualification-capsule.json").write_text(
+              json.dumps(capsule, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(capsule, sort_keys=True, indent=2))
+          PY
+
+      - name: Upload A2Q evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: de001a-a2q-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/de001a-a2q
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Enforce valid A2Q evidence qualification
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ steps.download_raw.outcome }}" = "success"
+          test "${{ steps.upstream.outcome }}" = "success"
+          test "${{ steps.software.outcome }}" = "success"
+          test "${{ steps.a0_reference.outcome }}" = "success"
+          test "${{ steps.assemble.outcome }}" = "success"
+          test "${{ steps.a2q.outcome }}" = "success"
+          test "${{ steps.postflight.outcome }}" = "success"
