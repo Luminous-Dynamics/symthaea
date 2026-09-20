@@ -73,6 +73,7 @@ pub mod prog_suite;
 pub mod prog_suite_development_program;
 pub mod prog_suite_replay_evidence;
 pub mod prog_suite_subject_bound;
+pub mod prog_suite_work_architecture;
 pub mod prog_suite_work_bridge;
 pub mod prog_suite_work_evidence;
 pub mod renaissance;
@@ -169,6 +170,10 @@ pub use prog_suite_subject_bound::{
     ProgSuiteSubjectBoundErrorV1, ProgSuiteSubjectBoundPlanV1,
     ProgSuiteSubjectBoundRealizationV1, bind_prog_suite_subject,
     realize_prog_suite_subject_bound,
+};
+pub use prog_suite_work_architecture::{
+    PROG_SUITE_WORK_ARCHITECTURE_VERSION, ProgSuiteWorkArchitectureErrorV1,
+    ProgSuiteWorkArchitectureV1, derive_prog_suite_work_architecture,
 };
 pub use prog_suite_work_bridge::{
     PROG_SUITE_WORK_BRIDGE_VERSION, ProgSuiteMeterProjectionV1,
