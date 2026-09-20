@@ -10,6 +10,7 @@
 #![deny(unsafe_code)]
 
 pub mod assurance_case;
+pub mod verification_receipt;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
