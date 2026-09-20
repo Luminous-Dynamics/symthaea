@@ -98,6 +98,7 @@ pub mod thematic_source_material;
 pub mod voicing;
 pub mod work_obligation;
 pub mod work_plan;
+pub mod work_tonal_trajectory;
 
 pub use accompaniment::Accompaniment;
 pub use cadence::Cadence;
@@ -249,4 +250,10 @@ pub use work_obligation::{
 pub use work_plan::{
     FormalFunctionV1, HIERARCHICAL_WORK_PLAN_VERSION, HierarchicalWorkPlanV1,
     WorkNodeKindV1, WorkNodeV1, WorkPlanErrorV1,
+};
+pub use work_tonal_trajectory::{
+    WORK_TONAL_TRAJECTORY_VERSION, TonalClosurePolicyV1, TonalRegionRoleV1,
+    TonalRegionV1, TonalRelationV1, TonalTrajectoryCoverageV1, TonalTransitionIntentV1,
+    TonalTransitionV1, WorkTonalTrajectoryErrorV1, WorkTonalTrajectoryV1,
+    classify_tonal_relation,
 };
