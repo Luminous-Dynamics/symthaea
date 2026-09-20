@@ -1,0 +1,41 @@
+name: QUAL INTIMACY-DIRECTOR-001A exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/qual-intimacy-director-001a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen candidate
+        uses: actions/checkout@v4
+        with:
+          ref: d5ccc29f1fd86eafce32f9f9f051f3e71024c988
+          fetch-depth: 0
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "d5ccc29f1fd86eafce32f9f9f051f3e71024c988"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Rustfmt exact candidate
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Test intimacy director
+        run: cargo test -p symthaea-communication --test intimacy_director
+
+      - name: Clippy intimacy director
+        run: cargo clippy -p symthaea-communication --test intimacy_director -- -D warnings
