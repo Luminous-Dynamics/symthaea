@@ -10,6 +10,8 @@ pub mod prog_suite_contextual_harmony_audio_panel;
 pub mod prog_suite_contextual_harmony_audio_protocol;
 #[path = "prog_suite_contextual_harmony_section_audio.rs"]
 pub mod prog_suite_contextual_harmony_section_audio;
+#[path = "prog_suite_contextual_harmony_section_spectral.rs"]
+pub mod prog_suite_contextual_harmony_section_spectral;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
