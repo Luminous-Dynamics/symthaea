@@ -71,6 +71,7 @@ pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_development_program;
+pub mod prog_suite_replay_evidence;
 pub mod prog_suite_subject_bound;
 pub mod prog_suite_work_bridge;
 pub mod prog_suite_work_evidence;
@@ -152,6 +153,12 @@ pub use prog_suite::{
 pub use prog_suite_development_program::{
     PROG_SUITE_DEVELOPMENT_PROGRAM_VERSION, ProgSuiteDevelopmentProgramErrorV1,
     ProgSuiteDevelopmentProgramV1, derive_prog_suite_development_program,
+};
+pub use prog_suite_replay_evidence::{
+    PROG_SUITE_REPLAY_EVIDENCE_VERSION, ProgSuiteReplayAuthorityV1,
+    ProgSuiteReplayEvidenceErrorV1, ProgSuiteReplayEvidenceV1, ProgSuiteReplayNonClaimV1,
+    ProgSuiteScoreReplayDifferenceV1, ProgSuiteScoreReplayReceiptV1,
+    ProgSuiteStageMechanismReceiptV1, derive_prog_suite_replay_evidence,
 };
 pub use prog_suite_subject_bound::{
     PROG_SUITE_SUBJECT_BOUND_PLAN_VERSION, PROG_SUITE_SUBJECT_BOUND_REALIZATION_VERSION,
