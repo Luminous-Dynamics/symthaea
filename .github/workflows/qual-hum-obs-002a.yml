@@ -1,0 +1,44 @@
+name: QUAL HUM-OBS-002A exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-hum-obs-002a-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head humanoid qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate subject
+        uses: actions/checkout@v4
+        with:
+          ref: d39b19e78ad9200a9fe325ab597a832e0c2be00a
+          fetch-depth: 1
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=d39b19e78ad9200a9fe325ab597a832e0c2be00a
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "qualified_subject=$actual"
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/domains/symthaea-humanoid
+      - name: Rustfmt exact humanoid crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-humanoid/Cargo.toml -- --check
+      - name: Run BEHAVIOR adapter source tests
+        run: cargo test -p symthaea-humanoid behavior_2026_observatory --lib
+      - name: Clippy humanoid library
+        run: cargo clippy -p symthaea-humanoid --lib -- -D warnings
