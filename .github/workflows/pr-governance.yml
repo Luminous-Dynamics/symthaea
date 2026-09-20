@@ -14,6 +14,7 @@ concurrency:
 jobs:
   governance:
     name: Governance Check (Class A/B Changes)
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
@@ -29,9 +30,13 @@ jobs:
           set -euo pipefail
           bash scripts/check-class-a-changes.sh --ci
 
-      - name: Preserve Showroom hygiene on draft PRs
+      - name: Preserve Showroom hygiene
         shell: bash
         run: bash .github/scripts/check-showroom-hygiene.sh
+
+      - name: Ratchet draft-safe full-CI topology
+        shell: bash
+        run: python3 .github/scripts/check-draft-ci-gates.py
 
       - name: Record governance evidence
         shell: bash
@@ -49,4 +54,5 @@ jobs:
             echo "pr_draft=${PR_DRAFT}"
             echo "governance_check=pass"
             echo "showroom_hygiene_check=pass"
+            echo "draft_ci_gate_check=pass"
           } | tee pr-governance-receipt.txt

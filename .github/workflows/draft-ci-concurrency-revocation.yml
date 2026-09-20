@@ -1,0 +1,35 @@
+name: CI Draft Revocation Signal
+
+# Runnerless lifecycle revocation for the heavyweight CI workflow.
+#
+# The ordinary CI workflow uses this automatic pull-request concurrency group:
+#
+#   CI-${{ github.ref }}-auto
+#
+# GitHub concurrency groups are repository-wide. On converted_to_draft this
+# workflow intentionally enters the same group with cancel-in-progress enabled,
+# superseding any queued/running ready-state CI run for the same PR ref before a
+# cancellation job needs runner capacity.
+#
+# The only job is impossible under this workflow's sole trigger. Its purpose is
+# to keep the workflow schema valid while ensuring the revocation signal itself
+# never requests a runner. Manual workflow_dispatch evidence is not subscribed
+# and is therefore outside this revocation path.
+
+on:
+  pull_request:
+    types: [converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: CI-${{ github.ref }}-auto
+  cancel-in-progress: true
+
+jobs:
+  runnerless-sentinel:
+    name: Runnerless CI revocation sentinel
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
