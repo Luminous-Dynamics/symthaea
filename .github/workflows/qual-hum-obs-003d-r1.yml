@@ -1,0 +1,33 @@
+name: QUAL HUM-OBS-003D-R1 exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/hum-obs-003d-high-assurance-admission
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head HumanoidBench high-assurance R1 qualification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: 305e8ada10be93877bfd25a22fbd3a6f980d0d3a
+          fetch-depth: 1
+      - name: Verify exact subject
+        run: test "$(git rev-parse HEAD)" = "305e8ada10be93877bfd25a22fbd3a6f980d0d3a"
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: rustfmt
+        run: cargo fmt --manifest-path crates/domains/symthaea-humanoid/Cargo.toml -- --check
+      - name: targeted tests
+        run: cargo test -p symthaea-humanoid humanoidbench_high_assurance --lib
+      - name: clippy
+        run: cargo clippy -p symthaea-humanoid --lib -- -D warnings
