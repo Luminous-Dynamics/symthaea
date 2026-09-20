@@ -15,7 +15,16 @@ cargo fmt --all -- --check
 echo "-- compile nixward library --"
 cargo check -p nixward --lib
 
-echo "-- authority tests --"
+echo "-- authority identity tests --"
 cargo test -p nixward --lib action::authorization::tests
+
+echo "-- pre-service identity compatibility oracle --"
+cargo test -p nixward --test action_identity_compat
+
+echo "-- executor typed-command tests --"
+cargo test -p nixward --lib action::executor::tests
+
+echo "-- service manager typed-command tests --"
+cargo test -p nixward --lib action::service_manager::tests
 
 echo "Nixward authority focused qualification: PASS"

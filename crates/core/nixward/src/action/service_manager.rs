@@ -3,12 +3,14 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Systemd Service Management Actions
 //!
-//! Wraps `systemctl` commands for service lifecycle management.
-//! All operations produce `NixOSCommand` values routed through
-//! the Φ-gated executor — the service manager itself does NOT
-//! execute commands directly.
+//! Provides normalized typed lifecycle operations plus read-only status queries.
+//! Lifecycle mutations are represented as structured `NixOSCommand::Service`
+//! values and are executed by the normal Nixward execution/authority layers;
+//! the service manager does not execute those mutations directly.
 
-use super::executor::{NixOSCommand, SafetyLevel};
+use super::executor::{
+    NixOSCommand, ServiceOperation, validate_service_unit_name,
+};
 use std::process::Command;
 
 /// Manages systemd services: start, stop, restart, enable, disable.
@@ -30,66 +32,49 @@ pub struct ServiceStatus {
 }
 
 impl ServiceManager {
-    /// Generate a command to start a service.
+    fn lifecycle(operation: ServiceOperation, service: &str) -> NixOSCommand {
+        NixOSCommand::Service {
+            operation,
+            unit: Self::normalize_name(service),
+        }
+    }
+
+    /// Generate a typed command to start a service.
     pub fn start(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["start".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        Self::lifecycle(ServiceOperation::Start, service)
     }
 
-    /// Generate a command to stop a service.
+    /// Generate a typed command to stop a service.
     pub fn stop(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["stop".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        Self::lifecycle(ServiceOperation::Stop, service)
     }
 
-    /// Generate a command to restart a service.
+    /// Generate a typed command to restart a service.
     pub fn restart(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["restart".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        Self::lifecycle(ServiceOperation::Restart, service)
     }
 
-    /// Generate a command to reload a service (without full restart).
+    /// Generate a typed command to reload a service (without full restart).
     pub fn reload(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["reload".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        Self::lifecycle(ServiceOperation::Reload, service)
     }
 
-    /// Generate a command to enable a service (start on boot).
+    /// Generate a typed command to enable a service (start on boot).
     ///
     /// Note: on NixOS this is typically done declaratively. This is for
     /// imperative service management or user services.
     pub fn enable(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["enable".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        Self::lifecycle(ServiceOperation::Enable, service)
     }
 
-    /// Generate a command to disable a service.
+    /// Generate a typed command to disable a service.
     pub fn disable(service: &str) -> NixOSCommand {
-        NixOSCommand::Custom {
-            command: "systemctl".to_string(),
-            args: vec!["disable".to_string(), Self::normalize_name(service)],
-            safety_level: SafetyLevel::SystemModify,
-        }
+        Self::lifecycle(ServiceOperation::Disable, service)
     }
 
     /// Query the current status of a service (read-only, runs directly).
     pub fn status(service: &str) -> Result<ServiceStatus, std::io::Error> {
-        let unit = Self::normalize_name(service);
+        let unit = Self::validated_name(service)?;
 
         let output = Command::new("systemctl")
             .args([
@@ -152,13 +137,14 @@ impl ServiceManager {
 
     /// Check if a service is running (read-only, runs directly).
     pub fn is_active(service: &str) -> Result<bool, std::io::Error> {
+        let unit = Self::validated_name(service)?;
         let output = Command::new("systemctl")
-            .args(["is-active", "--quiet", &Self::normalize_name(service)])
+            .args(["is-active", "--quiet", &unit])
             .status()?;
         Ok(output.success())
     }
 
-    /// Ensure service name ends with ".service" if no suffix given.
+    /// Ensure service name ends with ".service" if no suffix is supplied.
     fn normalize_name(service: &str) -> String {
         if service.contains('.') {
             service.to_string()
@@ -166,11 +152,19 @@ impl ServiceManager {
             format!("{service}.service")
         }
     }
+
+    fn validated_name(service: &str) -> Result<String, std::io::Error> {
+        let unit = Self::normalize_name(service);
+        validate_service_unit_name(&unit)
+            .map_err(|reason| std::io::Error::new(std::io::ErrorKind::InvalidInput, reason))?;
+        Ok(unit)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::action::executor::SafetyLevel;
 
     #[test]
     fn test_normalize_name() {
@@ -189,6 +183,7 @@ mod tests {
         assert_eq!(bin, "systemctl");
         assert_eq!(args, vec!["start", "nginx.service"]);
         assert_eq!(cmd.safety_level(), SafetyLevel::SystemModify);
+        assert!(cmd.validate_shape().is_ok());
     }
 
     #[test]
@@ -261,6 +256,7 @@ mod tests {
                 SafetyLevel::SystemModify,
                 "All service lifecycle commands should be SystemModify"
             );
+            assert!(cmd.validate_shape().is_ok());
         }
     }
 
@@ -273,6 +269,18 @@ mod tests {
         let cmd = ServiceManager::stop("docker.socket");
         let (_, args) = cmd.to_command();
         assert_eq!(args[1], "docker.socket");
+    }
+
+    #[test]
+    fn test_invalid_unit_is_rejected_by_typed_and_read_only_paths() {
+        let cmd = ServiceManager::restart("nginx*.service");
+        assert!(cmd.validate_shape().is_err());
+
+        let err = ServiceManager::validated_name("--now.service").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+
+        let err = ServiceManager::validated_name("foo/bar.service").unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
     }
 
     #[test]
