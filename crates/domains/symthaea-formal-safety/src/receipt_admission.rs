@@ -23,13 +23,16 @@ pub enum ReceiptAdmissionError {
     EmptyProfileId,
     MalformedReceiptEnvelope,
     MissingAttestation,
+    ReceiptNotYetValid,
     ReceiptExpired,
     InvalidSignerAuthorizationGrant,
+    SignerAuthorizationNotYetValid,
     SignerAuthorizationExpired,
     SignerAuthorizationReceiptMismatch,
     SignerAuthorizationSubjectMismatch,
     SignerAuthorizationAttestationMismatch,
     InvalidEvidenceAdmissionGrant,
+    EvidenceAdmissionNotYetValid,
     EvidenceAdmissionExpired,
     EvidenceAdmissionReceiptMismatch,
     EvidenceAdmissionSubjectMismatch,
@@ -80,6 +83,10 @@ impl SignerAuthorizationGrant {
         self.valid_until_unix_s
             .is_some_and(|deadline| now_unix_s > deadline)
     }
+
+    pub fn is_not_yet_valid_at(&self, now_unix_s: u64) -> bool {
+        now_unix_s < self.issued_unix_s
+    }
 }
 
 /// Profile-local permission to admit a specific subset of one receipt's
@@ -113,6 +120,10 @@ impl EvidenceAdmissionGrant {
     pub fn is_expired_at(&self, now_unix_s: u64) -> bool {
         self.valid_until_unix_s
             .is_some_and(|deadline| now_unix_s > deadline)
+    }
+
+    pub fn is_not_yet_valid_at(&self, now_unix_s: u64) -> bool {
+        now_unix_s < self.issued_unix_s
     }
 }
 
@@ -182,6 +193,9 @@ impl AdmittedVerificationEvidence {
 /// identity/authority adapter (for example Xenia) and `evidence_admission` from
 /// an independently evaluated assurance policy.
 ///
+/// Every input validity interval must be current at `now_unix_s`:
+/// `issued_at <= now <= expires_at` when an expiry exists.
+///
 /// Success still does **not** qualify a claim or authorize an action.
 pub fn admit_verification_receipt(
     envelope: &AttestedVerificationReceipt,
@@ -199,12 +213,18 @@ pub fn admit_verification_receipt(
     let Some(attestation) = envelope.attestation.as_ref() else {
         return Err(ReceiptAdmissionError::MissingAttestation);
     };
+    if envelope.receipt.issued_unix_s > now_unix_s {
+        return Err(ReceiptAdmissionError::ReceiptNotYetValid);
+    }
     if envelope.receipt.is_expired_at(now_unix_s) {
         return Err(ReceiptAdmissionError::ReceiptExpired);
     }
 
     if !signer_authorization.validate() {
         return Err(ReceiptAdmissionError::InvalidSignerAuthorizationGrant);
+    }
+    if signer_authorization.is_not_yet_valid_at(now_unix_s) {
+        return Err(ReceiptAdmissionError::SignerAuthorizationNotYetValid);
     }
     if signer_authorization.is_expired_at(now_unix_s) {
         return Err(ReceiptAdmissionError::SignerAuthorizationExpired);
@@ -225,6 +245,9 @@ pub fn admit_verification_receipt(
 
     if !evidence_admission.validate() {
         return Err(ReceiptAdmissionError::InvalidEvidenceAdmissionGrant);
+    }
+    if evidence_admission.is_not_yet_valid_at(now_unix_s) {
+        return Err(ReceiptAdmissionError::EvidenceAdmissionNotYetValid);
     }
     if evidence_admission.is_expired_at(now_unix_s) {
         return Err(ReceiptAdmissionError::EvidenceAdmissionExpired);
@@ -461,6 +484,61 @@ mod tests {
         assert_eq!(
             admit_verification_receipt(&value, &signer, &admission, "production", 181),
             Err(ReceiptAdmissionError::SignerAuthorizationExpired)
+        );
+    }
+
+    #[test]
+    fn future_dated_receipt_fails_closed() {
+        let mut value = envelope(VerificationConclusion::Supports);
+        value.receipt.issued_unix_s = 151;
+        let signer = signer_grant(&value);
+        let admission = admission_grant(&value, "production", &["property.memory_safe"]);
+
+        assert_eq!(
+            admit_verification_receipt(&value, &signer, &admission, "production", 150),
+            Err(ReceiptAdmissionError::ReceiptNotYetValid)
+        );
+    }
+
+    #[test]
+    fn future_dated_signer_authorization_fails_closed() {
+        let value = envelope(VerificationConclusion::Supports);
+        let mut signer = signer_grant(&value);
+        signer.issued_unix_s = 151;
+        signer.valid_until_unix_s = Some(180);
+        let admission = admission_grant(&value, "production", &["property.memory_safe"]);
+
+        assert_eq!(
+            admit_verification_receipt(&value, &signer, &admission, "production", 150),
+            Err(ReceiptAdmissionError::SignerAuthorizationNotYetValid)
+        );
+    }
+
+    #[test]
+    fn future_dated_evidence_admission_fails_closed() {
+        let value = envelope(VerificationConclusion::Supports);
+        let signer = signer_grant(&value);
+        let mut admission = admission_grant(&value, "production", &["property.memory_safe"]);
+        admission.issued_unix_s = 151;
+        admission.valid_until_unix_s = Some(180);
+
+        assert_eq!(
+            admit_verification_receipt(&value, &signer, &admission, "production", 150),
+            Err(ReceiptAdmissionError::EvidenceAdmissionNotYetValid)
+        );
+    }
+
+    #[test]
+    fn validity_boundaries_are_inclusive() {
+        let value = envelope(VerificationConclusion::Supports);
+        let signer = signer_grant(&value);
+        let admission = admission_grant(&value, "production", &["property.memory_safe"]);
+
+        assert!(
+            admit_verification_receipt(&value, &signer, &admission, "production", 100).is_ok()
+        );
+        assert!(
+            admit_verification_receipt(&value, &signer, &admission, "production", 180).is_ok()
         );
     }
 
