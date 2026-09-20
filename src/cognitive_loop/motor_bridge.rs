@@ -57,16 +57,15 @@ pub use symthaea_core::embodiment::{
 /// `accessors/system.rs` both switched to `HumanoidEmbodiment` in
 /// commit `[THIS COMMIT]`.
 ///
-/// `MotorBridge` is kept for backwards-compatibility — downstream
-/// code that already references it will keep working — but it
-/// receives no new features. All future humanoid-specific additions
-/// (moral-gate paths, safe fallbacks, telemetry fields) should land
-/// in `HumanoidEmbodiment` only.
+/// `MotorBridge` remains only as a simulation/control compatibility surface.
+/// Its former `hal` helpers were removed because [`HumanoidCommand`] has
+/// canonical normalized-torque semantics while the legacy PWM HAL interpreted
+/// those values as joint position. A deprecated compatibility type must not
+/// preserve an easier path to physical effects than the typed hardware stack.
 ///
-/// This struct does not carry `#[deprecated]` because in-crate tests
-/// and external downstream references still use it and the
-/// deprecation warnings would be noisy without producing any signal
-/// the next reader doesn't already have from this doc-comment.
+/// This struct does not carry `#[deprecated]` because in-crate tests and
+/// external downstream references still use its simulation/control behavior.
+/// No new physical-hardware entry points should be added here.
 #[cfg(feature = "humanoid")]
 pub struct MotorBridge {
     controller: HumanoidController,
@@ -191,34 +190,6 @@ impl MotorBridge {
 
     pub fn total_steps(&self) -> usize {
         self.total_steps
-    }
-
-    #[cfg(feature = "hal")]
-    pub fn write_to_hardware<I: symthaea_hal::I2cBus>(
-        &self,
-        safety: &mut symthaea_hal::SafetyInterlock,
-        servo: &mut symthaea_hal::ServoOutput<I>,
-    ) -> Result<(), symthaea_hal::HalError> {
-        let safe_cmd = safety.filter_command(&self.last_command)?;
-        servo.apply(&safe_cmd)
-    }
-
-    #[cfg(feature = "hal")]
-    pub fn step_from_readings(
-        &mut self,
-        _readings: &[Option<Vec<f32>>],
-        thought_hv: &ContinuousHV,
-    ) -> HumanoidCommand {
-        let (command, _) = self.step_direct(thought_hv);
-        command
-    }
-
-    #[cfg(feature = "hal")]
-    pub fn hal_callback<'a>(
-        &'a mut self,
-        thought_hv: &'a ContinuousHV,
-    ) -> impl FnMut(&[Option<Vec<f32>>]) -> HumanoidCommand + 'a {
-        move |readings| self.step_from_readings(readings, thought_hv)
     }
 }
 
@@ -460,46 +431,5 @@ mod embodiment_tests {
             MotorSafetyLevel::Orange,
             "consent violation → Orange"
         );
-    }
-}
-
-#[cfg(test)]
-#[cfg(feature = "hal")]
-mod hal_tests {
-    use super::*;
-
-    fn make_bridge() -> MotorBridge {
-        let genesis = GenesisSeed::from_phrase("test");
-        MotorBridge::new(&genesis)
-    }
-
-    #[test]
-    fn test_step_from_readings_basic() {
-        let mut bridge = make_bridge();
-        let hv = ContinuousHV::zero(16384);
-        let cmd = bridge.step_from_readings(&[], &hv);
-        for &t in &cmd.torques {
-            assert!(t.is_finite());
-        }
-    }
-
-    #[test]
-    fn test_step_from_readings_increments_steps() {
-        let mut bridge = make_bridge();
-        let hv = ContinuousHV::zero(16384);
-        assert_eq!(bridge.total_steps(), 0);
-        let _ = bridge.step_from_readings(&[], &hv);
-        assert_eq!(bridge.total_steps(), 1);
-    }
-
-    #[test]
-    fn test_hal_callback_works() {
-        let mut bridge = make_bridge();
-        let hv = ContinuousHV::zero(16384);
-        let mut cb = bridge.hal_callback(&hv);
-        let cmd = cb(&[]);
-        for &t in &cmd.torques {
-            assert!(t.is_finite());
-        }
     }
 }
