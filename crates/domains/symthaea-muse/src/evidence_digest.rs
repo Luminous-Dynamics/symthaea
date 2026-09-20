@@ -18,6 +18,8 @@ pub mod prog_suite_contextual_harmony_section_spectral;
 pub mod prog_suite_contextual_harmony_symbolic_acoustic_tonal;
 #[path = "prog_suite_contextual_harmony_tonal_survival_panel.rs"]
 pub mod prog_suite_contextual_harmony_tonal_survival_panel;
+#[path = "prog_suite_contextual_harmony_tonal_survival_stream.rs"]
+pub mod prog_suite_contextual_harmony_tonal_survival_stream;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
