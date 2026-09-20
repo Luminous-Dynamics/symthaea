@@ -1,0 +1,141 @@
+name: QUAL SEP-001A exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-sep-001a-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head separation-contract qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: e667e8b5cecf4b0a25f5bf78132d15fda81214aa
+      SOURCE_PARENT: 5fd5259af776c0a7f1b9608f040bfae9009871a1
+      PACKAGE: symthaea-separations
+      CRATE: crates/domains/symthaea-separations
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: e667e8b5cecf4b0a25f5bf78132d15fda81214aa
+          fetch-depth: 2
+
+      - name: Verify exact source identity and semantic scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "$CRATE/Cargo.toml"
+          test "${changed[1]}" = "$CRATE/src/lib.rs"
+          echo "qualified_subject=$SOURCE_SHA"
+          echo "qualified_parent=$SOURCE_PARENT"
+          echo "semantic_diff_paths=PASS"
+
+      - name: Prove separation authority boundary is represented
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$CRATE/src/lib.rs"
+          grep -Fq 'does not establish that a separation occurred' "$src"
+          grep -Fq 'pub struct SeparationFeedStateV1' "$src"
+          grep -Fq 'pub struct SeparationArchitectureV1' "$src"
+          grep -Fq 'pub struct SeparationOperatingStateV1' "$src"
+          grep -Fq 'process order can' "$src"
+          grep -Fq 'fn feed_phase_code' "$src"
+          grep -Fq 'fn feed_condition_code' "$src"
+          grep -Fq 'fn mechanism_code' "$src"
+          grep -Fq 'fn driving_force_code' "$src"
+          if grep -Fq 'pub fn selectivity' "$src"; then
+            echo 'selectivity authority landed too early in SEP-001A'
+            exit 1
+          fi
+          if grep -Fq 'pub fn recovery' "$src"; then
+            echo 'recovery authority landed too early in SEP-001A'
+            exit 1
+          fi
+          echo "separation_authority_boundary=PASS"
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/sep-001a-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+          cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+
+      - name: Rustfmt exact separations crate
+        run: cargo fmt --manifest-path "$CRATE/Cargo.toml" -- --check
+
+      - name: Compile and run all separations targets
+        run: cargo test -p "$PACKAGE" --all-targets --locked
+
+      - name: Strict Clippy on separations targets
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- Cargo.lock "$CRATE"
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_SEPARATION_FEED_ARCHITECTURE_OPERATING_CONTRACTS"
+          echo "species_transfer_authority=NONE"
+          echo "selectivity_authority=NONE"
+          echo "recovery_authority=NONE"
+          echo "industrial_process_authority=NONE"
