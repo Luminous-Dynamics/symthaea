@@ -17,6 +17,7 @@ pub mod conditioned_property;
 pub mod database;
 pub mod discovery_campaign;
 pub mod encoder;
+pub mod evaluation_seal;
 pub mod evidence;
 pub mod haptic_prober;
 pub mod hea_screening;
@@ -45,6 +46,9 @@ pub use discovery_campaign::{
     ObjectiveDirection, campaign_pareto_front, campaign_point_is_feasible,
 };
 pub use encoder::MaterialHdcEncoder;
+pub use evaluation_seal::{
+    EvaluationSealError, MultiFidelityEvaluationSeal, canonical_semantic_identity,
+};
 pub use evidence::{
     MaterialsClaimAuthority, MaterialsEvidenceChain, MaterialsEvidenceError, MaterialsEvidenceKind,
     MaterialsEvidenceRecord, MaterialsEvidenceStage,
