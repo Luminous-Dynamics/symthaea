@@ -769,7 +769,8 @@ mod tests {
     };
 
     fn digest(byte: char) -> String {
-        byte.to_string().repeat(64)
+        assert!(byte.is_ascii(), "fixture digest seed must be ASCII");
+        format!("{:02x}", u32::from(byte)).repeat(32)
     }
 
     fn source() -> ValidatedSnapshotReceipt {
