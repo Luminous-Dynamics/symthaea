@@ -1,0 +1,44 @@
+name: QUAL KAMA-DIALOGUE-001N2 exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-kama-dialogue-001n2-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head reflective-memory retrieval firewall qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate subject
+        uses: actions/checkout@v4
+        with:
+          ref: 9deb331989c93c89b230f66d97af71ceaa90a9d1
+          fetch-depth: 1
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=9deb331989c93c89b230f66d97af71ceaa90a9d1
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "qualified_subject=$actual"
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/core/symthaea-communication
+      - name: Rustfmt exact communication crate
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: Run retrieval-firewall integration test
+        run: cargo test -p symthaea-communication --test reflective_memory_retrieval
+      - name: Clippy retrieval-firewall integration target
+        run: cargo clippy -p symthaea-communication --test reflective_memory_retrieval -- -D warnings
