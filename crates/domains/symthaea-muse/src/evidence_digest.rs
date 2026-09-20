@@ -14,6 +14,8 @@ pub mod prog_suite_contextual_harmony_section_audio;
 pub mod prog_suite_contextual_harmony_section_pitch_class;
 #[path = "prog_suite_contextual_harmony_section_spectral.rs"]
 pub mod prog_suite_contextual_harmony_section_spectral;
+#[path = "prog_suite_contextual_harmony_symbolic_acoustic_tonal.rs"]
+pub mod prog_suite_contextual_harmony_symbolic_acoustic_tonal;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
