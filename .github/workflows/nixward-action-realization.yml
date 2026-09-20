@@ -1,0 +1,43 @@
+name: Nixward Action Realization
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "crates/core/nixward/src/action/realization.rs"
+      - "crates/core/nixward/src/action/mod.rs"
+      - "scripts/qualify_nixward_action_realization.sh"
+      - ".github/workflows/nixward-action-realization.yml"
+      - "crates/core/nixward/Cargo.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  action-realization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Run focused qualification
+        run: bash scripts/qualify_nixward_action_realization.sh
