@@ -1,0 +1,132 @@
+name: QUAL SIM-PROC-001 exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-sim-proc-001-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head raw process-capture qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: 995beaf461bede210e5b458ef0326f7961b88642
+      SOURCE_PARENT: a884f7770f7df98a9a955881cf03e813d709d7de
+      PACKAGE: symthaea-process-capture
+      CRATE: crates/bridges/symthaea-process-capture
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: 995beaf461bede210e5b458ef0326f7961b88642
+          fetch-depth: 2
+
+      - name: Verify exact source identity and semantic scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "$CRATE/Cargo.toml"
+          test "${changed[1]}" = "$CRATE/src/lib.rs"
+          echo "qualified_subject=$SOURCE_SHA"
+          echo "qualified_parent=$SOURCE_PARENT"
+          echo "semantic_diff_paths=PASS"
+
+      - name: Prove raw-process authority boundary is represented
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$CRATE/src/lib.rs"
+          grep -Fq 'pub enum EnvironmentPolicy' "$src"
+          grep -Fq 'InheritAndOverride' "$src"
+          grep -Fq 'ClearAndSet' "$src"
+          grep -Fq 'pub enum ProcessTermination' "$src"
+          grep -Fq 'TimedOut' "$src"
+          grep -Fq 'OutputLimitExceeded' "$src"
+          grep -Fq 'pub fn process_success(&self) -> bool' "$src"
+          grep -Fq 'This is **not** a scientific/numerical convergence predicate.' "$src"
+          grep -Fq 'elapsed_time_is_process_evidence_not_convergence_evidence' "$src"
+          echo "raw_process_authority_boundary=PASS"
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/sim-proc-001-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+
+      - name: Rustfmt exact process-capture crate
+        run: cargo fmt --manifest-path "$CRATE/Cargo.toml" -- --check
+
+      - name: Compile and run all process-capture targets
+        run: cargo test -p "$PACKAGE" --all-targets
+
+      - name: Strict Clippy on process-capture targets
+        run: cargo clippy -p "$PACKAGE" --all-targets -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- Cargo.lock "$CRATE"
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_RAW_PROCESS_CAPTURE"
+          echo "process_execution_claim=TEST_FIXTURES_ONLY"
+          echo "solver_convergence_authority=NONE"
+          echo "scientific_result_authority=NONE"
+          echo "materials_discovery_claim=NONE"
