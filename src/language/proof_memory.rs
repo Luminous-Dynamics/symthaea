@@ -137,7 +137,8 @@ impl CachedProofEngine {
         #[cfg(feature = "swarm")] swarm_proofs: &[symthaea_swarm::SwarmProofMsg],
         #[cfg(not(feature = "swarm"))] _swarm_proofs: &[()],
     ) -> (ProofVerdict, String) {
-        // Exact local SMT matches are safe to reuse as verdicts.
+        // Exact local SMT matches are reusable because their verdict was
+        // produced by this proof engine and retained in local proof memory.
         if let Some(cached_record) = self.memory.exact_smt(smtlib2) {
             self.cache_hits += 1;
             return (
@@ -149,55 +150,50 @@ impl CachedProofEngine {
             );
         }
 
-        // 1. Distributed SMT Short-Circuit (Read Path Interception).
-        // Peer verdicts are reused only for exact SMT-LIB2 matches.
+        // Peer messages are information, not proof authority. Even an exact
+        // SMT-LIB2 match and `verified=true` cannot mint a local verdict: the
+        // peer bit is not a proof certificate and is not bound here to a
+        // locally trusted verifier receipt. Until such receipts exist, peers
+        // may only contribute hints and the local verifier still executes.
+        let mut proof_hints = Vec::new();
         #[cfg(feature = "swarm")]
         if let Some(peer_proof) = swarm_proofs.iter().find(|p| p.smtlib2 == smtlib2) {
-            self.cache_hits += 1;
-            let verdict = if peer_proof.verified {
-                ProofVerdict::Proven
-            } else {
-                ProofVerdict::Refuted
-            };
-            return (
-                verdict,
-                format!(
-                    "SWARM SHORT-CIRCUIT HIT: Found exact match in peer mesh registry for `{}`.",
-                    peer_proof.label
-                ),
-            );
+            proof_hints.push(format!(
+                "peer exact SMT claim `{}` reported verified={}; treated as hint only",
+                peer_proof.label, peer_proof.verified
+            ));
         }
 
-        let mut fuzzy_hint = None;
         if let Ok(encoded) =
             encode_rust_ast_hdc(source, symthaea_core::hdc::unified_hv::HDC_DIMENSION)
         {
             // HDC similarity is useful as a repair hint, but not sound enough
-            // to reuse a formal SMT verdict. Only exact SMT hashes short-circuit.
+            // to reuse a formal SMT verdict. Only locally established exact
+            // SMT records may short-circuit this verifier.
             if let Some((cached_record, score)) =
                 self.memory.nearest(&encoded.features, min_similarity)
             {
-                fuzzy_hint = Some(format!(
+                proof_hints.push(format!(
                     "local fuzzy proof prototype `{}` matched at {:.3}; treated as hint only",
                     cached_record.label, score
                 ));
             }
 
-            // 2. Fuzzy Lemma Chaining via High-Dimensional Computing (HDC)
+            // Fuzzy swarm matches are likewise hints only.
             #[cfg(feature = "swarm")]
             {
                 let mut best_swarm_match: Option<(&symthaea_swarm::SwarmProofMsg, f32)> = None;
                 for peer_proof in swarm_proofs {
                     let score = encoded.hv.similarity(&peer_proof.proof_hv);
-                    if score >= min_similarity {
-                        if best_swarm_match.is_none() || score > best_swarm_match.unwrap().1 {
-                            best_swarm_match = Some((peer_proof, score));
-                        }
+                    if score >= min_similarity
+                        && (best_swarm_match.is_none() || score > best_swarm_match.unwrap().1)
+                    {
+                        best_swarm_match = Some((peer_proof, score));
                     }
                 }
 
                 if let Some((peer_proof, score)) = best_swarm_match {
-                    fuzzy_hint = Some(format!(
+                    proof_hints.push(format!(
                         "swarm fuzzy proof prototype `{}` matched at {:.3}; treated as hint only",
                         peer_proof.label, score
                     ));
@@ -205,13 +201,13 @@ impl CachedProofEngine {
             }
         }
 
-        let summary = if let Some(hint) = fuzzy_hint {
+        let summary = if proof_hints.is_empty() {
+            "Evaluated via structural Z3 SMT runtime engine execution.".to_string()
+        } else {
             format!(
                 "Evaluated via structural Z3 SMT runtime engine execution; {}.",
-                hint
+                proof_hints.join("; ")
             )
-        } else {
-            "Evaluated via structural Z3 SMT runtime engine execution.".to_string()
         };
         self.solver_calls += 1;
         let bridge_result = self.bridge.verify_satisfiable(smtlib2);
@@ -401,35 +397,54 @@ mod tests {
 
     #[test]
     #[cfg(feature = "swarm")]
-    fn test_swarm_short_circuit_hit() {
-        let memory = ProofMemory::default();
-        let bridge = Z3Bridge {
-            z3_available: false,
-            z3_path: None,
-            timeout_secs: 5,
+    fn test_swarm_exact_match_is_hint_only_and_peer_verdict_bit_has_no_authority() {
+        let query = "(assert (= a b))";
+        let make_engine = || {
+            CachedProofEngine::new(
+                Z3Bridge {
+                    z3_available: false,
+                    z3_path: None,
+                    timeout_secs: 5,
+                },
+                ProofMemory::default(),
+            )
         };
-        let mut engine = CachedProofEngine::new(bridge, memory);
-
-        let peer_proof = symthaea_swarm::SwarmProofMsg {
+        let make_peer = |verified| symthaea_swarm::SwarmProofMsg {
             node_id: uuid::Uuid::new_v4(),
             label: "peer_lemma_alpha".to_string(),
-            smtlib2: "(assert (= a b))".to_string(),
+            smtlib2: query.to_string(),
             proof_hv: symthaea_core::hdc::ContinuousHV::zero(16384),
-            verified: true,
+            verified,
             timestamp: 0,
         };
 
-        let (verdict, details) = engine.verify_with_cache(
+        let mut verified_engine = make_engine();
+        let (verified_verdict, verified_details) = verified_engine.verify_with_cache(
             "local_check",
             "pub fn test() {}",
-            "(assert (= a b))",
+            query,
             0.85,
-            &[peer_proof],
+            &[make_peer(true)],
         );
 
-        assert_eq!(verdict, ProofVerdict::Proven);
-        assert_eq!(engine.cache_hits, 1);
-        assert!(details.contains("SWARM SHORT-CIRCUIT HIT"));
+        let mut unverified_engine = make_engine();
+        let (unverified_verdict, unverified_details) = unverified_engine.verify_with_cache(
+            "local_check",
+            "pub fn test() {}",
+            query,
+            0.85,
+            &[make_peer(false)],
+        );
+
+        assert_eq!(verified_verdict, unverified_verdict);
+        assert_eq!(verified_engine.cache_hits, 0);
+        assert_eq!(unverified_engine.cache_hits, 0);
+        assert_eq!(verified_engine.solver_calls, 1);
+        assert_eq!(unverified_engine.solver_calls, 1);
+        assert!(verified_details.contains("peer exact SMT claim"));
+        assert!(verified_details.contains("treated as hint only"));
+        assert!(unverified_details.contains("peer exact SMT claim"));
+        assert!(unverified_details.contains("treated as hint only"));
     }
 }
 
