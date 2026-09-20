@@ -1,0 +1,82 @@
+name: SCIP Semantic Claim Oracle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/scip_semantic_claim_oracle.py'
+      - 'scripts/test_scip_semantic_claim_oracle.py'
+      - 'tests/fixtures/scip/semantic_claim_inventory_v1.json'
+      - 'docs/release/evidence/SCIP_SEMANTIC_CLAIM_ORACLE_V1.md'
+      - '.github/workflows/scip-semantic-claim-oracle.yml'
+  pull_request:
+    paths:
+      - 'scripts/scip_semantic_claim_oracle.py'
+      - 'scripts/test_scip_semantic_claim_oracle.py'
+      - 'tests/fixtures/scip/semantic_claim_inventory_v1.json'
+      - 'docs/release/evidence/SCIP_SEMANTIC_CLAIM_ORACLE_V1.md'
+      - '.github/workflows/scip-semantic-claim-oracle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semantic-claim-oracle:
+    name: Verify independent structured-claim oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compile Python sources
+        run: |
+          python3 -m py_compile \
+            scripts/scip_semantic_claim_oracle.py \
+            scripts/test_scip_semantic_claim_oracle.py
+
+      - name: Verify frozen source and fixture bytes
+        shell: bash
+        run: |
+          cat > /tmp/scip-semantic-sha256.txt <<'EOF'
+          0727bf1ef810fcaef57ea6290596fbfbb1b835074d995bc74d9b6e1da1a745aa  scripts/scip_semantic_claim_oracle.py
+          4855112ebc7a3178ddf12d31d42f25fbbdfe175dc4f8660702ac0a6608f2d1b0  scripts/test_scip_semantic_claim_oracle.py
+          b51a178dee532a99e46a11dc65779337af63e4749c67d744a809a5b3fe0c016b  tests/fixtures/scip/semantic_claim_inventory_v1.json
+          EOF
+          sha256sum -c /tmp/scip-semantic-sha256.txt
+
+      - name: Run oracle self-test
+        run: python3 scripts/scip_semantic_claim_oracle.py --self-test
+
+      - name: Run external adversarial harness
+        run: python3 scripts/test_scip_semantic_claim_oracle.py
+
+      - name: Verify frozen positive comparison and authority boundary
+        shell: bash
+        run: |
+          python3 scripts/scip_semantic_claim_oracle.py \
+            tests/fixtures/scip/semantic_claim_inventory_v1.json \
+            > /tmp/scip-semantic-result.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path('/tmp/scip-semantic-result.json').read_text())
+          assert result['comparison_sha256'] == 'e0d42e1a1ead213f4261405c22d1f80cb6f1d106fd5621481eb0e95a6cca4530'
+          assert result['authority'] == 'measurement-only'
+          assert result['claim_inventory_equivalent'] is True
+          assert result['surface_fidelity_established'] is False
+          assert result['text_to_claim_extraction_qualified'] is False
+          assert len(result['dimensions']) == 11
+          PY
+
+      - name: Prove tracked checkout unchanged
+        shell: bash
+        run: |
+          test -z "$(git status --porcelain --untracked-files=all)"

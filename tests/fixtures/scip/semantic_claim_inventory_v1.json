@@ -1,0 +1,85 @@
+{
+  "schema": "symthaea.scip-semantic-claim-comparison-input/v1",
+  "contract_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "surface_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "source_claims": [
+    {
+      "claim_id": "claim-1",
+      "subject_ref": "sensor:S17",
+      "relation": "reports-temperature",
+      "object_ref": "reactor:R1",
+      "direction": "forward",
+      "polarity": "positive",
+      "numeric": {
+        "value": "f64:4073b00000000000",
+        "unit": "K"
+      },
+      "quantifier": {
+        "kind": "exact",
+        "value": 1
+      },
+      "temporal_scope": "window:2026-09-20T10:00Z/2026-09-20T10:05Z",
+      "epistemic_modality": "probable",
+      "attribution": "observation:17",
+      "causal_strength": "none"
+    },
+    {
+      "claim_id": "claim-2",
+      "subject_ref": "controller:C1",
+      "relation": "commands",
+      "object_ref": "valve:V1",
+      "direction": "forward",
+      "polarity": "positive",
+      "numeric": null,
+      "quantifier": {
+        "kind": "exact",
+        "value": 1
+      },
+      "temporal_scope": "window:2026-09-20T10:00Z/2026-09-20T10:05Z",
+      "epistemic_modality": "certain",
+      "attribution": "command:9",
+      "causal_strength": "none"
+    }
+  ],
+  "surface_claims": [
+    {
+      "surface_claim_id": "surface-1",
+      "source_claim_id": "claim-1",
+      "subject_ref": "sensor:S17",
+      "relation": "reports-temperature",
+      "object_ref": "reactor:R1",
+      "direction": "forward",
+      "polarity": "positive",
+      "numeric": {
+        "value": "f64:4073b00000000000",
+        "unit": "K"
+      },
+      "quantifier": {
+        "kind": "exact",
+        "value": 1
+      },
+      "temporal_scope": "window:2026-09-20T10:00Z/2026-09-20T10:05Z",
+      "epistemic_modality": "probable",
+      "attribution": "observation:17",
+      "causal_strength": "none"
+    },
+    {
+      "surface_claim_id": "surface-2",
+      "source_claim_id": "claim-2",
+      "subject_ref": "controller:C1",
+      "relation": "commands",
+      "object_ref": "valve:V1",
+      "direction": "forward",
+      "polarity": "positive",
+      "numeric": null,
+      "quantifier": {
+        "kind": "exact",
+        "value": 1
+      },
+      "temporal_scope": "window:2026-09-20T10:00Z/2026-09-20T10:05Z",
+      "epistemic_modality": "certain",
+      "attribution": "command:9",
+      "causal_strength": "none"
+    }
+  ]
+}
