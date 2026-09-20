@@ -1,0 +1,148 @@
+name: QUAL MAG-EXP-002R2 exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-mag-exp-002r2-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head Fe-Co-Zr experiment qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: 8d985ea9f25311683c5c6038b7a1b594cd1ed114
+      SOURCE_PARENT: cc83ce1eceae4dd52fb027d477b6a3d867d56d09
+      PACKAGE: symthaea-materials-fe-co-zr-experiment
+      LEGACY_DRIVER_BLOB: 5d5f40ea1839b5dbc874892959fda780d60713e3
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: 8d985ea9f25311683c5c6038b7a1b594cd1ed114
+          fetch-depth: 2
+
+      - name: Verify exact source identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          echo "qualified_subject=$SOURCE_SHA"
+          echo "qualified_parent=$SOURCE_PARENT"
+
+      - name: Prove readiness authority quarantine
+        shell: bash
+        run: |
+          set -euo pipefail
+          facade="crates/domains/symthaea-materials-fe-co-zr-experiment/src/lib.rs"
+          driver="crates/domains/symthaea-materials-fe-co-zr-experiment/src/orchestration_driver.rs"
+          test "$(git hash-object "$driver")" = "$LEGACY_DRIVER_BLOB"
+          grep -Fq 'mod orchestration_driver;' "$facade"
+          if grep -Fq 'ReadinessReport' "$facade"; then
+            echo "forbidden_public_symbol=ReadinessReport"
+            exit 1
+          fi
+          if grep -Fq 'readiness_report' "$facade"; then
+            echo "forbidden_public_symbol=readiness_report"
+            exit 1
+          fi
+          echo "private_driver_blob_identity=PASS"
+          echo "static_readiness_exports_absent=PASS"
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove parent locked metadata before judging new package
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/mag-exp-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+
+      - name: Rustfmt exact experiment crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-materials-fe-co-zr-experiment/Cargo.toml -- --check
+
+      - name: Compile and run all experiment targets
+        run: cargo test -p "$PACKAGE" --all-targets
+
+      - name: Prove rustdoc public surface excludes static readiness API
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo doc -p "$PACKAGE" --lib --no-deps
+          index="target/doc/symthaea_materials_fe_co_zr_experiment/index.html"
+          test -f "$index"
+          if grep -Fq 'ReadinessReport' "$index"; then
+            echo "rustdoc_public_leak=ReadinessReport"
+            exit 1
+          fi
+          if grep -Fq 'readiness_report' "$index"; then
+            echo "rustdoc_public_leak=readiness_report"
+            exit 1
+          fi
+          echo "rustdoc_static_readiness_exports_absent=PASS"
+
+      - name: Strict Clippy on experiment targets
+        run: cargo clippy -p "$PACKAGE" --all-targets -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- \
+            Cargo.lock \
+            crates/domains/symthaea-materials-fe-co-zr-experiment
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_RUNTIME_GATE_WITH_PUBLIC_AUTHORITY_QUARANTINE"
+          echo "large_archive_execution=NOT_RUN"
+          echo "oqmd_database_state_authority=NONE"
+          echo "materials_discovery_claim=NONE"
