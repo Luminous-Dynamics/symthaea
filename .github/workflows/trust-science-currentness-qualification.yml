@@ -1,0 +1,185 @@
+name: Trust + Science Currentness Stack Qualification
+
+on:
+  push:
+    branches:
+      - qual/run-trust-science-currentness-stack-v1-r7
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trust-science-currentness-qualification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Exact-head trust/science bootstrap qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          rustc --version
+          rustc -Vv
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+      - name: Prove qualifier gates fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          expect_failure() {
+            if "$@"; then
+              echo "expected command to fail but it succeeded: $*" >&2
+              exit 1
+            fi
+          }
+          common_args=(
+            --expected-head "$GITHUB_SHA"
+            --expected-rust 1.96.0
+            --package symthaea-trust-core
+            --package symthaea-science-research
+            --source-path crates/core/symthaea-trust-core
+            --source-path crates/core/symthaea-science-research
+          )
+          expect_failure bash scripts/qualify-research-crate.sh \
+            --program TRUST-SCI-CURRENTNESS-NEG-WRONG-PARENT-R7 \
+            --source-parent 0000000000000000000000000000000000000000 \
+            "${common_args[@]}" \
+            --qualifier-path scripts/qualify-research-crate.sh \
+            --qualifier-path .github/workflows/trust-science-currentness-qualification.yml \
+            --output-dir /tmp/trust-science-neg-wrong-parent
+          expect_failure bash scripts/qualify-research-crate.sh \
+            --program TRUST-SCI-CURRENTNESS-NEG-INCOMPLETE-SCOPE-R7 \
+            --source-parent e8a025ee9f2d4e2b70420e2f6e65193067da802b \
+            "${common_args[@]}" \
+            --qualifier-path .github/workflows/trust-science-currentness-qualification.yml \
+            --output-dir /tmp/trust-science-neg-incomplete-scope
+
+      - name: Qualify frozen trust + science source stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/qualify-research-crate.sh \
+            --program TRUST-SCI-CURRENTNESS-QUAL-001A-R7 \
+            --source-parent e8a025ee9f2d4e2b70420e2f6e65193067da802b \
+            --expected-head "$GITHUB_SHA" \
+            --expected-rust 1.96.0 \
+            --package symthaea-trust-core \
+            --package symthaea-science-research \
+            --source-path crates/core/symthaea-trust-core \
+            --source-path crates/core/symthaea-science-research \
+            --qualifier-path scripts/qualify-research-crate.sh \
+            --qualifier-path .github/workflows/trust-science-currentness-qualification.yml \
+            --output-dir /tmp/trust-science-currentness-qualification
+
+      - name: Bind all-feature graph and toolchain binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence=/tmp/trust-science-currentness-qualification
+          test -f "$evidence/receipt.txt"
+          test -f "$evidence/Cargo.lock.generated"
+
+          original_lock="$(mktemp)"
+          cp Cargo.lock "$original_lock"
+          restore_lock() {
+            cp "$original_lock" Cargo.lock
+            rm -f "$original_lock"
+          }
+          trap restore_lock EXIT
+
+          cp "$evidence/Cargo.lock.generated" Cargo.lock
+          candidate_lock_sha="$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          recorded_lock_sha="$(sed -n 's/^generated_lock_sha256=//p' "$evidence/receipt.txt")"
+          if [[ "$candidate_lock_sha" != "$recorded_lock_sha" ]]; then
+            echo "candidate lock identity changed before evidence enrichment" >&2
+            exit 1
+          fi
+
+          cargo metadata --locked --all-features --format-version 1 \
+            > "$evidence/Cargo.metadata.all-features.json"
+          : > "$evidence/dependency-tree.all-features.txt"
+          for package in symthaea-trust-core symthaea-science-research; do
+            printf 'package=%s\n' "$package" >> "$evidence/dependency-tree.all-features.txt"
+            cargo tree --locked --all-features -p "$package" \
+              --edges normal,build,dev --prefix none --charset ascii \
+              >> "$evidence/dependency-tree.all-features.txt"
+          done
+
+          {
+            rustup show active-toolchain
+            rustup component list --installed
+          } > "$evidence/toolchain-selection.txt"
+          : > "$evidence/toolchain-binaries.txt"
+          : > "$evidence/toolchain-binaries.sha256"
+          for tool in rustc cargo rustfmt cargo-clippy clippy-driver rustdoc; do
+            tool_path="$(rustup which "$tool")"
+            tool_sha="$(sha256sum "$tool_path" | cut -d' ' -f1)"
+            printf '%s=%s\n' "$tool" "$tool_path" >> "$evidence/toolchain-binaries.txt"
+            printf '%s=%s\n' "$tool" "$tool_sha" >> "$evidence/toolchain-binaries.sha256"
+          done
+
+          all_features_metadata_sha256="$(sha256sum "$evidence/Cargo.metadata.all-features.json" | cut -d' ' -f1)"
+          all_features_dependency_tree_sha256="$(sha256sum "$evidence/dependency-tree.all-features.txt" | cut -d' ' -f1)"
+          toolchain_selection_sha256="$(sha256sum "$evidence/toolchain-selection.txt" | cut -d' ' -f1)"
+          toolchain_binaries_manifest_sha256="$(sha256sum "$evidence/toolchain-binaries.sha256" | cut -d' ' -f1)"
+
+          {
+            echo "all_features_cargo_metadata_sha256=$all_features_metadata_sha256"
+            echo "all_features_dependency_tree_sha256=$all_features_dependency_tree_sha256"
+            echo "toolchain_selection_sha256=$toolchain_selection_sha256"
+            echo "toolchain_binaries_manifest_sha256=$toolchain_binaries_manifest_sha256"
+            echo "all_features_resolved_graph_bound=PASS"
+            echo "selected_toolchain_binaries_bound=PASS"
+          } >> "$evidence/receipt.txt"
+
+          restore_lock
+          trap - EXIT
+          if [[ -n "$(git status --porcelain=v1)" ]]; then
+            echo "working tree is not clean after evidence enrichment" >&2
+            git status --short >&2
+            exit 1
+          fi
+
+      - name: Print qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/trust-science-currentness-qualification/receipt.txt ]]; then
+            cat /tmp/trust-science-currentness-qualification/receipt.txt
+          fi
+          if [[ -f /tmp/trust-science-currentness-qualification/Cargo.lock.patch ]]; then
+            echo "Cargo.lock.patch bytes: $(wc -c < /tmp/trust-science-currentness-qualification/Cargo.lock.patch)"
+            sha256sum /tmp/trust-science-currentness-qualification/Cargo.lock.patch
+          fi
+          if [[ -f /tmp/trust-science-currentness-qualification/dependency-tree.all-features.txt ]]; then
+            echo "dependency-tree.all-features.txt sha256:"
+            sha256sum /tmp/trust-science-currentness-qualification/dependency-tree.all-features.txt
+          fi
+          if [[ -f /tmp/trust-science-currentness-qualification/toolchain-binaries.sha256 ]]; then
+            echo "toolchain-binaries.sha256 manifest:"
+            cat /tmp/trust-science-currentness-qualification/toolchain-binaries.sha256
+          fi
+
+      - name: Retain bootstrap qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trust-science-currentness-qualification-${{ github.sha }}
+          path: /tmp/trust-science-currentness-qualification/
+          if-no-files-found: warn
+          retention-days: 30
