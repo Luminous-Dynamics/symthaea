@@ -70,6 +70,7 @@ pub mod pitch;
 pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
+pub mod prog_suite_coverage_citation;
 pub mod prog_suite_development_adjudication;
 pub mod prog_suite_development_program;
 pub mod prog_suite_obligation_citation;
@@ -155,6 +156,13 @@ pub use prog_suite::{
     ProgSuiteRealizationV1, ProgSuiteSectionCarrierV1, ProgSuiteSectionCarriersV1,
     ProgSuiteSectionPlanV1, ProgSuiteTransformV1, derive_prog_suite_section_carriers,
     plan_prog_suite, realize_prog_suite_with_plan,
+};
+pub use prog_suite_coverage_citation::{
+    PROG_SUITE_COVERAGE_CITATION_PROFILE, PROG_SUITE_COVERAGE_CITATION_VERSION,
+    ProgSuiteCoverageCitationDispositionV1, ProgSuiteCoverageCitationErrorV1,
+    ProgSuiteCoverageCitationNonClaimV1, ProgSuiteCoverageCitationProjectionLossV1,
+    ProgSuiteCoverageCitationRecordV1, ProgSuiteCoverageCitationSetV1,
+    cite_prog_suite_whole_section_coverage,
 };
 pub use prog_suite_development_adjudication::{
     PROG_SUITE_DEVELOPMENT_ADJUDICATION_VERSION, PROG_SUITE_FIRST_STATEMENT_EVIDENCE_PROFILE,
