@@ -21,6 +21,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod repository_effect_policy;
+mod repository_materialization_receipt;
 mod repository_snapshot;
 mod repository_snapshot_diff;
 mod repository_snapshot_receipt;
@@ -143,6 +144,27 @@ enum Commands {
         /// Write JSON to this path instead of stdout.
         #[arg(long)]
         output: Option<PathBuf>,
+    },
+    /// Bind a concrete repository materialization to a validated source subject.
+    RepositoryMaterialization {
+        /// Strict materialization-realization JSON spec. The source snapshot ID is derived, not caller supplied.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Validated repository-source subject from which this materialization was prepared.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Rebuild a stored repository-materialization receipt against its validated source subject.
+    RepositoryMaterializationVerify {
+        /// Stored repository-materialization receipt.
+        #[arg(long)]
+        receipt: PathBuf,
+        /// Validated repository-source subject.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
     },
     /// Canonicalize and identify a Cargo execution intent for assurance admission.
     CargoExecutionIntent {
@@ -403,6 +425,19 @@ fn main() -> anyhow::Result<()> {
             output,
         } => {
             repository_effect_policy::run(&base, &head, &policy, output)?;
+        }
+        Commands::RepositoryMaterialization {
+            spec,
+            pre_snapshot,
+            output,
+        } => {
+            repository_materialization_receipt::run(&spec, &pre_snapshot, output)?;
+        }
+        Commands::RepositoryMaterializationVerify {
+            receipt,
+            pre_snapshot,
+        } => {
+            repository_materialization_receipt::run_verify(&receipt, &pre_snapshot)?;
         }
         Commands::CargoExecutionIntent {
             spec,
