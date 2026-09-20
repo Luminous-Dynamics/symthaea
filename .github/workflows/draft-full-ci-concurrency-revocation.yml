@@ -1,0 +1,41 @@
+name: Draft Full CI Concurrency Revocation
+
+# Runnerless first-line revocation for the heavyweight CI workflow.
+#
+# A ready PR may already have a queued/running `CI` workflow when it is converted
+# back to draft. Waiting for a write-capable governor runner creates a revocation
+# gap precisely when hosted capacity is saturated. GitHub concurrency groups are
+# repository-wide, so this workflow can join CI's exact pull-request concurrency
+# group on converted_to_draft and cancel that pending/running CI run before any
+# runner is allocated here.
+#
+# ready_for_review is subscribed only to satisfy lifecycle/liveness auditing. On
+# that transition this workflow uses a unique inert concurrency group and cannot
+# interfere with CI admission.
+
+on:
+  pull_request:
+    types: [ready_for_review, converted_to_draft]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event.action == 'converted_to_draft' && format('CI-{0}-auto', github.ref) || format('draft-full-ci-revocation-noop-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event.action == 'converted_to_draft' }}
+
+jobs:
+  impossible-runner-state:
+    name: Runner must remain unallocated
+    # For ready_for_review, action != converted_to_draft. For converted_to_draft,
+    # draft == true. Therefore this job is false for every valid trigger state.
+    # Keeping the impossible conjunction explicit lets the repository-wide draft
+    # safety checker prove this is a runner-capable workflow whose runner cannot
+    # be admitted while draft.
+    if: github.event.action == 'converted_to_draft' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - name: Fail closed on impossible event semantics
+        run: |
+          echo 'unexpected converted_to_draft event with draft=false' >&2
+          exit 86
