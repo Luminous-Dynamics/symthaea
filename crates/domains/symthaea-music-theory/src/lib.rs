@@ -73,6 +73,7 @@ pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_contextual_harmony;
 pub mod prog_suite_contextual_harmony_comparison;
+pub mod prog_suite_contextual_harmony_lockbox;
 pub mod prog_suite_contextual_harmony_panel;
 pub mod prog_suite_development_context;
 pub mod prog_suite_development_program;
@@ -177,6 +178,17 @@ pub use prog_suite_contextual_harmony_comparison::{
     ProgSuiteEventDifferenceSummaryV1, ProgSuiteHarmonyComparisonAuthorityV1,
     ProgSuiteHarmonyComparisonNonClaimV1, ProgSuiteSectionHarmonyComparisonV1,
     ProgSuiteVoiceComparisonV1, derive_prog_suite_contextual_harmony_comparison,
+};
+pub use prog_suite_contextual_harmony_lockbox::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_LOCKBOX_MOTIF_COUNT,
+    PROG_SUITE_CONTEXTUAL_HARMONY_LOCKBOX_SUBJECT_COUNT,
+    PROG_SUITE_CONTEXTUAL_HARMONY_LOCKBOX_VERSION,
+    ProgSuiteContextualHarmonyLockboxErrorV1, ProgSuiteContextualHarmonyLockboxV1,
+    ProgSuiteHarmonyLockboxAggregationV1, ProgSuiteHarmonyLockboxAnalysisPlanV1,
+    ProgSuiteHarmonyLockboxEndpointV1, ProgSuiteHarmonyLockboxMotifV1,
+    ProgSuiteHarmonyLockboxNonClaimV1, ProgSuiteHarmonyLockboxPrimaryUnitV1,
+    ProgSuiteHarmonyLockboxStatusV1, ProgSuiteHarmonyLockboxSubjectV1,
+    predeclare_prog_suite_contextual_harmony_motif_lockbox_v1,
 };
 pub use prog_suite_contextual_harmony_panel::{
     PROG_SUITE_CONTEXTUAL_HARMONY_PANEL_VERSION,
