@@ -1,0 +1,30 @@
+{
+  "schema": "symthaea.scip-text-claim-case-admission-policy/v1",
+  "authority": "case-admission-only",
+  "v19_manifest_policy_sha256": "9a30ba36b3e872aaec349647f71433579bc0932f24c96335bb32afe77498ffc0",
+  "v20_annotation_policy_sha256": "12a8431fd8a93dd8ba158758bb4089ef951960240fcab11a5178159e67f19bb9",
+  "binding": {
+    "surface_sha256_matches_v20": true,
+    "source_inventory_sha256_matches_v20": true,
+    "expected_inventory_sha256_is_v20_frozen_surface_inventory": true,
+    "annotation_receipt_sha256_matches_v20": true,
+    "v19_case_id_recomputed": true,
+    "assignment_key_bound_in_admission_receipt": true,
+    "split_bound_in_admission_receipt": true,
+    "hidden_alignment_inventory_not_substituted_for_expected_inventory": true
+  },
+  "receipt": {
+    "schema": "symthaea.scip-text-claim-case-admission/v1",
+    "algorithm": "sha256-domain-separated-canonical-json/v1",
+    "domain": "symthaea-scip-text-claim-case-admission-v1\u0000",
+    "self_hash_field_absent": true
+  },
+  "claim_boundary": {
+    "single_case_admission_does_not_verify_split_assignment": true,
+    "single_case_admission_does_not_verify_cross_split_leakage": true,
+    "single_case_admission_does_not_qualify_v19_manifest": true,
+    "single_case_admission_does_not_prove_human_correctness": true,
+    "single_case_admission_does_not_establish_surface_fidelity": true,
+    "single_case_admission_does_not_authorize_confirmatory_execution": true
+  }
+}
