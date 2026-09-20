@@ -70,6 +70,7 @@ pub mod pitch;
 pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
+pub mod prog_suite_development_program;
 pub mod prog_suite_work_bridge;
 pub mod prog_suite_work_evidence;
 pub mod renaissance;
@@ -145,6 +146,10 @@ pub use prog_suite::{
     PROG_SUITE_BARS_PER_SECTION, PROG_SUITE_PLAN_VERSION, ProgSuitePlanErrorV1,
     ProgSuitePlanV1, ProgSuiteRealizationV1, ProgSuiteSectionPlanV1, ProgSuiteTransformV1,
     plan_prog_suite, realize_prog_suite_with_plan,
+};
+pub use prog_suite_development_program::{
+    PROG_SUITE_DEVELOPMENT_PROGRAM_VERSION, ProgSuiteDevelopmentProgramErrorV1,
+    ProgSuiteDevelopmentProgramV1, derive_prog_suite_development_program,
 };
 pub use prog_suite_work_bridge::{
     PROG_SUITE_WORK_BRIDGE_VERSION, ProgSuiteMeterProjectionV1,
