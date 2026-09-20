@@ -1,9 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+mod qmpy_recheck;
 mod readiness_gate;
 mod readiness_recheck;
 
+use qmpy_recheck::require_current_qmpy_import;
 use readiness_gate::{
     RUNTIME_READINESS_FILE, RuntimeReadinessGate, execute_runtime_readiness,
 };
@@ -305,6 +307,7 @@ fn require_runtime_readiness(
 ) -> Result<RuntimeReadinessGate, Box<dyn Error>> {
     let gate = load::<RuntimeReadinessGate>(config, RUNTIME_READINESS_FILE)?;
     gate.validate_against(config, prepared)?;
+    require_current_qmpy_import(config, &gate.qmpy_import)?;
     require_current_mysql_observation(config, &gate.mysql_fixture.live_observation)?;
     Ok(gate)
 }
