@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-scip-realization-contract"
+version = "0.1.0"
+edition = "2024"
+description = "Grounded semantic verification obligations for accepted SCIP language surfaces"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-communication = { workspace = true }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+symthaea-scip-realization-receipt = { path = "../symthaea-scip-realization-receipt" }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+async-trait = "0.1"
+symthaea = { path = "../../..", default-features = false }
+symthaea-scip-llm-adapter = { path = "../symthaea-scip-llm-adapter" }
+tokio = { workspace = true }

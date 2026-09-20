@@ -1,0 +1,88 @@
+name: SCIP Semantic Realization Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/bridges/symthaea-scip-realization-contract/**'
+      - 'crates/bridges/symthaea-scip-realization-receipt/**'
+      - 'crates/bridges/symthaea-interlingua/**'
+      - '.github/workflows/scip-realization-contract.yml'
+  pull_request:
+    paths:
+      - 'crates/bridges/symthaea-scip-realization-contract/**'
+      - 'crates/bridges/symthaea-scip-realization-receipt/**'
+      - 'crates/bridges/symthaea-interlingua/**'
+      - '.github/workflows/scip-realization-contract.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  semantic-contract:
+    name: Qualify grounded semantic verification contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-scip-realization-contract-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-scip-realization-contract-
+            ${{ runner.os }}-cargo-scip-realization-receipt-
+            ${{ runner.os }}-cargo-scip-
+
+      - name: Format changed semantic-contract Rust files
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="${BASE_SHA:-HEAD^1}"
+          mapfile -t files < <(
+            git diff --diff-filter=ACMR --name-only "$base" HEAD -- \
+              crates/bridges/symthaea-scip-realization-contract \
+              | grep -E '\.rs$' || true
+          )
+          if ((${#files[@]})); then
+            printf 'rustfmt checking %s\n' "${files[@]}"
+            rustfmt --edition 2024 --config skip_children=true --check "${files[@]}"
+          else
+            echo 'No changed semantic-contract Rust files to format-check.'
+          fi
+
+      - name: Detect workspace lock drift
+        shell: bash
+        run: |
+          cp Cargo.lock /tmp/Cargo.lock.before
+          cargo metadata --format-version 1 --no-deps >/dev/null
+          if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
+            echo '::error::Cargo metadata requires Cargo.lock reconciliation; do not qualify an unfrozen dependency graph.'
+            git diff -- Cargo.lock || true
+            exit 1
+          fi
+
+      - name: Test semantic realization contract
+        run: cargo test --locked -p symthaea-scip-realization-contract --all-targets
+
+      - name: Strict Clippy semantic realization contract
+        run: cargo clippy --locked -p symthaea-scip-realization-contract --all-targets --no-deps -- -D warnings
