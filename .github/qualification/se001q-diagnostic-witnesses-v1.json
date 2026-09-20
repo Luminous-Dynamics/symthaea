@@ -117,7 +117,7 @@
             "end_exclusive": 146,
             "start": 20
           },
-          "excerpt_base64": "Y2Fubm90IHVwZGF0ZSB0aGUgbG9jayBmaWxlIC9ob21lL3J1bm5lci93b3JrL3N5bXRoYWVhL3N5bXRoYWVhL3N1YmplY3QvQ2FyZ28ubG9jayBiZWNhdXNlIC0tbG9ja2VkIHdhcyBwYXNzZWQgdG8gcHJldmVudCB0aGsz",
+          "excerpt_base64": "Y2Fubm90IHVwZGF0ZSB0aGUgbG9jayBmaWxlIC9ob21lL3J1bm5lci93b3JrL3N5bXRoYWVhL3N5bXRoYWVhL3N1YmplY3QvQ2FyZ28ubG9jayBiZWNhdXNlIC0tbG9ja2VkIHdhcyBwYXNzZWQgdG8gcHJldmVudCB0aGlz",
           "excerpt_sha256": "sha256:b772d771c2c88c2c2db117d9edd64618ccea0790c7315bdbe6fcb53525db9643",
           "exit_code": 101,
           "stream": "stderr",
