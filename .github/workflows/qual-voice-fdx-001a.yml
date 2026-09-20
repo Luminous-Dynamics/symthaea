@@ -1,0 +1,41 @@
+name: QUAL VOICE-FDX-001A exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/qual-voice-fdx-001a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout frozen candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 4fe826073fe7e5eaff3c3d23c4bee429973cd640
+          fetch-depth: 0
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "4fe826073fe7e5eaff3c3d23c4bee429973cd640"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Rustfmt exact candidate
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Test full-duplex turn controller
+        run: cargo test -p symthaea-communication --test full_duplex_turn_controller
+
+      - name: Clippy full-duplex turn controller
+        run: cargo clippy -p symthaea-communication --test full_duplex_turn_controller -- -D warnings
