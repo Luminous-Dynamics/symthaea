@@ -10,6 +10,7 @@
 #![deny(unsafe_code)]
 
 pub mod assurance_case;
+pub mod assurance_state;
 pub mod verification_receipt;
 
 use serde::{Deserialize, Serialize};
