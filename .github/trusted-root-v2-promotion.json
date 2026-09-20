@@ -1,0 +1,42 @@
+{
+  "schema": "symthaea-trusted-root-v2-promotion-v1",
+  "repository": "Luminous-Dynamics/symthaea",
+  "branch": "main",
+  "parent_contract": {
+    "pr": 5223,
+    "head": "27277820946e83428d962765e33b1b74ddf4d71c",
+    "recipe": ".github/rulesets/main-trusted-root-v1.json"
+  },
+  "candidate_recipe": ".github/rulesets/main-trusted-root-v2-required-governance.json",
+  "state": "deferred-until-execution-plane-qualified",
+  "required_status_checks": [
+    "Governance Check (Class A/B Changes)"
+  ],
+  "intentionally_not_required": [
+    {
+      "context": "actionlint + GitHub shell syntax",
+      "reason": "Workflow Syntax is path-scoped and is absent on pull requests that do not change .github workflows or scripts; making that context globally required would deadlock unrelated merges."
+    }
+  ],
+  "activation_prerequisites": {
+    "actions_execution_issue": 4276,
+    "actions_execution_issue_must_be_resolved": true,
+    "lifecycle_pr": 5149,
+    "lifecycle_pr_must_be_merged": true,
+    "minimum_distinct_current_head_governance_successes": 3,
+    "required_runner_class": "github-hosted",
+    "required_runner_label": "ubuntu-latest",
+    "runner_assignment_must_be_nonzero": true,
+    "all_required_runs_must_conclude_success": true
+  },
+  "status_check_policy": {
+    "strict_required_status_checks_policy": false,
+    "reason": "Use a loose required check initially to avoid multiplying executions while hosted-runner capacity is recovering."
+  },
+  "nonclaims": [
+    "This manifest does not activate the v2 ruleset.",
+    "Queued, skipped, or cancelled runs do not satisfy execution-plane promotion evidence.",
+    "One successful hosted run is not sufficient to establish stable runner availability.",
+    "Workflow Syntax remains important but is not globally require-able while path-scoped."
+  ]
+}
