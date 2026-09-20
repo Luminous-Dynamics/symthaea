@@ -1,0 +1,30 @@
+{
+  "authority": {
+    "meaning": "manifest-complete causal repair evidence linkage only",
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE",
+    "sufficient_for_repair_grant": false
+  },
+  "domain": "symthaea.se001q.repair-evidence-join-census.v1.2",
+  "expected_source_artifact_zip_sha256": "sha256:6b9f2566e762b3064b0925d4ffbc86d8b3bdb4dd81b9c0863379b2b19362d78e",
+  "expected_source_evidence_file_count": 31,
+  "expected_source_evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731",
+  "expected_subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+  "purpose": "Bind the prior non-authorizing causal repair-evidence join to the complete EV2.4 evidence-manifest↔artifact ZIP census.",
+  "required_prior_join_result": "JOINED_CAUSAL_REPAIR_EVIDENCE",
+  "required_prior_join_schema": "symthaea.se001q.repair-evidence-join.v1.1",
+  "requirements": [
+    "prior v1.1 repair-evidence join is content-addressed and explicitly non-authorizing",
+    "prior join binds the same exact source artifact ZIP and evidence manifest",
+    "downloaded EV2.4 ZIP bytes match the exact frozen artifact SHA-256",
+    "evidence/manifest.json is content-addressed and binds the frozen subject",
+    "manifest contains exactly 31 unique normalized relative file paths",
+    "ZIP contains exactly evidence/manifest.json plus the manifest-declared evidence files under evidence/",
+    "ZIP has no duplicate or unsafe evidence member names",
+    "every manifest-declared file SHA-256 equals the exact ZIP member bytes",
+    "result remains non-authorizing"
+  ],
+  "result": "JOINED_CAUSAL_REPAIR_EVIDENCE_WITH_MANIFEST_CENSUS",
+  "schema": "symthaea.se001q.repair-evidence-join-census-contract.v1.2",
+  "theorem": "Prior joined causal repair evidence + exact full evidence-manifest↔artifact census establishes manifest-complete joined evidence, not mutation authority."
+}
