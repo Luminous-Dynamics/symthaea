@@ -38,6 +38,8 @@ pub mod perceptual_participant_schedule;
 pub mod perceptual_participant_identity;
 #[path = "perceptual_enrollment_lifecycle.rs"]
 pub mod perceptual_enrollment_lifecycle;
+#[path = "perceptual_recruitment_grant.rs"]
+pub mod perceptual_recruitment_grant;
 #[path = "perceptual_enrollment_store.rs"]
 pub mod perceptual_enrollment_store;
 #[path = "perceptual_schedule_reveal.rs"]
