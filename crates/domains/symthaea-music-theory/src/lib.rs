@@ -71,6 +71,7 @@ pub mod pitch;
 pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
+pub mod prog_suite_contextual_harmony;
 pub mod prog_suite_development_context;
 pub mod prog_suite_development_program;
 pub mod prog_suite_replay_evidence;
@@ -161,6 +162,12 @@ pub use prog_suite::{
     ProgSuiteRealizationV1, ProgSuiteSectionCarrierV1, ProgSuiteSectionCarriersV1,
     ProgSuiteSectionPlanV1, ProgSuiteTransformV1, derive_prog_suite_section_carriers,
     plan_prog_suite, realize_prog_suite_with_plan,
+};
+pub use prog_suite_contextual_harmony::{
+    PROG_SUITE_CONTEXTUAL_HARMONY_VERSION, ProgSuiteContextualHarmonyErrorV1,
+    ProgSuiteContextualHarmonyNonClaimV1, ProgSuiteContextualHarmonyPlanV1,
+    ProgSuiteContextualHarmonyProfileV1, ProgSuiteContextualHarmonyReceiptV1,
+    ProgSuiteHarmonicNarrativeRoleV1, derive_prog_suite_contextual_harmony,
 };
 pub use prog_suite_development_context::{
     PROG_SUITE_DEVELOPMENT_CONTEXT_VERSION, ProgSuiteDevelopmentContextErrorV1,
