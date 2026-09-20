@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-scip-semantic-review"
+version = "0.1.0"
+edition = "2024"
+description = "Authority-narrow semantic review contracts for accepted SCIP language surfaces"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+blake3 = { workspace = true }
+symthaea-communication = { workspace = true }
+symthaea-interlingua = { path = "../symthaea-interlingua" }
+symthaea-scip-llm-adapter = { path = "../symthaea-scip-llm-adapter" }
+symthaea-scip-realization-receipt = { path = "../symthaea-scip-realization-receipt" }
