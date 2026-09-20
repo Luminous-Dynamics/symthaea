@@ -1,0 +1,304 @@
+name: STAT-LM-001A Exact Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/stat-lm-001a-qualification.yml"
+      - "crates/domains/symthaea-statistics/src/lib.rs"
+      - "crates/domains/symthaea-statistics/src/linear_model.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stat-lm-001a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_PARENT: b192955f3aa77a5cd3687faaa5c57a1077a4bc9e
+  SOURCE_SHA: 3a358cf3b9eb688ccabd24d49021e12f3935e49b
+  SOURCE_TREE: 45485cdd0eb0bc2aa5c03b0dfd6e499886311295
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-stat-lm-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Bind qualifier, source, and exact source delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          mkdir -p "$evidence"
+
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          test "$(git rev-parse "$SOURCE_SHA^{tree}")" = "$SOURCE_TREE"
+          test -z "$(git status --porcelain=v1)"
+
+          mapfile -t qualifier_actual < <(git diff --name-only "$SOURCE_SHA" HEAD | LC_ALL=C sort)
+          qualifier_expected=(".github/workflows/stat-lm-001a-qualification.yml")
+          mapfile -t qualifier_expected < <(printf '%s\n' "${qualifier_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${qualifier_expected[@]}") <(printf '%s\n' "${qualifier_actual[@]}")
+
+          mapfile -t source_actual < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA" | LC_ALL=C sort)
+          source_expected=(
+            "crates/domains/symthaea-statistics/src/lib.rs"
+            "crates/domains/symthaea-statistics/src/linear_model.rs"
+          )
+          mapfile -t source_expected < <(printf '%s\n' "${source_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${source_expected[@]}") <(printf '%s\n' "${source_actual[@]}")
+
+          git diff --quiet "$SOURCE_SHA" HEAD -- \
+            crates/domains/symthaea-statistics/src/lib.rs \
+            crates/domains/symthaea-statistics/src/linear_model.rs \
+            Cargo.toml Cargo.lock
+
+          {
+            echo "qualifier_head=$actual_head"
+            echo "source_parent=$SOURCE_PARENT"
+            echo "source_sha=$SOURCE_SHA"
+            echo "source_tree=$SOURCE_TREE"
+          } > "$evidence/identity.txt"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          rustc -Vv > "$evidence/rustc.txt"
+          cargo -Vv > "$evidence/cargo.txt"
+          rustfmt -V > "$evidence/rustfmt.txt"
+          cargo clippy -V > "$evidence/clippy.txt"
+
+      - name: Freeze source semantic ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          file="crates/domains/symthaea-statistics/src/linear_model.rs"
+          lib="crates/domains/symthaea-statistics/src/lib.rs"
+
+          grep -F 'column-pivoted-modified-gram-schmidt-reorthogonalized-v1' "$file"
+          grep -F 'pub factorization_column_order: Vec<usize>' "$file"
+          grep -F 'pub rank_threshold: f64' "$file"
+          grep -F 'LinearLeastSquaresDisposition::RankDeficient' "$file"
+          grep -F 'coefficients: None' "$file"
+          grep -F 'pub mod linear_model;' "$lib"
+          grep -F 'try_linear_least_squares' "$lib"
+
+      - name: Verify parent locked metadata is executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          qualifier_head="$(git rev-parse HEAD)"
+          git checkout --detach "$SOURCE_PARENT"
+          set +e
+          cargo metadata --no-deps --format-version 1 --locked \
+            > "$evidence/parent-metadata.json" \
+            2> "$evidence/parent-metadata.stderr"
+          status=$?
+          set -e
+          echo "$status" > "$evidence/parent-metadata.status"
+          git checkout --detach "$qualifier_head"
+          if [ "$status" -ne 0 ]; then
+            {
+              echo 'qualification_claim=NOT_EVALUATED'
+              echo 'reason=SOURCE_PARENT_LOCKED_METADATA_FAILED'
+              echo 'source_pass=NONE'
+            } > "$evidence/receipt.txt"
+            echo 'Exact parent cannot satisfy locked Cargo metadata; no source conclusion.' >&2
+            exit "$status"
+          fi
+
+      - name: Exact-path rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-statistics/src/lib.rs \
+            crates/domains/symthaea-statistics/src/linear_model.rs
+
+      - name: Locked statistics tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          cargo test --locked -p symthaea-statistics 2>&1 | tee "$evidence/cargo-test.txt"
+
+      - name: Locked all-target check
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          cargo check --locked -p symthaea-statistics --all-targets 2>&1 \
+            | tee "$evidence/cargo-check.txt"
+
+      - name: Strict statistics Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          cargo clippy --locked -p symthaea-statistics --all-targets -- -D warnings 2>&1 \
+            | tee "$evidence/cargo-clippy.txt"
+
+      - name: External public-API known-answer harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          harness="$RUNNER_TEMP/stat-lm-public-harness"
+          mkdir -p "$harness/src"
+          cat > "$harness/Cargo.toml" <<EOF
+          [package]
+          name = "stat-lm-public-harness"
+          version = "0.0.0"
+          edition = "2024"
+
+          [workspace]
+
+          [dependencies]
+          symthaea-statistics = { path = "$GITHUB_WORKSPACE/crates/domains/symthaea-statistics" }
+          EOF
+
+          cat > "$harness/src/main.rs" <<'EOF'
+          use symthaea_statistics::{
+              LinearLeastSquaresDisposition, LinearLeastSquaresProfile, LinearModelError,
+              try_linear_least_squares,
+          };
+
+          fn close(actual: f64, expected: f64, tolerance: f64) {
+              assert!(
+                  (actual - expected).abs() <= tolerance,
+                  "actual={actual:?} expected={expected:?} tolerance={tolerance:?}"
+              );
+          }
+
+          fn main() {
+              let profile = LinearLeastSquaresProfile::default();
+              let design = vec![
+                  vec![1.0e-3, 1.0],
+                  vec![2.0e-3, 0.0],
+                  vec![3.0e-3, -1.0],
+                  vec![4.0e-3, 2.0],
+              ];
+              let outcomes = design
+                  .iter()
+                  .map(|row| 2.0 * row[0] + 3.0 * row[1])
+                  .collect::<Vec<_>>();
+              let fit = try_linear_least_squares(&design, &outcomes, profile).unwrap();
+              assert_eq!(fit.disposition, LinearLeastSquaresDisposition::FullColumnRank);
+              assert_eq!(fit.factorization_column_order[0], 1);
+              let beta = fit.coefficients.as_ref().unwrap();
+              close(beta[0], 2.0, 1.0e-10);
+              close(beta[1], 3.0, 1.0e-12);
+
+              let duplicate = vec![vec![1.0, 2.0], vec![2.0, 4.0], vec![3.0, 6.0]];
+              let rank_deficient =
+                  try_linear_least_squares(&duplicate, &[1.0, 2.0, 3.0], profile).unwrap();
+              assert_eq!(
+                  rank_deficient.disposition,
+                  LinearLeastSquaresDisposition::RankDeficient
+              );
+              assert!(rank_deficient.coefficients.is_none());
+
+              let underdetermined = vec![vec![1.0, 0.0, 0.0], vec![0.0, 1.0, 0.0]];
+              assert_eq!(
+                  try_linear_least_squares(&underdetermined, &[1.0, 2.0], profile).unwrap_err(),
+                  LinearModelError::Underdetermined {
+                      observations: 2,
+                      parameters: 3,
+                  }
+              );
+
+              println!("external_public_api_harness=PASS");
+              println!("physical_identifiability_claim=NONE");
+              println!("causal_identifiability_claim=NONE");
+          }
+          EOF
+
+          CARGO_NET_OFFLINE=true cargo run --manifest-path "$harness/Cargo.toml" 2>&1 \
+            | tee "$evidence/external-harness.txt"
+          grep -Fxq 'external_public_api_harness=PASS' "$evidence/external-harness.txt"
+          grep -Fxq 'physical_identifiability_claim=NONE' "$evidence/external-harness.txt"
+          grep -Fxq 'causal_identifiability_claim=NONE' "$evidence/external-harness.txt"
+
+      - name: Postflight source and lock immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          git diff --quiet "$SOURCE_SHA" HEAD -- \
+            crates/domains/symthaea-statistics/src/lib.rs \
+            crates/domains/symthaea-statistics/src/linear_model.rs \
+            Cargo.toml Cargo.lock
+
+      - name: Write source-only qualification receipt
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          {
+            echo 'program=STAT-LM-001A'
+            echo 'qualification_claim=SOURCE_ONLY_NUMERICAL_SUBSTRATE'
+            echo 'method=column-pivoted-modified-gram-schmidt-reorthogonalized-v1'
+            echo 'physical_identifiability_claim=NONE'
+            echo 'causal_identifiability_claim=NONE'
+            echo 'physical_parameter_truth=NONE'
+            echo 'experiment_validity=NONE'
+            echo 'controller_authority=NONE'
+            echo "source_sha=$SOURCE_SHA"
+            echo "source_tree=$SOURCE_TREE"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "qualifier_tree=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo 'parent_locked_metadata=PASS'
+            echo 'source_ratchets=PASS'
+            echo 'rustfmt=PASS'
+            echo 'statistics_tests=PASS'
+            echo 'all_target_check=PASS'
+            echo 'strict_clippy=PASS'
+            echo 'external_public_api_harness=PASS'
+            echo 'postflight_immutable=PASS'
+          } > "$evidence/receipt.txt"
+
+      - name: Record evidence checksums
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/stat-lm-001a-evidence"
+          mkdir -p "$evidence"
+          find "$evidence" -maxdepth 1 -type f ! -name SHA256SUMS \
+            -print0 | sort -z | xargs -0 -r sha256sum \
+            > "$evidence/SHA256SUMS"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: stat-lm-001a-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/stat-lm-001a-evidence/
+          if-no-files-found: error
+          retention-days: 90
