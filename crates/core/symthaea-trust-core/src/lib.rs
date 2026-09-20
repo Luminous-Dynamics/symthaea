@@ -12,6 +12,8 @@
 //!   prospective revocation, replacement, and retroactive compromise;
 //! - content-addressed key-to-principal/organization/region/role bindings;
 //! - frozen delegated trust-root policies and dual-threshold rotation contracts;
+//! - structural signature-feasibility proofs over the exact root-bound principal
+//!   directory, kept distinct from institutional root authority;
 //! - role-aware root authority capabilities that reuse cryptographic attestation
 //!   verification and independently enforce principal/org/region quorum geometry;
 //! - bounded interval-based time evidence with explicit source strength;
@@ -56,6 +58,7 @@ mod transparency_namespace_monitor;
 mod transparency_witness;
 mod trust;
 mod trust_root;
+mod trust_root_feasibility;
 mod trusted_time;
 
 #[cfg(test)]
@@ -85,4 +88,5 @@ pub use transparency_namespace_monitor::*;
 pub use transparency_witness::*;
 pub use trust::*;
 pub use trust_root::*;
+pub use trust_root_feasibility::*;
 pub use trusted_time::*;
