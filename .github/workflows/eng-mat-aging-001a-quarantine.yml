@@ -1,0 +1,233 @@
+name: ENG-MAT-AGING-001A Quarantine Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/eng-mat-aging-001a-quarantine.yml"
+      - "crates/domains/symthaea-materials/src/aging.rs"
+      - "crates/domains/symthaea-materials/src/lib.rs"
+      - "src/safety/materials_bridge.rs"
+      - "examples/benchmark_genesis_materials.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eng-mat-aging-001a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_SHA: 14b757d5023ef0ebb0d1015e607e68f60bda4afe
+  SOURCE_PARENT: b192955f3aa77a5cd3687faaa5c57a1077a4bc9e
+  SOURCE_TREE: c7ed93969284d639df6ce6253b5100a04b5e2926
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-quarantine-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Bind qualifier, source, and exact source delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          test "$(git rev-parse "$SOURCE_SHA^{tree}")" = "$SOURCE_TREE"
+          test -z "$(git status --porcelain=v1)"
+
+          mapfile -t qualifier_actual < <(git diff --name-only "$SOURCE_SHA" HEAD | LC_ALL=C sort)
+          qualifier_expected=(".github/workflows/eng-mat-aging-001a-quarantine.yml")
+          mapfile -t qualifier_expected < <(printf '%s\n' "${qualifier_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${qualifier_expected[@]}") <(printf '%s\n' "${qualifier_actual[@]}")
+
+          mapfile -t source_actual < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA" | LC_ALL=C sort)
+          source_expected=(
+            "crates/domains/symthaea-materials/src/aging.rs"
+            "crates/domains/symthaea-materials/src/lib.rs"
+            "examples/benchmark_genesis_materials.rs"
+            "src/safety/materials_bridge.rs"
+          )
+          mapfile -t source_expected < <(printf '%s\n' "${source_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${source_expected[@]}") <(printf '%s\n' "${source_actual[@]}")
+
+          git diff --quiet "$SOURCE_SHA" HEAD -- \
+            crates/domains/symthaea-materials/src/aging.rs \
+            crates/domains/symthaea-materials/src/lib.rs \
+            src/safety/materials_bridge.rs \
+            examples/benchmark_genesis_materials.rs \
+            Cargo.toml Cargo.lock
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Freeze source-level non-amplification ratchets
+        shell: bash
+        run: |
+          set -euo pipefail
+          aging="crates/domains/symthaea-materials/src/aging.rs"
+          safety="src/safety/materials_bridge.rs"
+          bench="examples/benchmark_genesis_materials.rs"
+
+          grep -F 'pub const MATERIAL_AGING_CLAIM_CLASS: &str = "research-representation-drift-only";' "$aging"
+          grep -F 'remaining_strength: 1.0' "$aging"
+          grep -F 'research drift signal only' "$aging"
+          if grep -F 'remaining_strength: state_similarity' "$aging"; then
+            echo 'HDC similarity must not be copied into remaining_strength' >&2
+            exit 1
+          fi
+
+          grep -F 'research-heuristic-diagnostic-only-no-physical-authority' "$safety"
+          grep -F 'pub fn remaining_strength_to_safety_level(_remaining_strength: f32) -> SafetyLevel' "$safety"
+          grep -F 'SafetyGateResult::Blocked' "$safety"
+          grep -F 'integrity_critical: true' "$safety"
+
+          grep -F 'state_similarity={:.3} [research heuristic only]' "$bench"
+          grep -F 'no residual-strength/lifetime claim' "$bench"
+          if grep -F 'remaining_strength={' "$bench"; then
+            echo 'Public benchmark must not present remaining_strength as evidence' >&2
+            exit 1
+          fi
+
+      - name: Verify parent locked metadata is executable
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/eng-mat-aging-001a-evidence"
+          mkdir -p "$evidence"
+          qualifier_head="$(git rev-parse HEAD)"
+          git checkout --detach "$SOURCE_PARENT"
+          set +e
+          cargo metadata --no-deps --format-version 1 --locked \
+            > "$evidence/parent-metadata.json" \
+            2> "$evidence/parent-metadata.stderr"
+          status=$?
+          set -e
+          echo "$status" > "$evidence/parent-metadata.status"
+          git checkout --detach "$qualifier_head"
+          if [ "$status" -ne 0 ]; then
+            echo 'Exact parent cannot satisfy locked Cargo metadata; no source conclusion.' >&2
+            exit "$status"
+          fi
+
+      - name: Exact-path rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-materials/src/aging.rs \
+            crates/domains/symthaea-materials/src/lib.rs \
+            src/safety/materials_bridge.rs \
+            examples/benchmark_genesis_materials.rs
+
+      - name: Materials aging regressions
+        run: cargo test -p symthaea-materials --locked aging::tests -- --nocapture
+
+      - name: Root safety bridge regressions
+        run: cargo test -p symthaea --lib --features materials --locked safety::materials_bridge -- --nocapture
+
+      - name: Public materials benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/eng-mat-aging-001a-evidence"
+          mkdir -p "$evidence"
+          cargo run -p symthaea --example benchmark_genesis_materials --features materials --locked \
+            | tee "$evidence/benchmark.stdout"
+          grep -F 'research heuristic only' "$evidence/benchmark.stdout"
+          grep -F 'no residual-strength/lifetime claim' "$evidence/benchmark.stdout"
+          if grep -F 'remaining_strength=' "$evidence/benchmark.stdout"; then
+            echo 'Benchmark output leaked a residual-strength presentation' >&2
+            exit 1
+          fi
+
+      - name: Unchanged engineering consumer still compiles
+        run: cargo check -p symthaea-engineering --lib --locked
+
+      - name: Strict materials Clippy
+        run: cargo clippy -p symthaea-materials --all-targets --locked -- -D warnings
+
+      - name: Postflight source and lock immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          git diff --quiet "$SOURCE_SHA" HEAD -- \
+            crates/domains/symthaea-materials/src/aging.rs \
+            crates/domains/symthaea-materials/src/lib.rs \
+            src/safety/materials_bridge.rs \
+            examples/benchmark_genesis_materials.rs \
+            Cargo.toml Cargo.lock
+
+      - name: Write source-only qualification receipt
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/eng-mat-aging-001a-evidence"
+          mkdir -p "$evidence"
+          {
+            echo 'program=ENG-MAT-AGING-001A'
+            echo 'qualification_claim=SOURCE_ONLY_SEMANTIC_QUARANTINE'
+            echo 'physical_aging_model_qualified=NONE'
+            echo 'residual_strength_claim=NONE'
+            echo 'lifetime_claim=NONE'
+            echo 'material_safety_authority=NONE'
+            echo 'operation_authority=NONE'
+            echo 'hdc_claim_class=research-representation-drift-only'
+            echo 'safety_bridge_claim_class=research-heuristic-diagnostic-only-no-physical-authority'
+            echo "source_sha=$SOURCE_SHA"
+            echo "source_tree=$SOURCE_TREE"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "qualifier_tree=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version)"
+            echo "cargo=$(cargo --version)"
+            echo 'parent_locked_metadata=PASS'
+            echo 'source_ratchets=PASS'
+            echo 'rustfmt=PASS'
+            echo 'materials_tests=PASS'
+            echo 'safety_bridge_tests=PASS'
+            echo 'public_benchmark=PASS'
+            echo 'engineering_consumer_compile=PASS'
+            echo 'materials_clippy=PASS'
+            echo 'postflight_immutable=PASS'
+          } > "$evidence/receipt.txt"
+
+      - name: Record evidence checksums
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/eng-mat-aging-001a-evidence"
+          mkdir -p "$evidence"
+          find "$evidence" -maxdepth 1 -type f ! -name SHA256SUMS \
+            -print0 | sort -z | xargs -0 -r sha256sum \
+            > "$evidence/SHA256SUMS"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eng-mat-aging-001a-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/eng-mat-aging-001a-evidence/
+          if-no-files-found: error
+          retention-days: 90
