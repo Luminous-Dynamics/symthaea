@@ -96,6 +96,7 @@ pub mod thematic_retrograde_evidence;
 pub mod thematic_score_evidence;
 pub mod thematic_source_material;
 pub mod voicing;
+pub mod work_metric_architecture;
 pub mod work_obligation;
 pub mod work_plan;
 pub mod work_tonal_trajectory;
@@ -243,6 +244,11 @@ pub use thematic_source_material::{
     ThematicSourceMaterialPlanV1, ThematicSourceMaterialV1,
 };
 pub use voicing::{lead_bass, lead_upper};
+pub use work_metric_architecture::{
+    WORK_METRIC_ARCHITECTURE_VERSION, MetricArchitectureCoverageV1, MetricRegionRoleV1,
+    MetricRegionV1, MetricTransitionRelationV1, MetricTransitionV1,
+    WorkMetricArchitectureErrorV1, WorkMetricArchitectureV1,
+};
 pub use work_obligation::{
     ObligationDueWindowV2, WORK_OBLIGATION_PLAN_VERSION, WorkObligationErrorV2,
     WorkObligationKindV2, WorkObligationPlanV2, WorkObligationV2,
