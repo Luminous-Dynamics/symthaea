@@ -1,0 +1,25 @@
+{
+  "schema": "symthaea.se001q.cross-generation-corroboration-contract.v1",
+  "purpose": "Non-authorizing corroboration of the same Cargo.lock delta across two executed SE-001Q diagnostic generations.",
+  "accepted_verification_schemas": [
+    "symthaea.se001q.lock-delta-verification.v1",
+    "symthaea.se001q.lock-delta-verification.v2"
+  ],
+  "minimum_strong_verifier_count": 1,
+  "requirements": [
+    "both capsules report REPRODUCIBLE_LOCK_DELTA and contain a content-addressed LockDeltaWitness",
+    "both manifests exactly match retained file sets, sizes, and SHA-256 digests",
+    "same frozen subject, experiment_id, and toolchain",
+    "byte-identical source Cargo.lock and generated Cargo.lock",
+    "distinct run IDs, artifact IDs, and verifier SHAs",
+    "at least one capsule passed the v2 independent verifier"
+  ],
+  "result": "CORROBORATED_GENERATED_LOCK",
+  "authority": {
+    "meaning": "corroboration only",
+    "sufficient_for_repair_grant": false,
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE"
+  },
+  "theorem": "LockDeltaWitness(A) + LockDeltaWitness(B) + identical lock bytes + independent generations => corroboration, not mutation authority"
+}
