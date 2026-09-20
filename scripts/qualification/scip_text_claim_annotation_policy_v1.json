@@ -1,0 +1,53 @@
+{
+  "schema": "symthaea.scip-text-claim-annotation-policy/v1",
+  "authority": "annotation-evidence-only",
+  "v18_preregistration_sha256": "96e2ec5e1fad213f4261405c22d1f80cb6f1d106fd5621481eb0e95a6cca4530",
+  "v19_manifest_policy_sha256": "9a30ba36b3e872aaec349647f71433579bc0932f24c96335bb32afe77498ffc0",
+  "actor_identity": {
+    "representation": "opaque-sha256-fingerprint",
+    "names_emails_forbidden": true,
+    "all_roles_within_case_distinct": true,
+    "fingerprint_is_provenance_not_authentication": true
+  },
+  "extraction": {
+    "independent_annotators": 2,
+    "surface_text_visible": true,
+    "public_claim_schema_visible": true,
+    "source_inventory_hidden": true,
+    "source_claim_ids_hidden": true,
+    "candidate_output_hidden": true,
+    "exact_agreement_uses_claim_inventory_sha256": true,
+    "disagreement_requires_distinct_adjudicator": true,
+    "adjudicator_source_inventory_hidden": true,
+    "raw_annotation_artifacts_retained_by_digest": true,
+    "frozen_before_alignment": true
+  },
+  "alignment": {
+    "independent_aligners": 2,
+    "frozen_surface_inventory_visible": true,
+    "source_inventory_visible": true,
+    "candidate_output_hidden": true,
+    "surface_inventory_mutation_forbidden": true,
+    "allowed_alignment_outcomes": [
+      "exact-source-claim",
+      "no-source-support"
+    ],
+    "exact_agreement_uses_aligned_inventory_sha256": true,
+    "disagreement_requires_distinct_adjudicator": true,
+    "raw_alignment_artifacts_retained_by_digest": true
+  },
+  "receipt": {
+    "schema": "symthaea.scip-text-claim-annotation-bundle/v1",
+    "digest_algorithm": "sha256-domain-separated-canonical-json/v1",
+    "digest_domain": "symthaea-scip-text-claim-annotation-bundle-v1\u0000",
+    "self_hash_field_absent": true,
+    "v19_annotation_receipt_sha256_is_bundle_digest": true
+  },
+  "claim_boundary": {
+    "bundle_validation_does_not_prove_human_correctness": true,
+    "process_declarations_are_not_independently_attested": true,
+    "bundle_validation_does_not_establish_extractor_quality": true,
+    "bundle_validation_does_not_establish_surface_fidelity": true,
+    "bundle_validation_does_not_authorize_confirmatory_execution": true
+  }
+}
