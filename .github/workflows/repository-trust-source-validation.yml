@@ -1,0 +1,67 @@
+name: Repository Trust Source Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - ".github/repository-trust-policy.json"
+      - ".github/rulesets/main-trusted-root-v1.json"
+      - ".github/scripts/check-repository-trust-policy.py"
+      - ".github/workflows/repository-trust-policy.yml"
+      - ".github/workflows/repository-trust-source-validation.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: repository-trust-source-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+jobs:
+  validate-source-contract:
+    name: Validate repository trust source contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact subject bytes
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/${REPOSITORY}/${SUBJECT_SHA}"
+          curl --fail --location --silent --show-error \
+            "${base}/.github/scripts/check-repository-trust-policy.py" \
+            --output /tmp/check-repository-trust-policy.py
+          curl --fail --location --silent --show-error \
+            "${base}/.github/repository-trust-policy.json" \
+            --output /tmp/repository-trust-policy.json
+          curl --fail --location --silent --show-error \
+            "${base}/.github/rulesets/main-trusted-root-v1.json" \
+            --output /tmp/main-trusted-root-v1.json
+
+      - name: Self-test verifier
+        run: python3 /tmp/check-repository-trust-policy.py --self-test
+
+      - name: Derive synthetic effective rules from exact recipe
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          recipe = json.loads(
+              Path('/tmp/main-trusted-root-v1.json').read_text(encoding='utf-8')
+          )
+          rules = recipe.get('rules')
+          Path('/tmp/synthetic-effective-rules.json').write_text(
+              json.dumps(rules), encoding='utf-8'
+          )
+          PY
+
+      - name: Verify policy and recipe coherence
+        run: |
+          python3 /tmp/check-repository-trust-policy.py \
+            --policy /tmp/repository-trust-policy.json \
+            --recipe /tmp/main-trusted-root-v1.json \
+            --rules /tmp/synthetic-effective-rules.json
