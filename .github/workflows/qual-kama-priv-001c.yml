@@ -1,0 +1,44 @@
+name: QUAL KAMA-PRIV-001C exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-kama-priv-001c-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head privacy-audit qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate subject
+        uses: actions/checkout@v4
+        with:
+          ref: 29a4d3b43a3b53d1fc43159c515355a82c53a380
+          fetch-depth: 1
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=29a4d3b43a3b53d1fc43159c515355a82c53a380
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "qualified_subject=$actual"
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/core/symthaea-communication
+      - name: Rustfmt exact communication crate
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: Run KAMA-PRIV-001C integration target
+        run: cargo test -p symthaea-communication --test intimate_privacy_audit
+      - name: Clippy KAMA-PRIV-001C integration target
+        run: cargo clippy -p symthaea-communication --test intimate_privacy_audit -- -D warnings
