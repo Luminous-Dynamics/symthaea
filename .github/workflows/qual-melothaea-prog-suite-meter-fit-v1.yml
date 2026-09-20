@@ -1,0 +1,96 @@
+name: QUAL Melothaea ProgSuite Meter Fit V1
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-melothaea-prog-suite-meter-fit-v1-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  SUBJECT_SHA: 162a89ea74e6e8118bf6b5fcb9e27f2ae7ab1e3b
+  BASE_SHA: dc0d174acd6bc051160513834cd4a61c2b00b6be
+
+jobs:
+  qualify:
+    name: Frozen subject qualification
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout frozen subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Prove exact subject and incremental surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "${actual}" = "${SUBJECT_SHA}"
+          mapfile -t files < <(git diff --name-only "${BASE_SHA}" "${SUBJECT_SHA}")
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "crates/domains/symthaea-music-theory/src/lib.rs"
+          test "${files[1]}" = "crates/domains/symthaea-music-theory/src/prog_suite.rs"
+          {
+            echo "qualifier=melothaea-prog-suite-meter-fit-v1"
+            echo "subject_sha=${SUBJECT_SHA}"
+            echo "base_sha=${BASE_SHA}"
+            echo "subject_file_count=${#files[@]}"
+            printf 'subject_file=%s\n' "${files[@]}"
+          } | tee melothaea-prog-suite-meter-fit-v1-receipt.txt
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "rustc=$(rustc --version --verbose | tr '\n' ';')"
+            echo "cargo=$(cargo --version)"
+          } | tee -a melothaea-prog-suite-meter-fit-v1-receipt.txt
+
+      - name: Format gate
+        run: cargo fmt -p symthaea-music-theory -- --check
+
+      - name: Focused ProgSuite regression gate
+        run: cargo test -p symthaea-music-theory prog_suite
+
+      - name: All-targets buildability gate
+        run: cargo check -p symthaea-music-theory --all-targets
+
+      - name: Clippy gate
+        run: cargo clippy -p symthaea-music-theory --all-targets --no-deps -- -D warnings
+
+      - name: Seal successful receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "format_gate=pass"
+            echo "focused_prog_suite_tests=pass"
+            echo "all_targets_check=pass"
+            echo "clippy_gate=pass"
+            echo "qualification=pass"
+          } | tee -a melothaea-prog-suite-meter-fit-v1-receipt.txt
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: melothaea-prog-suite-meter-fit-v1-${{ env.SUBJECT_SHA }}
+          path: melothaea-prog-suite-meter-fit-v1-receipt.txt
+          if-no-files-found: error
+          retention-days: 30
