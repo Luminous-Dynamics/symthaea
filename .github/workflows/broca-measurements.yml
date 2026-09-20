@@ -2,6 +2,7 @@ name: Broca Measurements
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
@@ -30,6 +31,7 @@ env:
 jobs:
   broca-measurements:
     name: Broca measurement artifacts
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 45
 

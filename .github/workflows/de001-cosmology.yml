@@ -2,6 +2,7 @@ name: DE-001 Cosmology Research Kernel
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-cosmology-research/**"
       - "docs/research/DE_001_PREREGISTRATION_2026-09-18.md"
@@ -19,6 +20,7 @@ concurrency:
 jobs:
   kernel-contract:
     name: DE-001 kernel contract
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -104,4 +106,5 @@ jobs:
 
   a1r-qualification:
     name: DE-001A1 fixed-point qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     uses: ./.github/workflows/de001a-a1r-qualification.yml
