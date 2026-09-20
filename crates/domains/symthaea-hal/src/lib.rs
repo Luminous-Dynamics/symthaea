@@ -76,6 +76,7 @@ pub mod interlock;
 pub mod mock;
 pub mod motor_safety;
 pub mod pca9685;
+mod position_calibration;
 pub mod recording;
 pub mod runtime;
 pub mod sensor;
