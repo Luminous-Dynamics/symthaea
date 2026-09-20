@@ -39,6 +39,7 @@ pub mod composer;
 pub mod contrapuntal_foundry;
 pub mod counterpoint;
 pub mod describe;
+pub mod development_context;
 pub mod development_program;
 pub mod diversity_plan;
 pub mod explorer;
@@ -113,6 +114,11 @@ pub use composer::{
     compose_with_spec_and_form,
 };
 pub use counterpoint::{has_parallel_perfect, parallel_perfect_violations};
+pub use development_context::{
+    DEVELOPMENT_CONTEXT_VERSION, DevelopmentStageContextV1,
+    WorkDevelopmentContextErrorV1, WorkDevelopmentContextV1,
+    derive_work_development_context,
+};
 pub use development_program::{
     DEVELOPMENT_PROGRAM_VERSION, DevelopmentEvidenceRequirementV1, DevelopmentGraphProjectionV1,
     DevelopmentOperationV1, DevelopmentProgramErrorV1, DevelopmentProgramV1, DevelopmentStageV1,
