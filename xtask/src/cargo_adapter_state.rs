@@ -13,8 +13,11 @@ pub(crate) struct ValidatedPreflightBindings {
     pub git_worktree_state_id: Option<String>,
 }
 
-/// Opaque effect-entry evidence supplied by an external assurance/effect gate.
-/// The adapter orchestrator does not mint or interpret authority semantics.
+/// Opaque effect-entry admission evidence supplied by an external assurance gate.
+///
+/// Production integration is expected to map this to the corrected AI Assurance
+/// `EffectAdmissionReceipt` contract. The xtask model treats the digest as opaque
+/// and never infers adapter entry or external-effect occurrence from it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct EffectAdmission {
     pub receipt_digest: String,
@@ -34,6 +37,60 @@ pub(crate) trait EffectEntryGate {
         &mut self,
         intent: &CargoExecutionIntent,
     ) -> Result<EffectAdmission, EffectRejection>;
+}
+
+/// Opaque acknowledgement that the exact admission evidence reached the
+/// persistence strength selected by the trusted host.
+///
+/// The deterministic model does not claim that this is fsync, a database commit,
+/// replication, a Xenia signature, or any other concrete durability mechanism.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AdmissionPersistenceAck {
+    pub admission_receipt_digest: String,
+    pub persistence_ack_digest: String,
+}
+
+/// Persistence policy rejected or failed after effect admission had already won.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AdmissionPersistenceRejection {
+    pub reason: String,
+}
+
+/// Host-selected persistence boundary for already-won effect admission evidence.
+pub(crate) trait AdmissionPersistence {
+    fn persist(
+        &mut self,
+        intent: &CargoExecutionIntent,
+        admission: &EffectAdmission,
+    ) -> Result<AdmissionPersistenceAck, AdmissionPersistenceRejection>;
+}
+
+/// Opaque approval that immediate pre-spawn freshness still matches the exact
+/// admitted/persisted execution subject.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PreSpawnFreshnessApproval {
+    pub admission_receipt_digest: String,
+    pub persistence_ack_digest: String,
+    pub freshness_evidence_digest: String,
+}
+
+/// Freshness rejected after admission evidence was persisted/acknowledged.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PreSpawnFreshnessRejection {
+    pub reason: String,
+}
+
+/// Immediate pre-backend freshness boundary.
+///
+/// Production integration is expected to be backed by the canonical pre-spawn
+/// freshness receipts rather than this deterministic fake interface.
+pub(crate) trait PreSpawnFreshnessGate {
+    fn verify(
+        &mut self,
+        intent: &CargoExecutionIntent,
+        admission: &EffectAdmission,
+        persistence: &AdmissionPersistenceAck,
+    ) -> Result<PreSpawnFreshnessApproval, PreSpawnFreshnessRejection>;
 }
 
 /// Terminal subprocess state. A non-zero Cargo exit remains ordinary execution
@@ -90,13 +147,32 @@ pub(crate) enum AdapterRunReport {
         repository_source_before: String,
         reason: String,
     },
-    /// Effect admission succeeded and the adapter backend boundary was invoked.
-    /// `process.terminal` separately states whether a child process actually
-    /// spawned/exited, failed to spawn, timed out, or was cancelled.
+    /// Effect admission won, but the selected persistence policy rejected or its
+    /// acknowledgement was malformed. Admission evidence is retained explicitly.
+    AdmissionPersistenceRejected {
+        intent_id: String,
+        repository_source_before: String,
+        effect_admission_digest: String,
+        reason: String,
+    },
+    /// Admission evidence was persisted/acknowledged, but immediate freshness
+    /// rejected before the process backend became reachable.
+    FreshnessRejected {
+        intent_id: String,
+        repository_source_before: String,
+        effect_admission_digest: String,
+        persistence_ack_digest: String,
+        reason: String,
+    },
+    /// Admission, persistence, and freshness succeeded and the adapter backend
+    /// boundary was invoked. `process.terminal` separately states whether a child
+    /// process actually spawned/exited, failed to spawn, timed out, or cancelled.
     BackendEntered {
         intent_id: String,
         repository_source_before: String,
         effect_admission_digest: String,
+        persistence_ack_digest: String,
+        pre_spawn_freshness_digest: String,
         process: ProcessCapture,
         postflight: PostflightCapture,
     },
@@ -116,24 +192,31 @@ impl AdapterRunReport {
 /// 1. validate the immutable execution intent;
 /// 2. validate independently established Cargo/policy/Git bindings;
 /// 3. probe the current source subject and require the exact admitted subject;
-/// 4. acquire external effect-entry admission;
-/// 5. only then invoke the process backend;
-/// 6. after backend return, always attempt postflight source capture before
+/// 4. acquire external effect-entry admission evidence;
+/// 5. persist/ack that exact admission evidence under host policy;
+/// 6. require immediate pre-spawn freshness bound to the same admission + ack;
+/// 7. only then invoke the process backend;
+/// 8. after backend return, always attempt postflight source capture before
 ///    interpreting/validating backend output.
 ///
 /// Invalid/malformed immutable inputs return `Err` before any external boundary
-/// is called. Ordinary preflight mismatches and effect denial are represented as
-/// reports so tests can prove the backend remained unreachable.
-pub(crate) fn run_with_backend<P, G, B>(
+/// is called. Ordinary preflight/admission/persistence/freshness rejections are
+/// represented as reports so tests can preserve already-established evidence and
+/// prove that later boundaries remained unreachable.
+pub(crate) fn run_with_backend<P, G, S, F, B>(
     mut intent: CargoExecutionIntent,
     mut bindings: ValidatedPreflightBindings,
     source_probe: &mut P,
     effect_gate: &mut G,
+    persistence: &mut S,
+    freshness: &mut F,
     backend: &mut B,
 ) -> anyhow::Result<AdapterRunReport>
 where
     P: RepositorySourceProbe,
     G: EffectEntryGate,
+    S: AdmissionPersistence,
+    F: PreSpawnFreshnessGate,
     B: CargoProcessBackend,
 {
     validate_intent(&mut intent)?;
@@ -201,6 +284,58 @@ where
         }
     };
 
+    let persistence_ack = match persistence.persist(&intent, &admission) {
+        Ok(mut ack) => {
+            let validation = validate_persistence_ack(&mut ack, &admission);
+            if let Err(error) = validation {
+                return Ok(AdapterRunReport::AdmissionPersistenceRejected {
+                    intent_id: intent.intent_id.clone(),
+                    repository_source_before: current_source,
+                    effect_admission_digest: admission.receipt_digest,
+                    reason: error.to_string(),
+                });
+            }
+            ack
+        }
+        Err(rejection) => {
+            return Ok(AdapterRunReport::AdmissionPersistenceRejected {
+                intent_id: intent.intent_id.clone(),
+                repository_source_before: current_source,
+                effect_admission_digest: admission.receipt_digest,
+                reason: rejection.reason,
+            });
+        }
+    };
+
+    let freshness_approval = match freshness.verify(&intent, &admission, &persistence_ack) {
+        Ok(mut approval) => {
+            let validation = validate_freshness_approval(
+                &mut approval,
+                &admission,
+                &persistence_ack,
+            );
+            if let Err(error) = validation {
+                return Ok(AdapterRunReport::FreshnessRejected {
+                    intent_id: intent.intent_id.clone(),
+                    repository_source_before: current_source,
+                    effect_admission_digest: admission.receipt_digest,
+                    persistence_ack_digest: persistence_ack.persistence_ack_digest,
+                    reason: error.to_string(),
+                });
+            }
+            approval
+        }
+        Err(rejection) => {
+            return Ok(AdapterRunReport::FreshnessRejected {
+                intent_id: intent.intent_id.clone(),
+                repository_source_before: current_source,
+                effect_admission_digest: admission.receipt_digest,
+                persistence_ack_digest: persistence_ack.persistence_ack_digest,
+                reason: rejection.reason,
+            });
+        }
+    };
+
     let mut process = backend.execute(&intent);
 
     // Once backend entry has occurred, preserve the ordering invariant that
@@ -224,6 +359,8 @@ where
         intent_id: intent.intent_id,
         repository_source_before: current_source,
         effect_admission_digest: admission.receipt_digest,
+        persistence_ack_digest: persistence_ack.persistence_ack_digest,
+        pre_spawn_freshness_digest: freshness_approval.freshness_evidence_digest,
         process,
         postflight,
     })
@@ -242,6 +379,50 @@ fn normalize_bindings(bindings: &mut ValidatedPreflightBindings) -> anyhow::Resu
     normalize_digest("bindings.effect_policy_id", &mut bindings.effect_policy_id)?;
     if let Some(value) = &mut bindings.git_worktree_state_id {
         normalize_digest("bindings.git_worktree_state_id", value)?;
+    }
+    Ok(())
+}
+
+fn validate_persistence_ack(
+    ack: &mut AdmissionPersistenceAck,
+    admission: &EffectAdmission,
+) -> anyhow::Result<()> {
+    normalize_digest(
+        "persistence.admission_receipt_digest",
+        &mut ack.admission_receipt_digest,
+    )?;
+    normalize_digest(
+        "persistence.persistence_ack_digest",
+        &mut ack.persistence_ack_digest,
+    )?;
+    if ack.admission_receipt_digest != admission.receipt_digest {
+        bail!("persistence acknowledgement is bound to another admission receipt");
+    }
+    Ok(())
+}
+
+fn validate_freshness_approval(
+    approval: &mut PreSpawnFreshnessApproval,
+    admission: &EffectAdmission,
+    persistence: &AdmissionPersistenceAck,
+) -> anyhow::Result<()> {
+    normalize_digest(
+        "freshness.admission_receipt_digest",
+        &mut approval.admission_receipt_digest,
+    )?;
+    normalize_digest(
+        "freshness.persistence_ack_digest",
+        &mut approval.persistence_ack_digest,
+    )?;
+    normalize_digest(
+        "freshness.freshness_evidence_digest",
+        &mut approval.freshness_evidence_digest,
+    )?;
+    if approval.admission_receipt_digest != admission.receipt_digest {
+        bail!("freshness approval is bound to another admission receipt");
+    }
+    if approval.persistence_ack_digest != persistence.persistence_ack_digest {
+        bail!("freshness approval is bound to another persistence acknowledgement");
     }
     Ok(())
 }
@@ -267,6 +448,10 @@ fn normalize_digest(name: &str, value: &mut String) -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use crate::cargo_execution_contract::{CargoExecutionIntentSpec, build_intent};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    type Trace = Rc<RefCell<Vec<&'static str>>>;
 
     fn digest(byte: char) -> String {
         byte.to_string().repeat(64)
@@ -304,11 +489,15 @@ mod tests {
         post: Option<anyhow::Result<String>>,
         pre_calls: usize,
         post_calls: usize,
+        trace: Option<Trace>,
     }
 
     impl RepositorySourceProbe for FakeProbe {
         fn preflight_source_id(&mut self) -> anyhow::Result<String> {
             self.pre_calls += 1;
+            if let Some(trace) = &self.trace {
+                trace.borrow_mut().push("preflight_source");
+            }
             self.pre
                 .take()
                 .expect("fake preflight source configured")
@@ -316,6 +505,9 @@ mod tests {
 
         fn postflight_source_id(&mut self) -> anyhow::Result<String> {
             self.post_calls += 1;
+            if let Some(trace) = &self.trace {
+                trace.borrow_mut().push("postflight_source");
+            }
             self.post
                 .take()
                 .expect("fake postflight source configured")
@@ -325,6 +517,7 @@ mod tests {
     struct FakeGate {
         decision: Option<Result<EffectAdmission, EffectRejection>>,
         calls: usize,
+        trace: Option<Trace>,
     }
 
     impl EffectEntryGate for FakeGate {
@@ -333,18 +526,66 @@ mod tests {
             _intent: &CargoExecutionIntent,
         ) -> Result<EffectAdmission, EffectRejection> {
             self.calls += 1;
+            if let Some(trace) = &self.trace {
+                trace.borrow_mut().push("admit");
+            }
             self.decision.take().expect("fake admission configured")
+        }
+    }
+
+    struct FakePersistence {
+        decision: Option<Result<AdmissionPersistenceAck, AdmissionPersistenceRejection>>,
+        calls: usize,
+        trace: Option<Trace>,
+    }
+
+    impl AdmissionPersistence for FakePersistence {
+        fn persist(
+            &mut self,
+            _intent: &CargoExecutionIntent,
+            _admission: &EffectAdmission,
+        ) -> Result<AdmissionPersistenceAck, AdmissionPersistenceRejection> {
+            self.calls += 1;
+            if let Some(trace) = &self.trace {
+                trace.borrow_mut().push("persist");
+            }
+            self.decision.take().expect("fake persistence configured")
+        }
+    }
+
+    struct FakeFreshness {
+        decision: Option<Result<PreSpawnFreshnessApproval, PreSpawnFreshnessRejection>>,
+        calls: usize,
+        trace: Option<Trace>,
+    }
+
+    impl PreSpawnFreshnessGate for FakeFreshness {
+        fn verify(
+            &mut self,
+            _intent: &CargoExecutionIntent,
+            _admission: &EffectAdmission,
+            _persistence: &AdmissionPersistenceAck,
+        ) -> Result<PreSpawnFreshnessApproval, PreSpawnFreshnessRejection> {
+            self.calls += 1;
+            if let Some(trace) = &self.trace {
+                trace.borrow_mut().push("freshness");
+            }
+            self.decision.take().expect("fake freshness configured")
         }
     }
 
     struct FakeBackend {
         capture: Option<ProcessCapture>,
         calls: usize,
+        trace: Option<Trace>,
     }
 
     impl CargoProcessBackend for FakeBackend {
         fn execute(&mut self, _intent: &CargoExecutionIntent) -> ProcessCapture {
             self.calls += 1;
+            if let Some(trace) = &self.trace {
+                trace.borrow_mut().push("backend");
+            }
             self.capture.take().expect("fake process capture configured")
         }
     }
@@ -363,6 +604,30 @@ mod tests {
                 receipt_digest: digest('2'),
             })),
             calls: 0,
+            trace: None,
+        }
+    }
+
+    fn persistence_allowed() -> FakePersistence {
+        FakePersistence {
+            decision: Some(Ok(AdmissionPersistenceAck {
+                admission_receipt_digest: digest('2'),
+                persistence_ack_digest: digest('5'),
+            })),
+            calls: 0,
+            trace: None,
+        }
+    }
+
+    fn freshness_allowed() -> FakeFreshness {
+        FakeFreshness {
+            decision: Some(Ok(PreSpawnFreshnessApproval {
+                admission_receipt_digest: digest('2'),
+                persistence_ack_digest: digest('5'),
+                freshness_evidence_digest: digest('7'),
+            })),
+            calls: 0,
+            trace: None,
         }
     }
 
@@ -374,21 +639,34 @@ mod tests {
                 stderr_sha256: digest('4'),
             }),
             calls: 0,
+            trace: None,
         }
     }
 
     #[test]
-    fn stale_source_rejects_before_effect_or_backend() {
+    fn stale_source_rejects_before_effect_or_later_boundaries() {
         let mut probe = probe(Ok(digest('8')), Ok(digest('a')));
         let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = backend_exit(0);
-        let report = run_with_backend(intent(), bindings(), &mut probe, &mut gate, &mut backend)
-            .unwrap();
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
 
         assert!(!report.backend_was_called());
         assert_eq!(probe.pre_calls, 1);
         assert_eq!(probe.post_calls, 0);
         assert_eq!(gate.calls, 0);
+        assert_eq!(persistence.calls, 0);
+        assert_eq!(freshness.calls, 0);
         assert_eq!(backend.calls, 0);
     }
 
@@ -398,44 +676,252 @@ mod tests {
         bad.build_context_id = digest('7');
         let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
         let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = backend_exit(0);
-        let report = run_with_backend(intent(), bad, &mut probe, &mut gate, &mut backend).unwrap();
+        let report = run_with_backend(
+            intent(),
+            bad,
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
 
         assert!(!report.backend_was_called());
         assert_eq!(probe.pre_calls, 0);
         assert_eq!(gate.calls, 0);
+        assert_eq!(persistence.calls, 0);
+        assert_eq!(freshness.calls, 0);
         assert_eq!(backend.calls, 0);
     }
 
     #[test]
-    fn effect_denial_keeps_backend_unreachable() {
+    fn effect_denial_keeps_persistence_freshness_and_backend_unreachable() {
         let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
         let mut gate = FakeGate {
             decision: Some(Err(EffectRejection {
                 reason: "revoked authority epoch".into(),
             })),
             calls: 0,
+            trace: None,
         };
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = backend_exit(0);
-        let report = run_with_backend(intent(), bindings(), &mut probe, &mut gate, &mut backend)
-            .unwrap();
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
 
         assert!(matches!(report, AdapterRunReport::EffectRejected { .. }));
         assert_eq!(gate.calls, 1);
+        assert_eq!(persistence.calls, 0);
+        assert_eq!(freshness.calls, 0);
         assert_eq!(backend.calls, 0);
         assert_eq!(probe.post_calls, 0);
     }
 
     #[test]
-    fn nonzero_process_exit_is_retained_and_postflight_still_runs() {
+    fn persistence_failure_retains_admission_and_blocks_later_boundaries() {
         let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
         let mut gate = gate_allowed();
-        let mut backend = backend_exit(17);
-        let report = run_with_backend(intent(), bindings(), &mut probe, &mut gate, &mut backend)
-            .unwrap();
+        let mut persistence = FakePersistence {
+            decision: Some(Err(AdmissionPersistenceRejection {
+                reason: "durability acknowledgement unavailable".into(),
+            })),
+            calls: 0,
+            trace: None,
+        };
+        let mut freshness = freshness_allowed();
+        let mut backend = backend_exit(0);
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
 
         match report {
-            AdapterRunReport::BackendEntered { process, postflight, .. } => {
+            AdapterRunReport::AdmissionPersistenceRejected {
+                effect_admission_digest,
+                reason,
+                ..
+            } => {
+                assert_eq!(effect_admission_digest, digest('2'));
+                assert!(reason.contains("durability"));
+            }
+            other => panic!("unexpected report: {other:?}"),
+        }
+        assert_eq!(gate.calls, 1);
+        assert_eq!(persistence.calls, 1);
+        assert_eq!(freshness.calls, 0);
+        assert_eq!(backend.calls, 0);
+        assert_eq!(probe.post_calls, 0);
+    }
+
+    #[test]
+    fn malformed_persistence_binding_retains_admission_and_fails_closed() {
+        let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
+        let mut gate = gate_allowed();
+        let mut persistence = FakePersistence {
+            decision: Some(Ok(AdmissionPersistenceAck {
+                admission_receipt_digest: digest('8'),
+                persistence_ack_digest: digest('5'),
+            })),
+            calls: 0,
+            trace: None,
+        };
+        let mut freshness = freshness_allowed();
+        let mut backend = backend_exit(0);
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
+
+        match report {
+            AdapterRunReport::AdmissionPersistenceRejected {
+                effect_admission_digest,
+                reason,
+                ..
+            } => {
+                assert_eq!(effect_admission_digest, digest('2'));
+                assert!(reason.contains("another admission"));
+            }
+            other => panic!("unexpected report: {other:?}"),
+        }
+        assert_eq!(freshness.calls, 0);
+        assert_eq!(backend.calls, 0);
+    }
+
+    #[test]
+    fn freshness_failure_retains_admission_and_persistence_ack() {
+        let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
+        let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = FakeFreshness {
+            decision: Some(Err(PreSpawnFreshnessRejection {
+                reason: "source changed after admission persistence".into(),
+            })),
+            calls: 0,
+            trace: None,
+        };
+        let mut backend = backend_exit(0);
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
+
+        match report {
+            AdapterRunReport::FreshnessRejected {
+                effect_admission_digest,
+                persistence_ack_digest,
+                reason,
+                ..
+            } => {
+                assert_eq!(effect_admission_digest, digest('2'));
+                assert_eq!(persistence_ack_digest, digest('5'));
+                assert!(reason.contains("source changed"));
+            }
+            other => panic!("unexpected report: {other:?}"),
+        }
+        assert_eq!(gate.calls, 1);
+        assert_eq!(persistence.calls, 1);
+        assert_eq!(freshness.calls, 1);
+        assert_eq!(backend.calls, 0);
+        assert_eq!(probe.post_calls, 0);
+    }
+
+    #[test]
+    fn freshness_binding_substitution_fails_before_backend() {
+        let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
+        let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = FakeFreshness {
+            decision: Some(Ok(PreSpawnFreshnessApproval {
+                admission_receipt_digest: digest('2'),
+                persistence_ack_digest: digest('6'),
+                freshness_evidence_digest: digest('7'),
+            })),
+            calls: 0,
+            trace: None,
+        };
+        let mut backend = backend_exit(0);
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
+
+        match report {
+            AdapterRunReport::FreshnessRejected { reason, .. } => {
+                assert!(reason.contains("another persistence acknowledgement"));
+            }
+            other => panic!("unexpected report: {other:?}"),
+        }
+        assert_eq!(backend.calls, 0);
+        assert_eq!(probe.post_calls, 0);
+    }
+
+    #[test]
+    fn nonzero_process_exit_retains_all_pre_spawn_evidence_and_runs_postflight() {
+        let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
+        let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
+        let mut backend = backend_exit(17);
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
+
+        match report {
+            AdapterRunReport::BackendEntered {
+                effect_admission_digest,
+                persistence_ack_digest,
+                pre_spawn_freshness_digest,
+                process,
+                postflight,
+                ..
+            } => {
+                assert_eq!(effect_admission_digest, digest('2'));
+                assert_eq!(persistence_ack_digest, digest('5'));
+                assert_eq!(pre_spawn_freshness_digest, digest('7'));
                 assert_eq!(process.terminal, ProcessTerminal::Exited { code: 17 });
                 assert!(matches!(postflight, PostflightCapture::Captured { .. }));
             }
@@ -446,15 +932,65 @@ mod tests {
     }
 
     #[test]
+    fn exact_order_is_admit_then_persist_then_freshness_then_backend_then_postflight() {
+        let trace: Trace = Rc::new(RefCell::new(Vec::new()));
+        let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
+        probe.trace = Some(Rc::clone(&trace));
+        let mut gate = gate_allowed();
+        gate.trace = Some(Rc::clone(&trace));
+        let mut persistence = persistence_allowed();
+        persistence.trace = Some(Rc::clone(&trace));
+        let mut freshness = freshness_allowed();
+        freshness.trace = Some(Rc::clone(&trace));
+        let mut backend = backend_exit(0);
+        backend.trace = Some(Rc::clone(&trace));
+
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
+        assert!(report.backend_was_called());
+        assert_eq!(
+            *trace.borrow(),
+            vec![
+                "preflight_source",
+                "admit",
+                "persist",
+                "freshness",
+                "backend",
+                "postflight_source",
+            ]
+        );
+    }
+
+    #[test]
     fn postflight_capture_failure_does_not_erase_process_evidence() {
         let mut probe = probe(Ok(digest('a')), Err(anyhow::anyhow!("probe failed")));
         let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = backend_exit(0);
-        let report = run_with_backend(intent(), bindings(), &mut probe, &mut gate, &mut backend)
-            .unwrap();
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
 
         match report {
-            AdapterRunReport::BackendEntered { process, postflight, .. } => {
+            AdapterRunReport::BackendEntered {
+                process, postflight, ..
+            } => {
                 assert_eq!(process.terminal, ProcessTerminal::Exited { code: 0 });
                 assert!(matches!(postflight, PostflightCapture::CaptureFailed { .. }));
             }
@@ -468,6 +1004,8 @@ mod tests {
     fn spawn_failure_is_not_mislabeled_as_process_execution() {
         let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
         let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = FakeBackend {
             capture: Some(ProcessCapture {
                 terminal: ProcessTerminal::SpawnFailed {
@@ -477,9 +1015,18 @@ mod tests {
                 stderr_sha256: digest('4'),
             }),
             calls: 0,
+            trace: None,
         };
-        let report = run_with_backend(intent(), bindings(), &mut probe, &mut gate, &mut backend)
-            .unwrap();
+        let report = run_with_backend(
+            intent(),
+            bindings(),
+            &mut probe,
+            &mut gate,
+            &mut persistence,
+            &mut freshness,
+            &mut backend,
+        )
+        .unwrap();
 
         match report {
             AdapterRunReport::BackendEntered { process, .. } => {
@@ -493,6 +1040,8 @@ mod tests {
     fn malformed_backend_capture_still_attempts_postflight_before_error() {
         let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
         let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = FakeBackend {
             capture: Some(ProcessCapture {
                 terminal: ProcessTerminal::Exited { code: 0 },
@@ -500,9 +1049,21 @@ mod tests {
                 stderr_sha256: digest('4'),
             }),
             calls: 0,
+            trace: None,
         };
 
-        assert!(run_with_backend(intent(), bindings(), &mut probe, &mut gate, &mut backend).is_err());
+        assert!(
+            run_with_backend(
+                intent(),
+                bindings(),
+                &mut probe,
+                &mut gate,
+                &mut persistence,
+                &mut freshness,
+                &mut backend,
+            )
+            .is_err()
+        );
         assert_eq!(backend.calls, 1);
         assert_eq!(probe.post_calls, 1);
     }
@@ -513,10 +1074,25 @@ mod tests {
         tampered.adapter_semantics_digest = digest('8');
         let mut probe = probe(Ok(digest('a')), Ok(digest('a')));
         let mut gate = gate_allowed();
+        let mut persistence = persistence_allowed();
+        let mut freshness = freshness_allowed();
         let mut backend = backend_exit(0);
-        assert!(run_with_backend(tampered, bindings(), &mut probe, &mut gate, &mut backend).is_err());
+        assert!(
+            run_with_backend(
+                tampered,
+                bindings(),
+                &mut probe,
+                &mut gate,
+                &mut persistence,
+                &mut freshness,
+                &mut backend,
+            )
+            .is_err()
+        );
         assert_eq!(probe.pre_calls, 0);
         assert_eq!(gate.calls, 0);
+        assert_eq!(persistence.calls, 0);
+        assert_eq!(freshness.calls, 0);
         assert_eq!(backend.calls, 0);
     }
 }
