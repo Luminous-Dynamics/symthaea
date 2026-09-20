@@ -1,0 +1,118 @@
+name: Trust + Science Currentness Stack Qualification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trust-science-currentness-qualification-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    name: Exact-head trust/science bootstrap qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout exact qualifier head
+        # actions/checkout v4 resolved 2026-09-19.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup default 1.96.0
+          rustc --version
+          rustc -Vv
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+      - name: Prove qualifier gates fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expect_failure() {
+            if "$@"; then
+              echo "expected command to fail but it succeeded: $*" >&2
+              exit 1
+            fi
+          }
+
+          common_args=(
+            --expected-head "$GITHUB_SHA"
+            --expected-rust 1.96.0
+            --package symthaea-trust-core
+            --package symthaea-science-research
+            --source-path crates/core/symthaea-trust-core
+            --source-path crates/core/symthaea-science-research
+          )
+
+          # Attack 1: substitute a different frozen source parent.
+          expect_failure bash scripts/qualify-research-crate.sh \
+            --program TRUST-SCI-CURRENTNESS-NEG-WRONG-PARENT \
+            --source-parent 0000000000000000000000000000000000000000 \
+            "${common_args[@]}" \
+            --qualifier-path scripts/qualify-research-crate.sh \
+            --qualifier-path .github/workflows/trust-science-currentness-qualification.yml \
+            --output-dir /tmp/trust-science-neg-wrong-parent
+
+          # Attack 2: omit one qualifier path so unrelated scope could be hidden.
+          expect_failure bash scripts/qualify-research-crate.sh \
+            --program TRUST-SCI-CURRENTNESS-NEG-INCOMPLETE-SCOPE \
+            --source-parent a9ac3f3bc600641d50db1fe25b7f10b9338eba38 \
+            "${common_args[@]}" \
+            --qualifier-path .github/workflows/trust-science-currentness-qualification.yml \
+            --output-dir /tmp/trust-science-neg-incomplete-scope
+
+      - name: Qualify frozen trust + science source stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/qualify-research-crate.sh \
+            --program TRUST-SCI-CURRENTNESS-QUAL-001A-R3 \
+            --source-parent a9ac3f3bc600641d50db1fe25b7f10b9338eba38 \
+            --expected-head "$GITHUB_SHA" \
+            --expected-rust 1.96.0 \
+            --package symthaea-trust-core \
+            --package symthaea-science-research \
+            --source-path crates/core/symthaea-trust-core \
+            --source-path crates/core/symthaea-science-research \
+            --qualifier-path scripts/qualify-research-crate.sh \
+            --qualifier-path .github/workflows/trust-science-currentness-qualification.yml \
+            --output-dir /tmp/trust-science-currentness-qualification
+
+      - name: Print qualification receipt
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f /tmp/trust-science-currentness-qualification/receipt.txt ]]; then
+            cat /tmp/trust-science-currentness-qualification/receipt.txt
+          fi
+          if [[ -f /tmp/trust-science-currentness-qualification/Cargo.lock.patch ]]; then
+            echo "Cargo.lock.patch bytes: $(wc -c < /tmp/trust-science-currentness-qualification/Cargo.lock.patch)"
+            sha256sum /tmp/trust-science-currentness-qualification/Cargo.lock.patch
+          fi
+          if [[ -f /tmp/trust-science-currentness-qualification/dependency-tree.txt ]]; then
+            echo "dependency-tree.txt sha256:"
+            sha256sum /tmp/trust-science-currentness-qualification/dependency-tree.txt
+          fi
+
+      - name: Retain bootstrap qualification evidence
+        if: always()
+        # actions/upload-artifact v4 resolved 2026-09-19.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: trust-science-currentness-qualification-${{ github.sha }}
+          path: /tmp/trust-science-currentness-qualification/
+          if-no-files-found: warn
+          retention-days: 30
