@@ -89,7 +89,10 @@ pub use runtime::{
     AngleMonitor, CurrentMonitor, HalRuntime, HalRuntimeBuilder, HealthStatus, RuntimeTelemetry,
 };
 pub use sensor::{EmbeddedSensor, HalSensorAdapter, SensorDecoder};
-pub use servo::ServoOutput;
+pub use servo::{
+    ActuationDisposition, EndpointActuationDisposition, ServoActuationFailure,
+    ServoActuationReceipt, ServoOutput,
+};
 
 /// Re-export `embedded_hal::i2c::I2c` so downstream crates don't need a direct dependency.
 pub use embedded_hal::i2c::I2c as I2cBus;
