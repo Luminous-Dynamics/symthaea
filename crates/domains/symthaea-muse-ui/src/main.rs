@@ -19,6 +19,8 @@ pub mod comparison_browser_events;
 pub mod comparison_capability;
 pub mod comparison_duration_exposure;
 pub mod comparison_evidence_envelope;
+#[cfg(target_arch = "wasm32")]
+pub mod comparison_evidence_indexed_db;
 pub mod comparison_evidence_record;
 pub mod comparison_evidence_store;
 pub mod comparison_evidence_validation;

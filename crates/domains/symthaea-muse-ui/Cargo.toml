@@ -37,4 +37,13 @@ web-sys = { version = "0.3", features = [
     "MediaElementAudioSourceNode",
     "MediaQueryList",
     "Document",
+    "DomException",
+    "DomStringList",
+    "IdbDatabase",
+    "IdbFactory",
+    "IdbObjectStore",
+    "IdbOpenDbRequest",
+    "IdbRequest",
+    "IdbTransaction",
+    "IdbTransactionMode",
 ] }
