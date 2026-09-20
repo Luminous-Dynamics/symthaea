@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Canonical evidence encoding with RustCrypto SHA-256 commitments.
 
+#[path = "prog_suite_contextual_harmony_audio_protocol.rs"]
+pub mod prog_suite_contextual_harmony_audio_protocol;
+
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt::Write as _;
