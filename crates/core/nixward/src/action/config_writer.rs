@@ -8,10 +8,12 @@
 //! - Creates a git-tracked backup before any write
 //! - Writes atomically via temp file + rename
 //! - Validates syntax with `nix-instantiate --parse` before committing
+//! - Refuses stale patches whose live pre-image changed after planning
 //!
-//! All writes go through the Φ-gated executor — the config writer itself
-//! does NOT execute system commands, it only produces modified config text
-//! and backup/restore operations.
+//! `ConfigWriter` is a filesystem mutation primitive, not an authorization
+//! boundary. Callers must establish any required execution authority before
+//! invoking a write. `apply_patch` separately enforces that the patch still
+//! applies to the exact file content against which it was planned.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -288,8 +290,48 @@ impl ConfigWriter {
         Ok(())
     }
 
-    /// Apply a patch: create backup, validate, write atomically.
+    /// Verify that the target still contains the exact pre-image used to plan a patch.
+    ///
+    /// This is a fail-closed currentness check, not a universal filesystem
+    /// transaction. Repeating it immediately before the final rename narrows the
+    /// check-to-use window, but a non-cooperating writer can still race between
+    /// that final check and rename. A stronger lock/CAS profile can be added later
+    /// if required for a deployment environment.
+    fn validate_live_preimage(patch: &ConfigPatch) -> Result<(), std::io::Error> {
+        let current = match std::fs::read_to_string(&patch.target) {
+            Ok(current) => current,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::WouldBlock,
+                    format!(
+                        "stale ConfigPatch: target {} no longer exists; state changed since planning",
+                        patch.target.display()
+                    ),
+                ));
+            }
+            Err(err) => return Err(err),
+        };
+
+        if current != patch.original {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::WouldBlock,
+                format!(
+                    "stale ConfigPatch: target {} changed since planning",
+                    patch.target.display()
+                ),
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Apply a patch: verify currentness, validate, create backup, and write atomically.
     pub fn apply_patch(&self, patch: &ConfigPatch) -> Result<WriteResult, std::io::Error> {
+        // Currentness is checked before *any* success return, including historical
+        // no-op and dry-run paths. A patch planned against A cannot claim success
+        // after the live target has become B.
+        Self::validate_live_preimage(patch)?;
+
         if patch.is_noop() {
             return Ok(WriteResult {
                 path: patch.target.clone(),
@@ -323,9 +365,16 @@ impl ConfigWriter {
             None
         };
 
-        // Atomic write: write to temp file, then rename
+        // Prepare the candidate without touching the target. Then revalidate the live
+        // pre-image immediately before the final atomic replacement. If the target
+        // drifted while validation/backup work ran, remove the prepared candidate and
+        // fail closed rather than overwriting newer state.
         let temp_path = patch.target.with_extension("nix.tmp");
         std::fs::write(&temp_path, &patch.modified)?;
+        if let Err(err) = Self::validate_live_preimage(patch) {
+            let _ = std::fs::remove_file(&temp_path);
+            return Err(err);
+        }
         std::fs::rename(&temp_path, &patch.target)?;
 
         Ok(WriteResult {
