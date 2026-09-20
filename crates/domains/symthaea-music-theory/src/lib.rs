@@ -39,6 +39,7 @@ pub mod composer;
 pub mod contrapuntal_foundry;
 pub mod counterpoint;
 pub mod describe;
+pub mod development_program;
 pub mod diversity_plan;
 pub mod explorer;
 pub mod fingerprint;
@@ -105,6 +106,10 @@ pub use composer::{
     compose_with_spec_and_form,
 };
 pub use counterpoint::{has_parallel_perfect, parallel_perfect_violations};
+pub use development_program::{
+    DEVELOPMENT_PROGRAM_VERSION, DevelopmentEvidenceRequirementV1, DevelopmentGraphProjectionV1,
+    DevelopmentOperationV1, DevelopmentProgramErrorV1, DevelopmentProgramV1, DevelopmentStageV1,
+};
 pub use form::{Form, Section, SectionRole};
 pub use grammar::{
     GrammarEngine, GrammarFamily, GrammarPlanEvidence, GrammarProfile, GrammarRealization,
