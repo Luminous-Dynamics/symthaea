@@ -19,6 +19,7 @@ pub mod comparison_browser_events;
 pub mod comparison_capability;
 pub mod comparison_duration_exposure;
 pub mod comparison_evidence_record;
+pub mod comparison_evidence_validation;
 pub mod comparison_identity;
 pub mod comparison_judgment;
 pub mod comparison_switch;
