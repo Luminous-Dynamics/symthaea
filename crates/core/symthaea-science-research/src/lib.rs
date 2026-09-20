@@ -54,7 +54,8 @@ pub mod identity;
 pub mod independence;
 pub mod protocol;
 pub mod provenance;
-pub mod qualification_cadence_conformant_currentness;
+mod qualification_cadence_conformant_currentness;
+pub mod qualification_cadence_conformant_currentness_gate;
 pub mod qualification_cadence_currentness_durable_head;
 pub mod qualification_cadence_currentness_head;
 pub mod qualification_cadence_currentness_publication;
@@ -107,7 +108,11 @@ pub use identity::*;
 pub use independence::*;
 pub use protocol::*;
 pub use provenance::*;
-pub use qualification_cadence_conformant_currentness::*;
+pub use qualification_cadence_conformant_currentness::{
+    CadenceConformantInstitutionalCurrentnessAtEvaluation, LaterHeadFederationReplayInputs,
+    QualificationCadenceCurrentnessError, QualificationCadenceCurrentnessInputs,
+};
+pub use qualification_cadence_conformant_currentness_gate::*;
 pub use qualification_cadence_currentness_durable_head::*;
 pub use qualification_cadence_currentness_head::*;
 pub use qualification_cadence_currentness_publication::*;
