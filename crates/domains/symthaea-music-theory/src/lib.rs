@@ -71,6 +71,7 @@ pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_development_program;
+pub mod prog_suite_observed_relation;
 pub mod prog_suite_replay_evidence;
 pub mod prog_suite_subject_bound;
 pub mod prog_suite_work_bridge;
@@ -155,6 +156,14 @@ pub use prog_suite::{
 pub use prog_suite_development_program::{
     PROG_SUITE_DEVELOPMENT_PROGRAM_VERSION, ProgSuiteDevelopmentProgramErrorV1,
     ProgSuiteDevelopmentProgramV1, derive_prog_suite_development_program,
+};
+pub use prog_suite_observed_relation::{
+    PROG_SUITE_OBSERVED_RELATION_VERSION, ProgSuiteObservedMelodyEventV1,
+    ProgSuiteObservedOperationSemanticsV1, ProgSuiteObservedRelationErrorV1,
+    ProgSuiteObservedRelationEvidenceV1, ProgSuiteObservedRelationNonClaimV1,
+    ProgSuiteObservedRelationStatusV1, ProgSuiteOperationObservationV1,
+    ProgSuitePhraseAdaptationObservationV1, ProgSuiteScoreProjectionObservationV1,
+    ProgSuiteStageObservedRelationV1, measure_prog_suite_observed_relations,
 };
 pub use prog_suite_replay_evidence::{
     PROG_SUITE_REPLAY_EVIDENCE_VERSION, ProgSuiteReplayAuthorityV1,
