@@ -17,6 +17,7 @@ mod cargo_graph;
 mod cargo_impact;
 mod cargo_invocation;
 mod cargo_runtime_binding;
+mod cargo_toolchain_attestation;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -261,6 +262,63 @@ enum Commands {
         /// Exact repository effect policy admitted for the execution.
         #[arg(long = "effect-policy")]
         effect_policy: PathBuf,
+    },
+    /// Bind exact Cargo/rustc executable content to exact version-probe transcripts and validated context identity.
+    CargoToolchainAttestation {
+        /// Strict attestation spec containing only the probe-adapter identity.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Validated prepared runtime binding whose executable content IDs are authoritative.
+        #[arg(long = "runtime-binding")]
+        runtime_binding: PathBuf,
+        /// Validated repository-source subject used by the runtime binding.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Canonical Cargo build-context/invocation document.
+        #[arg(long)]
+        context: PathBuf,
+        /// Validated Cargo adapter-semantics receipt.
+        #[arg(long = "adapter-semantics")]
+        adapter_semantics: PathBuf,
+        /// Exact repository effect policy used by the runtime binding.
+        #[arg(long = "effect-policy")]
+        effect_policy: PathBuf,
+        /// Exact stdout bytes captured from the admitted Cargo version probe.
+        #[arg(long = "cargo-transcript")]
+        cargo_transcript: PathBuf,
+        /// Exact stdout bytes captured from the admitted rustc verbose-version probe.
+        #[arg(long = "rustc-transcript")]
+        rustc_transcript: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Rebuild a stored toolchain attestation against the exact runtime/context/probe transcripts.
+    CargoToolchainAttestationVerify {
+        /// Stored Cargo toolchain-attestation receipt.
+        #[arg(long)]
+        receipt: PathBuf,
+        /// Validated prepared runtime binding.
+        #[arg(long = "runtime-binding")]
+        runtime_binding: PathBuf,
+        /// Validated repository-source subject used by the runtime binding.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Canonical Cargo build-context/invocation document.
+        #[arg(long)]
+        context: PathBuf,
+        /// Validated Cargo adapter-semantics receipt.
+        #[arg(long = "adapter-semantics")]
+        adapter_semantics: PathBuf,
+        /// Exact repository effect policy used by the runtime binding.
+        #[arg(long = "effect-policy")]
+        effect_policy: PathBuf,
+        /// Exact Cargo version-probe transcript bytes.
+        #[arg(long = "cargo-transcript")]
+        cargo_transcript: PathBuf,
+        /// Exact rustc verbose-version transcript bytes.
+        #[arg(long = "rustc-transcript")]
+        rustc_transcript: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -509,6 +567,50 @@ fn main() -> anyhow::Result<()> {
                 &context,
                 &adapter_semantics,
                 &effect_policy,
+            )?;
+        }
+        Commands::CargoToolchainAttestation {
+            spec,
+            runtime_binding,
+            pre_snapshot,
+            context,
+            adapter_semantics,
+            effect_policy,
+            cargo_transcript,
+            rustc_transcript,
+            output,
+        } => {
+            cargo_toolchain_attestation::run(
+                &spec,
+                &runtime_binding,
+                &pre_snapshot,
+                &context,
+                &adapter_semantics,
+                &effect_policy,
+                &cargo_transcript,
+                &rustc_transcript,
+                output,
+            )?;
+        }
+        Commands::CargoToolchainAttestationVerify {
+            receipt,
+            runtime_binding,
+            pre_snapshot,
+            context,
+            adapter_semantics,
+            effect_policy,
+            cargo_transcript,
+            rustc_transcript,
+        } => {
+            cargo_toolchain_attestation::run_verify(
+                &receipt,
+                &runtime_binding,
+                &pre_snapshot,
+                &context,
+                &adapter_semantics,
+                &effect_policy,
+                &cargo_transcript,
+                &rustc_transcript,
             )?;
         }
     }
