@@ -12,10 +12,12 @@
 //!   prospective revocation, replacement, and retroactive compromise;
 //! - content-addressed key-to-principal/organization/region/role bindings;
 //! - frozen delegated trust-root policies and dual-threshold rotation contracts;
-//! - structural signature-feasibility proofs over the exact root-bound principal
-//!   directory, kept distinct from institutional root authority;
+//! - structural quorum-feasibility proofs over the exact root-bound principal
+//!   directory, with deterministic witnesses binding signatures, principals,
+//!   organizations, regions, algorithms, and exact verification-key material;
 //! - feasibility-gated root authority capabilities whose public identities carry
-//!   the exact root signature-feasibility proof forward;
+//!   the exact quorum-feasibility proof and concrete attestation-envelope capacity
+//!   forward without rewriting historical frozen-root identities;
 //! - role-aware root authority capabilities that reuse cryptographic attestation
 //!   verification and independently enforce principal/org/region quorum geometry;
 //! - bounded interval-based time evidence with explicit source strength;

@@ -194,7 +194,9 @@ fn bootstrap_provider_initial_snapshot_and_feasibility_are_bound() {
     assert_ne!(left.authority_gate_sha256(), right.authority_gate_sha256());
     assert_eq!(left.snapshot().trust_snapshot_sha256(), &snapshot.digest().unwrap());
     assert_eq!(left.root_signature_feasibility_sha256(), feasibility.proof_sha256());
+    assert_eq!(left.maximum_attestation_signatures(), MAX_SIGNATURES);
     assert!(left.root_signature_feasibility_established());
+    assert!(left.root_attestation_capacity_established());
     assert!(!left.current_state_established());
 }
 
@@ -255,6 +257,55 @@ fn feasibility_proof_for_another_root_cannot_mint_trust_state() {
         result,
         Err(GenesisTrustStateAuthorizationError::RootFeasibilityRootMismatch)
     );
+}
+
+#[test]
+fn root_quorum_exceeding_attestation_capacity_cannot_mint_trust_state() {
+    let principals = (0..=MAX_SIGNATURES)
+        .map(|index| {
+            let principal_id = format!("p-{index}");
+            let key_id = format!("key-{index}");
+            TrustedPrincipal {
+                principal_id,
+                organization_id: "org-shared".into(),
+                region_id: "region-shared".into(),
+                keys: vec![key_binding(&key_id)],
+            }
+        })
+        .collect();
+    let directory = directory(principals);
+    let root = genesis_root(
+        &directory,
+        role_policy(TrustRole::Root, MAX_SIGNATURES + 1, 1, 1, 1),
+    );
+    let feasibility = prove_trust_root_signature_feasibility(&root, &directory)
+        .expect("directory contains enough role-bound keys for the structural witness");
+    let snapshot = trust_snapshot(&["key-0"]);
+    let result = authorize_genesis_trust_state(
+        &root,
+        &directory,
+        &feasibility,
+        &snapshot,
+        &GenesisTrustAnchorEvidence {
+            anchor_artifact_sha256: Sha256Digest::of_bytes(b"offline-root-anchor"),
+            initial_trust_snapshot_sha256: snapshot.digest().unwrap(),
+            anchored_at_unix_s: 200,
+        },
+        &BootstrapVerifier { identity: "bootstrap-provider", accept: true },
+    );
+
+    assert!(matches!(
+        result,
+        Err(GenesisTrustStateAuthorizationError::RootAttestationCapacity(findings))
+            if findings.iter().any(|finding| matches!(
+                finding,
+                RootAttestationCapacityFinding::SignatureThresholdExceedsEnvelopeLimit {
+                    role: TrustRole::Root,
+                    required,
+                    maximum,
+                } if *required == MAX_SIGNATURES + 1 && *maximum == MAX_SIGNATURES
+            ))
+    ));
 }
 
 #[test]

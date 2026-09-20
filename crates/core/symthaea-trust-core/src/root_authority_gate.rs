@@ -6,18 +6,15 @@
 //! Historical raw root/snapshot authority capabilities remain implemented in
 //! `root_authority`, but are no longer re-exported as public minting functions.
 //! Public genesis and root-transition admission must carry the exact
-//! `TrustRootSignatureFeasibilityProof` for the root being authorized. The
-//! resulting public trust-state and role-attestation wrappers bind that gate
-//! identity forward without changing historical `FrozenTrustRoot` hashes.
+//! `TrustRootSignatureFeasibilityProof` for the root being authorized and must
+//! also prove that the root's signature/algorithm requirements fit within the
+//! concrete detached-attestation envelope supported by this crate. The resulting
+//! public trust-state and role-attestation wrappers bind both gates forward
+//! without changing historical `FrozenTrustRoot` hashes.
 
 use serde::Serialize;
 
-use crate::{
-    FramedDigest, FrozenTrustRoot, GenesisRootAuthorizationError,
-    GenesisTrustAnchorEvidence, GenesisTrustAnchorVerifier, RootRoleQuorumProof,
-    RootTransitionAuthorizationError, Sha256Digest, TrustRootSignatureFeasibilityProof,
-    TrustRootTransitionContract, TrustSnapshot, TrustedPrincipalDirectory,
-};
+use crate::attestation::MAX_SIGNATURES;
 use crate::root_authority::{
     AuthorizedRoleError,
     AuthorizedTrustRoleAttestation as RawAuthorizedTrustRoleAttestation,
@@ -27,16 +24,38 @@ use crate::root_authority::{
     authorize_role_under_root as authorize_role_under_root_raw,
     authorize_root_transition as authorize_root_transition_raw,
 };
+use crate::{
+    FramedDigest, FrozenTrustRoot, GenesisRootAuthorizationError,
+    GenesisTrustAnchorEvidence, GenesisTrustAnchorVerifier, RootRoleQuorumProof,
+    RootTransitionAuthorizationError, Sha256Digest, TrustRole,
+    TrustRootSignatureFeasibilityProof, TrustRootTransitionContract, TrustSnapshot,
+    TrustedPrincipalDirectory,
+};
 
 const TRUST_STATE_FEASIBILITY_GATE_DOMAIN: &str =
-    "symthaea.feasibility-gated-trust-state.identity.v1";
+    "symthaea.feasibility-gated-trust-state.identity.v2";
 const TRUST_ROLE_FEASIBILITY_GATE_DOMAIN: &str =
-    "symthaea.feasibility-gated-root-role.identity.v1";
+    "symthaea.feasibility-gated-root-role.identity.v2";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RootAttestationCapacityFinding {
+    SignatureThresholdExceedsEnvelopeLimit {
+        role: TrustRole,
+        required: usize,
+        maximum: usize,
+    },
+    RequiredAlgorithmsExceedEnvelopeLimit {
+        role: TrustRole,
+        required: usize,
+        maximum: usize,
+    },
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GenesisTrustStateAuthorizationError {
     RootFeasibilityRootMismatch,
     RootFeasibilityPrincipalDirectoryMismatch,
+    RootAttestationCapacity(Vec<RootAttestationCapacityFinding>),
     Authorization(GenesisRootAuthorizationError),
 }
 
@@ -45,13 +64,16 @@ pub enum RootTransitionTrustStateAuthorizationError {
     PreviousRootFeasibilityRootMismatch,
     PreviousRootFeasibilityPrincipalDirectoryMismatch,
     PreviousRootFeasibilityProofMismatch,
+    PreviousRootAttestationCapacity(Vec<RootAttestationCapacityFinding>),
     NextRootFeasibilityRootMismatch,
     NextRootFeasibilityPrincipalDirectoryMismatch,
+    NextRootAttestationCapacity(Vec<RootAttestationCapacityFinding>),
     Authorization(RootTransitionAuthorizationError),
 }
 
 /// Public trust state whose construction proves that the exact root has enough
-/// eligible role-bound keys to satisfy every configured signature threshold.
+/// eligible role-bound keys to satisfy every configured quorum threshold and
+/// that those requirements fit inside the concrete attestation envelope.
 ///
 /// This is intentionally serialize-only: retained evidence cannot be
 /// deserialized back into authority.
@@ -59,6 +81,7 @@ pub enum RootTransitionTrustStateAuthorizationError {
 pub struct AuthorizedTrustState {
     inner: RawAuthorizedTrustState,
     root_signature_feasibility_sha256: Sha256Digest,
+    maximum_attestation_signatures: usize,
     authority_gate_sha256: Sha256Digest,
 }
 
@@ -75,6 +98,10 @@ impl AuthorizedTrustState {
         &self.root_signature_feasibility_sha256
     }
 
+    pub fn maximum_attestation_signatures(&self) -> usize {
+        self.maximum_attestation_signatures
+    }
+
     pub fn authority_gate_sha256(&self) -> &Sha256Digest {
         &self.authority_gate_sha256
     }
@@ -83,8 +110,12 @@ impl AuthorizedTrustState {
         true
     }
 
-    /// This gate establishes structural signature feasibility, not that this is
-    /// the globally current trust state at an arbitrary later time.
+    pub const fn root_attestation_capacity_established(&self) -> bool {
+        true
+    }
+
+    /// This gate establishes structural feasibility and protocol representability,
+    /// not that this is the globally current trust state at an arbitrary later time.
     pub const fn current_state_established(&self) -> bool {
         false
     }
@@ -137,12 +168,16 @@ impl AuthorizedTrustRoleAttestation {
     }
 
     /// Public role-authority identity. Unlike the historical raw authority
-    /// digest, this includes the feasibility-gated trust-state identity.
+    /// digest, this includes the feasibility/capacity-gated trust-state identity.
     pub fn authority_sha256(&self) -> &Sha256Digest {
         &self.authority_sha256
     }
 
     pub const fn root_signature_feasibility_established(&self) -> bool {
+        true
+    }
+
+    pub const fn root_attestation_capacity_established(&self) -> bool {
         true
     }
 }
@@ -163,6 +198,12 @@ pub fn authorize_genesis_trust_state(
             GenesisTrustStateAuthorizationError::RootFeasibilityPrincipalDirectoryMismatch,
         );
     }
+    let capacity_findings = attestation_capacity_findings(root);
+    if !capacity_findings.is_empty() {
+        return Err(GenesisTrustStateAuthorizationError::RootAttestationCapacity(
+            capacity_findings,
+        ));
+    }
 
     let inner = authorize_genesis_trust_state_raw(
         root,
@@ -177,6 +218,7 @@ pub fn authorize_genesis_trust_state(
     Ok(AuthorizedTrustState {
         inner,
         root_signature_feasibility_sha256: root_feasibility.proof_sha256().clone(),
+        maximum_attestation_signatures: MAX_SIGNATURES,
         authority_gate_sha256,
     })
 }
@@ -226,6 +268,14 @@ pub fn authorize_root_transition(
             RootTransitionTrustStateAuthorizationError::PreviousRootFeasibilityProofMismatch,
         );
     }
+    let previous_capacity_findings = attestation_capacity_findings(previous_root);
+    if !previous_capacity_findings.is_empty() {
+        return Err(
+            RootTransitionTrustStateAuthorizationError::PreviousRootAttestationCapacity(
+                previous_capacity_findings,
+            ),
+        );
+    }
     if next_root_feasibility.root_sha256() != next_root.root_sha256() {
         return Err(
             RootTransitionTrustStateAuthorizationError::NextRootFeasibilityRootMismatch,
@@ -236,6 +286,14 @@ pub fn authorize_root_transition(
     {
         return Err(
             RootTransitionTrustStateAuthorizationError::NextRootFeasibilityPrincipalDirectoryMismatch,
+        );
+    }
+    let next_capacity_findings = attestation_capacity_findings(next_root);
+    if !next_capacity_findings.is_empty() {
+        return Err(
+            RootTransitionTrustStateAuthorizationError::NextRootAttestationCapacity(
+                next_capacity_findings,
+            ),
         );
     }
 
@@ -260,8 +318,36 @@ pub fn authorize_root_transition(
     Ok(AuthorizedTrustState {
         inner,
         root_signature_feasibility_sha256: next_root_feasibility.proof_sha256().clone(),
+        maximum_attestation_signatures: MAX_SIGNATURES,
         authority_gate_sha256,
     })
+}
+
+fn attestation_capacity_findings(
+    root: &FrozenTrustRoot,
+) -> Vec<RootAttestationCapacityFinding> {
+    let mut findings = Vec::new();
+    for policy in root.role_policies() {
+        if policy.minimum_valid_signatures > MAX_SIGNATURES {
+            findings.push(
+                RootAttestationCapacityFinding::SignatureThresholdExceedsEnvelopeLimit {
+                    role: policy.role,
+                    required: policy.minimum_valid_signatures,
+                    maximum: MAX_SIGNATURES,
+                },
+            );
+        }
+        if policy.required_algorithms.len() > MAX_SIGNATURES {
+            findings.push(
+                RootAttestationCapacityFinding::RequiredAlgorithmsExceedEnvelopeLimit {
+                    role: policy.role,
+                    required: policy.required_algorithms.len(),
+                    maximum: MAX_SIGNATURES,
+                },
+            );
+        }
+    }
+    findings
 }
 
 fn genesis_state_gate_digest(
@@ -273,7 +359,9 @@ fn genesis_state_gate_digest(
     digest.text(inner.root().authority_sha256().as_str());
     digest.text(inner.snapshot().authority_sha256().as_str());
     digest.text(feasibility.proof_sha256().as_str());
-    digest.text("root-signature-feasibility-required");
+    digest.text(&MAX_SIGNATURES.to_string());
+    digest.text("root-quorum-feasibility-required");
+    digest.text("attestation-envelope-capacity-required");
     digest.digest()
 }
 
@@ -290,7 +378,9 @@ fn transition_state_gate_digest(
     digest.text(inner.root().authority_sha256().as_str());
     digest.text(inner.snapshot().authority_sha256().as_str());
     digest.text(next_feasibility.proof_sha256().as_str());
-    digest.text("root-signature-feasibility-required");
+    digest.text(&MAX_SIGNATURES.to_string());
+    digest.text("root-quorum-feasibility-required");
+    digest.text("attestation-envelope-capacity-required");
     digest.digest()
 }
 
@@ -302,6 +392,7 @@ fn role_gate_digest(
     digest.text(state.authority_gate_sha256().as_str());
     digest.text(inner.authority_sha256().as_str());
     digest.text(inner.role_quorum_proof_sha256().as_str());
-    digest.text("root-signature-feasibility-transitively-required");
+    digest.text("root-quorum-feasibility-transitively-required");
+    digest.text("attestation-envelope-capacity-transitively-required");
     digest.digest()
 }
