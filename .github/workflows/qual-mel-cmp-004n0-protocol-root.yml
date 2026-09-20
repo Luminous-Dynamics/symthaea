@@ -1,0 +1,75 @@
+name: QUAL-MEL-CMP-004N0 protocol root
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify frozen modular protocol root
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify qualifier wrapper and frozen source topology
+        shell: bash
+        env:
+          SOURCE_SHA: 48b0d9c93db8a0cce78c13074aec0cf699e05979
+          BASE_SHA: 5fd5259af776c0a7f1b9608f040bfae9009871a1
+          LEGACY_LIB_BLOB: b4b11ee4323a061d375af30c5821a6859f7959e8
+          LEGACY_CATALOG_BLOB: ad68241b9c826f21f5ce9124a3d1b3cd61a79fd4
+        run: |
+          set -euo pipefail
+          QUALIFIER_SHA="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          test "$(git rev-parse "$SOURCE_SHA^")" = "$BASE_SHA"
+
+          mapfile -t wrapper_changed < <(git diff --name-only "$SOURCE_SHA" "$QUALIFIER_SHA")
+          test "${#wrapper_changed[@]}" -eq 1
+          test "${wrapper_changed[0]}" = ".github/workflows/qual-mel-cmp-004n0-protocol-root.yml"
+
+          test "$(git rev-parse "$BASE_SHA:crates/domains/symthaea-muse-protocol/src/lib.rs")" = "$LEGACY_LIB_BLOB"
+          test "$(git rev-parse "$SOURCE_SHA:crates/domains/symthaea-muse-protocol/src/legacy.rs")" = "$LEGACY_LIB_BLOB"
+          test "$(git rev-parse "$BASE_SHA:crates/domains/symthaea-muse-protocol/src/catalog.rs")" = "$LEGACY_CATALOG_BLOB"
+          test "$(git rev-parse "$SOURCE_SHA:crates/domains/symthaea-muse-protocol/src/legacy/catalog.rs")" = "$LEGACY_CATALOG_BLOB"
+
+          git checkout --detach "$SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Install pinned Rust and WASM target
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Format
+        run: cargo fmt -p symthaea-muse-protocol -- --check
+
+      - name: Native check and tests
+        run: |
+          cargo check -p symthaea-muse-protocol
+          cargo test -p symthaea-muse-protocol
+
+      - name: WASM check
+        run: cargo check -p symthaea-muse-protocol --target wasm32-unknown-unknown
+
+      - name: Strict native Clippy
+        run: cargo clippy -p symthaea-muse-protocol --all-targets --no-deps -- -D warnings
+
+      - name: Strict WASM Clippy
+        run: cargo clippy -p symthaea-muse-protocol --target wasm32-unknown-unknown --no-deps -- -D warnings
+
+      - name: Postflight exact source and clean tree
+        shell: bash
+        env:
+          SOURCE_SHA: 48b0d9c93db8a0cce78c13074aec0cf699e05979
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain)"
