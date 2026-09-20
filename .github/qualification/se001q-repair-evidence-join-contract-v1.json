@@ -1,0 +1,33 @@
+{
+  "authority": {
+    "meaning": "evidence linkage only",
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE",
+    "sufficient_for_repair_grant": false
+  },
+  "domain": "symthaea.se001q.repair-evidence-join.v1",
+  "expected_experiment_id": "SE-001Q-LOCK-DIAG-001",
+  "expected_source_lock_sha256": "sha256:d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f",
+  "expected_subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+  "expected_workflow_path": ".github/workflows/systems-engineering-se001q-lock-delta-diagnostic.yml",
+  "purpose": "Join cross-generation lock corroboration with exact GitHub/artifact provenance for the same two diagnostic generations without issuing repair authority.",
+  "required_corroboration_result": "CORROBORATED_GENERATED_LOCK",
+  "required_corroboration_schema": "symthaea.se001q.cross-generation-corroboration.v1.1",
+  "required_provenance_schema": "symthaea.se001q.github-provenance.v1.1",
+  "required_provenance_strength": "API_CONSISTENCY_PLUS_ARTIFACT_DIGEST_BINDING_NOT_GITHUB_SIGNATURE",
+  "requirements": [
+    "exactly two corroborated diagnostic generations and exactly two provenance witnesses",
+    "one-to-one run ID pairing between corroboration and provenance",
+    "artifact ID equality for each paired generation",
+    "verifier SHA equals provenance workflow head SHA for each paired generation",
+    "corroboration artifact ZIP SHA-256 equals both provenance API digest and downloaded archive SHA-256",
+    "provenance API artifact byte count equals the downloaded archive byte count",
+    "provenance workflow path equals the exact SE-001Q lock-diagnostic workflow",
+    "all run, artifact, evidence, lock, and Git identities are syntactically exact",
+    "both provenance witnesses are distinct and internally content-addressed",
+    "join contract, corroboration, provenance, and output all carry the complete non-authorizing authority tuple"
+  ],
+  "result": "JOINED_REPAIR_EVIDENCE",
+  "schema": "symthaea.se001q.repair-evidence-join-contract.v1",
+  "theorem": "Cross-generation corroboration + exact paired transport provenance establishes a joined evidence input set, not mutation authority."
+}
