@@ -71,6 +71,7 @@ pub mod premise;
 pub mod process_grammar;
 pub mod prog_suite;
 pub mod prog_suite_development_program;
+pub mod prog_suite_subject_bound;
 pub mod prog_suite_work_bridge;
 pub mod prog_suite_work_evidence;
 pub mod renaissance;
@@ -151,6 +152,12 @@ pub use prog_suite::{
 pub use prog_suite_development_program::{
     PROG_SUITE_DEVELOPMENT_PROGRAM_VERSION, ProgSuiteDevelopmentProgramErrorV1,
     ProgSuiteDevelopmentProgramV1, derive_prog_suite_development_program,
+};
+pub use prog_suite_subject_bound::{
+    PROG_SUITE_SUBJECT_BOUND_PLAN_VERSION, PROG_SUITE_SUBJECT_BOUND_REALIZATION_VERSION,
+    ProgSuiteSubjectBoundErrorV1, ProgSuiteSubjectBoundPlanV1,
+    ProgSuiteSubjectBoundRealizationV1, bind_prog_suite_subject,
+    realize_prog_suite_subject_bound,
 };
 pub use prog_suite_work_bridge::{
     PROG_SUITE_WORK_BRIDGE_VERSION, ProgSuiteMeterProjectionV1,
