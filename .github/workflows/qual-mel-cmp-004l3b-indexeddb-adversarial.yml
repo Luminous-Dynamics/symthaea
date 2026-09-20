@@ -1,0 +1,420 @@
+name: QUAL-MEL-CMP-004L3B IndexedDB adversarial
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-adversarial:
+    name: Qualify frozen IndexedDB adversarial behavior
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify wrapper and frozen source
+        shell: bash
+        env:
+          SOURCE_SHA: 89d7d9d5a9635f949b179ec8b05635e62d7f3b4f
+          SOURCE_PARENT_SHA: b89fa2f1f660d4fe10212d77a270f8712f5d0c98
+        run: |
+          set -euo pipefail
+          QUALIFIER_SHA="$(git rev-parse HEAD)"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          test "$(git rev-parse "$SOURCE_SHA^")" = "$SOURCE_PARENT_SHA"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_SHA" "$QUALIFIER_SHA")
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/qual-mel-cmp-004l3b-indexeddb-adversarial.yml"
+          git checkout --detach "$SOURCE_SHA"
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+
+      - name: Install pinned Rust and WASM target
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: taiki-e/install-action@wasm-pack
+
+      - name: Confirm Chrome availability
+        shell: bash
+        run: google-chrome --version
+
+      - name: Overlay adversarial browser harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          crate="crates/domains/symthaea-muse-ui"
+          cp "$crate/src/main.rs" "$crate/src/lib.rs"
+
+          cat >> "$crate/Cargo.toml" <<'EOF'
+
+          [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+          wasm-bindgen-test = "0.3"
+          EOF
+
+          mkdir -p "$crate/tests"
+          cat > "$crate/tests/indexeddb_adversarial.rs" <<'EOF'
+          #![cfg(target_arch = "wasm32")]
+
+          use std::cell::RefCell;
+          use std::rc::Rc;
+
+          use futures::channel::oneshot;
+          use wasm_bindgen::closure::Closure;
+          use wasm_bindgen::{JsCast, JsValue};
+          use wasm_bindgen_test::*;
+          use web_sys::{
+              IdbDatabase, IdbOpenDbRequest, IdbRequest, IdbTransaction,
+              IdbTransactionMode,
+          };
+
+          use symthaea_muse_protocol::{
+              ArtifactIdentity, CompositionArtifactId, RenditionArtifactId,
+              ScoreContentArtifactId,
+          };
+          use symthaea_muse_ui::comparison_evidence_envelope::{
+              ARTIFACT_BOUND_COMPARISON_ENVELOPE_SCHEMA_VERSION,
+              ArtifactBoundBlindComparisonEnvelopeV1,
+          };
+          use symthaea_muse_ui::comparison_evidence_indexed_db::{
+              COMPARISON_EVIDENCE_DATABASE_NAME,
+              COMPARISON_EVIDENCE_DATABASE_VERSION,
+              COMPARISON_EVIDENCE_OBJECT_STORE,
+              IndexedDbComparisonEvidenceError,
+              IndexedDbComparisonEvidenceStore,
+          };
+          use symthaea_muse_ui::comparison_evidence_record::{
+              ARTIFACT_BOUND_COMPARISON_EVIDENCE_SCHEMA_VERSION,
+              ArtifactBoundBlindComparisonEvidenceV1,
+              BlindAssignmentProvenanceV1,
+              BlindHumanComparisonChoiceV1,
+              ComparisonEvidenceAuthorityV1,
+              ComparisonIdentityRelationV1,
+              DurationEvidenceV1,
+              EvidenceSideV1,
+              ExposurePolicyEvidenceV1,
+              HumanComparisonJudgmentV1,
+              ListeningExposureEvidenceV1,
+              MusicalAnchorEvidenceV1,
+              ResolvedHumanComparisonChoiceV1,
+              RevealedAssignmentEvidenceV1,
+          };
+          use symthaea_muse_ui::comparison_evidence_store::ComparisonEvidenceStoreContractError;
+
+          wasm_bindgen_test_configure!(run_in_browser);
+
+          const EMBEDDED_TRIAL: &str = "20000000000000000000000000000001";
+          const WRONG_KEY: &str = "20000000000000000000000000000002";
+          const NON_STRING_KEY: &str = "20000000000000000000000000000003";
+
+          fn identity(score: char, composition: char, rendition: char) -> ArtifactIdentity {
+              ArtifactIdentity {
+                  score_content: ScoreContentArtifactId(score.to_string().repeat(64)),
+                  composition: CompositionArtifactId(composition.to_string().repeat(64)),
+                  rendition: RenditionArtifactId(rendition.to_string().repeat(64)),
+              }
+          }
+
+          fn envelope(id: &str) -> ArtifactBoundBlindComparisonEnvelopeV1 {
+              ArtifactBoundBlindComparisonEnvelopeV1 {
+                  schema_version: ARTIFACT_BOUND_COMPARISON_ENVELOPE_SCHEMA_VERSION,
+                  trial_instance_id: id.into(),
+                  evidence: ArtifactBoundBlindComparisonEvidenceV1 {
+                      schema_version: ARTIFACT_BOUND_COMPARISON_EVIDENCE_SCHEMA_VERSION,
+                      trial_id: 404,
+                      recorded_at_unix_ms: 1_800_000_200_000,
+                      side_a_identity: identity('1', '2', '3'),
+                      side_b_identity: identity('4', '5', '6'),
+                      revealed_assignment: RevealedAssignmentEvidenceV1 {
+                          visible_a_side: EvidenceSideV1::A,
+                          visible_b_side: EvidenceSideV1::B,
+                      },
+                      anchor: MusicalAnchorEvidenceV1 {
+                          bar_index: 4,
+                          beat_offset: 0.0,
+                      },
+                      exposure_policy: ExposurePolicyEvidenceV1 {
+                          minimum_seconds_per_side: 0.5,
+                          max_contiguous_step_seconds: 0.6,
+                      },
+                      duration_evidence_at_judgment: DurationEvidenceV1 {
+                          visible_a_seconds: 0.7,
+                          visible_b_seconds: 0.7,
+                      },
+                      judgment: HumanComparisonJudgmentV1 {
+                          blind_choice: BlindHumanComparisonChoiceV1::NoPreference,
+                          resolved_choice: ResolvedHumanComparisonChoiceV1::NoPreference,
+                          listening_exposure: ListeningExposureEvidenceV1 {
+                              visible_a_auditions: 1,
+                              visible_b_auditions: 1,
+                          },
+                          self_reported_confidence: None,
+                          note: "adversarial fixture".into(),
+                      },
+                      identity_relation: ComparisonIdentityRelationV1::DifferentComposition,
+                      assignment_provenance: BlindAssignmentProvenanceV1::Unspecified,
+                      authority: ComparisonEvidenceAuthorityV1::HumanSelfReport,
+                  },
+              }
+          }
+
+          async fn wait_request(request: IdbRequest) -> Result<JsValue, JsValue> {
+              let (sender, receiver) = oneshot::channel();
+              let sender = Rc::new(RefCell::new(Some(sender)));
+
+              let success_sender = sender.clone();
+              let success_request = request.clone();
+              let success = Closure::wrap(Box::new(move || {
+                  let result = success_request.result();
+                  if let Some(sender) = success_sender.borrow_mut().take() {
+                      let _ = sender.send(result);
+                  }
+              }) as Box<dyn FnMut()>);
+
+              let error_sender = sender;
+              let error = Closure::wrap(Box::new(move || {
+                  if let Some(sender) = error_sender.borrow_mut().take() {
+                      let _ = sender.send(Err(JsValue::from_str("IndexedDB request failed")));
+                  }
+              }) as Box<dyn FnMut()>);
+
+              request.set_onsuccess(Some(success.as_ref().unchecked_ref()));
+              request.set_onerror(Some(error.as_ref().unchecked_ref()));
+              let result = receiver
+                  .await
+                  .map_err(|_| JsValue::from_str("IndexedDB request channel closed"))?;
+              request.set_onsuccess(None);
+              request.set_onerror(None);
+              drop(success);
+              drop(error);
+              result
+          }
+
+          async fn wait_open(request: IdbOpenDbRequest) -> Result<IdbDatabase, JsValue> {
+              let (sender, receiver) = oneshot::channel();
+              let sender = Rc::new(RefCell::new(Some(sender)));
+
+              let success_sender = sender.clone();
+              let success_request: IdbRequest = request.clone().unchecked_into();
+              let success = Closure::wrap(Box::new(move || {
+                  let result = success_request
+                      .result()
+                      .and_then(|value| value.dyn_into::<IdbDatabase>());
+                  if let Some(sender) = success_sender.borrow_mut().take() {
+                      let _ = sender.send(result);
+                  }
+              }) as Box<dyn FnMut()>);
+
+              let error_sender = sender.clone();
+              let error = Closure::wrap(Box::new(move || {
+                  if let Some(sender) = error_sender.borrow_mut().take() {
+                      let _ = sender.send(Err(JsValue::from_str("IndexedDB open failed")));
+                  }
+              }) as Box<dyn FnMut()>);
+
+              let blocked_sender = sender;
+              let blocked = Closure::wrap(Box::new(move || {
+                  if let Some(sender) = blocked_sender.borrow_mut().take() {
+                      let _ = sender.send(Err(JsValue::from_str("IndexedDB open was blocked")));
+                  }
+              }) as Box<dyn FnMut()>);
+
+              request.set_onsuccess(Some(success.as_ref().unchecked_ref()));
+              request.set_onerror(Some(error.as_ref().unchecked_ref()));
+              request.set_onblocked(Some(blocked.as_ref().unchecked_ref()));
+              let result = receiver
+                  .await
+                  .map_err(|_| JsValue::from_str("IndexedDB open channel closed"))?;
+              request.set_onsuccess(None);
+              request.set_onerror(None);
+              request.set_onblocked(None);
+              drop(success);
+              drop(error);
+              drop(blocked);
+              result
+          }
+
+          async fn wait_transaction(transaction: IdbTransaction) -> Result<(), JsValue> {
+              let (sender, receiver) = oneshot::channel();
+              let sender = Rc::new(RefCell::new(Some(sender)));
+
+              let complete_sender = sender.clone();
+              let complete = Closure::wrap(Box::new(move || {
+                  if let Some(sender) = complete_sender.borrow_mut().take() {
+                      let _ = sender.send(Ok(()));
+                  }
+              }) as Box<dyn FnMut()>);
+
+              let failure_sender = sender.clone();
+              let abort = Closure::wrap(Box::new(move || {
+                  if let Some(sender) = failure_sender.borrow_mut().take() {
+                      let _ = sender.send(Err(JsValue::from_str("IndexedDB transaction aborted")));
+                  }
+              }) as Box<dyn FnMut()>);
+
+              let error_sender = sender;
+              let error = Closure::wrap(Box::new(move || {
+                  if let Some(sender) = error_sender.borrow_mut().take() {
+                      let _ = sender.send(Err(JsValue::from_str("IndexedDB transaction errored")));
+                  }
+              }) as Box<dyn FnMut()>);
+
+              transaction.set_oncomplete(Some(complete.as_ref().unchecked_ref()));
+              transaction.set_onabort(Some(abort.as_ref().unchecked_ref()));
+              transaction.set_onerror(Some(error.as_ref().unchecked_ref()));
+              let result = receiver
+                  .await
+                  .map_err(|_| JsValue::from_str("IndexedDB transaction channel closed"))?;
+              transaction.set_oncomplete(None);
+              transaction.set_onabort(None);
+              transaction.set_onerror(None);
+              drop(complete);
+              drop(abort);
+              drop(error);
+              result
+          }
+
+          async fn raw_database() -> IdbDatabase {
+              let factory = web_sys::window()
+                  .unwrap()
+                  .indexed_db()
+                  .unwrap()
+                  .unwrap();
+              let request = factory
+                  .open_with_u32(
+                      COMPARISON_EVIDENCE_DATABASE_NAME,
+                      COMPARISON_EVIDENCE_DATABASE_VERSION,
+                  )
+                  .unwrap();
+              wait_open(request).await.unwrap()
+          }
+
+          async fn raw_put(key: &str, value: &JsValue) {
+              let database = raw_database().await;
+              let transaction = database
+                  .transaction_with_str_and_mode(
+                      COMPARISON_EVIDENCE_OBJECT_STORE,
+                      IdbTransactionMode::Readwrite,
+                  )
+                  .unwrap();
+              let store = transaction.object_store(COMPARISON_EVIDENCE_OBJECT_STORE).unwrap();
+              let request = store
+                  .put_with_key(value, &JsValue::from_str(key))
+                  .unwrap();
+              wait_request(request).await.unwrap();
+              wait_transaction(transaction).await.unwrap();
+              database.close();
+          }
+
+          async fn raw_delete(key: &str) {
+              let database = raw_database().await;
+              let transaction = database
+                  .transaction_with_str_and_mode(
+                      COMPARISON_EVIDENCE_OBJECT_STORE,
+                      IdbTransactionMode::Readwrite,
+                  )
+                  .unwrap();
+              let store = transaction.object_store(COMPARISON_EVIDENCE_OBJECT_STORE).unwrap();
+              let request = store.delete(&JsValue::from_str(key)).unwrap();
+              wait_request(request).await.unwrap();
+              wait_transaction(transaction).await.unwrap();
+              database.close();
+          }
+
+          #[wasm_bindgen_test]
+          async fn valid_envelope_under_wrong_primary_key_is_rejected_by_read_and_list() {
+              let adapter = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+              raw_delete(WRONG_KEY).await;
+              let json = serde_json::to_string(&envelope(EMBEDDED_TRIAL)).unwrap();
+              raw_put(WRONG_KEY, &JsValue::from_str(&json)).await;
+
+              let expected = ComparisonEvidenceStoreContractError::ExistingKeyMismatch {
+                  expected_trial_instance_id: WRONG_KEY.into(),
+                  found_trial_instance_id: EMBEDDED_TRIAL.into(),
+              };
+              assert_eq!(
+                  adapter.read(WRONG_KEY).await,
+                  Err(IndexedDbComparisonEvidenceError::Contract(expected))
+              );
+              assert!(matches!(
+                  adapter.list().await,
+                  Err(IndexedDbComparisonEvidenceError::Contract(
+                      ComparisonEvidenceStoreContractError::ExistingKeyMismatch { .. }
+                  ))
+              ));
+
+              raw_delete(WRONG_KEY).await;
+          }
+
+          #[wasm_bindgen_test]
+          async fn non_string_value_is_corruption_not_absence() {
+              let adapter = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+              raw_delete(NON_STRING_KEY).await;
+              raw_put(NON_STRING_KEY, &JsValue::from_f64(42.0)).await;
+
+              assert_eq!(
+                  adapter.read(NON_STRING_KEY).await,
+                  Err(IndexedDbComparisonEvidenceError::UnexpectedStoredValue)
+              );
+
+              raw_delete(NON_STRING_KEY).await;
+          }
+
+          #[wasm_bindgen_test]
+          async fn live_adapter_connection_closes_on_versionchange_so_upgrade_can_finish() {
+              let adapter = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+              let factory = web_sys::window()
+                  .unwrap()
+                  .indexed_db()
+                  .unwrap()
+                  .unwrap();
+
+              let upgrade = factory
+                  .open_with_u32(
+                      COMPARISON_EVIDENCE_DATABASE_NAME,
+                      COMPARISON_EVIDENCE_DATABASE_VERSION + 1,
+                  )
+                  .unwrap();
+              let upgraded = wait_open(upgrade)
+                  .await
+                  .expect("adapter must close its live connection on versionchange");
+              upgraded.close();
+              drop(adapter);
+
+              let delete = factory
+                  .delete_database(COMPARISON_EVIDENCE_DATABASE_NAME)
+                  .unwrap();
+              let deleted: IdbRequest = delete.clone().unchecked_into();
+              wait_request(deleted).await.unwrap();
+
+              // Restore the V1 database so later tests/runs do not inherit an
+              // intentionally upgraded schema.
+              let restored = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+              drop(restored);
+          }
+          EOF
+
+      - name: Execute adversarial IndexedDB tests in headless Chrome
+        shell: bash
+        run: |
+          set -euo pipefail
+          wasm-pack test crates/domains/symthaea-muse-ui \
+            --chrome --headless --test indexeddb_adversarial
+
+      - name: Restore and verify frozen product source
+        if: always()
+        shell: bash
+        env:
+          SOURCE_SHA: 89d7d9d5a9635f949b179ec8b05635e62d7f3b4f
+        run: |
+          set -euo pipefail
+          git reset --hard "$SOURCE_SHA"
+          git clean -fd
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain)"
