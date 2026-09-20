@@ -14,9 +14,7 @@
 //! Phi/confidence and command-risk classification remain advisory inputs and do not
 //! mint authorization here.
 
-use super::executor::{
-    ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel,
-};
+use super::executor::{ChannelOperation, FlakeOperation, NixOSCommand, SafetyLevel};
 use blake3::Hasher;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -29,9 +27,7 @@ const EXECUTION_RECEIPT_DOMAIN: &[u8] = b"nixward-execution-receipt-v1";
 ///
 /// Ordering is intentional: a scope may authorize the same or a narrower action
 /// class, never a broader one.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum NixActionScopeV1 {
     ReadOnly,
     UserModify,
@@ -206,6 +202,14 @@ impl NixActionIntentV1 {
         validate_list(&self.preconditions, "precondition")?;
         validate_list(&self.required_postconditions, "required postcondition")?;
         validate_action_shape(&self.action)?;
+
+        let minimum_scope = minimum_scope_for_action(&self.action);
+        if self.maximum_scope < minimum_scope {
+            return Err(NixAuthorizationErrorV1::ScopeTooNarrow {
+                requested: self.maximum_scope,
+                minimum: minimum_scope,
+            });
+        }
         Ok(())
     }
 
@@ -335,9 +339,15 @@ impl LiveNixAuthorizationV1 {
         if digest != self.record.action_intent_digest {
             return Err(NixAuthorizationErrorV1::IntentMismatch);
         }
+        if now_unix_ms < self.record.issued_at_unix_ms {
+            return Err(NixAuthorizationErrorV1::NotYetValid);
+        }
         if let Some(expires) = self.record.expires_at_unix_ms
             && now_unix_ms > expires
         {
+            // Expiry is terminal for a one-shot capability. Mark it consumed so a
+            // later caller cannot revive it by supplying an earlier wall-clock value.
+            self.consumed = true;
             return Err(NixAuthorizationErrorV1::Expired);
         }
         self.consumed = true;
@@ -425,10 +435,17 @@ pub enum NixAuthorizationErrorV1 {
     EmptyListItem { field: &'static str, index: usize },
     #[error("free-form custom commands are not supported by governed action-intent v1")]
     UnsupportedCustomCommand,
+    #[error("maximum scope {requested:?} is narrower than action minimum {minimum:?}")]
+    ScopeTooNarrow {
+        requested: NixActionScopeV1,
+        minimum: NixActionScopeV1,
+    },
     #[error("authorization decision is not approved")]
     NotApproved,
     #[error("authorization is bound to a different action intent")]
     IntentMismatch,
+    #[error("authorization is not yet valid")]
+    NotYetValid,
     #[error("authorization has expired")]
     Expired,
     #[error("one-shot authorization was already consumed")]
@@ -472,6 +489,31 @@ fn validate_action_shape(action: &NixActionDescriptorV1) -> Result<(), NixAuthor
         | NixActionDescriptorV1::CollectGarbage { .. } => {}
     }
     Ok(())
+}
+
+fn minimum_scope_for_action(action: &NixActionDescriptorV1) -> NixActionScopeV1 {
+    match action {
+        NixActionDescriptorV1::Search { .. }
+        | NixActionDescriptorV1::ChannelList
+        | NixActionDescriptorV1::FlakeShow
+        | NixActionDescriptorV1::FlakeCheck => NixActionScopeV1::ReadOnly,
+
+        NixActionDescriptorV1::EnvInstall { .. }
+        | NixActionDescriptorV1::EnvRemove { .. }
+        | NixActionDescriptorV1::EnvRollback
+        | NixActionDescriptorV1::ChannelUpdate { .. }
+        | NixActionDescriptorV1::ChannelAdd { .. }
+        | NixActionDescriptorV1::ChannelRemove { .. }
+        | NixActionDescriptorV1::FlakeUpdate { .. }
+        | NixActionDescriptorV1::FlakeLock { .. }
+        | NixActionDescriptorV1::HomeManagerSwitch { .. } => NixActionScopeV1::UserModify,
+
+        NixActionDescriptorV1::RebuildTest { .. } | NixActionDescriptorV1::RebuildBoot { .. } => {
+            NixActionScopeV1::SystemModify
+        }
+        NixActionDescriptorV1::RebuildSwitch { .. } => NixActionScopeV1::SystemCritical,
+        NixActionDescriptorV1::CollectGarbage { .. } => NixActionScopeV1::Destructive,
+    }
 }
 
 fn require_nonempty(value: &str, field: &'static str) -> Result<(), NixAuthorizationErrorV1> {
@@ -744,6 +786,19 @@ mod tests {
     }
 
     #[test]
+    fn manually_narrowed_scope_is_rejected() {
+        let mut intent = NixActionIntentV1::from_command("host:x", None, &rebuild()).unwrap();
+        intent.maximum_scope = NixActionScopeV1::ReadOnly;
+        assert_eq!(
+            intent.validate_shape().unwrap_err(),
+            NixAuthorizationErrorV1::ScopeTooNarrow {
+                requested: NixActionScopeV1::ReadOnly,
+                minimum: NixActionScopeV1::SystemCritical,
+            }
+        );
+    }
+
+    #[test]
     fn custom_shell_commands_are_outside_governed_v1() {
         let command = NixOSCommand::Custom {
             command: "sh".to_string(),
@@ -813,7 +868,24 @@ mod tests {
     }
 
     #[test]
-    fn expired_authorization_fails_without_becoming_reusable() {
+    fn authorization_cannot_be_used_before_issue_time() {
+        let intent = NixActionIntentV1::from_command("host:x", None, &rebuild()).unwrap();
+        let mut live = LiveNixAuthorizationV1::local_explicit_confirmation(
+            &intent,
+            "tui-approval:abc",
+            1_000,
+            Some(2_000),
+        )
+        .unwrap();
+        assert_eq!(
+            live.consume_for(&intent, 999).unwrap_err(),
+            NixAuthorizationErrorV1::NotYetValid
+        );
+        assert!(live.consume_for(&intent, 1_000).is_ok());
+    }
+
+    #[test]
+    fn expired_authorization_is_terminal() {
         let intent = NixActionIntentV1::from_command("host:x", None, &rebuild()).unwrap();
         let mut live = LiveNixAuthorizationV1::local_explicit_confirmation(
             &intent,
@@ -825,6 +897,10 @@ mod tests {
         assert_eq!(
             live.consume_for(&intent, 1_101).unwrap_err(),
             NixAuthorizationErrorV1::Expired
+        );
+        assert_eq!(
+            live.consume_for(&intent, 1_050).unwrap_err(),
+            NixAuthorizationErrorV1::AlreadyConsumed
         );
     }
 
