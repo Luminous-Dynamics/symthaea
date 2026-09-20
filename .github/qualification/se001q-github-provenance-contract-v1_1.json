@@ -1,0 +1,24 @@
+{
+  "schema": "symthaea.se001q.github-provenance-contract.v1.1",
+  "domain": "symthaea.se001q.github-provenance.v1.1",
+  "source": "github-rest-api-reviewed-export-plus-downloaded-artifact",
+  "required_event": "pull_request",
+  "required_run_status": "completed",
+  "required_run_conclusion": "success",
+  "required_job_status": "completed",
+  "required_job_conclusion": "success",
+  "require_nonempty_job_steps": true,
+  "require_job_attempt_match": true,
+  "require_artifact_not_expired": true,
+  "require_artifact_digest_prefix": "sha256:",
+  "require_artifact_archive_digest_match": true,
+  "require_artifact_workflow_run_binding": true,
+  "require_distinct_api_snapshots": true,
+  "authority": {
+    "meaning": "execution provenance and downloaded-artifact transport consistency only",
+    "sufficient_for_repair_grant": false,
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE"
+  },
+  "theorem": "reviewed GitHub run/job/artifact metadata + exact downloaded archive SHA-256 equality establishes transport-consistent provenance, not mutation authority"
+}
