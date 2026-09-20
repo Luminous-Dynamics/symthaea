@@ -1,0 +1,543 @@
+name: QUAL-MEL-CMP-004L3 browser runtime
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-runtime:
+    name: Qualify frozen IndexedDB runtime in Chrome
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SOURCE_SHA: 89d7d9d5a9635f949b179ec8b05635e62d7f3b4f
+      BASE_SHA: b89fa2f1f660d4fe10212d77a270f8712f5d0c98
+      WASM_BINDGEN_VERSION: 0.2.108
+      WASM_BINDGEN_TEST_VERSION: 0.3.58
+    steps:
+      - name: Checkout frozen L2 source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          fetch-depth: 0
+
+      - name: Verify exact source identity and surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          mapfile -t changed < <(git diff --name-only "$BASE_SHA" "$SOURCE_SHA")
+          expected=(
+            "crates/domains/symthaea-muse-ui/Cargo.toml"
+            "crates/domains/symthaea-muse-ui/src/comparison_evidence_indexed_db.rs"
+            "crates/domains/symthaea-muse-ui/src/main.rs"
+          )
+          printf '%s\n' "${changed[@]}" | sort > /tmp/actual-paths
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/actual-paths
+          git diff --quiet
+          git diff --cached --quiet
+
+      - name: Install pinned Rust and wasm target
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Verify locked wasm-bindgen family
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import tomllib
+          from pathlib import Path
+          lock = tomllib.loads(Path("Cargo.lock").read_text())
+          packages = lock["package"]
+          versions = sorted({p["version"] for p in packages if p["name"] == "wasm-bindgen"})
+          assert versions == ["0.2.108"], versions
+          futures = sorted({p["version"] for p in packages if p["name"] == "wasm-bindgen-futures"})
+          assert "0.4.58" in futures, futures
+          print("locked wasm-bindgen:", versions[0])
+          print("locked wasm-bindgen-futures:", ", ".join(futures))
+          PY
+
+      - name: Inspect hosted browser toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v google-chrome
+          command -v chromedriver
+          google-chrome --version | tee /tmp/chrome-version.txt
+          chromedriver --version | tee /tmp/chromedriver-version.txt
+
+      - name: Install exact wasm-bindgen test runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install wasm-bindgen-cli --version "$WASM_BINDGEN_VERSION" --locked
+          wasm-bindgen --version | tee /tmp/wasm-bindgen-cli-version.txt
+          (wasm-bindgen-test-runner --version || true) 2>&1 | tee /tmp/wasm-bindgen-test-runner-version.txt
+
+      - name: Inject qualification-only browser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat >> crates/domains/symthaea-muse-ui/Cargo.toml <<'TOML'
+
+          [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+          wasm-bindgen-test = "=0.3.58"
+          TOML
+
+          cat >> crates/domains/symthaea-muse-ui/src/comparison_evidence_indexed_db.rs <<'RUST'
+
+          #[cfg(test)]
+          mod browser_runtime_qualification {
+              use super::*;
+              use crate::comparison_evidence_envelope::{
+                  ArtifactBoundBlindComparisonEnvelopeV1,
+                  ARTIFACT_BOUND_COMPARISON_ENVELOPE_SCHEMA_VERSION,
+              };
+              use crate::comparison_evidence_record::{
+                  ArtifactBoundBlindComparisonEvidenceV1,
+                  BlindAssignmentProvenanceV1,
+                  BlindHumanComparisonChoiceV1,
+                  ComparisonEvidenceAuthorityV1,
+                  ComparisonIdentityRelationV1,
+                  DurationEvidenceV1,
+                  EvidenceSideV1,
+                  ExposurePolicyEvidenceV1,
+                  HumanComparisonJudgmentV1,
+                  ListeningExposureEvidenceV1,
+                  MusicalAnchorEvidenceV1,
+                  ResolvedHumanComparisonChoiceV1,
+                  RevealedAssignmentEvidenceV1,
+                  ARTIFACT_BOUND_COMPARISON_EVIDENCE_SCHEMA_VERSION,
+              };
+              use crate::comparison_evidence_store::ComparisonEvidenceStoreContractError;
+              use gloo_timers::future::TimeoutFuture;
+              use symthaea_muse_protocol::{
+                  ArtifactIdentity,
+                  CompositionArtifactId,
+                  RenditionArtifactId,
+                  ScoreContentArtifactId,
+              };
+              use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
+
+              wasm_bindgen_test_configure!(run_in_browser);
+
+              const TRIAL: &str = "0123456789abcdef0123456789abcdef";
+              const OTHER_TRIAL: &str = "fedcba9876543210fedcba9876543210";
+
+              fn identity(score: char, composition: char, rendition: char) -> ArtifactIdentity {
+                  ArtifactIdentity {
+                      score_content: ScoreContentArtifactId(score.to_string().repeat(64)),
+                      composition: CompositionArtifactId(composition.to_string().repeat(64)),
+                      rendition: RenditionArtifactId(rendition.to_string().repeat(64)),
+                  }
+              }
+
+              fn envelope_for(id: &str, note: &str) -> ArtifactBoundBlindComparisonEnvelopeV1 {
+                  ArtifactBoundBlindComparisonEnvelopeV1 {
+                      schema_version: ARTIFACT_BOUND_COMPARISON_ENVELOPE_SCHEMA_VERSION,
+                      trial_instance_id: id.into(),
+                      evidence: ArtifactBoundBlindComparisonEvidenceV1 {
+                          schema_version: ARTIFACT_BOUND_COMPARISON_EVIDENCE_SCHEMA_VERSION,
+                          trial_id: 202,
+                          recorded_at_unix_ms: 1_800_000_000_000,
+                          side_a_identity: identity('a', 'b', 'c'),
+                          side_b_identity: identity('d', 'e', 'f'),
+                          revealed_assignment: RevealedAssignmentEvidenceV1 {
+                              visible_a_side: EvidenceSideV1::B,
+                              visible_b_side: EvidenceSideV1::A,
+                          },
+                          anchor: MusicalAnchorEvidenceV1 {
+                              bar_index: 2,
+                              beat_offset: 0.5,
+                          },
+                          exposure_policy: ExposurePolicyEvidenceV1 {
+                              minimum_seconds_per_side: 0.5,
+                              max_contiguous_step_seconds: 0.6,
+                          },
+                          duration_evidence_at_judgment: DurationEvidenceV1 {
+                              visible_a_seconds: 0.5,
+                              visible_b_seconds: 0.5,
+                          },
+                          judgment: HumanComparisonJudgmentV1 {
+                              blind_choice: BlindHumanComparisonChoiceV1::PreferVisibleA,
+                              resolved_choice: ResolvedHumanComparisonChoiceV1::PreferSideB,
+                              listening_exposure: ListeningExposureEvidenceV1 {
+                                  visible_a_auditions: 1,
+                                  visible_b_auditions: 1,
+                              },
+                              self_reported_confidence: Some(0.75),
+                              note: note.into(),
+                          },
+                          identity_relation: ComparisonIdentityRelationV1::DifferentComposition,
+                          assignment_provenance: BlindAssignmentProvenanceV1::Unspecified,
+                          authority: ComparisonEvidenceAuthorityV1::HumanSelfReport,
+                      },
+                  }
+              }
+
+              fn envelope(note: &str) -> ArtifactBoundBlindComparisonEnvelopeV1 {
+                  envelope_for(TRIAL, note)
+              }
+
+              fn factory() -> web_sys::IdbFactory {
+                  web_sys::window()
+                      .expect("browser window")
+                      .indexed_db()
+                      .expect("IndexedDB binding call")
+                      .expect("IndexedDB factory")
+              }
+
+              async fn reset_database() {
+                  let request = factory()
+                      .delete_database(COMPARISON_EVIDENCE_DATABASE_NAME)
+                      .expect("delete database request");
+                  OpenRequestWaiter::new(request)
+                      .wait()
+                      .await
+                      .expect("database reset must complete");
+              }
+
+              async fn raw_open(version: u32) -> IdbDatabase {
+                  let request = factory()
+                      .open_with_u32(COMPARISON_EVIDENCE_DATABASE_NAME, version)
+                      .expect("raw database open");
+                  OpenRequestWaiter::new(request)
+                      .wait()
+                      .await
+                      .expect("raw database open must complete")
+                      .dyn_into()
+                      .expect("open result must be IdbDatabase")
+              }
+
+              async fn raw_add(key: &str, value: JsValue) {
+                  let store = IndexedDbComparisonEvidenceStore::open()
+                      .await
+                      .expect("open product database");
+                  let transaction = store
+                      .readwrite_transaction()
+                      .expect("raw write transaction");
+                  let object_store = transaction
+                      .object_store(COMPARISON_EVIDENCE_OBJECT_STORE)
+                      .expect("object store");
+                  let request = object_store
+                      .add_with_key(&value, &JsValue::from_str(key))
+                      .expect("raw add request");
+                  let transaction_waiter = TransactionWaiter::new(transaction);
+                  RequestWaiter::new(request)
+                      .wait()
+                      .await
+                      .expect("raw add request must succeed");
+                  transaction_waiter
+                      .wait()
+                      .await
+                      .expect("raw add transaction must commit");
+              }
+
+              fn is_conflict(
+                  result: &Result<
+                      IndexedDbComparisonEvidenceCreateOutcome,
+                      IndexedDbComparisonEvidenceError,
+                  >,
+              ) -> bool {
+                  matches!(
+                      result,
+                      Err(IndexedDbComparisonEvidenceError::Contract(
+                          ComparisonEvidenceStoreContractError::ConflictingTrialReuse { .. }
+                      ))
+                  )
+              }
+
+              #[wasm_bindgen_test(async)]
+              async fn indexeddb_runtime_qualification_v1() {
+                  reset_database().await;
+
+                  {
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      assert_eq!(
+                          store.create_once(envelope("first")).await.unwrap(),
+                          IndexedDbComparisonEvidenceCreateOutcome::Created
+                      );
+                      let validated = store
+                          .read(TRIAL)
+                          .await
+                          .unwrap()
+                          .expect("saved trial must exist");
+                      assert_eq!(validated.trial_instance_id(), TRIAL);
+                      assert_eq!(
+                          store.create_once(envelope("first")).await.unwrap(),
+                          IndexedDbComparisonEvidenceCreateOutcome::ExactReplay
+                      );
+                      store.delete(&validated).await.unwrap();
+                      assert!(store.read(TRIAL).await.unwrap().is_none());
+                  }
+
+                  reset_database().await;
+
+                  {
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      assert_eq!(
+                          store.create_once(envelope("original")).await.unwrap(),
+                          IndexedDbComparisonEvidenceCreateOutcome::Created
+                      );
+                      let conflict = store.create_once(envelope("changed")).await;
+                      assert!(is_conflict(&conflict));
+                      let persisted = store.read(TRIAL).await.unwrap().unwrap();
+                      assert_eq!(
+                          persisted.evidence().record().judgment.note.as_str(),
+                          "original"
+                      );
+                  }
+
+                  reset_database().await;
+
+                  {
+                      let left = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      let right = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      let (a, b) = futures::join!(
+                          left.create_once(envelope("same")),
+                          right.create_once(envelope("same"))
+                      );
+                      assert!(
+                          matches!(
+                              (&a, &b),
+                              (
+                                  Ok(IndexedDbComparisonEvidenceCreateOutcome::Created),
+                                  Ok(IndexedDbComparisonEvidenceCreateOutcome::ExactReplay)
+                              ) | (
+                                  Ok(IndexedDbComparisonEvidenceCreateOutcome::ExactReplay),
+                                  Ok(IndexedDbComparisonEvidenceCreateOutcome::Created)
+                              )
+                          ),
+                          "same-evidence race results: {a:?} / {b:?}"
+                      );
+                  }
+
+                  reset_database().await;
+
+                  {
+                      let left = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      let right = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      let (a, b) = futures::join!(
+                          left.create_once(envelope("left")),
+                          right.create_once(envelope("right"))
+                      );
+                      let one_created = matches!(
+                          &a,
+                          Ok(IndexedDbComparisonEvidenceCreateOutcome::Created)
+                      ) as u8
+                          + matches!(
+                              &b,
+                              Ok(IndexedDbComparisonEvidenceCreateOutcome::Created)
+                          ) as u8;
+                      let one_conflict = is_conflict(&a) as u8 + is_conflict(&b) as u8;
+                      assert_eq!(one_created, 1, "conflicting race: {a:?} / {b:?}");
+                      assert_eq!(one_conflict, 1, "conflicting race: {a:?} / {b:?}");
+                  }
+
+                  reset_database().await;
+
+                  {
+                      let wrong = envelope_for(OTHER_TRIAL, "mis-keyed");
+                      raw_add(
+                          TRIAL,
+                          JsValue::from_str(&serde_json::to_string(&wrong).unwrap()),
+                      )
+                      .await;
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      assert!(matches!(
+                          store.read(TRIAL).await,
+                          Err(IndexedDbComparisonEvidenceError::Contract(
+                              ComparisonEvidenceStoreContractError::ExistingKeyMismatch { .. }
+                          ))
+                      ));
+                      assert!(matches!(
+                          store.list().await,
+                          Err(IndexedDbComparisonEvidenceError::Contract(
+                              ComparisonEvidenceStoreContractError::ExistingKeyMismatch { .. }
+                          ))
+                      ));
+                  }
+
+                  reset_database().await;
+
+                  {
+                      raw_add(TRIAL, JsValue::from_str("{not-json")).await;
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      assert!(matches!(
+                          store.read(TRIAL).await,
+                          Err(IndexedDbComparisonEvidenceError::Contract(
+                              ComparisonEvidenceStoreContractError::ExistingMalformedJson(_)
+                          ))
+                      ));
+                  }
+
+                  reset_database().await;
+
+                  {
+                      let mut unsupported = envelope("unsupported");
+                      unsupported.schema_version = 99;
+                      raw_add(
+                          TRIAL,
+                          JsValue::from_str(&serde_json::to_string(&unsupported).unwrap()),
+                      )
+                      .await;
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      assert!(matches!(
+                          store.read(TRIAL).await,
+                          Err(IndexedDbComparisonEvidenceError::Contract(
+                              ComparisonEvidenceStoreContractError::ExistingInvalid(_)
+                          ))
+                      ));
+                  }
+
+                  reset_database().await;
+
+                  {
+                      raw_add(TRIAL, JsValue::from_f64(7.0)).await;
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      assert!(matches!(
+                          store.read(TRIAL).await,
+                          Err(IndexedDbComparisonEvidenceError::UnexpectedStoredValue)
+                      ));
+                  }
+
+                  reset_database().await;
+
+                  {
+                      let store = IndexedDbComparisonEvidenceStore::open().await.unwrap();
+                      let request = factory()
+                          .open_with_u32(COMPARISON_EVIDENCE_DATABASE_NAME, 2)
+                          .unwrap();
+                      let upgraded: IdbDatabase = OpenRequestWaiter::new(request)
+                          .wait()
+                          .await
+                          .expect("versionchange-aware connection must not block upgrade")
+                          .dyn_into()
+                          .unwrap();
+                      upgraded.close();
+                      drop(store);
+                  }
+
+                  reset_database().await;
+
+                  // These blocked/cancelled upgrade requests are deliberately last:
+                  // they are allowed to complete silently after the raw blocker closes,
+                  // and therefore must not contaminate later fixtures.
+                  {
+                      let blocker = raw_open(1).await;
+
+                      let blocked_request = factory()
+                          .open_with_u32(COMPARISON_EVIDENCE_DATABASE_NAME, 2)
+                          .unwrap();
+                      assert!(matches!(
+                          OpenRequestWaiter::new(blocked_request).wait().await,
+                          Err(IndexedDbComparisonEvidenceError::OpenBlocked)
+                      ));
+
+                      let cancelled_request = factory()
+                          .open_with_u32(COMPARISON_EVIDENCE_DATABASE_NAME, 3)
+                          .unwrap();
+                      let pending = OpenRequestWaiter::new(cancelled_request).wait();
+                      drop(pending);
+
+                      blocker.close();
+                      TimeoutFuture::new(50).await;
+                  }
+              }
+          }
+          RUST
+
+      - name: Run exact browser qualification
+        id: browser
+        shell: bash
+        env:
+          WASM_BINDGEN_USE_BROWSER: "1"
+        run: |
+          set -euo pipefail
+          export CHROMEDRIVER="$(command -v chromedriver)"
+          set +e
+          cargo test \
+            -p symthaea-muse-ui \
+            --bin symthaea-muse-ui \
+            --target wasm32-unknown-unknown \
+            indexeddb_runtime_qualification_v1 \
+            -- --nocapture 2>&1 | tee /tmp/mel-cmp-004l3-browser.log
+          status=${PIPESTATUS[0]}
+          set -e
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$status" > /tmp/browser-exit-code.txt
+          exit "$status"
+
+      - name: Write runtime receipt
+        if: always()
+        shell: bash
+        env:
+          QUALIFIER_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+          TEST_EXIT: ${{ steps.browser.outputs.exit_code }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          def read(path):
+              p = Path(path)
+              return p.read_text().strip() if p.exists() else None
+
+          receipt = {
+              "schema": "mel-cmp-004l3-browser-runtime-v1",
+              "frozen_source_sha": os.environ["SOURCE_SHA"],
+              "frozen_base_sha": os.environ["BASE_SHA"],
+              "qualifier_head": os.environ.get("QUALIFIER_HEAD"),
+              "rustc": subprocess.run(
+                  ["rustc", "--version"], text=True, capture_output=True
+              ).stdout.strip(),
+              "cargo": subprocess.run(
+                  ["cargo", "--version"], text=True, capture_output=True
+              ).stdout.strip(),
+              "wasm_bindgen_source_version": os.environ["WASM_BINDGEN_VERSION"],
+              "wasm_bindgen_test_version": os.environ["WASM_BINDGEN_TEST_VERSION"],
+              "wasm_bindgen_cli": read("/tmp/wasm-bindgen-cli-version.txt"),
+              "wasm_bindgen_test_runner": read(
+                  "/tmp/wasm-bindgen-test-runner-version.txt"
+              ),
+              "chrome": read("/tmp/chrome-version.txt"),
+              "chromedriver": read("/tmp/chromedriver-version.txt"),
+              "test_exit_code": read("/tmp/browser-exit-code.txt")
+                  or os.environ.get("TEST_EXIT"),
+              "claim_boundary": {
+                  "source_engineering": "separate exact-source qualifier #4982",
+                  "browser_runtime": "this receipt",
+                  "quota_runtime": "not established unless explicitly exercised",
+                  "cross_browser": "not established by Chrome-only execution",
+                  "attention": "not established",
+                  "randomization": "not established",
+                  "musical_quality": "not established",
+                  "export_consent": "not established",
+              },
+          }
+          Path("/tmp/mel-cmp-004l3-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-cmp-004l3-browser-runtime-${{ env.SOURCE_SHA }}
+          path: |
+            /tmp/mel-cmp-004l3-browser.log
+            /tmp/mel-cmp-004l3-receipt.json
+          retention-days: 90
+          if-no-files-found: warn
