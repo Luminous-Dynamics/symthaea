@@ -9,4 +9,6 @@
 
 mod legacy;
 
+pub mod comparison_evidence;
+
 pub use legacy::*;
