@@ -124,8 +124,9 @@ fn fixture() -> (FrozenTrustRoot, TrustedPrincipalDirectory, TrustSnapshot, Auth
             usages: BTreeSet::from([usage(TrustRole::TransparencyWitness)]),
         },
     ]).unwrap();
+    let feasibility = prove_trust_root_signature_feasibility(&root, &directory).unwrap();
     let state = authorize_genesis_trust_state(
-        &root, &directory, &snapshot,
+        &root, &directory, &feasibility, &snapshot,
         &GenesisTrustAnchorEvidence {
             anchor_artifact_sha256: Sha256Digest::of_bytes(b"offline-root-anchor"),
             initial_trust_snapshot_sha256: snapshot.digest().unwrap(),

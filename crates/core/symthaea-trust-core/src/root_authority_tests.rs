@@ -140,8 +140,9 @@ fn bootstrap_state(
         initial_trust_snapshot_sha256: snapshot.digest().unwrap(),
         anchored_at_unix_s: 200,
     };
+    let feasibility = prove_trust_root_signature_feasibility(root, directory).unwrap();
     authorize_genesis_trust_state(
-        root, directory, snapshot, &anchor,
+        root, directory, &feasibility, snapshot, &anchor,
         &BootstrapVerifier { identity: provider, accept: true },
     ).unwrap()
 }
@@ -182,14 +183,19 @@ fn two_independent_principals_satisfy_root_quorum() {
 }
 
 #[test]
-fn bootstrap_provider_and_initial_snapshot_are_both_bound() {
+fn bootstrap_provider_initial_snapshot_and_feasibility_are_bound() {
     let directory = directory(vec![principal("p-a", "org-a", "region-a", &["a"])]);
     let root = genesis_root(&directory, role_policy(TrustRole::Root, 1, 1, 1, 1));
     let snapshot = trust_snapshot(&["a"]);
+    let feasibility = prove_trust_root_signature_feasibility(&root, &directory).unwrap();
     let left = bootstrap_state(&root, &directory, &snapshot, "bootstrap-provider-a");
     let right = bootstrap_state(&root, &directory, &snapshot, "bootstrap-provider-b");
     assert_ne!(left.root().authority_sha256(), right.root().authority_sha256());
+    assert_ne!(left.authority_gate_sha256(), right.authority_gate_sha256());
     assert_eq!(left.snapshot().trust_snapshot_sha256(), &snapshot.digest().unwrap());
+    assert_eq!(left.root_signature_feasibility_sha256(), feasibility.proof_sha256());
+    assert!(left.root_signature_feasibility_established());
+    assert!(!left.current_state_established());
 }
 
 #[test]
@@ -197,8 +203,9 @@ fn rejected_bootstrap_anchor_cannot_mint_trust_state() {
     let directory = directory(vec![principal("p-a", "org-a", "region-a", &["a"])]);
     let root = genesis_root(&directory, role_policy(TrustRole::Root, 1, 1, 1, 1));
     let snapshot = trust_snapshot(&["a"]);
+    let feasibility = prove_trust_root_signature_feasibility(&root, &directory).unwrap();
     let result = authorize_genesis_trust_state(
-        &root, &directory, &snapshot,
+        &root, &directory, &feasibility, &snapshot,
         &GenesisTrustAnchorEvidence {
             anchor_artifact_sha256: Sha256Digest::of_bytes(b"untrusted-anchor"),
             initial_trust_snapshot_sha256: snapshot.digest().unwrap(),
@@ -206,7 +213,48 @@ fn rejected_bootstrap_anchor_cannot_mint_trust_state() {
         },
         &BootstrapVerifier { identity: "bootstrap-provider", accept: false },
     );
-    assert_eq!(result, Err(GenesisRootAuthorizationError::AnchorRejected));
+    assert_eq!(
+        result,
+        Err(GenesisTrustStateAuthorizationError::Authorization(
+            GenesisRootAuthorizationError::AnchorRejected,
+        ))
+    );
+}
+
+#[test]
+fn feasibility_proof_for_another_root_cannot_mint_trust_state() {
+    let directory = directory(vec![principal("p-a", "org-a", "region-a", &["a"])]);
+    let root = genesis_root(&directory, role_policy(TrustRole::Root, 1, 1, 1, 1));
+    let other_root = TrustRootDraft {
+        version: 1,
+        predecessor_root_sha256: None,
+        issued_at_unix_s: 100,
+        expires_at_unix_s: 850,
+        role_policies: vec![
+            role_policy(TrustRole::Root, 1, 1, 1, 1),
+            role_policy(TrustRole::Freshness, 1, 1, 1, 1),
+        ],
+    }
+    .freeze(&directory)
+    .unwrap();
+    let wrong_feasibility = prove_trust_root_signature_feasibility(&other_root, &directory).unwrap();
+    let snapshot = trust_snapshot(&["a"]);
+    let result = authorize_genesis_trust_state(
+        &root,
+        &directory,
+        &wrong_feasibility,
+        &snapshot,
+        &GenesisTrustAnchorEvidence {
+            anchor_artifact_sha256: Sha256Digest::of_bytes(b"offline-root-anchor"),
+            initial_trust_snapshot_sha256: snapshot.digest().unwrap(),
+            anchored_at_unix_s: 200,
+        },
+        &BootstrapVerifier { identity: "bootstrap-provider", accept: true },
+    );
+    assert_eq!(
+        result,
+        Err(GenesisTrustStateAuthorizationError::RootFeasibilityRootMismatch)
+    );
 }
 
 #[test]

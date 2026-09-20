@@ -14,6 +14,8 @@
 //! - frozen delegated trust-root policies and dual-threshold rotation contracts;
 //! - structural signature-feasibility proofs over the exact root-bound principal
 //!   directory, kept distinct from institutional root authority;
+//! - feasibility-gated root authority capabilities whose public identities carry
+//!   the exact root signature-feasibility proof forward;
 //! - role-aware root authority capabilities that reuse cryptographic attestation
 //!   verification and independently enforce principal/org/region quorum geometry;
 //! - bounded interval-based time evidence with explicit source strength;
@@ -46,6 +48,7 @@ mod identity;
 mod principal;
 mod revalidation;
 mod root_authority;
+mod root_authority_gate;
 mod temporal_lifecycle;
 mod time;
 mod transparency;
@@ -70,7 +73,13 @@ pub use attestation::*;
 pub use identity::*;
 pub use principal::*;
 pub use revalidation::*;
-pub use root_authority::*;
+pub use root_authority::{
+    AuthorizedRoleError, AuthorizedTrustRoot, AuthorizedTrustSnapshot,
+    GenesisRootAuthorizationError, GenesisTrustAnchorEvidence, GenesisTrustAnchorVerifier,
+    RoleSignerIdentity, RootAuthorizationKind, RootRoleQuorumFinding, RootRoleQuorumProof,
+    RootTransitionAuthorizationError, TrustSnapshotAuthorizationKind, prove_root_role_quorum,
+};
+pub use root_authority_gate::*;
 pub use temporal_lifecycle::*;
 pub use time::*;
 pub use transparency::*;
