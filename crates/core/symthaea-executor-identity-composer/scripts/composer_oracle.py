@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Independent stdlib SHA-256 oracle for EXEC-ID-001D3B.
+"""Independent stdlib SHA-256 oracle for EXEC-ID-001D3B2/B2B.
 
-This script imports no Symthaea production code. It reconstructs only the
-language-neutral composition-policy and authored live-binding transcript bytes.
+This script imports no Symthaea production code. It treats the already-frozen
+neutral identity requirement, D3A relation policy, and B2A provider-policy
+manifest as upstream semantic inputs, then independently reconstructs the
+composition-policy and authored live-binding transcript bytes.
+
 The binding fixture is canonicalization evidence only; Python cannot mint the
 opaque Rust VerifiedExecutorBinding live type.
 """
@@ -16,8 +19,9 @@ SCHEMA = 1
 POLICY_DOMAIN = b"symthaea.executor.identity.composer.policy.v1\0"
 BINDING_DOMAIN = b"symthaea.executor.identity.composer.binding.v1\0"
 
-EXPECTED_POLICY = "1787c698b21e79a45dffbe09cd8ffcb6ea409924a668022acefc442ace60db09"
-EXPECTED_BINDING = "19112f42350e223d34e7d0d4bf46be23783e929877850ceee2873b9578ab8223"
+EXPECTED_PROVIDER_MANIFEST = "09afb27f405b4c549bb37afa7fb6c010279bab7a9b71426ed68babd4703c86b4"
+EXPECTED_POLICY = "f73940711add2eb9f5b4a17661cbbf305835402c9cf0074675c66d624a71dcab"
+EXPECTED_BINDING = "5f4a6eedd06c44b54f16330f8ba4786549834a10330c87b7f445c8f528474748"
 
 PRINCIPAL = bytes.fromhex(
     "6247c633b5234adba7b0403112772997a3bc433de490f147efb10668c0df074a"
@@ -31,6 +35,7 @@ CHALLENGE = bytes.fromhex(
 RELATION_POLICY = bytes.fromhex(
     "5eeb222be4f932efb6071e7b44ebe8c3226797ac1232a43690c0fca712fbe1d0"
 )
+PROVIDER_POLICY_MANIFEST = bytes.fromhex(EXPECTED_PROVIDER_MANIFEST)
 
 
 def u16(value: int) -> bytes:
@@ -64,7 +69,7 @@ def composition_policy() -> bytes:
         u16(SCHEMA),
         REQUIREMENT,
         RELATION_POLICY,
-        repeated(0xB1),
+        PROVIDER_POLICY_MANIFEST,
     )
 
 
@@ -90,10 +95,11 @@ def require(label: str, actual: bytes, expected: str) -> None:
     actual_hex = actual.hex()
     if actual_hex != expected:
         raise SystemExit(f"{label} mismatch: {actual_hex} != {expected}")
-    print(f"{label:8s} {actual_hex}")
+    print(f"{label:18s} {actual_hex}")
 
 
 def main() -> None:
+    require("provider-manifest", PROVIDER_POLICY_MANIFEST, EXPECTED_PROVIDER_MANIFEST)
     require("policy", composition_policy(), EXPECTED_POLICY)
     require("binding", binding(), EXPECTED_BINDING)
 

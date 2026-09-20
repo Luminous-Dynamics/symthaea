@@ -1,4 +1,4 @@
-name: Executor Identity Composer V1 Qualification
+name: Executor Identity Composer Provider Policy V1 Qualification
 
 on:
   pull_request:
@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/executor-identity-composer-v1-qualification.yml'
       - 'crates/core/symthaea-executor-identity-composer/**'
+      - 'crates/core/symthaea-executor-provider-policy/**'
       - 'crates/core/symthaea-executor-subject-graph/**'
       - 'crates/core/symthaea-executor-identity/**'
       - 'crates/core/symthaea-interaction-core/**'
@@ -16,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: executor-identity-composer-v1-${{ github.event.pull_request.head.sha || github.sha }}
+  group: executor-identity-composer-provider-policy-v1-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: true
 
 env:
@@ -24,8 +25,8 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  executor-identity-composer-v1:
-    name: Exact-head trusted composer ownership kernel v1
+  executor-identity-composer-provider-policy-v1:
+    name: Exact-head composer canonical provider-policy binding v1
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -38,10 +39,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify exact D3A parent and tranche scope
+      - name: Verify exact B2A parent and tranche scope
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-          REQUIRED_PARENT: e3242ffcfbee145dba6a687b68ebf8d35e25a708
+          REQUIRED_PARENT: 155453b5984caf11001fab9428d5b3c978cbccc4
         run: |
           set -euo pipefail
           if [ "${{ github.event_name }}" = pull_request ]; then
@@ -73,38 +74,54 @@ jobs:
           set -euo pipefail
           test -z "$(git status --porcelain=v1)"
 
-      - name: Enforce composer ownership and no-promotion boundary
+      - name: Enforce canonical provider-policy and live-binding boundaries
         run: |
           set -euo pipefail
           MANIFEST=crates/core/symthaea-executor-identity-composer/Cargo.toml
           SOURCE=crates/core/symthaea-executor-identity-composer/src/lib.rs
           NEUTRAL=crates/core/symthaea-executor-identity/src/lib.rs
           GRAPH=crates/core/symthaea-executor-subject-graph/src/lib.rs
+          PROVIDER_POLICY=crates/core/symthaea-executor-provider-policy/src/lib.rs
 
           grep -Fq 'sha2 = { workspace = true }' "${MANIFEST}"
           grep -Fq 'thiserror = { workspace = true }' "${MANIFEST}"
           grep -Fq 'symthaea-executor-identity = { path = "../symthaea-executor-identity" }' "${MANIFEST}"
+          grep -Fq 'symthaea-executor-provider-policy = { path = "../symthaea-executor-provider-policy" }' "${MANIFEST}"
           grep -Fq 'symthaea-executor-subject-graph = { path = "../symthaea-executor-subject-graph" }' "${MANIFEST}"
           grep -Fq 'symthaea-interaction-core = { path = "../symthaea-interaction-core" }' "${MANIFEST}"
 
           if grep -Eiq 'serde|reqwest|hyper|tokio|holochain|hdk|hdi|xenia|spiffe|spire|rats|eat|tpm|wasmtime|keyring|secret-service|symthaea-authority|symthaea-action' "${MANIFEST}"; then
-            echo 'provider/runtime/authority/serialization dependency leaked into D3B ownership kernel' >&2
+            echo 'provider runtime/authority/serialization dependency leaked into composer' >&2
             exit 1
           fi
 
           grep -Fq 'symthaea.executor.identity.composer.policy.v1\0' "${SOURCE}"
           grep -Fq 'symthaea.executor.identity.composer.binding.v1\0' "${SOURCE}"
           grep -Fq 'pub struct ExecutorCompositionPolicyV1' "${SOURCE}"
-          grep -Fq 'pub struct ExecutorCompositionPolicyId' "${SOURCE}"
-          grep -Fq 'pub struct ExecutorVerificationContextId' "${SOURCE}"
+          grep -Fq 'provider_policy: &ExecutorProviderPolicyManifestV1' "${SOURCE}"
+          grep -Fq 'provider_policy_manifest: ExecutorProviderPolicyManifestIdV1' "${SOURCE}"
+          grep -Fq 'ProviderPolicyRequirementMismatch' "${SOURCE}"
+          grep -Fq 'ProviderPolicyRelationPolicyMismatch' "${SOURCE}"
           grep -Fq 'pub struct VerifiedExecutorBinding' "${SOURCE}"
           grep -Fq 'pub fn structural_match' "${SOURCE}"
+          grep -Fq 'pub struct ExecutorProviderPolicyManifestV1' "${PROVIDER_POLICY}"
+
+          if grep -Fq 'provider_policy_commitment: Digest32' "${SOURCE}"; then
+            echo 'raw arbitrary provider-policy digest seam remains in composition policy' >&2
+            exit 1
+          fi
+          if grep -Fq 'fn provider_policy_commitment(' "${SOURCE}"; then
+            echo 'raw provider-policy commitment accessor remains in composer' >&2
+            exit 1
+          fi
 
           for required_test in \
             frozen_policy_and_binding_vectors \
             exact_structure_matches \
             challenge_substitution_rejects \
             supplied_requirement_must_match_challenge_requirement \
+            provider_manifest_requirement_mismatch_rejects_before_policy_identity \
+            provider_manifest_relation_policy_mismatch_rejects_before_policy_identity \
             composition_policy_requirement_substitution_rejects \
             composition_policy_identity_substitution_rejects \
             principal_substitution_rejects_even_under_matching_challenge_digest_field \
@@ -113,8 +130,8 @@ jobs:
             identity_profile_substitution_rejects \
             missing_required_dimension_rejects \
             graph_policy_evidence_and_currentness_are_binding_semantics \
-            provider_policy_commitment_is_policy_identity \
-            zero_context_and_provider_policy_commitments_reject
+            provider_policy_manifest_is_policy_identity \
+            zero_verification_context_rejects
           do
             grep -Fq "fn ${required_test}" "${SOURCE}"
           done
@@ -127,17 +144,17 @@ jobs:
             echo 'live binding leaked into deterministic D3A graph crate' >&2
             exit 1
           fi
+          if grep -Fq 'VerifiedExecutorBinding' "${PROVIDER_POLICY}"; then
+            echo 'live binding leaked into provider-policy configuration crate' >&2
+            exit 1
+          fi
 
-          # D3B owns opaque live state but has no positive graph promotion path.
-          # A future D3C implementation must derive/run D3A internally from
-          # concrete verified provider facts; D3B must never accept the public
-          # graph-match candidate as a minting input.
           if grep -Fq 'SubjectGraphMatchCandidateV1' "${SOURCE}"; then
-            echo 'public D3A graph candidate leaked into D3B ownership kernel' >&2
+            echo 'public D3A graph candidate leaked into composer ownership kernel' >&2
             exit 1
           fi
           if grep -Fq 'assess_subject_graph_v1' "${SOURCE}"; then
-            echo 'D3B must not perform positive graph assessment/composition' >&2
+            echo 'positive D3A graph assessment leaked into pre-D3C composer' >&2
             exit 1
           fi
 
@@ -153,26 +170,19 @@ jobs:
           if match is None:
               raise SystemExit('VerifiedExecutorBinding derive shape not found')
           derives = {item.strip() for item in match.group(1).split(',')}
-          forbidden_derives = {'Clone', 'Copy', 'Serialize', 'Deserialize'}
-          leaked = sorted(derives & forbidden_derives)
+          leaked = sorted(derives & {'Clone', 'Copy', 'Serialize', 'Deserialize'})
           if leaked:
               raise SystemExit(f'live binding forbidden derives: {leaked}')
 
           start = source.index('impl VerifiedExecutorBinding {')
           end = source.index('\n}\n\nconst fn profile_code', start)
           block = source[start:end]
-          forbidden_constructors = (
-              'pub fn new(',
-              'pub const fn new(',
-              'pub fn from_',
-              'pub const fn from_',
-              'pub fn compose',
-              'pub fn verify',
-              'pub fn mint',
+          forbidden = (
+              'pub fn new(', 'pub const fn new(', 'pub fn from_',
+              'pub const fn from_', 'pub fn compose', 'pub fn verify', 'pub fn mint',
           )
-          if any(item in block for item in forbidden_constructors):
+          if any(item in block for item in forbidden):
               raise SystemExit('public live-binding minting surface found')
-
           if re.search(r'\bSerialize\b|\bDeserialize\b|serde::', source):
               raise SystemExit('serialization leaked into live composer kernel')
           PY
@@ -182,27 +192,28 @@ jobs:
             exit 1
           fi
           if grep -Eq 'std::net::|std::fs::|std::process::|Command::new|SystemTime|Instant::now' "${SOURCE}"; then
-            echo 'runtime I/O/clock leaked into D3B ownership kernel' >&2
+            echo 'runtime I/O/clock leaked into composer' >&2
             exit 1
           fi
 
       - name: Independent canonical composer oracle
         run: |
           set -euo pipefail
+          python3 crates/core/symthaea-executor-provider-policy/scripts/provider_policy_oracle.py
           python3 crates/core/symthaea-executor-identity-composer/scripts/composer_oracle.py
 
       - name: Format
         run: |
           set -euo pipefail
-          cargo fmt -p symthaea-executor-identity-composer -- --check
+          cargo fmt -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer -- --check
 
       - name: Resolve candidate and execute focused gates
         run: |
           set -euo pipefail
           cp Cargo.lock /tmp/Cargo.lock.before
-          cargo check -p symthaea-executor-identity-composer --all-targets
-          cargo test -p symthaea-executor-identity-composer
-          cargo clippy -p symthaea-executor-identity-composer --all-targets -- -D warnings
+          cargo check -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer --all-targets
+          cargo test -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer
+          cargo clippy -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer --all-targets -- -D warnings
           if ! cmp -s /tmp/Cargo.lock.before Cargo.lock; then
             echo 'Cargo.lock requires committed reconciliation on the accepted stacked lineage:' >&2
             diff -u /tmp/Cargo.lock.before Cargo.lock || true
@@ -212,9 +223,9 @@ jobs:
       - name: Locked replay
         run: |
           set -euo pipefail
-          cargo check --locked -p symthaea-executor-identity-composer --all-targets
-          cargo test --locked -p symthaea-executor-identity-composer
-          cargo clippy --locked -p symthaea-executor-identity-composer --all-targets -- -D warnings
+          cargo check --locked -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer --all-targets
+          cargo test --locked -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer
+          cargo clippy --locked -p symthaea-executor-provider-policy -p symthaea-executor-identity-composer --all-targets -- -D warnings
 
       - name: Prove qualification did not mutate source
         run: |

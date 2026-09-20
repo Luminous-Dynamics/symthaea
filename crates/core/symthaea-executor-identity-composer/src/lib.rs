@@ -7,7 +7,9 @@
 //! no friend-crate privacy, so the live type deliberately does not live in the
 //! neutral `symthaea-executor-identity` ABI.
 //!
-//! D3B stops before provider-positive production verification:
+//! The composition policy consumes the canonical provider-policy manifest from
+//! `symthaea-executor-provider-policy`. The manifest is configuration identity
+//! only; consuming it does not verify a provider or create live identity.
 //!
 //! ```text
 //! ExecutorIdentityChallenge
@@ -16,7 +18,7 @@
 //! + future internal deterministic graph assessment
 //!     -> VerifiedExecutorBinding
 //!
-//! D3B ownership kernel alone
+//! ownership/composition policy alone
 //!     != provider verification
 //!     != live composition
 //!     != authority
@@ -35,6 +37,9 @@ use symthaea_executor_identity::{
     ExecutorEvidenceSubjectId, ExecutorIdentityChallenge, ExecutorIdentityDimension,
     ExecutorIdentityDimensionSet, ExecutorIdentityProfile, ExecutorIdentityRequirement,
     ExecutorProfileId, ExecutorRuntimeIncarnationId,
+};
+use symthaea_executor_provider_policy::{
+    ExecutorProviderPolicyManifestIdV1, ExecutorProviderPolicyManifestV1,
 };
 use symthaea_executor_subject_graph::SubjectGraphRelationPolicyV1;
 use symthaea_interaction_core::Digest32;
@@ -59,6 +64,10 @@ const ALL_DIMENSIONS: [ExecutorIdentityDimension; 7] = [
 pub enum ExecutorComposerError {
     #[error("{0} must not use an all-zero digest")]
     ZeroDigest(&'static str),
+    #[error("provider-policy manifest belongs to a different identity requirement")]
+    ProviderPolicyRequirementMismatch,
+    #[error("provider-policy manifest belongs to a different graph relation policy")]
+    ProviderPolicyRelationPolicyMismatch,
 }
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
@@ -132,13 +141,13 @@ impl ExecutorVerificationContextId {
 /// Ordinary configured composition policy.
 ///
 /// This value binds the exact neutral identity requirement, exact D3A relation
-/// policy, and one configuration-owned provider-policy commitment. It is policy
-/// identity only and cannot create live verified state.
+/// policy, and one canonical B2A provider-policy manifest identity. The
+/// manifest is configuration only and cannot create live verified state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecutorCompositionPolicyV1 {
     requirement: Digest32,
     relation_policy: Digest32,
-    provider_policy_commitment: Digest32,
+    provider_policy_manifest: ExecutorProviderPolicyManifestIdV1,
     id: ExecutorCompositionPolicyId,
 }
 
@@ -146,23 +155,30 @@ impl ExecutorCompositionPolicyV1 {
     pub fn new(
         requirement: &ExecutorIdentityRequirement,
         relation_policy: &SubjectGraphRelationPolicyV1,
-        provider_policy_commitment: Digest32,
+        provider_policy: &ExecutorProviderPolicyManifestV1,
     ) -> Result<Self, ExecutorComposerError> {
-        reject_zero("provider policy commitment", provider_policy_commitment)?;
-
         let requirement_digest = requirement.digest();
         let relation_policy_digest = relation_policy.digest();
+
+        if provider_policy.requirement_digest() != requirement_digest {
+            return Err(ExecutorComposerError::ProviderPolicyRequirementMismatch);
+        }
+        if provider_policy.relation_policy_digest() != relation_policy_digest {
+            return Err(ExecutorComposerError::ProviderPolicyRelationPolicyMismatch);
+        }
+
+        let provider_policy_manifest = provider_policy.id();
         let mut transcript = Transcript::new(COMPOSITION_POLICY_DOMAIN);
         transcript.u16(EXECUTOR_COMPOSER_SCHEMA_VERSION);
         transcript.digest(requirement_digest);
         transcript.digest(relation_policy_digest);
-        transcript.digest(provider_policy_commitment);
+        transcript.digest(provider_policy_manifest.digest());
         let id = ExecutorCompositionPolicyId::from_digest(transcript.finish());
 
         Ok(Self {
             requirement: requirement_digest,
             relation_policy: relation_policy_digest,
-            provider_policy_commitment,
+            provider_policy_manifest,
             id,
         })
     }
@@ -175,8 +191,8 @@ impl ExecutorCompositionPolicyV1 {
         self.relation_policy
     }
 
-    pub const fn provider_policy_commitment(&self) -> Digest32 {
-        self.provider_policy_commitment
+    pub const fn provider_policy_manifest(&self) -> ExecutorProviderPolicyManifestIdV1 {
+        self.provider_policy_manifest
     }
 
     pub const fn id(&self) -> ExecutorCompositionPolicyId {
@@ -391,15 +407,19 @@ impl Transcript {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_executor_subject_graph::SubjectRelationAssurance;
+    use symthaea_executor_identity::ExecutorVerifierProfileId;
+    use symthaea_executor_provider_policy::{ProviderPolicyEntryV1, ProviderPolicyTargetV1};
+    use symthaea_executor_subject_graph::{SubjectRelationAssurance, SubjectRelationClass};
     use symthaea_interaction_core::{
         IdentityComponent, IdentityOrdering, NamespaceId, PrincipalRef,
     };
 
     const EXPECTED_POLICY: &str =
-        "1787c698b21e79a45dffbe09cd8ffcb6ea409924a668022acefc442ace60db09";
+        "f73940711add2eb9f5b4a17661cbbf305835402c9cf0074675c66d624a71dcab";
     const EXPECTED_BINDING: &str =
-        "19112f42350e223d34e7d0d4bf46be23783e929877850ceee2873b9578ab8223";
+        "5f4a6eedd06c44b54f16330f8ba4786549834a10330c87b7f445c8f528474748";
+    const EXPECTED_PROVIDER_MANIFEST: &str =
+        "09afb27f405b4c549bb37afa7fb6c010279bab7a9b71426ed68babd4703c86b4";
 
     fn digest(byte: u8) -> Digest32 {
         Digest32::new([byte; 32])
@@ -476,16 +496,109 @@ mod tests {
         )
     }
 
+    fn alternate_relation_policy() -> SubjectGraphRelationPolicyV1 {
+        SubjectGraphRelationPolicyV1::new(
+            SubjectRelationAssurance::DevelopmentObserved,
+            SubjectRelationAssurance::MeasuredProcess,
+            SubjectRelationAssurance::MeasuredProcess,
+            SubjectRelationAssurance::HardwareAnchoredProcess,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn provider_entry(
+        target: ProviderPolicyTargetV1,
+        verifier: u8,
+        schema: u8,
+        trust: u8,
+        appraisal: u8,
+        currentness: u8,
+        epoch: u64,
+    ) -> ProviderPolicyEntryV1 {
+        ProviderPolicyEntryV1::new(
+            target,
+            ExecutorVerifierProfileId::new(digest(verifier)).expect("verifier profile"),
+            digest(schema),
+            1,
+            digest(trust),
+            digest(appraisal),
+            digest(currentness),
+            epoch,
+        )
+        .expect("provider entry")
+    }
+
+    fn provider_manifest(
+        requirement: &ExecutorIdentityRequirement,
+        relation_policy: &SubjectGraphRelationPolicyV1,
+        session_trust: u8,
+    ) -> ExecutorProviderPolicyManifestV1 {
+        let mut entries = vec![
+            provider_entry(
+                ProviderPolicyTargetV1::Identity(ExecutorIdentityDimension::Workload),
+                0x12,
+                0x32,
+                0x42,
+                0x52,
+                0x62,
+                8,
+            ),
+            provider_entry(
+                ProviderPolicyTargetV1::Identity(ExecutorIdentityDimension::Software),
+                0x13,
+                0x33,
+                0x43,
+                0x53,
+                0x63,
+                9,
+            ),
+            provider_entry(
+                ProviderPolicyTargetV1::Relation(SubjectRelationClass::WorkloadSoftware),
+                0x22,
+                0x35,
+                0x45,
+                0x55,
+                0x65,
+                11,
+            ),
+        ];
+
+        if requirement
+            .required_dimensions()
+            .contains(ExecutorIdentityDimension::SessionPeer)
+        {
+            entries.push(provider_entry(
+                ProviderPolicyTargetV1::Identity(ExecutorIdentityDimension::SessionPeer),
+                0x11,
+                0x31,
+                session_trust,
+                0x51,
+                0x61,
+                7,
+            ));
+            entries.push(provider_entry(
+                ProviderPolicyTargetV1::Relation(SubjectRelationClass::EndpointWorkload),
+                0x21,
+                0x34,
+                0x44,
+                0x54,
+                0x64,
+                10,
+            ));
+        }
+
+        ExecutorProviderPolicyManifestV1::new(requirement, relation_policy, entries)
+            .expect("provider manifest")
+    }
+
     fn policy(
         requirement: &ExecutorIdentityRequirement,
-        provider_policy_byte: u8,
+        session_trust: u8,
     ) -> ExecutorCompositionPolicyV1 {
-        ExecutorCompositionPolicyV1::new(
-            requirement,
-            &relation_policy(),
-            digest(provider_policy_byte),
-        )
-        .expect("policy")
+        let graph_policy = relation_policy();
+        let provider_policy = provider_manifest(requirement, &graph_policy, session_trust);
+        ExecutorCompositionPolicyV1::new(requirement, &graph_policy, &provider_policy)
+            .expect("policy")
     }
 
     fn binding_fixture(
@@ -523,7 +636,7 @@ mod tests {
     ) {
         let requirement = requirement();
         let challenge = challenge(&requirement, 0xA2);
-        let policy = policy(&requirement, 0xB1);
+        let policy = policy(&requirement, 0x41);
         let binding = binding_fixture(
             &challenge,
             &requirement,
@@ -538,7 +651,11 @@ mod tests {
 
     #[test]
     fn frozen_policy_and_binding_vectors() {
-        let (_, _, policy, binding) = exact_binding();
+        let (requirement, _, policy, binding) = exact_binding();
+        let graph_policy = relation_policy();
+        let manifest = provider_manifest(&requirement, &graph_policy, 0x41);
+        assert_eq!(manifest.digest().to_hex(), EXPECTED_PROVIDER_MANIFEST);
+        assert_eq!(policy.provider_policy_manifest(), manifest.id());
         assert_eq!(policy.id().digest().to_hex(), EXPECTED_POLICY);
         assert_eq!(binding.digest().to_hex(), EXPECTED_BINDING);
     }
@@ -573,9 +690,32 @@ mod tests {
     }
 
     #[test]
+    fn provider_manifest_requirement_mismatch_rejects_before_policy_identity() {
+        let requirement = requirement();
+        let other_requirement = local_requirement();
+        let graph_policy = relation_policy();
+        let other_manifest = provider_manifest(&other_requirement, &graph_policy, 0x41);
+        assert_eq!(
+            ExecutorCompositionPolicyV1::new(&requirement, &graph_policy, &other_manifest),
+            Err(ExecutorComposerError::ProviderPolicyRequirementMismatch)
+        );
+    }
+
+    #[test]
+    fn provider_manifest_relation_policy_mismatch_rejects_before_policy_identity() {
+        let requirement = requirement();
+        let manifest_policy = alternate_relation_policy();
+        let manifest = provider_manifest(&requirement, &manifest_policy, 0x41);
+        assert_eq!(
+            ExecutorCompositionPolicyV1::new(&requirement, &relation_policy(), &manifest),
+            Err(ExecutorComposerError::ProviderPolicyRelationPolicyMismatch)
+        );
+    }
+
+    #[test]
     fn composition_policy_requirement_substitution_rejects() {
         let (requirement, challenge, _, binding) = exact_binding();
-        let other_policy = policy(&local_requirement(), 0xB1);
+        let other_policy = policy(&local_requirement(), 0x41);
         assert_eq!(
             binding.structural_match(&challenge, &requirement, &other_policy),
             Err(ExecutorBindingMismatch::CompositionPolicyRequirementMismatch)
@@ -585,7 +725,7 @@ mod tests {
     #[test]
     fn composition_policy_identity_substitution_rejects() {
         let (requirement, challenge, _, binding) = exact_binding();
-        let changed_policy = policy(&requirement, 0xB2);
+        let changed_policy = policy(&requirement, 0x99);
         assert_eq!(
             binding.structural_match(&challenge, &requirement, &changed_policy),
             Err(ExecutorBindingMismatch::CompositionPolicyMismatch)
@@ -640,7 +780,7 @@ mod tests {
     fn missing_required_dimension_rejects() {
         let requirement = requirement();
         let challenge = challenge(&requirement, 0xA2);
-        let policy = policy(&requirement, 0xB1);
+        let policy = policy(&requirement, 0x41);
         let binding = binding_fixture(
             &challenge,
             &requirement,
@@ -666,7 +806,7 @@ mod tests {
     fn graph_policy_evidence_and_currentness_are_binding_semantics() {
         let requirement = requirement();
         let challenge = challenge(&requirement, 0xA2);
-        let policy = policy(&requirement, 0xB1);
+        let policy = policy(&requirement, 0x41);
         let dimensions = requirement.required_dimensions();
         let baseline = binding_fixture(
             &challenge,
@@ -710,31 +850,20 @@ mod tests {
     }
 
     #[test]
-    fn provider_policy_commitment_is_policy_identity() {
+    fn provider_policy_manifest_is_policy_identity() {
         let requirement = requirement();
         assert_ne!(
-            policy(&requirement, 0xB1).id(),
-            policy(&requirement, 0xB2).id()
+            policy(&requirement, 0x41).id(),
+            policy(&requirement, 0x99).id()
         );
     }
 
     #[test]
-    fn zero_context_and_provider_policy_commitments_reject() {
-        let requirement = requirement();
+    fn zero_verification_context_rejects() {
         assert_eq!(
             ExecutorVerificationContextId::new(Digest32::new([0; 32])),
             Err(ExecutorComposerError::ZeroDigest(
                 "executor verification context identity"
-            ))
-        );
-        assert_eq!(
-            ExecutorCompositionPolicyV1::new(
-                &requirement,
-                &relation_policy(),
-                Digest32::new([0; 32]),
-            ),
-            Err(ExecutorComposerError::ZeroDigest(
-                "provider policy commitment"
             ))
         );
     }
