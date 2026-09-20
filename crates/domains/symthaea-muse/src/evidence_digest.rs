@@ -61,6 +61,18 @@ pub mod perceptual_enrollment_orchestrator;
 #[path = "perceptual_enrollment_witness_provider_fixture.rs"]
 pub mod perceptual_enrollment_witness_provider_fixture;
 #[cfg(test)]
+#[path = "perceptual_enrollment_e2e_fixture.rs"]
+mod perceptual_enrollment_e2e_fixture;
+#[cfg(test)]
+#[path = "perceptual_enrollment_e2e_tests.rs"]
+mod perceptual_enrollment_e2e_tests;
+#[cfg(test)]
+#[path = "perceptual_enrollment_e2e_fault_tests.rs"]
+mod perceptual_enrollment_e2e_fault_tests;
+#[cfg(test)]
+#[path = "perceptual_enrollment_e2e_provider_fault_tests.rs"]
+mod perceptual_enrollment_e2e_provider_fault_tests;
+#[cfg(test)]
 #[path = "perceptual_enrollment_coordinator_tests.rs"]
 mod perceptual_enrollment_coordinator_tests;
 #[cfg(test)]
