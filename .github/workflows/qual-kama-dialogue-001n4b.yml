@@ -1,0 +1,33 @@
+name: QUAL KAMA-DIALOGUE-001N4B exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/kama-dialogue-001n4b-exact-enumeration-set
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact-head reflective exact-enumeration qualification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: 0e3dcc563bb739cdf3994ef1a23e29439a99287b
+          fetch-depth: 1
+      - name: Verify exact subject
+        run: test "$(git rev-parse HEAD)" = "0e3dcc563bb739cdf3994ef1a23e29439a99287b"
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: rustfmt
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: targeted tests
+        run: cargo test -p symthaea-communication --test reflective_memory_exact_enumeration
+      - name: clippy
+        run: cargo clippy -p symthaea-communication --test reflective_memory_exact_enumeration -- -D warnings
