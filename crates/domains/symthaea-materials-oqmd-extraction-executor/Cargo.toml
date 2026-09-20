@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-materials-oqmd-extraction-executor"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+symthaea-process-capture = { path = "../../bridges/symthaea-process-capture" }
+symthaea-process-stdin = { path = "../../bridges/symthaea-process-stdin" }
+symthaea-process-file-io = { path = "../../bridges/symthaea-process-file-io" }
+symthaea-materials-historical-extraction = { path = "../symthaea-materials-historical-extraction" }
+symthaea-materials-historical-import = { path = "../symthaea-materials-historical-import" }
+symthaea-materials-snapshot-acquisition = { path = "../symthaea-materials-snapshot-acquisition" }
+symthaea-materials-oqmd-import-executor = { path = "../symthaea-materials-oqmd-import-executor" }
+symthaea-materials-oqmd-db-state = { path = "../symthaea-materials-oqmd-db-state" }
