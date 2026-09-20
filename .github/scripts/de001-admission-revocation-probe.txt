@@ -1,0 +1,5 @@
+DE-001 admission revocation probe.
+
+Ephemeral CI-only file. No product, research, qualification, evidence, optimizer, or scientific authority.
+
+Touching .github/scripts/** intentionally materializes Workflow Syntax while ordinary PR opening also materializes CI and PR Governance. Conversion to draft must be handled by runnerless concurrency revocation signals from the base branch.
