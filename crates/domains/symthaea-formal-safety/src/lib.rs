@@ -9,6 +9,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod assurance_case;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
