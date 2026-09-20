@@ -16,6 +16,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+#[path = "work_obligation_evidence_observatory.rs"]
+pub mod observatory;
 #[path = "prog_suite_work_evidence_projection.rs"]
 pub mod prog_suite_projection;
 #[path = "sonata_work_evidence_projection.rs"]
