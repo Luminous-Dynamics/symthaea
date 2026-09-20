@@ -1,0 +1,65 @@
+name: AI Assurance Exact Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/core/symthaea-ai-assurance/**'
+      - '.github/workflows/ai-assurance-exact-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Exact-head authority kernel qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Resolve exact qualification subject
+        id: subject
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out exact qualification subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.subject.outputs.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact checkout identity
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ steps.subject.outputs.sha }}"
+          echo "qualified_subject=$(git rev-parse HEAD)"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check assurance package formatting
+        run: cargo fmt --package symthaea-ai-assurance -- --check
+
+      - name: Verify committed workspace resolution is locked
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+      - name: Test assurance kernel, integration attacks, and compile-fail docs
+        run: cargo test --locked -p symthaea-ai-assurance
+
+      - name: Clippy assurance kernel
+        run: cargo clippy --locked -p symthaea-ai-assurance --all-targets -- -D warnings
+
+      - name: Require qualification to leave tracked assurance artifacts unchanged
+        if: always()
+        run: git diff --exit-code -- Cargo.lock crates/core/symthaea-ai-assurance
