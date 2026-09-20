@@ -146,8 +146,10 @@ pub use obligation::{
 pub use phrase::{Period, Phrase};
 pub use pitch::{Interval, IntervalQuality, Pitch, PitchClass};
 pub use prog_suite::{
-    PROG_SUITE_BARS_PER_SECTION, PROG_SUITE_PLAN_VERSION, ProgSuitePlanErrorV1,
-    ProgSuitePlanV1, ProgSuiteRealizationV1, ProgSuiteSectionPlanV1, ProgSuiteTransformV1,
+    PROG_SUITE_BARS_PER_SECTION, PROG_SUITE_METER_FIT_VERSION, PROG_SUITE_PLAN_VERSION,
+    ProgSuiteMeterFitReceiptV1, ProgSuitePlanErrorV1, ProgSuitePlanV1,
+    ProgSuiteRealizationV1, ProgSuiteSectionCarrierV1, ProgSuiteSectionCarriersV1,
+    ProgSuiteSectionPlanV1, ProgSuiteTransformV1, derive_prog_suite_section_carriers,
     plan_prog_suite, realize_prog_suite_with_plan,
 };
 pub use prog_suite_development_program::{

@@ -13,6 +13,14 @@
 //! score behavior while creating an auditable boundary for work-scale FORM
 //! adapters and later score-side evidence. `source_seed` is provenance only:
 //! once a valid plan exists, the plan itself is authoritative.
+//!
+//! A single source motif cannot simultaneously occupy one full 4/4, 7/4, and
+//! 5/4 bar without an explicit rhythmic adaptation. Every section therefore
+//! derives a [`ProgSuiteSectionCarrierV1`]: first apply the section's declared
+//! pitch/order transformation, then scale every event duration by one exact
+//! rational factor so one motif statement occupies exactly one local bar.
+//! The adaptation is auditable through [`ProgSuiteMeterFitReceiptV1`] and is a
+//! realization-context operation, not an extra FORM-002 thematic ancestry claim.
 
 use crate::MusicalIntent;
 use crate::form::{Form, Section, SectionRole};
@@ -25,6 +33,7 @@ use crate::score::Score;
 use serde::{Deserialize, Serialize};
 
 pub const PROG_SUITE_PLAN_VERSION: &str = "melothaea-prog-suite-plan-v1";
+pub const PROG_SUITE_METER_FIT_VERSION: &str = "melothaea-prog-suite-meter-fit-v1";
 pub const PROG_SUITE_BARS_PER_SECTION: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,6 +88,37 @@ pub struct ProgSuitePlanV1 {
     pub total_beats: Duration,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgSuiteMeterFitReceiptV1 {
+    pub section_index: usize,
+    pub meter: u8,
+    /// Duration after the declared thematic transformation but before meter fit.
+    pub transformed_duration: Duration,
+    /// One complete local bar in quarter-note beats.
+    pub target_duration: Duration,
+    /// Reduced exact rational multiplier applied to every event duration.
+    pub rhythm_scale_numerator: i64,
+    pub rhythm_scale_denominator: i64,
+    pub fitted_duration: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgSuiteSectionCarrierV1 {
+    pub section_index: usize,
+    pub transformation: ProgSuiteTransformV1,
+    /// Exact result of the declared thematic transform, before local-meter fit.
+    pub transformed_motif: Motif,
+    /// Exact rhythmic carrier consumed by `Period::parallel_in`.
+    pub meter_fitted_motif: Motif,
+    pub meter_fit: ProgSuiteMeterFitReceiptV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgSuiteSectionCarriersV1 {
+    pub version: String,
+    pub sections: Vec<ProgSuiteSectionCarrierV1>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProgSuiteRealizationV1 {
     pub plan: ProgSuitePlanV1,
@@ -88,6 +128,7 @@ pub struct ProgSuiteRealizationV1 {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ProgSuitePlanErrorV1 {
     WrongVersion { found: String },
+    WrongMeterFitVersion { found: String },
     InvalidTempo { found: f32 },
     WrongSectionCount { found: usize },
     WrongRole {
@@ -115,6 +156,13 @@ pub enum ProgSuitePlanErrorV1 {
         expected: Duration,
         found: Duration,
     },
+    InvalidSourceMotifDuration { found: Duration },
+    MeterFitDurationMismatch {
+        section_index: usize,
+        expected: Duration,
+        found: Duration,
+    },
+    CanonicalSectionCarriersMismatch,
     RealizedSectionSpanMismatch {
         index: usize,
         planned: Duration,
@@ -230,6 +278,28 @@ impl ProgSuitePlanV1 {
     }
 }
 
+impl ProgSuiteSectionCarriersV1 {
+    /// Re-derive the entire carrier set from the authoritative plan + source
+    /// motif and require exact equality. This keeps serialized meter-fit
+    /// receipts descriptive rather than hand-editable authority.
+    pub fn validate(
+        &self,
+        plan: &ProgSuitePlanV1,
+        motif: &Motif,
+    ) -> Result<(), ProgSuitePlanErrorV1> {
+        if self.version != PROG_SUITE_METER_FIT_VERSION {
+            return Err(ProgSuitePlanErrorV1::WrongMeterFitVersion {
+                found: self.version.clone(),
+            });
+        }
+        let canonical = derive_prog_suite_section_carriers(plan, motif)?;
+        if &canonical != self {
+            return Err(ProgSuitePlanErrorV1::CanonicalSectionCarriersMismatch);
+        }
+        Ok(())
+    }
+}
+
 /// Freeze every architectural choice the existing ProgSuite engine makes
 /// before note realization.
 pub fn plan_prog_suite(
@@ -293,26 +363,98 @@ pub fn plan_prog_suite(
     Ok(plan)
 }
 
+/// Derive the exact thematic carrier consumed by each local-meter section.
+///
+/// The declared thematic transformation is applied first. Its result is then
+/// rhythmically scaled by the exact reduced factor `meter / transformed_len`.
+/// Pitch/rest order is untouched by the fit. This is deliberately modeled as
+/// realization-context adaptation rather than silently extending FORM-002.
+pub fn derive_prog_suite_section_carriers(
+    plan: &ProgSuitePlanV1,
+    motif: &Motif,
+) -> Result<ProgSuiteSectionCarriersV1, ProgSuitePlanErrorV1> {
+    plan.validate()?;
+    let source_duration = motif.total_duration();
+    if source_duration.num() <= 0 {
+        return Err(ProgSuitePlanErrorV1::InvalidSourceMotifDuration {
+            found: source_duration,
+        });
+    }
+
+    let mut sections = Vec::with_capacity(plan.sections.len());
+    for (section_index, section) in plan.sections.iter().enumerate() {
+        let transformed_motif = section.transformation.apply(motif);
+        let transformed_duration = transformed_motif.total_duration();
+        if transformed_duration.num() <= 0 {
+            return Err(ProgSuitePlanErrorV1::InvalidSourceMotifDuration {
+                found: transformed_duration,
+            });
+        }
+        let target_duration = Duration::new(i64::from(section.meter), 1);
+        let rhythm_scale = Duration::new(
+            target_duration.num() * transformed_duration.den(),
+            target_duration.den() * transformed_duration.num(),
+        );
+        let meter_fitted_motif = transformed_motif
+            .scale_rhythm(rhythm_scale.num(), rhythm_scale.den());
+        let fitted_duration = meter_fitted_motif.total_duration();
+        if fitted_duration != target_duration {
+            return Err(ProgSuitePlanErrorV1::MeterFitDurationMismatch {
+                section_index,
+                expected: target_duration,
+                found: fitted_duration,
+            });
+        }
+        sections.push(ProgSuiteSectionCarrierV1 {
+            section_index,
+            transformation: section.transformation,
+            transformed_motif,
+            meter_fitted_motif,
+            meter_fit: ProgSuiteMeterFitReceiptV1 {
+                section_index,
+                meter: section.meter,
+                transformed_duration,
+                target_duration,
+                rhythm_scale_numerator: rhythm_scale.num(),
+                rhythm_scale_denominator: rhythm_scale.den(),
+                fitted_duration,
+            },
+        });
+    }
+
+    Ok(ProgSuiteSectionCarriersV1 {
+        version: PROG_SUITE_METER_FIT_VERSION.into(),
+        sections,
+    })
+}
+
 /// Realize exactly the frozen ProgSuite plan. No section key, meter,
-/// progression, or transformation is re-selected here.
+/// progression, or transformation is re-selected here. Every transformed
+/// thematic carrier is fitted to exactly one local bar using the canonical
+/// rational meter-fit derivation above before phrase construction.
 pub fn realize_prog_suite_with_plan(
     plan: &ProgSuitePlanV1,
     motif: &Motif,
     intent: &MusicalIntent,
 ) -> Result<ProgSuiteRealizationV1, ProgSuitePlanErrorV1> {
     plan.validate()?;
+    let carriers = derive_prog_suite_section_carriers(plan, motif)?;
 
     let mut score = Score::new(plan.home_key, plan.tempo_bpm, plan.sections[0].meter);
     let mut prev_upper: Vec<Pitch> = Vec::new();
     let mut prev_bass: Option<Pitch> = None;
     let pattern = crate::accompaniment::Accompaniment::Comp;
 
-    for (index, section_plan) in plan.sections.iter().enumerate() {
-        let section_motif = section_plan.transformation.apply(motif);
+    for (index, (section_plan, carrier)) in plan
+        .sections
+        .iter()
+        .zip(&carriers.sections)
+        .enumerate()
+    {
         let dominant = section_plan.key.cadence_dominant_degree();
         let meter = f64::from(section_plan.meter);
         let period = Period::parallel_in(
-            &section_motif,
+            &carrier.meter_fitted_motif,
             &section_plan.progression_degrees,
             meter,
             dominant,
@@ -451,6 +593,85 @@ mod tests {
         assert_eq!(
             plan.sections[2].transformation,
             ProgSuiteTransformV1::Inversion
+        );
+    }
+
+    #[test]
+    fn meter_fit_makes_every_transformed_statement_exactly_one_local_bar() {
+        let plan = plan_prog_suite(Key::major(PitchClass::C), 100.0, 5, &spec()).unwrap();
+        let carriers = derive_prog_suite_section_carriers(&plan, &motif()).unwrap();
+        carriers.validate(&plan, &motif()).unwrap();
+
+        let durations: Vec<_> = carriers
+            .sections
+            .iter()
+            .map(|carrier| carrier.meter_fitted_motif.total_duration())
+            .collect();
+        assert_eq!(
+            durations,
+            vec![
+                Duration::new(4, 1),
+                Duration::new(7, 1),
+                Duration::new(5, 1),
+                Duration::new(4, 1),
+            ]
+        );
+        let scales: Vec<_> = carriers
+            .sections
+            .iter()
+            .map(|carrier| {
+                (
+                    carrier.meter_fit.rhythm_scale_numerator,
+                    carrier.meter_fit.rhythm_scale_denominator,
+                )
+            })
+            .collect();
+        assert_eq!(scales, vec![(1, 1), (7, 4), (5, 4), (1, 1)]);
+
+        // Seed 5 declares inversion followed by retrograde for B. Meter fit
+        // changes only duration, so the transformed degree order stays intact.
+        assert_eq!(
+            carriers.sections[1].transformed_motif.degrees(),
+            vec![-3, -1, 0, 1]
+        );
+        assert_eq!(
+            carriers.sections[1].meter_fitted_motif.degrees(),
+            vec![-3, -1, 0, 1]
+        );
+    }
+
+    #[test]
+    fn arbitrary_positive_source_length_is_fitted_exactly_not_assumed_four_beats() {
+        let plan = plan_prog_suite(Key::major(PitchClass::C), 100.0, 5, &spec()).unwrap();
+        let three_beat = Motif::from_degrees(&[
+            (1, Duration::quarter()),
+            (3, Duration::quarter()),
+            (5, Duration::quarter()),
+        ]);
+        let carriers = derive_prog_suite_section_carriers(&plan, &three_beat).unwrap();
+        let scales: Vec<_> = carriers
+            .sections
+            .iter()
+            .map(|carrier| {
+                (
+                    carrier.meter_fit.rhythm_scale_numerator,
+                    carrier.meter_fit.rhythm_scale_denominator,
+                )
+            })
+            .collect();
+        assert_eq!(scales, vec![(4, 3), (7, 3), (5, 3), (4, 3)]);
+        let realized = realize_prog_suite_with_plan(&plan, &three_beat, &intent()).unwrap();
+        assert_eq!(realized.score.total_beats, Duration::new(160, 1));
+    }
+
+    #[test]
+    fn empty_source_motif_fails_before_any_section_realization() {
+        let plan = plan_prog_suite(Key::major(PitchClass::C), 100.0, 5, &spec()).unwrap();
+        assert_eq!(
+            derive_prog_suite_section_carriers(&plan, &Motif::default()),
+            Err(ProgSuitePlanErrorV1::InvalidSourceMotifDuration {
+                found: Duration::zero(),
+            })
         );
     }
 
