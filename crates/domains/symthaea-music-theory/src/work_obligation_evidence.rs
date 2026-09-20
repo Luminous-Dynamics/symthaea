@@ -16,6 +16,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+#[path = "sonata_work_evidence_projection.rs"]
+pub mod sonata_projection;
+
 pub const WORK_OBLIGATION_EVIDENCE_PROJECTION_VERSION: &str =
     "melothaea-work-obligation-evidence-projection-v1";
 
@@ -251,7 +254,9 @@ mod tests {
         }
     }
 
-    fn set_with(record: WorkObligationEvidenceProjectionRecordV1) -> WorkObligationEvidenceProjectionSetV1 {
+    fn set_with(
+        record: WorkObligationEvidenceProjectionRecordV1,
+    ) -> WorkObligationEvidenceProjectionSetV1 {
         WorkObligationEvidenceProjectionSetV1 {
             version: WORK_OBLIGATION_EVIDENCE_PROJECTION_VERSION.into(),
             records: [(record.obligation_id.clone(), record)].into_iter().collect(),
