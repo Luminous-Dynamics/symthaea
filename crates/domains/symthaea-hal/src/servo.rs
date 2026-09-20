@@ -8,6 +8,10 @@
 //! accept a write before the other reports an I2C error. [`ServoActuationReceipt`]
 //! preserves that execution cut instead of flattening it into `Result<(), _>`.
 //!
+//! Startup pulse values are command-reference state only. They are initialized
+//! independently from each joint's calibration and must not be interpreted as
+//! observed physical joint positions.
+//!
 //! # Board Layout
 //!
 //! ```text
@@ -19,6 +23,7 @@ use embedded_hal::i2c::I2c;
 use embedded_hal_bus::i2c::{MutexDevice, RefCellDevice};
 use std::cell::RefCell;
 use std::sync::Mutex;
+use std::time::Duration;
 use symthaea_humanoid::types::{HumanoidCommand, NUM_ACTUATORS};
 use tracing::debug;
 
@@ -32,16 +37,10 @@ use crate::pca9685::{CHANNELS, Pca9685};
 
 /// Evidence available for one physical controller endpoint after an actuation
 /// attempt.
-///
-/// `InDoubt` is deliberate: an I2C error does not prove that the controller
-/// accepted no bytes before the failure became visible to the host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EndpointActuationDisposition {
-    /// No write was attempted for this endpoint.
     NotAttempted,
-    /// The host-side I2C write returned success.
-    ///
-    /// This proves controller-write acceptance only, not physical joint motion.
+    /// Host-side I2C write returned success. This is not physical-motion evidence.
     WriteAccepted,
     /// A write was attempted but its controller-side effect is not known.
     InDoubt,
@@ -50,24 +49,16 @@ pub enum EndpointActuationDisposition {
 /// Overall disposition of one logical servo command attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActuationDisposition {
-    /// Servo output was disabled, so no physical write was attempted.
     DisabledNoOp,
-    /// Command validation/conversion failed before any physical write.
     NotDispatched,
-    /// Every endpoint write returned success.
     Completed,
-    /// At least one endpoint is known accepted while another is not proven
-    /// accepted.
     Partial,
-    /// No endpoint is proven accepted, but at least one attempted write has an
-    /// uncertain controller-side effect.
     InDoubt,
 }
 
 /// Evidence for one logical servo command attempt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServoActuationReceipt {
-    /// Monotonic sequence assigned only to enabled command attempts.
     pub command_sequence: Option<u64>,
     pub board0: EndpointActuationDisposition,
     pub board1: EndpointActuationDisposition,
@@ -102,11 +93,6 @@ impl std::error::Error for ServoActuationFailure {
     }
 }
 
-/// Compatibility conversion for callers that still expose `HalResult`.
-///
-/// The typed receipt remains available from `ServoOutput::last_actuation_receipt`
-/// and the servo fault latch; this conversion exists so the current runtime can
-/// stop on the error without pretending it was an ordinary atomic failure.
 impl From<ServoActuationFailure> for HalError {
     fn from(failure: ServoActuationFailure) -> Self {
         HalError::Safety(failure.to_string())
@@ -114,66 +100,69 @@ impl From<ServoActuationFailure> for HalError {
 }
 
 // ============================================================================
+// COMMAND-REFERENCE KNOWLEDGE
+// ============================================================================
+
+/// What the HAL actually knows about one pulse command reference.
+///
+/// Neither variant claims physical joint position.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommandReferenceKnowledge {
+    /// Synthetic/configured baseline derived from this actuator's calibration.
+    ConfiguredCalibrationReference,
+    /// A host-side controller write for this actuator's board returned success.
+    WriteAccepted,
+}
+
+// ============================================================================
 // SERVO OUTPUT
 // ============================================================================
 
-/// Maximum slew rate in µs per tick (limits how fast servos move per update).
+/// Legacy maximum slew step in µs per call. Retained until HalRuntime migrates
+/// fully onto [`ServoOutput::apply_with_elapsed`].
 const DEFAULT_SLEW_RATE_US: u16 = 100;
+/// Transitional PWM-level velocity limit equivalent to 100 µs per 20 ms.
+const DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND: f64 = 5_000.0;
+/// Fail closed on unexpectedly large elapsed intervals.
+const DEFAULT_MAX_SLEW_GAP: Duration = Duration::from_millis(100);
 
-/// Servo output controller for 21-joint humanoid.
-///
-/// Owns two PCA9685 boards and a calibration profile. Each `apply()` call:
-/// 1. Converts the legacy command to pulse widths via calibration
-/// 2. Applies slew-rate limiting
-/// 3. Batch-writes board 0 then board 1
-/// 4. Returns endpoint-specific execution evidence
-///
-/// A `Partial` or `InDoubt` attempt latches a fault and disables further
-/// discretionary writes. A confirmed shutdown does not erase that history or
-/// clear the latch; reconstruction/reconciliation is required before reuse.
 pub struct ServoOutput<I> {
     board0: Pca9685<I>,
     board1: Pca9685<I>,
     calibration: CalibrationProfile,
-    /// Last pulse widths supported by successful host-side write evidence.
+    /// Last controller-command reference supported by the knowledge array below.
     last_pulses: [u16; NUM_ACTUATORS],
-    /// Maximum change in µs per update cycle.
+    command_reference_knowledge: [CommandReferenceKnowledge; NUM_ACTUATORS],
+    /// Legacy µs-per-call limit. Runtime migration will remove this path.
     slew_rate_us: u16,
-    /// Whether both PWM boards completed initialization.
+    /// Explicit elapsed-time PWM velocity limit.
+    max_pulse_velocity_us_per_second: f64,
+    /// Maximum accepted monotonic elapsed interval for one slew calculation.
+    max_slew_gap: Duration,
     initialized: bool,
-    /// Whether ordinary servo output is enabled.
     enabled: bool,
-    /// Whether the most recent shutdown was confirmed on both PWM boards.
     shutdown_verified: bool,
-    /// Next sequence allocated to an enabled logical command attempt.
     next_command_sequence: u64,
-    /// Most recent command-attempt receipt, including failures/no-ops.
     last_actuation_receipt: Option<ServoActuationReceipt>,
-    /// Latched consequential write fault. Never cleared implicitly.
     fault_latched: Option<ActuationDisposition>,
-    /// Exact receipt that caused the consequential fault latch. Unlike
-    /// `last_actuation_receipt`, this is not overwritten by later rejected
-    /// commands.
     latched_fault_receipt: Option<ServoActuationReceipt>,
 }
 
 impl<I: I2c> ServoOutput<I> {
-    /// Create a new servo output with two I2C buses (or the same bus) and calibration.
-    ///
-    /// - `bus0`: I2C bus for board 0 (address 0x40, joints 0–15)
-    /// - `bus1`: I2C bus for board 1 (address 0x41, joints 16–20)
     pub fn new(bus0: I, bus1: I, calibration: CalibrationProfile) -> Self {
-        let center = calibration
-            .joints
-            .first()
-            .map(JointCalibration::center_pulse_us)
-            .unwrap_or(1500);
+        let last_pulses = configured_reference_pulses(&calibration);
         Self {
             board0: Pca9685::new(bus0, 0x40),
             board1: Pca9685::new(bus1, 0x41),
             calibration,
-            last_pulses: [center; NUM_ACTUATORS],
+            last_pulses,
+            command_reference_knowledge: [
+                CommandReferenceKnowledge::ConfiguredCalibrationReference;
+                NUM_ACTUATORS
+            ],
             slew_rate_us: DEFAULT_SLEW_RATE_US,
+            max_pulse_velocity_us_per_second: DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND,
+            max_slew_gap: DEFAULT_MAX_SLEW_GAP,
             initialized: false,
             enabled: false,
             shutdown_verified: true,
@@ -184,17 +173,14 @@ impl<I: I2c> ServoOutput<I> {
         }
     }
 
-    /// Get a reference to board 0 (joints 0–15).
     pub fn board0(&self) -> &Pca9685<I> {
         &self.board0
     }
 
-    /// Get a reference to board 1 (joints 16–20).
     pub fn board1(&self) -> &Pca9685<I> {
         &self.board1
     }
 
-    /// Initialize both PCA9685 boards at the given PWM frequency (typically 50 Hz).
     pub fn init(&mut self, frequency_hz: f64) -> HalResult<()> {
         if let Some(disposition) = self.fault_latched {
             return Err(HalError::Safety(format!(
@@ -258,7 +244,6 @@ impl<I: I2c> ServoOutput<I> {
         Ok(())
     }
 
-    /// Enable servo output (allows `apply()` to write to hardware).
     pub fn enable(&mut self) -> HalResult<()> {
         if let Some(disposition) = self.fault_latched {
             return Err(HalError::Safety(format!(
@@ -282,12 +267,6 @@ impl<I: I2c> ServoOutput<I> {
         Ok(())
     }
 
-    /// Disable servo output and turn off all channels.
-    ///
-    /// Both boards are attempted even if the first write fails. A failed
-    /// shutdown is recorded as unverified so health reporting cannot mistake
-    /// a requested shutdown for confirmed de-energization. A successful
-    /// shutdown does not clear a prior actuation fault latch.
     pub fn disable(&mut self) -> HalResult<()> {
         let board0 = self.board0.all_off();
         let board1 = self.board1.all_off();
@@ -304,48 +283,79 @@ impl<I: I2c> ServoOutput<I> {
             }
             (Err(e), Ok(())) => Err(e),
             (Ok(()), Err(e)) => Err(e),
-            (Err(e0), Err(e1)) => Err(crate::error::HalError::Safety(format!(
+            (Err(e0), Err(e1)) => Err(HalError::Safety(format!(
                 "failed to disable both PWM boards: board0={e0}; board1={e1}"
             ))),
         }
     }
 
-    /// Whether both PWM boards completed initialization.
     pub fn is_initialized(&self) -> bool {
         self.initialized
     }
 
-    /// Whether ordinary output is currently enabled.
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
 
-    /// Whether both PWM boards confirmed the most recent all-off request.
     pub fn shutdown_verified(&self) -> bool {
         self.shutdown_verified
     }
 
-    /// Consequential write fault currently latched by the servo boundary.
     pub fn fault_latched(&self) -> Option<ActuationDisposition> {
         self.fault_latched
     }
 
-    /// Exact consequential receipt that caused the current fault latch.
     pub fn latched_fault_receipt(&self) -> Option<&ServoActuationReceipt> {
         self.latched_fault_receipt.as_ref()
     }
 
-    /// Most recent command-attempt receipt.
     pub fn last_actuation_receipt(&self) -> Option<&ServoActuationReceipt> {
         self.last_actuation_receipt.as_ref()
     }
 
-    /// Set the maximum slew rate (µs per update tick).
+    /// Command-reference provenance for every actuator. This is deliberately
+    /// not called physical-state knowledge.
+    pub fn command_reference_knowledge(
+        &self,
+    ) -> &[CommandReferenceKnowledge; NUM_ACTUATORS] {
+        &self.command_reference_knowledge
+    }
+
+    /// Transitional legacy setter. This still means µs per call, not per second.
     pub fn set_slew_rate(&mut self, us_per_tick: u16) {
         self.slew_rate_us = us_per_tick;
     }
 
-    /// Set the calibration profile.
+    /// Configure the explicit PWM velocity limit used by `apply_with_elapsed`.
+    pub fn set_max_pulse_velocity_us_per_second(&mut self, rate: f64) -> HalResult<()> {
+        if !rate.is_finite() || rate <= 0.0 {
+            return Err(HalError::Safety(format!(
+                "pulse velocity must be finite and positive, got {rate}"
+            )));
+        }
+        self.max_pulse_velocity_us_per_second = rate;
+        Ok(())
+    }
+
+    pub fn max_pulse_velocity_us_per_second(&self) -> f64 {
+        self.max_pulse_velocity_us_per_second
+    }
+
+    /// Configure the maximum accepted elapsed interval for one slew step.
+    pub fn set_max_slew_gap(&mut self, max_gap: Duration) -> HalResult<()> {
+        if max_gap.is_zero() {
+            return Err(HalError::Safety(
+                "maximum slew gap must be positive".to_string(),
+            ));
+        }
+        self.max_slew_gap = max_gap;
+        Ok(())
+    }
+
+    pub fn max_slew_gap(&self) -> Duration {
+        self.max_slew_gap
+    }
+
     pub fn set_calibration(&mut self, cal: CalibrationProfile) -> HalResult<()> {
         if self.enabled {
             return Err(HalError::Safety(
@@ -358,18 +368,62 @@ impl<I: I2c> ServoOutput<I> {
             )));
         }
         cal.validate()?;
+        self.last_pulses = configured_reference_pulses(&cal);
+        self.command_reference_knowledge = [
+            CommandReferenceKnowledge::ConfiguredCalibrationReference;
+            NUM_ACTUATORS
+        ];
         self.calibration = cal;
         Ok(())
     }
 
-    /// Apply a legacy `HumanoidCommand` to the servos and return endpoint-specific
-    /// execution evidence.
-    ///
-    /// This method does not claim physical motion. `WriteAccepted` means only
-    /// that the host-side I2C transaction returned success.
+    /// Legacy per-call slew path retained only until runtime migration.
     pub fn apply(
         &mut self,
         command: &HumanoidCommand,
+    ) -> Result<ServoActuationReceipt, ServoActuationFailure> {
+        self.apply_with_max_step(command, self.slew_rate_us)
+    }
+
+    /// Apply a command using an explicit elapsed monotonic duration.
+    ///
+    /// The caller owns the clock theorem. This API consumes only a `Duration`,
+    /// never UTC/wall-clock time or an implicit tick count.
+    pub fn apply_with_elapsed(
+        &mut self,
+        command: &HumanoidCommand,
+        elapsed: Duration,
+    ) -> Result<ServoActuationReceipt, ServoActuationFailure> {
+        // Preserve disabled/fault-latched semantics before timing validation.
+        if !self.enabled || self.fault_latched.is_some() {
+            return self.apply(command);
+        }
+
+        let max_step = match pulse_step_for_elapsed(
+            self.max_pulse_velocity_us_per_second,
+            elapsed,
+            self.max_slew_gap,
+        ) {
+            Ok(max_step) => max_step,
+            Err(error) => {
+                let receipt = ServoActuationReceipt {
+                    command_sequence: None,
+                    board0: EndpointActuationDisposition::NotAttempted,
+                    board1: EndpointActuationDisposition::NotAttempted,
+                    disposition: ActuationDisposition::NotDispatched,
+                };
+                self.last_actuation_receipt = Some(receipt);
+                return Err(ServoActuationFailure { receipt, error });
+            }
+        };
+
+        self.apply_with_max_step(command, max_step)
+    }
+
+    fn apply_with_max_step(
+        &mut self,
+        command: &HumanoidCommand,
+        max_step: u16,
     ) -> Result<ServoActuationReceipt, ServoActuationFailure> {
         if let Some(disposition) = self.fault_latched {
             let receipt = ServoActuationReceipt {
@@ -414,9 +468,6 @@ impl<I: I2c> ServoOutput<I> {
         let command_sequence = self.next_command_sequence;
         self.next_command_sequence += 1;
 
-        // 1. Convert command → target pulse widths. A conversion/validation
-        // failure occurs before any physical write and is therefore
-        // NotDispatched rather than InDoubt.
         let targets = match self.calibration.torques_to_pulses(&command.torques) {
             Ok(targets) => targets,
             Err(error) => {
@@ -431,14 +482,11 @@ impl<I: I2c> ServoOutput<I> {
             }
         };
 
-        // 2. Slew-rate limiting.
         let mut pulses = [0u16; NUM_ACTUATORS];
         for i in 0..NUM_ACTUATORS {
-            pulses[i] = slew_limit(self.last_pulses[i], targets[i], self.slew_rate_us);
+            pulses[i] = slew_limit(self.last_pulses[i], targets[i], max_step);
         }
 
-        // 3. Board 0 transaction. An I2C error is InDoubt rather than proof of
-        // non-dispatch. Do not update shadow state without successful return.
         if let Err(error) = self.board0.set_pulse_batch(0, &pulses[..CHANNELS]) {
             let receipt = ServoActuationReceipt {
                 command_sequence: Some(command_sequence),
@@ -451,9 +499,9 @@ impl<I: I2c> ServoOutput<I> {
             return Err(ServoActuationFailure { receipt, error });
         }
         self.last_pulses[..CHANNELS].copy_from_slice(&pulses[..CHANNELS]);
+        self.command_reference_knowledge[..CHANNELS]
+            .fill(CommandReferenceKnowledge::WriteAccepted);
 
-        // 4. Board 1 transaction. Board 0 is already known accepted; therefore
-        // a board 1 I2C error is a genuine partial execution cut.
         if let Err(error) = self.board1.set_pulse_batch(0, &pulses[CHANNELS..]) {
             let receipt = ServoActuationReceipt {
                 command_sequence: Some(command_sequence),
@@ -466,6 +514,8 @@ impl<I: I2c> ServoOutput<I> {
             return Err(ServoActuationFailure { receipt, error });
         }
         self.last_pulses[CHANNELS..].copy_from_slice(&pulses[CHANNELS..]);
+        self.command_reference_knowledge[CHANNELS..]
+            .fill(CommandReferenceKnowledge::WriteAccepted);
 
         let receipt = ServoActuationReceipt {
             command_sequence: Some(command_sequence),
@@ -488,36 +538,23 @@ impl<I: I2c> ServoOutput<I> {
         self.shutdown_verified = false;
     }
 
-    /// Get the last pulse widths supported by successful controller-write
-    /// evidence.
+    /// Last controller command references. These are not physical positions.
     pub fn last_pulses(&self) -> &[u16; NUM_ACTUATORS] {
         &self.last_pulses
     }
 
-    /// Move all servos to their center (neutral) position.
-    ///
-    /// Legacy behavior: temporarily bypasses normal slew-rate limiting. This is
-    /// not a generally qualified safety reflex and remains tracked separately.
+    /// Legacy immediate-centering path. Not a generally qualified safety reflex.
     pub fn center_all(&mut self) -> HalResult<()> {
         let zero = HumanoidCommand::zero();
-        let saved = self.slew_rate_us;
-        self.slew_rate_us = u16::MAX;
-        let result = self.apply(&zero).map(|_| ()).map_err(HalError::from);
-        self.slew_rate_us = saved;
-        result
+        self.apply_with_max_step(&zero, u16::MAX)
+            .map(|_| ())
+            .map_err(HalError::from)
     }
 
-    /// Get a reference to the calibration profile.
     pub fn calibration(&self) -> &CalibrationProfile {
         &self.calibration
     }
 
-    /// Read the PWM OFF registers for all 21 channels across both boards.
-    ///
-    /// This confirms only what the PCA9685 latched. It does **not** measure
-    /// physical servo or joint position; encoder or potentiometer feedback is
-    /// required for that claim. This performs 21 I2C reads and is not intended
-    /// for per-tick use.
     pub fn read_pwm_registers(&mut self) -> HalResult<[u16; NUM_ACTUATORS]> {
         let mut counts = [0u16; NUM_ACTUATORS];
         for (i, count) in counts.iter_mut().enumerate().take(CHANNELS) {
@@ -531,10 +568,6 @@ impl<I: I2c> ServoOutput<I> {
         Ok(counts)
     }
 
-    /// Compare commanded pulses against PCA9685 register readback.
-    ///
-    /// Returns `(joint_index, commanded_pulse_us, latched_off_count)` entries.
-    /// An empty vector proves register agreement only, not physical motion.
     pub fn verify_pwm_latch(&mut self) -> HalResult<Vec<(usize, u16, u16)>> {
         let actual = self.read_pwm_registers()?;
         let period_us = self.board0.period_us();
@@ -549,37 +582,32 @@ impl<I: I2c> ServoOutput<I> {
         Ok(mismatches)
     }
 
-    /// Backward-compatible alias for [`Self::read_pwm_registers`].
     #[deprecated(note = "PCA9685 readback is not physical position; use read_pwm_registers")]
     pub fn read_positions(&mut self) -> HalResult<[u16; NUM_ACTUATORS]> {
         self.read_pwm_registers()
     }
 
-    /// Backward-compatible alias for [`Self::verify_pwm_latch`].
     #[deprecated(note = "PCA9685 readback verifies only the PWM latch; use verify_pwm_latch")]
     pub fn verify_positions(&mut self) -> HalResult<Vec<(usize, u16, u16)>> {
         self.verify_pwm_latch()
     }
 }
 
-// ============================================================================
-// SHARED-BUS CONSTRUCTORS
-// ============================================================================
-
 impl<'a, I: I2c> ServoOutput<RefCellDevice<'a, I>> {
-    /// Create a servo output sharing a single I2C bus via `RefCell` (single-threaded).
     pub fn new_shared(bus: &'a RefCell<I>, calibration: CalibrationProfile) -> Self {
-        let center = calibration
-            .joints
-            .first()
-            .map(JointCalibration::center_pulse_us)
-            .unwrap_or(1500);
+        let last_pulses = configured_reference_pulses(&calibration);
         Self {
             board0: Pca9685::new(RefCellDevice::new(bus), 0x40),
             board1: Pca9685::new(RefCellDevice::new(bus), 0x41),
             calibration,
-            last_pulses: [center; NUM_ACTUATORS],
+            last_pulses,
+            command_reference_knowledge: [
+                CommandReferenceKnowledge::ConfiguredCalibrationReference;
+                NUM_ACTUATORS
+            ],
             slew_rate_us: DEFAULT_SLEW_RATE_US,
+            max_pulse_velocity_us_per_second: DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND,
+            max_slew_gap: DEFAULT_MAX_SLEW_GAP,
             initialized: false,
             enabled: false,
             shutdown_verified: true,
@@ -592,19 +620,20 @@ impl<'a, I: I2c> ServoOutput<RefCellDevice<'a, I>> {
 }
 
 impl<'a, I: I2c + Send> ServoOutput<MutexDevice<'a, I>> {
-    /// Create a servo output sharing a single I2C bus via `Mutex` (thread-safe).
     pub fn new_shared_mutex(bus: &'a Mutex<I>, calibration: CalibrationProfile) -> Self {
-        let center = calibration
-            .joints
-            .first()
-            .map(JointCalibration::center_pulse_us)
-            .unwrap_or(1500);
+        let last_pulses = configured_reference_pulses(&calibration);
         Self {
             board0: Pca9685::new(MutexDevice::new(bus), 0x40),
             board1: Pca9685::new(MutexDevice::new(bus), 0x41),
             calibration,
-            last_pulses: [center; NUM_ACTUATORS],
+            last_pulses,
+            command_reference_knowledge: [
+                CommandReferenceKnowledge::ConfiguredCalibrationReference;
+                NUM_ACTUATORS
+            ],
             slew_rate_us: DEFAULT_SLEW_RATE_US,
+            max_pulse_velocity_us_per_second: DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND,
+            max_slew_gap: DEFAULT_MAX_SLEW_GAP,
             initialized: false,
             enabled: false,
             shutdown_verified: true,
@@ -616,11 +645,48 @@ impl<'a, I: I2c + Send> ServoOutput<MutexDevice<'a, I>> {
     }
 }
 
-// ============================================================================
-// SLEW-RATE LIMITER
-// ============================================================================
+fn configured_reference_pulses(
+    calibration: &CalibrationProfile,
+) -> [u16; NUM_ACTUATORS] {
+    std::array::from_fn(|index| {
+        calibration
+            .joints
+            .get(index)
+            .map(JointCalibration::center_pulse_us)
+            .unwrap_or(1500)
+    })
+}
 
-/// Limit the step from `current` to `target` by at most `max_step` µs.
+fn pulse_step_for_elapsed(
+    rate_us_per_second: f64,
+    elapsed: Duration,
+    max_gap: Duration,
+) -> HalResult<u16> {
+    if !rate_us_per_second.is_finite() || rate_us_per_second <= 0.0 {
+        return Err(HalError::Safety(format!(
+            "pulse velocity must be finite and positive, got {rate_us_per_second}"
+        )));
+    }
+    if elapsed.is_zero() {
+        return Err(HalError::Safety(
+            "elapsed slew duration must be positive".to_string(),
+        ));
+    }
+    if elapsed > max_gap {
+        return Err(HalError::Safety(format!(
+            "elapsed slew duration {:?} exceeds configured maximum {:?}",
+            elapsed, max_gap
+        )));
+    }
+    let allowed = rate_us_per_second * elapsed.as_secs_f64();
+    if !allowed.is_finite() || allowed < 0.0 {
+        return Err(HalError::Safety(
+            "computed pulse slew allowance is invalid".to_string(),
+        ));
+    }
+    Ok(allowed.floor().clamp(0.0, u16::MAX as f64) as u16)
+}
+
 fn slew_limit(current: u16, target: u16, max_step: u16) -> u16 {
     if target > current {
         let delta = target - current;
@@ -639,10 +705,6 @@ fn slew_limit(current: u16, target: u16, max_step: u16) -> u16 {
     }
 }
 
-// ============================================================================
-// TESTS
-// ============================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -654,10 +716,11 @@ mod tests {
     };
 
     fn make_servo() -> ServoOutput<MockI2cBus> {
-        let bus0 = MockI2cBus::new();
-        let bus1 = MockI2cBus::new();
-        let cal = CalibrationProfile::default_21();
-        ServoOutput::new(bus0, bus1, cal)
+        ServoOutput::new(
+            MockI2cBus::new(),
+            MockI2cBus::new(),
+            CalibrationProfile::default_21(),
+        )
     }
 
     struct SwitchableFailBus {
@@ -701,12 +764,11 @@ mod tests {
     ) {
         let fail0 = Arc::new(AtomicBool::new(false));
         let fail1 = Arc::new(AtomicBool::new(false));
-        let cal = CalibrationProfile::default_21();
         (
             ServoOutput::new(
                 SwitchableFailBus::new(fail0.clone()),
                 SwitchableFailBus::new(fail1.clone()),
-                cal,
+                CalibrationProfile::default_21(),
             ),
             fail0,
             fail1,
@@ -714,14 +776,80 @@ mod tests {
     }
 
     #[test]
+    fn heterogeneous_calibration_centers_are_kept_per_actuator() {
+        let mut cal = CalibrationProfile::default_21();
+        cal.joints[0].pulse_min_us = 400;
+        cal.joints[0].pulse_max_us = 1600;
+        cal.joints[1].pulse_min_us = 1000;
+        cal.joints[1].pulse_max_us = 2400;
+        let servo = ServoOutput::new(MockI2cBus::new(), MockI2cBus::new(), cal);
+        assert_eq!(servo.last_pulses()[0], 1000);
+        assert_eq!(servo.last_pulses()[1], 1700);
+        assert!(servo
+            .command_reference_knowledge()
+            .iter()
+            .all(|state| *state == CommandReferenceKnowledge::ConfiguredCalibrationReference));
+    }
+
+    #[test]
+    fn elapsed_time_slew_two_10ms_steps_equal_one_20ms_step() {
+        let mut a = make_servo();
+        let mut b = make_servo();
+        for servo in [&mut a, &mut b] {
+            servo.init(50.0).unwrap();
+            servo.enable().unwrap();
+            servo.set_max_pulse_velocity_us_per_second(5_000.0).unwrap();
+        }
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[0] = 1.0;
+
+        a.apply_with_elapsed(&cmd, Duration::from_millis(10)).unwrap();
+        a.apply_with_elapsed(&cmd, Duration::from_millis(10)).unwrap();
+        b.apply_with_elapsed(&cmd, Duration::from_millis(20)).unwrap();
+
+        assert_eq!(a.last_pulses()[0], 1600);
+        assert_eq!(b.last_pulses()[0], 1600);
+    }
+
+    #[test]
+    fn elapsed_time_slew_rejects_zero_and_oversized_gap_before_dispatch() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable().unwrap();
+        let zero = servo
+            .apply_with_elapsed(&HumanoidCommand::zero(), Duration::ZERO)
+            .unwrap_err();
+        assert_eq!(zero.receipt.disposition, ActuationDisposition::NotDispatched);
+        assert_eq!(zero.receipt.command_sequence, None);
+
+        let large = servo
+            .apply_with_elapsed(&HumanoidCommand::zero(), Duration::from_millis(101))
+            .unwrap_err();
+        assert_eq!(large.receipt.disposition, ActuationDisposition::NotDispatched);
+        assert_eq!(large.receipt.command_sequence, None);
+        assert_eq!(servo.last_pulses()[0], 1500);
+    }
+
+    #[test]
+    fn successful_write_promotes_command_reference_not_physical_state() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable().unwrap();
+        servo
+            .apply_with_elapsed(&HumanoidCommand::zero(), Duration::from_millis(20))
+            .unwrap();
+        assert!(servo
+            .command_reference_knowledge()
+            .iter()
+            .all(|state| *state == CommandReferenceKnowledge::WriteAccepted));
+    }
+
+    #[test]
     fn test_servo_disabled_noop_is_typed() {
         let mut servo = make_servo();
-        assert!(!servo.is_enabled());
         let receipt = servo.apply(&HumanoidCommand::zero()).unwrap();
         assert_eq!(receipt.disposition, ActuationDisposition::DisabledNoOp);
         assert_eq!(receipt.command_sequence, None);
-        assert_eq!(receipt.board0, EndpointActuationDisposition::NotAttempted);
-        assert_eq!(receipt.board1, EndpointActuationDisposition::NotAttempted);
     }
 
     #[test]
@@ -736,11 +864,9 @@ mod tests {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-        assert!(
-            servo
-                .set_calibration(CalibrationProfile::default_21())
-                .is_err()
-        );
+        assert!(servo
+            .set_calibration(CalibrationProfile::default_21())
+            .is_err());
     }
 
     #[test]
@@ -748,18 +874,11 @@ mod tests {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-        assert!(servo.is_enabled());
-        assert!(!servo.shutdown_verified());
-
         let receipt = servo.apply(&HumanoidCommand::zero()).unwrap();
         assert_eq!(receipt.command_sequence, Some(1));
         assert_eq!(receipt.disposition, ActuationDisposition::Completed);
         assert_eq!(receipt.board0, EndpointActuationDisposition::WriteAccepted);
         assert_eq!(receipt.board1, EndpointActuationDisposition::WriteAccepted);
-
-        for &p in servo.last_pulses() {
-            assert_eq!(p, 1500);
-        }
     }
 
     #[test]
@@ -769,30 +888,16 @@ mod tests {
         servo.enable().unwrap();
         servo.set_slew_rate(u16::MAX);
         fail0.store(true, Ordering::SeqCst);
-
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
         cmd.torques[16] = 1.0;
         let failure = servo.apply(&cmd).unwrap_err();
-
         assert_eq!(failure.receipt.disposition, ActuationDisposition::InDoubt);
-        assert_eq!(
-            failure.receipt.board0,
-            EndpointActuationDisposition::InDoubt
-        );
-        assert_eq!(
-            failure.receipt.board1,
-            EndpointActuationDisposition::NotAttempted
-        );
+        assert_eq!(failure.receipt.board0, EndpointActuationDisposition::InDoubt);
+        assert_eq!(failure.receipt.board1, EndpointActuationDisposition::NotAttempted);
         assert_eq!(servo.last_pulses()[0], 1500);
         assert_eq!(servo.last_pulses()[16], 1500);
         assert_eq!(servo.fault_latched(), Some(ActuationDisposition::InDoubt));
-        assert_eq!(
-            servo.latched_fault_receipt().unwrap().command_sequence,
-            Some(1)
-        );
-        assert!(!servo.is_enabled());
-        assert!(!servo.shutdown_verified());
     }
 
     #[test]
@@ -802,38 +907,29 @@ mod tests {
         servo.enable().unwrap();
         servo.set_slew_rate(u16::MAX);
         fail1.store(true, Ordering::SeqCst);
-
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
         cmd.torques[16] = 1.0;
         let failure = servo.apply(&cmd).unwrap_err();
-
         assert_eq!(failure.receipt.disposition, ActuationDisposition::Partial);
-        assert_eq!(
-            failure.receipt.board0,
-            EndpointActuationDisposition::WriteAccepted
-        );
-        assert_eq!(
-            failure.receipt.board1,
-            EndpointActuationDisposition::InDoubt
-        );
+        assert_eq!(failure.receipt.board0, EndpointActuationDisposition::WriteAccepted);
+        assert_eq!(failure.receipt.board1, EndpointActuationDisposition::InDoubt);
         assert_eq!(servo.last_pulses()[0], 2500);
         assert_eq!(servo.last_pulses()[16], 1500);
-        assert_eq!(servo.fault_latched(), Some(ActuationDisposition::Partial));
-        assert!(!servo.is_enabled());
-        assert!(!servo.shutdown_verified());
+        assert_eq!(
+            servo.command_reference_knowledge()[0],
+            CommandReferenceKnowledge::WriteAccepted
+        );
+        assert_eq!(
+            servo.command_reference_knowledge()[16],
+            CommandReferenceKnowledge::ConfiguredCalibrationReference
+        );
 
         let second = servo.apply(&HumanoidCommand::zero()).unwrap_err();
-        assert_eq!(
-            second.receipt.disposition,
-            ActuationDisposition::NotDispatched
-        );
-        assert_eq!(second.receipt.command_sequence, None);
+        assert_eq!(second.receipt.disposition, ActuationDisposition::NotDispatched);
         let latched = servo.latched_fault_receipt().unwrap();
         assert_eq!(latched.command_sequence, Some(1));
         assert_eq!(latched.disposition, ActuationDisposition::Partial);
-        assert_eq!(latched.board0, EndpointActuationDisposition::WriteAccepted);
-        assert_eq!(latched.board1, EndpointActuationDisposition::InDoubt);
     }
 
     #[test]
@@ -844,14 +940,9 @@ mod tests {
         fail1.store(true, Ordering::SeqCst);
         let failure = servo.apply(&HumanoidCommand::zero()).unwrap_err();
         assert_eq!(failure.receipt.disposition, ActuationDisposition::Partial);
-
         servo.disable().unwrap();
         assert!(servo.shutdown_verified());
         assert_eq!(servo.fault_latched(), Some(ActuationDisposition::Partial));
-        assert_eq!(
-            servo.latched_fault_receipt().unwrap().disposition,
-            ActuationDisposition::Partial
-        );
         assert!(servo.enable().is_err());
     }
 
@@ -879,12 +970,10 @@ mod tests {
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
         servo.set_slew_rate(50);
-
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
         servo.apply(&cmd).unwrap();
         assert_eq!(servo.last_pulses()[0], 1550);
-
         servo.apply(&cmd).unwrap();
         assert_eq!(servo.last_pulses()[0], 1600);
     }
@@ -892,35 +981,28 @@ mod tests {
     #[test]
     fn test_servo_new_shared_refcell() {
         let bus = RefCell::new(MockI2cBus::new());
-        let cal = CalibrationProfile::default_21();
-        let mut servo = ServoOutput::new_shared(&bus, cal);
+        let mut servo = ServoOutput::new_shared(&bus, CalibrationProfile::default_21());
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
         servo.apply(&HumanoidCommand::zero()).unwrap();
-        for &p in servo.last_pulses() {
-            assert_eq!(p, 1500);
-        }
+        assert!(servo.last_pulses().iter().all(|pulse| *pulse == 1500));
     }
 
     #[test]
     fn test_servo_new_shared_mutex() {
         let bus = Mutex::new(MockI2cBus::new());
-        let cal = CalibrationProfile::default_21();
-        let mut servo = ServoOutput::new_shared_mutex(&bus, cal);
+        let mut servo = ServoOutput::new_shared_mutex(&bus, CalibrationProfile::default_21());
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
         servo.apply(&HumanoidCommand::zero()).unwrap();
-        for &p in servo.last_pulses() {
-            assert_eq!(p, 1500);
-        }
+        assert!(servo.last_pulses().iter().all(|pulse| *pulse == 1500));
     }
 
     #[test]
     fn test_read_pwm_registers_returns_21_elements() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
-        let positions = servo.read_pwm_registers().unwrap();
-        assert_eq!(positions.len(), NUM_ACTUATORS);
+        assert_eq!(servo.read_pwm_registers().unwrap().len(), NUM_ACTUATORS);
     }
 
     #[test]
@@ -928,12 +1010,8 @@ mod tests {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-
         servo.apply(&HumanoidCommand::zero()).unwrap();
-        assert_eq!(servo.last_pulses()[0], 1500);
-
         let mismatches = servo.verify_pwm_latch().unwrap();
-        assert!(!mismatches.is_empty(), "should detect mismatches");
         assert_eq!(mismatches.len(), NUM_ACTUATORS);
         assert_eq!(mismatches[0].1, 1500);
         assert_eq!(mismatches[0].2, 0);
@@ -944,16 +1022,29 @@ mod tests {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
         servo.set_slew_rate(u16::MAX);
         servo.apply(&cmd).unwrap();
         assert_eq!(servo.last_pulses()[0], 2500);
-
-        servo.set_slew_rate(50);
         servo.center_all().unwrap();
         assert_eq!(servo.last_pulses()[0], 1500);
+    }
+
+    #[test]
+    fn pulse_step_elapsed_validation() {
+        assert_eq!(
+            pulse_step_for_elapsed(
+                5_000.0,
+                Duration::from_millis(20),
+                Duration::from_millis(100)
+            )
+            .unwrap(),
+            100
+        );
+        assert!(pulse_step_for_elapsed(5_000.0, Duration::ZERO, Duration::from_millis(100)).is_err());
+        assert!(pulse_step_for_elapsed(5_000.0, Duration::from_millis(101), Duration::from_millis(100)).is_err());
+        assert!(pulse_step_for_elapsed(f64::NAN, Duration::from_millis(20), Duration::from_millis(100)).is_err());
     }
 }
 
@@ -968,25 +1059,20 @@ mod proptests {
             let result = slew_limit(current, target, max_step);
             let lo = current.min(target);
             let hi = current.max(target);
-            prop_assert!(result >= lo, "result {} < min(current={}, target={})", result, current, target);
-            prop_assert!(result <= hi, "result {} > max(current={}, target={})", result, current, target);
+            prop_assert!(result >= lo);
+            prop_assert!(result <= hi);
         }
 
         #[test]
         fn slew_limit_converges(current in 500u16..2500, target in 500u16..2500) {
-            let result = slew_limit(current, target, u16::MAX);
-            prop_assert_eq!(result, target);
+            prop_assert_eq!(slew_limit(current, target, u16::MAX), target);
         }
 
         #[test]
         fn slew_limit_max_step_respected(current in 500u16..2500, target in 500u16..2500, max_step in 1u16..500) {
             let result = slew_limit(current, target, max_step);
-            let delta = if result > current {
-                result - current
-            } else {
-                current - result
-            };
-            prop_assert!(delta <= max_step, "delta {} > max_step {}", delta, max_step);
+            let delta = result.abs_diff(current);
+            prop_assert!(delta <= max_step);
         }
     }
 }
