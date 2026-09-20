@@ -16,6 +16,7 @@ env:
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
   UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
   MEL_TONAL_QUAL_RECEIPT: ${{ github.workspace }}/melothaea-prog-suite-tonal-chain-qualification-v1.tsv
+  MEL_TONAL_HOST_ENVELOPE: ${{ github.workspace }}/melothaea-prog-suite-tonal-chain-hosted-envelope-v1.tsv
 
 jobs:
   qualify:
@@ -25,7 +26,35 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Initialize hosted execution envelope
+        id: envelope_init
+        shell: bash
+        run: |
+          set -euo pipefail
+          executor_head="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          {
+            printf 'schema\tmelothaea-prog-suite-tonal-chain-hosted-envelope-v1\n'
+            printf 'authority_scope\trunner-execution-diagnostics-only\n'
+            printf 'qualification_authority\tnone\n'
+            printf 'scientific_lockbox_execution\tnot-performed\n'
+            printf 'human_perceptual_authority\tnone\n'
+            printf 'artistic_quality_authority\tnone\n'
+            printf 'product_authority\tnone\n'
+            printf 'github_repository\t%s\n' "$GITHUB_REPOSITORY"
+            printf 'github_run_id\t%s\n' "$GITHUB_RUN_ID"
+            printf 'github_run_attempt\t%s\n' "$GITHUB_RUN_ATTEMPT"
+            printf 'github_event_name\t%s\n' "$GITHUB_EVENT_NAME"
+            printf 'executor_head_sha\t%s\n' "$executor_head"
+            printf 'runner_name\t%s\n' "$RUNNER_NAME"
+            printf 'runner_os\t%s\n' "$RUNNER_OS"
+            printf 'runner_arch\t%s\n' "$RUNNER_ARCH"
+            printf 'image_os\t%s\n' "${ImageOS:-unavailable}"
+            printf 'image_version\t%s\n' "${ImageVersion:-unavailable}"
+            printf 'runner_admitted_utc\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$MEL_TONAL_HOST_ENVELOPE"
+
       - name: Checkout exact qualifier head
+        id: checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
@@ -33,6 +62,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify pinned workflow actions
+        id: pins
         shell: bash
         run: |
           set -euo pipefail
@@ -44,6 +74,7 @@ jobs:
           fi
 
       - name: Install repository-pinned Rust toolchain
+        id: toolchain
         shell: bash
         run: |
           set -euo pipefail
@@ -55,6 +86,7 @@ jobs:
           test "$(cargo --version | awk '{print $2}')" = "$channel"
 
       - name: Install focused system dependencies
+        id: system_dependencies
         shell: bash
         run: |
           set -euo pipefail
@@ -62,10 +94,12 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev libasound2-dev
 
       - name: Run portable exact-subject qualifier
+        id: portable_qualifier
         shell: bash
         run: bash .github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh
 
       - name: Verify qualification receipt
+        id: receipt_verifier
         if: always()
         shell: bash
         run: |
@@ -77,6 +111,7 @@ jobs:
           python3 .github/qualification/verify-melothaea-prog-suite-tonal-chain-receipt-v1.py "$MEL_TONAL_QUAL_RECEIPT"
 
       - name: Publish receipt digest
+        id: receipt_digest
         if: always()
         shell: bash
         run: |
@@ -94,11 +129,60 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Upload qualification receipt
+      - name: Finalize hosted execution envelope
+        id: envelope_finalize
+        if: always()
+        shell: bash
+        env:
+          OUTCOME_ENVELOPE_INIT: ${{ steps.envelope_init.outcome }}
+          OUTCOME_CHECKOUT: ${{ steps.checkout.outcome }}
+          OUTCOME_PINS: ${{ steps.pins.outcome }}
+          OUTCOME_TOOLCHAIN: ${{ steps.toolchain.outcome }}
+          OUTCOME_SYSTEM_DEPENDENCIES: ${{ steps.system_dependencies.outcome }}
+          OUTCOME_PORTABLE_QUALIFIER: ${{ steps.portable_qualifier.outcome }}
+          OUTCOME_RECEIPT_VERIFIER: ${{ steps.receipt_verifier.outcome }}
+          OUTCOME_RECEIPT_DIGEST: ${{ steps.receipt_digest.outcome }}
+        run: |
+          set -euo pipefail
+          touch "$MEL_TONAL_HOST_ENVELOPE"
+          portable_receipt_present=false
+          portable_receipt_sha256=unavailable
+          if [[ -f "$MEL_TONAL_QUAL_RECEIPT" ]]; then
+            portable_receipt_present=true
+            portable_receipt_sha256="$(sha256sum "$MEL_TONAL_QUAL_RECEIPT" | awk '{print $1}')"
+          fi
+          {
+            printf 'envelope_init_outcome\t%s\n' "$OUTCOME_ENVELOPE_INIT"
+            printf 'checkout_outcome\t%s\n' "$OUTCOME_CHECKOUT"
+            printf 'pin_verification_outcome\t%s\n' "$OUTCOME_PINS"
+            printf 'toolchain_outcome\t%s\n' "$OUTCOME_TOOLCHAIN"
+            printf 'system_dependencies_outcome\t%s\n' "$OUTCOME_SYSTEM_DEPENDENCIES"
+            printf 'portable_qualifier_outcome\t%s\n' "$OUTCOME_PORTABLE_QUALIFIER"
+            printf 'portable_receipt_verifier_outcome\t%s\n' "$OUTCOME_RECEIPT_VERIFIER"
+            printf 'portable_receipt_digest_outcome\t%s\n' "$OUTCOME_RECEIPT_DIGEST"
+            printf 'portable_receipt_present\t%s\n' "$portable_receipt_present"
+            printf 'portable_receipt_sha256\t%s\n' "$portable_receipt_sha256"
+            printf 'runner_terminal_utc\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$MEL_TONAL_HOST_ENVELOPE"
+          envelope_digest="$(sha256sum "$MEL_TONAL_HOST_ENVELOPE" | awk '{print $1}')"
+          echo "melothaea hosted envelope_sha256=$envelope_digest"
+          {
+            echo
+            echo '### Hosted execution envelope'
+            echo
+            echo "- envelope SHA-256: \`$envelope_digest\`"
+            echo "- portable qualifier outcome: \`$OUTCOME_PORTABLE_QUALIFIER\`"
+            echo "- portable receipt verifier outcome: \`$OUTCOME_RECEIPT_VERIFIER\`"
+            echo '- envelope authority: runner diagnostics only; it is not qualification evidence'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload qualification receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: melothaea-prog-suite-tonal-chain-v1-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ env.MEL_TONAL_QUAL_RECEIPT }}
+          path: |
+            ${{ env.MEL_TONAL_HOST_ENVELOPE }}
+            ${{ env.MEL_TONAL_QUAL_RECEIPT }}
           if-no-files-found: error
           retention-days: 30
