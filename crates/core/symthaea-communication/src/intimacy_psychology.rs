@@ -160,6 +160,18 @@ impl IntimacyPsychologyEvidenceV1 {
     pub const fn reality_scope(&self) -> IntimacyRealityScopeV1 {
         self.reality_scope
     }
+
+    pub const fn observed_at_ns(&self) -> u64 {
+        self.observed_at_ns
+    }
+
+    pub const fn valid_until_ns(&self) -> Option<u64> {
+        self.valid_until_ns
+    }
+
+    pub const fn retention(&self) -> IntimacyPsychologyRetentionV1 {
+        self.retention
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -172,6 +184,9 @@ pub struct IntimacyPsychologyEstimateV1 {
     pub temporal_scope: IntimacyTemporalScopeV1,
     pub reality_scope: IntimacyRealityScopeV1,
     pub context_id: String,
+    pub observed_at_ns: u64,
+    pub valid_until_ns: Option<u64>,
+    pub retention: IntimacyPsychologyRetentionV1,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -202,6 +217,32 @@ impl IntimacyPsychologyModelV1 {
         }
         self.evidence.entry(evidence.dimension).or_default().push(evidence);
         Ok(())
+    }
+
+    /// Remove an evidence payload from active estimates while retaining its ID as a
+    /// tombstone. This prevents a retracted sensitive item from being silently
+    /// replayed under the same identity.
+    ///
+    /// This is model-local retraction only. It does not claim deletion of copies in
+    /// external logs, summaries, exports, or other memory systems.
+    pub fn retract_evidence(
+        &mut self,
+        evidence_id: &str,
+    ) -> Result<bool, IntimacyPsychologyErrorV1> {
+        let evidence_id = bounded_id(evidence_id.to_owned(), 256)
+            .ok_or(IntimacyPsychologyErrorV1::InvalidEvidenceId)?;
+        if !self.known_evidence_ids.contains(&evidence_id) {
+            return Ok(false);
+        }
+
+        let mut removed = false;
+        for evidence in self.evidence.values_mut() {
+            let before = evidence.len();
+            evidence.retain(|item| item.evidence_id != evidence_id);
+            removed |= evidence.len() != before;
+        }
+        self.evidence.retain(|_, evidence| !evidence.is_empty());
+        Ok(removed)
     }
 
     pub fn estimate_at(
@@ -250,6 +291,9 @@ impl IntimacyPsychologyModelV1 {
             temporal_scope,
             reality_scope,
             context_id,
+            observed_at_ns: best.observed_at_ns,
+            valid_until_ns: best.valid_until_ns,
+            retention: best.retention,
         })
     }
 }
@@ -332,33 +376,39 @@ mod tests {
     #[test]
     fn explicit_statement_outranks_population_prior() {
         let mut model = IntimacyPsychologyModelV1::default();
-        model.record(evidence(
-            "prior",
-            IntimacyPsychologySourceV1::PopulationPrior,
-            IntimacyTemporalScopeV1::TraitLike,
-            IntimacyRealityScopeV1::RealWorld,
-            "relationship:a",
-            0.9,
-            0.99,
-            None,
-        )).unwrap();
-        model.record(evidence(
-            "explicit",
-            IntimacyPsychologySourceV1::ExplicitUserStatement,
-            IntimacyTemporalScopeV1::TraitLike,
-            IntimacyRealityScopeV1::RealWorld,
-            "relationship:a",
-            0.2,
-            0.7,
-            None,
-        )).unwrap();
-        let estimate = model.estimate_at(
-            IntimacyPsychologyDimensionV1::NoveltyPreference,
-            IntimacyTemporalScopeV1::TraitLike,
-            IntimacyRealityScopeV1::RealWorld,
-            "relationship:a",
-            100,
-        ).unwrap();
+        model
+            .record(evidence(
+                "prior",
+                IntimacyPsychologySourceV1::PopulationPrior,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::RealWorld,
+                "relationship:a",
+                0.9,
+                0.99,
+                None,
+            ))
+            .unwrap();
+        model
+            .record(evidence(
+                "explicit",
+                IntimacyPsychologySourceV1::ExplicitUserStatement,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::RealWorld,
+                "relationship:a",
+                0.2,
+                0.7,
+                None,
+            ))
+            .unwrap();
+        let estimate = model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::NoveltyPreference,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::RealWorld,
+                "relationship:a",
+                100,
+            )
+            .unwrap();
         assert_eq!(estimate.evidence_id, "explicit");
         assert_eq!(estimate.value, 0.2);
     }
@@ -366,35 +416,41 @@ mod tests {
     #[test]
     fn newer_explicit_correction_beats_older_higher_confidence_statement() {
         let mut model = IntimacyPsychologyModelV1::default();
-        model.record(evidence_at(
-            "old-explicit",
-            IntimacyPsychologySourceV1::ExplicitUserStatement,
-            IntimacyTemporalScopeV1::CurrentState,
-            IntimacyRealityScopeV1::RealWorld,
-            "session:a",
-            0.9,
-            1.0,
-            100,
-            Some(300),
-        )).unwrap();
-        model.record(evidence_at(
-            "new-correction",
-            IntimacyPsychologySourceV1::ExplicitUserStatement,
-            IntimacyTemporalScopeV1::CurrentState,
-            IntimacyRealityScopeV1::RealWorld,
-            "session:a",
-            0.1,
-            0.6,
-            200,
-            Some(300),
-        )).unwrap();
-        let estimate = model.estimate_at(
-            IntimacyPsychologyDimensionV1::NoveltyPreference,
-            IntimacyTemporalScopeV1::CurrentState,
-            IntimacyRealityScopeV1::RealWorld,
-            "session:a",
-            250,
-        ).unwrap();
+        model
+            .record(evidence_at(
+                "old-explicit",
+                IntimacyPsychologySourceV1::ExplicitUserStatement,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                0.9,
+                1.0,
+                100,
+                Some(300),
+            ))
+            .unwrap();
+        model
+            .record(evidence_at(
+                "new-correction",
+                IntimacyPsychologySourceV1::ExplicitUserStatement,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                0.1,
+                0.6,
+                200,
+                Some(300),
+            ))
+            .unwrap();
+        let estimate = model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::NoveltyPreference,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                250,
+            )
+            .unwrap();
         assert_eq!(estimate.evidence_id, "new-correction");
         assert_eq!(estimate.value, 0.1);
     }
@@ -402,45 +458,53 @@ mod tests {
     #[test]
     fn fantasy_and_real_world_contexts_do_not_leak() {
         let mut model = IntimacyPsychologyModelV1::default();
-        model.record(evidence(
-            "fantasy",
-            IntimacyPsychologySourceV1::ExplicitUserStatement,
-            IntimacyTemporalScopeV1::TraitLike,
-            IntimacyRealityScopeV1::FantasyOnly,
-            "story:a",
-            1.0,
-            1.0,
-            None,
-        )).unwrap();
-        assert!(model.estimate_at(
-            IntimacyPsychologyDimensionV1::NoveltyPreference,
-            IntimacyTemporalScopeV1::TraitLike,
-            IntimacyRealityScopeV1::RealWorld,
-            "relationship:a",
-            100,
-        ).is_none());
+        model
+            .record(evidence(
+                "fantasy",
+                IntimacyPsychologySourceV1::ExplicitUserStatement,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::FantasyOnly,
+                "story:a",
+                1.0,
+                1.0,
+                None,
+            ))
+            .unwrap();
+        assert!(model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::NoveltyPreference,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::RealWorld,
+                "relationship:a",
+                100,
+            )
+            .is_none());
     }
 
     #[test]
     fn stale_current_state_evidence_is_ignored() {
         let mut model = IntimacyPsychologyModelV1::default();
-        model.record(evidence(
-            "state",
-            IntimacyPsychologySourceV1::ExplicitUserStatement,
-            IntimacyTemporalScopeV1::CurrentState,
-            IntimacyRealityScopeV1::RealWorld,
-            "session:a",
-            0.8,
-            1.0,
-            Some(150),
-        )).unwrap();
-        assert!(model.estimate_at(
-            IntimacyPsychologyDimensionV1::NoveltyPreference,
-            IntimacyTemporalScopeV1::CurrentState,
-            IntimacyRealityScopeV1::RealWorld,
-            "session:a",
-            151,
-        ).is_none());
+        model
+            .record(evidence(
+                "state",
+                IntimacyPsychologySourceV1::ExplicitUserStatement,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                0.8,
+                1.0,
+                Some(150),
+            ))
+            .unwrap();
+        assert!(model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::NoveltyPreference,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                151,
+            )
+            .is_none());
     }
 
     #[test]
@@ -459,6 +523,99 @@ mod tests {
             "sensor:evidence",
             IntimacyPsychologyRetentionV1::EphemeralSession,
         );
-        assert_eq!(result, Err(IntimacyPsychologyErrorV1::PhysiologyCannotEstablishTrait));
+        assert_eq!(
+            result,
+            Err(IntimacyPsychologyErrorV1::PhysiologyCannotEstablishTrait)
+        );
+    }
+
+    #[test]
+    fn trait_evidence_does_not_answer_current_state() {
+        let mut model = IntimacyPsychologyModelV1::default();
+        model
+            .record(evidence(
+                "trait",
+                IntimacyPsychologySourceV1::ExplicitUserStatement,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                0.8,
+                1.0,
+                None,
+            ))
+            .unwrap();
+        assert!(model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::NoveltyPreference,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                100,
+            )
+            .is_none());
+    }
+
+    #[test]
+    fn retraction_removes_payload_but_tombstones_identity() {
+        let mut model = IntimacyPsychologyModelV1::default();
+        let item = evidence(
+            "sensitive",
+            IntimacyPsychologySourceV1::ExplicitUserStatement,
+            IntimacyTemporalScopeV1::TraitLike,
+            IntimacyRealityScopeV1::RealWorld,
+            "relationship:a",
+            0.7,
+            1.0,
+            None,
+        );
+        model.record(item.clone()).unwrap();
+        assert!(model.retract_evidence("sensitive").unwrap());
+        assert!(model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::NoveltyPreference,
+                IntimacyTemporalScopeV1::TraitLike,
+                IntimacyRealityScopeV1::RealWorld,
+                "relationship:a",
+                100,
+            )
+            .is_none());
+        assert_eq!(
+            model.record(item),
+            Err(IntimacyPsychologyErrorV1::DuplicateEvidenceId)
+        );
+    }
+
+    #[test]
+    fn estimate_preserves_freshness_and_retention_provenance() {
+        let mut model = IntimacyPsychologyModelV1::default();
+        model
+            .record(IntimacyPsychologyEvidenceV1::new(
+                "provenance",
+                IntimacyPsychologyDimensionV1::DyadicDesire,
+                0.6,
+                0.8,
+                IntimacyPsychologySourceV1::ValidatedSelfReportInstrument,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                110,
+                Some(160),
+                "instrument:versioned-ref",
+                IntimacyPsychologyRetentionV1::DurableOptIn,
+            ).unwrap())
+            .unwrap();
+        let estimate = model
+            .estimate_at(
+                IntimacyPsychologyDimensionV1::DyadicDesire,
+                IntimacyTemporalScopeV1::CurrentState,
+                IntimacyRealityScopeV1::RealWorld,
+                "session:a",
+                120,
+            )
+            .unwrap();
+        assert_eq!(estimate.source, IntimacyPsychologySourceV1::ValidatedSelfReportInstrument);
+        assert_eq!(estimate.observed_at_ns, 110);
+        assert_eq!(estimate.valid_until_ns, Some(160));
+        assert_eq!(estimate.retention, IntimacyPsychologyRetentionV1::DurableOptIn);
     }
 }
