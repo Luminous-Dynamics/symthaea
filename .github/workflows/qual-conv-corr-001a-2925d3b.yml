@@ -1,0 +1,38 @@
+name: QUAL CONV-CORR-001A exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/conv-corr-001a-correction-observatory
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 2925d3ba94e1fd69cc1e086848eab7c682fb5af8
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "2925d3ba94e1fd69cc1e086848eab7c682fb5af8"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Exact correction observatory test
+        run: cargo test -p symthaea-communication --test correction_observatory
+
+      - name: Clippy exact correction observatory
+        run: cargo clippy -p symthaea-communication --test correction_observatory -- -D warnings
