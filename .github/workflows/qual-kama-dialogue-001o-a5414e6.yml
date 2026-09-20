@@ -1,0 +1,38 @@
+name: QUAL KAMA-DIALOGUE-001O exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/kama-dialogue-001o-full-duplex-benchmark
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: a5414e6c871e40b68092c7e2660bf9f7eaae1dac
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "a5414e6c871e40b68092c7e2660bf9f7eaae1dac"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Exact benchmark test
+        run: cargo test -p symthaea-communication --test full_duplex_benchmark
+
+      - name: Clippy exact benchmark
+        run: cargo clippy -p symthaea-communication --test full_duplex_benchmark -- -D warnings
