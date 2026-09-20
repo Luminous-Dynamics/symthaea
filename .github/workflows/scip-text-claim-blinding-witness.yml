@@ -1,0 +1,96 @@
+name: SCIP Text Claim Blinding Witness Contract
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/scip_text_claim_blinding_witness.py'
+      - 'scripts/test_scip_text_claim_blinding_witness.py'
+      - 'scripts/qualification/scip_text_claim_blinding_witness_policy_v1.json'
+      - 'docs/release/evidence/SCIP_TEXT_CLAIM_BLINDING_WITNESS_V1.md'
+      - '.github/workflows/scip-text-claim-blinding-witness.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  blinding-witness:
+    name: Validate operational blinding witness contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Prove exact five-file review surface
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          base="${BASE_SHA:-HEAD^1}"
+          git diff --name-only "$base" HEAD | LC_ALL=C sort > /tmp/actual.txt
+          cat > /tmp/expected.txt <<'LIST'
+          .github/workflows/scip-text-claim-blinding-witness.yml
+          docs/release/evidence/SCIP_TEXT_CLAIM_BLINDING_WITNESS_V1.md
+          scripts/qualification/scip_text_claim_blinding_witness_policy_v1.json
+          scripts/scip_text_claim_blinding_witness.py
+          scripts/test_scip_text_claim_blinding_witness.py
+          LIST
+          diff -u /tmp/expected.txt /tmp/actual.txt
+
+      - name: Verify exact V22 and inherited V20/V21 identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/scip-v22.sha256 <<'SUMS'
+          13d899085c08d026f27ed9d84ae2e2f6dc2484622c00efc2d24a5d71d256e7d6  scripts/scip_text_claim_blinding_witness.py
+          2bcce011444d323e47529a4b2079729c6bbc131a78ea3e410ee58298a7a962c5  scripts/test_scip_text_claim_blinding_witness.py
+          1c63dea703d3a1f80a6161d706359d1884e3ee4e2788b1df9610bf3962a5ff2c  scripts/qualification/scip_text_claim_blinding_witness_policy_v1.json
+          SUMS
+          sha256sum -c /tmp/scip-v22.sha256
+          test "$(git hash-object scripts/scip_text_claim_blinding_witness.py)" = e39812a8e00545c3d8f31f46f1b48a70e0b7da03
+          test "$(git hash-object scripts/test_scip_text_claim_blinding_witness.py)" = 4c928f324c9e187698a61b34ef5dac126e42a352
+          test "$(git hash-object scripts/qualification/scip_text_claim_blinding_witness_policy_v1.json)" = bf9f23a94a2096c90b05cc3c9d1be72796f9da58
+          test "$(git hash-object scripts/scip_text_claim_annotation_bundle.py)" = aa20559da3cdf3c4b7aeb304460eff7c7b2f9e38
+          test "$(git hash-object scripts/qualification/scip_text_claim_annotation_policy_v1.json)" = e4088cde2b6a629e3a3de2bd39873002814ac7ab
+          test "$(git hash-object scripts/scip_text_claim_case_admission.py)" = 537bdda1403ef426b6ea653e2f1759b8893970a8
+          test "$(git hash-object scripts/qualification/scip_text_claim_case_admission_policy_v1.json)" = 26cde8cef449abdf2dea56ba3b9d905330aee7da
+
+      - name: Compile without mutating checkout
+        env:
+          PYTHONPYCACHEPREFIX: /tmp/scip-v22-pycache
+        run: |
+          python3 -m py_compile \
+            scripts/scip_text_claim_blinding_witness.py \
+            scripts/test_scip_text_claim_blinding_witness.py
+
+      - name: Run role-profile and hostile-evidence suite
+        run: python3 -B scripts/test_scip_text_claim_blinding_witness.py
+
+      - name: Prove frozen policy identity and authority ceiling
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          p=json.loads(Path('scripts/qualification/scip_text_claim_blinding_witness_policy_v1.json').read_text())
+          canonical=json.dumps(p,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()
+          assert hashlib.sha256(canonical).hexdigest() == 'edb837213b56f4423bc096d3bb11c90dd07de03cf5b672398b1a17de2a6b6cc0'
+          assert p['v20_annotation_policy_sha256'] == '12a8431fd8a93dd8ba158758bb4089ef951960240fcab11a5178159e67f19bb9'
+          assert p['v21_case_admission_policy_sha256'] == '452f4201c230ca3278d1ddc744fb70bca5944fa0d77b89e494096cfbf9c3dfb9'
+          assert p['receipt']['domain'].endswith('\x00')
+          assert all(p['evidence'].values())
+          assert all(p['claim_boundary'].values())
+          assert p['roles']['extraction-annotator']['allowed_artifact_classes'] == ['surface-text','public-claim-schema']
+          assert 'source-inventory' in p['roles']['extraction-annotator']['forbidden_artifact_classes']
+          assert 'candidate-extractor-output' in p['roles']['alignment-annotator']['forbidden_artifact_classes']
+          PY
+
+      - name: Prove checkout remained byte-identical
+        run: test -z "$(git status --porcelain --untracked-files=all)"
