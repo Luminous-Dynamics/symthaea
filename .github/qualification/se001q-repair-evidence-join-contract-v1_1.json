@@ -1,0 +1,52 @@
+{
+  "authority": {
+    "meaning": "causal and reproduced repair evidence linkage only",
+    "qualification_claim": "NONE",
+    "repair_authority_claim": "NONE",
+    "sufficient_for_repair_grant": false
+  },
+  "domain": "symthaea.se001q.repair-evidence-join.v1.1",
+  "expected_diagnostic_gates": [
+    "focused-all-targets",
+    "focused-tests",
+    "focused-clippy"
+  ],
+  "expected_diagnostic_verifier_sha": "3dd33625162ec7137ef06c8079794a8d2aecc95d",
+  "expected_diagnostic_witness_ids": [
+    "sha256:f3abb0c5d1687b7a0ba353c077b06e8df1d0987c83fc36bade0a705512a88e01",
+    "sha256:0d8fca3617854d36684bcfaa3874113f3f44d08231adafe26082dfd39a037295",
+    "sha256:e841297900c3da1074a06cb7fe0e59652603de992985a0e54e5198f46699890a"
+  ],
+  "expected_diagnostic_witness_set_id": "sha256:0a7a16301a164334ef9b4097f019f7d6e8890c7a3c83d7548dd25cc6eaf09216",
+  "expected_experiment_id": "SE-001Q-LOCK-DIAG-001",
+  "expected_source_artifact_id": "10591990496",
+  "expected_source_artifact_zip_sha256": "sha256:6b9f2566e762b3064b0925d4ffbc86d8b3bdb4dd81b9c0863379b2b19362d78e",
+  "expected_source_evidence_manifest_id": "sha256:fdc699087ec4d66a8b0ea5ebddba1c79f039c89c06b850b65bc5c40528b0a731",
+  "expected_source_lock_sha256": "sha256:d7dcc25f8dc3807a86cea758f5380059ec8460d304618bcc5cfd6d5c9a6ce44f",
+  "expected_source_run_attempt": "1",
+  "expected_source_run_id": "35440131926",
+  "expected_subject_sha": "47de7f2a306cffb66b5505786220590aa5f42e90",
+  "expected_workflow_path": ".github/workflows/systems-engineering-se001q-lock-delta-diagnostic.yml",
+  "purpose": "Bind exact causal DiagnosticWitness bytes to independently reproduced Cargo.lock delta evidence and exact per-generation transport provenance without issuing repair authority.",
+  "required_corroboration_result": "CORROBORATED_GENERATED_LOCK",
+  "required_corroboration_schema": "symthaea.se001q.cross-generation-corroboration.v1.1",
+  "required_diagnostic_witness_set_schema": "symthaea.diagnostic-witness-set.v1",
+  "required_failure_class": "CARGO_LOCKFILE_UPDATE_REQUIRED",
+  "required_provenance_schema": "symthaea.se001q.github-provenance.v1.1",
+  "required_provenance_strength": "API_CONSISTENCY_PLUS_ARTIFACT_DIGEST_BINDING_NOT_GITHUB_SIGNATURE",
+  "requirements": [
+    "corrected content-addressed DiagnosticWitness set is verified against exact retained EV2.4 stderr byte slices from the exact source artifact ZIP",
+    "diagnostic source artifact ZIP, evidence manifest, subject, verifier, run, attempt, and artifact identities are exact",
+    "exactly two corroborated diagnostic generations and exactly two provenance witnesses",
+    "one-to-one run ID pairing between corroboration and provenance",
+    "artifact ID equality for each paired generation",
+    "verifier SHA equals provenance workflow head SHA for each paired generation",
+    "corroboration artifact ZIP SHA-256 equals both provenance API digest and downloaded archive SHA-256",
+    "provenance API artifact byte count equals the downloaded archive byte count",
+    "provenance workflow path equals the exact SE-001Q lock-diagnostic workflow",
+    "all inputs remain explicitly non-authorizing"
+  ],
+  "result": "JOINED_CAUSAL_REPAIR_EVIDENCE",
+  "schema": "symthaea.se001q.repair-evidence-join-contract.v1.1",
+  "theorem": "Exact retained causal failure bytes + cross-generation reproducible lock delta + paired transport provenance establishes joined causal repair evidence, not mutation authority."
+}
