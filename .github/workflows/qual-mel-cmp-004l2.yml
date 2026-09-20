@@ -1,0 +1,69 @@
+name: QUAL-MEL-CMP-004L2 exact source
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qual-mel-cmp-004l2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify frozen IndexedDB source
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: 89d7d9d5a9635f949b179ec8b05635e62d7f3b4f
+      BASE_SHA: b89fa2f1f660d4fe10212d77a270f8712f5d0c98
+    steps:
+      - name: Check out exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 2
+
+      - name: Verify exact subject and incremental surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test "$(git rev-parse HEAD^)" = "$BASE_SHA"
+          expected=$'crates/domains/symthaea-muse-ui/Cargo.toml\ncrates/domains/symthaea-muse-ui/src/comparison_evidence_indexed_db.rs\ncrates/domains/symthaea-muse-ui/src/main.rs'
+          actual="$(git diff --name-only "$BASE_SHA" "$SUBJECT_SHA")"
+          test "$actual" = "$expected"
+          test "$(git rev-list --count "$BASE_SHA..$SUBJECT_SHA")" = "1"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+
+      - name: Record toolchain identity
+        run: |
+          rustc --version --verbose
+          cargo --version --verbose
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-muse-ui -- --check
+
+      - name: Native comparison-store regressions
+        run: cargo test -p symthaea-muse-ui comparison_evidence_store
+
+      - name: Native UI test surface
+        run: cargo test -p symthaea-muse-ui
+
+      - name: WASM compile check
+        run: cargo check -p symthaea-muse-ui --target wasm32-unknown-unknown
+
+      - name: WASM strict Clippy
+        run: cargo clippy -p symthaea-muse-ui --target wasm32-unknown-unknown --no-deps -- -D warnings
+
+      - name: Source immutability postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          test -z "$(git status --porcelain)"
