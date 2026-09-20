@@ -1,0 +1,141 @@
+name: QUAL MAT-OPPORTUNITY-001A exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-mat-opportunity-001a-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head materials opportunity-contract qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: 05a98a6a62e08982c171923b4a2417099ac7a215
+      SOURCE_PARENT: 5fd5259af776c0a7f1b9608f040bfae9009871a1
+      PACKAGE: symthaea-materials
+      CRATE: crates/domains/symthaea-materials
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: 05a98a6a62e08982c171923b4a2417099ac7a215
+          fetch-depth: 2
+
+      - name: Verify exact source identity and semantic scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 3
+          test "${changed[0]}" = "$CRATE/Cargo.toml"
+          test "${changed[1]}" = "$CRATE/src/lib.rs"
+          test "${changed[2]}" = "$CRATE/src/opportunity.rs"
+          echo "qualified_subject=$SOURCE_SHA"
+          echo "qualified_parent=$SOURCE_PARENT"
+          echo "semantic_diff_paths=PASS"
+
+      - name: Prove planning-only authority boundary is represented
+        shell: bash
+        run: |
+          set -euo pipefail
+          src="$CRATE/src/opportunity.rs"
+          grep -Fq 'proposal-plane data only' "$src"
+          grep -Fq 'pub enum OpportunityAxis' "$src"
+          grep -Fq 'Unknown rather than silently assumed to be zero.' "$src"
+          grep -Fq 'Multi-axis research opportunity with no built-in aggregate score.' "$src"
+          grep -Fq 'fn bottleneck_state_code' "$src"
+          grep -Fq 'fn intervention_code' "$src"
+          grep -Fq 'fn axis_code' "$src"
+          grep -Fq 'fn ordinal_code' "$src"
+          if grep -Fq 'pub fn overall_score' "$src"; then
+            echo 'forbidden overall score API present'
+            exit 1
+          fi
+          if grep -Fq 'pub fn score(' "$src"; then
+            echo 'forbidden generic score API present'
+            exit 1
+          fi
+          echo "planning_authority_boundary=PASS"
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/mat-opportunity-001a-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+          cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+
+      - name: Rustfmt exact materials crate
+        run: cargo fmt --manifest-path "$CRATE/Cargo.toml" -- --check
+
+      - name: Compile and run all materials targets
+        run: cargo test -p "$PACKAGE" --all-targets --locked
+
+      - name: Strict Clippy on materials targets
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- Cargo.lock "$CRATE"
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_MATERIALS_OPPORTUNITY_PLANNING_CONTRACTS"
+          echo "scientific_property_authority=NONE"
+          echo "calculation_execution_authority=NONE"
+          echo "economic_or_investment_authority=NONE"
+          echo "deployment_authority=NONE"
