@@ -2,7 +2,7 @@
 import argparse, hashlib, json, subprocess, tempfile
 from pathlib import Path
 
-CAPTURE_PROTOCOL = "symthaea.se001q.lock-delta.capture.v1.1"
+CAPTURE_PROTOCOL = "symthaea.se001q.lock-delta.capture.v1.2"
 LOCK_DIAGNOSTICS = (b"cannot update the lock file", b"lock file", b"needs to be updated")
 
 
@@ -209,15 +209,18 @@ def main():
         })
         previous_lock_hash = lock_after
 
-    delta_exists = online_hash != before_hash and offline_hash != before_hash
-    reproduced = online_hash == offline_hash
+    online_delta_exists = online_hash != before_hash
+    offline_delta_exists = offline_hash != before_hash
+    any_delta_exists = online_delta_exists or offline_delta_exists
+    both_deltas_exist = online_delta_exists and offline_delta_exists
+    reproduced = both_deltas_exist and online_hash == offline_hash
     tracked_safe = online_paths == ["Cargo.lock"] and offline_paths == ["Cargo.lock"] and online_final_paths == ["Cargo.lock"] and offline_final_paths == ["Cargo.lock"]
     counter_lock_stable = all(item["lock_unchanged"] for item in counter)
     lock_boundary_cleared = all(not item["lock_update_diagnostic_present"] for item in counter)
 
-    if delta_exists and reproduced and tracked_safe and counter_lock_stable and lock_boundary_cleared and source_preserved:
+    if reproduced and tracked_safe and counter_lock_stable and lock_boundary_cleared and source_preserved:
         expected_status = "REPRODUCIBLE_LOCK_DELTA"
-    elif not delta_exists:
+    elif not any_delta_exists:
         expected_status = "NO_REPRODUCIBLE_LOCK_DELTA"
     else:
         expected_status = "INCOMPLETE_OR_NONREPRODUCIBLE"
@@ -235,7 +238,11 @@ def main():
         "counterfactual_locked_gates": counter,
         "source_preserved": source_preserved,
         "frozen_subject_unchanged": True,
-        "lock_delta_reproduced_offline": reproduced and delta_exists,
+        "online_delta_exists": online_delta_exists,
+        "offline_delta_exists": offline_delta_exists,
+        "any_delta_exists": any_delta_exists,
+        "both_deltas_exist": both_deltas_exist,
+        "lock_delta_reproduced_offline": reproduced,
         "counterfactual_lock_stable": counter_lock_stable,
         "lock_boundary_cleared": lock_boundary_cleared,
         "status": expected_status,

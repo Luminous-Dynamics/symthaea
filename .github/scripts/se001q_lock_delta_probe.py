@@ -2,7 +2,7 @@
 import argparse, hashlib, json, os, shutil, subprocess
 from pathlib import Path
 
-CAPTURE_PROTOCOL = "symthaea.se001q.lock-delta.capture.v1.1"
+CAPTURE_PROTOCOL = "symthaea.se001q.lock-delta.capture.v1.2"
 LOCK_DIAGNOSTICS = (b"cannot update the lock file", b"lock file", b"needs to be updated")
 
 
@@ -187,8 +187,11 @@ def main():
         subject_head = git_text(subject, "rev-parse", "HEAD") == subject_sha
         subject_tree_ok = git_text(subject, "rev-parse", "HEAD^{tree}") == subject_tree
         source_preserved = online_nonlock == expected_nonlock and offline_nonlock == expected_nonlock
-        delta_exists = online_lock != before_lock and offline_lock != before_lock
-        reproduced = online_lock == offline_lock
+        online_delta_exists = online_lock != before_lock
+        offline_delta_exists = offline_lock != before_lock
+        any_delta_exists = online_delta_exists or offline_delta_exists
+        both_deltas_exist = online_delta_exists and offline_delta_exists
+        reproduced = both_deltas_exist and online_lock == offline_lock
         tracked_safe = (
             online_changed == ["Cargo.lock"]
             and offline_changed == ["Cargo.lock"]
@@ -198,9 +201,9 @@ def main():
         counter_lock_stable = all(item["lock_unchanged"] for item in counter)
         lock_boundary_cleared = all(not item["lock_update_diagnostic_present"] for item in counter)
 
-        if delta_exists and reproduced and tracked_safe and counter_lock_stable and lock_boundary_cleared and source_preserved and subject_clean and subject_head and subject_tree_ok:
+        if reproduced and tracked_safe and counter_lock_stable and lock_boundary_cleared and source_preserved and subject_clean and subject_head and subject_tree_ok:
             status = "REPRODUCIBLE_LOCK_DELTA"
-        elif not delta_exists:
+        elif not any_delta_exists:
             status = "NO_REPRODUCIBLE_LOCK_DELTA"
         else:
             status = "INCOMPLETE_OR_NONREPRODUCIBLE"
@@ -236,7 +239,11 @@ def main():
             "counterfactual_locked_gates": counter,
             "source_preserved": source_preserved,
             "frozen_subject_unchanged": subject_clean and subject_head and subject_tree_ok,
-            "lock_delta_reproduced_offline": reproduced and delta_exists,
+            "online_delta_exists": online_delta_exists,
+            "offline_delta_exists": offline_delta_exists,
+            "any_delta_exists": any_delta_exists,
+            "both_deltas_exist": both_deltas_exist,
+            "lock_delta_reproduced_offline": reproduced,
             "counterfactual_lock_stable": counter_lock_stable,
             "lock_boundary_cleared": lock_boundary_cleared,
             "status": status,
