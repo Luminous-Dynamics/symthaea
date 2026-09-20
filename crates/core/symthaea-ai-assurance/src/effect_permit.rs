@@ -18,17 +18,22 @@
 //!    serialize on the same short critical section;
 //! 4. successful acquisition returns an affine [`EffectEntryPermit`] and records
 //!    a monotonic linearization sequence;
-//! 5. revocation rotates the epoch **and latches admission closed**;
-//! 6. while stopped, new tickets cannot be issued and old tickets cannot acquire;
-//! 7. [`EffectEntryDomain::resume`] reopens admission only after already-admitted
+//! 5. [`EffectEntryPermit::begin`] transitions that permit into an affine
+//!    [`EffectInFlight`] state and returns immutable admission evidence before
+//!    arbitrary adapter work runs;
+//! 6. revocation rotates the epoch **and latches admission closed**;
+//! 7. while stopped, new tickets cannot be issued and old tickets cannot acquire;
+//! 8. [`EffectEntryDomain::resume`] reopens admission only after already-admitted
 //!    work has become quiescent;
-//! 8. a permit acquired before revocation remains admission for that one effect;
-//! 9. revocation evidence records already-acquired and currently in-flight work
-//!    instead of pretending those effects disappeared.
+//! 9. a permit acquired before revocation remains admission for that one effect;
+//! 10. revocation evidence records already-acquired and currently in-flight work
+//!     instead of pretending those effects disappeared.
 //!
-//! The domain lock is **not** held while the effect callback runs. Acquisition is
-//! the point of no return for admission semantics; post-entry cancellation is a
-//! separate adapter-specific guarantee.
+//! The domain lock is **not** held while arbitrary adapter work runs. Acquisition
+//! is the point of no return for admission semantics; post-entry cancellation is
+//! a separate adapter-specific guarantee. [`EffectEntryReceipt`] proves admission
+//! and the transition into in-flight state. It does **not** prove that external
+//! adapter work started, completed, or produced an effect.
 //!
 //! The commitment's authority-snapshot and adapter-semantics digests are
 //! **commitments, not attestations by themselves**. The trusted host must derive
@@ -38,9 +43,10 @@
 //! semantics its digest names.
 //!
 //! This primitive also does not itself prove that arbitrary code used the permit.
-//! A concrete production adapter must make [`EffectEntryPermit::enter`] (or an
-//! equivalent permit-consuming boundary) structurally necessary before its first
-//! external side effect.
+//! A concrete production adapter should persist the receipt returned by
+//! [`EffectEntryPermit::begin`] before performing immediate freshness checks and
+//! then make [`EffectInFlight::run`] (or an equivalent consuming boundary)
+//! structurally necessary before its first external side effect.
 
 use std::fmt;
 use std::sync::{Arc, Mutex};
@@ -173,12 +179,16 @@ pub struct EffectEntryActivity {
 }
 
 impl EffectEntryActivity {
-    /// Acquired permits that have not yet entered their effect callback.
+    /// Acquired permits that have not yet transitioned into in-flight state.
     pub const fn outstanding_permits(self) -> u64 {
         self.outstanding_permits
     }
 
-    /// Effect callbacks that have begun and not yet returned/unwound.
+    /// Admissions transitioned into in-flight state and not yet resolved.
+    ///
+    /// An in-flight admission does not by itself prove that external adapter work
+    /// has started; the trusted host may still be persisting evidence or running
+    /// immediate freshness checks before the adapter callback begins.
     pub const fn in_flight_effects(self) -> u64 {
         self.in_flight_effects
     }
@@ -386,7 +396,7 @@ impl EffectEntryDomain {
     /// Explicitly reopen a stopped domain after already-admitted work is quiescent.
     ///
     /// Resume is fail-closed while an acquired permit is outstanding or an effect
-    /// callback is still in flight. This prevents a stopped domain from admitting
+    /// admission is still in flight. This prevents a stopped domain from admitting
     /// a new epoch of work while pre-stop admitted work is still unresolved.
     pub fn resume(&self) -> Result<EffectResumeReceipt, EffectEntryError> {
         let mut state = self
@@ -457,9 +467,9 @@ impl EffectEntryTicket {
 
 /// Affine one-effect admission whose acquisition already won the revocation race.
 ///
-/// The permit is intentionally neither `Clone` nor `Copy`. Consuming
-/// [`Self::enter`] makes one effect callback structurally follow successful
-/// admission without holding the domain lock during the callback.
+/// The permit is intentionally neither `Clone` nor `Copy`. [`Self::begin`]
+/// consumes it, transitions the accounting state to in-flight, and returns the
+/// immutable admission receipt before arbitrary adapter work can run.
 ///
 /// ```compile_fail
 /// use symthaea_ai_assurance::{EffectAdmissionCommitment, EffectEntryDomain};
@@ -468,8 +478,8 @@ impl EffectEntryTicket {
 /// let commitment = EffectAdmissionCommitment::new([7; 32], [8; 32], [9; 32]);
 /// let ticket = domain.issue_ticket(commitment).unwrap();
 /// let permit = domain.acquire(ticket, commitment).unwrap();
-/// let _ = permit.enter(|| ()).unwrap();
-/// let _ = permit.enter(|| ()).unwrap();
+/// let _ = permit.begin().unwrap();
+/// let _ = permit.begin().unwrap();
 /// ```
 #[derive(Debug)]
 pub struct EffectEntryPermit {
@@ -513,16 +523,18 @@ impl EffectEntryPermit {
         self.acquisition_sequence
     }
 
-    /// Consume this permit and invoke one already-admitted effect callback.
+    /// Consume this permit and transition the admitted effect into in-flight state.
     ///
-    /// No domain lock is held while `effect` runs. Immediately before invoking
-    /// the callback, this method moves the permit from the outstanding count to
-    /// the in-flight count. A private drop guard removes the in-flight count even
-    /// if the callback unwinds.
-    pub fn enter<F, R>(mut self, effect: F) -> Result<(EffectEntryReceipt, R), EffectEntryError>
-    where
-        F: FnOnce() -> R,
-    {
+    /// This is the evidence-before-adapter-work boundary. Under the short domain
+    /// lock it moves one unit from `outstanding_permits` to `in_flight_effects`,
+    /// captures the resulting activity snapshot, then releases the lock and
+    /// returns both immutable admission evidence and an affine in-flight guard.
+    ///
+    /// No arbitrary callback executes in this method. Trusted host code can
+    /// therefore durably persist the returned receipt and perform immediate
+    /// freshness checks before calling [`EffectInFlight::run`]. Dropping the
+    /// returned guard without running adapter work repairs the in-flight count.
+    pub fn begin(mut self) -> Result<(EffectEntryReceipt, EffectInFlight), EffectEntryError> {
         let state = Arc::clone(
             self.state
                 .as_ref()
@@ -545,9 +557,6 @@ impl EffectEntryPermit {
         };
 
         self.state = None;
-        let in_flight = EffectInFlightGuard {
-            state: Arc::clone(&state),
-        };
         let receipt = EffectEntryReceipt {
             permit_id: self.permit_id,
             ticket_id: self.ticket_id,
@@ -557,8 +566,21 @@ impl EffectEntryPermit {
             acquisition_sequence: self.acquisition_sequence,
             activity_at_entry,
         };
-        let result = effect();
-        drop(in_flight);
+        let in_flight = EffectInFlight { state };
+        Ok((receipt, in_flight))
+    }
+
+    /// Compatibility wrapper that begins admission and immediately runs one callback.
+    ///
+    /// New trusted adapters that need evidence persistence before freshness or
+    /// spawn should use [`Self::begin`] directly. This wrapper preserves the
+    /// original one-call behavior for existing callers.
+    pub fn enter<F, R>(self, effect: F) -> Result<(EffectEntryReceipt, R), EffectEntryError>
+    where
+        F: FnOnce() -> R,
+    {
+        let (receipt, in_flight) = self.begin()?;
+        let result = in_flight.run(effect);
         Ok((receipt, result))
     }
 }
@@ -578,7 +600,62 @@ impl Drop for EffectEntryPermit {
     }
 }
 
-/// Immutable evidence that one effect admission linearized successfully.
+/// Affine obligation representing one admitted effect transitioned to in-flight state.
+///
+/// This type is intentionally neither `Clone` nor `Copy`. It grants no new
+/// authority and cannot mint additional admissions. Its only responsibility is
+/// retaining the domain's in-flight accounting obligation until the host either
+/// drops it without starting adapter work or consumes it through [`Self::run`].
+///
+/// ```compile_fail
+/// use symthaea_ai_assurance::{EffectAdmissionCommitment, EffectEntryDomain};
+///
+/// let domain = EffectEntryDomain::new();
+/// let commitment = EffectAdmissionCommitment::new([10; 32], [11; 32], [12; 32]);
+/// let ticket = domain.issue_ticket(commitment).unwrap();
+/// let permit = domain.acquire(ticket, commitment).unwrap();
+/// let (_, in_flight) = permit.begin().unwrap();
+/// let _copy = in_flight.clone();
+/// ```
+#[derive(Debug)]
+pub struct EffectInFlight {
+    state: Arc<Mutex<EffectEntryState>>,
+}
+
+impl EffectInFlight {
+    /// Consume this in-flight obligation and run one arbitrary adapter callback.
+    ///
+    /// No domain lock is held while `effect` runs. Accounting is repaired after
+    /// normal return and during unwinding because `self` owns the drop boundary.
+    pub fn run<F, R>(self, effect: F) -> R
+    where
+        F: FnOnce() -> R,
+    {
+        let result = effect();
+        drop(self);
+        result
+    }
+}
+
+impl Drop for EffectInFlight {
+    fn drop(&mut self) {
+        let mut state = self
+            .state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        debug_assert!(state.in_flight_effects > 0);
+        if state.in_flight_effects > 0 {
+            state.in_flight_effects -= 1;
+        }
+    }
+}
+
+/// Immutable evidence that one effect admission linearized successfully and
+/// transitioned into in-flight state.
+///
+/// This receipt is intentionally evidence of admission, not adapter-attempt
+/// evidence. Its existence does not prove that external work started, completed,
+/// or changed external state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EffectEntryReceipt {
     permit_id: EffectEntryPermitId,
@@ -621,7 +698,8 @@ impl EffectEntryReceipt {
         self.acquisition_sequence
     }
 
-    /// Already-admitted work snapshot immediately before the callback began.
+    /// Already-admitted activity immediately after this permit transitioned to
+    /// in-flight state and before arbitrary adapter work was invoked.
     pub const fn activity_at_entry(self) -> EffectEntryActivity {
         self.activity_at_entry
     }
@@ -689,7 +767,7 @@ impl EffectResumeReceipt {
     }
 }
 
-/// Failure while issuing, acquiring, entering, revoking, or resuming effect entry.
+/// Failure while issuing, acquiring, beginning, entering, revoking, or resuming effect entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EffectEntryError {
     /// Ticket belongs to another admission domain.
@@ -784,24 +862,6 @@ impl EffectEntryState {
     }
 }
 
-#[derive(Debug)]
-struct EffectInFlightGuard {
-    state: Arc<Mutex<EffectEntryState>>,
-}
-
-impl Drop for EffectInFlightGuard {
-    fn drop(&mut self) {
-        let mut state = self
-            .state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        debug_assert!(state.in_flight_effects > 0);
-        if state.in_flight_effects > 0 {
-            state.in_flight_effects -= 1;
-        }
-    }
-}
-
 fn hash_field(hasher: &mut blake3::Hasher, bytes: &[u8]) {
     hasher.update(&(bytes.len() as u64).to_le_bytes());
     hasher.update(bytes);
@@ -863,9 +923,113 @@ mod tests {
     }
 
     #[test]
-    fn acquired_permit_survives_stop_but_blocks_resume_until_quiescent() {
+    fn begin_returns_persistable_receipt_before_adapter_work() {
         let domain = EffectEntryDomain::new();
         let commitment = commitment(2);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
+        let permit_id = permit.permit_id();
+        let ticket_id = permit.ticket_id();
+        let domain_id = permit.domain_id();
+        let epoch = permit.epoch();
+        let acquisition = permit.acquisition_sequence();
+
+        let (receipt, in_flight) = permit.begin().unwrap();
+
+        assert_eq!(receipt.permit_id(), permit_id);
+        assert_eq!(receipt.ticket_id(), ticket_id);
+        assert_eq!(receipt.domain_id(), domain_id);
+        assert_eq!(receipt.epoch(), epoch);
+        assert_eq!(receipt.commitment(), commitment);
+        assert_eq!(receipt.acquisition_sequence(), acquisition);
+        assert_eq!(receipt.activity_at_entry().outstanding_permits(), 0);
+        assert_eq!(receipt.activity_at_entry().in_flight_effects(), 1);
+        assert_eq!(domain.activity().in_flight_effects(), 1);
+
+        // No adapter callback has existed or run yet. The host can persist the
+        // receipt at this point and then decide whether freshness permits work.
+        drop(in_flight);
+        assert!(domain.activity().is_quiescent());
+    }
+
+    #[test]
+    fn in_flight_run_repairs_count_after_normal_return() {
+        let domain = EffectEntryDomain::new();
+        let commitment = commitment(3);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
+        let (_, in_flight) = permit.begin().unwrap();
+        assert_eq!(domain.activity().in_flight_effects(), 1);
+
+        let value = in_flight.run(|| 42_u64);
+        assert_eq!(value, 42);
+        assert!(domain.activity().is_quiescent());
+    }
+
+    #[test]
+    fn in_flight_run_repairs_count_after_unwind() {
+        let domain = EffectEntryDomain::new();
+        let commitment = commitment(4);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
+        let (_, in_flight) = permit.begin().unwrap();
+
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            in_flight.run(|| panic!("synthetic adapter unwind"));
+        }));
+        assert!(result.is_err());
+        assert!(domain.activity().is_quiescent());
+    }
+
+    #[test]
+    fn revocation_can_complete_after_begin_and_blocks_resume_until_guard_resolves() {
+        let domain = EffectEntryDomain::new();
+        let commitment = commitment(5);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
+        let acquisition = permit.acquisition_sequence();
+        let (receipt, in_flight) = permit.begin().unwrap();
+
+        let revocation = domain.revoke_all().unwrap();
+        assert!(acquisition < revocation.revocation_sequence());
+        assert_eq!(receipt.acquisition_sequence(), acquisition);
+        assert_eq!(revocation.admitted_activity().outstanding_permits(), 0);
+        assert_eq!(revocation.admitted_activity().in_flight_effects(), 1);
+        assert!(matches!(
+            domain.resume(),
+            Err(EffectEntryError::ResumeWhileActive { .. })
+        ));
+
+        drop(in_flight);
+        assert!(domain.activity().is_quiescent());
+        domain.resume().unwrap();
+    }
+
+    #[test]
+    fn enter_remains_compatible_with_begin_and_run_accounting() {
+        let domain = EffectEntryDomain::new();
+        let commitment = commitment(6);
+        let ticket = domain.issue_ticket(commitment).unwrap();
+        let permit = domain.acquire(ticket, commitment).unwrap();
+        let permit_id = permit.permit_id();
+        let ticket_id = permit.ticket_id();
+        let acquisition = permit.acquisition_sequence();
+
+        let (receipt, value) = permit.enter(|| 7_u64).unwrap();
+        assert_eq!(value, 7);
+        assert_eq!(receipt.permit_id(), permit_id);
+        assert_eq!(receipt.ticket_id(), ticket_id);
+        assert_eq!(receipt.commitment(), commitment);
+        assert_eq!(receipt.acquisition_sequence(), acquisition);
+        assert_eq!(receipt.activity_at_entry().outstanding_permits(), 0);
+        assert_eq!(receipt.activity_at_entry().in_flight_effects(), 1);
+        assert!(domain.activity().is_quiescent());
+    }
+
+    #[test]
+    fn acquired_permit_survives_stop_but_blocks_resume_until_quiescent() {
+        let domain = EffectEntryDomain::new();
+        let commitment = commitment(7);
         let ticket = domain.issue_ticket(commitment).unwrap();
         let permit = domain.acquire(ticket, commitment).unwrap();
         let acquisition = permit.acquisition_sequence();
@@ -894,7 +1058,7 @@ mod tests {
     #[test]
     fn revocation_during_callback_reports_in_flight_work_and_does_not_block() {
         let domain = Arc::new(EffectEntryDomain::new());
-        let commitment = commitment(3);
+        let commitment = commitment(8);
         let ticket = domain.issue_ticket(commitment).unwrap();
         let permit = domain.acquire(ticket, commitment).unwrap();
 
@@ -927,7 +1091,7 @@ mod tests {
     #[test]
     fn dropping_unused_permit_repairs_outstanding_count() {
         let domain = EffectEntryDomain::new();
-        let commitment = commitment(8);
+        let commitment = commitment(9);
         let ticket = domain.issue_ticket(commitment).unwrap();
         let permit = domain.acquire(ticket, commitment).unwrap();
         assert_eq!(domain.activity().outstanding_permits(), 1);
@@ -936,23 +1100,9 @@ mod tests {
     }
 
     #[test]
-    fn callback_unwind_repairs_in_flight_count() {
-        let domain = EffectEntryDomain::new();
-        let commitment = commitment(9);
-        let ticket = domain.issue_ticket(commitment).unwrap();
-        let permit = domain.acquire(ticket, commitment).unwrap();
-
-        let result = catch_unwind(AssertUnwindSafe(|| {
-            let _ = permit.enter(|| panic!("synthetic adapter unwind"));
-        }));
-        assert!(result.is_err());
-        assert!(domain.activity().is_quiescent());
-    }
-
-    #[test]
     fn new_epoch_ticket_can_be_admitted_only_after_resume() {
         let domain = EffectEntryDomain::new();
-        let commitment = commitment(4);
+        let commitment = commitment(10);
         let old_ticket = domain.issue_ticket(commitment).unwrap();
         domain.revoke_all().unwrap();
         assert!(matches!(
@@ -976,7 +1126,7 @@ mod tests {
     fn wrong_domain_and_commitment_fail_closed() {
         let first = EffectEntryDomain::new();
         let second = EffectEntryDomain::new();
-        let commitment = commitment(5);
+        let commitment = commitment(11);
         let ticket = first.issue_ticket(commitment).unwrap();
         assert!(matches!(
             second.acquire(ticket, commitment),
@@ -985,7 +1135,7 @@ mod tests {
 
         let ticket = first.issue_ticket(commitment).unwrap();
         assert!(matches!(
-            first.acquire(ticket, commitment(6)),
+            first.acquire(ticket, commitment(12)),
             Err(EffectEntryError::CommitmentMismatch)
         ));
         assert!(first.activity().is_quiescent());

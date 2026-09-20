@@ -2,7 +2,7 @@ use std::sync::{mpsc, Arc, Barrier};
 use std::thread;
 
 use symthaea_ai_assurance::{
-    EffectAdmissionCommitment, EffectEntryDomain, EffectEntryError,
+    EffectAdmissionCommitment, EffectEntryDomain, EffectEntryError, EffectInFlight,
 };
 
 fn commitment(tag: u8) -> EffectAdmissionCommitment {
@@ -86,6 +86,48 @@ fn public_acquisition_before_revocation_preserves_one_admitted_effect() {
 
     domain.resume().unwrap();
     assert!(!domain.is_stopped());
+}
+
+#[test]
+fn public_begin_exposes_admission_evidence_before_adapter_work() {
+    let domain = EffectEntryDomain::new();
+    let commitment = commitment(16);
+    let ticket = domain.issue_ticket(commitment).unwrap();
+    let permit = domain.acquire(ticket, commitment).unwrap();
+    let acquisition = permit.acquisition_sequence();
+
+    let (receipt, in_flight): (_, EffectInFlight) = permit.begin().unwrap();
+    assert_eq!(receipt.commitment(), commitment);
+    assert_eq!(receipt.acquisition_sequence(), acquisition);
+    assert_eq!(receipt.activity_at_entry().outstanding_permits(), 0);
+    assert_eq!(receipt.activity_at_entry().in_flight_effects(), 1);
+    assert_eq!(domain.activity().in_flight_effects(), 1);
+
+    // The receipt already exists here. No adapter callback has been created or
+    // run, so the host can persist it before freshness or external work.
+    let revocation = domain.revoke_all().unwrap();
+    assert_eq!(revocation.admitted_activity().in_flight_effects(), 1);
+    assert!(matches!(
+        domain.resume(),
+        Err(EffectEntryError::ResumeWhileActive { .. })
+    ));
+
+    drop(in_flight);
+    assert!(domain.activity().is_quiescent());
+    domain.resume().unwrap();
+}
+
+#[test]
+fn public_in_flight_run_is_affine_accounting_boundary() {
+    let domain = EffectEntryDomain::new();
+    let commitment = commitment(17);
+    let ticket = domain.issue_ticket(commitment).unwrap();
+    let permit = domain.acquire(ticket, commitment).unwrap();
+    let (_, in_flight): (_, EffectInFlight) = permit.begin().unwrap();
+
+    let value = in_flight.run(|| 17_u64);
+    assert_eq!(value, 17);
+    assert!(domain.activity().is_quiescent());
 }
 
 #[test]

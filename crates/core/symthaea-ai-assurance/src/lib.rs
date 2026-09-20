@@ -95,7 +95,7 @@ pub use effect_guard::{
 pub use effect_permit::{
     EffectAdmissionCommitment, EffectEntryActivity, EffectEntryDomain, EffectEntryDomainId,
     EffectEntryEpoch, EffectEntryError, EffectEntryPermit, EffectEntryPermitId, EffectEntryReceipt,
-    EffectEntrySequence, EffectEntryTicket, EffectEntryTicketId, EffectResumeReceipt,
+    EffectEntrySequence, EffectEntryTicket, EffectEntryTicketId, EffectInFlight, EffectResumeReceipt,
     EffectRevocationReceipt,
 };
 pub use host::{ResolutionError, ResolutionEvidenceReceipt, RuntimeAction, TrustedRuntime};
