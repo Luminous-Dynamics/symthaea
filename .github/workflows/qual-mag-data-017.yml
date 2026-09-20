@@ -1,0 +1,154 @@
+name: QUAL MAG-DATA-017 exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-mag-data-017-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head OQMD extraction qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SOURCE_SHA: cc83ce1eceae4dd52fb027d477b6a3d867d56d09
+      SOURCE_PARENT: ccd1e0c45b5713bdb8def1951d6cf757307d9214
+      PACKAGE: symthaea-materials-oqmd-extraction-executor
+      CRATE: crates/domains/symthaea-materials-oqmd-extraction-executor
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: cc83ce1eceae4dd52fb027d477b6a3d867d56d09
+          fetch-depth: 2
+
+      - name: Verify exact source identity and four-path semantic diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 4
+          expected=(
+            "$CRATE/Cargo.toml"
+            "$CRATE/python/oqmd_v17_extract.py"
+            "$CRATE/src/lib.rs"
+            "$CRATE/tests/normalization_contract.rs"
+          )
+          for i in 0 1 2 3; do test "${changed[$i]}" = "${expected[$i]}"; done
+          echo "semantic_diff_paths=PASS"
+
+      - name: Prove frozen qmpy adapter contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile "$CRATE/python/oqmd_v17_extract.py"
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('crates/domains/symthaea-materials-oqmd-extraction-executor/python/oqmd_v17_extract.py')
+          text = p.read_text()
+          required = [
+              'from qmpy.materials.formation_energy import FormationEnergy',
+              'FormationEnergy.search(["Co", "Fe", "Zr"], fit="standard")',
+              'records.order_by("entry_id", "id")',
+              'os.environ.setdefault("qmdb_v1_1_pswd", "")',
+              'logging.handlers.WatchedFileHandler = lambda *args, **kwargs: logging.NullHandler()',
+              'logging.handlers.WatchedFileHandler = _original_watched_file_handler',
+              'json.dumps(row, sort_keys=True, separators=(",", ":"))',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'missing frozen adapter contract: {needle}')
+          forbidden = [
+              'filter(delta_e',
+              'filter(stability',
+              'filter(band_gap',
+              'distinct()',
+          ]
+          for needle in forbidden:
+              if needle in text:
+                  raise SystemExit(f'unexpected target/property filtering or deduplication: {needle}')
+          print('qmpy_adapter_contract=PASS')
+          PY
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/mag-data-017-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+
+      - name: Rustfmt exact extraction crate
+        run: cargo fmt --manifest-path "$CRATE/Cargo.toml" -- --check
+
+      - name: Compile and run all extraction targets
+        run: cargo test -p "$PACKAGE" --all-targets
+
+      - name: Strict Clippy on extraction targets
+        run: cargo clippy -p "$PACKAGE" --all-targets -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- Cargo.lock "$CRATE"
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_OQMD_EXTRACTION_EXECUTOR"
+          echo "qmpy_version=1.4.0"
+          echo "qmpy_source_commit=dede5bdf4aa3ea1187a7bc273e86336c24aadb25"
+          echo "large_archive_execution=NOT_RUN"
+          echo "canonical_database_state=EXTERNAL_PARENT_AUTHORITY"
+          echo "provider_authenticity_claim=NONE"
+          echo "materials_discovery_claim=NONE"
