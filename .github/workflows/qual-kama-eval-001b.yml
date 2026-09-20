@@ -1,0 +1,44 @@
+name: QUAL KAMA-EVAL-001B exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-kama-eval-001b-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head communication qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate subject
+        uses: actions/checkout@v4
+        with:
+          ref: 78b8945495f4e8f241b8b8abd219a3870e304b5e
+          fetch-depth: 1
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=78b8945495f4e8f241b8b8abd219a3870e304b5e
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          echo "qualified_subject=$actual"
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/core/symthaea-communication
+      - name: Rustfmt exact communication crate
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: Run KAMA-EVAL-001B integration target
+        run: cargo test -p symthaea-communication --test intimacy_model_bench_v2
+      - name: Clippy KAMA-EVAL-001B integration target
+        run: cargo clippy -p symthaea-communication --test intimacy_model_bench_v2 -- -D warnings
