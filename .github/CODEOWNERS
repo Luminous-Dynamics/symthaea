@@ -1,0 +1,11 @@
+# Repository authority surfaces.
+#
+# This file names review ownership only. It is not an enforcement boundary by
+# itself: GitHub must also require code-owner review through an effective
+# branch-protection rule or repository ruleset (tracked in #330).
+
+/.github/ @Tristan-Stoltz-ERC
+/nix/modules/github-actions-runner.nix @Tristan-Stoltz-ERC
+/nix/tests/eval-github-actions-runner.nix @Tristan-Stoltz-ERC
+/nix/tests/eval-trusted-runner-routing.nix @Tristan-Stoltz-ERC
+/nix/ci-rust-shell.nix @Tristan-Stoltz-ERC
