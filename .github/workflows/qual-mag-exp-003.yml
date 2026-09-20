@@ -1,0 +1,162 @@
+name: QUAL MAG-EXP-003 exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-mag-exp-003-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact-head qmpy freshness qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: 2afa4b2b43923a56c35f2e3f13b5f48fda354e07
+      SOURCE_PARENT: 8d985ea9f25311683c5c6038b7a1b594cd1ed114
+      PACKAGE: symthaea-materials-fe-co-zr-experiment
+    steps:
+      - name: Checkout exact semantic subject
+        uses: actions/checkout@v4
+        with:
+          ref: 2afa4b2b43923a56c35f2e3f13b5f48fda354e07
+          fetch-depth: 2
+
+      - name: Verify exact source identity and semantic diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_PARENT" "$SOURCE_SHA")
+          test "${#changed[@]}" -eq 2
+          test "${changed[0]}" = "crates/domains/symthaea-materials-fe-co-zr-experiment/src/main.rs"
+          test "${changed[1]}" = "crates/domains/symthaea-materials-fe-co-zr-experiment/src/qmpy_recheck.rs"
+          echo "qualified_subject=$SOURCE_SHA"
+          echo "qualified_parent=$SOURCE_PARENT"
+          echo "semantic_diff_paths=PASS"
+
+      - name: Prove qmpy probe parity and consumption order
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('crates/domains/symthaea-materials-fe-co-zr-experiment/src')
+          gate = (root / 'readiness_gate.rs').read_text()
+          recheck = (root / 'qmpy_recheck.rs').read_text()
+          main = (root / 'main.rs').read_text()
+
+          def raw_const(text: str, name: str) -> str:
+              pattern = rf'const\s+{name}:\s*&str\s*=\s*r#"(.*?)"#;'
+              match = re.search(pattern, text, re.S)
+              if match is None:
+                  raise SystemExit(f'missing raw string constant {name}')
+              return match.group(1)
+
+          def string_const(text: str, name: str) -> str:
+              pattern = rf'const\s+{name}:\s*&str\s*=\s*"([^"]+)";'
+              match = re.search(pattern, text, re.S)
+              if match is None:
+                  raise SystemExit(f'missing string constant {name}')
+              return match.group(1)
+
+          if raw_const(gate, 'QMPY_IMPORT_SCRIPT') != raw_const(recheck, 'QMPY_IMPORT_SCRIPT'):
+              raise SystemExit('qmpy probe script diverged from frozen MAG-EXP-002 probe')
+          if string_const(gate, 'QMPY_IMPORT_MARKER') != string_const(recheck, 'QMPY_IMPORT_MARKER'):
+              raise SystemExit('qmpy import marker diverged from frozen MAG-EXP-002 marker')
+
+          start = main.index('fn require_runtime_readiness(')
+          body = main[start:main.index('\nfn load<', start)]
+          qmpy = body.index('require_current_qmpy_import')
+          mysql = body.index('require_current_mysql_observation')
+          if not qmpy < mysql:
+              raise SystemExit('qmpy freshness must execute before live MySQL readiness consumption')
+
+          print('qmpy_probe_script_parity=PASS')
+          print('qmpy_probe_marker_parity=PASS')
+          print('readiness_consumption_order=PASS')
+          PY
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Prove exact parent locked metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent="$RUNNER_TEMP/mag-exp-parent"
+          git worktree add --detach "$parent" "$SOURCE_PARENT"
+          cargo metadata \
+            --manifest-path "$parent/Cargo.toml" \
+            --no-deps \
+            --format-version 1 \
+            --locked \
+            > "$RUNNER_TEMP/parent-metadata.json"
+          echo "parent_locked_metadata=PASS"
+
+      - name: Diagnose source lock reconciliation without accepting it
+        id: lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.frozen"
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/source-metadata.json"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff" || true
+          if test -s "$RUNNER_TEMP/Cargo.lock.diff"; then
+            echo "lock_delta=1" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=true"
+            cat "$RUNNER_TEMP/Cargo.lock.diff"
+          else
+            echo "lock_delta=0" >> "$GITHUB_OUTPUT"
+            echo "lock_reconciliation_required=false"
+          fi
+
+      - name: Rustfmt exact experiment crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-materials-fe-co-zr-experiment/Cargo.toml -- --check
+
+      - name: Compile and run all experiment targets
+        run: cargo test -p "$PACKAGE" --all-targets
+
+      - name: Strict Clippy on experiment targets
+        run: cargo clippy -p "$PACKAGE" --all-targets -- -D warnings
+
+      - name: Restore frozen lock and verify source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f "$RUNNER_TEMP/Cargo.lock.frozen"; then
+            cp "$RUNNER_TEMP/Cargo.lock.frozen" Cargo.lock
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git diff --exit-code -- \
+            Cargo.lock \
+            crates/domains/symthaea-materials-fe-co-zr-experiment
+          echo "postflight_source_identity=PASS"
+
+      - name: Qualification verdict
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test "${{ steps.lock.outputs.lock_delta }}" = "1"; then
+            echo "qualification_claim=NOT_QUALIFIED_LOCK_RECONCILIATION_REQUIRED"
+            exit 1
+          fi
+          echo "qualification_claim=SOURCE_ONLY_QMPY_FRESHNESS_CHILD"
+          echo "parent_source_qualification=EXTERNAL_DEPENDENCY_PR_4952"
+          echo "qmpy_full_recursive_closure_authority=NONE"
+          echo "large_archive_execution=NOT_RUN"
+          echo "oqmd_database_state_authority=NONE"
+          echo "materials_discovery_claim=NONE"
