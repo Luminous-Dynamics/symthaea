@@ -33,6 +33,11 @@ pub enum QualificationCurrentnessCadenceChangeFinding {
     VersionMismatch { expected: u64, actual: u64 },
     GenesisHasPredecessor,
     PredecessorMismatch { version: u64 },
+    AuthorizationTimeRegression {
+        version: u64,
+        previous_authorized_at_unix_s: u64,
+        actual_authorized_at_unix_s: u64,
+    },
     CurrentnessAgeWeakened { version: u64 },
     HeadAgeWeakened { version: u64 },
     LifecycleCheckpointAgeWeakened { version: u64 },
@@ -121,6 +126,18 @@ pub fn verify_non_weakening_currentness_cadence_lineage(
                         version: policy.version(),
                     });
                 }
+                if authorization_time_regresses(
+                    previous_policy.authorized_at_unix_s(),
+                    policy.authorized_at_unix_s(),
+                ) {
+                    findings.push(
+                        QualificationCurrentnessCadenceChangeFinding::AuthorizationTimeRegression {
+                            version: policy.version(),
+                            previous_authorized_at_unix_s: previous_policy.authorized_at_unix_s(),
+                            actual_authorized_at_unix_s: policy.authorized_at_unix_s(),
+                        },
+                    );
+                }
                 compare_limits(
                     previous_policy.policy().limits(),
                     policy.policy().limits(),
@@ -156,6 +173,10 @@ pub fn verify_non_weakening_currentness_cadence_lineage(
         policy_authority_sha256s,
         lineage_sha256,
     })
+}
+
+fn authorization_time_regresses(previous_authorized_at_unix_s: u64, actual_authorized_at_unix_s: u64) -> bool {
+    actual_authorized_at_unix_s < previous_authorized_at_unix_s
 }
 
 fn compare_limits(
@@ -288,5 +309,12 @@ mod tests {
             finding,
             QualificationCurrentnessCadenceChangeFinding::CurrentnessAgeWeakened { .. }
         )));
+    }
+
+    #[test]
+    fn authorization_time_must_not_regress() {
+        assert!(authorization_time_regresses(101, 100));
+        assert!(!authorization_time_regresses(100, 100));
+        assert!(!authorization_time_regresses(100, 101));
     }
 }
