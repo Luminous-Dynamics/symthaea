@@ -150,6 +150,7 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   nonce_incomplete='0000000000000000000000000000000000000000000000000000000000000002'
   nonce_malformed='0000000000000000000000000000000000000000000000000000000000000003'
   nonce_unused='0000000000000000000000000000000000000000000000000000000000000004'
+  nonce_race='0000000000000000000000000000000000000000000000000000000000000005'
   auth='1111111111111111111111111111111111111111111111111111111111111111'
   other_auth='2222222222222222222222222222222222222222222222222222222222222222'
 
@@ -181,6 +182,45 @@ pkgs.runCommand "eval-github-actions-runner" { } ''
   set -e
   test "$replay_status" = '73'
   test "$replay_output" = "ALREADY_CONSUMED $nonce $boot_id"
+
+  # Prove the actual one-time primitive under contention. Two distinct
+  # authorizations race the same nonce; atomic mkdir must admit exactly one.
+  race_a_out="$TMPDIR/stage-f-race-a.out"
+  race_b_out="$TMPDIR/stage-f-race-b.out"
+  set +e
+  (printf 'CONSUME %s %s\n' "$nonce_race" "$auth" | "$consumer_bin" "$test_ledger" > "$race_a_out") &
+  race_a_pid="$!"
+  (printf 'CONSUME %s %s\n' "$nonce_race" "$other_auth" | "$consumer_bin" "$test_ledger" > "$race_b_out") &
+  race_b_pid="$!"
+  wait "$race_a_pid"
+  race_a_status="$?"
+  wait "$race_b_pid"
+  race_b_status="$?"
+  set -e
+  race_a_output="$(<"$race_a_out")"
+  race_b_output="$(<"$race_b_out")"
+
+  if [[ "$race_a_status" == '0' && "$race_b_status" == '73' ]]; then
+    race_winner_auth="$auth"
+    race_loser_auth="$other_auth"
+    test "$race_a_output" = "CONSUMED $nonce_race $auth $boot_id"
+    test "$race_b_output" = "ALREADY_CONSUMED $nonce_race $boot_id"
+  elif [[ "$race_a_status" == '73' && "$race_b_status" == '0' ]]; then
+    race_winner_auth="$other_auth"
+    race_loser_auth="$auth"
+    test "$race_a_output" = "ALREADY_CONSUMED $nonce_race $boot_id"
+    test "$race_b_output" = "CONSUMED $nonce_race $other_auth $boot_id"
+  else
+    echo "Stage-F race admitted an invalid status pair: $race_a_status/$race_b_status" >&2
+    exit 1
+  fi
+
+  race_winner_status="$(printf 'STATUS %s %s\n' "$nonce_race" "$race_winner_auth" | "$consumer_bin" "$test_ledger")"
+  test "$race_winner_status" = "CONSUMED_STATUS $nonce_race $race_winner_auth $boot_id"
+  race_loser_status="$(printf 'STATUS %s %s\n' "$nonce_race" "$race_loser_auth" | "$consumer_bin" "$test_ledger")"
+  test "$race_loser_status" = "CONSUMED_DIFFERENT $nonce_race $boot_id"
+  test "$(sed -n '1p' "$test_ledger/$nonce_race/consumption-record")" = "authorization_sha256=$race_winner_auth"
+  test "$(sed -n '2p' "$test_ledger/$nonce_race/consumption-record")" = "boot_id=$boot_id"
 
   mkdir -m 0700 "$test_ledger/$nonce_incomplete"
   incomplete_output="$(printf 'STATUS %s %s\n' "$nonce_incomplete" "$auth" | "$consumer_bin" "$test_ledger")"
