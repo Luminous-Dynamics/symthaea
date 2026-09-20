@@ -1,0 +1,19 @@
+name: DE-001A Nix Draft Revocation Signal
+
+on:
+  pull_request:
+    types: [converted_to_draft, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.event.action == 'converted_to_draft' && format('de001a-cosmology-nix-{0}', github.event.pull_request.number) || format('de001a-nix-draft-revocation-signal-{0}', github.run_id) }}
+  cancel-in-progress: true
+
+jobs:
+  runnerless-signal:
+    name: Runnerless DE-001A Nix draft revocation signal
+    if: github.event.pull_request.draft == false && github.event.pull_request.draft == true
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'unreachable by contract'

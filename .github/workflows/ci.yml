@@ -45,7 +45,7 @@ jobs:
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,6 +57,7 @@ jobs:
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +72,7 @@ jobs:
   cls-field-count:
     name: CLS Field-Count Ratchet
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +82,7 @@ jobs:
   workspace-targets:
     name: Workspace Target Integrity
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -113,6 +116,7 @@ jobs:
   embodiment-safety-composition:
     name: Embodiment Safety Composition
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -129,6 +133,7 @@ jobs:
   orphan-modules:
     name: Orphan Module Check
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -174,6 +179,7 @@ jobs:
   doc-tests:
     name: Documentation Tests
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -198,6 +204,7 @@ jobs:
   muse:
     name: Muse (tests, studio, wasm UI)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 45
     # Nothing tested symthaea-muse before 2026-07-28: no job ran `-p
     # symthaea-muse` or `--workspace` (`cargo test` at the spark-engine job is
@@ -335,6 +342,7 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -402,6 +410,7 @@ jobs:
   test:
     name: Test (default features)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -434,6 +443,7 @@ jobs:
   test-spark-engine:
     name: Test spark-engine (workspace-excluded crate)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     # crates/domains/spark-engine is in workspace.exclude, so no other job
     # compiles or tests it. It builds standalone from its own directory.
     steps:
@@ -460,6 +470,7 @@ jobs:
   test-nextest:
     name: Test (nextest, observational)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     # Non-blocking: this job never fails the workflow (continue-on-error
     # below). It exists so we can watch cargo-nextest's process-per-test
     # isolation behave on this suite for a while before ever depending on
@@ -500,6 +511,7 @@ jobs:
   test-hardened-lib:
     name: Hardened Lib Regressions
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -536,6 +548,7 @@ jobs:
   test-cognitive-hardening:
     name: Cognitive Core Hardening (Phases 2.7–2.9)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 30
     # Regression-protect the full cognitive hardening arc:
     #   Phase 2.7 — LTC timing + epistemic modulation
@@ -597,6 +610,7 @@ jobs:
   test-hardened-daemon:
     name: Hardened Daemon Regressions
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -634,6 +648,7 @@ jobs:
   test-hardened-api:
     name: Hardened API Regressions
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -673,6 +688,7 @@ jobs:
   test-hardened-nix:
     name: Hardened Nix Regressions
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
@@ -731,6 +747,7 @@ jobs:
   test-all-features:
     name: Test CI-safe (${{ matrix.group }})
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 75
     strategy:
       fail-fast: false
@@ -862,6 +879,7 @@ jobs:
   test-feature-matrix:
     name: Test Feature Combinations
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -1191,6 +1209,7 @@ jobs:
   wasm-compat:
     name: WASM Compatibility (Spore)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -1257,6 +1276,7 @@ jobs:
   deny:
     name: Dependency Audit (cargo-deny)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -1269,6 +1289,7 @@ jobs:
   audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
 
@@ -1572,6 +1593,7 @@ jobs:
   compliance-safety-ethics:
     name: Compliance (Safety & Ethics)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -1663,6 +1685,7 @@ jobs:
   compliance-robustness:
     name: Compliance (Robustness & Governance)
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -1703,6 +1726,7 @@ jobs:
   secrets-scan:
     name: Secrets Scan
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     steps:
       - uses: actions/checkout@v4
         with:
