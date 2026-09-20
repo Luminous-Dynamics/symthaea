@@ -1,0 +1,5 @@
+CI-HOTFIX-004 lifecycle revocation probe.
+
+Ephemeral CI-only file. No product, research, qualification, evidence, optimizer, or scientific authority.
+
+Touching .github/scripts/** intentionally materializes Workflow Syntax; ordinary PR opening materializes CI and PR Governance. The exact-head ready-state runs must be cancelled when the same PR is converted back to draft by the workflows' native pull_request concurrency lifecycle.
