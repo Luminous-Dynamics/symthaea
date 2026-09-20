@@ -16,4 +16,8 @@ no-panic.workspace = true
 chumsky.workspace = true
 symthaea-core = { path = "../../core/symthaea-core" }
 serde = { workspace = true }
+sha2 = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

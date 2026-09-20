@@ -13,6 +13,7 @@ pub mod assurance_case;
 pub mod assurance_case_v3;
 pub mod assurance_state;
 pub mod receipt_admission;
+pub mod receipt_attestation_contract;
 pub mod verification_receipt;
 
 use serde::{Deserialize, Serialize};
