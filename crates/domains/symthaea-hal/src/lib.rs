@@ -73,6 +73,7 @@ pub mod recording;
 pub mod runtime;
 pub mod sensor;
 pub mod servo;
+pub mod session_state;
 
 // ── Public re-exports ────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ pub use servo::{
     ActuationDisposition, CommandReferenceKnowledge, EndpointActuationDisposition,
     ServoActuationFailure, ServoActuationReceipt, ServoOutput,
 };
+pub use session_state::ServoSessionState;
 
 /// Re-export `embedded_hal::i2c::I2c` so downstream crates don't need a direct dependency.
 pub use embedded_hal::i2c::I2c as I2cBus;
