@@ -16,6 +16,7 @@ mod cargo_execution_intent_v2;
 mod cargo_graph;
 mod cargo_impact;
 mod cargo_invocation;
+mod cargo_runtime_binding;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -199,6 +200,45 @@ enum Commands {
         /// Stored adapter-semantics receipt JSON.
         #[arg(long)]
         receipt: PathBuf,
+    },
+    /// Bind one concrete prepared runtime instance to validated source, Cargo, semantics, and effect subjects.
+    CargoRuntimeBinding {
+        /// Strict runtime-realization input JSON spec.
+        #[arg(long)]
+        spec: PathBuf,
+        /// Validated repository-source subject prepared for execution.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Canonical Cargo build-context/invocation document.
+        #[arg(long)]
+        context: PathBuf,
+        /// Validated Cargo adapter-semantics receipt.
+        #[arg(long = "adapter-semantics")]
+        adapter_semantics: PathBuf,
+        /// Exact repository effect policy admitted for the execution.
+        #[arg(long = "effect-policy")]
+        effect_policy: PathBuf,
+        /// Write JSON to this path instead of stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Rebuild a stored runtime binding against all validated upstream subjects.
+    CargoRuntimeBindingVerify {
+        /// Stored Cargo runtime-binding receipt.
+        #[arg(long)]
+        receipt: PathBuf,
+        /// Validated repository-source subject prepared for execution.
+        #[arg(long = "pre-snapshot")]
+        pre_snapshot: PathBuf,
+        /// Canonical Cargo build-context/invocation document.
+        #[arg(long)]
+        context: PathBuf,
+        /// Validated Cargo adapter-semantics receipt.
+        #[arg(long = "adapter-semantics")]
+        adapter_semantics: PathBuf,
+        /// Exact repository effect policy admitted for the execution.
+        #[arg(long = "effect-policy")]
+        effect_policy: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -403,6 +443,38 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::CargoAdapterSemanticsVerify { receipt } => {
             cargo_adapter_semantics::run_verify(&receipt)?;
+        }
+        Commands::CargoRuntimeBinding {
+            spec,
+            pre_snapshot,
+            context,
+            adapter_semantics,
+            effect_policy,
+            output,
+        } => {
+            cargo_runtime_binding::run(
+                &spec,
+                &pre_snapshot,
+                &context,
+                &adapter_semantics,
+                &effect_policy,
+                output,
+            )?;
+        }
+        Commands::CargoRuntimeBindingVerify {
+            receipt,
+            pre_snapshot,
+            context,
+            adapter_semantics,
+            effect_policy,
+        } => {
+            cargo_runtime_binding::run_verify(
+                &receipt,
+                &pre_snapshot,
+                &context,
+                &adapter_semantics,
+                &effect_policy,
+            )?;
         }
     }
     Ok(())
