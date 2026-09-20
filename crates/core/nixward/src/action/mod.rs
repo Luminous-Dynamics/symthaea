@@ -17,6 +17,7 @@ pub mod generation_manager;
 pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
+pub mod temporal;
 
 pub use authorization::{
     NixActionDescriptorV1, NixActionIntentV1, NixActionScopeV1,
@@ -35,3 +36,7 @@ pub use generation_manager::{Generation, GenerationDiff, GenerationManager};
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
+pub use temporal::{
+    EvidenceCurrentnessV1, EvidenceTemporalEvaluationV1, EvidenceTemporalStatusV1,
+    EvidenceWindowMillisV1, NixTimeErrorV1, UnixMillisV1, UnixSecondsV1,
+};
