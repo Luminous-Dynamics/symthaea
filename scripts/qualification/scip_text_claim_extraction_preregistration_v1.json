@@ -1,0 +1,233 @@
+{
+  "schema": "symthaea.scip-text-claim-extraction-preregistration/v1",
+  "authority": "preregistration-only",
+  "subject": "natural-language-surface-to-structured-claim-extraction",
+  "semantic_contract_profile": "symthaea.scip-semantic-realization-contract/v1",
+  "comparison_oracle_schema": "symthaea.scip-semantic-claim-comparison-result/v1",
+  "dimensions": [
+    {
+      "code": 0,
+      "name": "entity-reference"
+    },
+    {
+      "code": 1,
+      "name": "relation-direction"
+    },
+    {
+      "code": 2,
+      "name": "numeric-value-and-unit"
+    },
+    {
+      "code": 3,
+      "name": "polarity-and-negation"
+    },
+    {
+      "code": 4,
+      "name": "quantifier-and-cardinality"
+    },
+    {
+      "code": 5,
+      "name": "temporal-scope"
+    },
+    {
+      "code": 6,
+      "name": "epistemic-modality"
+    },
+    {
+      "code": 7,
+      "name": "attribution-and-source"
+    },
+    {
+      "code": 8,
+      "name": "causal-strength"
+    },
+    {
+      "code": 9,
+      "name": "unsupported-additions"
+    },
+    {
+      "code": 10,
+      "name": "required-detail-coverage"
+    }
+  ],
+  "corpus": {
+    "unit": "one exact grounded source inventory plus one natural-language surface plus one human-adjudicated expected extraction inventory",
+    "source_claims_per_case_min": 1,
+    "source_claims_per_case_max": 6,
+    "calibration_cases_per_dimension": 40,
+    "confirmatory_cases_per_dimension": 64,
+    "calibration_positive_fraction": "1/2",
+    "confirmatory_positive_fraction": "1/2",
+    "cross_dimension_discourse_calibration_cases": 88,
+    "cross_dimension_discourse_confirmatory_cases": 128,
+    "minimum_total_calibration_cases": 528,
+    "minimum_total_confirmatory_cases": 832,
+    "case_id_policy": "content-addressed-after-human-adjudication",
+    "confirmatory_labels_sealed_before_candidate_evaluation": true,
+    "confirmatory_surface_text_sealed_before_candidate_evaluation": true,
+    "no_case_reuse_across_splits": true,
+    "no_template_reuse_across_splits": true,
+    "no_named_entity_tuple_reuse_across_splits": true,
+    "no_numeric_tuple_reuse_across_splits": true,
+    "no_exact_sentence_reuse_across_splits": true,
+    "negative_cases_change_exactly_one_semantic_factor": true,
+    "positive_cases_preserve_all_semantic_factors": true,
+    "case_assignment_seed_committed_before_generation": true,
+    "case_assignment_seed_revealed_only_after_corpus_manifest_seal": true,
+    "within_dimension_positive_negative_balance": "1:1"
+  },
+  "case_families": {
+    "positive": [
+      "lexical-paraphrase",
+      "active-passive-paraphrase",
+      "clause-reordering-without-scope-change",
+      "pronoun-or-description-coreference-with-unambiguous-antecedent",
+      "numeric-format-paraphrase-with-identical-binary64-value-and-unit",
+      "epistemic-paraphrase-with-same-strength",
+      "attribution-paraphrase-with-same-source",
+      "multi-sentence-faithful-restatement"
+    ],
+    "negative_single_factor": [
+      "entity-substitution",
+      "relation-reversal",
+      "numeric-value-change",
+      "unit-change",
+      "negation-flip",
+      "quantifier-change",
+      "cardinality-change",
+      "temporal-scope-change",
+      "epistemic-strength-change",
+      "attribution-change",
+      "causal-strength-inflation",
+      "unsupported-claim-addition",
+      "required-claim-omission"
+    ],
+    "discourse": [
+      "long-distance-coreference",
+      "cross-sentence-negation",
+      "nested-attribution",
+      "temporal-contrast",
+      "multiple-entities-same-type",
+      "multiple-numbers-same-unit",
+      "causal-versus-correlational-contrast",
+      "mixed-certain-and-uncertain-claims"
+    ],
+    "negative_family_dimension_map": {
+      "entity-substitution": "entity-reference",
+      "relation-reversal": "relation-direction",
+      "numeric-value-change": "numeric-value-and-unit",
+      "unit-change": "numeric-value-and-unit",
+      "negation-flip": "polarity-and-negation",
+      "quantifier-change": "quantifier-and-cardinality",
+      "cardinality-change": "quantifier-and-cardinality",
+      "temporal-scope-change": "temporal-scope",
+      "epistemic-strength-change": "epistemic-modality",
+      "attribution-change": "attribution-and-source",
+      "causal-strength-inflation": "causal-strength",
+      "unsupported-claim-addition": "unsupported-additions",
+      "required-claim-omission": "required-detail-coverage"
+    }
+  },
+  "human_adjudication": {
+    "independent_annotators_per_case": 2,
+    "adjudicator_required_on_disagreement": true,
+    "annotators_blind_to_candidate_extractor_output": true,
+    "adjudicator_blind_to_candidate_extractor_identity": true,
+    "canonical_claim_schema_required": true,
+    "raw_annotation_and_resolution_history_retained": true
+  },
+  "candidate_protocol": {
+    "extractor_identity_must_bind": [
+      "implementation_digest",
+      "model_or_ruleset_identity",
+      "prompt_or_configuration_digest",
+      "normalization_profile",
+      "runtime_or_environment_identity"
+    ],
+    "candidate_freeze_before_confirmatory_execution": true,
+    "calibration_may_change_candidate": true,
+    "confirmatory_results_may_not_change_candidate": true,
+    "one_confirmatory_attempt_per_frozen_candidate": true,
+    "surface_text_is_only_semantic_input": true,
+    "ground_truth_inventory_hidden_during_extraction": true,
+    "source_graph_hidden_during_extraction": true,
+    "comparison_oracle_may_run_only_after_extraction_output_is_frozen": true,
+    "candidate_must_not_emit_source_claim_ids": true,
+    "candidate_output_schema": "surface-claim-inventory-without-source-alignment/v1"
+  },
+  "outcomes": [
+    "supported",
+    "contradicted",
+    "indeterminate"
+  ],
+  "abstention": {
+    "explicit_abstention_maps_to": "indeterminate",
+    "parse_or_runtime_failure_maps_to": "indeterminate",
+    "indeterminate_never_counts_as_supported": true,
+    "indeterminate_rate_reported_per_dimension": true
+  },
+  "confirmatory_metrics": {
+    "per_dimension_positive_preservation": "supported / positive_cases",
+    "per_dimension_negative_sensitivity": "contradicted / targeted_negative_cases",
+    "per_dimension_indeterminate_rate": "indeterminate / all_dimension_cases",
+    "unsupported_addition_false_positive_rate": "contradicted_positive_cases / unsupported_additions_positive_cases",
+    "required_detail_omission_rate": "contradicted_positive_cases / required_detail_coverage_positive_cases",
+    "macro_average_is_diagnostic_only": true,
+    "no_weighted_scalar_authority": true,
+    "per_dimension_exact_claim_precision": "exactly_matched_candidate_claims / candidate_claims",
+    "per_dimension_exact_claim_recall": "exactly_matched_expected_claims / expected_claims",
+    "per_dimension_expected_verdict_accuracy": "cases_with_expected_v17_dimension_verdict / all_targeted_cases"
+  },
+  "confirmatory_gates": {
+    "minimum_positive_preservation_each_dimension": "0.95",
+    "minimum_negative_sensitivity_each_dimension": "0.95",
+    "maximum_indeterminate_rate_each_dimension": "0.05",
+    "maximum_unsupported_addition_false_positive_rate": "0.02",
+    "maximum_required_detail_omission_rate": "0.02",
+    "zero_allowed_catastrophic_misses": [
+      "polarity-and-negation",
+      "numeric-value-and-unit",
+      "attribution-and-source",
+      "causal-strength"
+    ],
+    "catastrophic_miss_definition": "targeted negative case reported supported",
+    "all_gates_required": true,
+    "minimum_exact_claim_precision_each_dimension": "0.95",
+    "minimum_exact_claim_recall_each_dimension": "0.95",
+    "minimum_expected_verdict_accuracy_each_dimension": "0.95"
+  },
+  "negative_controls": {
+    "surface_permutation_control": true,
+    "source_inventory_permutation_control": true,
+    "unrelated_surface_control": true,
+    "empty_surface_control": true,
+    "instruction_injection_string_as_semantic_data_control": true,
+    "same_tokens_different_scope_control": true
+  },
+  "reporting": {
+    "all_case_level_results_retained": true,
+    "all_dimension_confusion_counts_reported": true,
+    "calibration_and_confirmatory_results_separate": true,
+    "failed_cases_reported_without_cherry_picking": true,
+    "candidate_runtime_failures_reported": true,
+    "human_adjudication_disagreements_reported": true
+  },
+  "promotion_boundary": {
+    "benchmark_pass_does_not_establish_surface_fidelity": true,
+    "benchmark_pass_does_not_establish_factual_truth": true,
+    "benchmark_pass_does_not_establish_backend_identity": true,
+    "benchmark_pass_does_not_grant_action_authority": true,
+    "positive_runtime_capability_requires_separate_typed_composition": true
+  },
+  "evaluation_binding": {
+    "candidate_output_contains_source_claim_ids": false,
+    "candidate_output_frozen_before_ground_truth_access": true,
+    "candidate_claims_match_expected_by_exact_canonical_claim_content": true,
+    "matched_candidate_claim_inherits_hidden_expected_source_alignment_only_after_freeze": true,
+    "unmatched_candidate_claim_classification": "unsupported-addition",
+    "unmatched_expected_claim_classification": "required-detail-omission",
+    "ambiguous_duplicate_canonical_claims_rejected": true,
+    "no_model_or_human_semantic_aligner_in_confirmatory_evaluation": true,
+    "v17_comparison_runs_only_on_post-freeze_exactly_matched_alignment": true
+  }
+}

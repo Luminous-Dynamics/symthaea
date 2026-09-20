@@ -1,0 +1,93 @@
+name: SCIP Text Claim Extraction Preregistration
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/scip_text_claim_extraction_preregistration.py'
+      - 'scripts/test_scip_text_claim_extraction_preregistration.py'
+      - 'scripts/qualification/scip_text_claim_extraction_preregistration_v1.json'
+      - 'docs/release/evidence/SCIP_TEXT_CLAIM_EXTRACTION_PREREG_V1.md'
+      - '.github/workflows/scip-text-claim-extraction-preregistration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preregistration:
+    name: Validate frozen text-to-claim benchmark contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+
+      - name: Prove exact five-file review surface
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          base="${BASE_SHA:-HEAD^1}"
+          git diff --name-only "$base" HEAD | LC_ALL=C sort > /tmp/actual.txt
+          cat > /tmp/expected.txt <<'EOF'
+          .github/workflows/scip-text-claim-extraction-preregistration.yml
+          docs/release/evidence/SCIP_TEXT_CLAIM_EXTRACTION_PREREG_V1.md
+          scripts/qualification/scip_text_claim_extraction_preregistration_v1.json
+          scripts/scip_text_claim_extraction_preregistration.py
+          scripts/test_scip_text_claim_extraction_preregistration.py
+          EOF
+          diff -u /tmp/expected.txt /tmp/actual.txt
+
+      - name: Verify exact preregistration bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/scip-v18.sha256 <<'EOF'
+          e9f752911c8a4cec706a3a0b04f7b4143726d6824ea7be70cb4c56a547d0bf6f  scripts/scip_text_claim_extraction_preregistration.py
+          ede320c9f07f135033b204b864e6b4456bef58e897aa920a6d4d1240d588106b  scripts/test_scip_text_claim_extraction_preregistration.py
+          9de306be32e16892beb93a44db81459eca3d1f058b8143b7be56699904ecd084  scripts/qualification/scip_text_claim_extraction_preregistration_v1.json
+          EOF
+          sha256sum -c /tmp/scip-v18.sha256
+
+      - name: Compile preregistration tools without mutating checkout
+        env:
+          PYTHONPYCACHEPREFIX: /tmp/scip-v18-pycache
+        run: |
+          python3 -m py_compile \
+            scripts/scip_text_claim_extraction_preregistration.py \
+            scripts/test_scip_text_claim_extraction_preregistration.py
+
+      - name: Run independent validator and hostile-input contracts
+        run: |
+          python3 -B scripts/scip_text_claim_extraction_preregistration.py --self-test
+          python3 -B scripts/test_scip_text_claim_extraction_preregistration.py
+
+      - name: Prove frozen semantic identity and non-authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/scip_text_claim_extraction_preregistration.py \
+            scripts/qualification/scip_text_claim_extraction_preregistration_v1.json \
+            > /tmp/result.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('/tmp/result.json').read_text())
+          assert result['preregistration_sha256'] == '96e2ec5e1fad2e4a955f15f1b0ec58d0ab748dc582cb5ed172f6b55ee42bacb3'
+          assert result['authority'] == 'preregistration-only'
+          assert result['dimension_count'] == 11
+          assert result['minimum_total_calibration_cases'] == 528
+          assert result['minimum_total_confirmatory_cases'] == 832
+          assert result['confirmatory_execution_authorized'] is False
+          assert result['surface_fidelity_established'] is False
+          assert result['runtime_capability_authorized'] is False
+          PY
+
+      - name: Prove checkout remained byte-identical
+        run: test -z "$(git status --porcelain --untracked-files=all)"
