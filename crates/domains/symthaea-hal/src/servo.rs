@@ -12,6 +12,15 @@
 //! independently from each joint's calibration and must not be interpreted as
 //! observed physical joint positions.
 //!
+//! Ordinary [`ServoOutput::apply`] owns its monotonic clock, anchored at
+//! `enable()`. Caller-supplied elapsed time is intentionally not part of the
+//! public hardware API: otherwise a caller could launder fabricated durations
+//! into additional motion budget. A private explicit-duration helper exists only
+//! to centralize the implementation and exercise deterministic unit tests.
+//! An excessive elapsed gap revokes the live actuation session: ordinary output
+//! is disabled and shutdown is marked unverified until an explicit all-off and
+//! re-enable establishes a fresh session.
+//!
 //! # Board Layout
 //!
 //! ```text
@@ -23,7 +32,7 @@ use embedded_hal::i2c::I2c;
 use embedded_hal_bus::i2c::{MutexDevice, RefCellDevice};
 use std::cell::RefCell;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use symthaea_humanoid::types::{HumanoidCommand, NUM_ACTUATORS};
 use tracing::debug;
 
@@ -118,9 +127,6 @@ pub enum CommandReferenceKnowledge {
 // SERVO OUTPUT
 // ============================================================================
 
-/// Legacy maximum slew step in µs per call. Retained until HalRuntime migrates
-/// fully onto [`ServoOutput::apply_with_elapsed`].
-const DEFAULT_SLEW_RATE_US: u16 = 100;
 /// Transitional PWM-level velocity limit equivalent to 100 µs per 20 ms.
 const DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND: f64 = 5_000.0;
 /// Fail closed on unexpectedly large elapsed intervals.
@@ -133,12 +139,15 @@ pub struct ServoOutput<I> {
     /// Last controller-command reference supported by the knowledge array below.
     last_pulses: [u16; NUM_ACTUATORS],
     command_reference_knowledge: [CommandReferenceKnowledge; NUM_ACTUATORS],
-    /// Legacy µs-per-call limit. Runtime migration will remove this path.
-    slew_rate_us: u16,
     /// Explicit elapsed-time PWM velocity limit.
     max_pulse_velocity_us_per_second: f64,
     /// Maximum accepted monotonic elapsed interval for one slew calculation.
     max_slew_gap: Duration,
+    /// Monotonic anchor for the ordinary `apply()` path. Reset on `enable()`.
+    last_apply_instant: Instant,
+    /// Fractional pulse allowance carried across successful elapsed-time steps.
+    /// This prevents call-frequency-dependent loss from integer rounding.
+    pulse_slew_fraction_us: f64,
     initialized: bool,
     enabled: bool,
     shutdown_verified: bool,
@@ -160,9 +169,10 @@ impl<I: I2c> ServoOutput<I> {
                 CommandReferenceKnowledge::ConfiguredCalibrationReference;
                 NUM_ACTUATORS
             ],
-            slew_rate_us: DEFAULT_SLEW_RATE_US,
             max_pulse_velocity_us_per_second: DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND,
             max_slew_gap: DEFAULT_MAX_SLEW_GAP,
+            last_apply_instant: Instant::now(),
+            pulse_slew_fraction_us: 0.0,
             initialized: false,
             enabled: false,
             shutdown_verified: true,
@@ -263,7 +273,9 @@ impl<I: I2c> ServoOutput<I> {
         self.calibration.validate()?;
         self.enabled = true;
         self.shutdown_verified = false;
-        debug!("servo output enabled");
+        self.last_apply_instant = Instant::now();
+        self.pulse_slew_fraction_us = 0.0;
+        debug!("servo output enabled with fresh monotonic slew reference");
         Ok(())
     }
 
@@ -321,19 +333,23 @@ impl<I: I2c> ServoOutput<I> {
         &self.command_reference_knowledge
     }
 
-    /// Transitional legacy setter. This still means µs per call, not per second.
-    pub fn set_slew_rate(&mut self, us_per_tick: u16) {
-        self.slew_rate_us = us_per_tick;
-    }
-
-    /// Configure the explicit PWM velocity limit used by `apply_with_elapsed`.
+    /// Configure the explicit PWM velocity limit.
+    ///
+    /// Timing policy cannot be changed while output is enabled because doing so
+    /// would mutate the safety envelope of an already-live actuation session.
     pub fn set_max_pulse_velocity_us_per_second(&mut self, rate: f64) -> HalResult<()> {
+        if self.enabled {
+            return Err(HalError::Safety(
+                "cannot change pulse velocity while servo output is enabled".to_string(),
+            ));
+        }
         if !rate.is_finite() || rate <= 0.0 {
             return Err(HalError::Safety(format!(
                 "pulse velocity must be finite and positive, got {rate}"
             )));
         }
         self.max_pulse_velocity_us_per_second = rate;
+        self.pulse_slew_fraction_us = 0.0;
         Ok(())
     }
 
@@ -343,6 +359,11 @@ impl<I: I2c> ServoOutput<I> {
 
     /// Configure the maximum accepted elapsed interval for one slew step.
     pub fn set_max_slew_gap(&mut self, max_gap: Duration) -> HalResult<()> {
+        if self.enabled {
+            return Err(HalError::Safety(
+                "cannot change maximum slew gap while servo output is enabled".to_string(),
+            ));
+        }
         if max_gap.is_zero() {
             return Err(HalError::Safety(
                 "maximum slew gap must be positive".to_string(),
@@ -373,38 +394,82 @@ impl<I: I2c> ServoOutput<I> {
             CommandReferenceKnowledge::ConfiguredCalibrationReference;
             NUM_ACTUATORS
         ];
+        self.pulse_slew_fraction_us = 0.0;
         self.calibration = cal;
         Ok(())
     }
 
-    /// Legacy per-call slew path retained only until runtime migration.
+    /// Apply a command using the servo session's internal monotonic clock.
+    ///
+    /// The clock anchor is reset on `enable()`. This path therefore removes the
+    /// historical `µs per call` assumption from existing `HalRuntime` callers
+    /// without allowing callers to supply their own motion-budget time.
     pub fn apply(
         &mut self,
         command: &HumanoidCommand,
     ) -> Result<ServoActuationReceipt, ServoActuationFailure> {
-        self.apply_with_max_step(command, self.slew_rate_us)
+        if !self.enabled || self.fault_latched.is_some() {
+            return self.apply_with_max_step(command, 0);
+        }
+        let elapsed = self.last_apply_instant.elapsed();
+        if elapsed.is_zero() {
+            let result = self.apply_with_max_step(command, 0);
+            if result
+                .as_ref()
+                .is_ok_and(|receipt| receipt.disposition == ActuationDisposition::Completed)
+            {
+                self.last_apply_instant = Instant::now();
+            }
+            return result;
+        }
+        self.apply_with_elapsed(command, elapsed)
     }
 
-    /// Apply a command using an explicit elapsed monotonic duration.
+    /// Internal explicit-duration implementation and deterministic test seam.
     ///
-    /// The caller owns the clock theorem. This API consumes only a `Duration`,
-    /// never UTC/wall-clock time or an implicit tick count.
-    pub fn apply_with_elapsed(
+    /// This is deliberately private to the hardware executor. A public live
+    /// hardware API accepting caller-selected elapsed time would let a caller
+    /// manufacture motion budget and violate the monotonic-time theorem.
+    fn apply_with_elapsed(
         &mut self,
         command: &HumanoidCommand,
         elapsed: Duration,
     ) -> Result<ServoActuationReceipt, ServoActuationFailure> {
-        // Preserve disabled/fault-latched semantics before timing validation.
+        // Disabled/fault-latched semantics do not require a timing theorem.
         if !self.enabled || self.fault_latched.is_some() {
-            return self.apply(command);
+            return self.apply_with_max_step(command, 0);
         }
 
-        let max_step = match pulse_step_for_elapsed(
+        // A stale live interval removes discretionary actuation authority. No
+        // new controller write is attempted, but prior PWM may still be latched,
+        // so shutdown is explicitly *unverified*. Recovery requires all-off
+        // verification followed by a fresh enable()/monotonic session.
+        if elapsed > self.max_slew_gap {
+            let receipt = ServoActuationReceipt {
+                command_sequence: None,
+                board0: EndpointActuationDisposition::NotAttempted,
+                board1: EndpointActuationDisposition::NotAttempted,
+                disposition: ActuationDisposition::NotDispatched,
+            };
+            self.last_actuation_receipt = Some(receipt);
+            self.enabled = false;
+            self.shutdown_verified = false;
+            return Err(ServoActuationFailure {
+                receipt,
+                error: HalError::Safety(format!(
+                    "monotonic actuation interval {:?} exceeds configured maximum {:?}; verified shutdown and re-enable required",
+                    elapsed, self.max_slew_gap
+                )),
+            });
+        }
+
+        let (max_step, next_fraction) = match pulse_step_for_elapsed(
             self.max_pulse_velocity_us_per_second,
             elapsed,
             self.max_slew_gap,
+            self.pulse_slew_fraction_us,
         ) {
-            Ok(max_step) => max_step,
+            Ok(step) => step,
             Err(error) => {
                 let receipt = ServoActuationReceipt {
                     command_sequence: None,
@@ -417,7 +482,15 @@ impl<I: I2c> ServoOutput<I> {
             }
         };
 
-        self.apply_with_max_step(command, max_step)
+        let result = self.apply_with_max_step(command, max_step);
+        if result
+            .as_ref()
+            .is_ok_and(|receipt| receipt.disposition == ActuationDisposition::Completed)
+        {
+            self.pulse_slew_fraction_us = next_fraction;
+            self.last_apply_instant = Instant::now();
+        }
+        result
     }
 
     fn apply_with_max_step(
@@ -605,9 +678,10 @@ impl<'a, I: I2c> ServoOutput<RefCellDevice<'a, I>> {
                 CommandReferenceKnowledge::ConfiguredCalibrationReference;
                 NUM_ACTUATORS
             ],
-            slew_rate_us: DEFAULT_SLEW_RATE_US,
             max_pulse_velocity_us_per_second: DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND,
             max_slew_gap: DEFAULT_MAX_SLEW_GAP,
+            last_apply_instant: Instant::now(),
+            pulse_slew_fraction_us: 0.0,
             initialized: false,
             enabled: false,
             shutdown_verified: true,
@@ -631,9 +705,10 @@ impl<'a, I: I2c + Send> ServoOutput<MutexDevice<'a, I>> {
                 CommandReferenceKnowledge::ConfiguredCalibrationReference;
                 NUM_ACTUATORS
             ],
-            slew_rate_us: DEFAULT_SLEW_RATE_US,
             max_pulse_velocity_us_per_second: DEFAULT_MAX_PULSE_VELOCITY_US_PER_SECOND,
             max_slew_gap: DEFAULT_MAX_SLEW_GAP,
+            last_apply_instant: Instant::now(),
+            pulse_slew_fraction_us: 0.0,
             initialized: false,
             enabled: false,
             shutdown_verified: true,
@@ -661,7 +736,8 @@ fn pulse_step_for_elapsed(
     rate_us_per_second: f64,
     elapsed: Duration,
     max_gap: Duration,
-) -> HalResult<u16> {
+    fractional_carry_us: f64,
+) -> HalResult<(u16, f64)> {
     if !rate_us_per_second.is_finite() || rate_us_per_second <= 0.0 {
         return Err(HalError::Safety(format!(
             "pulse velocity must be finite and positive, got {rate_us_per_second}"
@@ -678,13 +754,24 @@ fn pulse_step_for_elapsed(
             elapsed, max_gap
         )));
     }
-    let allowed = rate_us_per_second * elapsed.as_secs_f64();
+    if !fractional_carry_us.is_finite() || !(0.0..1.0).contains(&fractional_carry_us) {
+        return Err(HalError::Safety(format!(
+            "fractional pulse slew carry is invalid: {fractional_carry_us}"
+        )));
+    }
+
+    let allowed = rate_us_per_second * elapsed.as_secs_f64() + fractional_carry_us;
     if !allowed.is_finite() || allowed < 0.0 {
         return Err(HalError::Safety(
             "computed pulse slew allowance is invalid".to_string(),
         ));
     }
-    Ok(allowed.floor().clamp(0.0, u16::MAX as f64) as u16)
+    if allowed >= u16::MAX as f64 {
+        return Ok((u16::MAX, 0.0));
+    }
+
+    let whole = allowed.floor();
+    Ok((whole as u16, allowed - whole))
 }
 
 fn slew_limit(current: u16, target: u16, max_step: u16) -> u16 {
@@ -796,9 +883,9 @@ mod tests {
         let mut a = make_servo();
         let mut b = make_servo();
         for servo in [&mut a, &mut b] {
+            servo.set_max_pulse_velocity_us_per_second(5_000.0).unwrap();
             servo.init(50.0).unwrap();
             servo.enable().unwrap();
-            servo.set_max_pulse_velocity_us_per_second(5_000.0).unwrap();
         }
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
@@ -812,7 +899,27 @@ mod tests {
     }
 
     #[test]
-    fn elapsed_time_slew_rejects_zero_and_oversized_gap_before_dispatch() {
+    fn fractional_slew_carry_prevents_high_frequency_rounding_loss() {
+        let mut a = make_servo();
+        let mut b = make_servo();
+        for servo in [&mut a, &mut b] {
+            servo.set_max_pulse_velocity_us_per_second(5_000.0).unwrap();
+            servo.init(50.0).unwrap();
+            servo.enable().unwrap();
+        }
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[0] = 1.0;
+
+        a.apply_with_elapsed(&cmd, Duration::from_micros(100)).unwrap();
+        a.apply_with_elapsed(&cmd, Duration::from_micros(100)).unwrap();
+        b.apply_with_elapsed(&cmd, Duration::from_micros(200)).unwrap();
+
+        assert_eq!(a.last_pulses()[0], 1501);
+        assert_eq!(b.last_pulses()[0], 1501);
+    }
+
+    #[test]
+    fn elapsed_time_slew_rejects_zero_and_requires_rearm_after_oversized_gap() {
         let mut servo = make_servo();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
@@ -821,6 +928,7 @@ mod tests {
             .unwrap_err();
         assert_eq!(zero.receipt.disposition, ActuationDisposition::NotDispatched);
         assert_eq!(zero.receipt.command_sequence, None);
+        assert!(servo.is_enabled());
 
         let large = servo
             .apply_with_elapsed(&HumanoidCommand::zero(), Duration::from_millis(101))
@@ -828,6 +936,23 @@ mod tests {
         assert_eq!(large.receipt.disposition, ActuationDisposition::NotDispatched);
         assert_eq!(large.receipt.command_sequence, None);
         assert_eq!(servo.last_pulses()[0], 1500);
+        assert!(!servo.is_enabled());
+        assert!(!servo.shutdown_verified());
+        assert!(servo.enable().is_err());
+
+        servo.disable().unwrap();
+        assert!(servo.shutdown_verified());
+        servo.enable().unwrap();
+        assert!(servo.is_enabled());
+    }
+
+    #[test]
+    fn timing_policy_cannot_change_while_enabled() {
+        let mut servo = make_servo();
+        servo.init(50.0).unwrap();
+        servo.enable().unwrap();
+        assert!(servo.set_max_pulse_velocity_us_per_second(1_000.0).is_err());
+        assert!(servo.set_max_slew_gap(Duration::from_millis(50)).is_err());
     }
 
     #[test]
@@ -842,6 +967,20 @@ mod tests {
             .command_reference_knowledge()
             .iter()
             .all(|state| *state == CommandReferenceKnowledge::WriteAccepted));
+    }
+
+    #[test]
+    fn ordinary_apply_no_longer_has_fixed_per_call_motion_budget() {
+        let mut servo = make_servo();
+        servo.set_max_pulse_velocity_us_per_second(1e-9).unwrap();
+        servo.init(50.0).unwrap();
+        servo.enable().unwrap();
+        let mut cmd = HumanoidCommand::zero();
+        cmd.torques[0] = 1.0;
+        servo.apply(&cmd).unwrap();
+        // A normal test invocation cannot accumulate one whole microsecond of
+        // allowance at 1e-9 µs/s. Historical 100-µs-per-call semantics would move.
+        assert_eq!(servo.last_pulses()[0], 1500);
     }
 
     #[test]
@@ -884,14 +1023,16 @@ mod tests {
     #[test]
     fn board0_error_is_indoubt_and_board1_not_attempted() {
         let (mut servo, fail0, _fail1) = make_switchable_servo();
+        servo.set_max_pulse_velocity_us_per_second(10_000.0).unwrap();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-        servo.set_slew_rate(u16::MAX);
         fail0.store(true, Ordering::SeqCst);
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
         cmd.torques[16] = 1.0;
-        let failure = servo.apply(&cmd).unwrap_err();
+        let failure = servo
+            .apply_with_elapsed(&cmd, Duration::from_millis(100))
+            .unwrap_err();
         assert_eq!(failure.receipt.disposition, ActuationDisposition::InDoubt);
         assert_eq!(failure.receipt.board0, EndpointActuationDisposition::InDoubt);
         assert_eq!(failure.receipt.board1, EndpointActuationDisposition::NotAttempted);
@@ -903,14 +1044,16 @@ mod tests {
     #[test]
     fn board1_error_preserves_partial_board0_success_and_latches_fault() {
         let (mut servo, _fail0, fail1) = make_switchable_servo();
+        servo.set_max_pulse_velocity_us_per_second(10_000.0).unwrap();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-        servo.set_slew_rate(u16::MAX);
         fail1.store(true, Ordering::SeqCst);
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
         cmd.torques[16] = 1.0;
-        let failure = servo.apply(&cmd).unwrap_err();
+        let failure = servo
+            .apply_with_elapsed(&cmd, Duration::from_millis(100))
+            .unwrap_err();
         assert_eq!(failure.receipt.disposition, ActuationDisposition::Partial);
         assert_eq!(failure.receipt.board0, EndpointActuationDisposition::WriteAccepted);
         assert_eq!(failure.receipt.board1, EndpointActuationDisposition::InDoubt);
@@ -965,16 +1108,20 @@ mod tests {
     }
 
     #[test]
-    fn test_servo_slew_rate_applied() {
+    fn elapsed_time_slew_applied() {
         let mut servo = make_servo();
+        servo.set_max_pulse_velocity_us_per_second(2_500.0).unwrap();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
-        servo.set_slew_rate(50);
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
-        servo.apply(&cmd).unwrap();
+        servo
+            .apply_with_elapsed(&cmd, Duration::from_millis(20))
+            .unwrap();
         assert_eq!(servo.last_pulses()[0], 1550);
-        servo.apply(&cmd).unwrap();
+        servo
+            .apply_with_elapsed(&cmd, Duration::from_millis(20))
+            .unwrap();
         assert_eq!(servo.last_pulses()[0], 1600);
     }
 
@@ -1020,12 +1167,14 @@ mod tests {
     #[test]
     fn test_center_all() {
         let mut servo = make_servo();
+        servo.set_max_pulse_velocity_us_per_second(10_000.0).unwrap();
         servo.init(50.0).unwrap();
         servo.enable().unwrap();
         let mut cmd = HumanoidCommand::zero();
         cmd.torques[0] = 1.0;
-        servo.set_slew_rate(u16::MAX);
-        servo.apply(&cmd).unwrap();
+        servo
+            .apply_with_elapsed(&cmd, Duration::from_millis(100))
+            .unwrap();
         assert_eq!(servo.last_pulses()[0], 2500);
         servo.center_all().unwrap();
         assert_eq!(servo.last_pulses()[0], 1500);
@@ -1037,14 +1186,40 @@ mod tests {
             pulse_step_for_elapsed(
                 5_000.0,
                 Duration::from_millis(20),
-                Duration::from_millis(100)
+                Duration::from_millis(100),
+                0.0,
             )
             .unwrap(),
-            100
+            (100, 0.0)
         );
-        assert!(pulse_step_for_elapsed(5_000.0, Duration::ZERO, Duration::from_millis(100)).is_err());
-        assert!(pulse_step_for_elapsed(5_000.0, Duration::from_millis(101), Duration::from_millis(100)).is_err());
-        assert!(pulse_step_for_elapsed(f64::NAN, Duration::from_millis(20), Duration::from_millis(100)).is_err());
+        assert!(pulse_step_for_elapsed(
+            5_000.0,
+            Duration::ZERO,
+            Duration::from_millis(100),
+            0.0,
+        )
+        .is_err());
+        assert!(pulse_step_for_elapsed(
+            5_000.0,
+            Duration::from_millis(101),
+            Duration::from_millis(100),
+            0.0,
+        )
+        .is_err());
+        assert!(pulse_step_for_elapsed(
+            f64::NAN,
+            Duration::from_millis(20),
+            Duration::from_millis(100),
+            0.0,
+        )
+        .is_err());
+        assert!(pulse_step_for_elapsed(
+            5_000.0,
+            Duration::from_millis(20),
+            Duration::from_millis(100),
+            1.0,
+        )
+        .is_err());
     }
 }
 
