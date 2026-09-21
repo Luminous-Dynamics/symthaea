@@ -8,6 +8,7 @@
 //! action-intent/authorization records in `authorization` and must not treat
 //! Phi/confidence as execution authority.
 
+pub mod approver_evidence;
 pub mod authorization;
 pub mod config_writer;
 pub mod daemon_incarnation;
@@ -21,6 +22,11 @@ pub mod plan_executor;
 pub mod service_manager;
 pub mod temporal;
 
+pub use approver_evidence::{
+    ApproverEvidenceErrorV1, ApproverEvidenceProfileV1, ApproverEvidenceRefV1,
+    LocalUnixPeerCredentialEvidenceV1, VerifiedLocalUnixPeerCredentialV1,
+    xenia_evidence_ref_v1,
+};
 pub use authorization::{
     NixActionDescriptorV1, NixActionIntentV1, NixActionScopeV1,
     NixAuthorizationDecisionV1, NixAuthorizationErrorV1, NixAuthorizationProfileV1,
