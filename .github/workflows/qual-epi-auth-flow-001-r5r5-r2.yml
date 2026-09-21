@@ -1,0 +1,97 @@
+name: QUAL EPI-AUTH-FLOW-001-R5R5-R2 exact discovery
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact lineage and deltas
+        shell: bash
+        env:
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          BASE='adb69f11fa8068b019cc5bb598d0c7726a197fc9'
+          PRODUCT='9d7f3cebc90ed69553d0487bd9f312c2259f5fdf'
+          QUALIFIER="$(git rev-parse HEAD)"
+          WORKFLOW='.github/workflows/qual-epi-auth-flow-001-r5r5-r2.yml'
+
+          test "$QUALIFIER" = "$EVENT_HEAD_SHA"
+          test "$(git rev-parse "${QUALIFIER}^")" = "$PRODUCT"
+          test "$(git rev-parse "${PRODUCT}^")" = "$BASE"
+
+          mapfile -t product_delta < <(git diff --name-only "$BASE" "$PRODUCT" | sort)
+          expected_product=(
+            'docs/research/EPI_AUTH_FLOW_001_R5R5_R2_DISCOVERY.md'
+            'scripts/audit_epistemic_expression_consumers.py'
+            'scripts/discover_epistemic_authority_flow.py'
+          )
+          test "${#product_delta[@]}" -eq "${#expected_product[@]}"
+          for i in "${!expected_product[@]}"; do
+            test "${product_delta[$i]}" = "${expected_product[$i]}"
+          done
+
+          mapfile -t qualifier_delta < <(git diff --name-only "$PRODUCT" "$QUALIFIER" | sort)
+          test "${#qualifier_delta[@]}" -eq 1
+          test "${qualifier_delta[0]}" = "$WORKFLOW"
+
+      - name: Execute broad frozen discovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRODUCT='9d7f3cebc90ed69553d0487bd9f312c2259f5fdf'
+          git checkout --detach "$PRODUCT"
+          test "$(git rev-parse HEAD)" = "$PRODUCT"
+          python3 -m py_compile scripts/discover_epistemic_authority_flow.py
+          python3 scripts/discover_epistemic_authority_flow.py | tee /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -Fx 'schema=epi-auth-flow-001-r5r5-discovery-v1' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -Fx 'authority_scope=measurement-only-producer-bypass-status-ordinal-cube-prompt-gates-and-controls' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -Fx 'result=PASS_DISCOVERY' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -F 'SURFACE ordinal_bypass_status_surface count=' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -F 'SURFACE broca_ordinal_gate_surface count=' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -F 'SURFACE broca_cube_gate_surface count=' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -F 'SURFACE broca_gate_control_surface count=' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -F 'SURFACE llm_prompt_authority_surface count=' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+          grep -F 'SUMMARY ' /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+
+      - name: Execute exact production-consumer witness audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRODUCT='9d7f3cebc90ed69553d0487bd9f312c2259f5fdf'
+          test "$(git rev-parse HEAD)" = "$PRODUCT"
+          python3 -m py_compile scripts/audit_epistemic_expression_consumers.py
+          python3 scripts/audit_epistemic_expression_consumers.py | tee /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -Fx 'schema=epi-auth-flow-001-r5r5-r2-production-witness-v1' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -Fx 'authority_scope=measurement-only-exact-production-consumer-witnesses' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -Fx 'lexical_surface_semantics=conservative-file-level-membership-may-include-embedded-cfg-test-code' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -Fx 'result=PASS_CONSUMER_WITNESS' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -F 'WITNESS coding_confidence_to_generic_llm_context' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -F 'WITNESS generic_llm_context_to_system_prompt' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -F 'WITNESS verified_generation_property_split' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -F 'WITNESS verified_generation_overbroad_guarantee_vocabulary' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          grep -F 'SUMMARY ' /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+
+      - name: Preserve exact measurement outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epi-auth-flow-001-r5r5-r2-measurements
+          path: |
+            /tmp/epi-auth-flow-r5r5-r2-discovery.txt
+            /tmp/epi-auth-flow-r5r5-r2-consumers.txt
+          if-no-files-found: error
+          retention-days: 30
