@@ -1,0 +1,369 @@
+name: Nixward Legacy Runtime Workbench
+
+on:
+  push:
+    branches:
+      - scratch/nixward-legacy-runtime-workbench-r1
+    paths:
+      - ".github/workflows/nixward-legacy-runtime-workbench.yml"
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUSTC_WRAPPER: ""
+  SCCACHE_DISABLE: "1"
+
+jobs:
+  derive-runtime-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scratch/nixward-legacy-runtime-workbench-r1
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Apply exact runtime substitutions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one old snippet, found {count}")
+              return text.replace(old, new, 1)
+
+          daemon_path = Path("crates/core/nixward/src/bin/nixward_daemon.rs")
+          daemon = daemon_path.read_text()
+
+          daemon = replace_once(
+              daemon,
+              'use nixward::NixParser;\n',
+              '''use nixward::NixParser;
+          use nixward::action::{
+              LegacyApprovalGateDecisionV1, evaluate_legacy_approval_v1,
+              invalidate_legacy_verdict_file_v1,
+          };
+          ''',
+              "daemon action imports",
+          )
+
+          old_gate = '''                        if is_modifying {
+                                      let is_approved = self
+                                          .watchdog_status
+                                          .as_ref()
+                                          .map(|s| {
+                                              s.eq_ignore_ascii_case("approved")
+                                                  || s.eq_ignore_ascii_case("a")
+                                                  || s.eq_ignore_ascii_case("yes")
+                                          })
+                                          .unwrap_or(false);
+
+                                      if !is_approved {
+                                          self.pending_action = Some(cmd_str.clone());
+                                          eprintln!(
+                                              "nixward-daemon: Gating action [safety={:?}]. Waiting for watchdog approval: {}",
+                                              safety, cmd_str
+                                          );
+                                          return (dynamic_threshold, Some(best_action.expected_free_energy));
+                                      } else {
+                                          // TOCTOU guard: the operator approved a *specific*
+                                          // command (the one stored in `pending_action` when we
+                                          // requested approval). The plan can change between
+                                          // cycles, so if the command we would run now differs
+                                          // from what was approved, re-gate instead of executing
+                                          // an unapproved action.
+                                          if self.pending_action.as_deref() != Some(cmd_str.as_str()) {
+                                              eprintln!(
+                                                  "nixward-daemon: Plan changed since approval; re-gating (approved {:?}, now {}).",
+                                                  self.pending_action, cmd_str
+                                              );
+                                              self.pending_action = Some(cmd_str.clone());
+                                              self.watchdog_status = None;
+                                              return (
+                                                  dynamic_threshold,
+                                                  Some(best_action.expected_free_energy),
+                                              );
+                                          }
+
+                                          eprintln!("nixward-daemon: Watchdog APPROVED action: {}", cmd_str);
+          '''
+
+          new_gate = '''                        if is_modifying {
+                                      let wd_path = default_snapshot_path()
+                                          .with_file_name("local_approval_verdict.txt");
+                                      match evaluate_legacy_approval_v1(
+                                          self.pending_action.as_deref(),
+                                          cmd_str.as_str(),
+                                          self.legacy_approval_status.as_deref(),
+                                      ) {
+                                          LegacyApprovalGateDecisionV1::AwaitingFreshApproval {
+                                              invalidate_existing_verdict,
+                                          } => {
+                                              if invalidate_existing_verdict {
+                                                  if let Err(e) =
+                                                      invalidate_legacy_verdict_file_v1(&wd_path)
+                                                  {
+                                                      eprintln!(
+                                                          "nixward-daemon: FAILED to invalidate stale local approval ({e}); refusing mutation."
+                                                      );
+                                                      self.legacy_approval_status = None;
+                                                      self.pending_action = None;
+                                                      return (
+                                                          dynamic_threshold,
+                                                          Some(best_action.expected_free_energy),
+                                                      );
+                                                  }
+                                              }
+
+                                              self.legacy_approval_status = None;
+                                              self.pending_action = Some(cmd_str.clone());
+                                              eprintln!(
+                                                  "nixward-daemon: Gating action [safety={:?}]. Waiting for fresh local approval: {}",
+                                                  safety, cmd_str
+                                              );
+                                              return (
+                                                  dynamic_threshold,
+                                                  Some(best_action.expected_free_energy),
+                                              );
+                                          }
+                                          LegacyApprovalGateDecisionV1::VetoedCurrent => {
+                                              eprintln!(
+                                                  "nixward-daemon: Local operator VETOED pending action: {}",
+                                                  cmd_str
+                                              );
+                                              return (
+                                                  dynamic_threshold,
+                                                  Some(best_action.expected_free_energy),
+                                              );
+                                          }
+                                          LegacyApprovalGateDecisionV1::ApprovedCurrent => {
+                                              // Consume the approval artifact before any mutation.
+                                              // Failure to consume fails closed so the same ambient
+                                              // approval cannot remain available for replay.
+                                              if let Err(e) =
+                                                  invalidate_legacy_verdict_file_v1(&wd_path)
+                                              {
+                                                  eprintln!(
+                                                      "nixward-daemon: FAILED to consume local approval ({e}); refusing mutation."
+                                                  );
+                                                  self.legacy_approval_status = None;
+                                                  self.pending_action = None;
+                                                  return (
+                                                      dynamic_threshold,
+                                                      Some(best_action.expected_free_energy),
+                                                  );
+                                              }
+                                              self.legacy_approval_status = None;
+                                              self.pending_action = None;
+                                              eprintln!(
+                                                  "nixward-daemon: Local operator APPROVED action: {}",
+                                                  cmd_str
+                                              );
+                                          }
+                                      }
+          '''
+          daemon = replace_once(daemon, old_gate, new_gate, "daemon legacy gate")
+
+          old_clear = '''                                // Clear verdict file
+                                          let wd_path =
+                                              default_snapshot_path().with_file_name("watchdog_verdict.txt");
+                                          let _ = std::fs::remove_file(wd_path);
+                                          self.watchdog_status = None;
+                                          self.pending_action = None;
+          '''
+          new_clear = '''                                // Approval was already consumed above before mutation began.
+          '''
+          daemon = replace_once(daemon, old_clear, new_clear, "daemon post-approval clear")
+
+          daemon = daemon.replace("watchdog_status", "legacy_approval_status")
+          daemon = daemon.replace("watchdog_verdict.txt", "local_approval_verdict.txt")
+          daemon = daemon.replace(
+              "/// Last watchdog verdict (read from disk, written by `nixward watch`).",
+              "/// Transitional local human-approval verdict read from the legacy local file channel.",
+          )
+          daemon = daemon.replace(
+              "/// Read the latest watchdog verdict from disk (written by `nixward watch`).",
+              "/// Read the latest transitional local human-approval verdict from disk.",
+          )
+          daemon = daemon.replace("refresh_legacy_approval_status", "refresh_legacy_approval_status")
+          daemon_path.write_text(daemon)
+
+          tui_path = Path("crates/core/nixward/src/tui/app.rs")
+          tui = tui_path.read_text()
+          tui = replace_once(
+              tui,
+              'use crate::ipc::{self, DaemonSnapshot};\n',
+              '''use crate::action::{LegacyApprovalVerdictV1, publish_legacy_verdict_file_v1};
+          use crate::ipc::{self, DaemonSnapshot};
+          ''',
+              "TUI approval imports",
+          )
+
+          old_tui = '''                KeyCode::Char('a') | KeyCode::Char('A') => {
+                              let wd_path = self
+                                  .daemon_snapshot_path
+                                  .with_file_name("watchdog_verdict.txt");
+                              let _ = std::fs::write(&wd_path, "Approved");
+                              self.output
+                                  .push("🧠 [Watchdog] Action APPROVED. Sending to daemon...".into());
+                              self.refresh_data();
+                              return;
+                          }
+                          KeyCode::Char('v') | KeyCode::Char('V') => {
+                              let wd_path = self
+                                  .daemon_snapshot_path
+                                  .with_file_name("watchdog_verdict.txt");
+                              let _ = std::fs::write(&wd_path, "Vetoed");
+                              self.output
+                                  .push("🧠 [Watchdog] Action VETOED. Notifying daemon...".into());
+                              self.refresh_data();
+                              return;
+                          }
+          '''
+          new_tui = '''                KeyCode::Char('a') | KeyCode::Char('A') => {
+                              let approval_path = self
+                                  .daemon_snapshot_path
+                                  .with_file_name("local_approval_verdict.txt");
+                              match publish_legacy_verdict_file_v1(
+                                  &approval_path,
+                                  LegacyApprovalVerdictV1::Approved,
+                              ) {
+                                  Ok(()) => {
+                                      self.output.push(
+                                          "🧠 [Approval] Action APPROVED. Sending to daemon...".into(),
+                                      );
+                                      self.refresh_data();
+                                  }
+                                  Err(e) => self.output.push(format!(
+                                      "⚠️ [Approval] FAILED to publish approval; daemon was not authorized: {e}"
+                                  )),
+                              }
+                              return;
+                          }
+                          KeyCode::Char('v') | KeyCode::Char('V') => {
+                              let approval_path = self
+                                  .daemon_snapshot_path
+                                  .with_file_name("local_approval_verdict.txt");
+                              match publish_legacy_verdict_file_v1(
+                                  &approval_path,
+                                  LegacyApprovalVerdictV1::Vetoed,
+                              ) {
+                                  Ok(()) => {
+                                      self.output.push(
+                                          "🧠 [Approval] Action VETOED. Notifying daemon...".into(),
+                                      );
+                                      self.refresh_data();
+                                  }
+                                  Err(e) => self.output.push(format!(
+                                      "⚠️ [Approval] FAILED to publish veto; daemon state was not changed: {e}"
+                                  )),
+                              }
+                              return;
+                          }
+          '''
+          tui = replace_once(tui, old_tui, new_tui, "TUI approval publication")
+          tui_path.write_text(tui)
+
+          helper_path = Path("crates/core/nixward/src/action/legacy_approval_gate.rs")
+          helper = helper_path.read_text()
+          helper = helper.replace(
+              "legacy plain-text watchdog approval channel",
+              "legacy plain-text local approval channel",
+          )
+          helper = helper.replace("watchdog_verdict.txt", "local_approval_verdict.txt")
+          helper_path.write_text(helper)
+
+          qualifier_path = Path("scripts/qualify_nixward_legacy_approval.sh")
+          qualifier = qualifier_path.read_text()
+          qualifier = replace_once(
+              qualifier,
+              '''echo "-- compile nixward library --"
+          cargo check -p nixward --lib
+
+          echo "-- legacy approval replay tests --"
+          ''',
+              '''echo "-- compile nixward library --"
+          cargo check -p nixward --lib
+
+          echo "-- compile nixward daemon runtime --"
+          cargo check -p nixward --bin nixward-daemon --features daemon
+
+          echo "-- compile nixward TUI runtime --"
+          cargo check -p nixward --bin nixward-tui --features tui
+
+          echo "-- legacy approval replay tests --"
+          ''',
+              "qualifier runtime compile steps",
+          )
+          qualifier = replace_once(
+              qualifier,
+              '''cargo test -p nixward --lib action::legacy_approval_gate::tests
+
+          echo "Nixward legacy approval replay qualification: PASS"
+          ''',
+              '''cargo test -p nixward --lib action::legacy_approval_gate::tests
+
+          echo "-- runtime source-boundary audit --"
+          grep -Fq 'evaluate_legacy_approval_v1(' crates/core/nixward/src/bin/nixward_daemon.rs
+          test "$(grep -Fc 'invalidate_legacy_verdict_file_v1(&wd_path)' crates/core/nixward/src/bin/nixward_daemon.rs)" -ge 2
+          ! grep -Fq 'eq_ignore_ascii_case("approved")' crates/core/nixward/src/bin/nixward_daemon.rs
+          ! grep -Fq 'watchdog_verdict.txt' crates/core/nixward/src/bin/nixward_daemon.rs
+          grep -Fq 'publish_legacy_verdict_file_v1(' crates/core/nixward/src/tui/app.rs
+          ! grep -Fq 'std::fs::write(&wd_path, "Approved")' crates/core/nixward/src/tui/app.rs
+          ! grep -Fq 'watchdog_verdict.txt' crates/core/nixward/src/tui/app.rs
+          grep -Fq 'watchdog_verdict.txt' crates/core/nixward/src/bin/nixward.rs
+          grep -Fq 'local_approval_verdict.txt' crates/core/nixward/src/bin/nixward_daemon.rs
+          grep -Fq 'local_approval_verdict.txt' crates/core/nixward/src/tui/app.rs
+
+          echo "Nixward legacy approval replay qualification: PASS"
+          ''',
+              "qualifier source audit",
+          )
+          qualifier_path.write_text(qualifier)
+          PY
+
+      - name: Format and constrain the derived diff
+        shell: bash
+        run: |
+          cargo fmt --all
+          git diff --check
+          python3 - <<'PY'
+          import subprocess
+          allowed = {
+              "crates/core/nixward/src/bin/nixward_daemon.rs",
+              "crates/core/nixward/src/tui/app.rs",
+              "crates/core/nixward/src/action/legacy_approval_gate.rs",
+              "scripts/qualify_nixward_legacy_approval.sh",
+          }
+          changed = set(subprocess.check_output(["git", "diff", "--name-only"], text=True).splitlines())
+          if changed != allowed:
+              raise SystemExit(f"unexpected derived diff: {sorted(changed)}")
+          PY
+
+      - name: Run focused qualification on derived bytes
+        run: bash scripts/qualify_nixward_legacy_approval.sh
+
+      - name: Commit qualified derived bytes to workbench branch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            crates/core/nixward/src/bin/nixward_daemon.rs \
+            crates/core/nixward/src/tui/app.rs \
+            crates/core/nixward/src/action/legacy_approval_gate.rs \
+            scripts/qualify_nixward_legacy_approval.sh
+          git commit -m "fix(nixward): wire fail-closed legacy approval runtime"
+          git push origin HEAD:scratch/nixward-legacy-runtime-workbench-r1
