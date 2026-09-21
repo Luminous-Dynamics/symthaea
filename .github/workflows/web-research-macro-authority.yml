@@ -1,0 +1,83 @@
+name: Web Research Macro Authority
+
+on:
+  pull_request:
+    paths:
+      - 'patches/science/web-research-macro-authority-v1.patch'
+      - '.github/workflows/web-research-macro-authority.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Freeze qualification-only branch scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          base="${{ github.event.pull_request.base.sha }}"
+          changed="$(git diff --name-only "$base"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/science/web-research-macro-authority-v1\.patch|\.github/workflows/web-research-macro-authority\.yml)$' || true)"
+          test -z "$unexpected" || { echo "unexpected branch drift:"; printf '%s\n' "$unexpected"; exit 1; }
+
+      - name: Freeze current web-status authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          feed=src/web_research/conjecture_feed.rs
+          types=src/web_research/types.rs
+          grep -F 'self.epistemic_status.is_trustworthy()' "$feed"
+          grep -F 'matches!(self, Self::HighConfidence | Self::ModerateConfidence)' "$types"
+          grep -F 'if !prov.allows_macro_promotion()' "$feed"
+
+      - name: Apply exact candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/science/web-research-macro-authority-v1.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet fail-closed grammar authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          feed=src/web_research/conjecture_feed.rs
+          grep -F 'Web-derived conjectures may still be explored' "$feed"
+          grep -F 'pub fn allows_macro_promotion(&self) -> bool {' "$feed"
+          grep -A2 -F 'pub fn allows_macro_promotion(&self) -> bool {' "$feed" | grep -F 'false'
+          grep -F 'conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;' "$feed"
+          grep -F 'future evidence-plane-backed' "$feed"
+          ! grep -Fq 'self.epistemic_status.is_trustworthy()' "$feed"
+          ! grep -Fq 'if !prov.allows_macro_promotion()' "$feed"
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Focused macro-authority regressions
+        run: |
+          cargo +1.96.0 test -p symthaea --features web_research_module web_status_alone_never_grants_macro_authority -- --nocapture
+          cargo +1.96.0 test -p symthaea --features web_research_module trustworthy_web_provenance_is_still_macro_quarantined -- --nocapture
+          cargo +1.96.0 test -p symthaea --features web_research_module unverified_provenance_forces_quarantine -- --nocapture
+
+      - name: Web-research feature check
+        run: cargo +1.96.0 check -p symthaea --features web_research_module
+
+      - name: Strict library Clippy
+        run: cargo +1.96.0 clippy -p symthaea --features web_research_module --lib -- -D warnings
