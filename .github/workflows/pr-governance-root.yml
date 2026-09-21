@@ -14,25 +14,30 @@ concurrency:
 jobs:
   governance-root:
     name: Governance Root Check
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout trusted event base
+      - name: Checkout trusted main event base
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Bind trusted base and fetch untrusted head as Git objects only
+      - name: Bind trusted main base and fetch untrusted head as Git objects only
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          test "${PR_BASE_REF}" = "main" || {
+            echo "Governance Root is defined only for pull requests targeting main" >&2
+            exit 1
+          }
           trusted_checkout="$(git rev-parse HEAD)"
           test "${trusted_checkout}" = "${PR_BASE_SHA}" || {
             echo "trusted checkout does not match event base SHA" >&2
@@ -50,7 +55,8 @@ jobs:
           git cat-file -e "${PR_BASE_SHA}^{commit}"
           git cat-file -e "${PR_HEAD_SHA}^{commit}"
 
-          echo "governance_authority_source=BASE_BRANCH_TRUSTED_CODE"
+          echo "governance_authority_source=MAIN_BASE_TRUSTED_CODE"
+          echo "trusted_base_ref=${PR_BASE_REF}"
           echo "trusted_base_sha=${PR_BASE_SHA}"
           echo "fetched_untrusted_head_sha=${PR_HEAD_SHA}"
           echo "untrusted_head_worktree_checkout=false"
@@ -65,7 +71,7 @@ jobs:
           echo "validator_sha256=$(sha256sum .github/scripts/check-pr-governance.py | awk '{print $1}')"
           echo "policy_sha256=$(sha256sum .github/governance-change-policy-v1.json | awk '{print $1}')"
 
-      - name: Enforce exact PR governance policy from trusted base code
+      - name: Enforce exact PR governance policy from trusted main code
         shell: bash
         env:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -81,15 +87,17 @@ jobs:
         shell: bash
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           {
-            echo "governance_authority_source=BASE_BRANCH_TRUSTED_CODE"
+            echo "governance_authority_source=MAIN_BASE_TRUSTED_CODE"
             echo "event_name=${GITHUB_EVENT_NAME}"
             echo "pr_number=${PR_NUMBER}"
+            echo "trusted_base_ref=${PR_BASE_REF}"
             echo "trusted_base_sha=${PR_BASE_SHA}"
             echo "untrusted_head_sha=${PR_HEAD_SHA}"
             echo "changeset_subject=EXACT_EVENT_BASE_HEAD"
@@ -102,4 +110,5 @@ jobs:
             echo "class_a_scientific_adequacy=not_established_by_this_check"
             echo "class_a_test_execution=not_established_by_this_check"
             echo "full_ci_status=not_established_by_this_check"
+            echo "merge_authorization=not_established_by_this_check"
           } | tee pr-governance-root-receipt.txt
