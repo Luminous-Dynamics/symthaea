@@ -1,0 +1,211 @@
+name: Agency Time Linux Boottime Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/core/symthaea-agency-time/**"
+      - ".github/workflows/agency-time-linux-boottime-qualification.yml"
+
+concurrency:
+  group: agency-time-linux-boottime-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    if: >-
+      ${{ github.event.pull_request.draft == false &&
+          github.event.pull_request.head.ref == 'agency/time-linux-boottime-v1' &&
+          github.event.pull_request.base.ref == 'agency/time-abi-v1' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Assert exact predecessor and changed-path closure
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected_head"
+
+          parent='b89e150a8e52a8c64745fcbbeb7bda8d597db4c5'
+          git cat-file -e "${parent}^{commit}"
+          test "$(git merge-base "$parent" HEAD)" = "$parent"
+          test "$(git rev-list --count "${parent}..HEAD")" -eq 1
+          test "$(git rev-parse HEAD^)" = "$parent"
+
+          mapfile -t changed < <(git diff --name-only "$parent" HEAD | sort)
+          expected=(
+            '.github/workflows/agency-time-linux-boottime-qualification.yml'
+            'crates/core/symthaea-agency-time/Cargo.toml'
+            'crates/core/symthaea-agency-time/src/lib.rs'
+            'crates/core/symthaea-agency-time/src/linux_boottime.rs'
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!changed[@]}"; do
+            test "${changed[$i]}" = "${expected_sorted[$i]}"
+          done
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Ratchet Linux live-time theorem and capability split
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path('crates/core/symthaea-agency-time')
+          manifest = (root / 'Cargo.toml').read_text()
+          lib = (root / 'src/lib.rs').read_text()
+          provider = (root / 'src/linux_boottime.rs').read_text()
+
+          linux_deps = '[target.\'cfg(target_os = "linux")\'.dependencies]'
+          assert linux_deps in manifest
+          linux_pos = manifest.index(linux_deps)
+          getrandom_pos = manifest.index('getrandom.workspace = true')
+          rustix_line = 'rustix = { version = "=1.1.4", features = ["time"] }'
+          rustix_pos = manifest.index(rustix_line)
+          assert getrandom_pos > linux_pos
+          assert rustix_pos > linux_pos
+          assert '[dependencies]\ngetrandom.workspace = true' not in manifest
+          assert '[dependencies]\nrustix = ' not in manifest
+
+          assert 'pub struct LinuxBoottimeIssuer' in provider
+          assert 'pub struct LinuxBoottimeVerifier' in provider
+          assert 'pub struct LinuxBoottimeDomain' not in provider
+          assert 'ClockId::Boottime' in provider
+          assert 'TIME_NAMESPACE_PATH: &str = "/proc/self/ns/time"' in provider
+          assert '_time_namespace_handle: File' in provider
+          assert 'File::open(TIME_NAMESPACE_PATH)' in provider
+
+          issuer = re.search(
+              r'impl\s+LinuxBoottimeIssuer\s*\{(?P<body>.*?)(?=\n\}\n\nimpl\s+LinuxBoottimeVerifier)',
+              provider,
+              re.S,
+          )
+          verifier = re.search(
+              r'impl\s+LinuxBoottimeVerifier\s*\{(?P<body>.*?)(?=\n\}\n\nimpl\s+LinuxBoottimeCore)',
+              provider,
+              re.S,
+          )
+          assert issuer and verifier
+          assert 'pub fn issue_deadline' in issuer.group('body')
+          assert 'pub fn verifier' in issuer.group('body')
+          assert 'pub fn require_current' in verifier.group('body')
+          assert 'issue_deadline' not in verifier.group('body'), 'fast verifier gained deadline minting capability'
+          assert not re.search(r'pub\s+fn\s+new\s*\(', verifier.group('body')), \
+              'fast verifier gained independent construction capability'
+
+          pid_check = provider.index('if std::process::id() != self.process_id')
+          lock = provider.index('.state\n            .lock()')
+          assert pid_check < lock, 'fork check moved behind provider mutex acquisition'
+
+          for forbidden in (
+              'std::time::SystemTime',
+              'std::time::Instant',
+              '/proc/uptime',
+              'ClockId::Monotonic',
+              'pub trait MonotonicClock',
+              'pub trait RuntimeClock',
+              'unsafe {',
+          ):
+              assert forbidden not in provider, f'forbidden fallback/provider surface: {forbidden}'
+
+          marker = lib.index('pub struct MonotonicLeaseDeadline')
+          derive_region = lib[max(0, marker - 180):marker]
+          for forbidden in ('Debug', 'Clone', 'Copy', 'Serialize', 'Deserialize'):
+              assert forbidden not in derive_region
+          deadline_impl = re.search(r'impl\s+MonotonicLeaseDeadline\s*\{(?P<body>.*?)\n\}', lib, re.S)
+          assert deadline_impl
+          body = deadline_impl.group('body')
+          assert 'deadline_coordinate' not in body
+          assert not re.search(r'pub\s+(?:const\s+)?fn\s+(?:new|from_[A-Za-z0-9_]*)\s*\(', body)
+
+          for type_name in ('LinuxBoottimeIssuer', 'LinuxBoottimeVerifier'):
+              pos = provider.index(f'pub struct {type_name}')
+              derive = provider[max(0, pos - 180):pos]
+              for forbidden in ('Clone', 'Copy', 'Serialize', 'Deserialize'):
+                  assert forbidden not in derive, f'{type_name} acquired bearer/live-state derive {forbidden}'
+
+          assert 'DeadlineEvaluation::Current' not in lib
+          assert 'pub struct CurrentDeadline' not in lib
+          assert 'same_profile_different_runtime_domain_rejects' in provider
+          assert 'namespace_handle_and_identity_are_bound_to_same_nsfs_object' in provider
+          PY
+
+      - name: Materialize mechanical lock state without short-circuiting source evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cargo metadata --format-version 1 --no-deps >/dev/null
+
+          if git diff --quiet -- Cargo.lock; then
+            echo 'AGENCY_TIME_PROVIDER_LOCK_RECONCILIATION_REQUIRED=0' >> "$GITHUB_ENV"
+          else
+            echo 'AGENCY_TIME_PROVIDER_LOCK_RECONCILIATION_REQUIRED=1' >> "$GITHUB_ENV"
+            git diff -- Cargo.lock > /tmp/agency-time-provider-lock-reconciliation.diff
+            echo 'Cargo.lock changed mechanically; continuing provider qualification with the generated lock.'
+          fi
+
+          mapfile -t unexpected < <(git diff --name-only | grep -v '^Cargo.lock$' || true)
+          if (( ${#unexpected[@]} != 0 )); then
+            printf 'cargo metadata unexpectedly changed non-lock paths:\n' >&2
+            printf '  %s\n' "${unexpected[@]}" >&2
+            exit 1
+          fi
+
+      - name: Format
+        run: cargo fmt --check -p symthaea-agency-time
+
+      - name: Check with mechanically reconciled lock state
+        run: cargo check --locked -p symthaea-agency-time
+
+      - name: Test library
+        run: cargo test --locked -p symthaea-agency-time --lib
+
+      - name: Test doctests
+        run: cargo test --locked -p symthaea-agency-time --doc
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-agency-time --all-targets -- -D warnings
+
+      - name: Require source tree unchanged by qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t unexpected < <(git diff --name-only | grep -v '^Cargo.lock$' || true)
+          if (( ${#unexpected[@]} != 0 )); then
+            printf 'qualification changed unexpected non-lock paths:\n' >&2
+            printf '  %s\n' "${unexpected[@]}" >&2
+            exit 1
+          fi
+
+      - name: Final lockfile evidence gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${AGENCY_TIME_PROVIDER_LOCK_RECONCILIATION_REQUIRED:-0}" == '1' ]]; then
+            echo 'Provider source gates completed against the mechanically generated lock state.' >&2
+            echo 'Exact subject is NOT qualified because committed Cargo.lock does not contain that state.' >&2
+            echo 'Create a separate evidence-driven lock reconciliation child; do not hand-edit Cargo.lock.' >&2
+            echo 'Mechanical Cargo.lock diff follows:' >&2
+            cat /tmp/agency-time-provider-lock-reconciliation.diff >&2
+            exit 1
+          fi
+
+          git diff --exit-code
