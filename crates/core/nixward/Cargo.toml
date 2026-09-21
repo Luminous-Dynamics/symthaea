@@ -27,10 +27,11 @@ required-features = ["daemon"]
 
 [dependencies]
 symthaea-core = { path = "../symthaea-core" }
-# Native-only (C FFI, async)
+# Native-only (C FFI, async, OS randomness)
 tree-sitter = { workspace = true, optional = true }
 tree-sitter-nix = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
+getrandom = { workspace = true, optional = true }
 
 # WASM-safe
 blake3 = { workspace = true }
@@ -80,8 +81,8 @@ harness = false
 
 [features]
 default = ["native"]
-# Native: includes parser (tree-sitter), filesystem ops, async (tokio), SQLite
-native = ["nix", "rusqlite", "tree-sitter", "tree-sitter-nix", "tokio"]
+# Native: includes parser (tree-sitter), filesystem ops, async (tokio), SQLite, OS RNG
+native = ["nix", "rusqlite", "tree-sitter", "tree-sitter-nix", "tokio", "getrandom"]
 # WASM-safe subset: sovereign_config, sovereign_conversation, app_database, encoding, mind
 # Use: nixward = { default-features = false }
 cli = ["clap", "clap_complete", "native"]

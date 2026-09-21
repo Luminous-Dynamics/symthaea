@@ -24,4 +24,7 @@ cargo test -p nixward --lib action::temporal::tests
 echo "-- local approval tests --"
 cargo test -p nixward --lib action::local_approval::tests
 
+echo "-- daemon incarnation tests --"
+cargo test -p nixward --lib action::daemon_incarnation::tests
+
 echo "Nixward authority focused qualification: PASS"
