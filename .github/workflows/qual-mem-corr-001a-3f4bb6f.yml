@@ -1,0 +1,30 @@
+name: QUAL MEM-CORR-001A exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/mem-corr-001a-propagation-plan
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 3f4bb6ffa9bb9a9d0678e9afaad0a48417f87122
+          fetch-depth: 1
+      - name: Verify exact subject
+        run: test "$(git rev-parse HEAD)" = "3f4bb6ffa9bb9a9d0678e9afaad0a48417f87122"
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+      - name: rustfmt
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: integration test
+        run: cargo test -p symthaea-communication --test memory_correction_propagation
+      - name: clippy
+        run: cargo clippy -p symthaea-communication --test memory_correction_propagation -- -D warnings
