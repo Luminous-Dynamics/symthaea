@@ -1,0 +1,32 @@
+name: QUAL MEM-TXN-001A exact subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact frozen subject
+        uses: actions/checkout@v4
+        with:
+          ref: 1222342a11ce1730eb6b9e9d81c0731fea511069
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "1222342a11ce1730eb6b9e9d81c0731fea511069"
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Rustfmt
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+      - name: Test exact transaction contract
+        run: cargo test -p symthaea-communication --test memory_mutation_transaction
+      - name: Clippy exact transaction contract
+        run: cargo clippy -p symthaea-communication --test memory_mutation_transaction -- -D warnings
