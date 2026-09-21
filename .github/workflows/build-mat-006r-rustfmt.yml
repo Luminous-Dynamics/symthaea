@@ -1,0 +1,95 @@
+name: NEVER MERGE - Build MAT-006R rustfmt reconstruction
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/build-mat-006r-rustfmt.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-mat-006r-rustfmt
+  cancel-in-progress: false
+
+jobs:
+  build-repair:
+    name: Build fresh MAT-006R direct child
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FAILED_SOURCE: c3faf4b9df140a62da199075e813b0ddb2b6cb97
+      FAILED_TREE: f75fb6dbedeb1e87788306eb8c2ad87802745cb8
+      ORIGINAL_PARENT: b92995c317bcb06a89f62a2c0ed8a07ab6f31299
+      TARGET_BRANCH: mat-006r-rustfmt-reconstruction
+      BUILDER_WORKFLOW: .github/workflows/build-mat-006r-rustfmt.yml
+    steps:
+      - name: Checkout builder subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Prove builder is failed tree plus builder only
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$ORIGINAL_PARENT"
+          test "$(git rev-parse "$FAILED_SOURCE^{tree}")" = "$FAILED_TREE"
+          mapfile -t changed < <(git diff --name-only "$FAILED_SOURCE" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = "$BUILDER_WORKFLOW"
+          git diff --exit-code "$FAILED_SOURCE" HEAD -- crates/domains/symthaea-materials Cargo.lock Cargo.toml
+
+      - name: Refuse existing repair branch
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/dev/null 2>&1; then
+            echo "Target branch already exists; refusing overwrite: $TARGET_BRANCH" >&2
+            exit 1
+          fi
+
+      - name: Setup pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Mechanically canonicalize exact failed materials tree
+        run: |
+          set -euo pipefail
+          BEFORE_LOCK=$(sha256sum Cargo.lock | cut -d' ' -f1)
+          cargo fmt -p symthaea-materials
+          cargo fmt -p symthaea-materials -- --check
+          AFTER_LOCK=$(sha256sum Cargo.lock | cut -d' ' -f1)
+          test "$BEFORE_LOCK" = "$AFTER_LOCK"
+          test -z "$(git diff --name-only | grep -v '^crates/domains/symthaea-materials/' || true)"
+          git diff --check
+          git diff --stat "$FAILED_SOURCE" -- crates/domains/symthaea-materials
+          git diff "$FAILED_SOURCE" -- crates/domains/symthaea-materials > /tmp/mat-006r-rustfmt.patch
+
+      - name: Construct one-commit repair with original parent
+        run: |
+          set -euo pipefail
+          rm "$BUILDER_WORKFLOW"
+          git add -A crates/domains/symthaea-materials "$BUILDER_WORKFLOW"
+          test -z "$(git diff --cached --name-only | grep -v '^crates/domains/symthaea-materials/' || true)"
+          TREE=$(git write-tree)
+          export GIT_AUTHOR_NAME='Tristan Stoltz'
+          export GIT_AUTHOR_EMAIL='tristan.stoltz@evolvingresonantcocreationism.com'
+          export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
+          export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
+          COMMIT=$(printf '%s\n' 'MAT-006R: reconstruct cumulative materials stack with pinned rustfmt' | git commit-tree "$TREE" -p "$ORIGINAL_PARENT")
+          test "$(git rev-parse "$COMMIT^")" = "$ORIGINAL_PARENT"
+          test "$(git diff --name-only "$ORIGINAL_PARENT" "$COMMIT" | grep -v '^crates/domains/symthaea-materials/' | wc -l)" -eq 0
+          printf 'REPAIR_COMMIT=%s\nREPAIR_TREE=%s\n' "$COMMIT" "$(git rev-parse "$COMMIT^{tree}")"
+          git push origin "$COMMIT:refs/heads/$TARGET_BRANCH"
+
+      - name: Prove pushed identity
+        run: |
+          set -euo pipefail
+          REMOTE=$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)
+          test -n "$REMOTE"
+          test "$(git rev-parse "$REMOTE^")" = "$ORIGINAL_PARENT"
+          printf 'PUSHED_REPAIR=%s\nPUSHED_TREE=%s\n' "$REMOTE" "$(git rev-parse "$REMOTE^{tree}")"
