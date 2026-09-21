@@ -36,4 +36,7 @@ cargo test -p nixward --lib action::local_approval_ipc::tests
 echo "-- local approval submission/admission tests --"
 cargo test -p nixward --lib action::local_approval_submission::tests
 
+echo "-- local approval single-use store tests --"
+cargo test -p nixward --lib action::local_approval_store::tests
+
 echo "Nixward authority focused qualification: PASS"
