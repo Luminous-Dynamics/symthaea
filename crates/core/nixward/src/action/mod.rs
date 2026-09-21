@@ -10,6 +10,7 @@
 
 pub mod authorization;
 pub mod config_writer;
+pub mod daemon_incarnation;
 pub mod executor;
 pub mod flake_ops;
 pub mod gc_manager;
@@ -27,6 +28,7 @@ pub use authorization::{
     NixPostconditionStatusV1,
 };
 pub use config_writer::{ConfigPatch, ConfigWriter, WriteResult};
+pub use daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
 pub use executor::{
     ChannelOperation, ExecutionRecord, ExecutionResult, FlakeOperation, NixOSCommand,
     NixOSExecutor, SafetyLevel,

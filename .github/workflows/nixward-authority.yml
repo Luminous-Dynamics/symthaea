@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "crates/core/nixward/src/action/authorization.rs"
+      - "crates/core/nixward/src/action/daemon_incarnation.rs"
       - "crates/core/nixward/src/action/local_approval.rs"
       - "crates/core/nixward/src/action/mod.rs"
       - "crates/core/nixward/src/action/executor.rs"
