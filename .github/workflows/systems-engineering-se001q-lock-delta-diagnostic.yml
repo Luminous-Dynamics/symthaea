@@ -1,4 +1,4 @@
-name: Systems Engineering SE-001Q Lock Diagnostic v1.4
+name: Systems Engineering SE-001Q Lock Diagnostic v1.5
 
 on:
   pull_request:
@@ -9,13 +9,14 @@ on:
       - '.github/scripts/se001q_verify_diagnostic_witnesses.py'
       - '.github/scripts/se001q_lock_delta_probe.py'
       - '.github/scripts/se001q_verify_lock_delta.py'
+      - '.github/scripts/se001q_verify_lock_delta_v1_5.py'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: se001q-lock-diagnostic-v1_4-${{ github.ref }}
+  group: se001q-lock-diagnostic-v1_5-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -25,7 +26,7 @@ env:
 
 jobs:
   lock-diagnostic:
-    name: Diagnose frozen SE-001 lock resolution v1.4
+    name: Diagnose frozen SE-001 lock resolution v1.5
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -73,13 +74,13 @@ jobs:
             --work-root "$RUNNER_TEMP/se001q-lock-probe" \
             | tee lock-diagnostic-capture.json
 
-      - name: Independently re-derive lock diagnostic semantics
-        if: always() && steps.capture.outcome != 'skipped'
+      - name: Independently re-derive lock diagnostic semantics and toolchain
+        if: always() && steps.capture.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p lock-diagnostic-verification
-          python3 verifier/.github/scripts/se001q_verify_lock_delta.py \
+          python3 verifier/.github/scripts/se001q_verify_lock_delta_v1_5.py \
             --evidence lock-diagnostic \
             --experiment verifier/.github/qualification/se001q-lock-delta-experiment-v1.json \
             --subject subject \
@@ -101,13 +102,13 @@ jobs:
             echo 'witness-preflight outcome: `${{ steps.witness-preflight.outcome }}`'
             echo 'capture outcome: `${{ steps.capture.outcome }}`'
             echo
-            echo '### Lock-resolution diagnostic v1.4'
+            echo '### Lock-resolution diagnostic v1.5'
             echo
             echo '```json'
             cat lock-diagnostic/summary.json 2>/dev/null || true
             echo '```'
             echo
-            echo '### Independent semantic re-derivation'
+            echo '### Independent semantic + toolchain re-derivation'
             echo
             echo '```json'
             cat lock-diagnostic-verification/verification.json 2>/dev/null || true
@@ -130,7 +131,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: se001q-lock-diagnostic-v1_4-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: se001q-lock-diagnostic-v1_5-${{ env.SE001_SUBJECT }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             verifier/.github/qualification/se001q-diagnostic-witnesses-v1.json
             verifier/.github/qualification/se001q-lock-delta-experiment-v1.json
