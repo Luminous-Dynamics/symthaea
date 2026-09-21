@@ -22,6 +22,7 @@ pub mod irradiation_evidence;
 pub mod mining;
 pub mod properties;
 pub mod strategic;
+pub mod technoeconomics;
 pub mod thermodynamic_evidence;
 pub mod wolverine_ablation;
 
@@ -50,6 +51,13 @@ pub use properties::{MaterialCategory, MaterialProperty};
 pub use strategic::{
     STRATEGIC_HORIZON_LABELS, STRATEGIC_HORIZONS, StrategicFepAction, StrategicFepAgent,
     StrategicHdcEncoder, StrategicPredictor, StrategicReading,
+};
+pub use technoeconomics::{
+    CriticalityStatus, ECONOMIC_COMPOSITION_PPM_TOTAL, EconomicCompositionComponent,
+    EconomicParetoPoint, ElementCriticalityObservation, ElementEconomicContribution,
+    ElementPriceObservation, MaterialTechnoeconomicInput, MaterialTechnoeconomicResult,
+    PriceBasis, ProcessEconomicScenario, TechnoeconomicError, economic_pareto_front,
+    evaluate_material_technoeconomics,
 };
 pub use thermodynamic_evidence::{
     NormalizedThermodynamicEvidence, ThermodynamicDatabase, ThermodynamicEvidenceError,
