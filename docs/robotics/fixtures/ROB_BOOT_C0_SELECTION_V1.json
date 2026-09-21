@@ -1,0 +1,72 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-selection-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "objective_fixture": "symthaea.rob-boot.c0-oracle-fixture.v1",
+  "domain": {
+    "bw_tenths": [8, 9, 10, 11, 12],
+    "hh_tenths": [8, 9, 10, 11, 12],
+    "expected_candidate_count": 25
+  },
+  "applicability_fixture": {
+    "mode": "all_candidates_pre_admitted",
+    "purpose": "selection-policy-only",
+    "claim": "does_not_qualify_c0e_analytical_applicability"
+  },
+  "feasibility_profile": {
+    "deflection_ratio_max": [19, 20],
+    "relative_stress_ratio_max": [1, 1],
+    "notes": [
+      "qualification-only synthetic profile",
+      "relative stress guard is not an absolute strength or safety claim"
+    ]
+  },
+  "selection_rule": [
+    "retain_only_candidates_pre_admitted_by_fixture_applicability",
+    "retain_only_candidates_satisfying_frozen_feasibility_profile",
+    "minimize_mass_ratio",
+    "if_tied_minimize_deflection_ratio",
+    "if_still_tied_use_stable_semantic_candidate_identity"
+  ],
+  "expected_selected_candidate": {
+    "bw_tenths": 8,
+    "hh_tenths": 12,
+    "mass_ratio": [24, 25],
+    "deflection_ratio": [625, 864],
+    "stress_ratio": [125, 144]
+  },
+  "counterfactual_checks": [
+    {
+      "name": "stress_guard_is_live",
+      "change": "remove_relative_stress_ratio_max",
+      "expected_selected_candidate": {
+        "bw_tenths": 8,
+        "hh_tenths": 11,
+        "mass_ratio": [22, 25],
+        "deflection_ratio": [1250, 1331],
+        "stress_ratio": [125, 121]
+      }
+    }
+  ],
+  "required_reference_checks": [
+    "all_25_candidates_are_pre_admitted_only_for_this_selection_fixture",
+    "fixture_does_not_claim_to_test_c0e_applicability",
+    "exact_profile_selects_0p8_1p2",
+    "selected_candidate_objectives_match_objective_fixture",
+    "stress_guard_removal_changes_selection_to_0p8_1p1",
+    "selection_is_independent_of_candidate_enumeration_order",
+    "selection_uses_no_random_seed",
+    "relative_stress_guard_never_becomes_absolute_safety_factor",
+    "production_code_does_not_import_or_call_reference_selection_fixture"
+  ],
+  "nonclaims": [
+    "c0e_analytical_applicability",
+    "physical_campaign_thresholds",
+    "absolute_stress",
+    "material_strength",
+    "safety_factor",
+    "optimizer_superiority",
+    "physical_improvement",
+    "r2_success"
+  ]
+}

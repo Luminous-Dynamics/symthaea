@@ -1,0 +1,75 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-robustness-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "purpose": "known-answer tolerance-box robustness for ROB-DESIGN-001C0D",
+  "baseline": {
+    "bw": [1, 1],
+    "hh": [1, 1]
+  },
+  "candidate_nominal": {
+    "bw": [4, 5],
+    "hh": [6, 5],
+    "mass_ratio": [24, 25],
+    "deflection_ratio": [625, 864],
+    "stress_ratio": [125, 144]
+  },
+  "robust_feasibility_profile": {
+    "mass_ratio_max": [99, 100],
+    "deflection_ratio_max": [19, 20],
+    "relative_stress_ratio_max": [1, 1],
+    "notes": [
+      "synthetic qualification thresholds only",
+      "tolerance boxes are assumptions for software qualification, not manufacturing-capability evidence"
+    ]
+  },
+  "profiles": [
+    {
+      "name": "narrow_box",
+      "candidate_width_interval": [[79,100],[81,100]],
+      "candidate_height_interval": [[119,100],[121,100]],
+      "expected_worst_corners": {
+        "mass_ratio_max": [9801,10000],
+        "deflection_ratio_max": [100000000,133127561],
+        "stress_ratio_max": [1000000,1118719]
+      },
+      "expected_disposition": "robustly_feasible_within_fixture"
+    },
+    {
+      "name": "wide_box",
+      "candidate_width_interval": [[39,50],[41,50]],
+      "candidate_height_interval": [[59,50],[61,50]],
+      "expected_worst_corners": {
+        "mass_ratio_max": [2501,2500],
+        "deflection_ratio_max": [6250000,8009781],
+        "stress_ratio_max": [125000,135759]
+      },
+      "expected_disposition": "reject_mass_target_at_worst_corner"
+    }
+  ],
+  "monotone_corner_rules": {
+    "mass_ratio_max": "b_hi * h_hi / (b0 * h0)",
+    "deflection_ratio_max": "b0 * h0^3 / (b_lo * h_lo^3)",
+    "stress_ratio_max": "b0 * h0^2 / (b_lo * h_lo^2)"
+  },
+  "required_reference_checks": [
+    "nominal_candidate_matches_objective_oracle",
+    "narrow_box_worst_corner_values_match_exact_rationals",
+    "narrow_box_passes_all_three_robust_thresholds",
+    "wide_box_worst_corner_values_match_exact_rationals",
+    "wide_box_fails_only_mass_target_under_frozen_thresholds",
+    "changing_tolerance_box_changes_robustness_profile_identity",
+    "zero_or_negative_lower_dimension_rejects_before_ratio_evaluation",
+    "tolerance_assumption_never_becomes_process_capability_evidence",
+    "physical_measurement_remains_final_confirmatory_authority",
+    "production_code_does_not_import_reference_fixture"
+  ],
+  "nonclaims": [
+    "manufacturing_process_capability",
+    "as_built_conformity",
+    "physical_safety",
+    "absolute_material_strength",
+    "physical_improvement",
+    "r2_success"
+  ]
+}
