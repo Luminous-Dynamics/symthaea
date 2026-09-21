@@ -17,6 +17,7 @@ pub mod flake_ops;
 pub mod gc_manager;
 pub mod generation_manager;
 pub mod local_approval;
+pub mod local_approval_ipc;
 pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
@@ -46,6 +47,9 @@ pub use local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
     PendingNixApprovalRequestV1, digest_display,
 };
+pub use local_approval_ipc::LocalApprovalIpcErrorV1;
+#[cfg(target_os = "linux")]
+pub use local_approval_ipc::observe_linux_unix_peer_v1;
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
