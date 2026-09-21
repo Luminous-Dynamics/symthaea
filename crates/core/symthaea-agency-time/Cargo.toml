@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-agency-time"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Project-neutral temporal ABI for bounded Symthaea agency"
+
+[lib]
+path = "src/lib.rs"
