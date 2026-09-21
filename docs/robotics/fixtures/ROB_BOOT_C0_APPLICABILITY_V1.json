@@ -1,0 +1,67 @@
+{
+  "schema_id": "symthaea.rob-boot.c0-applicability-fixture.v1",
+  "authority": "qualification-reference-only",
+  "production_import_forbidden": true,
+  "purpose": "known-answer policy plumbing for ROB-DESIGN-001C0E",
+  "geometry_fixture": {
+    "baseline_span_to_height_ratio": [22, 1],
+    "bw_tenths": [8, 9, 10, 11, 12],
+    "hh_tenths": [8, 9, 10, 11, 12]
+  },
+  "shear_screen": {
+    "model": "conservative_isotropic_rectangular_center_load_upper_bound",
+    "upper_bound_equation": "shear_to_bending_upper = 3.6 * (h/L)^2",
+    "exact_equation_for_fixture": "9 * hh_tenths^2 / 121000",
+    "maximum_admitted_fraction": [1, 100],
+    "expected_height_disposition": {
+      "8": "pass",
+      "9": "pass",
+      "10": "pass",
+      "11": "pass",
+      "12": "reject_shear_budget"
+    },
+    "notes": [
+      "uses nu < 0.5 stable-isotropic upper bound",
+      "does_not_establish_physical_material_is_isotropic",
+      "does_not_establish_general_beam_accuracy"
+    ]
+  },
+  "synthetic_lateral_policy": {
+    "rule": "bw / hh >= 3/4",
+    "authority": "synthetic-policy-only",
+    "physical_buckling_claim": false,
+    "purpose": "prove a second applicability dimension is independently enforced",
+    "examples": [
+      {"bw_tenths":8,"hh_tenths":10,"expected":"pass"},
+      {"bw_tenths":8,"hh_tenths":11,"expected":"reject_lateral_policy"},
+      {"bw_tenths":9,"hh_tenths":12,"expected":"pass"}
+    ]
+  },
+  "combined_known_answers": [
+    {"bw_tenths":8,"hh_tenths":10,"expected":"applicable_within_fixture"},
+    {"bw_tenths":8,"hh_tenths":11,"expected":"reject_lateral_policy"},
+    {"bw_tenths":9,"hh_tenths":12,"expected":"reject_shear_budget"},
+    {"bw_tenths":12,"hh_tenths":11,"expected":"applicable_within_fixture"}
+  ],
+  "required_reference_checks": [
+    "baseline_ratio_and_height_scaling_are_applied_exactly",
+    "hh_11_passes_shear_budget",
+    "hh_12_fails_shear_budget",
+    "synthetic_lateral_policy_is_enforced_independently_of_shear",
+    "combined_disposition_preserves_specific_failure_reason",
+    "changing_shear_budget_changes_profile_identity",
+    "changing_synthetic_lateral_policy_changes_profile_identity",
+    "production_code_does_not_import_reference_fixture",
+    "fixture_never_claims_real_lateral_buckling_safety"
+  ],
+  "nonclaims": [
+    "physical_material_isotropy",
+    "universal_span_depth_rule",
+    "lateral_torsional_buckling_strength",
+    "local_contact_strength",
+    "yield_strength",
+    "physical_safety",
+    "physical_campaign_applicability",
+    "r2_success"
+  ]
+}
