@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, hashlib, json
+import argparse, hashlib, json, re
 from pathlib import Path
 
 DOMAIN="symthaea.se001q.cross-generation-corroboration.v1.2"
@@ -8,12 +8,15 @@ V2="symthaea.se001q.lock-delta-verification.v2"
 V21="symthaea.se001q.lock-delta-verification.v2.1"
 ACCEPTED={V1,V2,V21}
 STRONG={V2,V21}
+SHA256_RE=re.compile(r"^sha256:[0-9a-f]{64}$")
+GITSHA_RE=re.compile(r"^[0-9a-f]{40}$")
 EXPECTED_REQUIREMENTS=[
     "both capsules report REPRODUCIBLE_LOCK_DELTA and contain a content-addressed LockDeltaWitness",
     "both manifests exactly match retained file sets, sizes, and SHA-256 digests",
     "same frozen subject, experiment_id, exact experiment_sha256, and capture-recorded toolchain",
     "byte-identical source Cargo.lock and generated Cargo.lock",
-    "distinct run IDs, artifact IDs, and verifier SHAs",
+    "provenance run/artifact IDs are positive decimal integers, artifact digests are exact sha256:<64-lowercase-hex>, verifier SHAs are exact 40-lowercase-hex, and each supplied verifier SHA equals that capsule observation verifier_sha",
+    "distinct run IDs, artifact IDs, and verifier SHAs after capsule binding",
     "at least one capsule passed verification v2 or v2.1",
     "for verification v2.1, the wrapper verification_id is content-addressed, its nested base verification is v2 PASS, all toolchain predicates are true, capture/live toolchain strings equal the observation toolchain, experiment SHA-256 matches the observation, and parsed Rust/Cargo/Clippy releases are 1.96.0/1.96.0/0.1.96",
 ]
@@ -82,6 +85,19 @@ def generated_lock(root):
     if any(p.read_bytes()!=b for p in ps[1:]): die(f"{root}: generated lock copies disagree")
     return ps[0]
 
+def positive_decimal(value,what):
+    value=str(value)
+    if not value.isdigit() or int(value)<=0: die(f"invalid {what}")
+    return value
+
+def exact_sha256(value,what):
+    if not isinstance(value,str) or not SHA256_RE.fullmatch(value): die(f"invalid {what}")
+    return value
+
+def exact_gitsha(value,what):
+    if not isinstance(value,str) or not GITSHA_RE.fullmatch(value): die(f"invalid {what}")
+    return value
+
 def verification_binding(root,v,s):
     schema=v.get("schema")
     if schema not in ACCEPTED: die(f"{root}: verification schema not accepted")
@@ -139,19 +155,24 @@ def load(root_arg,verification_arg,prov):
     si=s["identity"]; wi=w["identity"]
     if si.get("status")!="REPRODUCIBLE_LOCK_DELTA": die(f"{root}: summary status mismatch")
     experiment_sha=si.get("experiment_sha256")
-    if not isinstance(experiment_sha,str) or not experiment_sha.startswith("sha256:"): die(f"{root}: missing experiment digest")
+    if not isinstance(experiment_sha,str) or not SHA256_RE.fullmatch(experiment_sha): die(f"{root}: missing or invalid experiment digest")
     capture_protocol=si.get("capture_protocol")
     if not isinstance(capture_protocol,str) or not capture_protocol: die(f"{root}: missing capture protocol")
+    capsule_verifier=exact_gitsha(si.get("verifier_sha"),f"{root} capsule verifier SHA")
     sl=source_lock(root); gl=generated_lock(root)
     if sha_file(sl)!=wi.get("source_lock_sha256") or sha_file(gl)!=wi.get("generated_lock_sha256"): die(f"{root}: retained lock bytes mismatch witness")
-    for k in ("run_id","artifact_id","artifact_zip_sha256","verifier_sha"):
-        if not prov.get(k): die(f"{root}: missing provenance {k}")
-    if not prov["artifact_zip_sha256"].startswith("sha256:"): die(f"{root}: bad artifact digest")
-    return dict(root=root,summary=s,manifest=m,witness=w,verification=v,verification_binding=vb,source=sl,generated=gl,prov=prov)
+    run_id=positive_decimal(prov.get("run_id"),f"{root} provenance run id")
+    artifact_id=positive_decimal(prov.get("artifact_id"),f"{root} provenance artifact id")
+    artifact_digest=exact_sha256(prov.get("artifact_zip_sha256"),f"{root} provenance artifact digest")
+    verifier_sha=exact_gitsha(prov.get("verifier_sha"),f"{root} provenance verifier SHA")
+    if verifier_sha!=capsule_verifier:
+        die(f"{root}: provenance verifier SHA does not equal capsule verifier SHA")
+    bound_prov={"run_id":run_id,"artifact_id":artifact_id,"artifact_zip_sha256":artifact_digest,"verifier_sha":verifier_sha}
+    return dict(root=root,summary=s,manifest=m,witness=w,verification=v,verification_binding=vb,source=sl,generated=gl,prov=bound_prov)
 
 def rec(label,c):
     si=c["summary"]["identity"]; p=c["prov"]; v=c["verification"]; vb=c["verification_binding"]
-    return {"label":label,"run_id":str(p["run_id"]),"artifact_id":str(p["artifact_id"]),"artifact_zip_sha256":p["artifact_zip_sha256"],"verifier_sha":p["verifier_sha"],"verification_schema":v["schema"],"base_verification_schema":vb["schema"],"observation_id":c["summary"]["observation_id"],"manifest_id":c["manifest"]["manifest_id"],"lock_delta_witness_id":c["witness"]["witness_id"],"experiment_id":si["experiment_id"],"experiment_sha256":si["experiment_sha256"],"capture_protocol":si["capture_protocol"],"toolchain":si["toolchain"]}
+    return {"label":label,"run_id":p["run_id"],"artifact_id":p["artifact_id"],"artifact_zip_sha256":p["artifact_zip_sha256"],"verifier_sha":p["verifier_sha"],"verification_schema":v["schema"],"base_verification_schema":vb["schema"],"observation_id":c["summary"]["observation_id"],"manifest_id":c["manifest"]["manifest_id"],"lock_delta_witness_id":c["witness"]["witness_id"],"experiment_id":si["experiment_id"],"experiment_sha256":si["experiment_sha256"],"capture_protocol":si["capture_protocol"],"toolchain":si["toolchain"]}
 
 def main():
     ap=argparse.ArgumentParser()
@@ -174,7 +195,7 @@ def main():
     ra,rb=rec("A",a),rec("B",b)
     if ra["run_id"]==rb["run_id"] or ra["artifact_id"]==rb["artifact_id"] or ra["verifier_sha"]==rb["verifier_sha"]: die("independence predicate failed")
     if sum(x["verification_schema"] in STRONG for x in (ra,rb))<1: die("at least one strong independent verifier required")
-    ident={"domain":DOMAIN,"contract_sha256":contract_sha,"subject_sha":ai["subject"]["sha"],"experiment_id":ai["experiment_id"],"experiment_sha256":ai["experiment_sha256"],"source_lock_sha256":sha_file(a["source"]),"generated_lock_sha256":sha_file(a["generated"]),"toolchain":ai["toolchain"],"runs":[ra,rb],"independence":{"distinct_run_ids":True,"distinct_artifact_ids":True,"distinct_verifier_generations":True,"strong_independent_verifier_present":True,"experiment_bytes_identical":True,"source_lock_bytes_identical":True,"generated_lock_bytes_identical":True},"result":"CORROBORATED_GENERATED_LOCK","authority":{"meaning":"cross-generation corroboration only","sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"}}
+    ident={"domain":DOMAIN,"contract_sha256":contract_sha,"subject_sha":ai["subject"]["sha"],"experiment_id":ai["experiment_id"],"experiment_sha256":ai["experiment_sha256"],"source_lock_sha256":sha_file(a["source"]),"generated_lock_sha256":sha_file(a["generated"]),"toolchain":ai["toolchain"],"runs":[ra,rb],"independence":{"distinct_run_ids":True,"distinct_artifact_ids":True,"distinct_verifier_generations":True,"verifier_metadata_bound_to_capsules":True,"strong_independent_verifier_present":True,"experiment_bytes_identical":True,"source_lock_bytes_identical":True,"generated_lock_bytes_identical":True},"result":"CORROBORATED_GENERATED_LOCK","authority":{"meaning":"cross-generation corroboration only","sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"}}
     out={"schema":DOMAIN,"corroboration_id":sha_bytes(canonical(ident)),"identity":ident}; reject_authority(out)
     p=Path(ns.output); p.parent.mkdir(parents=True,exist_ok=True); p.write_text(json.dumps(out,indent=2,sort_keys=True)+"\n")
     print(json.dumps({"schema":DOMAIN,"result":ident["result"],"corroboration_id":out["corroboration_id"],"contract_sha256":ident["contract_sha256"],"experiment_sha256":ident["experiment_sha256"],"generated_lock_sha256":ident["generated_lock_sha256"],"sufficient_for_repair_grant":False,"qualification_claim":"NONE","repair_authority_claim":"NONE"},sort_keys=True))

@@ -17,11 +17,12 @@
     "both manifests exactly match retained file sets, sizes, and SHA-256 digests",
     "same frozen subject, experiment_id, exact experiment_sha256, and capture-recorded toolchain",
     "byte-identical source Cargo.lock and generated Cargo.lock",
-    "distinct run IDs, artifact IDs, and verifier SHAs",
+    "provenance run/artifact IDs are positive decimal integers, artifact digests are exact sha256:<64-lowercase-hex>, verifier SHAs are exact 40-lowercase-hex, and each supplied verifier SHA equals that capsule observation verifier_sha",
+    "distinct run IDs, artifact IDs, and verifier SHAs after capsule binding",
     "at least one capsule passed verification v2 or v2.1",
     "for verification v2.1, the wrapper verification_id is content-addressed, its nested base verification is v2 PASS, all toolchain predicates are true, capture/live toolchain strings equal the observation toolchain, experiment SHA-256 matches the observation, and parsed Rust/Cargo/Clippy releases are 1.96.0/1.96.0/0.1.96"
   ],
   "result": "CORROBORATED_GENERATED_LOCK",
   "schema": "symthaea.se001q.cross-generation-corroboration-contract.v1.2",
-  "theorem": "LockDeltaWitness(A) + LockDeltaWitness(B) + identical experiment bytes + identical lock bytes + independent generations + valid accepted verification wrappers => corroboration, not mutation authority"
+  "theorem": "LockDeltaWitness(A) + LockDeltaWitness(B) + identical experiment bytes + identical lock bytes + capsule-bound independent verifier generations + valid accepted verification wrappers => corroboration, not mutation authority"
 }
