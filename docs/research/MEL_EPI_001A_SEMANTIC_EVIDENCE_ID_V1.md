@@ -43,7 +43,7 @@ EvidenceSemanticIdV1 parses/validates
 != source evidence validated
 ```
 
-A source-specific adapter that grants authority must recompute both the native evidence and the digest.
+A source-specific adapter that grants authority must recompute both the native evidence commitment and the semantic digest.
 
 ## V1 identity shape
 
@@ -94,8 +94,10 @@ V1 kinds:
 0x05 = finite f64 bits, canonicalized below
 0x06 = ordered sequence: count:u64-be || (len:u64-be || item)*
 0x07 = boolean (exact byte 0 or 1)
-0x08 = 32-byte digest reference
+0x08 = SHA-256 digest reference, exactly 32 digest bytes
 ```
+
+Field kind `0x08` is **not** a generic 32-byte digest slot. It must never be reinterpreted as BLAKE3-256 or another algorithm merely because that algorithm also emits 32 bytes. A future digest algorithm requires a distinct schema-defined field kind or a later transcript version.
 
 Maps are deliberately not a generic primitive. Domain adapters project unordered structures into canonically sorted sequences under their own schema semantics.
 
@@ -109,15 +111,63 @@ Maps are deliberately not a generic primitive. Domain adapters project unordered
 
 ## Text and collection rules
 
-- text is exact UTF-8 bytes; V1 performs no silent Unicode normalization.
-- a source schema may define normalization, but that choice belongs to the schema/profile identity.
+- text is the exact supplied UTF-8 byte sequence.
+- V1 performs no Unicode normalization, whitespace trimming, or case folding.
+- therefore canonically equivalent Unicode spellings remain distinct unless the frozen source schema explicitly normalizes them before transcript construction.
 - sequences preserve order.
 - unordered semantic sets must be sorted by the source adapter using a schema-defined comparator.
 - duplicate set members must be rejected unless the source schema explicitly defines multiset semantics.
 
+## Frozen cross-implementation vector
+
+The following vector covers every V1 field kind and the complete identity wrapper. It exists so independent Rust, Xenia, or other adapters can prove byte-for-byte agreement rather than merely agree on relational properties.
+
+Identity:
+
+```text
+namespace      = melothaea.vector
+schema_version = vector-v1
+profile_id     = source-native
+record_id      = record-0001
+```
+
+Semantic payload:
+
+```text
+tag 1 UTF-8                  = "melody"
+tag 2 bytes                  = 00 ff
+tag 3 unsigned integer       = 0x0102
+tag 4 signed integer         = -258
+tag 5 finite f64             = 1.5
+tag 6 ordered sequence       = ["a", "bc"]
+tag 7 boolean                = true
+tag 8 SHA-256 digest ref     = 11 repeated 32 times
+```
+
+Frozen lengths:
+
+```text
+semantic_payload_len = 169 bytes
+full_preimage_len    = 303 bytes
+```
+
+Frozen full preimage hex:
+
+```text
+6d656c6f74686165613a73656d616e7469632d65766964656e63653a763100010100000000000000106d656c6f74686165612e766563746f720002010000000000000009766563746f722d7631000301000000000000000d736f757263652d6e6174697665000401000000000000000b7265636f72642d3030303100050200000000000000a900010100000000000000066d656c6f6479000202000000000000000200ff00030300000000000000020102000404000000000000000301010200050500000000000000083ff8000000000000000606000000000000001b00000000000000020000000000000001610000000000000002626300070700000000000000010100080800000000000000201111111111111111111111111111111111111111111111111111111111111111
+```
+
+Independent reference SHA-256 over those exact 303 bytes:
+
+```text
+39fcacd18445633886e551976663f0acf9dcc0f8dd50a69a2fbdefeef315b651
+```
+
+The shared types crate need not compute that digest at runtime. The digest is a cross-implementation reference for reviewed crypto-bearing adapters.
+
 ## Why the shared crate freezes preimages instead of implementing SHA-256
 
-The workspace already contains multiple reviewed crypto-bearing boundaries, including the formal-safety receipt attestation contract. Making the shared *types* crate own yet another crypto implementation/provider would create unnecessary dependency and authority coupling.
+The workspace already contains reviewed crypto-bearing boundaries, including Muse's RustCrypto SHA-256 evidence layer and the formal-safety receipt attestation contract. Making the shared *types* crate own another crypto implementation/provider would create unnecessary dependency and authority coupling.
 
 The preimage contract gives every source adapter the same bytes while allowing the owning domain/Xenia/formal-safety layer to perform cryptographic work with its reviewed provider.
 
@@ -138,7 +188,10 @@ The implementation specifies tests for:
 9. malformed/uppercase SHA-256 text rejected;
 10. unsupported transcript version rejected;
 11. supplied digest equality can be checked exactly;
-12. semantic-ID shape can never substitute for native validation/rederivation.
+12. semantic-ID shape can never substitute for native validation/rederivation;
+13. composed/decomposed Unicode remains byte-distinct without source-defined normalization;
+14. one complete 303-byte vector freezes every V1 field kind and identity wrapper;
+15. field kind `0x08` is SHA-256-specific and cannot silently mean another 32-byte digest algorithm.
 
 ## Explicit nonclaims
 
@@ -162,4 +215,4 @@ A valid `EvidenceSemanticIdV1` does not establish:
 
 ## Successor boundary
 
-MEL-EPI-001B (#5284) may place this semantic ID inside source references and exact/projected preservation receipts. MEL-EPI-001C (#5285) may then add positive closed-world claim scopes. Neither successor may treat a generic semantic ID or projection as source evidence on shape alone.
+MEL-EPI-001B (#5284) may bind this semantic ID to an independently recomputed source-native commitment and an explicit preservation profile. MEL-EPI-001C (#5285) may then add positive closed-world claim scopes bound to that exact admitted source reference. Neither successor may treat a generic semantic ID or projection as source evidence on shape alone.
