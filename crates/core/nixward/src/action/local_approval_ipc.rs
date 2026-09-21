@@ -3,19 +3,26 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Kernel-backed local approval IPC identity observation.
 //!
-//! This module is intentionally small. It does not define an approval protocol,
-//! socket-path lifecycle, message framing, or authorization policy. Its only
-//! positive theorem on Linux is:
+//! The lower #5299 source establishes kernel observation of Unix peer
+//! credentials. In the private LOCAL-007 transport profile this adapter is
+//! deliberately narrowed further:
 //!
 //! ```text
 //! accepted UnixStream
 //! + successful SO_PEERCRED observation through pinned nix 0.27
+//! + peer effective UID == daemon effective UID
 //! -> VerifiedLocalUnixPeerCredentialV1
 //! ```
 //!
-//! The resulting credential proves a local process credential at this connection
-//! boundary. It does not identify the human behind that process and does not grant
-//! Nix execution authority.
+//! Filesystem mode 0600 is defense in depth, not the identity theorem: privileged
+//! processes may bypass DAC. The server-side SO_PEERCRED UID comparison is
+//! therefore mandatory for this same-UID profile.
+//!
+//! The resulting credential still proves only a local process credential at this
+//! connection boundary. It does not identify the human behind the process,
+//! establish organizational authority, or grant Nix execution authority. A future
+//! group/polkit/Xenia profile should use a separately qualified admission adapter
+//! rather than silently widening this same-UID function.
 
 use super::approver_evidence::{ApproverEvidenceErrorV1, VerifiedLocalUnixPeerCredentialV1};
 use super::temporal::UnixMillisV1;
@@ -27,17 +34,25 @@ pub enum LocalApprovalIpcErrorV1 {
     PeerCredentialObservation(String),
     #[error("kernel peer process id is invalid: {0}")]
     InvalidPeerProcessId(i64),
+    #[error(
+        "same-UID local approval profile rejected peer uid {observed_uid}; daemon effective uid is {expected_uid}"
+    )]
+    PeerEffectiveUidMismatch {
+        expected_uid: u32,
+        observed_uid: u32,
+    },
     #[error(transparent)]
     ApproverEvidence(#[from] ApproverEvidenceErrorV1),
 }
 
-/// Observe the kernel-reported credentials of an already accepted Linux Unix
-/// domain stream and mint the corresponding non-serializable positive type.
+/// Observe and admit the kernel-reported credentials of an already accepted Linux
+/// Unix-domain stream under the private same-effective-UID local approval profile.
 ///
-/// `transport_instance_ref` is provenance supplied by the owning listener/session
-/// layer. It is bound into the evidence identity but is not itself proof of the
-/// peer credential. The UID/GID/PID fields come only from `SO_PEERCRED` through
-/// `nix::sys::socket::getsockopt`.
+/// `transport_instance_ref` is listener/session provenance and is bound into the
+/// evidence identity, but it is not itself peer identity. UID/GID/PID come only
+/// from `SO_PEERCRED`. The observed UID must additionally equal the daemon's
+/// kernel-reported effective UID before the non-serializable positive type is
+/// minted.
 #[cfg(target_os = "linux")]
 pub fn observe_linux_unix_peer_v1(
     stream: &std::os::unix::net::UnixStream,
@@ -48,6 +63,9 @@ pub fn observe_linux_unix_peer_v1(
 
     let credentials = getsockopt(stream, PeerCredentials)
         .map_err(|err| LocalApprovalIpcErrorV1::PeerCredentialObservation(err.to_string()))?;
+
+    let expected_uid = nix::unistd::geteuid().as_raw();
+    validate_same_effective_uid_v1(credentials.uid(), expected_uid)?;
 
     let raw_pid = credentials.pid();
     let process_id = u32::try_from(raw_pid)
@@ -64,6 +82,20 @@ pub fn observe_linux_unix_peer_v1(
         observed_at,
     )
     .map_err(LocalApprovalIpcErrorV1::from)
+}
+
+fn validate_same_effective_uid_v1(
+    observed_uid: u32,
+    expected_uid: u32,
+) -> Result<(), LocalApprovalIpcErrorV1> {
+    if observed_uid == expected_uid {
+        Ok(())
+    } else {
+        Err(LocalApprovalIpcErrorV1::PeerEffectiveUidMismatch {
+            expected_uid,
+            observed_uid,
+        })
+    }
 }
 
 #[cfg(all(test, target_os = "linux"))]
@@ -85,11 +117,31 @@ mod tests {
         let expected = UnixCredentials::new();
         let evidence = verified.audit_evidence();
         assert_eq!(evidence.effective_uid, expected.uid());
+        assert_eq!(evidence.effective_uid, nix::unistd::geteuid().as_raw());
         assert_eq!(evidence.effective_gid, expected.gid());
         assert_eq!(evidence.process_id, Some(expected.pid() as u32));
         assert_eq!(evidence.process_id, Some(std::process::id()));
         assert_eq!(evidence.transport_instance_ref, "unix-socket-instance:test");
         assert_eq!(evidence.observed_at_unix_ms, 1_000);
+    }
+
+    #[test]
+    fn same_uid_profile_rejects_privilege_bypass_identity_mismatch() {
+        assert!(validate_same_effective_uid_v1(1000, 1000).is_ok());
+        assert_eq!(
+            validate_same_effective_uid_v1(0, 1000).unwrap_err(),
+            LocalApprovalIpcErrorV1::PeerEffectiveUidMismatch {
+                expected_uid: 1000,
+                observed_uid: 0,
+            }
+        );
+        assert_eq!(
+            validate_same_effective_uid_v1(1001, 1000).unwrap_err(),
+            LocalApprovalIpcErrorV1::PeerEffectiveUidMismatch {
+                expected_uid: 1000,
+                observed_uid: 1001,
+            }
+        );
     }
 
     #[test]
