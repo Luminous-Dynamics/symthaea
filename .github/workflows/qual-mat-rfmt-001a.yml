@@ -1,0 +1,149 @@
+name: MAT-RFMT-001A Historical Replay Manifest Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qual-mat-rfmt-001a.yml'
+      - 'docs/release/evidence/materials/historical-replay-manifest-v1.json'
+      - 'scripts/verify_materials_historical_replay.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-historical-replay-manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: 57d028ae04552c20b1a2697352bacd764233ac86
+      SOURCE_TREE: 0f7a308f2411cccb7e6d35e8e30ed95a2c8b885f
+      SOURCE_PARENT: adb69f11fa8068b019cc5bb598d0c7726a197fc9
+      MANIFEST_BLOB: dda10b5711cd539ea5cdafb7045f8ed1397600df
+      VERIFIER_BLOB: a09482081d7ccd777a77a209e4365be0bc38707f
+      MANIFEST: docs/release/evidence/materials/historical-replay-manifest-v1.json
+      VERIFIER: scripts/verify_materials_historical_replay.py
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind qualifier structure
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          test "$(git rev-parse "$SOURCE_SHA^")" = "$SOURCE_PARENT"
+          mapfile -t changed < <(git diff --name-only HEAD^ HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = ".github/workflows/qual-mat-rfmt-001a.yml"
+
+      - name: Materialize exact source subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach ../mat-rfmt-subject "$SOURCE_SHA"
+          cd ../mat-rfmt-subject
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_PARENT"
+          test "$(git ls-tree HEAD "$MANIFEST" | awk '{print $3}')" = "$MANIFEST_BLOB"
+          test "$(git ls-tree HEAD "$VERIFIER" | awk '{print $3}')" = "$VERIFIER_BLOB"
+          test -z "$(git status --porcelain)"
+
+      - name: Record execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../mat-rfmt-subject
+          python3 --version
+          git --version
+          sha256sum "$MANIFEST" "$VERIFIER"
+
+      - name: Python syntax gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../mat-rfmt-subject
+          python3 -m py_compile "$VERIFIER"
+
+      - name: Positive manifest verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../mat-rfmt-subject
+          python3 "$VERIFIER" "$MANIFEST"
+
+      - name: Build hostile manifest mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../mat-rfmt-subject
+          python3 - <<'PY'
+          import copy
+          import json
+          from pathlib import Path
+
+          src = json.loads(Path("docs/release/evidence/materials/historical-replay-manifest-v1.json").read_text())
+          out = Path("/tmp/mat-rfmt-hostile")
+          out.mkdir(exist_ok=True)
+
+          def emit(name, mutate):
+              value = copy.deepcopy(src)
+              mutate(value)
+              (out / f"{name}.json").write_text(json.dumps(value, indent=2) + "\n")
+
+          def edge(value, edge_id):
+              return next(item for item in value["edges"] if item["edge_id"] == edge_id)
+
+          emit("authority-shortcut", lambda v: v.__setitem__("qualified", True))
+          emit("wrong-common-parent", lambda v: edge(v, "MAT-010").__setitem__("parent_sha", "0" * 40))
+          emit("zero-k-extra-path", lambda v: edge(v, "MAT-008B-0K").__setitem__(
+              "changed_paths",
+              sorted(edge(v, "MAT-008B-0K")["changed_paths"] + ["crates/domains/symthaea-materials/src/lib.rs"]),
+          ))
+          emit("zero-k-preblob-drift", lambda v: edge(v, "MAT-008B-0K")["historical_blobs"][
+              "crates/domains/symthaea-materials/src/conditioned_property.rs"
+          ].__setitem__("pre", "1" * 40))
+          emit("zero-k-mag-quarantine-removed", lambda v: edge(v, "MAT-008B-0K")["projection"].__setitem__(
+              "forbidden_ancestry_import", ""
+          ))
+          emit("preservation-overlap", lambda v: edge(v, "MAT-009").__setitem__(
+              "changed_paths",
+              sorted(edge(v, "MAT-009")["changed_paths"] + ["crates/domains/symthaea-materials/src/conditioned_property.rs"]),
+          ))
+          emit("fake-pass", lambda v: edge(v, "MAT-006")["known_qualification"].__setitem__("disposition", "Passed"))
+          emit("provider-scope-escape", lambda v: edge(v, "MAT-015").__setitem__(
+              "changed_paths",
+              sorted(edge(v, "MAT-015")["changed_paths"] + ["crates/domains/symthaea-materials/src/lib.rs"]),
+          ))
+          PY
+
+      - name: Hostile mutations must reject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../mat-rfmt-subject
+          count=0
+          for fixture in /tmp/mat-rfmt-hostile/*.json; do
+            count=$((count + 1))
+            if python3 "$VERIFIER" "$fixture"; then
+              echo "hostile fixture unexpectedly accepted: $fixture" >&2
+              exit 1
+            fi
+          done
+          test "$count" -eq 8
+
+      - name: Source postflight immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ../mat-rfmt-subject
+          rm -rf scripts/__pycache__
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$SOURCE_TREE"
+          test -z "$(git status --porcelain)"
