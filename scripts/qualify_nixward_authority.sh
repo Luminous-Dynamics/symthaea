@@ -42,6 +42,9 @@ cargo test -p nixward --lib action::local_approval_store::tests
 if [[ "$(uname -s)" == "Linux" ]]; then
   echo "-- protected local approval socket tests --"
   cargo test -p nixward --lib action::local_approval_socket::tests
+
+  echo "-- daemon-local approval runtime composition tests --"
+  cargo test -p nixward --lib action::local_approval_runtime::tests
 fi
 
 echo "Nixward authority focused qualification: PASS"

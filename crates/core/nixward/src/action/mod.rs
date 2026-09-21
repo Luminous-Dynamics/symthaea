@@ -19,6 +19,8 @@ pub mod generation_manager;
 pub mod local_approval;
 pub mod local_approval_ipc;
 #[cfg(target_os = "linux")]
+pub mod local_approval_runtime;
+#[cfg(target_os = "linux")]
 pub mod local_approval_socket;
 pub mod local_approval_store;
 pub mod local_approval_submission;
@@ -54,6 +56,10 @@ pub use local_approval::{
 pub use local_approval_ipc::LocalApprovalIpcErrorV1;
 #[cfg(target_os = "linux")]
 pub use local_approval_ipc::observe_linux_unix_peer_v1;
+#[cfg(target_os = "linux")]
+pub use local_approval_runtime::{
+    InstalledLocalApprovalRequestV1, LocalApprovalRuntimeErrorV1, LocalApprovalRuntimeV1,
+};
 #[cfg(target_os = "linux")]
 pub use local_approval_socket::{
     LOCAL_APPROVAL_MAX_FRAME_BYTES_V1, LOCAL_APPROVAL_PROTOCOL_V1,

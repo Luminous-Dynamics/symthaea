@@ -9,6 +9,7 @@ on:
       - "crates/core/nixward/src/action/daemon_incarnation.rs"
       - "crates/core/nixward/src/action/local_approval.rs"
       - "crates/core/nixward/src/action/local_approval_ipc.rs"
+      - "crates/core/nixward/src/action/local_approval_runtime.rs"
       - "crates/core/nixward/src/action/local_approval_socket.rs"
       - "crates/core/nixward/src/action/local_approval_store.rs"
       - "crates/core/nixward/src/action/local_approval_submission.rs"
