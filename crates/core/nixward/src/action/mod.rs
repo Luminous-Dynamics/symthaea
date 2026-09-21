@@ -18,6 +18,7 @@ pub mod gc_manager;
 pub mod generation_manager;
 pub mod local_approval;
 pub mod local_approval_ipc;
+pub mod local_approval_store;
 pub mod local_approval_submission;
 pub mod phi_gate;
 pub mod plan_executor;
@@ -51,6 +52,10 @@ pub use local_approval::{
 pub use local_approval_ipc::LocalApprovalIpcErrorV1;
 #[cfg(target_os = "linux")]
 pub use local_approval_ipc::observe_linux_unix_peer_v1;
+pub use local_approval_store::{
+    ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
+    LocalApprovalRequestStoreV1, PendingRequestInstallV1,
+};
 pub use local_approval_submission::{
     LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1,
     admit_verified_local_submission_v1,
