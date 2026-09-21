@@ -1,27 +1,22 @@
 {
   "schema": "symthaea-pr-governance-change-policy-v1",
   "class_a_paths": [
-    {"match": "exact", "path": "symthaea/src/cognitive_loop/thresholds.rs", "authority": "safety"},
-    {"match": "exact", "path": "symthaea/src/cognitive_loop/ethics_engine.rs", "authority": "safety"},
-    {"match": "exact", "path": "symthaea/src/safety/agent.rs", "authority": "safety"},
-    {"match": "exact", "path": "crates/mycelix-bridge-common/src/consciousness_profile.rs", "authority": "safety"},
-    {"match": "exact", "path": "crates/mycelix-bridge-common/src/consciousness_thresholds.rs", "authority": "safety"},
+    {"match": "prefix", "path": "src/cognitive_loop/thresholds/", "authority": "safety"},
+    {"match": "exact", "path": "src/cognitive_loop/threshold_overrides.rs", "authority": "safety"},
+    {"match": "exact", "path": "crates/core/symthaea-types/src/threshold_overrides.rs", "authority": "safety"},
+    {"match": "exact", "path": "src/cognitive_loop/ethics_engine.rs", "authority": "safety"},
+    {"match": "exact", "path": "src/safety/agent.rs", "authority": "safety"},
+    {"match": "exact", "path": "scripts/cls_promote_candidate.sh", "authority": "safety"},
     {"match": "exact", "path": "docs/compliance/GOVERNANCE_CHARTER.md", "authority": "governance"},
     {"match": "exact", "path": ".github/governance-change-policy-v1.json", "authority": "governance"},
     {"match": "exact", "path": ".github/scripts/check-pr-governance.py", "authority": "governance"},
     {"match": "exact", "path": ".github/workflows/pr-governance.yml", "authority": "governance"},
     {"match": "exact", "path": ".github/workflows/pr-governance-root.yml", "authority": "governance"}
   ],
-  "class_b_paths": [
-    {"match": "exact", "path": "symthaea/src/cognitive_loop/consciousness_engine.rs"},
-    {"match": "exact", "path": "symthaea/src/cognitive_loop/substrate_manager.rs"},
-    {"match": "prefix", "path": "symthaea/src/cognitive_loop/calibration/"},
-    {"match": "exact", "path": "symthaea-core/src/hdc/substrate_independence.rs"},
-    {"match": "exact", "path": "symthaea-core/src/hdc/substrate_validation.rs"}
-  ],
+  "class_b_policy_state": "deferred-pending-gov-policy-001",
+  "class_b_paths": [],
   "adr_path_prefixes": [
-    "docs/compliance/adr/",
-    "symthaea/docs/compliance/adr/"
+    "docs/compliance/adr/"
   ],
   "class_a_prefix_policy": {
     "safety": ["safety:", "safety(...):", "ethics:", "ethics(...):", "emergency-safety:", "emergency-safety(...):"],
@@ -35,6 +30,7 @@
     "## Rollback Plan"
   ],
   "authority_nonclaims": [
+    "Class A path coverage is a versioned repository policy and does not prove all safety-sensitive code has been classified.",
     "Structural ADR presence does not establish scientific adequacy.",
     "Documented test evidence does not establish that tests executed successfully.",
     "This policy does not establish full-CI success or merge authorization."
