@@ -26,7 +26,7 @@ enum SemanticFieldKind {
     FiniteF64 = 0x05,
     Sequence = 0x06,
     Boolean = 0x07,
-    DigestReference = 0x08,
+    Sha256DigestReference = 0x08,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -74,6 +74,10 @@ impl std::error::Error for SemanticTranscriptError {}
 /// prevents duplicate tags. Maps are intentionally not a primitive: source
 /// adapters must project unordered structures into schema-defined canonical
 /// sequences before constructing this transcript.
+///
+/// UTF-8 values are byte-exact. This layer does not normalize Unicode, trim
+/// whitespace, or fold case. A source schema may do so before construction only
+/// when that normalization is itself part of the frozen source semantics.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SemanticTranscriptV1 {
     bytes: Vec<u8>,
@@ -171,12 +175,18 @@ impl SemanticTranscriptV1 {
         self.push_field(tag, SemanticFieldKind::Sequence, &payload)
     }
 
-    pub fn push_digest_reference(
+    /// Bind one exact SHA-256 digest as a semantic reference.
+    ///
+    /// Field kind `0x08` is SHA-256-specific in transcript V1. It must never be
+    /// reused for BLAKE3-256 or another 32-byte digest. A future digest
+    /// algorithm requires a distinct schema-defined field kind or a later
+    /// transcript version.
+    pub fn push_sha256_digest_reference(
         &mut self,
         tag: u16,
         digest: [u8; 32],
     ) -> Result<(), SemanticTranscriptError> {
-        self.push_field(tag, SemanticFieldKind::DigestReference, &digest)
+        self.push_field(tag, SemanticFieldKind::Sha256DigestReference, &digest)
     }
 
     fn push_field(
@@ -298,7 +308,9 @@ pub fn semantic_sha256_preimage(
     identity.push_utf8(4, record_id)?;
     identity.push_bytes(5, semantic_payload.as_bytes())?;
 
-    let mut preimage = Vec::with_capacity(SEMANTIC_EVIDENCE_DOMAIN_V1.len() + identity.as_bytes().len());
+    let mut preimage = Vec::with_capacity(
+        SEMANTIC_EVIDENCE_DOMAIN_V1.len() + identity.as_bytes().len(),
+    );
     preimage.extend_from_slice(SEMANTIC_EVIDENCE_DOMAIN_V1);
     preimage.extend_from_slice(identity.as_bytes());
     Ok(preimage)
@@ -471,6 +483,61 @@ mod tests {
         let mut positive = SemanticTranscriptV1::new();
         positive.push_f64(1, 0.0).unwrap();
         assert_eq!(negative, positive);
+    }
+
+    #[test]
+    fn exact_utf8_bytes_are_not_normalized() {
+        let mut composed = SemanticTranscriptV1::new();
+        composed.push_utf8(1, "\u{00e9}").unwrap();
+
+        let mut decomposed = SemanticTranscriptV1::new();
+        decomposed.push_utf8(1, "e\u{0301}").unwrap();
+
+        assert_ne!(composed.as_bytes(), decomposed.as_bytes());
+    }
+
+    #[test]
+    fn frozen_cross_implementation_preimage_vector() {
+        let mut payload = SemanticTranscriptV1::new();
+        payload.push_utf8(1, "melody").unwrap();
+        payload.push_bytes(2, &[0x00, 0xff]).unwrap();
+        payload.push_u64(3, 0x0102).unwrap();
+        payload.push_i64(4, -258).unwrap();
+        payload.push_f64(5, 1.5).unwrap();
+        payload
+            .push_sequence(6, &[b"a".to_vec(), b"bc".to_vec()])
+            .unwrap();
+        payload.push_bool(7, true).unwrap();
+        payload
+            .push_sha256_digest_reference(8, [0x11; 32])
+            .unwrap();
+
+        assert_eq!(payload.as_bytes().len(), 169);
+
+        let preimage = semantic_sha256_preimage(
+            "melothaea.vector",
+            "vector-v1",
+            "source-native",
+            "record-0001",
+            &payload,
+        )
+        .unwrap();
+
+        assert_eq!(preimage.len(), 303);
+        assert_eq!(
+            encode_lower_hex(&preimage),
+            concat!(
+                "6d656c6f74686165613a73656d616e7469632d65766964656e63653a763100010100000000000000106d656c6f746861",
+                "65612e766563746f720002010000000000000009766563746f722d7631000301000000000000000d736f757263652d6e",
+                "6174697665000401000000000000000b7265636f72642d3030303100050200000000000000a900010100000000000000",
+                "066d656c6f6479000202000000000000000200ff00030300000000000000020102000404000000000000000301010200",
+                "050500000000000000083ff8000000000000000606000000000000001b00000000000000020000000000000001610000",
+                "000000000002626300070700000000000000010100080800000000000000201111111111111111111111111111111111",
+                "111111111111111111111111111111"
+            )
+        );
+        // Independent reference SHA-256 over these exact 303 bytes:
+        // 39fcacd18445633886e551976663f0acf9dcc0f8dd50a69a2fbdefeef315b651
     }
 
     #[test]
