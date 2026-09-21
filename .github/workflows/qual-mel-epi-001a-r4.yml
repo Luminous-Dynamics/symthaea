@@ -1,0 +1,101 @@
+name: QUAL MEL-EPI-001A-R4 exact subject
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/qual-mel-epi-001a-r4.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout exact repaired product subject
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          subject='377d26d3207e715665713f37b52c7b097ad01313'
+          repair_parent='035422d7a8b701fe75f4f79e6ba777df47472394'
+          main_parent='5fd5259af776c0a7f1b9608f040bfae9009871a1'
+
+          git checkout --detach "$subject"
+
+          test "$(git rev-parse HEAD)" = "$subject"
+          test "$(git rev-parse HEAD^)" = "$repair_parent"
+          test "$(git rev-parse HEAD^^)" = "$main_parent"
+
+          mapfile -t repair_changed < <(
+            git diff --name-only "$repair_parent" "$subject" | sort
+          )
+          repair_expected=(
+            "crates/domains/symthaea-epistemic-types/src/semantic_evidence.rs"
+          )
+          test "${#repair_changed[@]}" -eq "${#repair_expected[@]}"
+          diff -u \
+            <(printf '%s\n' "${repair_expected[@]}" | sort) \
+            <(printf '%s\n' "${repair_changed[@]}")
+
+          mapfile -t product_changed < <(
+            git diff --name-only "$main_parent" "$subject" | sort
+          )
+          product_expected=(
+            "crates/domains/symthaea-epistemic-types/src/lib.rs"
+            "crates/domains/symthaea-epistemic-types/src/semantic_evidence.rs"
+            "docs/research/MEL_EPI_001A_SEMANTIC_EVIDENCE_ID_V1.md"
+            "docs/research/MEL_EPI_001_ROADMAP.md"
+          )
+          mapfile -t product_expected_sorted < <(
+            printf '%s\n' "${product_expected[@]}" | sort
+          )
+          test "${#product_changed[@]}" -eq "${#product_expected_sorted[@]}"
+          diff -u \
+            <(printf '%s\n' "${product_expected_sorted[@]}") \
+            <(printf '%s\n' "${product_changed[@]}")
+
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc --version
+          cargo --version
+          rustc --version | grep -F 'rustc 1.96.0 '
+          cargo --version | grep -F 'cargo 1.96.0 '
+
+      - name: Locked metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-epistemic-types -- --check
+
+      - name: Tests
+        run: cargo test --locked -p symthaea-epistemic-types
+
+      - name: Check all targets
+        run: cargo check --locked -p symthaea-epistemic-types --all-targets
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-epistemic-types --all-targets --no-deps -- -D warnings
+
+      - name: Exact-source postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "377d26d3207e715665713f37b52c7b097ad01313"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
