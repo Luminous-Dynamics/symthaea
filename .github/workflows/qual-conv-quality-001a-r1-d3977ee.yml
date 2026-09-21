@@ -1,0 +1,38 @@
+name: QUAL CONV-QUALITY-001A-R1 exact subject
+
+on:
+  pull_request:
+    branches:
+      - feat/conv-quality-001a-episode-scorecard
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: d3977eed8a272e6c923b836317059340c04e8d28
+
+      - name: Verify exact subject
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "d3977eed8a272e6c923b836317059340c04e8d28"
+
+      - name: Install Rust 1.96.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path crates/core/symthaea-communication/Cargo.toml -- --check
+
+      - name: Exact episode test
+        run: cargo test -p symthaea-communication --test conversation_quality_episode
+
+      - name: Clippy exact episode
+        run: cargo clippy -p symthaea-communication --test conversation_quality_episode -- -D warnings
