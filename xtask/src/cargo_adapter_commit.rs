@@ -31,8 +31,7 @@ pub(crate) enum CapturedSourceEffectOutcome {
 }
 
 /// Boundary responsible for completing Git/diff/effect evidence once source
-/// postflight has succeeded. The deterministic tests inject a fake; the real
-/// adapter should map this to #4562 + #4520/#4524.
+/// postflight has succeeded. Production mapping: #4562 + #4520/#4524.
 pub(crate) trait CapturedSourcePostflightBoundary {
     fn finalize(
         &mut self,
@@ -41,25 +40,19 @@ pub(crate) trait CapturedSourcePostflightBoundary {
     ) -> CapturedSourceEffectOutcome;
 }
 
-/// A pre-effect/effect-denied run intentionally has no backend-attempt result.
+/// A run that never reached the process backend has no backend-attempt result.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "state")]
 pub(crate) enum AttemptCommitOutcome {
-    NotCommitted {
-        intent_id: String,
-        reason: String,
-    },
-    Committed {
-        result: CargoExecutionAttemptResult,
-    },
+    NotCommitted { intent_id: String, reason: String },
+    Committed { result: CargoExecutionAttemptResult },
 }
 
-/// Convert the complete deterministic adapter/postflight pipeline into the
-/// canonical attempt-result contract.
+/// Convert deterministic adapter/postflight evidence into the canonical
+/// terminal-sensitive attempt-result contract.
 ///
-/// Only `BackendEntered` can create an attempt result. Every committed result
-/// must preserve exact intent lineage; no observation/source/effect values are
-/// fabricated to fill a missing stage.
+/// Only `BackendEntered` can create an attempt result. Persistence/freshness
+/// rejection occurs before process-backend entry and therefore cannot mint one.
 pub(crate) fn commit_pipeline_attempt<F>(
     mut intent: CargoExecutionIntent,
     pipeline: PostflightPipelineReport,
@@ -79,22 +72,38 @@ where
     }
 
     match pipeline.adapter {
-        AdapterRunReport::RejectedBeforeEffect { reason, .. } => Ok(
-            AttemptCommitOutcome::NotCommitted {
-                intent_id: intent.intent_id,
-                reason: format!("rejected before effect entry: {reason}"),
-            },
-        ),
+        AdapterRunReport::RejectedBeforeEffect { reason, .. } => {
+            not_committed(intent.intent_id, format!("rejected before effect entry: {reason}"))
+        }
         AdapterRunReport::EffectRejected {
             repository_source_before,
             reason,
             ..
         } => {
             require_source_before(&intent, &repository_source_before)?;
-            Ok(AttemptCommitOutcome::NotCommitted {
-                intent_id: intent.intent_id,
-                reason: format!("effect entry denied: {reason}"),
-            })
+            not_committed(intent.intent_id, format!("effect entry denied: {reason}"))
+        }
+        AdapterRunReport::AdmissionPersistenceRejected {
+            repository_source_before,
+            reason,
+            ..
+        } => {
+            require_source_before(&intent, &repository_source_before)?;
+            not_committed(
+                intent.intent_id,
+                format!("admission persistence rejected before backend entry: {reason}"),
+            )
+        }
+        AdapterRunReport::FreshnessRejected {
+            repository_source_before,
+            reason,
+            ..
+        } => {
+            require_source_before(&intent, &repository_source_before)?;
+            not_committed(
+                intent.intent_id,
+                format!("pre-spawn freshness rejected before backend entry: {reason}"),
+            )
         }
         AdapterRunReport::BackendEntered {
             repository_source_before,
@@ -107,24 +116,32 @@ where
             let terminal = map_terminal(process.terminal.clone());
             let postflight = map_postflight(&intent, postflight, finalizer)?;
             let observation = map_observation(pipeline.observation, &process.terminal)?;
-            let input = CargoExecutionAttemptInput {
-                effect_admission_digest,
-                terminal,
-                stdout_sha256: process.stdout_sha256,
-                stderr_sha256: process.stderr_sha256,
-                postflight,
-                observation,
-            };
-            let result = build_attempt_result(intent, input)?;
+            let result = build_attempt_result(
+                intent,
+                CargoExecutionAttemptInput {
+                    effect_admission_digest,
+                    terminal,
+                    stdout_sha256: process.stdout_sha256,
+                    stderr_sha256: process.stderr_sha256,
+                    postflight,
+                    observation,
+                },
+            )?;
             Ok(AttemptCommitOutcome::Committed { result })
         }
     }
+}
+
+fn not_committed(intent_id: String, reason: String) -> anyhow::Result<AttemptCommitOutcome> {
+    Ok(AttemptCommitOutcome::NotCommitted { intent_id, reason })
 }
 
 fn adapter_intent_id(report: &AdapterRunReport) -> &str {
     match report {
         AdapterRunReport::RejectedBeforeEffect { intent_id, .. }
         | AdapterRunReport::EffectRejected { intent_id, .. }
+        | AdapterRunReport::AdmissionPersistenceRejected { intent_id, .. }
+        | AdapterRunReport::FreshnessRejected { intent_id, .. }
         | AdapterRunReport::BackendEntered { intent_id, .. } => intent_id,
     }
 }
@@ -168,33 +185,30 @@ where
         }
         PostflightCapture::Captured {
             repository_source_after,
-        } => {
-            let effect = match finalizer.finalize(intent, &repository_source_after) {
-                CapturedSourceEffectOutcome::Evaluated {
-                    git_worktree_state_after,
+        } => Ok(match finalizer.finalize(intent, &repository_source_after) {
+            CapturedSourceEffectOutcome::Evaluated {
+                git_worktree_state_after,
+                observed_diff_id,
+                effect_evaluation_sha256,
+                effect_allowed,
+            } => CargoPostflightState::SourceCaptured {
+                repository_source_after,
+                git_worktree_state_after,
+                effect: CargoEffectPostflightState::Evaluated {
                     observed_diff_id,
                     effect_evaluation_sha256,
                     effect_allowed,
-                } => CargoPostflightState::SourceCaptured {
-                    repository_source_after,
-                    git_worktree_state_after,
-                    effect: CargoEffectPostflightState::Evaluated {
-                        observed_diff_id,
-                        effect_evaluation_sha256,
-                        effect_allowed,
-                    },
                 },
-                CapturedSourceEffectOutcome::Unavailable {
-                    git_worktree_state_after,
-                    reason,
-                } => CargoPostflightState::SourceCaptured {
-                    repository_source_after,
-                    git_worktree_state_after,
-                    effect: CargoEffectPostflightState::Unavailable { reason },
-                },
-            };
-            Ok(effect)
-        }
+            },
+            CapturedSourceEffectOutcome::Unavailable {
+                git_worktree_state_after,
+                reason,
+            } => CargoPostflightState::SourceCaptured {
+                repository_source_after,
+                git_worktree_state_after,
+                effect: CargoEffectPostflightState::Unavailable { reason },
+            },
+        }),
     }
 }
 
@@ -245,7 +259,9 @@ mod tests {
         VerifiedCargoObservation, continue_with_observation,
     };
     use crate::cargo_adapter_state::{
+        AdmissionPersistence, AdmissionPersistenceAck, AdmissionPersistenceRejection,
         CargoProcessBackend, EffectAdmission, EffectEntryGate, EffectRejection,
+        PreSpawnFreshnessApproval, PreSpawnFreshnessGate, PreSpawnFreshnessRejection,
         ProcessCapture, RepositorySourceProbe, ValidatedPreflightBindings, run_with_backend,
     };
     use crate::cargo_execution_attempt::{CargoEffectPostflightState, CargoPostflightState};
@@ -281,72 +297,84 @@ mod tests {
         }
     }
 
-    struct Probe {
-        pre: Option<anyhow::Result<String>>,
-        post: Option<anyhow::Result<String>>,
-    }
+    struct Probe(Option<anyhow::Result<String>>, Option<anyhow::Result<String>>);
     impl RepositorySourceProbe for Probe {
         fn preflight_source_id(&mut self) -> anyhow::Result<String> {
-            self.pre.take().unwrap()
+            self.0.take().unwrap()
         }
         fn postflight_source_id(&mut self) -> anyhow::Result<String> {
-            self.post.take().unwrap()
+            self.1.take().unwrap()
         }
     }
 
-    struct Gate {
-        decision: Option<Result<EffectAdmission, EffectRejection>>,
-    }
+    struct Gate(Option<Result<EffectAdmission, EffectRejection>>);
     impl EffectEntryGate for Gate {
-        fn admit(&mut self, _intent: &CargoExecutionIntent) -> Result<EffectAdmission, EffectRejection> {
-            self.decision.take().unwrap()
+        fn admit(
+            &mut self,
+            _intent: &CargoExecutionIntent,
+        ) -> Result<EffectAdmission, EffectRejection> {
+            self.0.take().unwrap()
         }
     }
 
-    struct Backend {
-        capture: Option<ProcessCapture>,
+    struct Persistence;
+    impl AdmissionPersistence for Persistence {
+        fn persist(
+            &mut self,
+            _intent: &CargoExecutionIntent,
+            admission: &EffectAdmission,
+        ) -> Result<AdmissionPersistenceAck, AdmissionPersistenceRejection> {
+            Ok(AdmissionPersistenceAck {
+                admission_receipt_digest: admission.receipt_digest.clone(),
+                persistence_ack_digest: digest('0'),
+            })
+        }
     }
+
+    struct Freshness;
+    impl PreSpawnFreshnessGate for Freshness {
+        fn verify(
+            &mut self,
+            _intent: &CargoExecutionIntent,
+            admission: &EffectAdmission,
+            persistence: &AdmissionPersistenceAck,
+        ) -> Result<PreSpawnFreshnessApproval, PreSpawnFreshnessRejection> {
+            Ok(PreSpawnFreshnessApproval {
+                admission_receipt_digest: admission.receipt_digest.clone(),
+                persistence_ack_digest: persistence.persistence_ack_digest.clone(),
+                freshness_evidence_digest: digest('5'),
+            })
+        }
+    }
+
+    struct Backend(Option<ProcessCapture>);
     impl CargoProcessBackend for Backend {
         fn execute(&mut self, _intent: &CargoExecutionIntent) -> ProcessCapture {
-            self.capture.take().unwrap()
+            self.0.take().unwrap()
         }
     }
 
-    struct Verifier {
-        outcome: Option<ObservationVerificationOutcome>,
-        calls: usize,
-    }
+    struct Verifier(Option<ObservationVerificationOutcome>, usize);
     impl CargoObservationVerificationBoundary for Verifier {
         fn verify(
             &mut self,
             _intent: &CargoExecutionIntent,
             _process: &ProcessCapture,
         ) -> ObservationVerificationOutcome {
-            self.calls += 1;
-            self.outcome.take().unwrap()
+            self.1 += 1;
+            self.0.take().unwrap()
         }
     }
 
-    struct Finalizer {
-        outcome: Option<CapturedSourceEffectOutcome>,
-        calls: usize,
-    }
+    struct Finalizer(Option<CapturedSourceEffectOutcome>, usize);
     impl CapturedSourcePostflightBoundary for Finalizer {
         fn finalize(
             &mut self,
             _intent: &CargoExecutionIntent,
             _repository_source_after: &str,
         ) -> CapturedSourceEffectOutcome {
-            self.calls += 1;
-            self.outcome.take().unwrap()
-        }
-    }
-
-    fn gate_allowed() -> Gate {
-        Gate {
-            decision: Some(Ok(EffectAdmission {
-                receipt_digest: digest('2'),
-            })),
+            self.1 += 1;
+            self.0.take().unwrap()
         }
     }
 
@@ -362,60 +390,53 @@ mod tests {
     }
 
     fn finalizer_evaluated() -> Finalizer {
-        Finalizer {
-            outcome: Some(CapturedSourceEffectOutcome::Evaluated {
+        Finalizer(
+            Some(CapturedSourceEffectOutcome::Evaluated {
                 git_worktree_state_after: Some(digest('9')),
                 observed_diff_id: digest('5'),
                 effect_evaluation_sha256: digest('6'),
                 effect_allowed: true,
             }),
-            calls: 0,
-        }
+            0,
+        )
     }
 
-    fn run_pipeline(
+    fn pipeline(
         terminal: ProcessTerminal,
         post: anyhow::Result<String>,
         observation: ObservationVerificationOutcome,
     ) -> PostflightPipelineReport {
         let frozen = intent();
-        let mut probe = Probe {
-            pre: Some(Ok(digest('a'))),
-            post: Some(post),
-        };
-        let mut gate = gate_allowed();
-        let mut backend = Backend {
-            capture: Some(ProcessCapture {
-                terminal,
-                stdout_sha256: digest('3'),
-                stderr_sha256: digest('4'),
-            }),
-        };
+        let mut probe = Probe(Some(Ok(digest('a'))), Some(post));
+        let mut gate = Gate(Some(Ok(EffectAdmission {
+            receipt_digest: digest('2'),
+        })));
+        let mut persistence = Persistence;
+        let mut freshness = Freshness;
+        let mut backend = Backend(Some(ProcessCapture {
+            terminal,
+            stdout_sha256: digest('3'),
+            stderr_sha256: digest('4'),
+        }));
         let adapter = run_with_backend(
             frozen.clone(),
             bindings(),
             &mut probe,
             &mut gate,
+            &mut persistence,
+            &mut freshness,
             &mut backend,
         )
         .unwrap();
-        let mut verifier = Verifier {
-            outcome: Some(observation),
-            calls: 0,
-        };
+        let mut verifier = Verifier(Some(observation), 0);
         continue_with_observation(frozen, adapter, &mut verifier).unwrap()
     }
 
     #[test]
-    fn verified_exit_commits_one_canonical_attempt_result() {
-        let pipeline = run_pipeline(
-            ProcessTerminal::Exited { code: 0 },
-            Ok(digest('a')),
-            verified(),
-        );
+    fn verified_exit_commits_canonical_attempt() {
+        let pipeline = pipeline(ProcessTerminal::Exited { code: 0 }, Ok(digest('a')), verified());
         let mut finalizer = finalizer_evaluated();
         let outcome = commit_pipeline_attempt(intent(), pipeline, &mut finalizer).unwrap();
-
         match outcome {
             AttemptCommitOutcome::Committed { result } => {
                 assert!(matches!(result.terminal, CargoTerminalState::Exited { code: 0 }));
@@ -430,40 +451,40 @@ mod tests {
             }
             other => panic!("unexpected commit outcome: {other:?}"),
         }
-        assert_eq!(finalizer.calls, 1);
+        assert_eq!(finalizer.1, 1);
     }
 
     #[test]
     fn spawn_failure_commits_without_fabricated_observation() {
         let frozen = intent();
-        let mut probe = Probe {
-            pre: Some(Ok(digest('a'))),
-            post: Some(Ok(digest('a'))),
-        };
-        let mut gate = gate_allowed();
-        let mut backend = Backend {
-            capture: Some(ProcessCapture {
-                terminal: ProcessTerminal::SpawnFailed {
-                    error_digest: digest('8'),
-                },
-                stdout_sha256: digest('3'),
-                stderr_sha256: digest('4'),
-            }),
-        };
+        let mut probe = Probe(Some(Ok(digest('a'))), Some(Ok(digest('a'))));
+        let mut gate = Gate(Some(Ok(EffectAdmission {
+            receipt_digest: digest('2'),
+        })));
+        let mut persistence = Persistence;
+        let mut freshness = Freshness;
+        let mut backend = Backend(Some(ProcessCapture {
+            terminal: ProcessTerminal::SpawnFailed {
+                error_digest: digest('8'),
+            },
+            stdout_sha256: digest('3'),
+            stderr_sha256: digest('4'),
+        }));
         let adapter = run_with_backend(
             frozen.clone(),
             bindings(),
             &mut probe,
             &mut gate,
+            &mut persistence,
+            &mut freshness,
             &mut backend,
         )
         .unwrap();
-        let mut verifier = Verifier { outcome: None, calls: 0 };
+        let mut verifier = Verifier(None, 0);
         let pipeline = continue_with_observation(frozen, adapter, &mut verifier).unwrap();
         let mut finalizer = finalizer_evaluated();
         let outcome = commit_pipeline_attempt(intent(), pipeline, &mut finalizer).unwrap();
-
-        assert_eq!(verifier.calls, 0);
+        assert_eq!(verifier.1, 0);
         match outcome {
             AttemptCommitOutcome::Committed { result } => {
                 assert!(matches!(result.terminal, CargoTerminalState::SpawnFailed { .. }));
@@ -477,18 +498,17 @@ mod tests {
     }
 
     #[test]
-    fn source_postflight_failure_commits_without_fabricated_effects() {
-        let pipeline = run_pipeline(
+    fn postflight_source_failure_does_not_fabricate_effects() {
+        let pipeline = pipeline(
             ProcessTerminal::Exited { code: 1 },
             Err(anyhow::anyhow!("postflight probe failed")),
             ObservationVerificationOutcome::VerificationFailed {
                 reason: "compiler transcript incomplete".into(),
             },
         );
-        let mut finalizer = Finalizer { outcome: None, calls: 0 };
+        let mut finalizer = Finalizer(None, 0);
         let outcome = commit_pipeline_attempt(intent(), pipeline, &mut finalizer).unwrap();
-
-        assert_eq!(finalizer.calls, 0);
+        assert_eq!(finalizer.1, 0);
         match outcome {
             AttemptCommitOutcome::Committed { result } => assert!(matches!(
                 result.postflight,
@@ -499,21 +519,16 @@ mod tests {
     }
 
     #[test]
-    fn effect_evaluation_unavailable_keeps_known_source_subject() {
-        let pipeline = run_pipeline(
-            ProcessTerminal::Exited { code: 0 },
-            Ok(digest('a')),
-            verified(),
-        );
-        let mut finalizer = Finalizer {
-            outcome: Some(CapturedSourceEffectOutcome::Unavailable {
+    fn effect_unavailable_preserves_known_source() {
+        let pipeline = pipeline(ProcessTerminal::Exited { code: 0 }, Ok(digest('a')), verified());
+        let mut finalizer = Finalizer(
+            Some(CapturedSourceEffectOutcome::Unavailable {
                 git_worktree_state_after: Some(digest('9')),
                 reason: "effect evaluator unavailable".into(),
             }),
-            calls: 0,
-        };
+            0,
+        );
         let outcome = commit_pipeline_attempt(intent(), pipeline, &mut finalizer).unwrap();
-
         match outcome {
             AttemptCommitOutcome::Committed { result } => assert!(matches!(
                 result.postflight,
@@ -527,8 +542,8 @@ mod tests {
     }
 
     #[test]
-    fn observation_verification_failure_still_commits_execution_evidence() {
-        let pipeline = run_pipeline(
+    fn observation_failure_still_commits_execution_evidence() {
+        let pipeline = pipeline(
             ProcessTerminal::Exited { code: 1 },
             Ok(digest('a')),
             ObservationVerificationOutcome::VerificationFailed {
@@ -546,33 +561,51 @@ mod tests {
         }
     }
 
-    #[test]
-    fn pre_effect_rejection_never_mints_attempt_result() {
+    fn assert_not_committed(adapter: AdapterRunReport) {
         let frozen = intent();
         let pipeline = PostflightPipelineReport {
-            adapter: AdapterRunReport::RejectedBeforeEffect {
-                intent_id: frozen.intent_id.clone(),
-                reason: "stale source".into(),
-            },
+            adapter,
             observation: ObservationStage::NotReached {
-                reason: "adapter rejected before effect entry".into(),
+                reason: "pre-backend rejection".into(),
             },
         };
-        let mut finalizer = Finalizer { outcome: None, calls: 0 };
+        let mut finalizer = Finalizer(None, 0);
         let outcome = commit_pipeline_attempt(frozen, pipeline, &mut finalizer).unwrap();
         assert!(matches!(outcome, AttemptCommitOutcome::NotCommitted { .. }));
-        assert_eq!(finalizer.calls, 0);
+        assert_eq!(finalizer.1, 0);
     }
 
     #[test]
-    fn intent_substitution_is_rejected_before_commit() {
-        let mut frozen = intent();
-        let pipeline = run_pipeline(
-            ProcessTerminal::Exited { code: 0 },
-            Ok(digest('a')),
-            verified(),
-        );
-        frozen = build_intent(
+    fn all_pre_backend_rejections_never_mint_attempt_results() {
+        let frozen = intent();
+        assert_not_committed(AdapterRunReport::RejectedBeforeEffect {
+            intent_id: frozen.intent_id.clone(),
+            reason: "stale source".into(),
+        });
+        assert_not_committed(AdapterRunReport::EffectRejected {
+            intent_id: frozen.intent_id.clone(),
+            repository_source_before: digest('a'),
+            reason: "effect denied".into(),
+        });
+        assert_not_committed(AdapterRunReport::AdmissionPersistenceRejected {
+            intent_id: frozen.intent_id.clone(),
+            repository_source_before: digest('a'),
+            effect_admission_digest: digest('2'),
+            reason: "durability unavailable".into(),
+        });
+        assert_not_committed(AdapterRunReport::FreshnessRejected {
+            intent_id: frozen.intent_id,
+            repository_source_before: digest('a'),
+            effect_admission_digest: digest('2'),
+            persistence_ack_digest: digest('0'),
+            reason: "currentness drift".into(),
+        });
+    }
+
+    #[test]
+    fn intent_substitution_is_rejected_before_finalization() {
+        let pipeline = pipeline(ProcessTerminal::Exited { code: 0 }, Ok(digest('a')), verified());
+        let substituted = build_intent(
             CargoExecutionIntentSpec {
                 schema: "symthaea.cargo-execution-intent-input.v1".into(),
                 git_worktree_state_before: Some(digest('9')),
@@ -587,7 +620,7 @@ mod tests {
         )
         .unwrap();
         let mut finalizer = finalizer_evaluated();
-        assert!(commit_pipeline_attempt(frozen, pipeline, &mut finalizer).is_err());
-        assert_eq!(finalizer.calls, 0);
+        assert!(commit_pipeline_attempt(substituted, pipeline, &mut finalizer).is_err());
+        assert_eq!(finalizer.1, 0);
     }
 }
