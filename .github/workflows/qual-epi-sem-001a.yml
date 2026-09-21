@@ -1,0 +1,95 @@
+name: QUAL EPI-SEM-001A exact audit subject
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/qual-epi-sem-001a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    # Keep the qualifier branch draft without consuming a hosted runner.
+    # Marking this NEVER MERGE PR ready explicitly admits execution.
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Verify qualifier lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRODUCT='aa43e3d555cd6bbcc30157170473f8048bec7c8a'
+          PARENT='adb69f11fa8068b019cc5bb598d0c7726a197fc9'
+          QUALIFIER_HEAD='${{ github.event.pull_request.head.sha }}'
+
+          test "$(git rev-parse HEAD)" = "$QUALIFIER_HEAD"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT"
+
+          mapfile -t qualifier_delta < <(git diff --name-only "$PRODUCT" "$QUALIFIER_HEAD" | sort)
+          expected_qualifier=(
+            '.github/workflows/qual-epi-sem-001a.yml'
+          )
+          diff -u \
+            <(printf '%s\n' "${expected_qualifier[@]}" | sort) \
+            <(printf '%s\n' "${qualifier_delta[@]}")
+
+          test "$(git rev-parse "$PRODUCT^")" = "$PARENT"
+          mapfile -t product_delta < <(git diff --name-only "$PARENT" "$PRODUCT" | sort)
+          expected_product=(
+            'docs/research/EPI_SEM_001A_LEGACY_AUTHORITY_AUDIT.md'
+            'scripts/audit_epistemic_authority_labels.py'
+          )
+          diff -u \
+            <(printf '%s\n' "${expected_product[@]}" | sort) \
+            <(printf '%s\n' "${product_delta[@]}")
+
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Checkout exact product subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach aa43e3d555cd6bbcc30157170473f8048bec7c8a
+          test "$(git rev-parse HEAD)" = 'aa43e3d555cd6bbcc30157170473f8048bec7c8a'
+          test "$(git rev-parse HEAD^)" = 'adb69f11fa8068b019cc5bb598d0c7726a197fc9'
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Compile audit script
+        run: python3 -m py_compile scripts/audit_epistemic_authority_labels.py
+
+      - name: Execute frozen inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/audit_epistemic_authority_labels.py | tee /tmp/epi-sem-001a-audit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path('/tmp/epi-sem-001a-audit.json').read_text())
+          assert report['schema'] == 'epi-sem-001a-audit-v1'
+          assert report['authority_scope'] == 'legacy-epistemic-semantic-inventory-only'
+          assert report['result'] == 'PASS_INVENTORY'
+          assert report['missing_expected_files'] == []
+          assert report['unexpected_new_files'] == []
+          assert report['missing_semantic_debt_witnesses'] == {}
+          PY
+
+      - name: Exact-source postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = 'aa43e3d555cd6bbcc30157170473f8048bec7c8a'
+          # py_compile creates __pycache__; remove only that execution artifact.
+          rm -rf scripts/__pycache__
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
