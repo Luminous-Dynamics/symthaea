@@ -1,9 +1,11 @@
+pub mod claim_scope;
 pub mod epistemic_watchdog;
 pub mod formal_watchdog;
 pub mod global_ledger;
 pub mod namespaced_code;
 pub mod semantic_evidence;
 pub mod source_reference;
+pub use claim_scope::*;
 pub use epistemic_watchdog::*;
 pub use formal_watchdog::*;
 pub use global_ledger::*;
