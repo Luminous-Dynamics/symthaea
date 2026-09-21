@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "purpose": "Fe-Co-Zr retrospective OQMD v1.7 experiment",
+  "symthaea_git_head": "REPLACE-WITH-EXACT-EXPERIMENT-HEAD",
+  "symthaea_flake_lock_sha256": "REPLACE-WITH-SHA256",
+  "runtime_flake_lock_sha256": "REPLACE-WITH-SHA256",
+  "runtime_nixpkgs_rev": "d233902339c02a9c334e7e593de68855ad26c4cb",
+  "qmpy_version": "1.4.0",
+  "qmpy_source_commit": "dede5bdf4aa3ea1187a7bc273e86336c24aadb25",
+  "qmpy_runtime_manifest_sha256": "REPLACE-WITH-SHA256",
+  "database_server": {
+    "binary_path": "REPLACE-WITH-ABSOLUTE-NIX-STORE-PATH",
+    "version_stdout": "REPLACE-WITH-EXACT-STDOUT",
+    "launch_profile": "unix-socket-only;skip-networking;utf8mb4;utc;strict;lower_case_table_names=0"
+  },
+  "database_client": {
+    "binary_path": "REPLACE-WITH-ABSOLUTE-NIX-STORE-PATH",
+    "version_stdout": "REPLACE-WITH-EXACT-STDOUT"
+  },
+  "decompressor": {
+    "binary_path": "REPLACE-WITH-ABSOLUTE-NIX-STORE-PATH"
+  },
+  "curl": {
+    "binary_path": "REPLACE-WITH-ABSOLUTE-NIX-STORE-PATH"
+  },
+  "notes": [
+    "This file is descriptive input whose exact bytes are hashed by the experiment.",
+    "Do not edit it after prepare; create a new run lineage instead."
+  ]
+}
