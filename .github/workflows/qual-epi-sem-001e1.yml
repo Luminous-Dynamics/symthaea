@@ -1,0 +1,70 @@
+name: QUAL EPI-SEM-001E1 exact discovery
+
+on:
+  pull_request:
+    types: [ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact lineage and delta
+        shell: bash
+        env:
+          MAIN_SHA: adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          PRODUCT_SHA: f280697a0ed333f0fc71f9e26cb371e13d29e033
+          PRODUCT_BRANCH: research/epi-sem-001e1-code-certificate-discovery
+          QUAL_PATH: .github/workflows/qual-epi-sem-001e1.yml
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          test "${{ github.event.pull_request.head.sha }}" = "$HEAD_SHA"
+          test "${{ github.event.pull_request.base.ref }}" = "$PRODUCT_BRANCH"
+          test "${{ github.event.pull_request.base.sha }}" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_SHA"
+          test "$(git rev-parse "${PRODUCT_SHA}^")" = "$MAIN_SHA"
+
+          mapfile -t product_delta < <(git diff --name-only "$MAIN_SHA" "$PRODUCT_SHA" | sort)
+          printf '%s\n' "${product_delta[@]}"
+          test "${#product_delta[@]}" -eq 2
+          test "${product_delta[0]}" = "docs/research/EPI-SEM-001E1_CODE_CERTIFICATE_SEMANTICS.md"
+          test "${product_delta[1]}" = "scripts/discover_code_certificate_semantics.py"
+
+          mapfile -t qual_delta < <(git diff --name-only "$PRODUCT_SHA" HEAD | sort)
+          printf '%s\n' "${qual_delta[@]}"
+          test "${#qual_delta[@]}" -eq 1
+          test "${qual_delta[0]}" = "$QUAL_PATH"
+
+      - name: Execute frozen E1 measurement
+        shell: bash
+        env:
+          PRODUCT_SHA: f280697a0ed333f0fc71f9e26cb371e13d29e033
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PRODUCT_SHA"
+          python3 -m py_compile scripts/discover_code_certificate_semantics.py
+          python3 scripts/discover_code_certificate_semantics.py | tee /tmp/epi-sem-001e1.out
+
+          grep -Fx 'schema=epi-sem-001e1-code-certificate-discovery-v1' /tmp/epi-sem-001e1.out
+          grep -Fx 'authority_scope=measurement-only-content-integrity-verification-metadata-and-authentication-boundary' /tmp/epi-sem-001e1.out
+          grep -Fx 'production_reference_semantics=conservative-file-level-symbol-membership' /tmp/epi-sem-001e1.out
+          grep -Fx 'result=PASS_DISCOVERY' /tmp/epi-sem-001e1.out
+          grep -F 'REFERENCE_FILE src/language/code_certificate.rs' /tmp/epi-sem-001e1.out
+          grep -F 'REFERENCE_FILE src/language/code_orchestrator.rs' /tmp/epi-sem-001e1.out
+          grep -Fx 'AUTHENTICATION_FIELDS []' /tmp/epi-sem-001e1.out
+
+      - name: Preserve exact measurement output
+        uses: actions/upload-artifact@v4
+        with:
+          name: epi-sem-001e1-code-certificate-discovery
+          path: /tmp/epi-sem-001e1.out
+          if-no-files-found: error
