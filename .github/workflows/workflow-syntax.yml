@@ -24,14 +24,56 @@ jobs:
   actionlint:
     name: actionlint + GitHub shell syntax
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout exact event subject
+      - name: Checkout event execution subject
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify checkout execution identity
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          checkout_sha="$(git rev-parse HEAD)"
+          test "${checkout_sha}" = "${GITHUB_SHA}" || {
+            echo "checkout SHA does not match event SHA" >&2
+            exit 1
+          }
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            expected_ref="refs/pull/${PR_NUMBER}/merge"
+            test "${GITHUB_REF}" = "${expected_ref}" || {
+              echo "unexpected PR execution ref: ${GITHUB_REF}" >&2
+              exit 1
+            }
+            test "${checkout_sha}" != "${PR_HEAD_SHA}" || {
+              echo "expected PR merge context, got raw PR head" >&2
+              exit 1
+            }
+            git merge-base --is-ancestor "${PR_BASE_SHA}" "${checkout_sha}" || {
+              echo "PR base SHA is not an ancestor of checkout subject" >&2
+              exit 1
+            }
+            git merge-base --is-ancestor "${PR_HEAD_SHA}" "${checkout_sha}" || {
+              echo "PR head SHA is not an ancestor of checkout subject" >&2
+              exit 1
+            }
+            echo "execution_subject=PR_MERGE_CONTEXT"
+            echo "base_is_ancestor_of_checkout=true"
+            echo "head_is_ancestor_of_checkout=true"
+          else
+            echo "execution_subject=EVENT_COMMIT"
+          fi
+          echo "event_sha=${GITHUB_SHA}"
+          echo "checkout_sha=${checkout_sha}"
+          echo "checkout_ref=${GITHUB_REF}"
 
       - name: Install pinned actionlint
         shell: bash
@@ -160,14 +202,25 @@ jobs:
         shell: bash
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
+          checkout_sha="$(git rev-parse HEAD)"
           {
             echo "event_name=${GITHUB_EVENT_NAME}"
-            echo "checkout_sha=${GITHUB_SHA}"
+            echo "event_sha=${GITHUB_SHA}"
+            echo "checkout_sha=${checkout_sha}"
+            echo "checkout_ref=${GITHUB_REF}"
             if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-              echo "pr_head_sha=${PR_HEAD_SHA}"
+              echo "execution_subject=PR_MERGE_CONTEXT"
+              echo "associated_head_sha=${PR_HEAD_SHA}"
+              echo "associated_base_sha=${PR_BASE_SHA}"
+              echo "base_is_ancestor_of_checkout=true"
+              echo "head_is_ancestor_of_checkout=true"
+            else
+              echo "execution_subject=EVENT_COMMIT"
             fi
+            echo "execution_identity_check=pass"
             echo "actionlint_version=1.7.12"
             echo "actionlint_archive_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
             echo "changed_workflows_only_on_pr=true"
