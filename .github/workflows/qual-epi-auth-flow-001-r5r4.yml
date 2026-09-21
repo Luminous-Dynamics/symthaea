@@ -1,0 +1,80 @@
+name: QUAL EPI-AUTH-FLOW-001-R5R4 exact discovery
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact lineage and deltas
+        shell: bash
+        env:
+          EVENT_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          BASE='adb69f11fa8068b019cc5bb598d0c7726a197fc9'
+          PRODUCT='30fe9d0cb39fe726d6317879354b9903c1c03da1'
+          QUALIFIER="$(git rev-parse HEAD)"
+          WORKFLOW='.github/workflows/qual-epi-auth-flow-001-r5r4.yml'
+
+          test "$QUALIFIER" = "$EVENT_HEAD_SHA"
+          test "$(git rev-parse "${QUALIFIER}^")" = "$PRODUCT"
+          test "$(git rev-parse "${PRODUCT}^")" = "$BASE"
+
+          mapfile -t product_delta < <(git diff --name-only "$BASE" "$PRODUCT" | sort)
+          expected_product=(
+            'docs/research/EPI_AUTH_FLOW_001_R5R4_DISCOVERY.md'
+            'scripts/discover_epistemic_authority_flow.py'
+          )
+          test "${#product_delta[@]}" -eq "${#expected_product[@]}"
+          for i in "${!expected_product[@]}"; do
+            test "${product_delta[$i]}" = "${expected_product[$i]}"
+          done
+
+          mapfile -t qualifier_delta < <(git diff --name-only "$PRODUCT" "$QUALIFIER" | sort)
+          test "${#qualifier_delta[@]}" -eq 1
+          test "${qualifier_delta[0]}" = "$WORKFLOW"
+
+      - name: Execute frozen R5R4 discovery subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          PRODUCT='30fe9d0cb39fe726d6317879354b9903c1c03da1'
+          OUT='/tmp/epi-auth-flow-r5r4.txt'
+          git checkout --detach "$PRODUCT"
+          test "$(git rev-parse HEAD)" = "$PRODUCT"
+          python3 -m py_compile scripts/discover_epistemic_authority_flow.py
+          python3 scripts/discover_epistemic_authority_flow.py | tee "$OUT"
+          grep -Fx 'schema=epi-auth-flow-001-r5r4-discovery-v1' "$OUT"
+          grep -Fx 'authority_scope=measurement-only-producer-certainty-ordinal-cube-gates-and-controls' "$OUT"
+          grep -Fx 'result=PASS_DISCOVERY' "$OUT"
+          grep -F 'SURFACE typed_strong_empirical_authority count=' "$OUT"
+          grep -F 'SURFACE epistemic_certainty_surface count=' "$OUT"
+          grep -F 'SURFACE epistemic_ordinal_surface count=' "$OUT"
+          grep -F 'SURFACE broca_ordinal_gate_surface count=' "$OUT"
+          grep -F 'SURFACE broca_cube_gate_surface count=' "$OUT"
+          grep -F 'SURFACE broca_gate_control_surface count=' "$OUT"
+          grep -F 'SURFACE strict_code_gate_surface count=' "$OUT"
+          grep -F 'SURFACE broca_cube_sink count=' "$OUT"
+          grep -F 'SUMMARY ' "$OUT"
+
+      - name: Preserve exact discovery output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epi-auth-flow-001-r5r4-discovery
+          path: /tmp/epi-auth-flow-r5r4.txt
+          if-no-files-found: error
+          retention-days: 30
