@@ -92,6 +92,9 @@ jobs:
       - name: Select CI-definition files for this event
         id: changed
         shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           : > /tmp/workflow-files.txt
@@ -99,13 +102,15 @@ jobs:
 
           case "${GITHUB_EVENT_NAME}" in
             pull_request)
-              git fetch --no-tags origin "${GITHUB_BASE_REF}"
+              test -n "${PR_BASE_SHA}" && test -n "${PR_HEAD_SHA}"
+              git cat-file -e "${PR_BASE_SHA}^{commit}"
+              git cat-file -e "${PR_HEAD_SHA}^{commit}"
               git diff --diff-filter=ACMRT --name-only \
-                "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                "${PR_BASE_SHA}...${PR_HEAD_SHA}" -- \
                 '.github/workflows/*.yml' '.github/workflows/*.yaml' \
                 > /tmp/workflow-files.txt
               git diff --diff-filter=ACMRT --name-only \
-                "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                "${PR_BASE_SHA}...${PR_HEAD_SHA}" -- \
                 '.github/scripts/*.sh' \
                 > /tmp/github-shell-files.txt
               ;;
@@ -213,12 +218,14 @@ jobs:
             echo "checkout_ref=${GITHUB_REF}"
             if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
               echo "execution_subject=PR_MERGE_CONTEXT"
+              echo "changed_file_subject=EXACT_EVENT_BASE_HEAD"
               echo "associated_head_sha=${PR_HEAD_SHA}"
               echo "associated_base_sha=${PR_BASE_SHA}"
               echo "base_is_ancestor_of_checkout=true"
               echo "head_is_ancestor_of_checkout=true"
             else
               echo "execution_subject=EVENT_COMMIT"
+              echo "changed_file_subject=EVENT_COMMIT_DELTA"
             fi
             echo "execution_identity_check=pass"
             echo "actionlint_version=1.7.12"

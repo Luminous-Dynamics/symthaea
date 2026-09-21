@@ -1,0 +1,105 @@
+name: PR Governance Root
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-governance-root-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  governance-root:
+    name: Governance Root Check
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted event base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind trusted base and fetch untrusted head as Git objects only
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          trusted_checkout="$(git rev-parse HEAD)"
+          test "${trusted_checkout}" = "${PR_BASE_SHA}" || {
+            echo "trusted checkout does not match event base SHA" >&2
+            exit 1
+          }
+
+          git fetch --no-tags --force origin \
+            "refs/pull/${PR_NUMBER}/head:refs/remotes/pr-governance/${PR_NUMBER}/head"
+          fetched_head="$(git rev-parse "refs/remotes/pr-governance/${PR_NUMBER}/head")"
+          test "${fetched_head}" = "${PR_HEAD_SHA}" || {
+            echo "fetched pull-request head does not match event head SHA" >&2
+            exit 1
+          }
+
+          git cat-file -e "${PR_BASE_SHA}^{commit}"
+          git cat-file -e "${PR_HEAD_SHA}^{commit}"
+
+          echo "governance_authority_source=BASE_BRANCH_TRUSTED_CODE"
+          echo "trusted_base_sha=${PR_BASE_SHA}"
+          echo "fetched_untrusted_head_sha=${PR_HEAD_SHA}"
+          echo "untrusted_head_worktree_checkout=false"
+          echo "untrusted_head_code_executed=false"
+
+      - name: Verify trusted governance source integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-pr-governance.py --self-test
+          python3 -m json.tool .github/governance-change-policy-v1.json >/dev/null
+          echo "validator_sha256=$(sha256sum .github/scripts/check-pr-governance.py | awk '{print $1}')"
+          echo "policy_sha256=$(sha256sum .github/governance-change-policy-v1.json | awk '{print $1}')"
+
+      - name: Enforce exact PR governance policy from trusted base code
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-pr-governance.py \
+            --base-sha "${PR_BASE_SHA}" \
+            --head-sha "${PR_HEAD_SHA}" \
+            | tee pr-governance-root-policy-receipt.txt
+
+      - name: Record governance-root evidence
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          {
+            echo "governance_authority_source=BASE_BRANCH_TRUSTED_CODE"
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "pr_number=${PR_NUMBER}"
+            echo "trusted_base_sha=${PR_BASE_SHA}"
+            echo "untrusted_head_sha=${PR_HEAD_SHA}"
+            echo "changeset_subject=EXACT_EVENT_BASE_HEAD"
+            echo "untrusted_head_worktree_checkout=false"
+            echo "untrusted_head_code_executed=false"
+            echo "permissions=contents_read_only"
+            echo "secrets_consumed=false"
+            echo "pr_draft=${PR_DRAFT}"
+            echo "governance_root_check=pass"
+            echo "class_a_scientific_adequacy=not_established_by_this_check"
+            echo "class_a_test_execution=not_established_by_this_check"
+            echo "full_ci_status=not_established_by_this_check"
+          } | tee pr-governance-root-receipt.txt
