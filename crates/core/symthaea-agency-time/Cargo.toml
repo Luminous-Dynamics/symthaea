@@ -7,3 +7,7 @@ description = "Project-neutral temporal ABI for bounded Symthaea agency"
 
 [lib]
 path = "src/lib.rs"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+getrandom.workspace = true
+rustix = { version = "=1.1.4", features = ["time"] }
