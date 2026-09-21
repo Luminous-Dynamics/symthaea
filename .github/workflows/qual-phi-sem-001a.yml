@@ -1,0 +1,73 @@
+name: QUAL PHI-SEM-001A exact inventory execution
+
+on:
+  pull_request:
+    branches:
+      - qual-phi-sem-001a
+    types:
+      - ready_for_review
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-phi-sem-001a-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout workflow-only child
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify workflow-only lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_parent='490beef91c40d1f1b6c4e49b56ddeb574d0f7827'
+          observed_parent="$(git rev-parse HEAD^)"
+          test "$observed_parent" = "$expected_parent"
+          mapfile -t changed < <(git diff --name-only "$expected_parent" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/qual-phi-sem-001a.yml'
+          test "${{ github.event.pull_request.base.sha }}" = "$expected_parent"
+
+      - name: Checkout frozen qualifier subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout --detach 490beef91c40d1f1b6c4e49b56ddeb574d0f7827
+          test "$(git rev-parse HEAD)" = '490beef91c40d1f1b6c4e49b56ddeb574d0f7827'
+
+      - name: Execute exact qualifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/qual-phi-sem-001a"
+          mkdir -p "$evidence_dir"
+          python3 scripts/qualify_phi_sem_001a.py --evidence-dir "$evidence_dir"
+          test -f "$evidence_dir/qualification_receipt.json"
+          python3 - "$evidence_dir/qualification_receipt.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          receipt = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+          assert receipt.get('status') == 'PASS_INVENTORY', receipt.get('status')
+          assert receipt['product_subject']['commit'] == '96befed9c734ace707c07fd2542d47177270bd6f'
+          assert receipt['product_subject']['tree'] == '91486e516cd2cb95f05b03a35037eb82677c8c37'
+          PY
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qual-phi-sem-001a-${{ github.run_id }}
+          path: ${{ runner.temp }}/qual-phi-sem-001a/
+          if-no-files-found: error
+          retention-days: 30
