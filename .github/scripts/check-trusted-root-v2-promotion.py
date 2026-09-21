@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate that trusted-root v2 is exactly v1 plus one safe Governance check."""
+"""Validate that trusted-root v2 is exactly v1 plus one safely evidenced Governance check."""
 
 from __future__ import annotations
 
@@ -16,6 +16,20 @@ EXPECTED_V1 = ".github/rulesets/main-trusted-root-v1.json"
 EXPECTED_V2 = ".github/rulesets/main-trusted-root-v2-required-governance.json"
 EXPECTED_CONTEXT = "Governance Check (Class A/B Changes)"
 EXCLUDED_CONTEXT = "actionlint + GitHub shell syntax"
+EXPECTED_EXECUTION_IDENTITY_PR = 5325
+EXPECTED_EXECUTION_IDENTITY_HEAD = "3ef9745fcaa9e547e5c8d9f7bd5d5240e73a0cd7"
+EXPECTED_EXECUTION_SUBJECT = "PR_MERGE_CONTEXT"
+EXPECTED_RECEIPT_FIELDS = [
+    "execution_subject",
+    "associated_head_sha",
+    "associated_base_sha",
+    "event_sha",
+    "checkout_sha",
+    "checkout_ref",
+    "base_is_ancestor_of_checkout",
+    "head_is_ancestor_of_checkout",
+    "execution_identity_check",
+]
 
 
 class ContractError(ValueError):
@@ -57,6 +71,27 @@ def validate_recipe_identity(recipe: dict[str, Any], name: str) -> None:
         raise ContractError(f"{name}: ref_name conditions missing")
     if ref_name.get("include") != ["refs/heads/main"] or ref_name.get("exclude") != []:
         raise ContractError(f"{name}: recipe must target exactly refs/heads/main")
+
+
+def expected_activation_prerequisites() -> dict[str, Any]:
+    return {
+        "actions_execution_issue": 4276,
+        "actions_execution_issue_must_be_resolved": True,
+        "lifecycle_pr": 5149,
+        "lifecycle_pr_must_be_merged": True,
+        "execution_identity_pr": EXPECTED_EXECUTION_IDENTITY_PR,
+        "execution_identity_pr_head": EXPECTED_EXECUTION_IDENTITY_HEAD,
+        "execution_identity_pr_must_be_merged": True,
+        "minimum_distinct_current_head_governance_successes": 3,
+        "required_runner_class": "github-hosted",
+        "required_runner_label": "ubuntu-latest",
+        "runner_assignment_must_be_nonzero": True,
+        "all_required_runs_must_conclude_success": True,
+        "required_execution_subject": EXPECTED_EXECUTION_SUBJECT,
+        "execution_identity_check_must_pass": True,
+        "required_governance_receipt_fields": EXPECTED_RECEIPT_FIELDS,
+        "pre_identity_governance_runs_must_not_count": True,
+    }
 
 
 def validate(v1: Any, v2: Any, promotion: Any) -> None:
@@ -112,19 +147,17 @@ def validate(v1: Any, v2: Any, promotion: Any) -> None:
     prereq = promotion.get("activation_prerequisites")
     if not isinstance(prereq, dict):
         raise ContractError("activation_prerequisites missing")
-    expected_prereq = {
-        "actions_execution_issue": 4276,
-        "actions_execution_issue_must_be_resolved": True,
-        "lifecycle_pr": 5149,
-        "lifecycle_pr_must_be_merged": True,
-        "minimum_distinct_current_head_governance_successes": 3,
-        "required_runner_class": "github-hosted",
-        "required_runner_label": "ubuntu-latest",
-        "runner_assignment_must_be_nonzero": True,
-        "all_required_runs_must_conclude_success": True,
-    }
-    if prereq != expected_prereq:
+    if prereq != expected_activation_prerequisites():
         raise ContractError("activation prerequisites drifted")
+
+    if prereq["required_execution_subject"] != EXPECTED_EXECUTION_SUBJECT:
+        raise ContractError("Governance promotion evidence must be PR_MERGE_CONTEXT")
+    if prereq["execution_identity_check_must_pass"] is not True:
+        raise ContractError("execution identity check must pass before Governance evidence counts")
+    if prereq["pre_identity_governance_runs_must_not_count"] is not True:
+        raise ContractError("pre-identity Governance runs must remain excluded")
+    if prereq["required_governance_receipt_fields"] != EXPECTED_RECEIPT_FIELDS:
+        raise ContractError("Governance receipt field contract drifted")
 
     policy = promotion.get("status_check_policy")
     if not isinstance(policy, dict) or policy.get("strict_required_status_checks_policy") is not False:
@@ -168,28 +201,38 @@ def self_test() -> None:
         "state": "deferred-until-execution-plane-qualified",
         "required_status_checks": [EXPECTED_CONTEXT],
         "intentionally_not_required": [{"context": EXCLUDED_CONTEXT, "reason": "path scoped"}],
-        "activation_prerequisites": {
-            "actions_execution_issue": 4276,
-            "actions_execution_issue_must_be_resolved": True,
-            "lifecycle_pr": 5149,
-            "lifecycle_pr_must_be_merged": True,
-            "minimum_distinct_current_head_governance_successes": 3,
-            "required_runner_class": "github-hosted",
-            "required_runner_label": "ubuntu-latest",
-            "runner_assignment_must_be_nonzero": True,
-            "all_required_runs_must_conclude_success": True,
-        },
+        "activation_prerequisites": expected_activation_prerequisites(),
         "status_check_policy": {"strict_required_status_checks_policy": False, "reason": "recovery"},
     }
     validate(base, stronger, promotion)
-    broken = json.loads(json.dumps(stronger))
-    broken["rules"][-1]["parameters"]["required_status_checks"] = [{"context": EXCLUDED_CONTEXT}]
+
+    broken_context = json.loads(json.dumps(stronger))
+    broken_context["rules"][-1]["parameters"]["required_status_checks"] = [{"context": EXCLUDED_CONTEXT}]
     try:
-        validate(base, broken, promotion)
+        validate(base, broken_context, promotion)
     except ContractError:
         pass
     else:
         raise AssertionError("path-scoped Workflow Syntax must not be accepted as the global v2 check")
+
+    broken_subject = json.loads(json.dumps(promotion))
+    broken_subject["activation_prerequisites"]["required_execution_subject"] = "RAW_PR_HEAD"
+    try:
+        validate(base, stronger, broken_subject)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("raw-head evidence must not satisfy the PR merge-context Governance contract")
+
+    broken_pre_identity = json.loads(json.dumps(promotion))
+    broken_pre_identity["activation_prerequisites"]["pre_identity_governance_runs_must_not_count"] = False
+    try:
+        validate(base, stronger, broken_pre_identity)
+    except ContractError:
+        pass
+    else:
+        raise AssertionError("pre-identity Governance runs must not count toward v2 promotion")
+
     print("trusted_root_v2_promotion_self_test=PASS")
 
 
@@ -213,6 +256,9 @@ def main() -> int:
         return 2
     print("trusted_root_v2_promotion=PASS")
     print(f"required_context={EXPECTED_CONTEXT}")
+    print(f"required_execution_subject={EXPECTED_EXECUTION_SUBJECT}")
+    print(f"execution_identity_pr={EXPECTED_EXECUTION_IDENTITY_PR}")
+    print("pre_identity_governance_runs_count=false")
     print("activation=DEFERRED_UNTIL_EXECUTION_PLANE_QUALIFIED")
     return 0
 

@@ -23,11 +23,28 @@
     "actions_execution_issue_must_be_resolved": true,
     "lifecycle_pr": 5149,
     "lifecycle_pr_must_be_merged": true,
+    "execution_identity_pr": 5325,
+    "execution_identity_pr_head": "3ef9745fcaa9e547e5c8d9f7bd5d5240e73a0cd7",
+    "execution_identity_pr_must_be_merged": true,
     "minimum_distinct_current_head_governance_successes": 3,
     "required_runner_class": "github-hosted",
     "required_runner_label": "ubuntu-latest",
     "runner_assignment_must_be_nonzero": true,
-    "all_required_runs_must_conclude_success": true
+    "all_required_runs_must_conclude_success": true,
+    "required_execution_subject": "PR_MERGE_CONTEXT",
+    "execution_identity_check_must_pass": true,
+    "required_governance_receipt_fields": [
+      "execution_subject",
+      "associated_head_sha",
+      "associated_base_sha",
+      "event_sha",
+      "checkout_sha",
+      "checkout_ref",
+      "base_is_ancestor_of_checkout",
+      "head_is_ancestor_of_checkout",
+      "execution_identity_check"
+    ],
+    "pre_identity_governance_runs_must_not_count": true
   },
   "status_check_policy": {
     "strict_required_status_checks_policy": false,
@@ -37,6 +54,7 @@
     "This manifest does not activate the v2 ruleset.",
     "Queued, skipped, or cancelled runs do not satisfy execution-plane promotion evidence.",
     "One successful hosted run is not sufficient to establish stable runner availability.",
+    "Governance runs created before the execution-identity contract do not satisfy promotion evidence.",
     "Workflow Syntax remains important but is not globally require-able while path-scoped."
   ]
 }
