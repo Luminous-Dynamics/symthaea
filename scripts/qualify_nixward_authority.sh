@@ -30,4 +30,7 @@ cargo test -p nixward --lib action::daemon_incarnation::tests
 echo "-- approver evidence tests --"
 cargo test -p nixward --lib action::approver_evidence::tests
 
+echo "-- local approval IPC peer-credential tests --"
+cargo test -p nixward --lib action::local_approval_ipc::tests
+
 echo "Nixward authority focused qualification: PASS"

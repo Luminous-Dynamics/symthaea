@@ -46,7 +46,8 @@ tracing = { workspace = true }
 chrono = { workspace = true }
 lru = { workspace = true }
 dashmap = { workspace = true }
-nix = { version = "0.27", optional = true }
+# `socket` is required for the safe SO_PEERCRED wrapper used by local approval IPC.
+nix = { version = "0.27", optional = true, features = ["socket"] }
 rusqlite = { workspace = true, optional = true }
 rnix = "0.11"
 
