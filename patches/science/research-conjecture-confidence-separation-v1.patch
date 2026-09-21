@@ -1,0 +1,139 @@
+diff --git a/src/web_research/conjecture_feed.rs b/src/web_research/conjecture_feed.rs
+index 2a38f0d..0000000 100644
+--- a/src/web_research/conjecture_feed.rs
++++ b/src/web_research/conjecture_feed.rs
+@@ -208,10 +208,29 @@ pub struct ProvenancedConjecture {
+     pub provenance: ResearchProvenance,
+ }
+ 
++/// Two deliberately non-collapsed confidence-like coordinates carried by a
++/// research-derived conjecture.
++///
++/// `conjecture_score` is whatever legacy/model-internal score the Conjecture
++/// Engine assigned. `data_provenance_confidence` is the web-research
++/// verifier's assessment of the source/data pedigree. They are not assumed to
++/// share calibration, likelihood semantics, or evidentiary meaning.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct ProvenancedConfidenceCoordinates {
++    pub conjecture_score: f64,
++    pub data_provenance_confidence: f32,
++}
++
++impl ProvenancedConjecture {
++    pub fn confidence_coordinates(&self) -> ProvenancedConfidenceCoordinates {
++        ProvenancedConfidenceCoordinates {
++            conjecture_score: self.conjecture.confidence,
++            data_provenance_confidence: self.provenance.confidence,
++        }
++    }
++}
++
+ /// Converts research-acquired numeric datasets into `ObservedSequence`
+ /// inputs for a [`ConjectureEngine`], keeping a side-table from each
+ /// generated sequence name back to its full [`ResearchProvenance`] so that
+@@ -297,12 +316,14 @@ impl ConjectureFeeder {
+     ///   [`EpistemicStatus::is_trustworthy`], the tier is forced down to
+     ///   [`MacroPromotionTier::Quarantined`] regardless of numeric fit
+     ///   quality.
+-    /// - `confidence` is capped by the source's verified confidence — a
+-    ///   conjecture can never be more trustworthy than the data it was
+-    ///   fit to.
++    /// - The conjecture's internal score and the source-provenance confidence
++    ///   remain separate coordinates. They are not combined with `min`,
++    ///   multiplication, averaging, or any other scalar fusion because their
++    ///   calibration and semantics differ.
++    ///
++    /// Source provenance may therefore constrain *admissibility* (for example
++    /// macro promotion) without destructively rewriting the model's own score.
+     pub fn provenanced_conjectures(&self, engine: &ConjectureEngine) -> Vec<ProvenancedConjecture> {
+         engine
+             .conjectures
+@@ -313,7 +334,6 @@ impl ConjectureFeeder {
+                     if !prov.allows_macro_promotion() {
+                         conjecture.macro_promotion_tier = MacroPromotionTier::Quarantined;
+                     }
+-                    conjecture.confidence = conjecture.confidence.min(prov.confidence as f64);
+                     ProvenancedConjecture {
+                         conjecture,
+                         provenance: prov.clone(),
+@@ -441,8 +461,11 @@ mod tests {
+                 pc.provenance.epistemic_status,
+                 EpistemicStatus::HighConfidence
+             );
+-            // Confidence can never exceed what the source earned.
+-            assert!(pc.conjecture.confidence <= pc.provenance.confidence as f64 + 1e-9);
++            let coordinates = pc.confidence_coordinates();
++            assert_eq!(coordinates.conjecture_score, pc.conjecture.confidence);
++            assert_eq!(
++                coordinates.data_provenance_confidence,
++                pc.provenance.confidence
++            );
+         }
+     }
+@@ -467,15 +490,44 @@ mod tests {
+ 
+         engine.generate_conjectures(3);
++        let original_scores: Vec<f64> = engine
++            .conjectures
++            .iter()
++            .filter(|c| c.source.starts_with("web_research#"))
++            .map(|c| c.confidence)
++            .collect();
+         let provenanced = feeder.provenanced_conjectures(&engine);
+         assert!(!provenanced.is_empty());
+-        for pc in &provenanced {
++        assert_eq!(provenanced.len(), original_scores.len());
++        for (pc, original_score) in provenanced.iter().zip(original_scores) {
+             assert_eq!(
+                 pc.conjecture.macro_promotion_tier,
+                 MacroPromotionTier::Quarantined
+             );
+-            // Tolerance widened from 1e-9: `prov.confidence` is f32 (0.2f32
+-            // widens to 0.20000000298023224f64), so 1e-9 was tighter than
+-            // the f32->f64 cast's own representation error and failed
+-            // spuriously. 1e-6 comfortably covers single-precision rounding
+-            // for any confidence in [0,1] while still catching real bugs.
+-            assert!(pc.conjecture.confidence <= 0.2 + 1e-6);
++            // Low-trust source provenance constrains admissibility but does
++            // not overwrite the Conjecture Engine's differently-scoped score.
++            assert_eq!(pc.conjecture.confidence, original_score);
++            assert!((pc.provenance.confidence - 0.2).abs() < f32::EPSILON);
+         }
+     }
++
++    #[test]
++    fn test_confidence_coordinates_are_not_scalar_fused() {
++        let pc = ProvenancedConjecture {
++            conjecture: Conjecture {
++                formula: symthaea_core::hdc::conjecture_engine::Expr::Const(1.0),
++                formula_str: "1".into(),
++                source: "fixture".into(),
++                domain: MathDomain::Physics,
++                training_mse: 0.0,
++                complexity: 1,
++                fitness: 0.0,
++                status: symthaea_core::hdc::conjecture_engine::ConjectureStatus::Proposed,
++                confidence: 0.91,
++                macro_promotion_tier: MacroPromotionTier::RecurrentNumerical,
++                eml_compiled: None,
++                eml_metrics: None,
++                eml_verified_real: None,
++                eml_real_domain: None,
++                eml_verified_complex: None,
++                eml_constructive_compiled: None,
++                eml_constructive_metrics: None,
++                eml_verified_constructive_real: None,
++            },
++            provenance: unverified_provenance(),
++        };
++        let coordinates = pc.confidence_coordinates();
++        assert_eq!(coordinates.conjecture_score, 0.91);
++        assert!((coordinates.data_provenance_confidence - 0.2).abs() < f32::EPSILON);
++        assert_ne!(
++            coordinates.conjecture_score,
++            coordinates.data_provenance_confidence as f64
++        );
++    }
+ 
+     #[test]
+     fn test_dataset_from_numeric_series_roundtrips_context() {
