@@ -1,0 +1,214 @@
+name: RES-SEC-001B-r2 Web Research Admission Quarantine
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'patches/security/res-sec-001b-web-research-admission-quarantine-v2.patch'
+      - '.github/workflows/res-sec-001b-web-research-admission-quarantine-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Freeze exact parent and qualification-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_parent=578f73dab000261dba715f3ecdea90b16aef0229
+          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+            test "${{ github.event.pull_request.base.sha }}" = "$expected_parent"
+          fi
+          changed="$(git diff --name-only "$expected_parent"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/security/res-sec-001b-web-research-admission-quarantine-v2\.patch|\.github/workflows/res-sec-001b-web-research-admission-quarantine-v2\.yml)$' || true)"
+          test -z "$unexpected" || {
+            echo 'unexpected RES-SEC-001B-r2 scope:'
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Validate patch framing and malformed negative control
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/security/res-sec-001b-web-research-admission-quarantine-v2.patch
+
+          # Git's own parser is the canonical oracle for unified-diff framing.
+          git apply --check "$patch"
+          echo 'candidate framing accepted by git apply --check'
+
+          cp "$patch" /tmp/res-sec-001b-malformed.patch
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('/tmp/res-sec-001b-malformed.patch')
+          text = path.read_text()
+          needle = '@@ -144,26 +144,13 @@'
+          replacement = '@@ -144,26 +144,12 @@'
+          assert text.count(needle) == 1, 'expected exact frozen hunk header once'
+          path.write_text(text.replace(needle, replacement, 1))
+          PY
+
+          if git apply --check /tmp/res-sec-001b-malformed.patch 2>/tmp/malformed.err; then
+            echo '::error::git unexpectedly accepted malformed negative-control framing'
+            exit 1
+          fi
+          grep -q . /tmp/malformed.err
+          echo 'negative control: git rejected deliberately malformed hunk framing'
+
+      - name: Freeze current self-confirming authority loop
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("src/web_research/mod.rs").read_text()
+          start = text.index("pub async fn research(&mut self, query: &str)")
+          end = text.index("    /// Get current epistemic stats", start)
+          block = text[start:end]
+
+          assert "self.integrator.integrate(result.clone()).await?" in block
+          assert "self.last_phi = integration.phi_after;" in block
+          assert "was_correct: claim.confidence > 0.7" in block
+          assert "self.learner.record_outcome(outcome)?;" in block
+          print("negative control: automatic knowledge/Phi/self-confirming learner loop is present before repair")
+          PY
+
+      - name: Freeze downstream meta-learning consequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'self.update_source_credibility(&outcome);' src/web_research/meta_learning.rs
+          grep -F 'self.update_domain_expertise(&outcome);' src/web_research/meta_learning.rs
+          grep -F 'let target = if outcome.was_correct { 1.0 } else { 0.0 };' src/web_research/meta_learning.rs
+          grep -F 'self.update_meta_phi();' src/web_research/meta_learning.rs
+          grep -F 'pub fn recommend_sources(&self, topic_domain: &str)' src/web_research/meta_learning.rs
+
+      - name: Apply exact r2 quarantine candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/security/res-sec-001b-web-research-admission-quarantine-v2.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet candidate-only path and run hostile source mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          text = Path("src/web_research/mod.rs").read_text()
+          start = text.index("pub async fn research(&mut self, query: &str)")
+          end = text.index("    /// Get current epistemic stats", start)
+          block = text[start:end]
+
+          def assert_quarantined(candidate: str) -> None:
+              assert "self.researcher.research_and_verify(query).await?" in candidate
+              assert "automatic knowledge and meta-learning admission are quarantined" in candidate
+              assert "claim_count = result.claims.len()" in candidate
+              assert "Ok(result)" in candidate
+
+              forbidden = (
+                  "self.integrator.integrate",
+                  "self.last_phi =",
+                  "was_correct:",
+                  "self.learner.record_outcome",
+                  "result_url",
+                  "%result.url",
+              )
+              for needle in forbidden:
+                  assert needle not in candidate, f"forbidden authority/disclosure edge present: {needle}"
+
+          assert_quarantined(block)
+          print("candidate ratchet: high-level research is candidate-only and warning omits raw URL")
+
+          def must_reject(label: str, mutated: str) -> None:
+              try:
+                  assert_quarantined(mutated)
+              except AssertionError as exc:
+                  print(f"mutation rejected [{label}]: {exc}")
+              else:
+                  raise AssertionError(f"mutation unexpectedly accepted: {label}")
+
+          auto_integration = block.replace(
+              "        let result = self.researcher.research_and_verify(query).await?;\n",
+              "        let result = self.researcher.research_and_verify(query).await?;\n"
+              "        let _integration = self.integrator.integrate(result.clone()).await?;\n",
+              1,
+          )
+          must_reject("automatic integration", auto_integration)
+
+          self_confirmation = block.replace(
+              "        Ok(result)",
+              '        let _marker = "was_correct: claim.confidence > 0.7";\n'
+              "        self.learner.record_outcome(outcome)?;\n"
+              "        Ok(result)",
+              1,
+          )
+          must_reject("confidence-derived learner feedback", self_confirmation)
+
+          raw_url_log = block.replace(
+              "            claim_count = result.claims.len(),",
+              "            result_url = %result.url,\n"
+              "            claim_count = result.claims.len(),",
+              1,
+          )
+          must_reject("raw URL diagnostic disclosure", raw_url_log)
+          PY
+
+      - name: Preserve explicit legacy APIs without automatic authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'pub struct KnowledgeIntegrator' src/web_research/integrator.rs
+          grep -F 'pub fn record_outcome(&mut self, outcome: VerificationOutcome)' src/web_research/meta_learning.rs
+          echo 'Legacy explicit APIs remain; only the automatic high-level transition is quarantined.'
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Compile web research feature
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features web_research_module
+
+      - name: Focused construction regression
+        run: cargo +1.96.0 test --locked -p symthaea --lib web_research::tests::test_epistemic_consciousness_creation --features web_research_module
+
+      - name: Restore product source and prove qualification-only subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- src/web_research/mod.rs
+          test -z "$(git status --porcelain=v1)"
+          git rev-parse HEAD
+          git rev-parse HEAD^
+          git rev-parse HEAD^{tree}
+          sha256sum \
+            patches/security/res-sec-001b-web-research-admission-quarantine-v2.patch \
+            .github/workflows/res-sec-001b-web-research-admission-quarantine-v2.yml
+
+      - name: Qualification statement
+        run: |
+          echo 'PASS establishes only that the exact r2 source candidate applies and removes the named automatic high-level knowledge/Phi/meta-learning authority transitions with patch-framing, mutation, and diagnostic-OPSEC ratchets.'
+          echo 'PASS does not establish source truth, safe knowledge admission, calibrated confidence, independent outcome evidence, prompt-injection immunity, or safe autonomous OSINT.'
