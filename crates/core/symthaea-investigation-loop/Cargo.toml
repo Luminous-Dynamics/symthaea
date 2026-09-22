@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-investigation-loop"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+symthaea-investigation = { path = "../symthaea-investigation" }
+symthaea-investigation-analysis = { path = "../symthaea-investigation-analysis" }
+symthaea-investigation-planning = { path = "../symthaea-investigation-planning" }
+symthaea-investigation-query = { path = "../symthaea-investigation-query" }
+symthaea-investigation-tool-selection = { path = "../symthaea-investigation-tool-selection" }
