@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-dev-way-studio-reference"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+
+# Deliberately separate from the parent Symthaea workspace.
+# This reference semantics crate must not alter root workspace membership or lock state.
+[workspace]
