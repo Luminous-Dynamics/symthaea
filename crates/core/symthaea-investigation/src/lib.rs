@@ -32,7 +32,7 @@ pub enum SearchPlanAuthorityScopeV1 {
     ProposalOnly,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum InvestigationError {
     InvalidReference {
         role: &'static str,
@@ -69,22 +69,22 @@ impl fmt::Display for InvestigationError {
             Self::MultipleInsufficientEvidenceHypotheses => {
                 write!(f, "hypothesis set permits exactly one insufficient-evidence alternative")
             }
-            Self::DuplicateHypothesisId(id) => write!(f, "duplicate hypothesis id: {id}"),
+            Self::DuplicateHypothesisId(_) => write!(f, "duplicate hypothesis id: <redacted>"),
             Self::TooFewDiscriminatorExpectations => {
                 write!(f, "a discriminating observation must compare at least two hypotheses")
             }
-            Self::DuplicateDiscriminatorHypothesis(id) => {
-                write!(f, "duplicate discriminator hypothesis: {id}")
+            Self::DuplicateDiscriminatorHypothesis(_) => {
+                write!(f, "duplicate discriminator hypothesis: <redacted>")
             }
-            Self::UnknownHypothesis(id) => write!(f, "unknown hypothesis: {id}"),
+            Self::UnknownHypothesis(_) => write!(f, "unknown hypothesis: <redacted>"),
             Self::NonDiscriminatingObservation => {
                 write!(f, "candidate assigns the same expected relation to every hypothesis")
             }
             Self::EmptySearchTargets => write!(f, "search plan requires at least one target discriminator"),
             Self::EmptySearchSources => write!(f, "search plan requires at least one source/tool profile"),
             Self::ZeroSearchBound(name) => write!(f, "search bound {name} must be greater than zero"),
-            Self::DuplicateAssumptionAssessmentId(id) => {
-                write!(f, "duplicate assumption assessment id: {id}")
+            Self::DuplicateAssumptionAssessmentId(_) => {
+                write!(f, "duplicate assumption assessment id: <redacted>")
             }
             Self::UnexpectedInitialAssumptionSupersession => {
                 write!(f, "first assessment for an assumption cannot supersede a prior assessment")
@@ -99,6 +99,12 @@ impl fmt::Display for InvestigationError {
                 write!(f, "analysis step requires at least one hypothesis assessment")
             }
         }
+    }
+}
+
+impl fmt::Debug for InvestigationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "InvestigationError({self})")
     }
 }
 
@@ -128,7 +134,7 @@ fn validate_ref(role: &'static str, value: &str) -> Result<(), InvestigationErro
 
 macro_rules! role_ref {
     ($name:ident) => {
-        #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct $name(String);
 
         impl $name {
@@ -140,6 +146,12 @@ macro_rules! role_ref {
 
             pub fn as_str(&self) -> &str {
                 &self.0
+            }
+        }
+
+        impl fmt::Debug for $name {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "{}(<redacted>)", stringify!($name))
             }
         }
     };
@@ -687,6 +699,30 @@ mod tests {
         assert!(InvestigationId::new("has space").is_err());
         assert!(InvestigationId::new("x".repeat(MAX_REF_BYTES + 1)).is_err());
         assert!(InvestigationId::new("investigation:1").is_ok());
+    }
+
+    #[test]
+    fn role_reference_debug_is_redacted_but_explicit_access_is_exact() {
+        let secret = "subject:private-investigation-target-7f8a";
+        let reference = SubjectRef::new(secret).unwrap();
+        let diagnostic = format!("{reference:?}");
+
+        assert_eq!(reference.as_str(), secret);
+        assert!(diagnostic.contains("SubjectRef(<redacted>)"));
+        assert!(!diagnostic.contains(secret));
+    }
+
+    #[test]
+    fn identifier_error_diagnostics_do_not_echo_raw_identifiers() {
+        let secret = "H-sensitive-target-93ab";
+        let error = InvestigationError::UnknownHypothesis(secret.to_string());
+        let display = format!("{error}");
+        let debug = format!("{error:?}");
+
+        assert!(!display.contains(secret));
+        assert!(!debug.contains(secret));
+        assert!(display.contains("<redacted>"));
+        assert!(debug.contains("<redacted>"));
     }
 
     #[test]
