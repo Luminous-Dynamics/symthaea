@@ -1,0 +1,181 @@
+name: DEV-WAY-002AQ exact Studio algebra qualification
+
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches: [feat/dev-way-studio-algebra-v0-1]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact pure Studio candidate algebra
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PRODUCT_SHA: de5e4436298fbceed5680a88c96228568c440aa7
+      PRODUCT_TREE: c3af6f5b06d363c105d13ea5aa60a2c09da7a6f0
+      PRODUCT_PARENT: 4f9eeb1d369bb6c47c821f699a0191903ac7bac7
+      REF_CRATE: reference/dev-way-studio-v0-1
+      RUST_TOOLCHAIN: 1.96.0
+      CARGO_TARGET_DIR: ${{ runner.temp }}/dev-way-studio-target
+
+    steps:
+      - name: Qualifier preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${{ github.event.pull_request.base.sha }}" = "$PRODUCT_SHA"
+          echo "qualifier_head=${{ github.event.pull_request.head.sha }}"
+          echo "product=$PRODUCT_SHA"
+          echo "tree=$PRODUCT_TREE"
+          echo "parent=$PRODUCT_PARENT"
+
+      - name: Checkout literal product subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.PRODUCT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Q0 exact provenance and shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$PRODUCT_TREE"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_PARENT"
+
+          mapfile -t changed < <(git diff --name-only "$PRODUCT_PARENT" "$PRODUCT_SHA" | LC_ALL=C sort)
+          expected=(
+            "reference/dev-way-studio-v0-1/Cargo.toml"
+            "reference/dev-way-studio-v0-1/src/lib.rs"
+          )
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${changed[$i]}" = "${expected[$i]}"
+          done
+
+          test "$(git rev-list --count "$PRODUCT_PARENT..$PRODUCT_SHA")" -eq 1
+          git diff --quiet "$PRODUCT_PARENT" "$PRODUCT_SHA" -- Cargo.toml Cargo.lock src/coding_agent
+
+      - name: Q1 manifest and capability audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, re, tomllib
+
+          root = pathlib.Path("reference/dev-way-studio-v0-1")
+          manifest = tomllib.loads((root / "Cargo.toml").read_text())
+          assert "workspace" in manifest, "standalone [workspace] boundary missing"
+          for key in ("dependencies", "dev-dependencies", "build-dependencies"):
+              assert not manifest.get(key), f"unexpected {key}: {manifest.get(key)}"
+
+          source = (root / "src/lib.rs").read_text()
+          assert "#![forbid(unsafe_code)]" in source
+          forbidden = [
+              r"std::fs", r"std::net", r"std::process", r"std::path::Path",
+              r"tokio::", r"reqwest::", r"rusqlite::", r"Command::new",
+              r"File::open", r"OpenOptions", r"TcpStream", r"UdpSocket",
+          ]
+          for pattern in forbidden:
+              assert re.search(pattern, source) is None, f"forbidden capability pattern: {pattern}"
+
+          disposition = re.search(
+              r"pub enum CreativeDispositionV1\s*\{(?P<body>.*?)\n\}",
+              source,
+              re.S,
+          )
+          assert disposition, "CreativeDispositionV1 not found"
+          variants = {
+              line.strip().rstrip(",")
+              for line in disposition.group("body").splitlines()
+              if line.strip() and not line.strip().startswith("//")
+          }
+          expected = {
+              "KeepExploring",
+              "PromisingCandidate",
+              "TooComplex",
+              "TechnicallyGoodWrongFeel",
+              "ElegantButUnproven",
+              "SelectedForSpecification",
+              "RejectedForNow",
+          }
+          assert variants == expected, (variants, expected)
+          for forbidden_name in ("Verified", "Correct", "Safe", "Qualified", "ApprovedForEffect"):
+              assert forbidden_name not in variants
+          assert "pub fn material_family" not in source
+          assert "pub fn material_diversity" not in source
+          PY
+
+      - name: Install exact Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal --component rustfmt --component clippy
+          rustc +"$RUST_TOOLCHAIN" -Vv
+          cargo +"$RUST_TOOLCHAIN" -V
+          cargo +"$RUST_TOOLCHAIN" clippy -V
+          cargo +"$RUST_TOOLCHAIN" fmt --version
+
+      - name: Q2 formatting
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo +"$RUST_TOOLCHAIN" fmt --manifest-path "$REF_CRATE/Cargo.toml" -- --check
+
+      - name: Q2-Q3 check tests and strict Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$REF_CRATE/Cargo.lock"
+          cargo +"$RUST_TOOLCHAIN" check --manifest-path "$REF_CRATE/Cargo.toml" --all-targets --offline
+          test -f "$REF_CRATE/Cargo.lock"
+          echo "generated_reference_lock_sha256=$(sha256sum "$REF_CRATE/Cargo.lock" | awk '{print $1}')"
+          cargo +"$RUST_TOOLCHAIN" test --manifest-path "$REF_CRATE/Cargo.toml" --offline
+          cargo +"$RUST_TOOLCHAIN" clippy --manifest-path "$REF_CRATE/Cargo.toml" --all-targets --offline -- -D warnings
+
+      - name: Q4 negative authority API audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import pathlib, re
+          source = pathlib.Path("reference/dev-way-studio-v0-1/src/lib.rs").read_text()
+
+          # Candidate selection must stay explicitly local to specification handoff.
+          assert "selected_for_specification" in source
+          assert "tests_passed" not in source
+          assert "CodeVerifier" not in source
+          assert "CodingExperienceStore" not in source
+          assert "AgentResult" not in source
+          assert "ApprovedForEffect" not in source
+
+          # Family census is declared ancestry metadata only.
+          assert "declared_family_census" in source
+          assert "declared_family_count" in source
+          assert "material_family_count" not in source
+          assert "material_diversity" not in source
+          PY
+
+      - name: Q5 exact immutability postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f "$REF_CRATE/Cargo.lock"
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$PRODUCT_TREE"
+          test -z "$(git status --porcelain --untracked-files=all)"
+
+          {
+            echo "### DEV-WAY-002AQ receipt"
+            echo "- product: \`$PRODUCT_SHA\`"
+            echo "- tree: \`$PRODUCT_TREE\`"
+            echo "- parent: \`$PRODUCT_PARENT\`"
+            echo "- Rust: \`$(rustc +"$RUST_TOOLCHAIN" --version)\`"
+            echo "- Cargo: \`$(cargo +"$RUST_TOOLCHAIN" --version)\`"
+            echo "- result: all conjunctive workflow gates reached"
+            echo "- claim ceiling: pure Studio candidate algebra only"
+          } >> "$GITHUB_STEP_SUMMARY"
