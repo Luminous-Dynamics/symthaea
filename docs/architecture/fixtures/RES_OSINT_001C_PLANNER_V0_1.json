@@ -1,0 +1,269 @@
+{
+  "analysis_profile_ref": "analysis:synthetic-reservoir:v0.1",
+  "authority": "CandidateAnalysisOnly",
+  "candidates": [
+    {
+      "benefits": {
+        "contradiction_falsifier_value": "VeryHigh",
+        "coverage_gap_reduction": "High",
+        "currentness_gap_reduction": "High",
+        "dependency_reduction": "Low",
+        "discriminating_power": "VeryHigh",
+        "expected_reproducibility": "VeryHigh"
+      },
+      "burdens": {
+        "expected_collection_cost": "Medium",
+        "opsec_disclosure_cost": "Low",
+        "privacy_sensitivity": "Low"
+      },
+      "description": "Independent second gauge reports no corresponding level change during the claimed event window",
+      "id": "D1",
+      "policy_disposition": "EligibleForExternalAuthorizationCandidate",
+      "proposal_authority": "ProposalOnly",
+      "relations": {
+        "H1": "StronglyDiscriminatesAgainst",
+        "H2": "DiscriminatesFor",
+        "H3": "NeutralUnderHypothesis",
+        "HU": "DiscriminatesAgainst"
+      },
+      "targets_unknowns": [
+        "MeasurementQuality",
+        "AlternativeExplanation"
+      ]
+    },
+    {
+      "benefits": {
+        "contradiction_falsifier_value": "VeryHigh",
+        "coverage_gap_reduction": "Medium",
+        "currentness_gap_reduction": "Medium",
+        "dependency_reduction": "Low",
+        "discriminating_power": "VeryHigh",
+        "expected_reproducibility": "VeryHigh"
+      },
+      "burdens": {
+        "expected_collection_cost": "Low",
+        "opsec_disclosure_cost": "Low",
+        "privacy_sensitivity": "Low"
+      },
+      "description": "Controlled calibration re-test demonstrates drift in the station sensor",
+      "id": "D2",
+      "policy_disposition": "EligibleForExternalAuthorizationCandidate",
+      "proposal_authority": "ProposalOnly",
+      "relations": {
+        "H1": "StronglyDiscriminatesAgainst",
+        "H2": "StronglyDiscriminatesFor",
+        "H3": "NeutralUnderHypothesis",
+        "HU": "DiscriminatesAgainst"
+      },
+      "targets_unknowns": [
+        "MeasurementQuality"
+      ]
+    },
+    {
+      "benefits": {
+        "contradiction_falsifier_value": "Low",
+        "coverage_gap_reduction": "Medium",
+        "currentness_gap_reduction": "Low",
+        "dependency_reduction": "VeryHigh",
+        "discriminating_power": "Medium",
+        "expected_reproducibility": "VeryHigh"
+      },
+      "burdens": {
+        "expected_collection_cost": "Low",
+        "opsec_disclosure_cost": "Low",
+        "privacy_sensitivity": "Low"
+      },
+      "description": "Exact publication lineage record establishes whether downstream reports A2 and A3 derive from A1",
+      "id": "D3",
+      "policy_disposition": "EligibleForExternalAuthorizationCandidate",
+      "proposal_authority": "ProposalOnly",
+      "relations": {
+        "H1": "NeutralUnderHypothesis",
+        "H2": "NeutralUnderHypothesis",
+        "H3": "StronglyDiscriminatesFor",
+        "HU": "DiscriminatesAgainst"
+      },
+      "targets_unknowns": [
+        "SourceLineage",
+        "Dependency"
+      ]
+    },
+    {
+      "benefits": {
+        "contradiction_falsifier_value": "VeryHigh",
+        "coverage_gap_reduction": "High",
+        "currentness_gap_reduction": "VeryHigh",
+        "dependency_reduction": "Medium",
+        "discriminating_power": "VeryHigh",
+        "expected_reproducibility": "High"
+      },
+      "burdens": {
+        "expected_collection_cost": "Medium",
+        "opsec_disclosure_cost": "High",
+        "privacy_sensitivity": "VeryHigh"
+      },
+      "description": "Protected technician device telemetry could reveal a calibration intervention during the event window",
+      "id": "D4",
+      "policy_disposition": "AnalyticallyUsefulButPrivacyBlocked",
+      "proposal_authority": "ProposalOnly",
+      "relations": {
+        "H1": "StronglyDiscriminatesAgainst",
+        "H2": "StronglyDiscriminatesFor",
+        "H3": "NeutralUnderHypothesis",
+        "HU": "DiscriminatesAgainst"
+      },
+      "targets_unknowns": [
+        "MeasurementQuality",
+        "TemporalRelation"
+      ]
+    },
+    {
+      "benefits": {
+        "contradiction_falsifier_value": "None",
+        "coverage_gap_reduction": "None",
+        "currentness_gap_reduction": "Low",
+        "dependency_reduction": "None",
+        "discriminating_power": "Low",
+        "expected_reproducibility": "Medium"
+      },
+      "burdens": {
+        "expected_collection_cost": "Medium",
+        "opsec_disclosure_cost": "Low",
+        "privacy_sensitivity": "Low"
+      },
+      "description": "A new publication repeats the same station report without new observation lineage",
+      "id": "D5",
+      "policy_disposition": "EligibleForExternalAuthorizationCandidate",
+      "proposal_authority": "ProposalOnly",
+      "relations": {
+        "H1": "WeaklyDiscriminatesFor",
+        "H2": "NeutralUnderHypothesis",
+        "H3": "WeaklyDiscriminatesFor",
+        "HU": "NeutralUnderHypothesis"
+      },
+      "targets_unknowns": []
+    }
+  ],
+  "expected_output": {
+    "authority": "CandidateAnalysisOnly",
+    "blocked_but_analytically_useful": {
+      "opsec": [],
+      "policy": [],
+      "privacy": [
+        "D4"
+      ]
+    },
+    "disconfirmation_candidates_for_H1": [
+      "D1",
+      "D2",
+      "D4"
+    ],
+    "dominated_eligible": [
+      {
+        "candidate": "D5",
+        "dominated_by": "D2"
+      }
+    ],
+    "eligible_disconfirmation_candidates": [
+      "D1",
+      "D2"
+    ],
+    "eligible_pareto_front": [
+      "D1",
+      "D2",
+      "D3"
+    ],
+    "planning_limitations": [
+      "PriorFalsifierSearchUnknownCoverage"
+    ],
+    "preferred_hypothesis_strengthened_by_zero_result": false
+  },
+  "frontier_ref": "F2",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "state": "PreferredWithinProfile"
+    },
+    {
+      "id": "H2",
+      "state": "Live"
+    },
+    {
+      "id": "H3",
+      "state": "Live"
+    },
+    {
+      "id": "HU",
+      "state": "InsufficientEvidence"
+    }
+  ],
+  "llm_required": false,
+  "metamorphic_expectations": [
+    {
+      "expected": "NoAvailableDisconfirmationCandidate",
+      "forbidden": "IncreasePreferredHypothesisConfidence",
+      "mutation": "remove D1, D2, and D4"
+    },
+    {
+      "expected": "D4 may enter eligible Pareto analysis but remains ProposalOnly",
+      "forbidden": "AuthorizedExecution",
+      "mutation": "change D4 policy disposition to EligibleForExternalAuthorizationCandidate"
+    },
+    {
+      "expected": "negative interpretation changes only within the exact declared corpus",
+      "forbidden": "SupportsPreferredHypothesis",
+      "mutation": "change S_D2 coverage from UnknownCoverage to ExhaustiveWithinDeclaredFiniteCorpus"
+    },
+    {
+      "expected": "D5 is no longer dominated solely by the original coordinates",
+      "forbidden": "retain stale domination witness",
+      "mutation": "move D5 benefits up to equal D2"
+    }
+  ],
+  "network_io": false,
+  "ordinal_profile": {
+    "benefit_direction": "higher_is_better",
+    "benefit_order": [
+      "None",
+      "Low",
+      "Medium",
+      "High",
+      "VeryHigh"
+    ],
+    "burden_direction": "lower_is_better",
+    "burden_order": [
+      "None",
+      "Low",
+      "Medium",
+      "High",
+      "VeryHigh"
+    ],
+    "dominance_rule": "A dominates B iff A is no worse on every declared coordinate and strictly better on at least one"
+  },
+  "preferred_hypothesis": "H1",
+  "prior_searches": [
+    {
+      "coverage": "UnknownCoverage",
+      "finding": "NoMatchObservedUnderSearchProfile",
+      "forbidden_interpretation": "SupportsPreferredHypothesis",
+      "id": "S_D2",
+      "permitted_interpretation": "UnresolvedDueToUnknownCoverage",
+      "result_count": 0,
+      "target_observation": "D2"
+    }
+  ],
+  "profile": "symthaea:next-information:pareto-front:v1",
+  "required_invariants": [
+    "preferred hypothesis under profile != true",
+    "failed falsifier search != confirmation",
+    "high information value != permission to collect",
+    "Pareto-nondominated != authorized",
+    "blocked request != useless analytic information",
+    "no available disconfirmation candidate != support for preferred hypothesis",
+    "dependency-reduction value != factual support",
+    "unknown != model guess",
+    "proposal authority != external authorization",
+    "planner output != Mycelix canonical mutation"
+  ],
+  "schema": "symthaea:osint-next-information-fixture:v0.1"
+}
