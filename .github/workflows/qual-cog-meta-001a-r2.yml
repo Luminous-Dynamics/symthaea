@@ -1,0 +1,96 @@
+name: QUAL COG-META-001A-R2 exact routing inventory
+
+on:
+  pull_request:
+    types: [ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact lineage and delta
+        shell: bash
+        env:
+          MAIN_SHA: adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          PRODUCT_SHA: fd6a985b1a2c4ce65d2927ea1b8c9a913d997fb0
+          PRODUCT_BRANCH: research/cog-meta-001a-r2-routing-inventory
+          DOC_PATH: docs/research/COG-META-001A_COGNITIVE_ROUTING_DISCOVERY.md
+          SCRIPT_PATH: scripts/discover_cognitive_routing_semantics.py
+          QUAL_PATH: .github/workflows/qual-cog-meta-001a-r2.yml
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          test "${{ github.event.pull_request.head.sha }}" = "$HEAD_SHA"
+          test "${{ github.event.pull_request.base.ref }}" = "$PRODUCT_BRANCH"
+          test "${{ github.event.pull_request.base.sha }}" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_SHA"
+          test "$(git rev-parse "${PRODUCT_SHA}^")" = "$MAIN_SHA"
+
+          mapfile -t product_delta < <(git diff --name-only "$MAIN_SHA" "$PRODUCT_SHA" | sort)
+          printf '%s\n' "${product_delta[@]}"
+          test "${#product_delta[@]}" -eq 2
+          test "${product_delta[0]}" = "$DOC_PATH"
+          test "${product_delta[1]}" = "$SCRIPT_PATH"
+
+          mapfile -t qual_delta < <(git diff --name-only "$PRODUCT_SHA" HEAD | sort)
+          printf '%s\n' "${qual_delta[@]}"
+          test "${#qual_delta[@]}" -eq 1
+          test "${qual_delta[0]}" = "$QUAL_PATH"
+
+      - name: Execute frozen R2 inventory twice
+        shell: bash
+        env:
+          PRODUCT_SHA: fd6a985b1a2c4ce65d2927ea1b8c9a913d997fb0
+          PRODUCT_TREE: 3f19b73a5510d60b3c275b67cd4c2c0db94a3779
+          EVIDENCE_DIR: /tmp/cog-meta-001a-r2-evidence
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          git checkout --detach "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD)" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$PRODUCT_TREE"
+
+          python3 -m py_compile scripts/discover_cognitive_routing_semantics.py
+          python3 scripts/discover_cognitive_routing_semantics.py > "$EVIDENCE_DIR/inventory-run-1.txt"
+          python3 scripts/discover_cognitive_routing_semantics.py > "$EVIDENCE_DIR/inventory-run-2.txt"
+          cmp "$EVIDENCE_DIR/inventory-run-1.txt" "$EVIDENCE_DIR/inventory-run-2.txt"
+
+          cp "$EVIDENCE_DIR/inventory-run-1.txt" "$EVIDENCE_DIR/inventory.txt"
+          sha256sum "$EVIDENCE_DIR/inventory.txt" | tee "$EVIDENCE_DIR/inventory.sha256"
+
+          OUT="$EVIDENCE_DIR/inventory.txt"
+          grep -Fx 'schema=cog-meta-001a-routing-inventory-v2' "$OUT"
+          grep -Fx 'authority_scope=measurement-only-cognitive-routing-scheduling-stopping-selection-and-cross-domain-projection-inventory' "$OUT"
+          grep -Fx 'production_reference_semantics=conservative-git-tracked-production-file-level-lexical-membership' "$OUT"
+          grep -Fx "subject_commit=$PRODUCT_SHA" "$OUT"
+          grep -Fx "subject_tree=$PRODUCT_TREE" "$OUT"
+
+          grep -Fx 'CONTROL_WITNESS cognitive_depth_to_urgency present=true path=src/cognitive_loop/helpers/cycle_phases_urgency.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS cycle_urgency_to_mesh_qos present=true path=src/swarm/mesh/mod.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS cognitive_depth_to_memory_breadth present=true path=src/cognitive_loop/cycle_phase_dynamics/memory_binding.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS cognitive_depth_to_neuromodulation present=true path=src/cognitive_loop/cycle_neuromod_phase.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS cognitive_depth_to_budget_scale present=true path=src/cognitive_loop/cycle_phase_dynamics/mod.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS meta_confidence_to_learning present=true path=src/cognitive_loop/cycle_subsystems.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS workspace_winner_take_all present=true path=crates/core/symthaea-workspace/src/lib.rs' "$OUT"
+          grep -Fx 'CONTROL_WITNESS metacognitive_recommendation_match present=true path=crates/core/symthaea-core/src/hdc/consciousness_integration/pipeline.rs' "$OUT"
+
+          grep -F 'CATEGORY cognitive_regime_routing count=' "$OUT"
+          grep -F 'CATEGORY transport_qos_projection count=' "$OUT"
+          grep -F 'SEMANTIC_COLLISION_CANDIDATE MetacognitiveRecommendation definitions=' "$OUT"
+          grep -Fx 'result=PASS_DISCOVERY' "$OUT"
+
+      - name: Preserve exact R2 measurement evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cog-meta-001a-r2-routing-inventory
+          path: /tmp/cog-meta-001a-r2-evidence
+          if-no-files-found: error
