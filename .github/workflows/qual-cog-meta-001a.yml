@@ -1,0 +1,92 @@
+name: QUAL COG-META-001A exact routing inventory
+
+on:
+  pull_request:
+    types: [ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact lineage and delta
+        shell: bash
+        env:
+          MAIN_SHA: adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          PRODUCT_SHA: 64279739109c6f976cab858e048dd34ae10568d3
+          PRODUCT_BRANCH: research/cog-meta-001a-routing-inventory
+          QUAL_PATH: .github/workflows/qual-cog-meta-001a.yml
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          test "${{ github.event.pull_request.head.sha }}" = "$HEAD_SHA"
+          test "${{ github.event.pull_request.base.ref }}" = "$PRODUCT_BRANCH"
+          test "${{ github.event.pull_request.base.sha }}" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_SHA"
+          test "$(git rev-parse "${PRODUCT_SHA}^")" = "$MAIN_SHA"
+
+          mapfile -t product_delta < <(git diff --name-only "$MAIN_SHA" "$PRODUCT_SHA" | sort)
+          printf '%s\n' "${product_delta[@]}"
+          test "${#product_delta[@]}" -eq 2
+          test "${product_delta[0]}" = "docs/research/COG-META-001A_COGNITIVE_ROUTING_DISCOVERY.md"
+          test "${product_delta[1]}" = "scripts/discover_cognitive_routing_semantics.py"
+
+          mapfile -t qual_delta < <(git diff --name-only "$PRODUCT_SHA" HEAD | sort)
+          printf '%s\n' "${qual_delta[@]}"
+          test "${#qual_delta[@]}" -eq 1
+          test "${qual_delta[0]}" = "$QUAL_PATH"
+
+      - name: Execute frozen routing inventory twice
+        shell: bash
+        env:
+          PRODUCT_SHA: 64279739109c6f976cab858e048dd34ae10568d3
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PRODUCT_SHA"
+          python3 -m py_compile scripts/discover_cognitive_routing_semantics.py
+          python3 scripts/discover_cognitive_routing_semantics.py > /tmp/cog-meta-001a-run1.out
+          python3 scripts/discover_cognitive_routing_semantics.py > /tmp/cog-meta-001a-run2.out
+          cmp -s /tmp/cog-meta-001a-run1.out /tmp/cog-meta-001a-run2.out
+          cp /tmp/cog-meta-001a-run1.out /tmp/cog-meta-001a.out
+          cat /tmp/cog-meta-001a.out
+
+          grep -Fx 'schema=cog-meta-001a-routing-inventory-v1' /tmp/cog-meta-001a.out
+          grep -Fx 'authority_scope=measurement-only-cognitive-routing-scheduling-stopping-and-selection-inventory' /tmp/cog-meta-001a.out
+          grep -Fx 'production_reference_semantics=conservative-production-file-level-lexical-membership' /tmp/cog-meta-001a.out
+          grep -Fx 'result=PASS_DISCOVERY' /tmp/cog-meta-001a.out
+
+          grep -F 'CATEGORY cadence_scheduling count=' /tmp/cog-meta-001a.out
+          grep -F 'CATEGORY content_competition count=' /tmp/cog-meta-001a.out
+          grep -F 'CATEGORY metacognitive_control count=' /tmp/cog-meta-001a.out
+          grep -F 'CATEGORY resource_gating count=' /tmp/cog-meta-001a.out
+          grep -F 'CATEGORY planning_search_simulation count=' /tmp/cog-meta-001a.out
+
+          grep -Fx 'CONTROL_WITNESS meta_confidence_to_learning present=true path=src/cognitive_loop/cycle_subsystems.rs' /tmp/cog-meta-001a.out
+          grep -Fx 'CONTROL_WITNESS workspace_winner_take_all present=true path=crates/core/symthaea-workspace/src/lib.rs' /tmp/cog-meta-001a.out
+          grep -Fx 'CONTROL_WITNESS metacognitive_recommendation_match present=true path=crates/core/symthaea-core/src/hdc/consciousness_integration/pipeline.rs' /tmp/cog-meta-001a.out
+
+          grep -F 'DEFINITION_SET AttentionBid count=' /tmp/cog-meta-001a.out
+          grep -F 'DEFINITION_SET MetacognitiveRecommendation count=' /tmp/cog-meta-001a.out
+          grep -F 'DEFINITION_SET MetaCognitiveReasoner count=' /tmp/cog-meta-001a.out
+          grep -F 'DEFINITION_SET MetacognitiveReasoner count=' /tmp/cog-meta-001a.out
+          grep -F 'SEMANTIC_COLLISION_CANDIDATE MetacognitiveRecommendation definitions=' /tmp/cog-meta-001a.out
+
+          sha256sum /tmp/cog-meta-001a.out | tee /tmp/cog-meta-001a.sha256
+
+      - name: Preserve exact routing inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: cog-meta-001a-routing-inventory
+          path: |
+            /tmp/cog-meta-001a.out
+            /tmp/cog-meta-001a.sha256
+          if-no-files-found: error
