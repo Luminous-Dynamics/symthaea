@@ -1,0 +1,165 @@
+name: QUAL RES-SEC-001B-FMT-001A
+
+on:
+  pull_request:
+    types: [ready_for_review]
+    branches:
+      - fix/res-sec-001b-rustfmt-baseline
+    paths:
+      - '.github/workflows/qual-res-sec-001b-fmt-001a.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Bind exact lineage and qualifier-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          product_parent=458c7b98d81c64b9361e252f85ef9d45132e6682
+          product=2649d0a9482ac6d1ac1fe802ef8e6c3d0f93cfd9
+          product_tree=18af24708ba84f8b05127e8b17f0c25737ee02b9
+
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "${{ github.event.pull_request.base.sha }}" = "$product"
+          test "$(git rev-parse HEAD^)" = "$product"
+          test "$(git rev-parse "$product^")" = "$product_parent"
+          test "$(git rev-parse "$product^{tree}")" = "$product_tree"
+
+          product_changed="$(git diff --name-only "$product_parent"..."$product")"
+          test "$product_changed" = 'src/web_research/mod.rs'
+
+          qualifier_changed="$(git diff --name-only "$product"...HEAD)"
+          test "$qualifier_changed" = '.github/workflows/qual-res-sec-001b-fmt-001a.yml'
+
+      - name: Reconstruct exact mechanical formatting delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+
+          parent = '458c7b98d81c64b9361e252f85ef9d45132e6682'
+          product = '2649d0a9482ac6d1ac1fe802ef8e6c3d0f93cfd9'
+          path = 'src/web_research/mod.rs'
+
+          def show(ref):
+              return subprocess.check_output(['git', 'show', f'{ref}:{path}'])
+
+          before = show(parent)
+          after = show(product)
+
+          old = (
+              b'pub fn create_epistemic_system()\n'
+              b'-> anyhow::Result<(WebResearcher, KnowledgeIntegrator, EpistemicLearner)> {'
+          )
+          new = (
+              b'pub fn create_epistemic_system() -> anyhow::Result<(\n'
+              b'    WebResearcher,\n'
+              b'    KnowledgeIntegrator,\n'
+              b'    EpistemicLearner,\n'
+              b')> {'
+          )
+
+          assert before.count(old) == 1, 'expected malformed signature exactly once in parent'
+          expected = before.replace(old, new, 1)
+          assert expected == after, 'product contains changes beyond exact mechanical formatting repair'
+
+          marker = b'pub async fn research(&mut self, query: &str)'
+          end_marker = b'    /// Get current epistemic stats'
+          def method(blob):
+              start = blob.index(marker)
+              end = blob.index(end_marker, start)
+              return blob[start:end]
+
+          parent_research = method(before)
+          product_research = method(after)
+          assert parent_research == product_research, 'research() changed in formatting prerequisite'
+
+          required_negative_controls = (
+              b'self.integrator.integrate(result.clone()).await?',
+              b'self.last_phi = integration.phi_after;',
+              b'was_correct: claim.confidence > 0.7',
+              b'self.learner.record_outcome(outcome)?;',
+          )
+          for needle in required_negative_controls:
+              assert needle in product_research, f'missing expected pre-quarantine authority edge: {needle!r}'
+
+          print('PASS: exact formatting-only reconstruction')
+          print('PASS: research() byte-identical to parent')
+          print('PASS: pre-quarantine authority loop remains as negative semantic control')
+          PY
+
+      - name: Materialize exact product worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+          product=2649d0a9482ac6d1ac1fe802ef8e6c3d0f93cfd9
+          rm -rf /tmp/res-sec-001b-fmt-product
+          git worktree add --detach /tmp/res-sec-001b-fmt-product "$product"
+          test "$(git -C /tmp/res-sec-001b-fmt-product rev-parse HEAD)" = "$product"
+          test "$(git -C /tmp/res-sec-001b-fmt-product rev-parse HEAD^{tree})" = '18af24708ba84f8b05127e8b17f0c25737ee02b9'
+
+      - name: Whole-repository formatting
+        working-directory: /tmp/res-sec-001b-fmt-product
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Compile web research feature
+        working-directory: /tmp/res-sec-001b-fmt-product
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features web_research_module
+
+      - name: Focused construction regression
+        working-directory: /tmp/res-sec-001b-fmt-product
+        run: cargo +1.96.0 test --locked -p symthaea --lib web_research::tests::test_epistemic_consciousness_creation --features web_research_module
+
+      - name: Prove exact product immutability and write receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          product_dir=/tmp/res-sec-001b-fmt-product
+          product=2649d0a9482ac6d1ac1fe802ef8e6c3d0f93cfd9
+          tree=18af24708ba84f8b05127e8b17f0c25737ee02b9
+
+          test "$(git -C "$product_dir" rev-parse HEAD)" = "$product"
+          test "$(git -C "$product_dir" rev-parse HEAD^{tree})" = "$tree"
+          test -z "$(git -C "$product_dir" status --porcelain=v1)"
+
+          {
+            echo 'schema=res-sec-001b-fmt-001a-qualification-v1'
+            echo 'authority=FormattingPrerequisiteOnly'
+            echo 'result=PASS_FORMAT_PREREQUISITE'
+            echo 'product_parent=458c7b98d81c64b9361e252f85ef9d45132e6682'
+            echo "product_commit=$product"
+            echo "product_tree=$tree"
+            echo "qualifier_commit=$(git rev-parse HEAD)"
+            echo "qualifier_tree=$(git rev-parse HEAD^{tree})"
+            echo 'rust_toolchain=1.96.0'
+            sha256sum "$product_dir/src/web_research/mod.rs"
+            echo 'claim_ceiling=Formatting clean plus exact named compile/test checks; no quarantine or autonomous-OSINT safety claim.'
+          } | tee /tmp/res-sec-001b-fmt-001a-receipt.txt
+
+      - name: Preserve qualification receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: res-sec-001b-fmt-001a-receipt
+          path: /tmp/res-sec-001b-fmt-001a-receipt.txt
+          if-no-files-found: error
+
+      - name: Qualification statement
+        run: |
+          echo 'PASS_FORMAT_PREREQUISITE establishes only that exact product 2649d0a9482ac6d1ac1fe802ef8e6c3d0f93cfd9 is the exact mechanical formatting repair and passes the named formatting/compile/test checks.'
+          echo 'It does NOT establish RES-SEC-001B quarantine semantics, source truth, safe knowledge admission, prompt-injection immunity, OPSEC correctness, or safe autonomous OSINT.'
