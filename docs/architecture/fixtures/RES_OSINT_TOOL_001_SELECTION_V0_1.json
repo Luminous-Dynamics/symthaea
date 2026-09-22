@@ -1,0 +1,141 @@
+{
+  "schema": "symthaea:osint-tool-selection-corpus:v1",
+  "profile": "symthaea:osint-tool-selection:pareto:v1",
+  "authority": ["CandidateAnalysisOnly", "ProposalOnly"],
+  "network_io": false,
+  "llm_required": false,
+  "epi_013_subject": {
+    "repo": "Luminous-Dynamics/mycelix",
+    "head": "3ce0c6ceeda41419512185c2a938f391d1592e3f",
+    "tree": "7f46b3d6b60a28dd7a346b908fddec825a6c2311",
+    "fixture_blob": "2536cfbba7402c19a62417904b2c732fbfb4ac88",
+    "profile": "mycelix:epi-osint-tool-profile:v1"
+  },
+  "tasks": [
+    {
+      "id": "TASK_WEB_PUBLIC",
+      "frontier_ref": "F2",
+      "purpose_ref": "purpose:public-web-discovery",
+      "required_capabilities": ["WebSearch"],
+      "coverage_requirement": "BestEffortOrBetter",
+      "currentness_requirement": "CurrentQualified",
+      "allowed_views": ["AnonymousPublicView"],
+      "forbidden_views": ["AuthenticatedAccountView"],
+      "forbidden_disclosure_surfaces": [],
+      "observation_only_required": false,
+      "required_transforms": [],
+      "expected": {
+        "eligible": ["T_WEB_PUBLIC_TOPK"],
+        "blocked": [{"profile": "T_WEB_AUTH_VIEW", "reason": "BlockedViewClass"}],
+        "pareto_front": ["T_WEB_PUBLIC_TOPK"],
+        "carried_limitations": ["ResultCap", "ProviderRankingOpaque", "CoverageUnknown"],
+        "forbidden_conclusions": ["ExhaustiveCoverage", "AbsentFromWorld"],
+        "authority": "ProposalOnly"
+      }
+    },
+    {
+      "id": "TASK_EXHAUSTIVE_SYNTHETIC_SCI",
+      "frontier_ref": "F2",
+      "purpose_ref": "purpose:finite-corpus-absence-check",
+      "required_capabilities": ["ScientificLiteratureSearch"],
+      "coverage_requirement": "ExactFiniteCorpus",
+      "required_corpus_commitment": "sha256:synthetic-science-corpus-v1",
+      "currentness_requirement": "CurrentQualified",
+      "allowed_views": ["DeclaredProviderCorpus"],
+      "forbidden_disclosure_surfaces": [],
+      "observation_only_required": true,
+      "required_transforms": [],
+      "expected": {
+        "eligible": ["T_SCI_FINITE"],
+        "pareto_front": ["T_SCI_FINITE"],
+        "ineligible_examples": [
+          {"profile": "T_WEB_PUBLIC_TOPK", "reason": "IneligibleCapability"},
+          {"profile": "T_CODE_BEST_EFFORT", "reason": "IneligibleCapability"}
+        ],
+        "allowed_negative_interpretation": "AbsentWithinExactFiniteCorpus",
+        "forbidden_conclusions": ["AbsentFromWorld"],
+        "authority": "ProposalOnly"
+      }
+    },
+    {
+      "id": "TASK_MEDIA_PROV_LOCAL",
+      "frontier_ref": "F2",
+      "purpose_ref": "purpose:local-media-provenance",
+      "required_capabilities": ["MediaProvenanceInspection"],
+      "coverage_requirement": "ExactFiniteCorpus",
+      "currentness_requirement": "CurrentQualified",
+      "allowed_views": ["LocalArtifactView"],
+      "forbidden_disclosure_surfaces": ["QueryTerms", "TargetIdentifiers", "UploadedMedia", "DnsTransportMetadata", "HeadersBody", "IpNetworkOrigin", "ProviderAnalytics", "StoredSearchHistory"],
+      "observation_only_required": true,
+      "required_transforms": ["MetadataParsing"],
+      "expected": {
+        "eligible": ["T_MEDIA_PROV"],
+        "pareto_front": ["T_MEDIA_PROV"],
+        "carried_limitations": [],
+        "forbidden_conclusions": ["ValidProvenanceMeansClaimTrue", "NoProvenanceMeansFake"],
+        "authority": "ProposalOnly"
+      }
+    },
+    {
+      "id": "TASK_RENDERED_PAGE",
+      "frontier_ref": "F2",
+      "purpose_ref": "purpose:rendered-page-observation",
+      "required_capabilities": ["BrowserRenderedCapture"],
+      "coverage_requirement": "BestEffortSearch",
+      "currentness_requirement": "CurrentQualified",
+      "allowed_views": ["AnonymousPublicView"],
+      "forbidden_disclosure_surfaces": [],
+      "observation_only_required": false,
+      "required_transforms": ["JavascriptExecution", "DomConstruction", "TextExtraction"],
+      "expected": {
+        "eligible_method_fit": ["T_BROWSER_CAPTURE"],
+        "selection_disposition": "NeedsExternalAuthorization",
+        "required_external_review_surfaces": ["TargetIdentifiers", "DnsTransportMetadata", "HeadersBody", "IpNetworkOrigin", "ProviderAnalytics"],
+        "pareto_front": ["T_BROWSER_CAPTURE"],
+        "authority": "ProposalOnly"
+      }
+    },
+    {
+      "id": "TASK_ARCHIVE_WORLD_ABSENCE",
+      "frontier_ref": "F2",
+      "purpose_ref": "purpose:world-absence-request",
+      "required_capabilities": ["WebArchiveLookup"],
+      "coverage_requirement": "WorldComplete",
+      "currentness_requirement": "Any",
+      "allowed_views": ["AnonymousPublicView", "DeclaredProviderCorpus"],
+      "forbidden_disclosure_surfaces": [],
+      "observation_only_required": false,
+      "required_transforms": [],
+      "expected": {
+        "eligible": [],
+        "pareto_front": [],
+        "partial_evidence_profiles": ["T_ARCHIVE_PARTIAL"],
+        "unmet_requirements": ["NoToolProfileCanEstablishRequestedCoverage"],
+        "forbidden_conclusions": ["AbsentFromWorld", "NeverExisted"],
+        "authority": "ProposalOnly"
+      }
+    }
+  ],
+  "required_invariants": [
+    "tool_profile_is_not_tool_selection",
+    "tool_selection_is_not_execution_authority",
+    "same_capability_is_not_interchangeable_methodology",
+    "provider_rank_is_not_tool_preference",
+    "historical_profile_is_not_current_availability",
+    "no_fitting_tool_does_not_authorize_question_weakening",
+    "blocked_profile_remains_visible_for_audit",
+    "selected_methodology_is_not_executed_methodology"
+  ],
+  "metamorphic_cases": [
+    {"mutation": "TASK_WEB_PUBLIC.allow_AuthenticatedAccountView", "expected": "T_WEB_AUTH_VIEW_becomes_eligible_but_ProposalOnly"},
+    {"mutation": "TASK_EXHAUSTIVE_SYNTHETIC_SCI.remove_ExactFiniteCorpus_requirement", "expected": "eligibility_may_widen_explicitly"},
+    {"mutation": "T_MEDIA_PROV.add_UploadedMedia_surface", "expected": "local_no_disclosure_preference_invalid"},
+    {"mutation": "T_ARCHIVE_PARTIAL.currentness->CurrentQualified", "expected": "world_absence_still_unsatisfied"},
+    {"mutation": "T_BROWSER_CAPTURE.remove_JavascriptExecution", "expected": "TASK_RENDERED_PAGE_method_fit_fails"},
+    {"mutation": "provider_rank_only", "expected": "selection_result_unchanged"},
+    {"mutation": "HistoricalKnownProfile->CurrentQualified_with_fresh_evidence", "expected": "currentness_partition_changes_explicitly"},
+    {"mutation": "side_effect->StateCreating_where_observation_only_required", "expected": "profile_ineligible"},
+    {"mutation": "delete_all_fitting_profiles", "expected": "explicit_unmet_requirement_no_unrelated_substitution"},
+    {"mutation": "candidate_order_only", "expected": "set_semantic_output_unchanged"}
+  ]
+}
