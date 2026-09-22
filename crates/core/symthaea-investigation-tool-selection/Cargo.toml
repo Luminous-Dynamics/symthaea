@@ -1,0 +1,9 @@
+[package]
+name = "symthaea-investigation-tool-selection"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Deterministic OSINT methodology selection for Symthaea investigations"
+
+[dependencies]
+symthaea-investigation = { path = "../symthaea-investigation" }
