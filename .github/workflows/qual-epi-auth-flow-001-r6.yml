@@ -1,0 +1,133 @@
+name: QUAL EPI-AUTH-FLOW-001 R6 exact byte inventory
+
+on:
+  pull_request:
+    types: [ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact R6 lineage and delta
+        shell: bash
+        env:
+          MAIN_SHA: adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          PRODUCT_SHA: 19b483b6e89a2cd7ef0933f0738c0e70e87d888c
+          PRODUCT_BRANCH: research/epi-auth-flow-001-r6-byte-inventory
+          QUAL_PATH: .github/workflows/qual-epi-auth-flow-001-r6.yml
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          test "${{ github.event.pull_request.head.sha }}" = "$HEAD_SHA"
+          test "${{ github.event.pull_request.base.ref }}" = "$PRODUCT_BRANCH"
+          test "${{ github.event.pull_request.base.sha }}" = "$PRODUCT_SHA"
+          test "$(git rev-parse HEAD^)" = "$PRODUCT_SHA"
+          test "$(git rev-parse "${PRODUCT_SHA}^")" = "$MAIN_SHA"
+
+          mapfile -t product_delta < <(git diff --name-only "$MAIN_SHA" "$PRODUCT_SHA" | sort)
+          printf '%s\n' "${product_delta[@]}"
+          test "${#product_delta[@]}" -eq 2
+          test "${product_delta[0]}" = "docs/research/EPI_AUTH_FLOW_001_R6_BYTE_INVENTORY.md"
+          test "${product_delta[1]}" = "scripts/inventory_epistemic_authority_flow.py"
+
+          mapfile -t qual_delta < <(git diff --name-only "$PRODUCT_SHA" HEAD | sort)
+          printf '%s\n' "${qual_delta[@]}"
+          test "${#qual_delta[@]}" -eq 1
+          test "${qual_delta[0]}" = "$QUAL_PATH"
+
+      - name: Fetch exact qualified predecessor subjects
+        shell: bash
+        env:
+          R5_PRODUCT: 9d7f3cebc90ed69553d0487bd9f312c2259f5fdf
+          R5_QUAL: 9c4501835500b4c90c4f975b41c63a885d5f972b
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin \
+            +refs/heads/research/epi-auth-flow-001-r5r5-r2-discovery:refs/remotes/origin/r5-product \
+            +refs/heads/qual/epi-auth-flow-001-r5r5-r2-9d7f3ce:refs/remotes/origin/r5-qual
+          test "$(git rev-parse refs/remotes/origin/r5-product)" = "$R5_PRODUCT"
+          test "$(git rev-parse refs/remotes/origin/r5-qual)" = "$R5_QUAL"
+          git cat-file -e "$R5_PRODUCT^{commit}"
+          git cat-file -e "$R5_QUAL^{commit}"
+
+      - name: Execute exact R6 inventory twice
+        shell: bash
+        env:
+          PRODUCT_SHA: 19b483b6e89a2cd7ef0933f0738c0e70e87d888c
+        run: |
+          set -euo pipefail
+          git checkout --detach "$PRODUCT_SHA"
+          python3 -m py_compile scripts/inventory_epistemic_authority_flow.py
+          python3 scripts/inventory_epistemic_authority_flow.py | tee /tmp/epi-auth-flow-r6-a.out
+          python3 scripts/inventory_epistemic_authority_flow.py > /tmp/epi-auth-flow-r6-b.out
+          cmp -s /tmp/epi-auth-flow-r6-a.out /tmp/epi-auth-flow-r6-b.out
+
+          grep -Fx 'schema=epi-auth-flow-001-r6-byte-inventory-v1' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'authority_scope=measurement-only-byte-bound-authority-flow-inventory' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'source_commit=adb69f11fa8068b019cc5bb598d0c7726a197fc9' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'source_tree=35a6c5fdba319556af9bb487838734f67c8ac0d6' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'qualified_product_commit=9d7f3cebc90ed69553d0487bd9f312c2259f5fdf' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'qualified_qualifier_commit=9c4501835500b4c90c4f975b41c63a885d5f972b' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'workflow_run_id=35616089981' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'workflow_job_id=106387046876' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'artifact_id=10684849865' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'artifact_zip_sha256=e2389e8dc1700898e5d956055cc7862a14f7f723398027491c2c9cce6e64415a' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'qualified_discovery_sha256=07cc24071bd84cb277dd91a668f1da96b29e5c4c37322b83b10b3ff195870504' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'qualified_consumer_sha256=26ed61bb6f4cd49ac1673b3a96e95285772417586728eb657f244e64f36fdea2' /tmp/epi-auth-flow-r6-a.out
+
+          while read -r name digest; do
+            grep -E "^SURFACE ${name} count=[0-9]+ path_digest=${digest} content_digest=[0-9a-f]{64}$" /tmp/epi-auth-flow-r6-a.out
+          done <<'EOF'
+          broca_cube_gate_surface e4c0570c59fc0268ec882324b0a3f373f1576d59fdc5edda6ac15543d5d94e3f
+          broca_cube_sink 5475d66ac33c90b7f17f397062175942835bd7e209b7827e4d25b785fb801124
+          broca_gate_control_surface 5b69d7754991130ead91eb80708e7adfa65989e63ec6d3768676b5b08cb6e6cb
+          broca_ordinal_gate_surface 0d496dfcec701f7bff020dc9270b1da84b9621a0437fa021f35b406b2d2d4b35
+          epistemic_code_bypass_surface 875125920d877ffd48f82c5cf5d2d4cb3deaeb63426559a828dc78232f67eee6
+          epistemic_ordinal_surface 1eef368fbffeacaf68e4dd08bf13b7ed7f77c0bfe632ab406c77edf1e36834ba
+          epistemic_status_definition fa40b7043725a0dc5228590544d2f0fee38215f1aa2380eb43642fad1f2e8de9
+          legacy_empirical_authority e02bc004d7f2b3e76d6dae653a26466a8cfe1722216b72d65d59bbfc8c85fac4
+          legacy_high_axis_authority baffdc6b55b9d46347dee3c90f6d56fc68b0b4f173c2623123b0c3fe4997436a
+          llm_prompt_authority_surface 3d6f3c8db5b3081271a1431c2f54d46ad4b9f1a3ae11f11368de41d6f2ad14ff
+          numeric_cube_transport 0ad6403b118d6fe496daf9f6e0cb09a48e5a52d99021a0770232e641d039f755
+          ordinal_bypass_status_surface 1356194d0833470e0d6cb92afd51db7185e1069a23db361445cc54cda6e6686b
+          scalar_cube_collapse de9fd15d61fc7c480914fb7150d4064ff3e3b11bdba577ea1de79aa55ee30510
+          strict_code_gate_surface 9cb9b94e14b25969fbb70a1056288c186a1ed49d48728774560d00857199b216
+          typed_cube_definition 224fcf171a0ab7686c65bbd4b3117cb5985a1038c46794d628c3a8cd66326d2a
+          typed_high_axis_authority 6088b51a6a450a287c81f03ae529377ac69eb1996ca96392ec34bec19dae32d4
+          typed_strong_empirical_authority 6088b51a6a450a287c81f03ae529377ac69eb1996ca96392ec34bec19dae32d4
+          EOF
+
+          for witness in \
+            coding_confidence_to_generic_llm_context \
+            formal_verification_is_separate_optional_property \
+            generic_llm_context_is_internal_not_admission \
+            generic_llm_context_to_system_prompt \
+            verified_generation_overbroad_guarantee_vocabulary \
+            verified_generation_property_split \
+            verified_generation_real_execution_fail_closed
+          do
+            grep -Fx "WITNESS ${witness}" /tmp/epi-auth-flow-r6-a.out
+          done
+
+          grep -E '^UNION count=108 memberships=193 content_digest=[0-9a-f]{64}$' /tmp/epi-auth-flow-r6-a.out
+          grep -Fx 'result=PASS_INVENTORY' /tmp/epi-auth-flow-r6-a.out
+          sha256sum /tmp/epi-auth-flow-r6-a.out | tee /tmp/epi-auth-flow-r6.sha256
+
+      - name: Preserve exact R6 inventory evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: epi-auth-flow-001-r6-byte-inventory
+          path: |
+            /tmp/epi-auth-flow-r6-a.out
+            /tmp/epi-auth-flow-r6-b.out
+            /tmp/epi-auth-flow-r6.sha256
+          if-no-files-found: error
