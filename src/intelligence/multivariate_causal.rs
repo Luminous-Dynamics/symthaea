@@ -3,18 +3,19 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Multivariate Causal Discovery - PC Algorithm
 //!
-//! Extends bivariate causal discovery to full DAG structure learning.
+//! Extends bivariate causal discovery to multivariate causal structure learning.
 //! Uses the PC (Peter-Clark) algorithm with KCIT for conditional independence.
 //!
 //! ## Algorithm Overview
 //!
-//! The PC algorithm discovers causal DAGs through:
+//! The PC algorithm discovers a partially directed causal structure through:
 //! 1. Start with complete undirected graph
 //! 2. Remove edges where X ⊥ Y | S for some conditioning set S
 //! 3. Orient edges based on v-structures (X -> Z <- Y)
 //! 4. Propagate orientation using acyclicity constraints
+//! 5. Preserve edges whose direction is not identified by those rules as undirected
 
-use super::causal_discovery::{CausalDirection, CausalDiscoveryEngine};
+use super::causal_discovery::CausalDiscoveryEngine;
 use std::collections::{HashMap, HashSet, VecDeque};
 
 /// A variable in the causal graph
@@ -42,7 +43,10 @@ pub struct DirectedEdge {
 /// Separation set: the conditioning set that made two variables independent
 type SepSet = HashMap<(usize, usize), HashSet<usize>>;
 
-/// The discovered causal DAG
+/// The discovered causal graph.
+///
+/// Despite the historical `CausalDAG` name, `undirected` retains skeleton edges
+/// whose orientation is not identified by the implemented PC orientation rules.
 #[derive(Debug, Clone)]
 pub struct CausalDAG {
     /// Variable names
@@ -176,14 +180,15 @@ impl PCAlgorithm {
         // Step 3: Propagate orientations
         self.propagate_orientations(&mut oriented, &skeleton, n);
 
-        // Build final DAG
+        // Build final partially directed graph. Edges that are not oriented by
+        // the PC rules stay undirected rather than being upgraded by a
+        // bivariate direction heuristic.
         let mut edges = Vec::new();
-        let undirected = Vec::new();
+        let mut undirected = Vec::new();
 
         for edge in &skeleton {
             let (a, b) = (edge.from, edge.to);
 
-            // Check if oriented
             if oriented.contains(&(a, b)) {
                 edges.push(DirectedEdge {
                     from: a,
@@ -197,24 +202,7 @@ impl PCAlgorithm {
                     confidence: self.compute_edge_confidence(variables, b, a),
                 });
             } else {
-                // Use bivariate direction as tiebreaker
-                let dir = self.engine.predict(&variables[a].data, &variables[b].data);
-                match dir {
-                    CausalDirection::Forward => {
-                        edges.push(DirectedEdge {
-                            from: a,
-                            to: b,
-                            confidence: 0.5,
-                        });
-                    }
-                    CausalDirection::Backward => {
-                        edges.push(DirectedEdge {
-                            from: b,
-                            to: a,
-                            confidence: 0.5,
-                        });
-                    }
-                }
+                undirected.push((a, b));
             }
         }
 
@@ -304,7 +292,9 @@ impl PCAlgorithm {
             return is_indep;
         }
 
-        // For larger conditioning sets, combine conditioning variables
+        // For larger conditioning sets, combine conditioning variables.
+        // This remains an experimental approximation and is tracked by
+        // SYM-CAUSAL-002 for replacement with a proper multivariate CI path.
         let z: Vec<f64> = (0..variables[x].data.len())
             .map(|i| {
                 cond.iter()
@@ -495,7 +485,10 @@ impl PCAlgorithm {
         }
     }
 
-    /// Compute confidence for an edge based on bivariate analysis
+    /// Compute confidence for an oriented edge based on bivariate analysis.
+    ///
+    /// This score does not identify edge direction; direction must already have
+    /// been established by the PC orientation rules above.
     fn compute_edge_confidence(&mut self, variables: &[Variable], from: usize, to: usize) -> f64 {
         let (_, conf) = self
             .engine
@@ -591,6 +584,32 @@ mod tests {
 
         // X and Y should become independent given Z
         assert_eq!(dag.variables.len(), 3);
+    }
+
+    #[test]
+    fn test_unresolved_edge_is_preserved_as_undirected() {
+        // With only two dependent variables there is no v-structure or Meek
+        // rule capable of identifying a direction. alpha=0 keeps the skeleton
+        // edge regardless of the HSIC magnitude, making this a deterministic
+        // regression fixture for the authority boundary.
+        let x: Vec<f64> = (0..100).map(|i| i as f64).collect();
+        let y = x.clone();
+        let variables = vec![
+            Variable {
+                name: "X".to_string(),
+                data: x,
+            },
+            Variable {
+                name: "Y".to_string(),
+                data: y,
+            },
+        ];
+
+        let mut pc = PCAlgorithm::new(42).with_alpha(0.0);
+        let graph = pc.learn(&variables);
+
+        assert!(graph.edges.is_empty());
+        assert_eq!(graph.undirected, vec![(0, 1)]);
     }
 
     #[test]
