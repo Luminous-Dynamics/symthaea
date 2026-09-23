@@ -40,8 +40,7 @@ jobs:
           workspaces: crates/core/symthaea-causal-reasoning
 
       - name: Format causal crate
-        working-directory: crates/core/symthaea-causal-reasoning
-        run: cargo fmt --all -- --check
+        run: cargo fmt -p symthaea-causal-reasoning -- --check
 
       - name: Check causal crate
         run: cargo check -p symthaea-causal-reasoning --all-targets
