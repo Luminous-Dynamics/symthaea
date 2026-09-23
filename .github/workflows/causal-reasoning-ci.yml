@@ -1,0 +1,65 @@
+name: Causal Reasoning CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/core/symthaea-causal-reasoning/**'
+      - 'tests/pc_alpha_threshold.rs'
+      - '.github/workflows/causal-reasoning-ci.yml'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'crates/core/symthaea-causal-reasoning/**'
+      - 'tests/pc_alpha_threshold.rs'
+      - '.github/workflows/causal-reasoning-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  causal-reasoning:
+    name: Causal Reasoning Core
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/core/symthaea-causal-reasoning
+
+      - name: Format causal crate
+        working-directory: crates/core/symthaea-causal-reasoning
+        run: cargo fmt --all -- --check
+
+      - name: Check causal crate
+        run: cargo check -p symthaea-causal-reasoning --all-targets
+
+      - name: Test causal crate
+        run: cargo test -p symthaea-causal-reasoning --all-targets
+
+      - name: Format exact alpha qualifier when present
+        run: |
+          if [ -f tests/pc_alpha_threshold.rs ]; then
+            rustfmt --check --edition 2024 tests/pc_alpha_threshold.rs
+          fi
+
+      - name: Run exact alpha qualifier when present
+        run: |
+          if [ -f tests/pc_alpha_threshold.rs ]; then
+            cargo test --test pc_alpha_threshold
+          fi
+
+      - name: Clippy causal crate
+        run: cargo clippy -p symthaea-causal-reasoning --all-targets -- -D warnings
