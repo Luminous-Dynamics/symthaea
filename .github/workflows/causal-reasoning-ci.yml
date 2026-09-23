@@ -5,14 +5,12 @@ on:
     branches: [main]
     paths:
       - 'crates/core/symthaea-causal-reasoning/**'
-      - 'tests/pc_alpha_threshold.rs'
       - '.github/workflows/causal-reasoning-ci.yml'
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'crates/core/symthaea-causal-reasoning/**'
-      - 'tests/pc_alpha_threshold.rs'
       - '.github/workflows/causal-reasoning-ci.yml'
   workflow_dispatch:
 
@@ -45,20 +43,22 @@ jobs:
       - name: Check causal crate
         run: cargo check -p symthaea-causal-reasoning --all-targets
 
-      - name: Test causal crate
-        run: cargo test -p symthaea-causal-reasoning --all-targets
-
       - name: Format exact alpha qualifier when present
         run: |
-          if [ -f tests/pc_alpha_threshold.rs ]; then
-            rustfmt --check --edition 2024 tests/pc_alpha_threshold.rs
+          qualifier='crates/core/symthaea-causal-reasoning/tests/pc_alpha_threshold.rs'
+          if [ -f "$qualifier" ]; then
+            rustfmt --check --edition 2024 "$qualifier"
           fi
 
       - name: Run exact alpha qualifier when present
         run: |
-          if [ -f tests/pc_alpha_threshold.rs ]; then
-            cargo test --test pc_alpha_threshold
+          qualifier='crates/core/symthaea-causal-reasoning/tests/pc_alpha_threshold.rs'
+          if [ -f "$qualifier" ]; then
+            cargo test -p symthaea-causal-reasoning --test pc_alpha_threshold
           fi
+
+      - name: Test causal crate
+        run: cargo test -p symthaea-causal-reasoning --all-targets
 
       - name: Clippy causal crate
         run: cargo clippy -p symthaea-causal-reasoning --all-targets -- -D warnings
