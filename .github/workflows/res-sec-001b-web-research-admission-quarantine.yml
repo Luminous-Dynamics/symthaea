@@ -1,0 +1,138 @@
+name: RES-SEC-001B Web Research Admission Quarantine
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'patches/security/res-sec-001b-web-research-admission-quarantine-v1.patch'
+      - '.github/workflows/res-sec-001b-web-research-admission-quarantine.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Freeze exact current-main parent and qualification-only scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_parent=adb69f11fa8068b019cc5bb598d0c7726a197fc9
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "${{ github.event.pull_request.base.sha }}" = "$expected_parent"
+          fi
+          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          changed="$(git diff --name-only "$expected_parent"...HEAD)"
+          printf '%s\n' "$changed"
+          unexpected="$(printf '%s\n' "$changed" | grep -Ev '^(patches/security/res-sec-001b-web-research-admission-quarantine-v1\.patch|\.github/workflows/res-sec-001b-web-research-admission-quarantine\.yml)$' || true)"
+          test -z "$unexpected" || {
+            echo 'unexpected RES-SEC-001B scope:'
+            printf '%s\n' "$unexpected"
+            exit 1
+          }
+
+      - name: Freeze current self-confirming research authority loop
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('src/web_research/mod.rs').read_text()
+          start = text.index('pub async fn research(&mut self, query: &str)')
+          end = text.index('    /// Get current epistemic stats', start)
+          block = text[start:end]
+          assert 'self.integrator.integrate(result.clone()).await?' in block
+          assert 'self.last_phi = integration.phi_after;' in block
+          assert 'was_correct: claim.confidence > 0.7' in block
+          assert 'self.learner.record_outcome(outcome)?;' in block
+          print('negative control: external research currently mutates knowledge/Phi and converts self-confidence into correctness feedback')
+          PY
+
+      - name: Freeze downstream meta-learning consequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'self.update_source_credibility(&outcome);' src/web_research/meta_learning.rs
+          grep -F 'self.update_domain_expertise(&outcome);' src/web_research/meta_learning.rs
+          grep -F 'let target = if outcome.was_correct { 1.0 } else { 0.0 };' src/web_research/meta_learning.rs
+          grep -F 'self.update_meta_phi();' src/web_research/meta_learning.rs
+          grep -F 'pub fn recommend_sources(&self, topic_domain: &str)' src/web_research/meta_learning.rs
+
+      - name: Freeze automatic knowledge-graph integration consequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'pub async fn integrate(&mut self, result: WebResearchResult)' src/web_research/integrator.rs
+          grep -F 'if claim.confidence >= self.config.min_confidence' src/web_research/integrator.rs
+          grep -F 'EdgeType::RelatedTo' src/web_research/integrator.rs
+          grep -F 'KnowledgeSource::Internal' src/web_research/integrator.rs
+
+      - name: Apply exact quarantine candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch=patches/security/res-sec-001b-web-research-admission-quarantine-v1.patch
+          git apply --check "$patch"
+          git apply "$patch"
+          git diff --check
+
+      - name: Ratchet candidate-only high-level research path
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('src/web_research/mod.rs').read_text()
+          start = text.index('pub async fn research(&mut self, query: &str)')
+          end = text.index('    /// Get current epistemic stats', start)
+          block = text[start:end]
+          assert 'self.researcher.research_and_verify(query).await?' in block
+          assert 'self.integrator.integrate' not in block
+          assert 'self.last_phi =' not in block
+          assert 'was_correct:' not in block
+          assert 'self.learner.record_outcome' not in block
+          assert 'automatic knowledge and meta-learning admission are quarantined' in block
+          assert 'Ok(result)' in block
+          print('candidate ratchet: research remains observable while internal knowledge/meta-learning admission is absent')
+          PY
+
+      - name: Preserve explicit legacy APIs without granting automatic authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'pub struct KnowledgeIntegrator' src/web_research/integrator.rs
+          grep -F 'pub fn record_outcome(&mut self, outcome: VerificationOutcome)' src/web_research/meta_learning.rs
+          echo 'Legacy explicit APIs remain available; this candidate removes only the automatic authority transition in EpistemicConsciousness::research().'
+
+      - name: Formatting
+        run: cargo +1.96.0 fmt --all -- --check
+
+      - name: Compile web research feature
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features web_research_module
+
+      - name: Focused construction regression
+        run: cargo +1.96.0 test --locked -p symthaea --lib web_research::tests::test_epistemic_consciousness_creation --features web_research_module
+
+      - name: Restore product tree and prove qualification-only subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout -- src/web_research/mod.rs
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Qualification statement
+        run: |
+          echo 'PASS establishes only that the exact high-level web-research candidate returns external research without automatic knowledge/Phi mutation or self-confidence-as-correctness learner updates.'
+          echo 'PASS does not establish source truth, semantic entailment, safe knowledge admission, calibrated confidence, independent outcome evidence, prompt-injection immunity, or safe autonomous OSINT.'
