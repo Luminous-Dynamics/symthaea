@@ -1,0 +1,81 @@
+name: Economics Core CI
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-economics/**'
+      - '.github/workflows/economics-core-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  harness-source:
+    name: harness / source-present
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify economics crate source exists
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f crates/domains/symthaea-economics/Cargo.toml
+          test -f crates/domains/symthaea-economics/src/lib.rs
+          test -f crates/domains/symthaea-economics/src/game.rs
+
+  harness-toolchain:
+    name: harness / rust-1.96-toolchain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Verify toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+  economics-core:
+    name: economics-core / ${{ matrix.phase }}
+    needs: [harness-source, harness-toolchain]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - phase: format
+            command: cargo fmt --manifest-path "$ECONOMICS_MANIFEST" -- --check
+          - phase: check
+            command: cargo check --manifest-path "$ECONOMICS_MANIFEST"
+          - phase: test
+            command: cargo test --manifest-path "$ECONOMICS_MANIFEST"
+          - phase: clippy
+            command: cargo clippy --manifest-path "$ECONOMICS_MANIFEST" --all-targets -- -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Copy economics crate outside monorepo workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          dst="$RUNNER_TEMP/symthaea-economics"
+          rm -rf "$dst"
+          cp -a crates/domains/symthaea-economics "$dst"
+          test -f "$dst/Cargo.toml"
+          echo "ECONOMICS_MANIFEST=$dst/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Run ${{ matrix.phase }}
+        shell: bash
+        run: ${{ matrix.command }}
