@@ -1,0 +1,266 @@
+name: ROB-DESIGN-001B0 Exact Parameters Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rob-design-001b0-exact-parameters.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rob-design-001b0-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE: symthaea-robot-design
+  QUALIFIED_001A: e005ef82174b818b2c682c2b1882955e1c11801f
+  QUALIFIED_001A_LIB_BLOB: cb1ba37bbe9ee270d65f0750d415e3eea0a98aaa
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-parameter-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Bind exact qualifier and source topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_head="$(git rev-parse HEAD)"
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected_parent="${{ github.event.pull_request.base.sha }}"
+          else
+            expected_parent="$(git rev-parse HEAD^)"
+          fi
+          echo "EXPECTED_PARENT=$expected_parent" >> "$GITHUB_ENV"
+          test "$actual_head" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          test "$(git rev-parse "$expected_parent^")" = "$QUALIFIED_001A"
+          test -z "$(git status --porcelain=v1)"
+
+          mapfile -t qualifier_actual < <(git diff --name-only "$expected_parent" HEAD | LC_ALL=C sort)
+          qualifier_expected=(".github/workflows/rob-design-001b0-exact-parameters.yml")
+          mapfile -t qualifier_expected < <(printf '%s\n' "${qualifier_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${qualifier_expected[@]}") <(printf '%s\n' "${qualifier_actual[@]}")
+
+          mapfile -t source_actual < <(git diff --name-only "$QUALIFIED_001A" "$expected_parent" | LC_ALL=C sort)
+          source_expected=(
+            "crates/domains/symthaea-robot-design/src/canonical.rs"
+            "crates/domains/symthaea-robot-design/src/exact_parameters.rs"
+            "crates/domains/symthaea-robot-design/src/lib.rs"
+          )
+          mapfile -t source_expected < <(printf '%s\n' "${source_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${source_expected[@]}") <(printf '%s\n' "${source_actual[@]}")
+          git diff --quiet "$QUALIFIED_001A" "$expected_parent" -- Cargo.toml Cargo.lock crates/domains/symthaea-robot-design/Cargo.toml
+
+      - name: Prove qualified 001A bytes are preserved
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent_blob="$(git rev-parse "$QUALIFIED_001A:crates/domains/symthaea-robot-design/src/lib.rs")"
+          preserved_blob="$(git rev-parse "$EXPECTED_PARENT:crates/domains/symthaea-robot-design/src/canonical.rs")"
+          test "$parent_blob" = "$QUALIFIED_001A_LIB_BLOB"
+          test "$preserved_blob" = "$QUALIFIED_001A_LIB_BLOB"
+          cmp \
+            <(git show "$QUALIFIED_001A:crates/domains/symthaea-robot-design/src/lib.rs") \
+            <(git show "$EXPECTED_PARENT:crates/domains/symthaea-robot-design/src/canonical.rs")
+
+      - name: Bind frozen source and workspace bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum Cargo.toml Cargo.lock crates/domains/symthaea-robot-design/Cargo.toml \
+            > "$RUNNER_TEMP/workspace-inputs.sha256"
+          find crates/domains/symthaea-robot-design -type f -print0 \
+            | LC_ALL=C sort -z \
+            | xargs -0 sha256sum > "$RUNNER_TEMP/robot-design-001b0-source.sha256"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Diagnose metadata and lock immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/rob-design-001b0-evidence"
+          mkdir -p "$evidence_dir"
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          set +e
+          cargo metadata --format-version 1 \
+            > "$evidence_dir/cargo-metadata.json" \
+            2> "$evidence_dir/cargo-metadata.stderr"
+          metadata_exit=$?
+          set -e
+          {
+            echo "metadata_exit=$metadata_exit"
+            echo "lock_before_sha256=$(sha256sum "$RUNNER_TEMP/Cargo.lock.before" | awk '{print $1}')"
+            echo "lock_after_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+          } > "$evidence_dir/lock-diagnostic.txt"
+          if ! cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; then
+            cp Cargo.lock "$evidence_dir/Cargo.lock.generated"
+            diff -u "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock > "$evidence_dir/Cargo.lock.diff" || true
+            echo "LOCK_RECONCILIATION_REQUIRED=true" >> "$GITHUB_ENV"
+          else
+            echo "LOCK_RECONCILIATION_REQUIRED=false" >> "$GITHUB_ENV"
+          fi
+          if [ "$metadata_exit" -ne 0 ]; then
+            echo "METADATA_DIAGNOSTIC_FAILED=true" >> "$GITHUB_ENV"
+          else
+            echo "METADATA_DIAGNOSTIC_FAILED=false" >> "$GITHUB_ENV"
+          fi
+          cp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Independent golden transcript harness
+        if: env.LOCK_RECONCILIATION_REQUIRED == 'false' && env.METADATA_DIAGNOSTIC_FAILED == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/rob-design-001b0-evidence"
+          python3 - <<'PY' | tee "$evidence_dir/independent-golden-reference.txt"
+          import hashlib
+
+          def put_str(out, value):
+              raw = value.encode("utf-8")
+              out += len(raw).to_bytes(8, "big")
+              out += raw
+
+          p = bytearray()
+          put_str(p, "symthaea.robot-design.exact-parameters.v1")
+          p += (1).to_bytes(4, "big")
+          params = [
+              ("link_length", 300_000),
+              ("section_height", 6_000),
+              ("section_width", 20_000),
+          ]
+          p += len(params).to_bytes(8, "big")
+          for name, value in params:
+              put_str(p, name)
+              p += bytes([0])
+              p += value.to_bytes(8, "big")
+
+          expected_p_hex = "000000000000002973796d74686165612e726f626f742d64657369676e2e65786163742d706172616d65746572732e7631000000010000000000000003000000000000000b6c696e6b5f6c656e6774680000000000000493e0000000000000000e73656374696f6e5f686569676874000000000000001770000000000000000d73656374696f6e5f7769647468000000000000004e20"
+          expected_p_sha = "7f8721c10bdd0cd351619750e94f2e41677be266cc5ba6701e95c4444f16ba9c"
+          assert p.hex() == expected_p_hex
+          assert hashlib.sha256(p).hexdigest() == expected_p_sha
+
+          d = bytearray()
+          put_str(d, "symthaea.robot-design.exact-length-domain.v1")
+          d += (1).to_bytes(4, "big")
+          put_str(d, "section_width")
+          d += bytes([1])
+          d += (5).to_bytes(4, "big")
+          d += bytes([0])
+          values = [16_000, 18_000, 20_000, 22_000, 24_000]
+          d += len(values).to_bytes(8, "big")
+          for value in values:
+              d += value.to_bytes(8, "big")
+
+          expected_d_hex = "000000000000002c73796d74686165612e726f626f742d64657369676e2e65786163742d6c656e6774682d646f6d61696e2e763100000001000000000000000d73656374696f6e5f776964746801000000050000000000000000050000000000003e8000000000000046500000000000004e2000000000000055f00000000000005dc0"
+          expected_d_sha = "62e6c2cd090bf1b954dbd1c74d93d594ef6734263e10f947303ede86406cd54f"
+          assert d.hex() == expected_d_hex
+          assert hashlib.sha256(d).hexdigest() == expected_d_sha
+
+          print("parameter_transcript_sha256=" + expected_p_sha)
+          print("domain_transcript_sha256=" + expected_d_sha)
+          print("independent_reference=PASS")
+          PY
+
+      - name: Rustfmt
+        if: env.LOCK_RECONCILIATION_REQUIRED == 'false' && env.METADATA_DIAGNOSTIC_FAILED == 'false'
+        run: cargo fmt --check -p "$PACKAGE"
+
+      - name: Locked compile
+        if: env.LOCK_RECONCILIATION_REQUIRED == 'false' && env.METADATA_DIAGNOSTIC_FAILED == 'false'
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Focused tests
+        if: env.LOCK_RECONCILIATION_REQUIRED == 'false' && env.METADATA_DIAGNOSTIC_FAILED == 'false'
+        run: cargo test -p "$PACKAGE" --locked -- --nocapture
+
+      - name: Strict Clippy
+        if: env.LOCK_RECONCILIATION_REQUIRED == 'false' && env.METADATA_DIAGNOSTIC_FAILED == 'false'
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Refuse qualification while lock reconciliation is required
+        if: env.LOCK_RECONCILIATION_REQUIRED == 'true'
+        run: |
+          echo "Cargo.lock changed under the exact frozen 001B0 source." >&2
+          exit 1
+
+      - name: Refuse qualification on metadata failure
+        if: env.METADATA_DIAGNOSTIC_FAILED == 'true'
+        run: |
+          echo "Cargo metadata failed for the exact frozen 001B0 source." >&2
+          exit 1
+
+      - name: Source postflight immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/Cargo.lock.before" ]; then
+            cp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
+          fi
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          sha256sum -c "$RUNNER_TEMP/workspace-inputs.sha256"
+          sha256sum -c "$RUNNER_TEMP/robot-design-001b0-source.sha256"
+
+      - name: Write evidence receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/rob-design-001b0-evidence"
+          mkdir -p "$evidence_dir"
+          {
+            echo "program=ROB-DESIGN-001B0"
+            echo "authority=exact-design-intent-parameter-source-qualification-only"
+            echo "qualified_001a_sha=$QUALIFIED_001A"
+            echo "source_subject_sha=$EXPECTED_PARENT"
+            echo "source_tree_sha=$(git rev-parse "$EXPECTED_PARENT^{tree}")"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "qualifier_tree_sha=$(git rev-parse HEAD^{tree})"
+            echo "rustc=$(rustc --version 2>/dev/null || echo unavailable)"
+            echo "cargo=$(cargo --version 2>/dev/null || echo unavailable)"
+            echo "lock_reconciliation_required=${LOCK_RECONCILIATION_REQUIRED:-UNKNOWN}"
+            echo "metadata_diagnostic_failed=${METADATA_DIAGNOSTIC_FAILED:-UNKNOWN}"
+            echo "job_status=${{ job.status }}"
+            echo "qualification_claim=SOURCE_ONLY"
+            echo "measurement_claim=NONE"
+            echo "fabrication_authority=NONE"
+            echo "physical_claim=NONE"
+            echo "actuation_authority=NONE"
+          } > "$evidence_dir/receipt.txt"
+          cp "$RUNNER_TEMP/workspace-inputs.sha256" "$evidence_dir/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/robot-design-001b0-source.sha256" "$evidence_dir/" 2>/dev/null || true
+          find "$evidence_dir" -type f ! -name sha256sums.txt -print0 \
+            | LC_ALL=C sort -z \
+            | xargs -0 sha256sum > "$evidence_dir/sha256sums.txt"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rob-design-001b0-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/rob-design-001b0-evidence/
+          if-no-files-found: error
+          retention-days: 90
