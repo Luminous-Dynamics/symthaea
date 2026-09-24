@@ -1,0 +1,137 @@
+name: ROB-DESIGN C0 Integrated Development Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rob-design-c0-integrated-dev.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rob-design-c0-integrated-dev-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  SOURCE_SHA: 30cdbc4b8e4ee69ff90b4ad7c79d4152cbd01130
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  integrated-development-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Bind exact source and workflow-only qualifier delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain=v1)"
+          mapfile -t actual < <(git diff --name-only "$SOURCE_SHA" HEAD | LC_ALL=C sort)
+          expected=(".github/workflows/rob-design-c0-integrated-dev.yml")
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Install Rust 1.96
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Exact-path rustfmt
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-robot-design/src/design_parameters.rs \
+            crates/domains/symthaea-robot-design/src/c0_joint_link_coupon.rs \
+            crates/domains/symthaea-robot-design/src/c0_normalized.rs \
+            crates/domains/symthaea-robot-design/src/c0_enumeration.rs \
+            crates/domains/symthaea-robot-design/src/c0_applicability.rs \
+            crates/domains/symthaea-robot-design/tests/design_parameters_dev.rs \
+            crates/domains/symthaea-robot-design/tests/c0_joint_link_coupon_dev.rs \
+            crates/domains/symthaea-robot-design/tests/c0_normalized_dev.rs \
+            crates/domains/symthaea-robot-design/tests/c0_enumeration_dev.rs \
+            crates/domains/symthaea-robot-design/tests/c0_applicability_dev.rs \
+            crates/domains/symthaea-robot-design/tests/c0_pipeline_dev.rs
+
+      - name: Locked focused integration tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p symthaea-robot-design --locked \
+            --test design_parameters_dev \
+            --test c0_joint_link_coupon_dev \
+            --test c0_normalized_dev \
+            --test c0_enumeration_dev \
+            --test c0_applicability_dev \
+            --test c0_pipeline_dev \
+            -- --nocapture
+
+      - name: Locked all-target compile
+        shell: bash
+        run: cargo check -p symthaea-robot-design --all-targets --locked
+
+      - name: Focused Clippy
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo clippy -p symthaea-robot-design --locked \
+            --test design_parameters_dev \
+            --test c0_joint_link_coupon_dev \
+            --test c0_normalized_dev \
+            --test c0_enumeration_dev \
+            --test c0_applicability_dev \
+            --test c0_pipeline_dev \
+            -- -D warnings -A dead-code
+
+      - name: Source immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD^)" = "$SOURCE_SHA"
+          git diff --quiet "$SOURCE_SHA" HEAD -- crates/domains/symthaea-robot-design Cargo.toml Cargo.lock
+
+      - name: Write development receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/rob-design-c0-integrated-dev-evidence"
+          mkdir -p "$evidence"
+          {
+            echo "program=ROB-DESIGN-C0-INTEGRATED-DEV"
+            echo "source_sha=$SOURCE_SHA"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "qualified_parent=e005ef82174b818b2c682c2b1882955e1c11801f"
+            echo "claim=DEVELOPMENT_ONLY"
+            echo "product_qualification=NONE"
+            echo "physical_claim=NONE"
+            echo "fabrication_authority=NONE"
+            echo "actuation_authority=NONE"
+            echo "job_status=${{ job.status }}"
+          } > "$evidence/receipt.txt"
+
+      - name: Upload development evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rob-design-c0-integrated-dev-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/rob-design-c0-integrated-dev-evidence/
+          if-no-files-found: error
+          retention-days: 30
