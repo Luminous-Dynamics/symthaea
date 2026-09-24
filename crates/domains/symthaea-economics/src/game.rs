@@ -257,9 +257,8 @@ impl Game2x2 {
     /// Swap players and strategy axes.
     pub fn transpose(self) -> Self {
         let mut transposed = [[(0.0, 0.0); 2]; 2];
-        for row in 0..2 {
-            for column in 0..2 {
-                let payoff = self.payoffs[row][column];
+        for (row, payoffs) in self.payoffs.iter().enumerate() {
+            for (column, &payoff) in payoffs.iter().enumerate() {
                 transposed[column][row] = (payoff.1, payoff.0);
             }
         }
