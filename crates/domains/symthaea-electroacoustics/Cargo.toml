@@ -5,6 +5,9 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Evidence-oriented electro-acoustic transducer models for Symthaea"
 
+[lib]
+path = "src/root.rs"
+
 [dependencies]
 serde = { workspace = true }
 thiserror = { workspace = true }
