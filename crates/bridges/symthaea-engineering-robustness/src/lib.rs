@@ -15,8 +15,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use symthaea_engineering_optimization::{
-    CandidateEvaluation, DesignCandidate, EvaluationStatus, FidelityClass, ObjectiveDirection,
-    OptimizationError, OptimizationProfile,
+    CandidateEvaluation, DesignCandidate, EvaluationStatus, ObjectiveDirection, OptimizationError,
+    OptimizationProfile,
 };
 use thiserror::Error;
 
@@ -88,7 +88,7 @@ impl Bounds {
 }
 
 /// Declared uncertainty model. Sampling is performed by an external backend.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum UncertaintyDistribution {
     BoundedUniform(Bounds),
     Normal {
@@ -466,8 +466,8 @@ impl RobustCampaignResult {
             complete_feasible_count: complete,
             complete_infeasible_count: infeasible,
             failed_censored_count: censored,
-            /// This is a scenario-classification fraction under the declared
-            /// model/evidence fidelity, not manufacturing yield evidence.
+            // Scenario classification under the declared model/evidence fidelity;
+            // this field is intentionally not named manufacturing yield.
             evaluated_feasibility_fraction,
             objective_summaries,
         })
@@ -676,6 +676,30 @@ mod tests {
 
     fn evaluation(id: &str, spl: f64, status: EvaluationStatus) -> CandidateEvaluation {
         let profile = profile();
+        let objectives = match &status {
+            EvaluationStatus::Failed { .. } => vec![],
+            _ => vec![ObjectiveObservation {
+                objective_id: "max_spl".into(),
+                value: spl,
+                unit: "dB".into(),
+                uncertainty: None,
+            }],
+        };
+        let constraints = match &status {
+            EvaluationStatus::Failed { .. } => vec![],
+            EvaluationStatus::Infeasible => vec![ConstraintObservation {
+                constraint_id: "temp".into(),
+                value: 190.0,
+                unit: "degC".into(),
+                satisfied: false,
+            }],
+            EvaluationStatus::Complete => vec![ConstraintObservation {
+                constraint_id: "temp".into(),
+                value: 130.0,
+                unit: "degC".into(),
+                satisfied: true,
+            }],
+        };
         CandidateEvaluation {
             candidate: candidate(),
             profile_digest: profile.digest().unwrap(),
@@ -683,30 +707,8 @@ mod tests {
                 solver_id: "solver-v1".into(),
             },
             evidence_ref: format!("solver-run:{id}"),
-            objectives: match status {
-                EvaluationStatus::Failed { .. } => vec![],
-                _ => vec![ObjectiveObservation {
-                    objective_id: "max_spl".into(),
-                    value: spl,
-                    unit: "dB".into(),
-                    uncertainty: None,
-                }],
-            },
-            constraints: match status {
-                EvaluationStatus::Failed { .. } => vec![],
-                EvaluationStatus::Infeasible => vec![ConstraintObservation {
-                    constraint_id: "temp".into(),
-                    value: 190.0,
-                    unit: "degC".into(),
-                    satisfied: false,
-                }],
-                EvaluationStatus::Complete => vec![ConstraintObservation {
-                    constraint_id: "temp".into(),
-                    value: 130.0,
-                    unit: "degC".into(),
-                    satisfied: true,
-                }],
-            },
+            objectives,
+            constraints,
             status,
         }
     }
