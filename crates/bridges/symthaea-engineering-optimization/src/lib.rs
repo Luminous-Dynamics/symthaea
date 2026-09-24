@@ -8,11 +8,9 @@
 //! backends may consume these types, but they may not erase the distinction
 //! between feasibility, objective values, uncertainty, or evaluation fidelity.
 //!
-//! In particular:
+//! `SurrogatePrediction != NumericalExecution != PhysicalMeasurement`.
 //!
-//! `SurrogatePrediction != NumericalExecution != PhysicalMeasurement`
-//!
-//! and a Pareto frontier is descriptive evidence, not automatic product-selection
+//! A Pareto frontier is descriptive evidence, not automatic product-selection
 //! authority.
 
 #![deny(unsafe_code)]
@@ -22,7 +20,6 @@ use std::collections::BTreeMap;
 use symthaea_sim_bridge::UncertaintyEstimate;
 use thiserror::Error;
 
-/// A variable domain admitted by an engineering design-space profile.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VariableDomain {
     Continuous { lower: f64, upper: f64 },
@@ -30,7 +27,6 @@ pub enum VariableDomain {
     Categorical { allowed: Vec<String> },
 }
 
-/// One named design variable.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesignVariable {
     pub id: String,
@@ -38,7 +34,6 @@ pub struct DesignVariable {
     pub domain: VariableDomain,
 }
 
-/// Exact value assigned to one design variable.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DesignValue {
     Continuous(f64),
@@ -46,29 +41,26 @@ pub enum DesignValue {
     Categorical(String),
 }
 
-/// One exact candidate assignment.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesignAssignment {
     pub variable_id: String,
     pub value: DesignValue,
 }
 
-/// Candidate identity plus the exact parameter set evaluated.
+/// Candidate plus the complete exact parameter set that identifies it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DesignCandidate {
     pub id: String,
-    /// Must be strictly ordered by `variable_id` and cover the complete profile.
+    /// Strictly ordered by `variable_id` and complete for the profile.
     pub assignments: Vec<DesignAssignment>,
 }
 
-/// Optimization direction for a named physical/engineering objective.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ObjectiveDirection {
     Minimize,
     Maximize,
 }
 
-/// One objective in a profile. There is intentionally no objective weight here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObjectiveSpec {
     pub id: String,
@@ -76,15 +68,13 @@ pub struct ObjectiveSpec {
     pub direction: ObjectiveDirection,
 }
 
-/// Hard-constraint admission rule.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum ConstraintRule {
     AtMost(f64),
     AtLeast(f64),
     BetweenInclusive { lower: f64, upper: f64 },
 }
 
-/// One hard feasibility constraint evaluated against a named metric.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HardConstraintSpec {
     pub id: String,
@@ -93,7 +83,7 @@ pub struct HardConstraintSpec {
     pub rule: ConstraintRule,
 }
 
-/// Complete objective/constraint/variable definition for one design campaign.
+/// Complete variable/objective/constraint definition for one campaign.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OptimizationProfile {
     pub id: String,
@@ -106,7 +96,6 @@ pub struct OptimizationProfile {
 }
 
 impl OptimizationProfile {
-    /// Validate canonical ordering, bounds, units, and IDs.
     pub fn validate(&self) -> Result<(), OptimizationError> {
         require_id("profile.id", &self.id)?;
         if self.variables.is_empty() {
@@ -115,7 +104,6 @@ impl OptimizationProfile {
         if self.objectives.is_empty() {
             return Err(OptimizationError::EmptyCollection("profile.objectives"));
         }
-
         ensure_strictly_ordered(
             "profile.variables",
             self.variables.iter().map(|value| value.id.as_str()),
@@ -131,7 +119,11 @@ impl OptimizationProfile {
 
         for variable in &self.variables {
             require_id("variable.id", &variable.id)?;
-            if variable.unit.as_ref().is_some_and(|unit| unit.trim().is_empty()) {
+            if variable
+                .unit
+                .as_ref()
+                .is_some_and(|unit| unit.trim().is_empty())
+            {
                 return Err(OptimizationError::EmptyIdentifier("variable.unit"));
             }
             validate_domain(&variable.domain)?;
@@ -144,22 +136,23 @@ impl OptimizationProfile {
             require_id("constraint.id", &constraint.id)?;
             require_id("constraint.metric_id", &constraint.metric_id)?;
             require_id("constraint.unit", &constraint.unit)?;
-            validate_constraint_rule(&constraint.rule)?;
+            validate_constraint_rule(constraint.rule)?;
         }
         Ok(())
     }
 
-    /// Stable digest over the complete canonical variable/objective/constraint profile.
-    ///
-    /// This is an identity aid, not a cryptographic proof that a solver behaved
-    /// correctly. Canonical ordering is required before the digest is admitted.
+    /// Stable digest over the complete canonical profile semantics.
     pub fn digest(&self) -> Result<String, OptimizationError> {
         self.validate()?;
         let mut material = String::new();
         push_field(&mut material, "profile", &self.id);
         for variable in &self.variables {
             push_field(&mut material, "var", &variable.id);
-            push_field(&mut material, "unit", variable.unit.as_deref().unwrap_or(""));
+            push_field(
+                &mut material,
+                "unit",
+                variable.unit.as_deref().unwrap_or(""),
+            );
             match &variable.domain {
                 VariableDomain::Continuous { lower, upper } => {
                     push_field(&mut material, "kind", "continuous");
@@ -216,7 +209,55 @@ impl OptimizationProfile {
     }
 }
 
-/// Evidence fidelity/authority class for one candidate evaluation.
+impl DesignCandidate {
+    pub fn validate(&self, profile: &OptimizationProfile) -> Result<(), OptimizationError> {
+        require_id("candidate.id", &self.id)?;
+        ensure_strictly_ordered(
+            "candidate.assignments",
+            self.assignments
+                .iter()
+                .map(|value| value.variable_id.as_str()),
+        )?;
+        if self.assignments.len() != profile.variables.len() {
+            return Err(OptimizationError::CandidateDoesNotCoverProfile);
+        }
+        for (assignment, variable) in self.assignments.iter().zip(&profile.variables) {
+            if assignment.variable_id != variable.id {
+                return Err(OptimizationError::CandidateDoesNotCoverProfile);
+            }
+            validate_assignment(assignment, variable)?;
+        }
+        Ok(())
+    }
+
+    /// Digest binds the human ID, exact assignments, and exact profile semantics.
+    pub fn digest(&self, profile: &OptimizationProfile) -> Result<String, OptimizationError> {
+        profile.validate()?;
+        self.validate(profile)?;
+        let mut material = String::new();
+        push_field(&mut material, "profile_digest", &profile.digest()?);
+        push_field(&mut material, "candidate", &self.id);
+        for assignment in &self.assignments {
+            push_field(&mut material, "variable", &assignment.variable_id);
+            match &assignment.value {
+                DesignValue::Continuous(value) => {
+                    push_field(&mut material, "kind", "continuous");
+                    push_f64(&mut material, "value", *value);
+                }
+                DesignValue::Discrete(value) => {
+                    push_field(&mut material, "kind", "discrete");
+                    push_field(&mut material, "value", &value.to_string());
+                }
+                DesignValue::Categorical(value) => {
+                    push_field(&mut material, "kind", "categorical");
+                    push_field(&mut material, "value", value);
+                }
+            }
+        }
+        Ok(blake3::hash(material.as_bytes()).to_hex().to_string())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationFidelity {
     Analytical { model_id: String },
@@ -254,7 +295,6 @@ impl EvaluationFidelity {
     }
 }
 
-/// One objective metric observation/prediction.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveObservation {
     pub objective_id: String,
@@ -263,7 +303,6 @@ pub struct ObjectiveObservation {
     pub uncertainty: Option<UncertaintyEstimate>,
 }
 
-/// One hard-constraint metric evaluation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ConstraintObservation {
     pub constraint_id: String,
@@ -272,14 +311,10 @@ pub struct ConstraintObservation {
     pub satisfied: bool,
 }
 
-/// Outcome state for one exact candidate evaluation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationStatus {
-    /// All hard constraints and all objectives were evaluated successfully.
     Complete,
-    /// At least one hard constraint failed under this fidelity/source.
     Infeasible,
-    /// The evaluator failed; no favorable defaults may be inferred.
     Failed { reason: String },
 }
 
@@ -302,19 +337,22 @@ impl CandidateEvaluation {
     pub fn validate(&self, profile: &OptimizationProfile) -> Result<(), OptimizationError> {
         profile.validate()?;
         self.candidate.validate(profile)?;
-        let expected_digest = profile.digest()?;
-        if self.profile_digest != expected_digest {
+        if self.profile_digest != profile.digest()? {
             return Err(OptimizationError::ProfileDigestMismatch);
         }
         self.fidelity.validate()?;
         require_id("evaluation.evidence_ref", &self.evidence_ref)?;
         ensure_strictly_ordered(
             "evaluation.objectives",
-            self.objectives.iter().map(|value| value.objective_id.as_str()),
+            self.objectives
+                .iter()
+                .map(|value| value.objective_id.as_str()),
         )?;
         ensure_strictly_ordered(
             "evaluation.constraints",
-            self.constraints.iter().map(|value| value.constraint_id.as_str()),
+            self.constraints
+                .iter()
+                .map(|value| value.constraint_id.as_str()),
         )?;
 
         let objective_specs: BTreeMap<_, _> = profile
@@ -325,7 +363,9 @@ impl CandidateEvaluation {
         for observation in &self.objectives {
             let spec = objective_specs
                 .get(observation.objective_id.as_str())
-                .ok_or_else(|| OptimizationError::UnknownObjective(observation.objective_id.clone()))?;
+                .ok_or_else(|| {
+                    OptimizationError::UnknownObjective(observation.objective_id.clone())
+                })?;
             validate_observed_scalar(
                 "objective.value",
                 observation.value,
@@ -343,7 +383,9 @@ impl CandidateEvaluation {
         for observation in &self.constraints {
             let spec = constraint_specs
                 .get(observation.constraint_id.as_str())
-                .ok_or_else(|| OptimizationError::UnknownConstraint(observation.constraint_id.clone()))?;
+                .ok_or_else(|| {
+                    OptimizationError::UnknownConstraint(observation.constraint_id.clone())
+                })?;
             validate_observed_scalar(
                 "constraint.value",
                 observation.value,
@@ -351,8 +393,7 @@ impl CandidateEvaluation {
                 &spec.unit,
                 None,
             )?;
-            let actual = constraint_satisfied(observation.value, &spec.rule);
-            if actual != observation.satisfied {
+            if constraint_satisfied(observation.value, spec.rule) != observation.satisfied {
                 return Err(OptimizationError::ConstraintSatisfactionMismatch {
                     constraint_id: observation.constraint_id.clone(),
                 });
@@ -372,7 +413,9 @@ impl CandidateEvaluation {
                 }
             }
             EvaluationStatus::Infeasible => {
-                if self.constraints.is_empty() || self.constraints.iter().all(|value| value.satisfied) {
+                if self.constraints.is_empty()
+                    || self.constraints.iter().all(|constraint| constraint.satisfied)
+                {
                     return Err(OptimizationError::InfeasibleWithoutFailedConstraint);
                 }
             }
@@ -389,27 +432,6 @@ impl CandidateEvaluation {
     }
 }
 
-impl DesignCandidate {
-    pub fn validate(&self, profile: &OptimizationProfile) -> Result<(), OptimizationError> {
-        require_id("candidate.id", &self.id)?;
-        ensure_strictly_ordered(
-            "candidate.assignments",
-            self.assignments.iter().map(|value| value.variable_id.as_str()),
-        )?;
-        if self.assignments.len() != profile.variables.len() {
-            return Err(OptimizationError::CandidateDoesNotCoverProfile);
-        }
-        for (assignment, variable) in self.assignments.iter().zip(&profile.variables) {
-            if assignment.variable_id != variable.id {
-                return Err(OptimizationError::CandidateDoesNotCoverProfile);
-            }
-            validate_assignment(assignment, variable)?;
-        }
-        Ok(())
-    }
-}
-
-/// Result of a pairwise Pareto comparison.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dominance {
     LeftDominates,
@@ -420,12 +442,8 @@ pub enum Dominance {
     Unqualified,
 }
 
-/// Compare two evaluations under the same optimization profile.
-///
-/// Cross-fidelity comparison is deliberately not promoted to Pareto dominance.
-/// Optimizers may use surrogate scores to choose *what to evaluate next*, but a
-/// surrogate candidate cannot become numerically/measured Pareto-superior solely
-/// by comparing unlike authority classes.
+/// Pairwise Pareto comparison. Unlike fidelity classes are deliberately not
+/// promoted into a single dominance relation.
 pub fn compare_dominance(
     left: &CandidateEvaluation,
     right: &CandidateEvaluation,
@@ -504,10 +522,7 @@ pub fn compare_dominance(
     })
 }
 
-/// Descriptive same-fidelity Pareto frontier indices.
-///
-/// Failed and infeasible evaluations are excluded. Mixing authority classes in
-/// one canonical frontier is rejected rather than silently blending them.
+/// Same-fidelity descriptive frontier. Failed/infeasible evaluations are excluded.
 pub fn pareto_frontier(
     evaluations: &[CandidateEvaluation],
     profile: &OptimizationProfile,
@@ -615,8 +630,8 @@ fn validate_assignment(
     Ok(())
 }
 
-fn validate_constraint_rule(rule: &ConstraintRule) -> Result<(), OptimizationError> {
-    match *rule {
+fn validate_constraint_rule(rule: ConstraintRule) -> Result<(), OptimizationError> {
+    match rule {
         ConstraintRule::AtMost(value) | ConstraintRule::AtLeast(value) => {
             if !value.is_finite() {
                 return Err(OptimizationError::NonFiniteBound);
@@ -631,8 +646,8 @@ fn validate_constraint_rule(rule: &ConstraintRule) -> Result<(), OptimizationErr
     Ok(())
 }
 
-fn constraint_satisfied(value: f64, rule: &ConstraintRule) -> bool {
-    match *rule {
+fn constraint_satisfied(value: f64, rule: ConstraintRule) -> bool {
+    match rule {
         ConstraintRule::AtMost(maximum) => value <= maximum,
         ConstraintRule::AtLeast(minimum) => value >= minimum,
         ConstraintRule::BetweenInclusive { lower, upper } => value >= lower && value <= upper,
@@ -863,6 +878,14 @@ mod tests {
         let mut b = a.clone();
         b.objectives[0].direction = ObjectiveDirection::Maximize;
         assert_ne!(a.digest().unwrap(), b.digest().unwrap());
+    }
+
+    #[test]
+    fn candidate_digest_binds_exact_assignment() {
+        let profile = profile();
+        let a = candidate("candidate-a", 0.02, 2);
+        let b = candidate("candidate-a", 0.03, 2);
+        assert_ne!(a.digest(&profile).unwrap(), b.digest(&profile).unwrap());
     }
 
     #[test]
