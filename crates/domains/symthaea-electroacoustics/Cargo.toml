@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-electroacoustics"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Evidence-oriented electro-acoustic transducer models for Symthaea"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
