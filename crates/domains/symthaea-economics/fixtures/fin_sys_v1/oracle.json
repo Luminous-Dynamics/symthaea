@@ -1,0 +1,135 @@
+{
+  "schema": "symthaea.fin-sys.synthetic-oracle.v1",
+  "profile_id": "minsky-cashflow-v1",
+  "visibility": "evaluator_only",
+  "fixtures": [
+    {
+      "fixture_id": "corp_cashflow_cover_001",
+      "expected_financing_regime": "HedgeFinanceCandidate",
+      "literal_fraud_predicate": "FalseByConstruction",
+      "construction_facts": {
+        "available_cash_flow": "260",
+        "interest_plus_principal_due": "200",
+        "coverage_surplus": "60"
+      },
+      "expected_fragility": {
+        "debt_stock": "High",
+        "debt_service_stress": "LowUnderFixture",
+        "refinancing_dependency": "NoneRequiredUnderFixture",
+        "productive_investment": "Positive"
+      },
+      "rationale": "Current cash flow covers both interest and principal due; debt stock alone must not drive the classification."
+    },
+    {
+      "fixture_id": "corp_refinance_gap_001",
+      "expected_financing_regime": "SpeculativeFinanceCandidate",
+      "literal_fraud_predicate": "FalseByConstruction",
+      "construction_facts": {
+        "available_cash_flow": "90",
+        "interest_due": "50",
+        "principal_due": "180",
+        "principal_refinancing_required": "140"
+      },
+      "expected_fragility": {
+        "debt_service_stress": "Moderate",
+        "refinancing_dependency": "Material",
+        "maturity_fragility": "Elevated"
+      },
+      "rationale": "Interest is serviceable from cash flow, but principal maturity cannot be met without refinancing."
+    },
+    {
+      "fixture_id": "corp_interest_shortfall_001",
+      "expected_financing_regime": "PonziFinanceCandidate",
+      "literal_fraud_predicate": "FalseByConstruction",
+      "construction_facts": {
+        "available_cash_flow": "18",
+        "interest_due": "42",
+        "interest_shortfall": "24",
+        "new_borrowing_for_interest": "24"
+      },
+      "expected_fragility": {
+        "debt_service_stress": "High",
+        "refinancing_dependency": "High",
+        "capitalized_interest_dependency": "Present"
+      },
+      "rationale": "The synthetic firm requires new borrowing/capitalization to cover interest; no deception/fraud is present."
+    },
+    {
+      "fixture_id": "household_missing_income_001",
+      "expected_financing_regime": "Indeterminate",
+      "literal_fraud_predicate": "NotAssessed",
+      "construction_facts": {
+        "missing_required_coordinate": "available_cash_flow"
+      },
+      "expected_fragility": {
+        "debt_stock": "Observed",
+        "debt_service_stress": "Indeterminate",
+        "refinancing_dependency": "NotEstablished"
+      },
+      "allowed_alternates": [],
+      "rationale": "Obligations without income/cash-flow evidence cannot support a Minsky cash-flow disposition."
+    },
+    {
+      "fixture_id": "sovereign_long_maturity_001",
+      "expected_financing_regime": "UnsupportedProfile",
+      "literal_fraud_predicate": "NotAssessed",
+      "construction_facts": {
+        "reason": "The firm/household minsky-cashflow-v1 profile is not valid for this sovereign subject without a sovereign-specific financing profile."
+      },
+      "expected_fragility": {
+        "debt_stock": "High",
+        "near_term_refinancing_need": "LowUnderFixture",
+        "maturity_fragility": "LowUnderFixture",
+        "foreign_currency_exposure": "LowUnderFixture"
+      },
+      "rationale": "Debt-to-GDP alone is insufficient and the selected subject/profile pair is unsupported."
+    },
+    {
+      "fixture_id": "scheme_payout_dependency_001",
+      "expected_financing_regime": "UnsupportedProfile",
+      "literal_fraud_predicate": "SyntheticLiteralPonziFraud",
+      "construction_facts": {
+        "verified_productive_asset_cash_flow": "0",
+        "payouts_depend_on_new_participant_inflows": "true",
+        "deceptive_return_claims_present": "true"
+      },
+      "expected_fragility": {
+        "new_participant_dependency": "Essential",
+        "productive_cashflow_support": "Absent"
+      },
+      "rationale": "Literal-fraud construction is an evaluator proposition separate from the Minsky debt-financing profile."
+    },
+    {
+      "fixture_id": "economy_sector_heterogeneity_001",
+      "expected_financing_regime": "MixedRegime",
+      "literal_fraud_predicate": "FalseByConstruction",
+      "construction_facts": {
+        "sector_a_regime": "HedgeFinanceCandidate",
+        "sector_b_regime": "SpeculativeFinanceCandidate",
+        "sector_c_regime": "PonziFinanceCandidate"
+      },
+      "expected_fragility": {
+        "aggregation_heterogeneity": "Material",
+        "single_regime_projection": "Forbidden"
+      },
+      "rationale": "The aggregate intentionally contains three different financing states; one homogeneous national label would erase evidence."
+    },
+    {
+      "fixture_id": "bank_liquidity_buffer_001",
+      "expected_financing_regime": "UnsupportedProfile",
+      "literal_fraud_predicate": "FalseByConstruction",
+      "construction_facts": {
+        "liquid_assets_minus_expected_outflows": "80",
+        "stable_funding_surplus": "70",
+        "equity_capital_positive": "true"
+      },
+      "expected_fragility": {
+        "liquidity_stress": "LowUnderBaselineFixture",
+        "maturity_transformation": "Present",
+        "automatic_pathology_inference": "Forbidden"
+      },
+      "rationale": "The firm/household Minsky profile is not the correct classifier for this bank and maturity transformation alone is not a pathology theorem."
+    }
+  ],
+  "claim_ceiling": "Oracle labels qualify only the frozen synthetic construction; they are not labels for real financial actors or systems."
+}
