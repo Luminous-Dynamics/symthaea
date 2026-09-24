@@ -19,14 +19,15 @@
 //! measurement evidence.
 
 use crate::{
-    ParameterSource, ScalarParameter, SuspensionParameter, TransducerModel, ValidationError,
+    ParameterSource, PhysicalUnit, ScalarParameter, SuspensionParameter, TransducerModel,
+    ValidationError,
 };
 use serde::{Deserialize, Serialize};
 use std::f64::consts::PI;
 use thiserror::Error;
 
 const MODEL_ID: &str = "moving-coil-lumped-small-signal-v1";
-const SINGULAR_EPSILON: f64 = 1.0e-30;
+const SINGULAR_MAGNITUDE_EPSILON: f64 = 1.0e-12;
 
 /// Authority attached to EAC-002 results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,10 +35,12 @@ pub enum PredictionAuthority {
     AnalyticalPrediction,
 }
 
-/// One source parameter consumed by an analytical derivation.
+/// Exact source parameter snapshot consumed by an analytical derivation.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InputSourceRef {
     pub field: String,
+    pub value: f64,
+    pub unit: PhysicalUnit,
     pub source: ParameterSource,
 }
 
@@ -81,10 +84,11 @@ impl ComplexValue {
     }
 
     fn checked_div(self, rhs: Self, quantity: &'static str) -> Result<Self, LinearModelError> {
-        let denominator = rhs.re * rhs.re + rhs.im * rhs.im;
-        if !denominator.is_finite() || denominator <= SINGULAR_EPSILON {
+        let magnitude = rhs.magnitude();
+        if !magnitude.is_finite() || magnitude <= SINGULAR_MAGNITUDE_EPSILON {
             return Err(LinearModelError::SingularComplexQuantity { quantity });
         }
+        let denominator = rhs.re * rhs.re + rhs.im * rhs.im;
         Ok(Self::new(
             (self.re * rhs.re + self.im * rhs.im) / denominator,
             (self.im * rhs.re - self.re * rhs.im) / denominator,
@@ -200,11 +204,17 @@ impl<'a> LinearReferenceModel<'a> {
             derivation: self.derivation(
                 "free-air-q-v1",
                 vec![
-                    source_ref("electrical.voice_coil_resistance", &self.transducer.electrical.voice_coil_resistance),
+                    source_ref(
+                        "electrical.voice_coil_resistance",
+                        &self.transducer.electrical.voice_coil_resistance,
+                    ),
                     source_ref("motor.force_factor", &self.transducer.motor.force_factor),
                     source_ref("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
                     suspension_source_ref(&self.transducer.mechanical.suspension),
-                    source_ref("mechanical.mechanical_resistance", &self.transducer.mechanical.mechanical_resistance),
+                    source_ref(
+                        "mechanical.mechanical_resistance",
+                        &self.transducer.mechanical.mechanical_resistance,
+                    ),
                 ],
                 vec![
                     "linear small-signal moving-coil model".into(),
@@ -250,10 +260,8 @@ impl<'a> LinearReferenceModel<'a> {
         let rms = self.transducer.mechanical.mechanical_resistance.value;
         let omega = 2.0 * PI * frequency_hz;
 
-        let mechanical_impedance = ComplexValue::new(
-            rms,
-            omega * mass - 1.0 / (omega * compliance),
-        );
+        let mechanical_impedance =
+            ComplexValue::new(rms, omega * mass - 1.0 / (omega * compliance));
         let motional_impedance = ComplexValue::new(bl * bl, 0.0)
             .checked_div(mechanical_impedance, "mechanical_impedance")?;
         let electrical_impedance = ComplexValue::new(re, omega * le);
@@ -263,10 +271,8 @@ impl<'a> LinearReferenceModel<'a> {
         let velocity = current
             .scale(bl)
             .checked_div(mechanical_impedance, "mechanical_impedance")?;
-        let displacement = velocity.checked_div(
-            ComplexValue::new(0.0, omega),
-            "angular_frequency",
-        )?;
+        let displacement = velocity
+            .checked_div(ComplexValue::new(0.0, omega), "angular_frequency")?;
 
         for (name, value) in [
             ("input_impedance_magnitude", input_impedance.magnitude()),
@@ -287,12 +293,18 @@ impl<'a> LinearReferenceModel<'a> {
             derivation: self.derivation(
                 "sinusoidal-terminal-response-v1",
                 vec![
-                    source_ref("electrical.voice_coil_resistance", &self.transducer.electrical.voice_coil_resistance),
+                    source_ref(
+                        "electrical.voice_coil_resistance",
+                        &self.transducer.electrical.voice_coil_resistance,
+                    ),
                     source_ref("electrical.voice_coil_inductance", inductance),
                     source_ref("motor.force_factor", &self.transducer.motor.force_factor),
                     source_ref("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
                     suspension_source_ref(&self.transducer.mechanical.suspension),
-                    source_ref("mechanical.mechanical_resistance", &self.transducer.mechanical.mechanical_resistance),
+                    source_ref(
+                        "mechanical.mechanical_resistance",
+                        &self.transducer.mechanical.mechanical_resistance,
+                    ),
                 ],
                 vec![
                     "linear small-signal moving-coil model".into(),
@@ -325,6 +337,8 @@ impl<'a> LinearReferenceModel<'a> {
 fn source_ref(field: &str, parameter: &ScalarParameter) -> InputSourceRef {
     InputSourceRef {
         field: field.into(),
+        value: parameter.value,
+        unit: parameter.unit,
         source: parameter.source.clone(),
     }
 }
@@ -366,7 +380,7 @@ pub enum LinearModelError {
     InvalidTerminalVoltage(f64),
     #[error("finite Q factors are undefined for a zero-loss mechanical model")]
     UndefinedFiniteQualityFactor,
-    #[error("cannot divide by singular {quantity}")]
+    #[error("cannot divide by singular or near-singular {quantity}")]
     SingularComplexQuantity { quantity: &'static str },
     #[error("derived {quantity} is invalid: {value}")]
     InvalidDerivedValue { quantity: &'static str, value: f64 },
@@ -393,7 +407,11 @@ mod tests {
             id: "linear-fixture-001".into(),
             electrical: ElectricalParameters {
                 voice_coil_resistance: q(6.0, PhysicalUnit::Ohm, "fixture-re"),
-                voice_coil_inductance: Some(q(0.0, PhysicalUnit::Henry, "explicit-zero-le")),
+                voice_coil_inductance: Some(q(
+                    0.0,
+                    PhysicalUnit::Henry,
+                    "explicit-zero-le",
+                )),
                 reference_temperature: q(20.0, PhysicalUnit::Celsius, "fixture-temp"),
                 max_voltage: None,
                 max_current: None,
@@ -441,6 +459,10 @@ mod tests {
             PredictionAuthority::AnalyticalPrediction
         );
         assert_eq!(fs.derivation.input_sources.len(), 2);
+        assert_eq!(
+            fs.derivation.input_sources[0].unit,
+            PhysicalUnit::Kilogram
+        );
     }
 
     #[test]
@@ -503,7 +525,7 @@ mod tests {
     }
 
     #[test]
-    fn singular_lossless_resonance_fails_response_closed() {
+    fn near_singular_lossless_resonance_fails_response_closed() {
         let mut fixture = fixture();
         fixture.mechanical.mechanical_resistance.value = 0.0;
         let model = LinearReferenceModel::new(&fixture).unwrap();
