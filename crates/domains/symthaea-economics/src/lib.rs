@@ -14,6 +14,7 @@ pub mod finance;
 pub mod game;
 pub mod inequality;
 pub mod market;
+pub mod stock_flow;
 
 pub use error::{EconomicsError, Result};
 pub use finance::{
@@ -29,6 +30,10 @@ pub use market::{
     Demand, Equilibrium, MarketSurplus, PriceOutcome, Supply, TaxedEquilibrium,
     arc_price_elasticity_of_demand, equilibrium, equilibrium_with_tax, market_at_price,
     market_surplus, price_elasticity_of_demand,
+};
+pub use stock_flow::{
+    ClosureProfile, ClosureReport, FinancialPositionTransition, IncomeFlowKind, IncomeTransfer,
+    InstrumentId, PositionId, RealCapitalCategory, RealCapitalFormation, SectorId, StockFlowSystem,
 };
 
 #[cfg(test)]
