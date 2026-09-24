@@ -3,15 +3,16 @@
 //! ngspice adapter boundary.
 //!
 //! ENG-SPICE-001 admits a deliberately narrow real-solver path: an explicit
-//! configured netlist is executed in ngspice batch mode and requested scalar
-//! `.measure` results are parsed from a dedicated log artifact. Arbitrary circuit
-//! topology is **not** inferred from `SimulationRequest` scalar parameters.
+//! configured, self-contained netlist is executed in ngspice batch mode and
+//! requested scalar `.measure` results are parsed from a dedicated log artifact.
+//! Arbitrary circuit topology is **not** inferred from `SimulationRequest`
+//! scalar parameters.
 
 #![deny(unsafe_code)]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use symthaea_sim_bridge::{
     CommandSolver, EngineeringDomain, ExecutionMode, SimulationBackend, SimulationError,
@@ -98,6 +99,13 @@ impl NgspiceBridge {
                 "ngspice netlist artifact cannot be empty".into(),
             ));
         }
+        let netlist_text = std::str::from_utf8(&netlist_bytes).map_err(|error| {
+            SimulationError::InvalidRequest(format!(
+                "qualified ngspice netlist must be UTF-8 text: {error}"
+            ))
+        })?;
+        validate_qualified_netlist(netlist_text, &requested)?;
+
         let input_digest = blake3::hash(&netlist_bytes).to_hex().to_string();
         let solver_version = self.solver_version()?;
         let log_path = temporary_log_path(&input_digest);
@@ -111,8 +119,7 @@ impl NgspiceBridge {
             .arg(log_path.to_string_lossy().to_string())
             .arg(self.netlist_path.to_string_lossy().to_string());
 
-        let execution = command.execute();
-        if let Err(error) = execution {
+        if let Err(error) = command.execute() {
             let _ = fs::remove_file(&log_path);
             return Err(error);
         }
@@ -244,6 +251,69 @@ fn normalize_metric(metric: &str) -> String {
     metric.trim().to_ascii_lowercase()
 }
 
+/// Restrict the first qualified execution lane to declarative self-contained
+/// netlists. Includes/libraries and the interactive control language need a
+/// later explicit trusted-artifact/authority design rather than implicit file or
+/// process authority.
+fn validate_qualified_netlist(
+    netlist: &str,
+    requested: &BTreeMap<String, String>,
+) -> Result<(), SimulationError> {
+    let forbidden = [
+        ".control", ".endc", ".include", ".inc", ".lib", "source", "load", "shell",
+    ];
+    let mut measures = BTreeSet::new();
+    let mut has_tabulated_output = false;
+
+    for raw_line in netlist.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('*') {
+            continue;
+        }
+        let lower = line.to_ascii_lowercase();
+        let tokens: Vec<_> = lower.split_whitespace().collect();
+        let Some(first) = tokens.first().copied() else {
+            continue;
+        };
+        if forbidden.contains(&first) {
+            return Err(SimulationError::InvalidRequest(format!(
+                "qualified ngspice netlist uses forbidden directive/command {first:?}; first tranche permits only self-contained declarative netlists"
+            )));
+        }
+        if first == ".print" || first == ".plot" {
+            has_tabulated_output = true;
+        }
+        if first == ".measure" || first == ".meas" {
+            if tokens.len() < 3 {
+                return Err(SimulationError::InvalidRequest(
+                    "ngspice .measure line is missing analysis/name fields".into(),
+                ));
+            }
+            let name = normalize_metric(tokens[2]);
+            if !measures.insert(name.clone()) {
+                return Err(SimulationError::InvalidRequest(format!(
+                    "ngspice netlist declares duplicate .measure name {name:?}"
+                )));
+            }
+        }
+    }
+
+    if !has_tabulated_output {
+        return Err(SimulationError::InvalidRequest(
+            "qualified ngspice batch netlist requires a .print or .plot directive so .measure data remains available without a rawfile"
+                .into(),
+        ));
+    }
+    for normalized in requested.keys() {
+        if !measures.contains(normalized) {
+            return Err(SimulationError::InvalidRequest(format!(
+                "requested metric {normalized:?} is not declared by a .measure/.meas statement in the bound netlist"
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Parse scalar `.measure` output lines of the form `name = value ...`.
 fn parse_measurements(
     log: &str,
@@ -344,6 +414,10 @@ mod tests {
         request
     }
 
+    fn safe_netlist() -> &'static str {
+        "* fixture\nV1 in 0 1\nR1 in out 1k\nR2 out 0 1k\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n"
+    }
+
     #[test]
     fn dry_run_returns_non_external_fixture_metrics() {
         let backend = NgspiceBridge::dry_run();
@@ -351,6 +425,35 @@ mod tests {
         assert!(result.converged);
         assert_eq!(result.evidence.mode, ExecutionMode::DryRun);
         assert!(!result.is_engineering_evidence());
+    }
+
+    #[test]
+    fn qualified_netlist_binds_requested_measure() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        assert!(validate_qualified_netlist(safe_netlist(), &requested).is_ok());
+    }
+
+    #[test]
+    fn control_language_is_rejected_from_first_qualified_lane() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        let netlist = ".control\nshell echo nope\n.endc\n.measure tran vmax MAX v(out)\n.print tran v(out)\n";
+        assert!(matches!(
+            validate_qualified_netlist(netlist, &requested),
+            Err(SimulationError::InvalidRequest(message)) if message.contains("forbidden")
+        ));
+    }
+
+    #[test]
+    fn includes_are_rejected_until_artifact_graph_is_explicit() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        let netlist = ".include vendor.lib\n.measure tran vmax MAX v(out)\n.print tran v(out)\n";
+        assert!(validate_qualified_netlist(netlist, &requested).is_err());
+    }
+
+    #[test]
+    fn missing_measure_declaration_fails_before_execution() {
+        let requested = canonical_requested_metrics(&request(&["missing"])).unwrap();
+        assert!(validate_qualified_netlist(safe_netlist(), &requested).is_err());
     }
 
     #[test]
@@ -420,7 +523,8 @@ mod tests {
 
     #[test]
     fn explicit_netlist_path_is_preserved() {
-        let bridge = NgspiceBridge::default().with_netlist_path(Path::new("fixture.cir"));
+        let bridge = NgspiceBridge::default()
+            .with_netlist_path(std::path::Path::new("fixture.cir"));
         assert_eq!(bridge.netlist_path, PathBuf::from("fixture.cir"));
     }
 }
