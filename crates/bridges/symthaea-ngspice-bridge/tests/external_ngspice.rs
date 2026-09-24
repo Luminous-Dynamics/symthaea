@@ -58,3 +58,23 @@ fn rc_one_time_constant_matches_closed_form_reference() {
     assert!(result.is_engineering_evidence());
     assert!((result.metrics[0].value - expected).abs() < 2e-3);
 }
+
+#[test]
+#[ignore = "requires a real ngspice executable"]
+fn series_rlc_peak_current_matches_resonant_reference() {
+    let bridge = NgspiceBridge::default()
+        .with_netlist_path(fixture("series_rlc_ac.cir"))
+        .with_metric_unit("i_peak", "A");
+    let mut request = SimulationRequest::new(
+        "rlc-external",
+        EngineeringDomain::Electrical,
+        SolverKind::Circuit,
+        "qualify the resonant current of a 10 ohm / 10 mH / 1 uF series RLC",
+    );
+    request.requested_metrics = vec!["i_peak".into()];
+
+    let result = bridge.run(&request).unwrap();
+    // At series resonance the ideal reactive terms cancel and |I| = 1 V / 10 ohm.
+    assert!(result.is_engineering_evidence());
+    assert!((result.metrics[0].value - 0.1).abs() < 2e-3);
+}
