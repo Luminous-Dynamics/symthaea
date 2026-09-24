@@ -12,5 +12,6 @@ keywords = ["ngspice", "spice", "circuit", "electronics", "simulation"]
 categories = ["simulation", "science"]
 
 [dependencies]
+blake3 = { workspace = true }
 symthaea-sim-bridge = { path = "../symthaea-sim-bridge" }
 
