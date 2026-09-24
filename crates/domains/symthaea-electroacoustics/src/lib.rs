@@ -63,8 +63,8 @@ pub struct ParameterSource {
     pub kind: ParameterSourceKind,
     /// Human/audit-readable source identity. Must never be empty.
     pub provenance: String,
-    /// Addressable source evidence where available (receipt, measurement run,
-    /// solver artifact, datasheet digest, etc.).
+    /// Addressable source evidence where required (measurement run, numerical
+    /// solver receipt/artifact, fitted-data lineage, etc.).
     pub evidence_ref: Option<String>,
     /// Method identity for derived/fitted values.
     pub method: Option<String>,
@@ -95,9 +95,13 @@ impl ParameterSource {
             return Err(ValidationError::MissingProvenance);
         }
 
+        // Numerical values must remain traceable to the exact solver/result
+        // lineage just as physical values remain traceable to measurement.
         if matches!(
             self.kind,
-            ParameterSourceKind::Measured | ParameterSourceKind::FittedFromMeasurement
+            ParameterSourceKind::NumericalDerived
+                | ParameterSourceKind::Measured
+                | ParameterSourceKind::FittedFromMeasurement
         ) && self
             .evidence_ref
             .as_ref()
@@ -533,6 +537,12 @@ mod tests {
             .with_evidence_ref(format!("measurement:{name}"))
     }
 
+    fn fitted(name: &str) -> ParameterSource {
+        ParameterSource::new(ParameterSourceKind::FittedFromMeasurement, name)
+            .with_evidence_ref(format!("measurement:{name}"))
+            .with_method("small-signal-fit-v1")
+    }
+
     fn q(value: f64, unit: PhysicalUnit, source: ParameterSource) -> ScalarParameter {
         ScalarParameter::new(value, unit, source)
     }
@@ -568,7 +578,7 @@ mod tests {
                 force_factor: q(
                     6.7,
                     PhysicalUnit::TeslaMeter,
-                    measured("small-signal-fit"),
+                    fitted("small-signal-force-factor-fit"),
                 ),
                 max_linear_excursion: Some(q(
                     0.006,
@@ -586,12 +596,12 @@ mod tests {
                 suspension: SuspensionParameter::Compliance(q(
                     0.0007,
                     PhysicalUnit::MeterPerNewton,
-                    measured("compliance-fit"),
+                    fitted("compliance-fit"),
                 )),
                 mechanical_resistance: q(
                     1.2,
                     PhysicalUnit::NewtonSecondPerMeter,
-                    measured("mechanical-resistance-fit"),
+                    fitted("mechanical-resistance-fit"),
                 ),
                 max_mechanical_excursion: Some(q(
                     0.009,
@@ -649,6 +659,23 @@ mod tests {
                 ParameterSourceKind::Measured
             ))
         ));
+    }
+
+    #[test]
+    fn numerical_derived_requires_evidence_and_method() {
+        let source = ParameterSource::new(ParameterSourceKind::NumericalDerived, "fem-run")
+            .with_method("elmer-magnetostatic-v1");
+        assert!(matches!(
+            source.validate(),
+            Err(ValidationError::MissingEvidenceReference(
+                ParameterSourceKind::NumericalDerived
+            ))
+        ));
+
+        source
+            .with_evidence_ref("solver:elmer-run-001")
+            .validate()
+            .unwrap();
     }
 
     #[test]
