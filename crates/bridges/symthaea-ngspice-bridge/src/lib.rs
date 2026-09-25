@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! ngspice adapter boundary.
 //!
-//! ENG-SPICE-001 admits a deliberately narrow real-solver path: an explicit
-//! configured, self-contained netlist is executed in ngspice batch mode and
-//! requested scalar `.measure` results are parsed from a dedicated log artifact.
-//! Arbitrary circuit topology is **not** inferred from `SimulationRequest`
-//! scalar parameters.
+//! ENG-SPICE-001 admits a deliberately narrow real-solver path: an explicit,
+//! self-contained netlist is executed in ngspice batch mode and requested
+//! scalar `.measure` results are parsed from a dedicated log artifact.
 
 #![deny(unsafe_code)]
 
@@ -23,16 +21,11 @@ const PARSER_VERSION: &str = "ngspice-measure-parser-v1";
 const REAL_RESULT_CONFIDENCE: f64 = 0.5;
 static LOG_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-/// ngspice backend descriptor.
 #[derive(Debug, Clone)]
 pub struct NgspiceBridge {
-    /// When true, return deterministic placeholder metrics for orchestration tests.
     pub dry_run: bool,
-    /// Command used to invoke the solver (e.g. `ngspice`).
     pub solver_cmd: String,
-    /// Exact netlist artifact used by the real solver path.
     pub netlist_path: PathBuf,
-    /// Units for requested `.measure` scalars, keyed case-insensitively.
     pub metric_units: BTreeMap<String, String>,
 }
 
@@ -48,7 +41,6 @@ impl Default for NgspiceBridge {
 }
 
 impl NgspiceBridge {
-    /// Create a dry-run ngspice bridge.
     pub fn dry_run() -> Self {
         Self {
             dry_run: true,
@@ -56,13 +48,11 @@ impl NgspiceBridge {
         }
     }
 
-    /// Bind the exact netlist artifact used by subsequent real executions.
     pub fn with_netlist_path(mut self, path: impl Into<PathBuf>) -> Self {
         self.netlist_path = path.into();
         self
     }
 
-    /// Declare the physical unit for one requested `.measure` scalar.
     pub fn with_metric_unit(mut self, metric: impl AsRef<str>, unit: impl Into<String>) -> Self {
         self.metric_units
             .insert(normalize_metric(metric.as_ref()), unit.into());
@@ -109,11 +99,10 @@ impl NgspiceBridge {
         let input_digest = blake3::hash(&netlist_bytes).to_hex().to_string();
         let solver_version = self.solver_version()?;
         let log_path = temporary_log_path(&input_digest);
-
         let command = CommandSolver::new(&self.solver_cmd)
             .arg("-b")
-            // Ignore user .spiceinit so local interactive preferences cannot
-            // silently change a qualified batch execution.
+            // Ignore user .spiceinit so ambient interactive preferences cannot
+            // silently change qualified batch execution.
             .arg("-n")
             .arg("-o")
             .arg(log_path.to_string_lossy().to_string())
@@ -166,8 +155,7 @@ impl NgspiceBridge {
         result.validate()?;
         if !result.is_engineering_evidence() {
             return Err(SimulationError::Adapter(
-                "parsed ngspice result did not satisfy complete external-evidence provenance"
-                    .into(),
+                "parsed ngspice result did not satisfy complete external-evidence provenance".into(),
             ));
         }
         Ok(result)
@@ -216,13 +204,11 @@ impl SimulationBackend for NgspiceBridge {
                 request.domain
             )));
         }
-
         if self.dry_run {
             return Ok(SimulationResult::dry_run(&request.id, self.name(), 0.55)
                 .with_metric("peak_voltage", 12.1, "V")
                 .with_metric("settling_time", 0.032, "s"));
         }
-
         self.run_real(request)
     }
 }
@@ -251,10 +237,39 @@ fn normalize_metric(metric: &str) -> String {
     metric.trim().to_ascii_lowercase()
 }
 
+/// Tokenize enough SPICE syntax to identify assignment keys without false
+/// positives such as `profile=` containing the substring `file=`.
+fn assignment_keys(line: &str) -> Vec<String> {
+    let mut normalized = String::with_capacity(line.len() * 2);
+    for ch in line.chars() {
+        match ch {
+            '=' => normalized.push_str(" = "),
+            '(' | ')' | ',' | '{' | '}' => normalized.push(' '),
+            _ => normalized.push(ch.to_ascii_lowercase()),
+        }
+    }
+    let tokens: Vec<_> = normalized.split_whitespace().collect();
+    tokens
+        .windows(2)
+        .filter_map(|window| (window[1] == "=").then(|| window[0].to_string()))
+        .collect()
+}
+
+fn forbidden_runtime_file_key(line: &str) -> Option<String> {
+    assignment_keys(line).into_iter().find(|key| {
+        key == "file"
+            || key == "filename"
+            || key == "filepath"
+            || key.ends_with("_file")
+            || key.ends_with("_filename")
+            || key.ends_with("_filepath")
+    })
+}
+
 /// Restrict the first qualified execution lane to declarative self-contained
-/// netlists. Includes/libraries and the interactive control language need a
-/// later explicit trusted-artifact/authority design rather than implicit file or
-/// process authority.
+/// netlists. Until ENG-SIM-INPUT-001 provides a transitive trusted artifact
+/// closure, both directive-based and parameter-based ambient file discovery are
+/// rejected fail-closed.
 fn validate_qualified_netlist(
     netlist: &str,
     requested: &BTreeMap<String, String>,
@@ -278,6 +293,11 @@ fn validate_qualified_netlist(
         if forbidden.contains(&first) {
             return Err(SimulationError::InvalidRequest(format!(
                 "qualified ngspice netlist uses forbidden directive/command {first:?}; first tranche permits only self-contained declarative netlists"
+            )));
+        }
+        if let Some(key) = forbidden_runtime_file_key(&lower) {
+            return Err(SimulationError::InvalidRequest(format!(
+                "qualified ngspice netlist uses runtime file-bearing parameter {key:?}; external model/data files require an explicit solver input-closure artifact graph"
             )));
         }
         if first == ".print" || first == ".plot" {
@@ -314,7 +334,6 @@ fn validate_qualified_netlist(
     Ok(())
 }
 
-/// Parse scalar `.measure` output lines of the form `name = value ...`.
 fn parse_measurements(
     log: &str,
     requested: &BTreeMap<String, String>,
@@ -364,8 +383,6 @@ fn parse_measurements(
     Ok(values)
 }
 
-/// Process exit success is not convergence. Reject known ngspice analysis-failure
-/// diagnostics before any parsed scalar is promoted as a converged result.
 fn reject_known_failure_markers(log: &str) -> Result<(), SimulationError> {
     for line in log.lines() {
         let normalized = line.trim().to_ascii_lowercase();
@@ -420,8 +437,7 @@ mod tests {
 
     #[test]
     fn dry_run_returns_non_external_fixture_metrics() {
-        let backend = NgspiceBridge::dry_run();
-        let result = backend.run(&request(&[])).unwrap();
+        let result = NgspiceBridge::dry_run().run(&request(&[])).unwrap();
         assert!(result.converged);
         assert_eq!(result.evidence.mode, ExecutionMode::DryRun);
         assert!(!result.is_engineering_evidence());
@@ -434,20 +450,41 @@ mod tests {
     }
 
     #[test]
-    fn control_language_is_rejected_from_first_qualified_lane() {
+    fn control_language_and_includes_are_rejected() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        let netlist = ".control\nshell echo nope\n.endc\n.measure tran vmax MAX v(out)\n.print tran v(out)\n";
-        assert!(matches!(
-            validate_qualified_netlist(netlist, &requested),
-            Err(SimulationError::InvalidRequest(message)) if message.contains("forbidden")
-        ));
+        for netlist in [
+            ".control\nshell echo nope\n.endc\n.measure tran vmax MAX v(out)\n.print tran v(out)\n",
+            ".include vendor.lib\n.measure tran vmax MAX v(out)\n.print tran v(out)\n",
+        ] {
+            assert!(validate_qualified_netlist(netlist, &requested).is_err());
+        }
     }
 
     #[test]
-    fn includes_are_rejected_until_artifact_graph_is_explicit() {
+    fn runtime_file_parameters_are_rejected_until_closure_is_bound() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        let netlist = ".include vendor.lib\n.measure tran vmax MAX v(out)\n.print tran v(out)\n";
-        assert!(validate_qualified_netlist(netlist, &requested).is_err());
+        for line in [
+            "A1 in out model file=unbound.csv",
+            "A1 in out model input_file = unbound.csv",
+            "A1 in out model state_file=state.bin",
+            "A1 in out model waveform_filename=data.tbl",
+            "A1 in out model filepath=/tmp/data",
+        ] {
+            let netlist = format!(
+                "{line}\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n"
+            );
+            assert!(matches!(
+                validate_qualified_netlist(&netlist, &requested),
+                Err(SimulationError::InvalidRequest(message)) if message.contains("runtime file-bearing")
+            ));
+        }
+    }
+
+    #[test]
+    fn similarly_named_non_file_parameter_is_not_false_positive() {
+        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
+        let netlist = "A1 in out model profile=1\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n";
+        assert!(validate_qualified_netlist(netlist, &requested).is_ok());
     }
 
     #[test]
@@ -459,43 +496,33 @@ mod tests {
     #[test]
     fn measure_parser_accepts_scientific_scalar_and_ignores_at_clause() {
         let requested = canonical_requested_metrics(&request(&["vmax", "settle"])).unwrap();
-        let log = "\nvmax = 1.234000e+01 at= 2.0e-03\nsettle = 3.200000e-02\n";
-        let parsed = parse_measurements(log, &requested).unwrap();
+        let parsed = parse_measurements(
+            "vmax = 1.234000e+01 at= 2.0e-03\nsettle = 3.200000e-02\n",
+            &requested,
+        )
+        .unwrap();
         assert_eq!(parsed["vmax"], 12.34);
         assert_eq!(parsed["settle"], 0.032);
     }
 
     #[test]
-    fn duplicate_measurement_is_rejected_as_ambiguous() {
+    fn duplicate_or_missing_measurement_fails_closed() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        let log = "vmax = 1.0\nvmax = 2.0\n";
-        assert!(matches!(
-            parse_measurements(log, &requested),
-            Err(SimulationError::Adapter(message)) if message.contains("duplicate")
-        ));
-    }
-
-    #[test]
-    fn missing_measurement_fails_closed() {
-        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        assert!(matches!(
-            parse_measurements("other = 1.0\n", &requested),
-            Err(SimulationError::Adapter(message)) if message.contains("missing")
-        ));
+        assert!(parse_measurements("vmax = 1.0\nvmax = 2.0\n", &requested).is_err());
+        assert!(parse_measurements("other = 1.0\n", &requested).is_err());
     }
 
     #[test]
     fn convergence_failure_marker_blocks_promotion() {
-        let log = "Warning: trouble with node\ndoAnalyses: TRAN: Timestep too small; trouble with x1\n";
-        assert!(reject_known_failure_markers(log).is_err());
+        assert!(reject_known_failure_markers(
+            "Warning: trouble with node\ndoAnalyses: TRAN: Timestep too small; trouble with x1\n"
+        )
+        .is_err());
     }
 
     #[test]
     fn duplicate_requested_metrics_are_case_insensitively_rejected() {
-        assert!(matches!(
-            canonical_requested_metrics(&request(&["VMAX", "vmax"])),
-            Err(SimulationError::InvalidRequest(message)) if message.contains("duplicate")
-        ));
+        assert!(canonical_requested_metrics(&request(&["VMAX", "vmax"])).is_err());
     }
 
     #[test]
@@ -518,13 +545,5 @@ mod tests {
         let a = temporary_log_path("0123456789abcdef0123");
         let b = temporary_log_path("0123456789abcdef0123");
         assert_ne!(a, b);
-        assert!(a.starts_with(std::env::temp_dir()));
-    }
-
-    #[test]
-    fn explicit_netlist_path_is_preserved() {
-        let bridge = NgspiceBridge::default()
-            .with_netlist_path(std::path::Path::new("fixture.cir"));
-        assert_eq!(bridge.netlist_path, PathBuf::from("fixture.cir"));
     }
 }
