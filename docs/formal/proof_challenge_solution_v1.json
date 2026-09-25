@@ -1,0 +1,59 @@
+{
+  "schema": "symthaea.formal-verification.proof-challenge-solution.v1",
+  "tracking_issue": 5779,
+  "authority": "TrustTopologyMetadataOnly",
+  "parent_contract": "symthaea.formal-verification.proof-observability.v1",
+  "checker_profiles": [
+    "ProducerOnly",
+    "ChallengeComparator",
+    "KernelReplay",
+    "IndependentCertificate"
+  ],
+  "required_nonclaims": [
+    "kernel replay != theorem-intent correctness",
+    "challenge/solution agreement != source refinement",
+    "independent certificate check != runtime authority",
+    "multiple checkers != elimination of shared assumptions"
+  ],
+  "synthetic_challenge": {
+    "id": "SYN-CHALLENGE-001",
+    "obligation_id": "SYN-AUTH-001",
+    "human_claim": "For every natural n, P n.",
+    "formal_statement": "forall n : Nat, P n",
+    "statement_sha256": "c05631ffc1823974d1425bfb92aa9f1985e6d7dca8f6d045f578460fceb40762",
+    "permitted_axioms": [],
+    "trust_roots": ["Lean4 kernel"],
+    "subject_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "evidence_class": "AbstractFormalTheorem",
+    "coverage_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+    "required_negative_controls": ["statement mutation", "axiom injection"],
+    "claim_ceiling": ["does not establish Rust refinement", "does not establish runtime authority"],
+    "checker_profile": "KernelReplay"
+  },
+  "synthetic_challenge_sha256": "70d9ae182e1acd51e9339a220b9aa73892d17a035b1a006a2ea1b0323d0eb9a1",
+  "synthetic_solution": {
+    "id": "SYN-SOLUTION-001",
+    "challenge_sha256": "70d9ae182e1acd51e9339a220b9aa73892d17a035b1a006a2ea1b0323d0eb9a1",
+    "presented_human_claim": "For every natural n, P n.",
+    "producer_toolchain": "synthetic-lean-producer-v1",
+    "artifact_digests": [
+      "3333333333333333333333333333333333333333333333333333333333333333"
+    ],
+    "checker_receipts": [
+      {
+        "profile": "ChallengeComparator",
+        "checker_identity": "synthetic-comparator-v1",
+        "problem_sha256": "70d9ae182e1acd51e9339a220b9aa73892d17a035b1a006a2ea1b0323d0eb9a1",
+        "result": "PASS"
+      },
+      {
+        "profile": "KernelReplay",
+        "checker_identity": "synthetic-kernel-v1",
+        "problem_sha256": "70d9ae182e1acd51e9339a220b9aa73892d17a035b1a006a2ea1b0323d0eb9a1",
+        "result": "PASS"
+      }
+    ],
+    "producer_warnings": [],
+    "result": "PASS"
+  }
+}
