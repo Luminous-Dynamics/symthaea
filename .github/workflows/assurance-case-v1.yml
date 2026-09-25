@@ -1,0 +1,85 @@
+name: Assurance Case v1
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/ASSURANCE_CASE_V1.md"
+      - "docs/formal/assurance_case_v1.json"
+      - "docs/formal/PROOF_CHALLENGE_SOLUTION_V1.md"
+      - "docs/formal/proof_challenge_solution_v1.json"
+      - "scripts/validate_assurance_case_v1.py"
+      - "scripts/validate_proof_challenge_solution_v1.py"
+      - ".github/workflows/assurance-case-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: assurance-case-v1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Record exact subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "HEAD=$(git rev-parse HEAD)"
+          echo "TREE=$(git rev-parse HEAD^{tree})"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+          test -z "$(git status --porcelain)"
+
+      - name: Revalidate proof review chain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_proof_review_capsule_v1.py | tee /tmp/proof-review-capsule-v1.txt
+          grep -Fx 'PROOF_REVIEW_CAPSULE_V1_PASS' /tmp/proof-review-capsule-v1.txt
+          python3 scripts/validate_proof_observability_v1.py | tee /tmp/proof-observability-v1.txt
+          grep -Fx 'PROOF_OBSERVABILITY_V1_PASS' /tmp/proof-observability-v1.txt
+          python3 scripts/validate_proof_challenge_solution_v1.py | tee /tmp/proof-challenge-solution-v1.txt
+          grep -Fx 'PROOF_CHALLENGE_SOLUTION_V1_PASS' /tmp/proof-challenge-solution-v1.txt
+
+      - name: Validate assurance case
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_assurance_case_v1.py | tee /tmp/assurance-case-v1.txt
+          grep -Fx 'ASSURANCE_CASE_V1_PASS' /tmp/assurance-case-v1.txt
+
+      - name: Static claim-ceiling audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/formal/ASSURANCE_CASE_V1.md
+          grep -F 'assurance case != theorem' "$doc"
+          grep -F 'more evidence != automatic stronger claim' "$doc"
+          grep -F 'risk tier != confidence score' "$doc"
+          grep -F 'formal theorem != lifecycle assurance' "$doc"
+
+      - name: Digest assurance contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            docs/formal/ASSURANCE_CASE_V1.md \
+            docs/formal/assurance_case_v1.json \
+            scripts/validate_assurance_case_v1.py
+
+      - name: Prove checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"

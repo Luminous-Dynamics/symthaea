@@ -1,0 +1,78 @@
+{
+  "schema": "symthaea.formal-verification.assurance-case.v1",
+  "tracking_issue": 5780,
+  "authority": "AssuranceCompositionMetadataOnly",
+  "parent_contract": "symthaea.formal-verification.proof-challenge-solution.v1",
+  "risk_tiers": ["R0", "R1", "R2", "R3", "R4"],
+  "relations": ["Supports", "DependsOn", "Refines", "Rebuts", "Gap", "Supersedes"],
+  "evidence_kinds": [
+    "FormalCapsule",
+    "RuntimeQualification",
+    "DifferentialTest",
+    "Provenance",
+    "VulnerabilityAnalysis",
+    "OperationalControl",
+    "IndependentReview",
+    "ChallengeSolution"
+  ],
+  "statuses": ["unconditional-current", "qualified-with-gaps", "review-required", "blocked", "superseded"],
+  "required_nonclaims": [
+    "assurance case != theorem",
+    "more evidence != automatic stronger claim",
+    "risk tier != confidence score",
+    "independent review != mathematical proof",
+    "formal theorem != lifecycle assurance"
+  ],
+  "synthetic_case": {
+    "id": "SYN-ASSURANCE-001",
+    "human_claim": "The synthetic service preserves property P over the declared exact subject.",
+    "claim_type": "Correctness",
+    "subject_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "evidence": [
+      {
+        "id": "SYN-INFINITE-001",
+        "kind": "FormalCapsule",
+        "source_class": "AbstractFormalTheorem",
+        "relation": "Supports",
+        "state": "qualified"
+      },
+      {
+        "id": "SYN-SOLUTION-001",
+        "kind": "ChallengeSolution",
+        "source_class": "TrustTopologyMetadataOnly",
+        "relation": "Supports",
+        "state": "qualified"
+      },
+      {
+        "id": "SYN-RUNTIME-001",
+        "kind": "RuntimeQualification",
+        "source_class": "RuntimeQualification",
+        "relation": "Supports",
+        "state": "qualified"
+      }
+    ],
+    "trust_inventory": [
+      {"category": "proof-kernel", "identity": "Lean4 kernel", "qualified": true},
+      {"category": "compiler", "identity": "rustc/LLVM outside theorem", "qualified": false}
+    ],
+    "gaps": [
+      {"id": "GAP-001", "description": "native binary correctness not established", "state": "open"}
+    ],
+    "rebuttals": [],
+    "claim_ceiling": [
+      "does not establish native binary correctness",
+      "does not establish runtime behavior outside retained qualification profiles"
+    ],
+    "operational_prerequisites": ["exact qualified subject must match deployment subject"],
+    "risk_tier": "R2",
+    "status": "qualified-with-gaps",
+    "previous": {
+      "node_sha256": null,
+      "trust_identities": [],
+      "risk_tier": null
+    },
+    "semantic_changes": ["initial assurance node"],
+    "human_review_required": true,
+    "independent_review_required": false
+  }
+}
