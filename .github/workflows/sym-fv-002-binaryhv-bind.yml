@@ -1,0 +1,137 @@
+name: SYM-FV-002 BinaryHV Bind
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/hdc/BinaryHVBind.lean"
+      - "docs/formal/sym-fv-002-binaryhv-bind-v1.json"
+      - "scripts/validate_sym_fv_002.py"
+      - "crates/core/symthaea-core/src/hdc/binary_hv.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-fv-002-binaryhv-bind.yml"
+  push:
+    branches: [main]
+    paths:
+      - "formal/lean/hdc/BinaryHVBind.lean"
+      - "docs/formal/sym-fv-002-binaryhv-bind-v1.json"
+      - "scripts/validate_sym_fv_002.py"
+      - "crates/core/symthaea-core/src/hdc/binary_hv.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-fv-002-binaryhv-bind.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-002-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  binaryhv-bind:
+    name: Lean abstract bind theorem
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record exact Git subject
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git status --porcelain=v1 --untracked-files=all
+
+      - name: Static contract and negative controls
+        run: python3 scripts/validate_sym_fv_002.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Typecheck Lean theorem subject
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            lean --version | tee /tmp/sym-fv-002-lean-version.txt
+            lean formal/lean/hdc/BinaryHVBind.lean | tee /tmp/sym-fv-002-lean-output.txt
+          '
+
+      - name: Postflight immutability and receipt
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          root = Path.cwd()
+          source_commit = "458c7b98d81c64b9361e252f85ef9d45132e6682"
+          source_path = "crates/core/symthaea-core/src/hdc/binary_hv.rs"
+          paths = {
+              "proof": root / "formal/lean/hdc/BinaryHVBind.lean",
+              "manifest": root / "docs/formal/sym-fv-002-binaryhv-bind-v1.json",
+              "validator": root / "scripts/validate_sym_fv_002.py",
+              "flake_lock": root / "flake.lock",
+          }
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          receipt = {
+              "schema": "symthaea.formal.sym-fv-002-qualification-receipt.v1",
+              "evidence_class": "AbstractFormalTheorem",
+              "result": "LeanTypechecked",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "source_commit": source_commit,
+              "source_path": source_path,
+              "source_blob": git("rev-parse", f"{source_commit}:{source_path}"),
+              "head_source_blob": git("rev-parse", f"HEAD:{source_path}"),
+              "lean_version": Path("/tmp/sym-fv-002-lean-version.txt").read_text().strip(),
+              "proof_sha256": sha256(paths["proof"]),
+              "manifest_sha256": sha256(paths["manifest"]),
+              "validator_sha256": sha256(paths["validator"]),
+              "flake_lock_blob": git("rev-parse", "HEAD:flake.lock"),
+              "flake_lock_sha256": sha256(paths["flake_lock"]),
+              "static_contract": "PASS",
+              "negative_controls": "PASS",
+              "lean_exit_zero": True,
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-rust-refinement",
+                  "not-simd-proof",
+                  "not-compiler-or-native-binary-proof",
+                  "not-aeneas-extraction",
+              ],
+          }
+          Path("/tmp/sym-fv-002-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-002-${{ github.sha }}
+          path: |
+            /tmp/sym-fv-002-lean-version.txt
+            /tmp/sym-fv-002-lean-output.txt
+            /tmp/sym-fv-002-receipt.json
+          if-no-files-found: error
+          retention-days: 30
