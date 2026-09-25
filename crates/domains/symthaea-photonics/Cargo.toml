@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-photonics"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-bounded photonic assembly and model semantics for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+blake3 = { workspace = true }
+symthaea-engineering-catalog = { path = "../symthaea-engineering-catalog" }
+
+[dev-dependencies]
+serde_json = { workspace = true }
