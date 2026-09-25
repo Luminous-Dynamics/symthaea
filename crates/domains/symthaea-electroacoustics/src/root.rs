@@ -14,4 +14,5 @@ mod parameters;
 
 pub use parameters::*;
 
+pub mod enclosure;
 pub mod linear;
