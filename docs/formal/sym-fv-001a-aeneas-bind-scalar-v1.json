@@ -1,0 +1,64 @@
+{
+  "schema": "symthaea-sym-fv-001a-v1",
+  "issue": 5713,
+  "title": "exact Aeneas extraction probe for BinaryHV::bind_scalar",
+  "source": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+    "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+    "blob": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056",
+    "function": "BinaryHV::bind_scalar",
+    "crate_dir": "crates/core/symthaea-core",
+    "byte_count": 2048,
+    "operation": "bytewise-xor"
+  },
+  "translator": {
+    "aeneas_repository": "AeneasVerif/aeneas",
+    "aeneas_commit": "b86120db3183b0107eb5f2637b11c424cd06ef1c",
+    "aeneas_flake": "github:AeneasVerif/aeneas/b86120db3183b0107eb5f2637b11c424cd06ef1c",
+    "charon_repository": "AeneasVerif/charon",
+    "charon_commit": "4bd5a29f6e97ce2201ed35251afe5716e53b0a3a",
+    "charon_mode": "cargo --preset=aeneas",
+    "backend": "lean",
+    "split_files": true,
+    "namespace": "SymthaeaFV001A.Generated"
+  },
+  "result_classes": [
+    "ExtractedAndLeanTypechecked",
+    "UnsupportedRustConstruct",
+    "UnsupportedDependencyBoundary",
+    "TranslatorFailure",
+    "LeanGenerationFailure",
+    "LeanTypecheckFailure",
+    "EnvironmentFailure"
+  ],
+  "required_receipt_fields": [
+    "source_commit",
+    "source_blob",
+    "source_path",
+    "head_source_blob",
+    "aeneas_commit",
+    "charon_commit",
+    "aeneas_reported_version",
+    "charon_reported_version",
+    "llbc_sha256",
+    "generated_lean",
+    "external_model_templates",
+    "lean_toolchain",
+    "result_class",
+    "semantic_success"
+  ],
+  "claim_ceiling": "ExtractedAndLeanTypechecked",
+  "nonclaims": [
+    "extraction success is not an HDC theorem",
+    "extraction success is not a Rust-to-spec refinement theorem",
+    "extraction success is not a SIMD theorem",
+    "extraction success is not a rustc or LLVM theorem",
+    "generated Lean is not trusted compiler output",
+    "a green evidence-capture step does not imply semantic success; result_class controls the claim"
+  ],
+  "successor": {
+    "issue": 5716,
+    "required_class": "ExtractedAndLeanTypechecked"
+  }
+}
