@@ -100,11 +100,21 @@ pub struct SolverInputClosure {
 }
 
 impl SolverInputClosure {
+    /// Revalidate a deserialized/stored closure and its content identity.
     pub fn validate_identity(&self) -> Result<(), ClosureError> {
+        if self.closure_version != CLOSURE_VERSION {
+            return Err(ClosureError::UnsupportedClosureVersion(
+                self.closure_version.clone(),
+            ));
+        }
         validate_digest(
-            "closure_digest_blake3",
-            &self.closure_digest_blake3,
+            "solver_executable_digest_blake3",
+            &self.solver_executable_digest_blake3,
         )?;
+        validate_artifacts(&self.artifacts)?;
+        validate_environment(&self.environment)?;
+        validate_digest("closure_digest_blake3", &self.closure_digest_blake3)?;
+
         let recomputed = compute_closure_digest(
             &self.solver_id,
             &self.solver_version,
@@ -150,7 +160,7 @@ impl SolverInputClosureBuilder {
         }
     }
 
-    /// Use when the executable bytes were hashed by a trusted outer layer.
+    /// Use only when executable bytes were hashed by a trusted outer layer.
     pub fn with_solver_executable_digest(mut self, digest: impl Into<String>) -> Self {
         self.solver_executable_digest_blake3 = digest.into();
         self
@@ -191,50 +201,9 @@ impl SolverInputClosureBuilder {
             return Err(ClosureError::UnresolvedInputs(self.unresolved_inputs));
         }
 
-        let mut ids = BTreeSet::new();
-        let mut primary_count = 0usize;
         for artifact in &mut self.artifacts {
-            if artifact.logical_id.trim().is_empty() {
-                return Err(ClosureError::EmptyLogicalId);
-            }
-            if !ids.insert(artifact.logical_id.clone()) {
-                return Err(ClosureError::DuplicateArtifactId(
-                    artifact.logical_id.clone(),
-                ));
-            }
-            validate_digest("artifact.digest_blake3", &artifact.digest_blake3)?;
-            if artifact.role == SolverInputRole::Primary {
-                primary_count += 1;
-            }
             artifact.parent_ids.sort();
             artifact.parent_ids.dedup();
-            if artifact
-                .parent_ids
-                .iter()
-                .any(|parent| parent == &artifact.logical_id)
-            {
-                return Err(ClosureError::SelfParent(artifact.logical_id.clone()));
-            }
-            if artifact.role == SolverInputRole::GeneratedIntermediate
-                && artifact.parent_ids.is_empty()
-            {
-                return Err(ClosureError::GeneratedIntermediateMissingParent(
-                    artifact.logical_id.clone(),
-                ));
-            }
-        }
-        if primary_count != 1 {
-            return Err(ClosureError::PrimaryArtifactCount(primary_count));
-        }
-        for artifact in &self.artifacts {
-            for parent in &artifact.parent_ids {
-                if !ids.contains(parent) {
-                    return Err(ClosureError::MissingParent {
-                        artifact: artifact.logical_id.clone(),
-                        parent: parent.clone(),
-                    });
-                }
-            }
         }
         self.artifacts.sort_by(|a, b| {
             a.role
@@ -242,20 +211,18 @@ impl SolverInputClosureBuilder {
                 .cmp(&b.role.tag())
                 .then_with(|| a.logical_id.cmp(&b.logical_id))
         });
+        validate_artifacts(&self.artifacts)?;
 
-        let mut environment_keys = BTreeSet::new();
-        for binding in &self.environment {
-            if binding.key.trim().is_empty() {
-                return Err(ClosureError::EmptyEnvironmentKey);
-            }
-            if !environment_keys.insert(binding.key.clone()) {
-                return Err(ClosureError::DuplicateEnvironmentKey(binding.key.clone()));
-            }
-            validate_digest("environment.value_digest_blake3", &binding.value_digest_blake3)?;
-        }
         self.environment.sort_by(|a, b| a.key.cmp(&b.key));
+        validate_environment(&self.environment)?;
 
-        self.prohibited_ambient.retain(|item| !item.trim().is_empty());
+        if self
+            .prohibited_ambient
+            .iter()
+            .any(|item| item.trim().is_empty())
+        {
+            return Err(ClosureError::EmptyAmbientProhibition);
+        }
         self.prohibited_ambient.sort();
         self.prohibited_ambient.dedup();
 
@@ -279,6 +246,100 @@ impl SolverInputClosureBuilder {
             closure_digest_blake3,
         })
     }
+}
+
+fn validate_artifacts(artifacts: &[SolverInputArtifact]) -> Result<(), ClosureError> {
+    let mut ids = BTreeSet::new();
+    let mut primary_count = 0usize;
+    for artifact in artifacts {
+        if artifact.logical_id.trim().is_empty() {
+            return Err(ClosureError::EmptyLogicalId);
+        }
+        if !ids.insert(artifact.logical_id.clone()) {
+            return Err(ClosureError::DuplicateArtifactId(
+                artifact.logical_id.clone(),
+            ));
+        }
+        validate_digest("artifact.digest_blake3", &artifact.digest_blake3)?;
+        if artifact.role == SolverInputRole::Primary {
+            primary_count += 1;
+        }
+        if artifact
+            .parent_ids
+            .iter()
+            .any(|parent| parent == &artifact.logical_id)
+        {
+            return Err(ClosureError::SelfParent(artifact.logical_id.clone()));
+        }
+        if artifact.role == SolverInputRole::GeneratedIntermediate
+            && artifact.parent_ids.is_empty()
+        {
+            return Err(ClosureError::GeneratedIntermediateMissingParent(
+                artifact.logical_id.clone(),
+            ));
+        }
+    }
+    if primary_count != 1 {
+        return Err(ClosureError::PrimaryArtifactCount(primary_count));
+    }
+    for artifact in artifacts {
+        for parent in &artifact.parent_ids {
+            if !ids.contains(parent) {
+                return Err(ClosureError::MissingParent {
+                    artifact: artifact.logical_id.clone(),
+                    parent: parent.clone(),
+                });
+            }
+        }
+    }
+    ensure_acyclic(artifacts)
+}
+
+fn ensure_acyclic(artifacts: &[SolverInputArtifact]) -> Result<(), ClosureError> {
+    let parents: BTreeMap<&str, BTreeSet<&str>> = artifacts
+        .iter()
+        .map(|artifact| {
+            (
+                artifact.logical_id.as_str(),
+                artifact.parent_ids.iter().map(String::as_str).collect(),
+            )
+        })
+        .collect();
+    let mut resolved = BTreeSet::new();
+
+    while resolved.len() < parents.len() {
+        let before = resolved.len();
+        for (id, dependencies) in &parents {
+            if !resolved.contains(id)
+                && dependencies.iter().all(|parent| resolved.contains(parent))
+            {
+                resolved.insert(*id);
+            }
+        }
+        if resolved.len() == before {
+            let cyclic = parents
+                .keys()
+                .filter(|id| !resolved.contains(**id))
+                .map(|id| (*id).to_string())
+                .collect();
+            return Err(ClosureError::CyclicArtifactGraph(cyclic));
+        }
+    }
+    Ok(())
+}
+
+fn validate_environment(environment: &[EnvironmentBinding]) -> Result<(), ClosureError> {
+    let mut keys = BTreeSet::new();
+    for binding in environment {
+        if binding.key.trim().is_empty() {
+            return Err(ClosureError::EmptyEnvironmentKey);
+        }
+        if !keys.insert(binding.key.clone()) {
+            return Err(ClosureError::DuplicateEnvironmentKey(binding.key.clone()));
+        }
+        validate_digest("environment.value_digest_blake3", &binding.value_digest_blake3)?;
+    }
+    Ok(())
 }
 
 fn validate_digest(field: &'static str, digest: &str) -> Result<(), ClosureError> {
@@ -344,12 +405,16 @@ fn hash_u64(hasher: &mut blake3::Hasher, value: u64) {
 
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum ClosureError {
+    #[error("unsupported solver input closure version {0:?}")]
+    UnsupportedClosureVersion(String),
     #[error("solver id/version cannot be empty")]
     EmptySolverIdentity,
     #[error("artifact logical id cannot be empty")]
     EmptyLogicalId,
     #[error("environment key cannot be empty")]
     EmptyEnvironmentKey,
+    #[error("ambient-prohibition label cannot be empty")]
+    EmptyAmbientProhibition,
     #[error("invalid BLAKE3 digest for {field}: {digest:?}")]
     InvalidDigest { field: &'static str, digest: String },
     #[error("duplicate artifact logical id {0:?}")]
@@ -362,6 +427,8 @@ pub enum ClosureError {
     GeneratedIntermediateMissingParent(String),
     #[error("artifact {artifact:?} references missing parent {parent:?}")]
     MissingParent { artifact: String, parent: String },
+    #[error("artifact dependency graph contains a cycle: {0:?}")]
+    CyclicArtifactGraph(Vec<String>),
     #[error("duplicate environment key {0:?}")]
     DuplicateEnvironmentKey(String),
     #[error("solver input closure is incomplete; unresolved inputs: {0:?}")]
@@ -459,6 +526,26 @@ mod tests {
     }
 
     #[test]
+    fn cyclic_derivation_graph_fails_closed() {
+        let a = SolverInputArtifact::from_bytes(
+            "a",
+            SolverInputRole::GeneratedIntermediate,
+            b"a",
+        )
+        .with_parent("b");
+        let b = SolverInputArtifact::from_bytes(
+            "b",
+            SolverInputRole::GeneratedIntermediate,
+            b"b",
+        )
+        .with_parent("a");
+        assert!(matches!(
+            base_builder().add_artifact(a).add_artifact(b).finalize(),
+            Err(ClosureError::CyclicArtifactGraph(_))
+        ));
+    }
+
+    #[test]
     fn environment_binding_changes_identity_without_storing_value() {
         let a = base_builder()
             .bind_environment(EnvironmentBinding::from_value("OMP_NUM_THREADS", "1"))
@@ -475,20 +562,23 @@ mod tests {
 
     #[test]
     fn exactly_one_primary_is_required() {
-        let none = SolverInputClosureBuilder::new("solver", "1", b"exe")
-            .finalize()
-            .unwrap_err();
-        assert_eq!(none, ClosureError::PrimaryArtifactCount(0));
-
-        let two = base_builder()
-            .add_artifact(SolverInputArtifact::from_bytes(
-                "other-primary",
-                SolverInputRole::Primary,
-                b"other",
-            ))
-            .finalize()
-            .unwrap_err();
-        assert_eq!(two, ClosureError::PrimaryArtifactCount(2));
+        assert_eq!(
+            SolverInputClosureBuilder::new("solver", "1", b"exe")
+                .finalize()
+                .unwrap_err(),
+            ClosureError::PrimaryArtifactCount(0)
+        );
+        assert_eq!(
+            base_builder()
+                .add_artifact(SolverInputArtifact::from_bytes(
+                    "other-primary",
+                    SolverInputRole::Primary,
+                    b"other",
+                ))
+                .finalize()
+                .unwrap_err(),
+            ClosureError::PrimaryArtifactCount(2)
+        );
     }
 
     #[test]
@@ -499,5 +589,17 @@ mod tests {
             closure.validate_identity(),
             Err(ClosureError::ClosureDigestMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn closure_version_is_load_bearing() {
+        let mut closure = base_builder().finalize().unwrap();
+        closure.closure_version = "future-version".into();
+        assert_eq!(
+            closure.validate_identity(),
+            Err(ClosureError::UnsupportedClosureVersion(
+                "future-version".into()
+            ))
+        );
     }
 }
