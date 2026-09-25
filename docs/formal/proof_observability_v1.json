@@ -1,0 +1,89 @@
+{
+  "schema": "symthaea.formal-verification.proof-observability.v1",
+  "tracking_issue": 5778,
+  "authority": "ReviewMetadataOnly",
+  "parent_contract": "symthaea.formal-verification.proof-review-capsule.v1",
+  "coverage_classes": ["Exact", "Partial", "Bounded", "Unknown"],
+  "vacuity_states": ["Clear", "Detected", "Unknown"],
+  "report_states": ["reviewed-current", "review-required", "blocked"],
+  "required_nonclaims": [
+    "proof observability != theorem truth",
+    "no detected vacuity != complete specification",
+    "used-by-proof != semantically intended",
+    "coverage report != source refinement",
+    "Exact coverage != compiler/native-binary correctness",
+    "Unknown observability != evidence of defect"
+  ],
+  "synthetic_reports": [
+    {
+      "id": "SYN-OBS-EXACT-001",
+      "capsule_id": "SYN-INFINITE-001",
+      "proof_goal": "forall n : Nat, P n",
+      "subject_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "checker_receipt": "synthetic-kernel-replay-001",
+      "proof_checked": true,
+      "assumptions_in_scope": ["P 0", "forall n, P n -> P (n + 1)"],
+      "assumptions_used": ["P 0", "forall n, P n -> P (n + 1)"],
+      "critical_premises": ["forall n, P n -> P (n + 1)"],
+      "unused_critical_premises": [],
+      "axioms_used": [],
+      "dependency_closure": ["Nat.rec", "induction-step"],
+      "dependency_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+      "represented_regions": ["synthetic/induction/base", "synthetic/induction/step"],
+      "required_regions": ["synthetic/induction/base", "synthetic/induction/step"],
+      "unconstrained_regions": [],
+      "vacuity": {
+        "state": "Clear",
+        "evidence": ["synthetic-consistency-check-001"]
+      },
+      "coverage": {
+        "class": "Exact",
+        "bound": null,
+        "details": "Induction basis, step, and constructor coverage are represented."
+      },
+      "previous": {
+        "report_sha256": null,
+        "dependency_digest": null,
+        "coverage_class": null
+      },
+      "semantic_changes": ["initial report"],
+      "semantic_review_required": true,
+      "state": "review-required"
+    },
+    {
+      "id": "SYN-OBS-PARTIAL-001",
+      "capsule_id": "SYN-FINITE-001",
+      "proof_goal": "retained implementation projection satisfies P",
+      "subject_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "checker_receipt": "synthetic-refinement-check-001",
+      "proof_checked": true,
+      "assumptions_in_scope": ["supported subset only"],
+      "assumptions_used": ["supported subset only"],
+      "critical_premises": [],
+      "unused_critical_premises": [],
+      "axioms_used": [],
+      "dependency_closure": ["projection-spec-v1"],
+      "dependency_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+      "represented_regions": ["src/supported.rs:kernel"],
+      "required_regions": ["src/supported.rs:kernel", "src/unsupported.rs:edge"],
+      "unconstrained_regions": ["src/unsupported.rs:edge"],
+      "vacuity": {
+        "state": "Unknown",
+        "evidence": []
+      },
+      "coverage": {
+        "class": "Partial",
+        "bound": null,
+        "details": "One required implementation edge is outside the retained refinement subject."
+      },
+      "previous": {
+        "report_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "dependency_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "coverage_class": "Partial"
+      },
+      "semantic_changes": [],
+      "semantic_review_required": false,
+      "state": "reviewed-current"
+    }
+  ]
+}
