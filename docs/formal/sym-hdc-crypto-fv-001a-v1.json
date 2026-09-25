@@ -1,0 +1,60 @@
+{
+  "schema": "symthaea.formal.sym-hdc-crypto-fv-001a.v1",
+  "issue": 5857,
+  "parent_issue": 5844,
+  "evidence_class": "AbstractFormalTheorem",
+  "stack_parent": {
+    "issue": 5715,
+    "pr": 5801,
+    "commit": "2199cf04634e81d85592ed0479a5c3d2d0fb6ac8",
+    "path": "formal/lean/hdc/BinaryHVBind.lean",
+    "blob": "f724618781b2660d1e76e45a69dcf796a792d76d",
+    "relationship": "reused-exact-abstract-xor-algebra"
+  },
+  "theorem_subjects": [
+    "recover_derived_from_known_pair",
+    "universal_known_pair_forgery",
+    "forged_tag_is_accepted",
+    "one_share_recovers_secret"
+  ],
+  "production_refinement_targets": [
+    {
+      "commit": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+      "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+      "blob": "59c0ea6bc92fd1d67a9f764bb396918fd823331a",
+      "symbols": ["HdcMac::compute", "HdcShare", "HdcThresholdSharing::split", "HdcThresholdSharing::split_secure"],
+      "relationship": "future-refinement-target-not-proved-here"
+    },
+    {
+      "commit": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+      "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+      "blob": "a232b0b699f5d0301fe052b0e013f289194c13b6",
+      "symbols": ["HdcMac::compute", "HdcShare", "HdcThresholdSharing::split", "HdcThresholdSharing::split_secure"],
+      "relationship": "compatibility-copy-must-be-refined-separately"
+    }
+  ],
+  "attack_claims": {
+    "mac": "one known valid message/tag pair reveals the reusable derived XOR mask and enables valid tags for arbitrary chosen messages",
+    "threshold": "one returned share record contains secret XOR mask and the same mask, therefore one record recovers the secret"
+  },
+  "coverage": {
+    "kind": "Universal",
+    "scope": "all abstract 16384-bit BinaryHV messages, derived masks, secrets, and share masks"
+  },
+  "claim_ceiling": [
+    "abstract-attack-algebra-only",
+    "not-production-rust-refinement",
+    "not-proof-all-hdc-cryptography-insecure",
+    "not-commitment-context-or-fhe-proof-yet",
+    "not-secure-replacement"
+  ],
+  "negative_controls": [
+    "parent-algebra-drift",
+    "duplicate-model-injection",
+    "forgery-theorem-deletion",
+    "one-share-theorem-deletion",
+    "proof-hole-injection",
+    "source-rebinding",
+    "claim-escalation"
+  ]
+}
