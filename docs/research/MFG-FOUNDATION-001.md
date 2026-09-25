@@ -7,180 +7,277 @@ Base subject: `458c7b98d81c64b9361e252f85ef9d45132e6682`
 
 Define a reusable, evidence-bounded process for identifying and improving mature physical technologies whose progress is constrained less by missing fundamental physics than by fragmented evidence, poor lifecycle feedback, weak interoperability, expensive experimentation, maintenance burden, over-customization, or design-to-manufacturing disconnects.
 
-This is a cross-domain campaign/orchestration layer. It is **not** a second material ontology, evidence-authority system, lifecycle ledger, or autonomous invention authority.
+This is a cross-domain research/orchestration layer. It is deliberately **not** a second materials ontology, measurement system, evidence-dependency graph, hypothesis ontology, manufacturing ledger, lifecycle graph, or authority system.
 
-It does not authorize manufacturing, deployment, biological experimentation, procurement, safety-critical control, or regulatory claims.
+It does not authorize manufacturing, deployment, biological experimentation, maintenance, procurement, safety-critical control, or regulatory claims.
 
-## Existing ownership — reuse first
+## Governing rule — reuse before abstraction
 
-MFG-FOUNDATION must compose existing qualified semantics rather than replacing them:
+Every proposed common field must first answer:
 
-- `MAT-007` / #4336 — reproducible physical material subject identity;
-- `MAT-008` / #4339 — conditioned material-property evidence, uncertainty, method class, units and source/result artifacts;
-- `MAT-009` / #4340 — campaign identity, hard constraints, budgets, independent objectives and Pareto semantics;
-- `MAT-010` / #4341 — failed/null/duplicate/OOD search memory;
-- `MAT-013` / #4344 — provenance-complete physical sample lineage and scale state;
-- `MAT-014` / #4345 — human-authorized active materials discovery orchestration;
-- `CEM-001` / #4346 — low-carbon cement campaign;
-- `BIO-CEM-001` / #5751 and `BIO-CEM-001A` / #5753 — living/self-healing cement campaign and literature benchmark;
-- FIELD/QIF — calibrated physical observation / inspection authority where applicable;
-- MFG-PROC / MFG-LIFE — manufacturing process and lifecycle semantics;
-- Mycelix `BIO-MFG-001` / #3113 — operational biological lot, containment-reference and lifecycle provenance.
+```text
+who already owns this fact?
+```
 
-If one of these layers already carries identity, quantity, uncertainty, evidence authority, provenance, scale, Pareto objectives or human authorization, MFG-FOUNDATION stores a typed reference to it rather than inventing a competing representation.
+If a canonical owner exists, MFG-FOUNDATION stores an exact typed reference instead of copying the value, identity, lineage, calibration, validity, provenance, lifecycle state, hypothesis, execution state, or authority.
+
+The zero-duplication gate is tracked in #5768.
+
+## Canonical ownership map
+
+### Materials research
+
+The repaired MAT line is intended to own:
+
+- MAT-007 — physical material subject identity;
+- MAT-008 — conditioned material/property evidence, methods and uncertainty;
+- MAT-009 — campaign, hard constraints, independent objectives and Pareto semantics;
+- MAT-010 — failed/null/duplicate/OOD SearchMemory;
+- MAT-013 — physical sample/process lineage and scale;
+- MAT-014 — proposal/acquisition/human-review discovery orchestration.
+
+The MAT-RFMT recovery program #5323 is reconstructing the historical stack on current `main`. MFG-FOUNDATION must not bind implementation to stale historical branch interfaces.
+
+### Quantities, units, frames and time
+
+SE-SEM-001 #4861 owns canonical physical quantity-kind, unit, conversion, frame, shape and clock/time-base semantics.
+
+Therefore this program must not create local physical-value standards such as:
+
+```text
+Pressure
+Power
+Flow
+Temperature
+CrackWidth
+Torque
+Duration
+unit: String
+```
+
+merely for convenience.
+
+### Physical observations and calibration
+
+FIELD-000 #3589, FIELD-001A #3633 and SE-OBS #3695 own the common physical-observation, source/device/configuration, calibration/traceability, uncertainty, timestamp and raw-vs-derived evidence boundaries.
+
+A MFG-FOUNDATION record should normally point to the authoritative observation rather than copying its measured payload.
+
+### Evidence dependency, independence and replication
+
+ENG-EVID-INDEP-001 #4918 owns domain-neutral evidence-dependency/common-mode lineage, claim-relative independence profiles, repeat-vs-replication distinctions, calibration/clock/model/implementation common modes and indeterminate-dependence semantics.
+
+Therefore:
+
+```text
+multiple observations
+!= multiple independent observations
+```
+
+and MFG-FOUNDATION must not create a second generic source-lineage or `LeakageGroupRef` ontology.
+
+#5756 owns only benchmark partition policy and deterministic partition receipts over canonical dependency refs.
+
+### Hypotheses and failure causes
+
+Hypothesis identity stays with the domain that owns the proposition.
+
+Examples:
+
+- MAT-HYPOTHESIS-001 #5254 — materials mechanism/process/intervention hypotheses;
+- SE-VV #3697 — engineering failure-mode/effect/cause and discrepancy-investigation hypotheses;
+- domain-specific physics/research subjects where a more specific owner exists.
+
+#5757 owns only the evidence-bearing attribution relation from an observed effect to an existing hypothesis/mechanism subject.
+
+### Applicability, validity and currentness
+
+A generic MFG `ApplicabilityProfile` is not approved.
+
+Existing ownership/precedent includes domain study-scope profiles, SE-VV intended-use/validity envelopes, SE-SEMANTICS applicability-review consequences and ETK authority-bearing currentness/contradiction/supersession/applicability-loss semantics.
+
+Until an exact generic-owner audit proves a real gap, MFG-FOUNDATION carries only an external validity/applicability-scope reference.
+
+### Physical components and articles
+
+ENG-CATALOG #5675 owns generic component/source-document/BOM/realized-article identity.
+
+ROT-EQUIP should reference existing component/article subjects where possible instead of inventing a second catalog identity.
+
+### Manufacturing and lifecycle
+
+MFG-PROC owns process definition, process-state transformation, capability, recipe, process-plan, inspection/hold/rework and capability-history semantics.
+
+MFG-LIFE owns lifecycle strategy/design/assessment semantics.
+
+Mycelix owns concrete operational provenance for plan instances, work/lot/batch/unit scope, provider/site/resource assignments, manufacturing/service/lifecycle events, and biological material lots/containment references where applicable.
+
+Preserve:
+
+```text
+process plan
+!= plan executed
+
+inspection planned
+!= inspection executed
+!= result accepted
+
+historical capability
+!= future capability guarantee
+```
+
+### Verification, reliability and discrepancy
+
+SE-VV owns generic V&V, credibility, reliability/maintainability, failure-mode/cause and anomaly/discrepancy lifecycle semantics.
+
+MFG-FOUNDATION may relate those facts to hypotheses; it should not create another generic FMEA/R&M system.
 
 ## Core separation
 
 ```text
-technology opportunity
+technology constraint observed
 != validated intervention
-!= experimentally established mechanism
+!= mechanism established
 != manufacturable product
 != qualified production process
 != safe field deployment
 ```
 
-The engine must preserve these distinctions structurally.
+Likewise:
+
+```text
+observation
+!= admitted evidence
+!= mechanism support
+!= recommendation
+!= human decision
+!= authorization
+!= execution
+!= successful outcome
+!= qualification/certification
+```
 
 ## No `stagnant=true`
 
 "Stagnation" is not a primitive truth value.
 
-A technology-opportunity claim must instead be grounded in concrete evidence such as:
+A candidate opportunity must instead reference concrete evidence such as:
 
-- unusually low productivity growth;
-- large conversion or distribution losses;
-- high maintenance / failure burden;
-- excessive specification or product-family fragmentation;
-- weak interoperability;
-- large deployment gap despite technically available capability;
-- persistent fouling / corrosion / degradation;
-- manual translation between design, controls and field execution;
+- energy/conversion loss;
+- material waste;
+- failure/degradation burden;
+- maintenance/downtime burden;
+- interoperability fragmentation;
+- excessive specification/variant fragmentation;
+- poor repairability/remanufacturing;
+- weak field feedback;
+- unresolved mechanism;
 - weak lab-to-field transfer;
-- poor repairability or remanufacturing;
-- missing lifecycle feedback.
+- deployment/integration barriers;
+- standardization opportunity;
+- closed-loop-control opportunity.
 
-This prevents rhetoric such as "industry X is stagnant" from entering the evidence layer as fact.
+These are descriptive constraint classes. They do not establish solvability, importance, priority, or commercial value.
 
-## Relationship to BIO-CEM
+## Minimal provisional common kernel
 
-BIO-CEM is the first candidate campaign to exercise the causal-materials research pattern:
+The current **upper bound**, not an implementation target, is approximately:
 
 ```text
-MAT-007 material subject
-+ MAT-008 conditioned observations
-+ study/source lineage
-+ control/intervention graph
-+ mechanism attribution
-+ degradation/recovery history
-+ MAT-013 physical lineage when physical work begins
-+ Mycelix operational provenance
+TechnologyConstraintClassV1
+TechnologyConstraintObservationV1
+BenchmarkPartitionPolicyV1
+BenchmarkPartitionReceiptV1
+MechanismAttributionEdgeV1
 ```
 
-The legacy `symthaea-materials::MaterialProperty` remains a compact bulk-engineering descriptor used by the current HDC materials functionality. BIO-CEM literature observations, viability state, study lineage and mechanism attribution must not be folded into that descriptor.
+Audit has already removed proposed common primitives:
 
-Where the MAT stack supersedes legacy descriptors for scientific authority, the legacy HDC representation should be treated as retrieval/representation infrastructure rather than the canonical evidence identity.
+```text
+LeakageGroupRefV1
+  -> ENG-EVID-INDEP #4918 already owns dependency/independence
 
-## Opportunity evidence contract
+MechanismHypothesisV1
+  -> domain owners already own hypothesis identity
 
-A cross-domain opportunity observation should reference existing domain evidence and add only what is not already owned elsewhere:
+ApplicabilityProfileV1
+  -> blocked pending proof that existing applicability/validity owners are insufficient
+```
+
+If further audit eliminates another type, remove it. Issue existence does not justify code.
+
+## Technology constraint reference envelope
+
+#5755 now treats the common observation as reference-only, conceptually:
 
 ```text
 TechnologyConstraintObservationV1 {
   technology_subject_ref,
   constraint_class,
   evidence_ref,
-  source_lineage_ref,
-  population_or_operating_context_ref,
-  observation_period,
-  applicability_profile_ref,
-  contradiction_refs[],
-  freshness_or_transfer_state
+  evidence_dependency_ref?,
+  operating_context_ref,
+  observation_period_or_time_ref?,
+  applicability_or_validity_scope_ref?,
+  contradiction_or_related_evidence_refs[],
 }
 ```
 
-This type should not duplicate MAT-008 quantities or FIELD/QIF measurements. `evidence_ref` points to the authoritative observation where one exists.
+This envelope does not own the measurement value, unit, calibration, asset/material identity, dependency graph, applicability ontology, or authority.
 
-Missing evidence is represented as missing evidence, not a neutral or favorable score.
+## Benchmark partitioning
 
-## Candidate constraint classes
+#5756 consumes ENG-EVID-INDEP dependency/common-mode refs and adds only benchmark policy plus deterministic group-to-partition assignment receipts.
 
-- EnergyLoss
-- MaterialWaste
-- FailureOrDegradationBurden
-- SkilledManualTranslationBurden
-- InteroperabilityFragmentation
-- RepairabilityConstraint
-- FieldFeedbackGap
-- ExcessiveVariantFragmentation
-- MaintenanceOrDowntimeBurden
-- UnresolvedMechanism
-- LabToFieldTransferGap
-- StandardizationOpportunity
-- ClosedLoopControlOpportunity
-- ExperimentAccessibilityConstraint
-- ManufacturingAccessibilityConstraint
-- SafetyOrRegulatoryBurden
-
-The taxonomy is descriptive. It does not imply that every recorded constraint is practically or economically solvable.
-
-## Evidence semantics
-
-Every opportunity claim must preserve:
-
-- source lineage;
-- observation time or study period where available;
-- target population / geography / deployment context;
-- measured quantity or qualitative-claim class;
-- uncertainty representation;
-- applicability constraints;
-- contradiction references;
-- evidence freshness / transfer validity.
-
-Derived opportunity assessments may summarize evidence but may not erase conflicting observations.
-
-## Candidate research state
-
-Do not make one universal monotonic readiness enum span every domain. Keep independent evidence/authority planes and expose a derived research view such as:
+The grouping policy is claim-relative:
 
 ```text
-constraint observed
--> evidence qualified
--> mechanism hypotheses enumerated
--> discriminating intervention proposed
--> simulation/model evidence collected
--> experiment proposed
--> experiment observed
--> independent replication evidence collected
--> manufacturing-transfer evidence collected
--> field evidence collected
+leave-row-out
+!= leave-study-out
+!= leave-asset-out
+!= calibration-independent evaluation
 ```
 
-Later contradictory evidence may challenge earlier derived views without rewriting historical observations.
+BIO-CEM study holdout should keep one paper, supplement, copied table and all formulations from that source dependency together.
 
-No state implies regulatory approval, safety certification, commercial readiness or causal proof unless separately evidenced.
+ROT-EQUIP leave-asset-out should keep all relevant windows from one asset together.
 
-## Mechanism-attribution graph
+A leakage-safe split is an evidence-integrity property only; it does not establish model quality or causal validity.
 
-Observed effects may reference multiple candidate mechanisms with explicit evidence-bearing relationships.
+## Mechanism attribution
 
-Recommended derived states:
+#5757 owns the relation, not the hypothesis itself.
 
-- SupportedUnderProfile
-- ChallengedUnderProfile
-- Unresolved
-- NotApplicable
+Conceptually:
 
-Prefer profile-relative names over an unqualified `Supported` where evidence applies only under a bounded condition set.
+```text
+MechanismAttributionEdgeV1 {
+  effect_ref,
+  mechanism_or_hypothesis_ref,
+  applicability_or_validity_scope_ref,
+  state,
+  evidence_links[],
+  competing_mechanism_refs[],
+  confounder_refs[],
+  limitations[],
+}
+```
 
-Attribution requires linked evidence. Similarity, prediction or model fit alone cannot establish causal support.
+Recommended bounded states:
+
+- SupportedUnderProfile;
+- ChallengedUnderProfile;
+- Unresolved;
+- NotApplicableUnderProfile.
+
+Evidence roles may include support, challenge, control, confounder, replication, transfer and discrimination against alternatives.
 
 ```text
 HDC similarity
 != shared mechanism
 
 model prediction
-!= experimental observation
+!= observation
 
 correlation
 != intervention effect
@@ -189,157 +286,259 @@ before/after improvement
 != causal attribution
 ```
 
-## Portfolio selection
+## First proving domain — BIO-CEM
 
-Do not introduce another universal weighted innovation score. Reuse the discipline of MAT-009 where possible and generalize it across technology campaigns.
+BIO-CEM uses #5753/#5767/#5759 to prove the architecture against a literature/materials-heavy domain.
 
-Preserve an inspectable multi-objective frontier across dimensions such as:
-
-- expected human/community utility;
-- physical plausibility;
-- measurable improvement potential;
-- experiment affordability;
-- manufacturing accessibility;
-- cross-domain reuse;
-- time-to-evidence;
-- safety / regulatory burden;
-- repairability / lifecycle leverage;
-- evidence completeness / transfer risk.
-
-Any scalar prioritization is an explicit policy layer with inspectable weights/version and must retain the underlying vector and Pareto frontier.
-
-## Initial domain probes
-
-Use probes that differ enough to test generality:
-
-1. `BIO-CEM` — adaptive/living cementitious materials;
-2. rotating equipment systems — motor + drive + pump/fan/compressor + piping/ducting + controls;
-3. industrial thermal systems — heat recovery + heat pumps + thermal storage;
-4. building controls — interoperability, commissioning and verified control transfer;
-5. corrosion / protective coatings;
-6. water-treatment membranes and fouling;
-7. distribution transformer family/specification rationalization.
-
-These are research probes, not product commitments.
-
-## Why these probes are evidence-worthy
-
-The initial external evidence scan suggests several concrete system constraints worth representing rather than asserting generic stagnation:
-
-- global construction productivity increased only about 0.4% annually from 2000–2022 while manufacturing increased about 3% annually over the same period;
-- DOE describes building-control deployment as constrained by proprietary hardware/software, fragmented data and poor interoperability, while high-performance controls can substantially reduce commercial HVAC energy use;
-- DOE industrial guidance continues to treat pumps, fans, motors, process heat and compressed air as whole-system optimization opportunities; compressed air can lose more than 80% of input energy as heat;
-- IEA reports commercially available heat pumps could technically supply about 20% of global industrial heat demand, while deployment remains low and integration/economics are significant constraints;
-- DOE reports more than 80,000 distribution-transformer varieties in the United States and identifies inconsistent specifications as one contributor to long production times;
-- corrosion remains a broad lifecycle burden across infrastructure;
-- current RO literature continues to identify fouling, scaling, cleaning burden, scale-up, stability and field-transfer issues.
-
-These examples justify an evidence registry. They do not establish that Symthaea can solve each constraint or that any candidate is commercially superior.
-
-## Field-feedback loop
-
-A useful cross-domain digital thread is:
+Independent evidence planes remain:
 
 ```text
-baseline evidence
--> hypothesis
--> proposed intervention
--> explicit authorization / execution receipt
--> post-intervention observation
--> context / confounder evidence
--> mechanism-attribution update
--> lifecycle / maintenance result
--> next campaign state
+VisibleCrackClosure
+TransportRecovery
+MechanicalRecovery
+MineralizationEvidence
+BiologicalViability
+DurabilityResponse
+RepeatedHealingResponse
 ```
 
-Required distinctions:
+They are not one healing score.
+
+Biological state is explicit and observation-relative; `living=true` is forbidden as a scientific shortcut.
+
+BIO-CEM owns only genuinely domain-specific vocabulary such as biological observation state, healing output-plane classification, control roles, literature extraction state and method/comparability state. Material identity, measurements, source dependency, hypotheses, physical sample lineage, operational biological lots and authority remain with their canonical owners.
+
+## Second proving domain — ROT-EQUIP
+
+ROT-EQUIP #5760 uses a deliberately different system boundary:
 
 ```text
-recommendation != execution
-execution != successful outcome
-predicted savings != measured savings
-maintenance completion != restored performance
-manufacturing conformity != field durability
+electrical supply
+-> drive/starter
+-> motor
+-> coupling/gearbox
+-> pump | fan | compressor
+-> piping/ducting/valves/dampers/restrictions
+-> process load
+-> controls
 ```
 
-Mycelix should own operational lineage and receipts where those fit its existing semantics; Symthaea should reference them rather than duplicating the ledger.
+Independent observation planes include electrical input, mechanical state, fluid/air process state, useful output/system performance, and maintenance/degradation evidence.
 
-## Qualification tests
+Preserve:
 
-The first implementation tranche should prove:
+```text
+component efficiency
+!= system efficiency
 
-1. missing evidence cannot increase confidence;
+anomaly detected
+!= fault identified
+!= root cause established
+
+maintenance performed
+!= restored performance
+
+predicted savings
+!= measured savings
+```
+
+ROT-EQUIP should add only its true domain vocabulary: narrowly defined topology/role semantics, operating-context binding and rotating/flow-system mechanism families that no existing owner supplies.
+
+## Cross-domain generality gate
+
+The program does not expand merely because another industry is interesting.
+
+First prove:
+
+```text
+BIO-CEM
+        \
+         > same small reference / partition / attribution substrate
+        /
+ROT-EQUIP
+```
+
+without:
+
+- `AnyValue`;
+- free-form JSON semantic escape hatches;
+- duplicate quantity/unit systems;
+- duplicate observation/calibration systems;
+- duplicate evidence-independence graphs;
+- duplicate hypothesis ontologies;
+- duplicate component identities;
+- duplicate manufacturing/lifecycle ledgers;
+- duplicate currentness or authority systems.
+
+Only after that proof should industrial thermal systems, building controls, corrosion/coatings, membranes, transformers or other sectors become new adapters.
+
+## Portfolio decision layer
+
+#5758 projects explicit evidence into existing Pareto/decision-analysis machinery rather than implementing another optimization engine.
+
+Preserve:
+
+```text
+opportunity evidence
+!= criterion value
+!= Pareto membership
+!= scalar priority
+!= selected project
+!= funded/procured project
+```
+
+Missing evidence stays missing. Any scalar weighting is an explicit policy artifact with inspectable weights, normalization, missing-data policy and sensitivity; it never becomes scientific evidence.
+
+## External constraint corpus
+
+#5761 is a versioned evidence corpus/validator, not a new registry service.
+
+Every public-source claim preserves exact population/context/time/source lineage and claim class. Historical evidence cannot silently become a current global fact, and newer sources do not automatically defeat older evidence.
+
+## Intervention/outcome composition
+
+#5762 binds proposal, external work/authority refs, external execution receipts, post-observation refs and #5757 attribution refs without creating another work-order or execution ledger.
+
+```text
+recommendation
+!= authorization
+!= execution
+!= correct execution
+!= improved performance
+!= causal proof
+```
+
+## Research-to-manufacturing transfer
+
+#5763 is a derived assessment over MAT sample evidence, MFG-PROC capability/history, FIELD/SE observations and Mycelix operational provenance.
+
+Independent transfer dimensions replace a universal `manufacturable=true` or `ProductionReady` state.
+
+```text
+coupon result
+!= batch capability
+!= stable production process
+!= field durability
+```
+
+## Negative evidence
+
+#5764 projects null/failed/contradictory/OOD/replication/transfer outcomes into existing MAT-010, SE-VV, #5757 and operational owners rather than creating another negative-results ledger.
+
+```text
+null result
+!= missing result
+
+failed intervention
+!= impossible intervention
+
+replication disagreement
+!= fraud
+```
+
+## Currentness and applicability
+
+#5765 is a read-only projection over ETK/SE/domain currentness and applicability owners.
+
+```text
+old evidence
+!= invalid evidence
+
+recent evidence
+!= superior evidence
+
+applicable under profile A
+!= applicable under profile B
+```
+
+## Authority non-escalation
+
+#5766 freezes authority-composition rules only.
+
+MFG-FOUNDATION artifacts normally grant zero physical authority.
+
+```text
+derived authority
+<= explicitly referenced external authority facts
+```
+
+No quantity of confidence, simulation success, HDC similarity, provenance completeness, Pareto priority or supporting studies can manufacture missing permission.
+
+## Type-budget gate
+
+Every implementation PR beneath #5754 must include a table equivalent to:
+
+```text
+proposed field/type
+semantic meaning
+existing owners searched
+canonical owner/ref used
+why a genuinely new semantic is still required
+```
+
+Reject fields whose justification is only convenience, naming preference, serialization convenience, or avoiding a dependency that should be composed.
+
+Prefer:
+
+```text
+fewer new types + stronger exact refs
+```
+
+over a broader local ontology.
+
+## Ordered execution boundary
+
+```text
+MAT recovery / canonical shared-owner readiness
+        ↓
+#5768 exact ownership audit
+        ↓
+#5767 BIO-CEM deterministic fixture contract
+        ↓
+#5755 minimal reference envelope
+        ↓
+#5756 benchmark partition policy/receipt
+        ↓
+#5759 BIO-CEM projection
+        ↓
+#5757 attribution relation as needed
+        ↓
+#5760 ROT-EQUIP projection
+        ↓
+prove two-domain generality
+        ↓
+#5758/#5761 portfolio + public constraint evidence
+        ↓
+#5762–#5766 only as thin projections/adapters where existing layers do not already suffice
+```
+
+Do not open common Rust implementation before the repaired MAT interfaces required by BIO-CEM are available and the #5768 field/type audit is satisfied against current source interfaces.
+
+## Qualification expectations
+
+The first executable tranche should eventually prove at least:
+
+1. missing evidence cannot increase a claim silently;
 2. contradictory evidence survives aggregation;
-3. the same source/study lineage cannot leak across benchmark partitions;
-4. performance observations do not create mechanism support automatically;
-5. HDC similarity does not create causal equivalence;
-6. portfolio ordering is reconstructable from evidence plus explicit policy;
-7. weight sensitivity is exposed when candidate ordering is unstable;
-8. domain-specific fields extend common contracts without duplicate universal material/quantity identities;
-9. recommendation, authorization, execution and outcome remain distinct;
-10. null/failed/negative results remain first-class evidence;
-11. evidence freshness and cross-context transfer are explicit;
-12. scale transfer (coupon -> lab batch -> device -> pilot -> industrial/field) is never implicit.
-
-## Ordered implementation subjects
-
-### Foundation
-
-- #5755 `MFG-FOUNDATION-001A` — typed opportunity-evidence contract;
-- #5756 `MFG-FOUNDATION-001B` — source-lineage-safe benchmark partitioning;
-- #5757 `MFG-FOUNDATION-001C` — mechanism-attribution graph;
-- #5758 `MFG-FOUNDATION-001D` — transparent multi-objective portfolio frontier.
-
-### Generalization
-
-- #5759 `MFG-FOUNDATION-001E` — BIO-CEM adapter;
-- #5760 `MFG-FOUNDATION-001F` — second-domain industrial-equipment adapter;
-- #5761 `MFG-FOUNDATION-001G` — technology-constraint evidence registry.
-
-### Closed-loop / transfer integrity
-
-- #5762 `MFG-FOUNDATION-001H` — field-feedback/intervention receipt boundary;
-- #5763 `MFG-FOUNDATION-001I` — experiment-to-manufacturing transfer boundary;
-- #5764 `MFG-FOUNDATION-001J` — negative-results/replication ledger integration;
-- #5765 `MFG-FOUNDATION-001K` — evidence freshness and transfer-validity semantics;
-- #5766 `MFG-FOUNDATION-001L` — human-review / authority envelope.
-
-Implementation should merge or collapse any child whose semantics are already fully supplied by MAT/MFG/FIELD/Mycelix after exact code-location audit. Issue existence is not justification for duplicate code.
-
-## Preferred execution order
-
-```text
-MAT/CEM/MFG reuse audit
-        ↓
-001A typed cross-domain refs only
-        ↓
-001B lineage partitioning
-        ↓
-BIO-CEM-001A / 001E adapter
-        ↓
-001C mechanism attribution
-        ↓
-001F rotating-equipment adapter
-        ↓
-prove cross-domain generality
-        ↓
-001D/G portfolio + external constraint evidence
-        ↓
-H/I/J/K/L only where existing layers do not already satisfy them
-```
-
-This deliberately postpones generic scoring and closed-loop expansion until two substantially different domains prove the common abstraction.
+3. dependency/common-mode lineage is not confused with row identity;
+4. benchmark receipts replay deterministically;
+5. performance observations cannot automatically support a mechanism;
+6. HDC/model similarity cannot create causal equivalence;
+7. BIO-CEM and ROT-EQUIP use the same common relations without semantic distortion;
+8. policy changes do not rewrite scientific evidence;
+9. recommendation/authorization/execution/outcome remain distinct;
+10. scale and context transfer are never implicit.
 
 ## Non-goals
 
 - wet-lab recipes;
-- autonomous manufacturing instructions;
+- autonomous manufacturing or maintenance instructions;
 - autonomous safety-critical control;
 - procurement/funding authority;
 - regulatory certification;
 - replacing domain standards;
-- inventing a second material, quantity, uncertainty or provenance identity system;
-- using a single `innovation_score` or `stagnant=true` flag as truth.
+- creating a universal innovation/stagnation score;
+- inventing duplicate identity, quantity, measurement, lineage, hypothesis, provenance, lifecycle, currentness or authority systems.
 
 ## Acceptance boundary
 
