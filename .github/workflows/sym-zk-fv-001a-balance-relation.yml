@@ -1,0 +1,127 @@
+name: SYM-ZK-FV-001A Balance Relation
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/zk/BalanceRelation.lean"
+      - "docs/formal/sym-zk-fv-001a-balance-relation-v1.json"
+      - "scripts/validate_sym_zk_fv_001a.py"
+      - "crates/core/symthaea-zkproof/core/src/lib.rs"
+      - "crates/core/symthaea-zkproof/methods/guest/src/main.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-zk-fv-001a-balance-relation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "formal/lean/zk/BalanceRelation.lean"
+      - "docs/formal/sym-zk-fv-001a-balance-relation-v1.json"
+      - "scripts/validate_sym_zk_fv_001a.py"
+      - "crates/core/symthaea-zkproof/core/src/lib.rs"
+      - "crates/core/symthaea-zkproof/methods/guest/src/main.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-zk-fv-001a-balance-relation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-zk-fv-001a-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  balance-relation:
+    name: Lean balance statement relation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record exact Git subject
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git status --porcelain=v1 --untracked-files=all
+
+      - name: Static contract and negative controls
+        run: python3 scripts/validate_sym_zk_fv_001a.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Typecheck Lean theorem subject
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            lean --version | tee /tmp/sym-zk-fv-001a-lean-version.txt
+            lean formal/lean/zk/BalanceRelation.lean | tee /tmp/sym-zk-fv-001a-lean-output.txt
+          '
+
+      - name: Postflight immutability and receipt
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          receipt = {
+              "schema": "symthaea.formal.sym-zk-fv-001a-qualification-receipt.v1",
+              "issue": 5849,
+              "parent_issue": 5841,
+              "evidence_class": "AbstractFormalTheorem",
+              "result": "LeanTypechecked",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "lean_version": Path("/tmp/sym-zk-fv-001a-lean-version.txt").read_text().strip(),
+              "proof_sha256": sha256("formal/lean/zk/BalanceRelation.lean"),
+              "manifest_sha256": sha256("docs/formal/sym-zk-fv-001a-balance-relation-v1.json"),
+              "validator_sha256": sha256("scripts/validate_sym_zk_fv_001a.py"),
+              "core_source_blob": git("rev-parse", "HEAD:crates/core/symthaea-zkproof/core/src/lib.rs"),
+              "guest_source_blob": git("rev-parse", "HEAD:crates/core/symthaea-zkproof/methods/guest/src/main.rs"),
+              "static_contract": "PASS",
+              "negative_controls": "PASS",
+              "lean_exit_zero": True,
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-risc0-guest-refinement",
+                  "not-proof-system-soundness",
+                  "not-zero-knowledge",
+                  "not-runtime-authorization"
+              ]
+          }
+          Path("/tmp/sym-zk-fv-001a-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-zk-fv-001a-${{ github.sha }}
+          path: |
+            /tmp/sym-zk-fv-001a-lean-version.txt
+            /tmp/sym-zk-fv-001a-lean-output.txt
+            /tmp/sym-zk-fv-001a-receipt.json
+          if-no-files-found: error
+          retention-days: 30
