@@ -1,0 +1,41 @@
+{
+  "schema": "symthaea.formal.hdc-crypto-fv-001.v1",
+  "issue": 5864,
+  "parent_issue": 5862,
+  "evidence_class": "AbstractFormalTheorem",
+  "source": {
+    "commit": "2dfddf6027d8eaf62221f8a71be2bb6d1d7bd9a9",
+    "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+    "blob": "59c0ea6bc92fd1d67a9f764bb396918fd823331a",
+    "subjects": [
+      "HdcMac::compute",
+      "HdcThresholdSharing::split",
+      "HdcThresholdSharing::split_secure",
+      "HdcShare"
+    ],
+    "relationship": "abstract-negative-theorem-target-not-rust-refinement"
+  },
+  "abstract_subject": {
+    "dimension_bits": 16384,
+    "representation": "Fin 16384 -> Bool",
+    "binding": "pointwise Bool.xor",
+    "mac_model": "tag = message XOR effective_mask",
+    "share_model": "record = (secret XOR mask, mask)"
+  },
+  "required_theorems": [
+    "known_pair_recovers_effective_mask",
+    "one_pair_forges_arbitrary_message",
+    "one_share_recovers_secret"
+  ],
+  "result_semantics": {
+    "mac": "negative-security-theorem-forgeable-linear-transform",
+    "sharing": "negative-security-theorem-one-share-recovers-secret"
+  },
+  "nonclaims": [
+    "not-rust-refinement",
+    "not-simd-or-compiler-proof",
+    "not-positive-mac-security",
+    "not-positive-threshold-security",
+    "not-proof-of-unrelated-exploitability"
+  ]
+}
