@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! ngspice adapter boundary.
 //!
-//! ENG-SPICE-001 admits a deliberately narrow real-solver path: an explicit,
-//! self-contained netlist is executed in ngspice batch mode and requested
-//! scalar `.measure` results are parsed from a dedicated log artifact.
+//! ENG-SPICE-001 admits a deliberately narrow real-solver path. Until solver
+//! input closure is integrated, qualified netlists are restricted to built-in
+//! linear R/C/L elements plus independent V/I sources and a small analysis/output
+//! directive subset. Requested scalar `.measure` results are parsed from a
+//! dedicated log artifact.
 
 #![deny(unsafe_code)]
 
@@ -101,8 +103,9 @@ impl NgspiceBridge {
         let log_path = temporary_log_path(&input_digest);
         let command = CommandSolver::new(&self.solver_cmd)
             .arg("-b")
-            // Ignore user .spiceinit so ambient interactive preferences cannot
-            // silently change qualified batch execution.
+            // Suppress user .spiceinit. The remaining installation/runtime
+            // closure is intentionally outside the current claim and is the
+            // reason this lane admits only a closure-safe built-in subset.
             .arg("-n")
             .arg("-o")
             .arg(log_path.to_string_lossy().to_string())
@@ -141,7 +144,7 @@ impl NgspiceBridge {
             result = result.with_metric(metric, value, unit);
         }
         result.warnings.push(
-            "ngspice process/log/metric parsing succeeded; this does not establish circuit-model or physical validity"
+            "qualified only for the built-in linear R/C/L + independent V/I subset; process/log/metric parsing does not establish model or physical validity"
                 .into(),
         );
         result = result.with_external_evidence(SimulationEvidence {
@@ -155,7 +158,8 @@ impl NgspiceBridge {
         result.validate()?;
         if !result.is_engineering_evidence() {
             return Err(SimulationError::Adapter(
-                "parsed ngspice result did not satisfy complete external-evidence provenance".into(),
+                "parsed ngspice result did not satisfy current external-evidence provenance contract"
+                    .into(),
             ));
         }
         Ok(result)
@@ -191,8 +195,7 @@ impl SimulationBackend for NgspiceBridge {
     fn run(&self, request: &SimulationRequest) -> Result<SimulationResult, SimulationError> {
         if request.solver != SolverKind::Circuit {
             return Err(SimulationError::InvalidRequest(format!(
-                "ngspice cannot satisfy {:?}",
-                request.solver
+                "ngspice cannot satisfy {:?}", request.solver
             )));
         }
         if !matches!(
@@ -200,8 +203,7 @@ impl SimulationBackend for NgspiceBridge {
             EngineeringDomain::Electrical | EngineeringDomain::Systems
         ) {
             return Err(SimulationError::InvalidRequest(format!(
-                "ngspice expected electrical/systems request, got {:?}",
-                request.domain
+                "ngspice expected electrical/systems request, got {:?}", request.domain
             )));
         }
         if self.dry_run {
@@ -237,46 +239,43 @@ fn normalize_metric(metric: &str) -> String {
     metric.trim().to_ascii_lowercase()
 }
 
-/// Tokenize enough SPICE syntax to identify assignment keys without false
-/// positives such as `profile=` containing the substring `file=`.
-fn assignment_keys(line: &str) -> Vec<String> {
-    let mut normalized = String::with_capacity(line.len() * 2);
-    for ch in line.chars() {
-        match ch {
-            '=' => normalized.push_str(" = "),
-            '(' | ')' | ',' | '{' | '}' => normalized.push(' '),
-            _ => normalized.push(ch.to_ascii_lowercase()),
+fn validate_statement_subset(first: &str) -> Result<(), SimulationError> {
+    if first.starts_with('.') {
+        const ALLOWED_DIRECTIVES: &[&str] = &[
+            ".tran", ".ac", ".dc", ".op", ".measure", ".meas", ".print", ".plot", ".end",
+        ];
+        if !ALLOWED_DIRECTIVES.contains(&first) {
+            return Err(SimulationError::InvalidRequest(format!(
+                "qualified ngspice first tranche rejects directive {first:?}; only the built-in linear analysis/output subset is admitted"
+            )));
         }
+        return Ok(());
     }
-    let tokens: Vec<_> = normalized.split_whitespace().collect();
-    tokens
-        .windows(2)
-        .filter_map(|window| (window[1] == "=").then(|| window[0].to_string()))
-        .collect()
+
+    let prefix = first.as_bytes().first().copied().unwrap_or_default();
+    if matches!(prefix, b'r' | b'c' | b'l' | b'v' | b'i') {
+        Ok(())
+    } else {
+        Err(SimulationError::InvalidRequest(format!(
+            "qualified ngspice first tranche rejects element/statement {first:?}; only R/C/L and independent V/I sources are admitted"
+        )))
+    }
 }
 
-fn forbidden_runtime_file_key(line: &str) -> Option<String> {
-    assignment_keys(line).into_iter().find(|key| {
-        key == "file"
-            || key == "filename"
-            || key == "filepath"
-            || key.ends_with("_file")
-            || key.ends_with("_filename")
-            || key.ends_with("_filepath")
-    })
+fn contains_file_bearing_syntax(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    // Deliberately conservative. The first tranche has no reason to use any
+    // token containing `file`; false negatives are more dangerous than rejecting
+    // an unrelated identifier until the transitive closure graph is available.
+    lower
+        .split(|ch: char| ch.is_whitespace() || matches!(ch, '(' | ')' | ',' | '=' | '{' | '}' | '"' | '\''))
+        .any(|token| token.contains("file"))
 }
 
-/// Restrict the first qualified execution lane to declarative self-contained
-/// netlists. Until ENG-SIM-INPUT-001 provides a transitive trusted artifact
-/// closure, both directive-based and parameter-based ambient file discovery are
-/// rejected fail-closed.
 fn validate_qualified_netlist(
     netlist: &str,
     requested: &BTreeMap<String, String>,
 ) -> Result<(), SimulationError> {
-    let forbidden = [
-        ".control", ".endc", ".include", ".inc", ".lib", "source", "load", "shell",
-    ];
     let mut measures = BTreeSet::new();
     let mut has_tabulated_output = false;
 
@@ -290,16 +289,15 @@ fn validate_qualified_netlist(
         let Some(first) = tokens.first().copied() else {
             continue;
         };
-        if forbidden.contains(&first) {
-            return Err(SimulationError::InvalidRequest(format!(
-                "qualified ngspice netlist uses forbidden directive/command {first:?}; first tranche permits only self-contained declarative netlists"
-            )));
+
+        validate_statement_subset(first)?;
+        if contains_file_bearing_syntax(&lower) {
+            return Err(SimulationError::InvalidRequest(
+                "qualified ngspice first tranche rejects file-bearing syntax until external solver input closure is explicit"
+                    .into(),
+            ));
         }
-        if let Some(key) = forbidden_runtime_file_key(&lower) {
-            return Err(SimulationError::InvalidRequest(format!(
-                "qualified ngspice netlist uses runtime file-bearing parameter {key:?}; external model/data files require an explicit solver input-closure artifact graph"
-            )));
-        }
+
         if first == ".print" || first == ".plot" {
             has_tabulated_output = true;
         }
@@ -398,8 +396,7 @@ fn reject_known_failure_markers(log: &str) -> Result<(), SimulationError> {
             || (normalized.contains("measure") && normalized.contains("failed"));
         if hard_failure {
             return Err(SimulationError::Adapter(format!(
-                "ngspice log reports numerical/analysis failure: {}",
-                line.trim()
+                "ngspice log reports numerical/analysis failure: {}", line.trim()
             )));
         }
     }
@@ -444,47 +441,43 @@ mod tests {
     }
 
     #[test]
-    fn qualified_netlist_binds_requested_measure() {
+    fn qualified_linear_netlist_is_admitted() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
         assert!(validate_qualified_netlist(safe_netlist(), &requested).is_ok());
     }
 
     #[test]
-    fn control_language_and_includes_are_rejected() {
+    fn model_subcircuit_control_and_xspice_surfaces_are_rejected() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        for netlist in [
-            ".control\nshell echo nope\n.endc\n.measure tran vmax MAX v(out)\n.print tran v(out)\n",
-            ".include vendor.lib\n.measure tran vmax MAX v(out)\n.print tran v(out)\n",
-        ] {
-            assert!(validate_qualified_netlist(netlist, &requested).is_err());
-        }
-    }
-
-    #[test]
-    fn runtime_file_parameters_are_rejected_until_closure_is_bound() {
-        let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        for line in [
-            "A1 in out model file=unbound.csv",
-            "A1 in out model input_file = unbound.csv",
-            "A1 in out model state_file=state.bin",
-            "A1 in out model waveform_filename=data.tbl",
-            "A1 in out model filepath=/tmp/data",
+        for statement in [
+            ".model d diode",
+            ".subckt thing in out",
+            ".control",
+            "A1 in out digital_model",
+            "D1 in out diode_model",
+            "M1 d g s b mos_model",
         ] {
             let netlist = format!(
-                "{line}\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n"
+                "* fixture\n{statement}\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n"
             );
-            assert!(matches!(
-                validate_qualified_netlist(&netlist, &requested),
-                Err(SimulationError::InvalidRequest(message)) if message.contains("runtime file-bearing")
-            ));
+            assert!(validate_qualified_netlist(&netlist, &requested).is_err());
         }
     }
 
     #[test]
-    fn similarly_named_non_file_parameter_is_not_false_positive() {
+    fn file_bearing_syntax_is_rejected_until_closure_is_bound() {
         let requested = canonical_requested_metrics(&request(&["vmax"])).unwrap();
-        let netlist = "A1 in out model profile=1\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n";
-        assert!(validate_qualified_netlist(netlist, &requested).is_ok());
+        for statement in [
+            "V1 in 0 PWL FILE data.csv",
+            "V1 in 0 wavefile=unbound.wav",
+            "A1 in out model input_file=unbound.csv",
+            ".include vendor.lib",
+        ] {
+            let netlist = format!(
+                "* fixture\n{statement}\n.tran 1u 10u\n.measure tran vmax MAX v(out)\n.print tran v(out)\n.end\n"
+            );
+            assert!(validate_qualified_netlist(&netlist, &requested).is_err());
+        }
     }
 
     #[test]
