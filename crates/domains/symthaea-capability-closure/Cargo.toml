@@ -5,6 +5,9 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Pure deterministic capability-dependency contracts for productive-closure analysis"
 
+[lib]
+path = "src/root.rs"
+
 [dependencies]
 serde = { workspace = true }
 
