@@ -8,11 +8,13 @@
 //! Each admitted unit has a stable UCUM-compatible code, an explicit quantity
 //! kind, and a deterministic conversion to one canonical SI representation.
 //!
-//! Human display labels are not evidence identities.
+//! Human display labels are not evidence identities. `UnitCode` serializes as
+//! its canonical machine code (for example `"Ohm"`, `"m3"`, `"Cel"`), not as
+//! a Rust enum variant name.
 
 #![deny(unsafe_code)]
 
-use serde::{Deserialize, Serialize};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
 /// Semantic quantity kind. Equal physical dimensions do not automatically imply
@@ -44,11 +46,7 @@ pub enum QuantityKind {
 }
 
 /// Closed unit set admitted by ENG-UNITS-001 v1.
-///
-/// Variant names are Rust-facing; `ucum_code()` is the stable serialized/machine
-/// unit identity intended for evidence interchange.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UnitCode {
     Ohm,
     Milliohm,
@@ -118,7 +116,7 @@ impl UnitCode {
         }
     }
 
-    /// Canonical case-sensitive UCUM-compatible code.
+    /// Canonical case-sensitive UCUM-compatible machine code.
     pub const fn ucum_code(self) -> &'static str {
         match self {
             Self::Ohm => "Ohm",
@@ -160,6 +158,52 @@ impl UnitCode {
             Self::Pascal => "Pa",
             Self::Kilopascal => "kPa",
         }
+    }
+
+    /// Parse only the exact case-sensitive codes admitted by this contract.
+    /// This is not a general UCUM parser and intentionally accepts no aliases.
+    pub fn from_ucum_code(code: &str) -> Option<Self> {
+        Some(match code {
+            "Ohm" => Self::Ohm,
+            "mOhm" => Self::Milliohm,
+            "H" => Self::Henry,
+            "mH" => Self::Millihenry,
+            "uH" => Self::Microhenry,
+            "V" => Self::Volt,
+            "mV" => Self::Millivolt,
+            "A" => Self::Ampere,
+            "mA" => Self::Milliampere,
+            "W" => Self::Watt,
+            "mW" => Self::Milliwatt,
+            "kW" => Self::Kilowatt,
+            "K" => Self::Kelvin,
+            "Cel" => Self::Celsius,
+            "K-1" => Self::PerKelvin,
+            "m" => Self::Meter,
+            "cm" => Self::Centimeter,
+            "mm" => Self::Millimeter,
+            "m2" => Self::SquareMeter,
+            "cm2" => Self::SquareCentimeter,
+            "mm2" => Self::SquareMillimeter,
+            "m3" => Self::CubicMeter,
+            "L" => Self::Liter,
+            "mL" => Self::Milliliter,
+            "kg" => Self::Kilogram,
+            "g" => Self::Gram,
+            "m/N" => Self::MeterPerNewton,
+            "N/m" => Self::NewtonPerMeter,
+            "N.s/m" => Self::NewtonSecondPerMeter,
+            "m/s" => Self::MeterPerSecond,
+            "kg/m3" => Self::KilogramPerCubicMeter,
+            "T.m" => Self::TeslaMeter,
+            "Hz" => Self::Hertz,
+            "kHz" => Self::Kilohertz,
+            "s" => Self::Second,
+            "ms" => Self::Millisecond,
+            "Pa" => Self::Pascal,
+            "kPa" => Self::Kilopascal,
+            _ => return None,
+        })
     }
 
     pub const fn canonical_unit(self) -> UnitCode {
@@ -240,6 +284,26 @@ impl UnitCode {
             });
         }
         Ok((canonical - self.offset_to_canonical()) / self.scale_to_canonical())
+    }
+}
+
+impl Serialize for UnitCode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(self.ucum_code())
+    }
+}
+
+impl<'de> Deserialize<'de> for UnitCode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let code = String::deserialize(deserializer)?;
+        Self::from_ucum_code(&code)
+            .ok_or_else(|| D::Error::custom(format!("unsupported canonical engineering unit {code:?}")))
     }
 }
 
@@ -330,6 +394,18 @@ mod tests {
         assert_eq!(UnitCode::Celsius.ucum_code(), "Cel");
         assert_eq!(UnitCode::CubicMeter.ucum_code(), "m3");
         assert_eq!(UnitCode::TeslaMeter.ucum_code(), "T.m");
+    }
+
+    #[test]
+    fn wire_serialization_uses_canonical_machine_code() {
+        assert_eq!(serde_json::to_string(&UnitCode::Ohm).unwrap(), "\"Ohm\"");
+        assert_eq!(serde_json::to_string(&UnitCode::CubicMeter).unwrap(), "\"m3\"");
+        assert_eq!(
+            serde_json::from_str::<UnitCode>("\"Cel\"").unwrap(),
+            UnitCode::Celsius
+        );
+        assert!(serde_json::from_str::<UnitCode>("\"ohm\"").is_err());
+        assert!(serde_json::from_str::<UnitCode>("\"cubic_meter\"").is_err());
     }
 
     #[test]
