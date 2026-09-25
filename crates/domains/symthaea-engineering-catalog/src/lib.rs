@@ -20,6 +20,8 @@
 //! != installed article
 //! ```
 
+#![deny(unsafe_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use thiserror::Error;
@@ -44,8 +46,13 @@ pub enum CatalogError {
     DuplicateSpecification(String),
     #[error("evidence class requires a source document")]
     SourceDocumentRequired,
-    #[error("internally measured evidence must not use a manufacturer/distributor source document as its measurement authority")]
-    InvalidMeasuredAuthority,
+    #[error("evidence class does not admit a source document")]
+    SourceDocumentNotAdmitted,
+    #[error("evidence class {evidence_class} is incompatible with source kind {source_kind}")]
+    EvidenceSourceClassMismatch {
+        evidence_class: &'static str,
+        source_kind: String,
+    },
 }
 
 fn validate_token(field: &'static str, value: &str) -> Result<(), CatalogError> {
@@ -59,7 +66,11 @@ fn validate_token(field: &'static str, value: &str) -> Result<(), CatalogError> 
 }
 
 fn validate_sha256_hex(value: &str) -> Result<(), CatalogError> {
-    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()) {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    {
         return Err(CatalogError::InvalidSha256);
     }
     Ok(())
@@ -93,8 +104,6 @@ pub struct SourceDocumentId(pub String);
 #[serde(transparent)]
 pub struct EvidenceSnapshotId(pub String);
 
-/// Stable manufacturer identity. `display_name` is navigation metadata and is intentionally
-/// excluded from component identity; `manufacturer_id` is the semantic identifier.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManufacturerIdentityV1 {
     pub manufacturer_id: String,
@@ -159,10 +168,6 @@ impl ComponentClassV1 {
     }
 }
 
-/// Canonical engineering component subject.
-///
-/// Friendly aliases and display labels are navigation metadata and do not affect identity.
-/// Variant, revision, manufacturer identity, part number and class do affect identity.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComponentSubjectV1 {
     pub manufacturer: ManufacturerIdentityV1,
@@ -240,21 +245,8 @@ impl SourceKindV1 {
         }
         Ok(())
     }
-
-    fn is_manufacturer_or_distributor(&self) -> bool {
-        matches!(
-            self,
-            Self::ManufacturerDatasheet
-                | Self::ManufacturerApplicationNote
-                | Self::ManufacturerDrawing
-                | Self::ManufacturerCertificate
-                | Self::DistributorDocument
-        )
-    }
 }
 
-/// Exact source-document identity. `locator` and retrieval metadata help an auditor find the
-/// artifact but do not replace or alter the byte-content identity.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EngineeringSourceDocumentV1 {
     pub source_kind: SourceKindV1,
@@ -290,8 +282,6 @@ impl EngineeringSourceDocumentV1 {
     }
 }
 
-/// Evidence meaning attached to a specification claim. These variants are intentionally not
-/// ordered: `AbsoluteMaximum`, for example, is not "stronger" than `Nominal` for normal use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SpecificationEvidenceClassV1 {
     ManufacturerGuaranteed,
@@ -311,10 +301,45 @@ impl SpecificationEvidenceClassV1 {
     pub fn requires_source_document(self) -> bool {
         !matches!(self, Self::Assumption | Self::Unknown)
     }
+
+    fn canonical_tag(self) -> &'static str {
+        match self {
+            Self::ManufacturerGuaranteed => "manufacturer-guaranteed",
+            Self::ManufacturerTypical => "manufacturer-typical",
+            Self::ManufacturerAbsoluteMaximum => "manufacturer-absolute-maximum",
+            Self::ManufacturerNominal => "manufacturer-nominal",
+            Self::DistributorMetadata => "distributor-metadata",
+            Self::ImportedDatabase => "imported-database",
+            Self::CommunityReported => "community-reported",
+            Self::InternallyMeasured => "internally-measured",
+            Self::DerivedModel => "derived-model",
+            Self::Assumption => "assumption",
+            Self::Unknown => "unknown",
+        }
+    }
+
+    fn admits_source_kind(self, source: &SourceKindV1) -> bool {
+        match self {
+            Self::ManufacturerGuaranteed
+            | Self::ManufacturerTypical
+            | Self::ManufacturerAbsoluteMaximum
+            | Self::ManufacturerNominal => matches!(
+                source,
+                SourceKindV1::ManufacturerDatasheet
+                    | SourceKindV1::ManufacturerApplicationNote
+                    | SourceKindV1::ManufacturerDrawing
+                    | SourceKindV1::ManufacturerCertificate
+            ),
+            Self::DistributorMetadata => matches!(source, SourceKindV1::DistributorDocument),
+            Self::ImportedDatabase => matches!(source, SourceKindV1::ImportedDatabase),
+            Self::CommunityReported => matches!(source, SourceKindV1::CommunityReport),
+            Self::InternallyMeasured => matches!(source, SourceKindV1::InternalMeasurementRecord),
+            Self::DerivedModel => matches!(source, SourceKindV1::InternalModelRecord),
+            Self::Assumption | Self::Unknown => false,
+        }
+    }
 }
 
-/// A semantic specification claim *without* a numeric value. The numeric quantity/value layer
-/// is added only after SE-SEM-001 qualifies.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpecificationEvidenceRefV1 {
     pub specification_kind_id: String,
@@ -333,18 +358,21 @@ impl SpecificationEvidenceRefV1 {
             validate_token("applicability_profile_id", value)?;
         }
 
-        if self.evidence_class.requires_source_document() && self.source_document_id.is_none() {
-            return Err(CatalogError::SourceDocumentRequired);
+        match (&self.source_document_id, self.evidence_class.requires_source_document()) {
+            (None, true) => return Err(CatalogError::SourceDocumentRequired),
+            (Some(_), false) => return Err(CatalogError::SourceDocumentNotAdmitted),
+            _ => {}
         }
 
         if let Some(document_id) = &self.source_document_id {
             let document = documents
                 .get(document_id)
                 .ok_or_else(|| CatalogError::UnknownDocument(document_id.0.clone()))?;
-            if self.evidence_class == SpecificationEvidenceClassV1::InternallyMeasured
-                && document.source_kind.is_manufacturer_or_distributor()
-            {
-                return Err(CatalogError::InvalidMeasuredAuthority);
+            if !self.evidence_class.admits_source_kind(&document.source_kind) {
+                return Err(CatalogError::EvidenceSourceClassMismatch {
+                    evidence_class: self.evidence_class.canonical_tag(),
+                    source_kind: document.source_kind.canonical_tag(),
+                });
             }
         }
         Ok(())
@@ -352,9 +380,9 @@ impl SpecificationEvidenceRefV1 {
 
     fn canonical_key(&self) -> String {
         format!(
-            "{}::{:?}::{}::{}",
+            "{}::{}::{}::{}",
             self.specification_kind_id,
-            self.evidence_class,
+            self.evidence_class.canonical_tag(),
             self.source_document_id
                 .as_ref()
                 .map(|id| id.0.as_str())
@@ -364,10 +392,6 @@ impl SpecificationEvidenceRefV1 {
     }
 }
 
-/// Canonical evidence snapshot for one component subject.
-///
-/// Document ordering and specification ordering are canonicalized before hashing. Friendly
-/// component labels and source locators are not semantic identity inputs.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComponentEvidenceSnapshotV1 {
     pub component: ComponentSubjectV1,
@@ -380,10 +404,7 @@ pub struct ComponentEvidenceSnapshotV1 {
 impl ComponentEvidenceSnapshotV1 {
     pub fn validate(
         &self,
-    ) -> Result<
-        BTreeMap<SourceDocumentId, EngineeringSourceDocumentV1>,
-        CatalogError,
-    > {
+    ) -> Result<BTreeMap<SourceDocumentId, EngineeringSourceDocumentV1>, CatalogError> {
         self.component.validate()?;
         let mut documents = BTreeMap::new();
         for document in &self.source_documents {
@@ -424,7 +445,6 @@ impl ComponentEvidenceSnapshotV1 {
         for key in evidence {
             hash_field(&mut hasher, &key);
         }
-
         Ok(EvidenceSnapshotId(hasher.finalize().to_hex().to_string()))
     }
 }
@@ -452,12 +472,28 @@ mod tests {
         EngineeringSourceDocumentV1 {
             source_kind: kind,
             publisher_id: "maker:acme-optics".into(),
-            document_id: "PD-100-datasheet".into(),
+            document_id: "PD-100-document".into(),
             revision: Some("2026-01".into()),
             content_sha256: std::iter::repeat_n(digest_char, 64).collect(),
             locator: Some("https://example.invalid/pd100.pdf".into()),
             retrieved_at: Some("2026-09-25T00:00:00Z".into()),
         }
+    }
+
+    fn evidence_for(
+        class: SpecificationEvidenceClassV1,
+        doc: &EngineeringSourceDocumentV1,
+    ) -> (BTreeMap<SourceDocumentId, EngineeringSourceDocumentV1>, SpecificationEvidenceRefV1) {
+        let id = doc.source_document_id().unwrap();
+        (
+            BTreeMap::from([(id.clone(), doc.clone())]),
+            SpecificationEvidenceRefV1 {
+                specification_kind_id: "test.specification".into(),
+                evidence_class: class,
+                source_document_id: Some(id),
+                applicability_profile_id: None,
+            },
+        )
     }
 
     #[test]
@@ -484,20 +520,14 @@ mod tests {
         let mut b = a.clone();
         b.locator = Some("file:///archive/pd100.pdf".into());
         b.retrieved_at = Some("2026-09-26T00:00:00Z".into());
-        assert_eq!(
-            a.source_document_id().unwrap(),
-            b.source_document_id().unwrap()
-        );
+        assert_eq!(a.source_document_id().unwrap(), b.source_document_id().unwrap());
     }
 
     #[test]
     fn changed_source_bytes_change_document_identity() {
         let a = document(SourceKindV1::ManufacturerDatasheet, 'a');
         let b = document(SourceKindV1::ManufacturerDatasheet, 'b');
-        assert_ne!(
-            a.source_document_id().unwrap(),
-            b.source_document_id().unwrap()
-        );
+        assert_ne!(a.source_document_id().unwrap(), b.source_document_id().unwrap());
     }
 
     #[test]
@@ -507,7 +537,6 @@ mod tests {
         d2.document_id = "PD-100-drawing".into();
         let d1_id = d1.source_document_id().unwrap();
         let d2_id = d2.source_document_id().unwrap();
-
         let e1 = SpecificationEvidenceRefV1 {
             specification_kind_id: "optical.responsivity".into(),
             evidence_class: SpecificationEvidenceClassV1::ManufacturerTypical,
@@ -520,7 +549,6 @@ mod tests {
             source_document_id: Some(d2_id),
             applicability_profile_id: None,
         };
-
         let a = ComponentEvidenceSnapshotV1 {
             component: component(),
             source_documents: vec![d1.clone(), d2.clone()],
@@ -552,13 +580,7 @@ mod tests {
     #[test]
     fn typical_and_guaranteed_are_semantically_distinct() {
         let doc = document(SourceKindV1::ManufacturerDatasheet, 'a');
-        let id = doc.source_document_id().unwrap();
-        let typical = SpecificationEvidenceRefV1 {
-            specification_kind_id: "electrical.current".into(),
-            evidence_class: SpecificationEvidenceClassV1::ManufacturerTypical,
-            source_document_id: Some(id.clone()),
-            applicability_profile_id: None,
-        };
+        let (_, typical) = evidence_for(SpecificationEvidenceClassV1::ManufacturerTypical, &doc);
         let guaranteed = SpecificationEvidenceRefV1 {
             evidence_class: SpecificationEvidenceClassV1::ManufacturerGuaranteed,
             ..typical.clone()
@@ -567,31 +589,59 @@ mod tests {
     }
 
     #[test]
-    fn internal_measurement_cannot_launder_manufacturer_document() {
-        let doc = document(SourceKindV1::ManufacturerDatasheet, 'a');
-        let id = doc.source_document_id().unwrap();
-        let docs = BTreeMap::from([(id.clone(), doc)]);
-        let evidence = SpecificationEvidenceRefV1 {
-            specification_kind_id: "electrical.dark-current".into(),
-            evidence_class: SpecificationEvidenceClassV1::InternallyMeasured,
-            source_document_id: Some(id),
-            applicability_profile_id: None,
-        };
-        assert_eq!(evidence.validate(&docs), Err(CatalogError::InvalidMeasuredAuthority));
+    fn positive_source_compatibility_accepts_exact_classes() {
+        let cases = [
+            (SpecificationEvidenceClassV1::ManufacturerTypical, SourceKindV1::ManufacturerDatasheet),
+            (SpecificationEvidenceClassV1::DistributorMetadata, SourceKindV1::DistributorDocument),
+            (SpecificationEvidenceClassV1::ImportedDatabase, SourceKindV1::ImportedDatabase),
+            (SpecificationEvidenceClassV1::CommunityReported, SourceKindV1::CommunityReport),
+            (SpecificationEvidenceClassV1::InternallyMeasured, SourceKindV1::InternalMeasurementRecord),
+            (SpecificationEvidenceClassV1::DerivedModel, SourceKindV1::InternalModelRecord),
+        ];
+        for (index, (class, kind)) in cases.into_iter().enumerate() {
+            let doc = document(kind, char::from(b'a' + index as u8));
+            let (docs, evidence) = evidence_for(class, &doc);
+            assert!(evidence.validate(&docs).is_ok());
+        }
     }
 
     #[test]
-    fn internal_measurement_requires_internal_measurement_record() {
-        let doc = document(SourceKindV1::InternalMeasurementRecord, 'c');
-        let id = doc.source_document_id().unwrap();
-        let docs = BTreeMap::from([(id.clone(), doc)]);
-        let evidence = SpecificationEvidenceRefV1 {
-            specification_kind_id: "electrical.dark-current".into(),
-            evidence_class: SpecificationEvidenceClassV1::InternallyMeasured,
-            source_document_id: Some(id),
-            applicability_profile_id: Some("article:serial-001".into()),
-        };
-        assert!(evidence.validate(&docs).is_ok());
+    fn internal_measurement_rejects_manufacturer_imported_community_and_model_sources() {
+        let invalid = [
+            SourceKindV1::ManufacturerDatasheet,
+            SourceKindV1::DistributorDocument,
+            SourceKindV1::ImportedDatabase,
+            SourceKindV1::CommunityReport,
+            SourceKindV1::InternalModelRecord,
+            SourceKindV1::StandardOrHandbook,
+        ];
+        for (index, kind) in invalid.into_iter().enumerate() {
+            let doc = document(kind, char::from(b'a' + index as u8));
+            let (docs, evidence) = evidence_for(SpecificationEvidenceClassV1::InternallyMeasured, &doc);
+            assert!(matches!(
+                evidence.validate(&docs),
+                Err(CatalogError::EvidenceSourceClassMismatch { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn manufacturer_claim_cannot_use_distributor_document() {
+        let doc = document(SourceKindV1::DistributorDocument, 'a');
+        let (docs, evidence) = evidence_for(SpecificationEvidenceClassV1::ManufacturerGuaranteed, &doc);
+        assert!(matches!(
+            evidence.validate(&docs),
+            Err(CatalogError::EvidenceSourceClassMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn assumption_and_unknown_cannot_gain_document_authority() {
+        let doc = document(SourceKindV1::ManufacturerDatasheet, 'a');
+        for class in [SpecificationEvidenceClassV1::Assumption, SpecificationEvidenceClassV1::Unknown] {
+            let (docs, evidence) = evidence_for(class, &doc);
+            assert_eq!(evidence.validate(&docs), Err(CatalogError::SourceDocumentNotAdmitted));
+        }
     }
 
     #[test]
@@ -602,10 +652,19 @@ mod tests {
     }
 
     #[test]
-    fn serde_round_trip_preserves_identity() {
+    fn serde_round_trip_preserves_identity_and_validation() {
         let original = component();
         let encoded = serde_json::to_string(&original).unwrap();
         let decoded: ComponentSubjectV1 = serde_json::from_str(&encoded).unwrap();
         assert_eq!(original.component_id().unwrap(), decoded.component_id().unwrap());
+
+        let doc = document(SourceKindV1::ImportedDatabase, 'c');
+        let (docs, bad) = evidence_for(SpecificationEvidenceClassV1::InternallyMeasured, &doc);
+        let encoded = serde_json::to_string(&bad).unwrap();
+        let decoded: SpecificationEvidenceRefV1 = serde_json::from_str(&encoded).unwrap();
+        assert!(matches!(
+            decoded.validate(&docs),
+            Err(CatalogError::EvidenceSourceClassMismatch { .. })
+        ));
     }
 }
