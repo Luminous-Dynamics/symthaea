@@ -7,14 +7,6 @@
 //! model enclosure loading, diaphragm breakup, acoustic radiation, thermal drift,
 //! suspension/motor nonlinearities, source impedance, or room response.
 //!
-//! The governing small-signal equations are:
-//!
-//! `Z_m = R_ms + j(omega M_ms - 1/(omega C_ms))`
-//!
-//! `Z_in = R_e + j omega L_e + (Bl)^2 / Z_m`
-//!
-//! `I = V / Z_in`, `v = Bl I / Z_m`, `x = v / (j omega)`.
-//!
 //! Results from this module are `AnalyticalPrediction`, never physical
 //! measurement evidence.
 
@@ -29,19 +21,38 @@ use thiserror::Error;
 const MODEL_ID: &str = "moving-coil-lumped-small-signal-v1";
 const SINGULAR_MAGNITUDE_EPSILON: f64 = 1.0e-12;
 
-/// Authority attached to EAC-002 results.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PredictionAuthority {
     AnalyticalPrediction,
 }
 
-/// Exact source parameter snapshot consumed by an analytical derivation.
+/// Distinguishes model-state inputs from invocation-time excitation inputs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AnalyticalInputKind {
+    ModelParameter,
+    RuntimeExcitation,
+}
+
+/// Machine-checkable unit carried by every analytical derivation input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AnalyticalInputUnit {
+    Physical(PhysicalUnit),
+    Hertz,
+    VoltRms,
+}
+
+/// Exact input snapshot consumed by an analytical derivation.
+///
+/// Model parameters retain their EAC-001 source provenance. Runtime excitation
+/// arguments intentionally carry no `ParameterSource`; their authority is that
+/// they are exact invocation inputs, not measured/model parameters.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct InputSourceRef {
+pub struct AnalyticalInputSnapshot {
     pub field: String,
     pub value: f64,
-    pub unit: PhysicalUnit,
-    pub source: ParameterSource,
+    pub unit: AnalyticalInputUnit,
+    pub kind: AnalyticalInputKind,
+    pub source: Option<ParameterSource>,
 }
 
 /// Inspectable derivation metadata carried by every EAC-002 prediction.
@@ -51,11 +62,10 @@ pub struct DerivationRecord {
     pub analytical_model_id: String,
     pub subject_model_id: String,
     pub equation_id: String,
-    pub input_sources: Vec<InputSourceRef>,
+    pub inputs: Vec<AnalyticalInputSnapshot>,
     pub assumptions: Vec<String>,
 }
 
-/// Minimal complex quantity used for analytical phasor results.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ComplexValue {
     pub re: f64,
@@ -96,7 +106,6 @@ impl ComplexValue {
     }
 }
 
-/// One scalar result with explicit analytical derivation metadata.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScalarPrediction {
     pub value: f64,
@@ -104,7 +113,6 @@ pub struct ScalarPrediction {
     pub derivation: DerivationRecord,
 }
 
-/// Derived free-air quality factors.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct QualityFactorPrediction {
     pub resonant_frequency_hz: f64,
@@ -114,7 +122,6 @@ pub struct QualityFactorPrediction {
     pub derivation: DerivationRecord,
 }
 
-/// Small-signal sinusoidal steady-state response at one frequency.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FrequencyPointPrediction {
     pub frequency_hz: f64,
@@ -126,25 +133,21 @@ pub struct FrequencyPointPrediction {
     pub derivation: DerivationRecord,
 }
 
-/// Borrowed analytical view over one validated EAC-001 transducer model.
 pub struct LinearReferenceModel<'a> {
     transducer: &'a TransducerModel,
 }
 
 impl<'a> LinearReferenceModel<'a> {
-    /// Validate the EAC-001 subject before any analytical prediction is admitted.
     pub fn new(transducer: &'a TransducerModel) -> Result<Self, LinearModelError> {
         transducer.validate()?;
         Ok(Self { transducer })
     }
 
-    /// Free-air small-signal mechanical resonance.
     pub fn free_air_resonance(&self) -> Result<ScalarPrediction, LinearModelError> {
         let mass = self.transducer.mechanical.moving_mass.value;
         let compliance = self.transducer.mechanical.suspension.compliance_m_per_n()?;
         let omega_0 = 1.0 / (mass * compliance).sqrt();
         let frequency_hz = omega_0 / (2.0 * PI);
-
         ensure_finite_positive(frequency_hz, "free_air_resonance_hz")?;
 
         Ok(ScalarPrediction {
@@ -153,8 +156,8 @@ impl<'a> LinearReferenceModel<'a> {
             derivation: self.derivation(
                 "fs-v1",
                 vec![
-                    source_ref("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
-                    suspension_source_ref(&self.transducer.mechanical.suspension),
+                    model_input("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
+                    suspension_input(&self.transducer.mechanical.suspension),
                 ],
                 vec![
                     "linear small-signal moving-coil model".into(),
@@ -165,11 +168,6 @@ impl<'a> LinearReferenceModel<'a> {
         })
     }
 
-    /// Classical free-air Qms/Qes/Qts views.
-    ///
-    /// A zero mechanical resistance is a valid idealized EAC-001 parameter, but
-    /// it produces infinite Qms. This method fails closed rather than serializing
-    /// infinity as an ordinary finite engineering result.
     pub fn quality_factors(&self) -> Result<QualityFactorPrediction, LinearModelError> {
         let mass = self.transducer.mechanical.moving_mass.value;
         let compliance = self.transducer.mechanical.suspension.compliance_m_per_n()?;
@@ -204,14 +202,14 @@ impl<'a> LinearReferenceModel<'a> {
             derivation: self.derivation(
                 "free-air-q-v1",
                 vec![
-                    source_ref(
+                    model_input(
                         "electrical.voice_coil_resistance",
                         &self.transducer.electrical.voice_coil_resistance,
                     ),
-                    source_ref("motor.force_factor", &self.transducer.motor.force_factor),
-                    source_ref("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
-                    suspension_source_ref(&self.transducer.mechanical.suspension),
-                    source_ref(
+                    model_input("motor.force_factor", &self.transducer.motor.force_factor),
+                    model_input("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
+                    suspension_input(&self.transducer.mechanical.suspension),
+                    model_input(
                         "mechanical.mechanical_resistance",
                         &self.transducer.mechanical.mechanical_resistance,
                     ),
@@ -228,9 +226,8 @@ impl<'a> LinearReferenceModel<'a> {
     /// Terminal electrical and moving-system response to a real RMS sinusoidal
     /// voltage at one positive frequency.
     ///
-    /// `L_e` is required explicitly. Callers that intentionally want the
-    /// zero-inductance approximation must provide `Some(0 H)` with provenance;
-    /// `None` is unknown and is never silently interpreted as zero.
+    /// `L_e = None` remains unknown. An intentional zero-inductance approximation
+    /// must therefore be represented explicitly as `Some(0 H)` with provenance.
     pub fn response_at(
         &self,
         frequency_hz: f64,
@@ -283,6 +280,31 @@ impl<'a> LinearReferenceModel<'a> {
             ensure_finite_nonnegative(value, name)?;
         }
 
+        let mut inputs = vec![
+            model_input(
+                "electrical.voice_coil_resistance",
+                &self.transducer.electrical.voice_coil_resistance,
+            ),
+            model_input("electrical.voice_coil_inductance", inductance),
+            model_input("motor.force_factor", &self.transducer.motor.force_factor),
+            model_input("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
+            suspension_input(&self.transducer.mechanical.suspension),
+            model_input(
+                "mechanical.mechanical_resistance",
+                &self.transducer.mechanical.mechanical_resistance,
+            ),
+        ];
+        inputs.push(runtime_input(
+            "runtime.frequency",
+            frequency_hz,
+            AnalyticalInputUnit::Hertz,
+        ));
+        inputs.push(runtime_input(
+            "runtime.terminal_voltage_rms",
+            terminal_voltage_rms,
+            AnalyticalInputUnit::VoltRms,
+        ));
+
         Ok(FrequencyPointPrediction {
             frequency_hz,
             terminal_voltage_rms,
@@ -292,20 +314,7 @@ impl<'a> LinearReferenceModel<'a> {
             displacement_m_rms: displacement,
             derivation: self.derivation(
                 "sinusoidal-terminal-response-v1",
-                vec![
-                    source_ref(
-                        "electrical.voice_coil_resistance",
-                        &self.transducer.electrical.voice_coil_resistance,
-                    ),
-                    source_ref("electrical.voice_coil_inductance", inductance),
-                    source_ref("motor.force_factor", &self.transducer.motor.force_factor),
-                    source_ref("mechanical.moving_mass", &self.transducer.mechanical.moving_mass),
-                    suspension_source_ref(&self.transducer.mechanical.suspension),
-                    source_ref(
-                        "mechanical.mechanical_resistance",
-                        &self.transducer.mechanical.mechanical_resistance,
-                    ),
-                ],
+                inputs,
                 vec![
                     "linear small-signal moving-coil model".into(),
                     "sinusoidal steady state".into(),
@@ -320,7 +329,7 @@ impl<'a> LinearReferenceModel<'a> {
     fn derivation(
         &self,
         equation_id: &str,
-        input_sources: Vec<InputSourceRef>,
+        inputs: Vec<AnalyticalInputSnapshot>,
         assumptions: Vec<String>,
     ) -> DerivationRecord {
         DerivationRecord {
@@ -328,28 +337,43 @@ impl<'a> LinearReferenceModel<'a> {
             analytical_model_id: MODEL_ID.into(),
             subject_model_id: self.transducer.id.clone(),
             equation_id: equation_id.into(),
-            input_sources,
+            inputs,
             assumptions,
         }
     }
 }
 
-fn source_ref(field: &str, parameter: &ScalarParameter) -> InputSourceRef {
-    InputSourceRef {
+fn model_input(field: &str, parameter: &ScalarParameter) -> AnalyticalInputSnapshot {
+    AnalyticalInputSnapshot {
         field: field.into(),
         value: parameter.value,
-        unit: parameter.unit,
-        source: parameter.source.clone(),
+        unit: AnalyticalInputUnit::Physical(parameter.unit),
+        kind: AnalyticalInputKind::ModelParameter,
+        source: Some(parameter.source.clone()),
     }
 }
 
-fn suspension_source_ref(suspension: &SuspensionParameter) -> InputSourceRef {
+fn runtime_input(
+    field: &str,
+    value: f64,
+    unit: AnalyticalInputUnit,
+) -> AnalyticalInputSnapshot {
+    AnalyticalInputSnapshot {
+        field: field.into(),
+        value,
+        unit,
+        kind: AnalyticalInputKind::RuntimeExcitation,
+        source: None,
+    }
+}
+
+fn suspension_input(suspension: &SuspensionParameter) -> AnalyticalInputSnapshot {
     match suspension {
         SuspensionParameter::Compliance(parameter) => {
-            source_ref("mechanical.suspension.compliance", parameter)
+            model_input("mechanical.suspension.compliance", parameter)
         }
         SuspensionParameter::Stiffness(parameter) => {
-            source_ref("mechanical.suspension.stiffness", parameter)
+            model_input("mechanical.suspension.stiffness", parameter)
         }
     }
 }
@@ -407,11 +431,7 @@ mod tests {
             id: "linear-fixture-001".into(),
             electrical: ElectricalParameters {
                 voice_coil_resistance: q(6.0, PhysicalUnit::Ohm, "fixture-re"),
-                voice_coil_inductance: Some(q(
-                    0.0,
-                    PhysicalUnit::Henry,
-                    "explicit-zero-le",
-                )),
+                voice_coil_inductance: Some(q(0.0, PhysicalUnit::Henry, "explicit-zero-le")),
                 reference_temperature: q(20.0, PhysicalUnit::Celsius, "fixture-temp"),
                 max_voltage: None,
                 max_current: None,
@@ -454,14 +474,10 @@ mod tests {
         let fs = model.free_air_resonance().unwrap();
         assert!((fs.value - 50.329_212_104_487_034).abs() < 1e-12);
         assert_eq!(fs.unit, "Hz");
+        assert_eq!(fs.derivation.inputs.len(), 2);
         assert_eq!(
-            fs.derivation.authority,
-            PredictionAuthority::AnalyticalPrediction
-        );
-        assert_eq!(fs.derivation.input_sources.len(), 2);
-        assert_eq!(
-            fs.derivation.input_sources[0].unit,
-            PhysicalUnit::Kilogram
+            fs.derivation.inputs[0].unit,
+            AnalyticalInputUnit::Physical(PhysicalUnit::Kilogram)
         );
     }
 
@@ -481,12 +497,31 @@ mod tests {
         let model = LinearReferenceModel::new(&fixture).unwrap();
         let fs = model.free_air_resonance().unwrap().value;
         let point = model.response_at(fs, 1.0).unwrap();
-
-        // At exact free-air resonance with Le explicitly set to zero:
-        // Zm = Rms and Zin = Re + Bl^2/Rms = 6 + 25/2 = 18.5 ohm.
         assert!((point.input_impedance_ohm.re - 18.5).abs() < 1e-10);
         assert!(point.input_impedance_ohm.im.abs() < 1e-10);
         assert!((point.current_a_rms.magnitude() - 1.0 / 18.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn runtime_excitation_is_bound_into_derivation() {
+        let fixture = fixture();
+        let model = LinearReferenceModel::new(&fixture).unwrap();
+        let a = model.response_at(100.0, 1.0).unwrap();
+        let b = model.response_at(200.0, 2.0).unwrap();
+        assert_ne!(a.derivation.inputs, b.derivation.inputs);
+
+        let runtime: Vec<_> = a
+            .derivation
+            .inputs
+            .iter()
+            .filter(|input| input.kind == AnalyticalInputKind::RuntimeExcitation)
+            .collect();
+        assert_eq!(runtime.len(), 2);
+        assert_eq!(runtime[0].field, "runtime.frequency");
+        assert_eq!(runtime[0].unit, AnalyticalInputUnit::Hertz);
+        assert_eq!(runtime[0].source, None);
+        assert_eq!(runtime[1].field, "runtime.terminal_voltage_rms");
+        assert_eq!(runtime[1].unit, AnalyticalInputUnit::VoltRms);
     }
 
     #[test]
