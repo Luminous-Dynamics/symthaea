@@ -18,4 +18,5 @@ pub use parameters::*;
 pub mod linear;
 pub mod nonlinear;
 pub mod nonlinear_evidence;
+pub mod nonlinear_reference;
 pub mod operating_state;
