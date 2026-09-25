@@ -1,0 +1,218 @@
+{
+  "schema_version": "civ-boot-capability-closure-v1",
+  "reference_oracle": {
+    "pr": 1619,
+    "head_sha": "58499378af3fd3777b916daac1aa5bd573f2c680",
+    "git_blob_sha": "0f7bf960ed4a0575e8b4e2d6d50fe6676e295b80"
+  },
+  "fixtures": [
+    {
+      "id": "simple-local-closure",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-metal"],
+      "imports": [],
+      "targets": ["frame"],
+      "recipes": [
+        {"recipe_id": "frame-route", "output": "frame", "requires": ["local-metal"]}
+      ]
+    },
+    {
+      "id": "imported-bearing-motor",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-copper"],
+      "imports": ["bearing"],
+      "targets": ["motor"],
+      "recipes": [
+        {"recipe_id": "motor-route", "output": "motor", "requires": ["local-copper", "bearing"]}
+      ]
+    },
+    {
+      "id": "downstream-inherited-import",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-metal", "local-copper"],
+      "imports": ["bearing"],
+      "targets": ["frame", "motor", "machine"],
+      "recipes": [
+        {"recipe_id": "frame-route", "output": "frame", "requires": ["local-metal"]},
+        {"recipe_id": "motor-route", "output": "motor", "requires": ["local-copper", "bearing"]},
+        {"recipe_id": "machine-route", "output": "machine", "requires": ["frame", "motor"]}
+      ]
+    },
+    {
+      "id": "local-bearing-alternative",
+      "expected_disposition": "Valid",
+      "local_primitives": ["ceramic-feed", "local-copper", "local-metal"],
+      "imports": ["bearing"],
+      "targets": ["bearing", "motor", "machine"],
+      "recipes": [
+        {"recipe_id": "bearing-local", "output": "bearing", "requires": ["ceramic-feed"]},
+        {"recipe_id": "frame-route", "output": "frame", "requires": ["local-metal"]},
+        {"recipe_id": "motor-route", "output": "motor", "requires": ["bearing", "local-copper"]},
+        {"recipe_id": "machine-route", "output": "machine", "requires": ["frame", "motor"]}
+      ]
+    },
+    {
+      "id": "unsupported-cycle",
+      "expected_disposition": "Valid",
+      "local_primitives": [],
+      "imports": [],
+      "targets": ["a", "b"],
+      "recipes": [
+        {"recipe_id": "a-from-b", "output": "a", "requires": ["b"]},
+        {"recipe_id": "b-from-a", "output": "b", "requires": ["a"]}
+      ]
+    },
+    {
+      "id": "or-route-local-alternative",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-metal", "local-magnet"],
+      "imports": ["electronics"],
+      "targets": ["actuator"],
+      "recipes": [
+        {"recipe_id": "electronic-route", "output": "actuator", "requires": ["local-metal", "electronics"]},
+        {"recipe_id": "local-route", "output": "actuator", "requires": ["local-metal", "local-magnet"]}
+      ]
+    },
+    {
+      "id": "imported-finished-machine",
+      "expected_disposition": "Valid",
+      "local_primitives": [],
+      "imports": ["machine"],
+      "targets": ["machine"],
+      "recipes": []
+    },
+    {
+      "id": "missing-prerequisite",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-metal"],
+      "imports": [],
+      "targets": ["widget"],
+      "recipes": [
+        {"recipe_id": "widget-route", "output": "widget", "requires": ["local-metal", "missing-seal"]}
+      ]
+    },
+    {
+      "id": "robot-housing-import-stack",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-polymer", "printer"],
+      "imports": ["controller", "motor"],
+      "targets": ["housing", "robot"],
+      "recipes": [
+        {"recipe_id": "housing-route", "output": "housing", "requires": ["local-polymer", "printer"]},
+        {"recipe_id": "robot-route", "output": "robot", "requires": ["controller", "housing", "motor"]}
+      ]
+    },
+    {
+      "id": "printer-frame-fallacy",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-polymer", "printer"],
+      "imports": [],
+      "targets": ["printer-frame", "printer-reproduction"],
+      "recipes": [
+        {"recipe_id": "printer-frame-route", "output": "printer-frame", "requires": ["local-polymer", "printer"]},
+        {"recipe_id": "printer-reproduction-route", "output": "printer-reproduction", "requires": ["printer-frame", "motion-system", "controller", "tooling"]}
+      ]
+    },
+    {
+      "id": "optical-metrology-not-laser-source",
+      "expected_disposition": "Valid",
+      "local_primitives": ["passive-optics", "reference-artifact"],
+      "imports": [],
+      "targets": ["optical-metrology", "laser-source"],
+      "recipes": [
+        {"recipe_id": "optical-metrology-route", "output": "optical-metrology", "requires": ["passive-optics", "reference-artifact"]}
+      ]
+    },
+    {
+      "id": "thermal-plasma-not-cold-plasma",
+      "expected_disposition": "Valid",
+      "local_primitives": ["substrate", "thermal-plasma-source"],
+      "imports": [],
+      "targets": ["cold-plasma-process"],
+      "recipes": [
+        {"recipe_id": "cold-plasma-process-route", "output": "cold-plasma-process", "requires": ["cold-plasma-source", "substrate"]}
+      ]
+    },
+    {
+      "id": "permutation-a",
+      "equivalence_group": "declaration-order",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-metal", "local-copper"],
+      "imports": ["controller", "bearing"],
+      "targets": ["machine", "motor"],
+      "recipes": [
+        {"recipe_id": "motor-route", "output": "motor", "requires": ["local-copper", "bearing"]},
+        {"recipe_id": "machine-route", "output": "machine", "requires": ["motor", "local-metal"]}
+      ]
+    },
+    {
+      "id": "permutation-b",
+      "equivalence_group": "declaration-order",
+      "expected_disposition": "Valid",
+      "local_primitives": ["local-copper", "local-metal"],
+      "imports": ["bearing", "controller"],
+      "targets": ["motor", "machine"],
+      "recipes": [
+        {"recipe_id": "machine-route", "output": "machine", "requires": ["local-metal", "motor"]},
+        {"recipe_id": "motor-route", "output": "motor", "requires": ["bearing", "local-copper"]}
+      ]
+    },
+    {
+      "id": "malformed-empty-local-id",
+      "expected_disposition": "InvalidInput",
+      "local_primitives": [""],
+      "imports": [],
+      "targets": [],
+      "recipes": []
+    },
+    {
+      "id": "malformed-duplicate-local-id",
+      "expected_disposition": "InvalidInput",
+      "local_primitives": ["x", "x"],
+      "imports": [],
+      "targets": [],
+      "recipes": []
+    },
+    {
+      "id": "malformed-empty-route-output",
+      "expected_disposition": "InvalidInput",
+      "local_primitives": [],
+      "imports": [],
+      "targets": [],
+      "recipes": [
+        {"recipe_id": "r", "output": "", "requires": ["x"]}
+      ]
+    },
+    {
+      "id": "malformed-empty-route-requirements",
+      "expected_disposition": "InvalidInput",
+      "local_primitives": [],
+      "imports": [],
+      "targets": [],
+      "recipes": [
+        {"recipe_id": "r", "output": "x", "requires": []}
+      ]
+    },
+    {
+      "id": "malformed-duplicate-route-id",
+      "expected_disposition": "InvalidInput",
+      "local_primitives": [],
+      "imports": [],
+      "targets": [],
+      "recipes": [
+        {"recipe_id": "same", "output": "a", "requires": ["x"]},
+        {"recipe_id": "same", "output": "b", "requires": ["y"]}
+      ]
+    },
+    {
+      "id": "malformed-duplicate-route-requirement",
+      "expected_disposition": "InvalidInput",
+      "local_primitives": [],
+      "imports": [],
+      "targets": [],
+      "recipes": [
+        {"recipe_id": "r", "output": "x", "requires": ["a", "a"]}
+      ]
+    }
+  ]
+}
