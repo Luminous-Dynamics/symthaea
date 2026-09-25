@@ -1,0 +1,60 @@
+name: Formal Verification Architecture v1
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/FORMAL_VERIFICATION_ARCHITECTURE_V1.md"
+      - "docs/formal/formal_verification_evidence_classes_v1.json"
+      - "scripts/validate_formal_verification_architecture_v1.py"
+      - ".github/workflows/formal-verification-architecture-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-verification-architecture-v1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Record exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Validate architecture contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_formal_verification_architecture_v1.py | tee /tmp/formal-verification-architecture-v1.txt
+          grep -Fx 'FORMAL_VERIFICATION_ARCHITECTURE_V1_PASS' /tmp/formal-verification-architecture-v1.txt
+
+      - name: Static claim-ceiling audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/formal/FORMAL_VERIFICATION_ARCHITECTURE_V1.md
+          grep -F 'Aeneas extraction != native binary verification' "$doc"
+          grep -F 'bounded trace conformance != full refinement' "$doc"
+          grep -F 'formal verification != permission for external effects' "$doc"
+          grep -F 'proof receipt != runtime authority' "$doc"
+
+      - name: Prove checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
