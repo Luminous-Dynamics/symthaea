@@ -1,0 +1,72 @@
+name: Proof Review Capsule v1
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/PROOF_REVIEW_CAPSULE_V1.md"
+      - "docs/formal/proof_review_capsule_schema_v1.json"
+      - "scripts/validate_proof_review_capsule_v1.py"
+      - ".github/workflows/proof-review-capsule-v1.yml"
+      - "docs/formal/formal_verification_evidence_classes_v1.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proof-review-capsule-v1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Record exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Validate proof review capsule contract and negative controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_proof_review_capsule_v1.py | tee /tmp/proof-review-capsule-v1.txt
+          grep -Fx 'PROOF_REVIEW_CAPSULE_V1_PASS' /tmp/proof-review-capsule-v1.txt
+
+      - name: Static claim-ceiling audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/formal/PROOF_REVIEW_CAPSULE_V1.md
+          grep -F 'proof capsule != proof' "$doc"
+          grep -F 'compact review != reduced verification' "$doc"
+          grep -F 'many finite tests != infinite-domain proof' "$doc"
+          grep -F 'composition metadata != a stronger evidence class' "$doc"
+
+      - name: Retain exact contract digests in log
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum \
+            docs/formal/PROOF_REVIEW_CAPSULE_V1.md \
+            docs/formal/proof_review_capsule_schema_v1.json \
+            docs/formal/formal_verification_evidence_classes_v1.json \
+            scripts/validate_proof_review_capsule_v1.py
+
+      - name: Prove checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"

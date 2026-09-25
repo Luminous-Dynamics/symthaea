@@ -1,0 +1,133 @@
+{
+  "schema": "symthaea.formal-verification.proof-review-capsule.v1",
+  "tracking_issue": 5773,
+  "authority": "ReviewAndCompositionMetadataOnly",
+  "capsule_digest": {
+    "algorithm": "sha256",
+    "canonicalization": "UTF-8 JSON with sorted object keys and compact separators, excluding derived_digest"
+  },
+  "review_questions": [
+    "Did the human claim or formal statement change?",
+    "Did assumptions, axioms, or trust roots change?",
+    "Did the exact implementation or model subject change?",
+    "Did prerequisite capsule identities or composition relations change?",
+    "Did the domain-coverage argument change?",
+    "Did any required negative control stop failing at the intended semantic boundary?",
+    "Did the claim ceiling widen?"
+  ],
+  "coverage_kinds": [
+    "FiniteCases",
+    "Universal",
+    "Induction",
+    "PartitionCover",
+    "GeneratorClosure",
+    "QuotientInvariant",
+    "Bisimulation",
+    "LimitTransfer"
+  ],
+  "coverage_scopes": [
+    "finite",
+    "exact-universal",
+    "bounded",
+    "quotient-relative",
+    "asymptotic"
+  ],
+  "composition_relations": [
+    "DependsOn",
+    "Implies",
+    "Conjunction",
+    "Refines",
+    "PartitionCover",
+    "Induction",
+    "GeneratorClosure",
+    "QuotientInvariant",
+    "Bisimulation",
+    "LimitTransfer"
+  ],
+  "required_nonclaims": [
+    "proof capsule != proof",
+    "proof DAG consistency != theorem truth",
+    "compact review != reduced verification",
+    "finite basis != universal coverage without a coverage theorem",
+    "many finite tests != infinite-domain proof",
+    "composition metadata != a stronger evidence class"
+  ],
+  "synthetic_capsules": [
+    {
+      "id": "SYN-FINITE-001",
+      "human_claim": "Every element of Fin 4 has value less than 4.",
+      "formal_statement": "forall x : Fin 4, x.val < 4",
+      "evidence_class": "AbstractFormalTheorem",
+      "status": "SyntheticPrepared",
+      "subject": {
+        "kind": "LeanTheorem",
+        "identity": "synthetic/finite/fin4_lt4",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "assumptions": [],
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "trust_roots": ["Lean4Kernel"],
+      "dependencies": [],
+      "coverage": {
+        "kind": "FiniteCases",
+        "scope": "finite",
+        "domain": "Fin 4",
+        "basis": ["all inhabitants of Fin 4"],
+        "coverage_theorem": "finite exhaustive domain",
+        "preservation_theorems": [],
+        "exceptions": []
+      },
+      "receipts": [
+        {
+          "kind": "SyntheticLeanKernelReceipt",
+          "statement_sha256": "67b11f0831f07f159a94f62edb627ae5ad9080a5141c9b1062f530672558d932",
+          "identity": "synthetic-receipt-finite-001"
+        }
+      ],
+      "negative_controls": ["statement mutation must stale the receipt"],
+      "claim_ceiling": ["synthetic architecture fixture only", "not production qualification"],
+      "review_delta": {
+        "previous_capsule": null,
+        "semantic_changes": ["initial synthetic capsule"]
+      }
+    },
+    {
+      "id": "SYN-INFINITE-001",
+      "human_claim": "For every natural number n, n + 0 = n.",
+      "formal_statement": "forall n : Nat, n + 0 = n",
+      "evidence_class": "AbstractFormalTheorem",
+      "status": "SyntheticPrepared",
+      "subject": {
+        "kind": "LeanTheorem",
+        "identity": "synthetic/infinite/nat_add_zero",
+        "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      },
+      "assumptions": [],
+      "axioms": ["propext", "Classical.choice", "Quot.sound"],
+      "trust_roots": ["Lean4Kernel"],
+      "dependencies": [],
+      "coverage": {
+        "kind": "Induction",
+        "scope": "exact-universal",
+        "domain": "Nat",
+        "basis": ["n = 0"],
+        "coverage_theorem": "Nat.rec covers zero and successor constructors",
+        "preservation_theorems": ["forall n, P n -> P (Nat.succ n)"],
+        "exceptions": []
+      },
+      "receipts": [
+        {
+          "kind": "SyntheticLeanKernelReceipt",
+          "statement_sha256": "b49a9f30e4d01c99a6087de3f19cf34386b7809587499fdcceda8870a3622e69",
+          "identity": "synthetic-receipt-infinite-001"
+        }
+      ],
+      "negative_controls": ["remove base case", "remove successor preservation", "relabel finite cases as universal"],
+      "claim_ceiling": ["synthetic architecture fixture only", "not production qualification"],
+      "review_delta": {
+        "previous_capsule": null,
+        "semantic_changes": ["initial synthetic capsule"]
+      }
+    }
+  ]
+}
