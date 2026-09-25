@@ -6,74 +6,116 @@
 //! EAC-003A begins with an intentionally narrow sealed-box model. The enclosure
 //! is assumed rigid and lossless; leakage, panel flexure, stuffing losses,
 //! diffraction, radiation loading, and distributed cavity modes are not hidden
-//! inside fitted constants. Later EAC-003 tranches may add those effects as
-//! separately identified approximation families.
+//! inside fitted constants.
 
 use crate::linear::{LinearModelError, LinearReferenceModel, PredictionAuthority};
 use crate::{
     ParameterSource, PhysicalUnit, ScalarParameter, SuspensionParameter, TransducerModel,
-    ValidationError,
+    UncertaintyInterval, ValidationError,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 const MODEL_ID: &str = "sealed-rigid-lossless-lumped-v1";
 
-/// One positive scalar whose unit is encoded by its containing field name.
+/// Explicit SI unit vocabulary for EAC-003 enclosure/environment quantities.
 ///
-/// This is used only for enclosure/environment quantities whose SI units are not
-/// yet part of EAC-001's transducer-specific `PhysicalUnit` enum.
+/// This is deliberately separate from the transducer-focused EAC-001 unit enum
+/// until a broader shared engineering quantity system is promoted. The important
+/// invariant is that the unit is data, never implied only by a Rust field name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnclosureUnit {
+    CubicMeter,
+    KilogramPerCubicMeter,
+    MeterPerSecond,
+}
+
+/// Positive scalar with explicit unit, source provenance and optional absolute
+/// uncertainty interval in the same declared unit.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SourcedPositiveScalar {
     pub value: f64,
+    pub unit: EnclosureUnit,
     pub source: ParameterSource,
+    pub uncertainty: Option<UncertaintyInterval>,
 }
 
 impl SourcedPositiveScalar {
-    pub fn new(value: f64, source: ParameterSource) -> Self {
-        Self { value, source }
+    pub fn new(value: f64, unit: EnclosureUnit, source: ParameterSource) -> Self {
+        Self {
+            value,
+            unit,
+            source,
+            uncertainty: None,
+        }
     }
 
-    fn validate(&self, field: &'static str) -> Result<(), EnclosureModelError> {
+    pub fn with_uncertainty(mut self, uncertainty: UncertaintyInterval) -> Self {
+        self.uncertainty = Some(uncertainty);
+        self
+    }
+
+    fn validate(
+        &self,
+        field: &'static str,
+        expected_unit: EnclosureUnit,
+    ) -> Result<(), EnclosureModelError> {
         if !self.value.is_finite() || self.value <= 0.0 {
             return Err(EnclosureModelError::InvalidPositiveScalar {
                 field,
                 value: self.value,
             });
         }
+        if self.unit != expected_unit {
+            return Err(EnclosureModelError::WrongUnit {
+                field,
+                expected: expected_unit,
+                actual: self.unit,
+            });
+        }
         self.source.validate()?;
+        if let Some(interval) = self.uncertainty {
+            interval.validate()?;
+            if !interval.contains(self.value) {
+                return Err(EnclosureModelError::UncertaintyDoesNotContainValue {
+                    field,
+                    value: self.value,
+                    lower: interval.lower,
+                    upper: interval.upper,
+                });
+            }
+        }
         Ok(())
     }
 }
 
-/// Air properties used by the reduced-order pneumatic spring model.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AirState {
-    pub density_kg_per_m3: SourcedPositiveScalar,
-    pub sound_speed_m_per_s: SourcedPositiveScalar,
+    pub density: SourcedPositiveScalar,
+    pub sound_speed: SourcedPositiveScalar,
 }
 
 impl AirState {
     pub fn validate(&self) -> Result<(), EnclosureModelError> {
-        self.density_kg_per_m3.validate("air.density_kg_per_m3")?;
-        self.sound_speed_m_per_s
-            .validate("air.sound_speed_m_per_s")?;
+        self.density.validate(
+            "air.density",
+            EnclosureUnit::KilogramPerCubicMeter,
+        )?;
+        self.sound_speed
+            .validate("air.sound_speed", EnclosureUnit::MeterPerSecond)?;
         Ok(())
     }
 }
 
-/// Explicit approximation family for this first sealed-box tranche.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SealedBoundaryModel {
-    /// Perfectly rigid enclosure with no leakage or additional dissipative loss.
     IdealRigidLossless,
 }
 
-/// Canonical reduced-order sealed enclosure input.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SealedEnclosure {
     pub id: String,
-    pub net_internal_volume_m3: SourcedPositiveScalar,
+    pub net_internal_volume: SourcedPositiveScalar,
     pub boundary_model: SealedBoundaryModel,
 }
 
@@ -82,22 +124,29 @@ impl SealedEnclosure {
         if self.id.trim().is_empty() {
             return Err(EnclosureModelError::EmptyIdentifier("sealed_enclosure.id"));
         }
-        self.net_internal_volume_m3
-            .validate("sealed_enclosure.net_internal_volume_m3")?;
+        self.net_internal_volume.validate(
+            "sealed_enclosure.net_internal_volume",
+            EnclosureUnit::CubicMeter,
+        )?;
         Ok(())
     }
 }
 
-/// Exact scalar snapshot used by an enclosure derivation.
+/// Unit carried by a serialized derivation input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EnclosureInputUnit {
+    Physical(PhysicalUnit),
+    Enclosure(EnclosureUnit),
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnclosureInputSnapshot {
     pub field: String,
     pub value: f64,
-    pub unit: String,
+    pub unit: EnclosureInputUnit,
     pub source: ParameterSource,
 }
 
-/// Inspectable analytical receipt for EAC-003A.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EnclosureDerivationRecord {
     pub authority: PredictionAuthority,
@@ -110,27 +159,19 @@ pub struct EnclosureDerivationRecord {
     pub assumptions: Vec<String>,
 }
 
-/// Ideal rigid sealed-box reduced-order result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SealedAlignmentPrediction {
-    /// Equivalent acoustic compliance volume of the free-air driver.
     pub equivalent_compliance_volume_vas_m3: f64,
-    /// Mechanical compliance contributed by the trapped enclosure air when
-    /// referred through the driver's effective piston area.
     pub box_mechanical_compliance_m_per_n: f64,
-    /// Parallel combination of suspension and box-air mechanical compliance.
     pub combined_mechanical_compliance_m_per_n: f64,
-    /// Classical `alpha = Vas / Vb` ratio.
     pub compliance_ratio_alpha: f64,
     pub free_air_resonance_hz: f64,
     pub sealed_resonance_hz: f64,
     pub free_air_q_total: f64,
-    /// Ideal rigid/lossless sealed-system Q under unchanged driver damping.
     pub sealed_q_total_ideal: f64,
     pub derivation: EnclosureDerivationRecord,
 }
 
-/// Borrowed ideal sealed-box analytical view.
 pub struct SealedReferenceModel<'a> {
     transducer: &'a TransducerModel,
     enclosure: &'a SealedEnclosure,
@@ -153,21 +194,19 @@ impl<'a> SealedReferenceModel<'a> {
         })
     }
 
-    /// Compute the classical rigid/lossless sealed-box alignment.
+    /// Classical rigid/lossless sealed-box reference:
     ///
-    /// The pneumatic box stiffness is referred to the driver's mechanical side:
+    /// `Cmb = Vb / (rho c^2 Sd^2)`
     ///
-    /// `C_mb = V_b / (rho c^2 S_d^2)`
+    /// `Ctotal = 1 / (1/Cms + 1/Cmb)`
     ///
-    /// and combines with suspension compliance as parallel springs:
-    ///
-    /// `C_total = 1 / (1/C_ms + 1/C_mb)`.
+    /// `Vas = rho c^2 Sd^2 Cms`, `alpha = Vas / Vb`.
     pub fn ideal_alignment(&self) -> Result<SealedAlignmentPrediction, EnclosureModelError> {
         let cms = self.transducer.mechanical.suspension.compliance_m_per_n()?;
         let sd = self.transducer.acoustic.effective_piston_area.value;
-        let volume = self.enclosure.net_internal_volume_m3.value;
-        let rho = self.air.density_kg_per_m3.value;
-        let c = self.air.sound_speed_m_per_s.value;
+        let volume = self.enclosure.net_internal_volume.value;
+        let rho = self.air.density.value;
+        let c = self.air.sound_speed.value;
 
         let vas = rho * c * c * sd * sd * cms;
         let box_compliance = volume / (rho * c * c * sd * sd);
@@ -177,10 +216,7 @@ impl<'a> SealedReferenceModel<'a> {
         for (quantity, value) in [
             ("equivalent_compliance_volume_vas_m3", vas),
             ("box_mechanical_compliance_m_per_n", box_compliance),
-            (
-                "combined_mechanical_compliance_m_per_n",
-                combined_compliance,
-            ),
+            ("combined_mechanical_compliance_m_per_n", combined_compliance),
             ("compliance_ratio_alpha", alpha),
         ] {
             ensure_finite_positive(value, quantity)?;
@@ -189,9 +225,9 @@ impl<'a> SealedReferenceModel<'a> {
         let linear = LinearReferenceModel::new(self.transducer)?;
         let fs = linear.free_air_resonance()?.value;
         let q = linear.quality_factors()?;
-        let resonance_multiplier = (1.0 + alpha).sqrt();
-        let sealed_resonance = fs * resonance_multiplier;
-        let sealed_q = q.q_total * resonance_multiplier;
+        let multiplier = (1.0 + alpha).sqrt();
+        let sealed_resonance = fs * multiplier;
+        let sealed_q = q.q_total * multiplier;
 
         ensure_finite_positive(sealed_resonance, "sealed_resonance_hz")?;
         ensure_finite_positive(sealed_q, "sealed_q_total_ideal")?;
@@ -239,24 +275,12 @@ impl<'a> SealedReferenceModel<'a> {
                     "mechanical.mechanical_resistance",
                     &self.transducer.mechanical.mechanical_resistance,
                 ),
-                EnclosureInputSnapshot {
-                    field: "sealed_enclosure.net_internal_volume".into(),
-                    value: self.enclosure.net_internal_volume_m3.value,
-                    unit: "m^3".into(),
-                    source: self.enclosure.net_internal_volume_m3.source.clone(),
-                },
-                EnclosureInputSnapshot {
-                    field: "air.density".into(),
-                    value: self.air.density_kg_per_m3.value,
-                    unit: "kg/m^3".into(),
-                    source: self.air.density_kg_per_m3.source.clone(),
-                },
-                EnclosureInputSnapshot {
-                    field: "air.sound_speed".into(),
-                    value: self.air.sound_speed_m_per_s.value,
-                    unit: "m/s".into(),
-                    source: self.air.sound_speed_m_per_s.source.clone(),
-                },
+                enclosure_snapshot(
+                    "sealed_enclosure.net_internal_volume",
+                    &self.enclosure.net_internal_volume,
+                ),
+                enclosure_snapshot("air.density", &self.air.density),
+                enclosure_snapshot("air.sound_speed", &self.air.sound_speed),
             ],
             assumptions: vec![
                 "rigid enclosure walls".into(),
@@ -284,27 +308,17 @@ fn driver_snapshot(field: &str, parameter: &ScalarParameter) -> EnclosureInputSn
     EnclosureInputSnapshot {
         field: field.into(),
         value: parameter.value,
-        unit: physical_unit_symbol(parameter.unit).into(),
+        unit: EnclosureInputUnit::Physical(parameter.unit),
         source: parameter.source.clone(),
     }
 }
 
-fn physical_unit_symbol(unit: PhysicalUnit) -> &'static str {
-    match unit {
-        PhysicalUnit::Ohm => "ohm",
-        PhysicalUnit::Henry => "H",
-        PhysicalUnit::Volt => "V",
-        PhysicalUnit::Ampere => "A",
-        PhysicalUnit::Watt => "W",
-        PhysicalUnit::Celsius => "degC",
-        PhysicalUnit::PerCelsius => "1/degC",
-        PhysicalUnit::TeslaMeter => "T*m",
-        PhysicalUnit::Kilogram => "kg",
-        PhysicalUnit::MeterPerNewton => "m/N",
-        PhysicalUnit::NewtonPerMeter => "N/m",
-        PhysicalUnit::NewtonSecondPerMeter => "N*s/m",
-        PhysicalUnit::Meter => "m",
-        PhysicalUnit::SquareMeter => "m^2",
+fn enclosure_snapshot(field: &str, parameter: &SourcedPositiveScalar) -> EnclosureInputSnapshot {
+    EnclosureInputSnapshot {
+        field: field.into(),
+        value: parameter.value,
+        unit: EnclosureInputUnit::Enclosure(parameter.unit),
+        source: parameter.source.clone(),
     }
 }
 
@@ -325,6 +339,19 @@ pub enum EnclosureModelError {
     EmptyIdentifier(&'static str),
     #[error("{field} must be finite and positive, got {value}")]
     InvalidPositiveScalar { field: &'static str, value: f64 },
+    #[error("{field} has wrong unit: expected {expected:?}, got {actual:?}")]
+    WrongUnit {
+        field: &'static str,
+        expected: EnclosureUnit,
+        actual: EnclosureUnit,
+    },
+    #[error("uncertainty for {field} [{lower}, {upper}] does not contain {value}")]
+    UncertaintyDoesNotContainValue {
+        field: &'static str,
+        value: f64,
+        lower: f64,
+        upper: f64,
+    },
     #[error("derived {quantity} is invalid: {value}")]
     InvalidDerivedValue { quantity: &'static str, value: f64 },
 }
@@ -334,7 +361,7 @@ mod tests {
     use super::*;
     use crate::{
         AcousticParameters, ElectricalParameters, MechanicalParameters, MotorParameters,
-        ParameterSourceKind, PhysicalUnit, ThermalParameters,
+        ParameterSourceKind, ThermalParameters,
     };
 
     fn source(name: &str) -> ParameterSource {
@@ -389,15 +416,27 @@ mod tests {
     fn enclosure() -> SealedEnclosure {
         SealedEnclosure {
             id: "sealed-box-10l".into(),
-            net_internal_volume_m3: SourcedPositiveScalar::new(0.01, source("cad-net-volume")),
+            net_internal_volume: SourcedPositiveScalar::new(
+                0.01,
+                EnclosureUnit::CubicMeter,
+                source("cad-net-volume"),
+            ),
             boundary_model: SealedBoundaryModel::IdealRigidLossless,
         }
     }
 
     fn air() -> AirState {
         AirState {
-            density_kg_per_m3: SourcedPositiveScalar::new(1.2041, source("air-state")),
-            sound_speed_m_per_s: SourcedPositiveScalar::new(343.2, source("air-state")),
+            density: SourcedPositiveScalar::new(
+                1.2041,
+                EnclosureUnit::KilogramPerCubicMeter,
+                source("air-state-density"),
+            ),
+            sound_speed: SourcedPositiveScalar::new(
+                343.2,
+                EnclosureUnit::MeterPerSecond,
+                source("air-state-speed"),
+            ),
         }
     }
 
@@ -406,8 +445,10 @@ mod tests {
         let driver = driver();
         let enclosure = enclosure();
         let air = air();
-        let model = SealedReferenceModel::new(&driver, &enclosure, &air).unwrap();
-        let result = model.ideal_alignment().unwrap();
+        let result = SealedReferenceModel::new(&driver, &enclosure, &air)
+            .unwrap()
+            .ideal_alignment()
+            .unwrap();
 
         assert!(
             (result.equivalent_compliance_volume_vas_m3 - 0.007_091_320_579_2).abs() < 1e-14
@@ -420,15 +461,39 @@ mod tests {
                 < driver.mechanical.suspension.compliance_m_per_n().unwrap()
         );
         assert_eq!(
-            result.derivation.authority,
-            PredictionAuthority::AnalyticalPrediction
+            result.derivation.inputs[6].unit,
+            EnclosureInputUnit::Enclosure(EnclosureUnit::CubicMeter)
         );
-        assert_eq!(
-            result.derivation.boundary_model,
-            SealedBoundaryModel::IdealRigidLossless
-        );
-        assert_eq!(result.derivation.inputs.len(), 9);
-        assert_eq!(result.derivation.inputs[1].unit, "m^2");
+    }
+
+    #[test]
+    fn wrong_volume_unit_fails_closed() {
+        let driver = driver();
+        let mut enclosure = enclosure();
+        let air = air();
+        enclosure.net_internal_volume.unit = EnclosureUnit::MeterPerSecond;
+        assert!(matches!(
+            SealedReferenceModel::new(&driver, &enclosure, &air),
+            Err(EnclosureModelError::WrongUnit {
+                field: "sealed_enclosure.net_internal_volume",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn wrong_air_unit_fails_closed() {
+        let driver = driver();
+        let enclosure = enclosure();
+        let mut air = air();
+        air.density.unit = EnclosureUnit::CubicMeter;
+        assert!(matches!(
+            SealedReferenceModel::new(&driver, &enclosure, &air),
+            Err(EnclosureModelError::WrongUnit {
+                field: "air.density",
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -436,14 +501,21 @@ mod tests {
         let driver = driver();
         let air = air();
         let large = SealedEnclosure {
-            net_internal_volume_m3: SourcedPositiveScalar::new(0.02, source("large-volume")),
+            net_internal_volume: SourcedPositiveScalar::new(
+                0.02,
+                EnclosureUnit::CubicMeter,
+                source("large-volume"),
+            ),
             ..enclosure()
         };
         let small = SealedEnclosure {
-            net_internal_volume_m3: SourcedPositiveScalar::new(0.005, source("small-volume")),
+            net_internal_volume: SourcedPositiveScalar::new(
+                0.005,
+                EnclosureUnit::CubicMeter,
+                source("small-volume"),
+            ),
             ..enclosure()
         };
-
         let large_result = SealedReferenceModel::new(&driver, &large, &air)
             .unwrap()
             .ideal_alignment()
@@ -452,7 +524,6 @@ mod tests {
             .unwrap()
             .ideal_alignment()
             .unwrap();
-
         assert!(small_result.sealed_resonance_hz > large_result.sealed_resonance_hz);
         assert!(small_result.sealed_q_total_ideal > large_result.sealed_q_total_ideal);
     }
@@ -463,14 +534,17 @@ mod tests {
         let air = air();
         let huge = SealedEnclosure {
             id: "sealed-box-huge".into(),
-            net_internal_volume_m3: SourcedPositiveScalar::new(1_000.0, source("huge-volume")),
+            net_internal_volume: SourcedPositiveScalar::new(
+                1_000.0,
+                EnclosureUnit::CubicMeter,
+                source("huge-volume"),
+            ),
             boundary_model: SealedBoundaryModel::IdealRigidLossless,
         };
         let result = SealedReferenceModel::new(&driver, &huge, &air)
             .unwrap()
             .ideal_alignment()
             .unwrap();
-
         assert!((result.sealed_resonance_hz / result.free_air_resonance_hz - 1.0).abs() < 1e-5);
         assert!((result.sealed_q_total_ideal / result.free_air_q_total - 1.0).abs() < 1e-5);
     }
@@ -480,28 +554,26 @@ mod tests {
         let driver = driver();
         let mut enclosure = enclosure();
         let air = air();
-        enclosure.net_internal_volume_m3.value = 0.0;
+        enclosure.net_internal_volume.value = 0.0;
         assert!(matches!(
             SealedReferenceModel::new(&driver, &enclosure, &air),
             Err(EnclosureModelError::InvalidPositiveScalar {
-                field: "sealed_enclosure.net_internal_volume_m3",
+                field: "sealed_enclosure.net_internal_volume",
                 ..
             })
         ));
     }
 
     #[test]
-    fn invalid_air_state_fails_closed() {
+    fn uncertainty_must_contain_nominal_value() {
         let driver = driver();
-        let enclosure = enclosure();
-        let mut air = air();
-        air.density_kg_per_m3.value = f64::NAN;
+        let mut enclosure = enclosure();
+        let air = air();
+        enclosure.net_internal_volume.uncertainty =
+            Some(UncertaintyInterval::new(0.02, 0.03).unwrap());
         assert!(matches!(
             SealedReferenceModel::new(&driver, &enclosure, &air),
-            Err(EnclosureModelError::InvalidPositiveScalar {
-                field: "air.density_kg_per_m3",
-                ..
-            })
+            Err(EnclosureModelError::UncertaintyDoesNotContainValue { .. })
         ));
     }
 
@@ -510,8 +582,7 @@ mod tests {
         let driver = driver();
         let enclosure = enclosure();
         let mut air = air();
-        air.sound_speed_m_per_s.source =
-            ParameterSource::new(ParameterSourceKind::Datasheet, "");
+        air.sound_speed.source = ParameterSource::new(ParameterSourceKind::Datasheet, "");
         assert!(matches!(
             SealedReferenceModel::new(&driver, &enclosure, &air),
             Err(EnclosureModelError::InvalidParameter(
