@@ -1,0 +1,54 @@
+{
+  "schema": "symthaea-fv-001a-extraction-contract-v1",
+  "issue": 5713,
+  "subject": {
+    "source_commit": "458c7b98d81c64b9361e252f85ef9d45132e6682",
+    "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+    "blob_sha": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056",
+    "crate_dir": "crates/core/symthaea-core",
+    "rust_item": "BinaryHV::bind_scalar",
+    "charon_start_from": "crate::hdc::binary_hv::_::bind_scalar",
+    "representation": "[u8; 2048]",
+    "semantic_kernel": "result[i] = self[i] XOR other[i] for every byte index 0 <= i < 2048"
+  },
+  "toolchain": {
+    "aeneas_repo": "https://github.com/AeneasVerif/aeneas.git",
+    "aeneas_revision": "6939df045f741c2d4afb927a7adc021752562ef6",
+    "charon_revision": "62585970fc75f61d83c7898ff8dfdd7edaa3c073",
+    "lean_toolchain": "leanprover/lean4:v4.31.0",
+    "charon_preset": "aeneas",
+    "aeneas_backend": "lean"
+  },
+  "pipeline": [
+    "verify exact source commit/blob and unchanged qualification-head blob",
+    "verify exactly one source bind_scalar definition and exact Charon start-from root",
+    "verify Aeneas revision, its locked Charon revision, and its Lean toolchain",
+    "Charon start translation from only the production bind_scalar subject into retained LLBC",
+    "verify the retained LLBC contains the selected bind_scalar item name",
+    "Aeneas translate retained LLBC to Lean",
+    "census generated Lean and external-model templates",
+    "Lake build generated Lean against the exact pinned Aeneas backend"
+  ],
+  "allowed_results": [
+    "ExtractedAndLeanTypechecked",
+    "UnsupportedRustConstruct",
+    "UnsupportedDependencyBoundary",
+    "TranslatorFailure",
+    "LeanGenerationFailure",
+    "LeanTypecheckFailure",
+    "EnvironmentFailure"
+  ],
+  "claim_class_on_success": "ExtractionFeasibilityEvidence",
+  "successor": {
+    "issue": 5716,
+    "required_claim": "ExtractedSourceRefinement",
+    "note": "No refinement theorem is established by this tranche."
+  },
+  "nonclaims": [
+    "extraction success != HDC theorem proved",
+    "generated Lean typecheck != Rust-to-abstract-spec refinement",
+    "scalar source extraction != SIMD implementation theorem",
+    "Aeneas source model != rustc/LLVM/native-binary verification",
+    "no external template emitted != proof that every dependency model is semantically complete"
+  ]
+}

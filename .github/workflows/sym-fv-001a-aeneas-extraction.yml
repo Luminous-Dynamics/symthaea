@@ -1,0 +1,69 @@
+name: SYM-FV-001A Aeneas Extraction
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/hdc/binary_hv.rs"
+      - "docs/formal/SYM_FV_001A_AENEAS_EXTRACTION_V1.md"
+      - "docs/formal/sym-fv-001a-aeneas-extraction-v1.json"
+      - "scripts/qualify_sym_fv_001a.py"
+      - ".github/workflows/sym-fv-001a-aeneas-extraction.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-001a-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Exact Rust -> LLBC -> Lean qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout exact qualification head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Record exact head
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git rev-parse 'HEAD^{tree}'
+          git status --short
+
+      - name: Syntax-check qualifier
+        run: python3 -m py_compile scripts/qualify_sym_fv_001a.py
+
+      - name: Execute exact extraction qualification
+        run: |
+          set -euo pipefail
+          python3 scripts/qualify_sym_fv_001a.py \
+            --manifest docs/formal/sym-fv-001a-aeneas-extraction-v1.json \
+            --output-dir "${{ runner.temp }}/sym-fv-001a"
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-001a-${{ github.sha }}
+          path: ${{ runner.temp }}/sym-fv-001a
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Postflight repository immutability
+        if: always()
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
