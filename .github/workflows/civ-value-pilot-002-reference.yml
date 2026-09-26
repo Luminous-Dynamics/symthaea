@@ -1,0 +1,21 @@
+name: CIV Value Pilot 002 Weak-Link Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_civ_value_pilot_002.py'
+      - 'docs/release/evidence/civ-value-pilot-001-reference-chains-v1.json'
+      - 'docs/release/evidence/civ-value-pilot-002-weak-link-chains-v1.json'
+      - '.github/workflows/civ-value-pilot-002-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Execute independent weak-link validator
+        run: python3 scripts/validate_civ_value_pilot_002.py
