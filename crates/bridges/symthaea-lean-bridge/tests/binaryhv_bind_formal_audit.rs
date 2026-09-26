@@ -28,16 +28,8 @@ fn proof_path() -> PathBuf {
         .join("../../../formal/lean/hdc/BinaryHVBind.lean")
 }
 
-#[test]
-fn binaryhv_bind_theorem_set_is_kernel_checked_and_constitutionally_audited() {
-    if !formal_audit_enabled() {
-        eprintln!(
-            "[sym-fv-002a] SYMTHAEA_LEAN_FORMAL_AUDIT not set; skipping real-Lean theorem audit"
-        );
-        return;
-    }
-
-    let cases = [
+fn cases() -> [TheoremAuditCase<'static>; 8] {
+    [
         TheoremAuditCase {
             theorem: "Symthaea.Formal.HDC.bit_bind",
             expected_statement: "(a b : BinaryHV) (i : BitIndex) : bit (bind a b) i = Bool.xor (bit a i) (bit b i)",
@@ -70,8 +62,19 @@ fn binaryhv_bind_theorem_set_is_kernel_checked_and_constitutionally_audited() {
             theorem: "Symthaea.Formal.HDC.unbind_left",
             expected_statement: "(a b : BinaryHV) : bind (bind a b) a = b",
         },
-    ];
+    ]
+}
 
+#[test]
+fn binaryhv_bind_theorem_set_is_kernel_checked_and_constitutionally_audited() {
+    if !formal_audit_enabled() {
+        eprintln!(
+            "[sym-fv-002a] SYMTHAEA_LEAN_FORMAL_AUDIT not set; skipping real-Lean theorem audit"
+        );
+        return;
+    }
+
+    let cases = cases();
     let report = audit_lean_theorem_set(
         proof_path(),
         &cases,
@@ -86,5 +89,28 @@ fn binaryhv_bind_theorem_set_is_kernel_checked_and_constitutionally_audited() {
     assert!(
         report.accepted(),
         "BinaryHV theorem set failed end-to-end Lean/proof audit: {report:#?}"
+    );
+}
+
+#[test]
+fn hostile_expected_statement_mutation_is_rejected() {
+    if !formal_audit_enabled() {
+        return;
+    }
+
+    let mutant = [TheoremAuditCase {
+        theorem: "Symthaea.Formal.HDC.bit_bind",
+        expected_statement: "(a b : BinaryHV) (i : BitIndex) : bit (bind a b) i = Bool.or (bit a i) (bit b i)",
+    }];
+    let report = audit_lean_theorem_set(
+        proof_path(),
+        &mutant,
+        &AxiomPolicy::constitutional(),
+    );
+
+    assert_eq!(report.results.len(), 1, "mutant must reach exactly one explicit audit result");
+    assert!(
+        !report.accepted(),
+        "hostile wrong-theorem/spec mutant produced a false green: {report:#?}"
     );
 }
