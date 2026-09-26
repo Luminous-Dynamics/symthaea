@@ -1,0 +1,24 @@
+name: TE-BENCH-001E2 independent leakage graph oracle
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/te-bench-001e2-reference.py'
+      - 'docs/release/evidence/te-bench-001e1-synthetic-leakage-graph-corpus-v1.json'
+      - '.github/workflows/te-bench-001e2-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate TE leakage graph semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Execute independent graph oracle
+        run: python3 scripts/te-bench-001e2-reference.py
