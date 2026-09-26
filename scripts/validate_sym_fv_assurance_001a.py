@@ -38,6 +38,7 @@ REQUIRED_TYPES = (
     "ClaimEntailmentWitness",
     "IndependenceWitness",
     "ReachabilityWitness",
+    "EvidenceClosed",
     "DependencyPath",
 )
 
@@ -59,6 +60,7 @@ REQUIRED_THEOREMS = (
     "environment_failure_cannot_support",
     "superseded_cannot_support",
     "invalidated_cannot_support",
+    "stale_generation_cannot_support",
     "evidence_class_non_amplification",
     "safety_cannot_close_liveness",
     "mismatched_subject_requires_refinement",
@@ -66,6 +68,8 @@ REQUIRED_THEOREMS = (
     "exact_subject_support_preserves_assumptions",
     "same_provenance_cannot_count_as_independent",
     "required_reachability_empty_rejected",
+    "evidence_closed_is_current_pass",
+    "evidence_closed_rejects_self_dependency",
     "closed_requires_every_mandatory_obligation",
     "contradictory_current_evidence_prevents_closure",
     "dependency_path_decreases",
@@ -153,6 +157,8 @@ def validate_contract(manifest: dict, proof: str) -> None:
         raise ContractError("unsafe declaration/token present")
     if "import Mathlib" in proof:
         raise ContractError("unexpected Mathlib dependency")
+    if re.search(r"\brcases\b", proof):
+        raise ContractError("non-core-oriented rcases tactic surface present")
     if "namespace Symthaea.Formal.Assurance" not in proof:
         raise ContractError("canonical assurance namespace missing")
 
@@ -174,7 +180,6 @@ def validate_contract(manifest: dict, proof: str) -> None:
         if arm not in proof:
             raise ContractError(f"canonical disposition arm missing/drifted: {arm}")
 
-    # Structural non-amplification controls.
     supports_match = re.search(
         r"def\s+Supports\b(?P<body>.*?)(?=\n/-- Positive reachability)",
         proof,
@@ -186,6 +191,7 @@ def validate_contract(manifest: dict, proof: str) -> None:
     required_support_terms = (
         "e.validity = .Current",
         "disposition e.result = .Pass",
+        "e.generation = o.generation",
         "e.evidenceClass = o.requiredClass",
         "e.propertyKind = o.propertyKind",
         "SubjectTransfer refinements e o",
@@ -195,13 +201,32 @@ def validate_contract(manifest: dict, proof: str) -> None:
         if term not in supports:
             raise ContractError(f"Supports lost mandatory term: {term}")
 
+    closed_match = re.search(
+        r"def\s+Closed\b(?P<body>.*?)(?=\n/--\nAn explicit independence claim)",
+        proof,
+        re.S,
+    )
+    if not closed_match:
+        raise ContractError("Closed body not found")
+    closed = closed_match.group("body")
+    for term in (
+        "ConflictFree receipts",
+        "Supports refinements entailments e o",
+        "EvidenceClosed rank receipts e",
+        "ReachabilitySatisfied reachability o",
+    ):
+        if term not in closed:
+            raise ContractError(f"Closed lost mandatory term: {term}")
+
+    if "rank prerequisite.evidenceId < rank e.evidenceId" not in proof:
+        raise ContractError("recursive EvidenceClosed rank decrease missing")
     if "rank prerequisite < rank dependent" not in proof:
-        raise ContractError("rank-decreasing dependency edge missing")
+        raise ContractError("rank-decreasing DependencyPath edge missing")
     if "Nat.lt_irrefl" not in proof:
         raise ContractError("dependency cycle rejection theorem missing irreflexivity proof")
 
     independence_match = re.search(
-        r"def\s+IndependentSupport\b(?P<body>.*?)(?=\n/--\nDependency justification)",
+        r"def\s+IndependentSupport\b(?P<body>.*?)(?=\n/--\nA rank-decreasing dependency path)",
         proof,
         re.S,
     )
@@ -211,13 +236,19 @@ def validate_contract(manifest: dict, proof: str) -> None:
     for term in (
         "left.evidenceId ≠ right.evidenceId",
         "left.provenanceRoot ≠ right.provenanceRoot",
+        "w.generation = left.generation",
+        "w.generation = right.generation",
         "w.basisDeclared = true",
     ):
         if term not in independence:
             raise ContractError(f"independence anti-double-counting term missing: {term}")
 
     kernel = manifest.get("semantic_kernel", {})
-    if kernel.get("dependency_discipline") != "strictly rank-decreasing DependencyPath":
+    if kernel.get("generation_binding") != "support and transfer witnesses bind exact obligation generation":
+        raise ContractError("manifest generation binding drift")
+    if kernel.get("dependency_closure") != "recursive EvidenceClosed over declared receipt dependencies":
+        raise ContractError("manifest dependency closure drift")
+    if kernel.get("dependency_discipline") != "strictly rank-decreasing EvidenceClosed and DependencyPath":
         raise ContractError("manifest dependency discipline drift")
     if set(kernel.get("canonical_dispositions", [])) != {
         "Pass", "Fail", "Blocked", "EnvironmentFailure"
@@ -267,6 +298,11 @@ def main() -> int:
             proof.replace(".ResourceExhaustion => .Blocked", ".ResourceExhaustion => .Pass", 1),
         )
         expect_reject(
+            "generation-gate-deleted",
+            manifest,
+            proof.replace("e.generation = o.generation ∧", "True ∧", 1),
+        )
+        expect_reject(
             "safety-liveness-gate-deleted",
             manifest,
             proof.replace("e.propertyKind = o.propertyKind ∧", "True ∧", 1),
@@ -275,6 +311,11 @@ def main() -> int:
             "evidence-class-gate-deleted",
             manifest,
             proof.replace("e.evidenceClass = o.requiredClass ∧", "True ∧", 1),
+        )
+        expect_reject(
+            "recursive-dependency-closure-deleted",
+            manifest,
+            proof.replace("EvidenceClosed rank receipts e ∧", "True ∧", 1),
         )
         expect_reject(
             "independence-provenance-deleted",
