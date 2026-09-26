@@ -1,0 +1,147 @@
+{
+  "authority": "representation_only_no_physical_execution_authority",
+  "cases": [
+    {
+      "acquisition_profile_ref": "acq:profile-001",
+      "as_built_configuration_ref": "asbuilt:bench-001-g1",
+      "calibration_currentness": "current",
+      "calibration_ref": "cal:bench-001-e1",
+      "campaign_ref": "campaign:001e",
+      "expected_disposition": "CampaignSubjectManifestComplete",
+      "id": "exact_as_built_subject_complete",
+      "installed_subsystem_refs": [
+        "device:imager-001",
+        "device:stage-001",
+        "optics:path-001"
+      ],
+      "physical_article_ref": "article:bench-001",
+      "reference_target_ref": "target:ref-001"
+    },
+    {
+      "design_ref": "design:bench-v1",
+      "expected_error": "PhysicalSubjectMissing",
+      "id": "design_only_without_physical_article",
+      "physical_article_ref": null
+    },
+    {
+      "camera_name": "camera-main",
+      "expected_error": "WeakIdentityInsufficient",
+      "friendly_name": "inspection-bench-main",
+      "id": "friendly_names_not_instance_identity",
+      "installed_subsystem_refs": [],
+      "physical_article_ref": null,
+      "stage_name": "stage-main"
+    },
+    {
+      "design_ref": "design:bench-v1",
+      "expected_identity_relation": "distinct",
+      "id": "same_design_two_physical_articles_distinct",
+      "physical_article_ref_a": "article:bench-a",
+      "physical_article_ref_b": "article:bench-b"
+    },
+    {
+      "as_built_configuration_ref_a": "asbuilt:bench-001-g1",
+      "as_built_configuration_ref_b": "asbuilt:bench-001-g2",
+      "expected_identity_relation": "distinct_configuration_generation",
+      "id": "camera_replacement_creates_new_as_built_generation",
+      "installed_subsystem_ref": "device:imager-new",
+      "physical_article_ref": "article:bench-001",
+      "removed_subsystem_ref": "device:imager-old"
+    },
+    {
+      "expected_identity_relation": "distinct_configuration_context",
+      "id": "optics_change_creates_new_configuration_context",
+      "imager_ref": "device:imager-001",
+      "optics_ref_a": "optics:path-a",
+      "optics_ref_b": "optics:path-b",
+      "physical_article_ref": "article:bench-001"
+    },
+    {
+      "acquisition_profile_ref_a": "acq:parser-a",
+      "acquisition_profile_ref_b": "acq:parser-b",
+      "as_built_configuration_ref": "asbuilt:bench-001-g1",
+      "expected_relation": "same_physical_article_changed_acquisition_context",
+      "id": "parser_or_firmware_change_preserves_hardware_but_changes_acquisition_context",
+      "physical_article_ref": "article:bench-001"
+    },
+    {
+      "as_built_configuration_ref": "asbuilt:bench-001-g1",
+      "calibration_currentness": "stale",
+      "calibration_ref": "cal:bench-001-old",
+      "expected_disposition": "CampaignSubjectNotCurrent",
+      "id": "stale_calibration_blocks_current_campaign_subject",
+      "physical_article_ref": "article:bench-001"
+    },
+    {
+      "campaign_reference_target_ref": "target:ref-b",
+      "expected_error": "TargetBindingMismatch",
+      "id": "reference_target_binding_mismatch",
+      "manifest_reference_target_ref": "target:ref-a"
+    },
+    {
+      "declared_order_semantics": "set",
+      "expected_identity_relation": "same",
+      "id": "unordered_subsystem_refs_canonicalize",
+      "subsystem_refs_a": [
+        "device:imager-001",
+        "device:stage-001",
+        "optics:path-001"
+      ],
+      "subsystem_refs_b": [
+        "optics:path-001",
+        "device:imager-001",
+        "device:stage-001"
+      ]
+    },
+    {
+      "expected_error": "DuplicateReference",
+      "id": "duplicate_subsystem_ref_rejected",
+      "subsystem_refs": [
+        "device:imager-001",
+        "device:imager-001"
+      ]
+    },
+    {
+      "expected_closure_relation": "operational_but_import_dependent",
+      "id": "imported_subsystems_preserve_import_dependence",
+      "imported_subsystem_refs": [
+        "device:imager-imported",
+        "device:stage-imported"
+      ],
+      "instrument_status": "operational_under_profile",
+      "physical_article_ref": "article:bench-001"
+    },
+    {
+      "as_built_configuration_ref": "asbuilt:bench-001-g1",
+      "campaign_ref": null,
+      "custody_context_ref": null,
+      "expected_disposition": "CampaignBindingIncomplete",
+      "id": "missing_campaign_or_custody_binding_incomplete",
+      "physical_article_ref": "article:bench-001"
+    },
+    {
+      "calibration_transfer_evidence_ref": null,
+      "expected_disposition": "CalibrationTransferRequired",
+      "id": "remount_without_calibration_transfer_requires_new_context",
+      "physical_article_ref": "article:bench-001",
+      "post_mount_ref": "mount:b",
+      "pre_mount_ref": "mount:a",
+      "prior_calibration_ref": "cal:mount-a"
+    },
+    {
+      "as_built_configuration_ref": "asbuilt:prototype-001-g1",
+      "expected_disposition": "ExploratorySubjectOnly",
+      "id": "exploratory_prototype_manifest_not_claim_bearing",
+      "manifest_mode": "exploratory",
+      "physical_article_ref": "article:prototype-001"
+    },
+    {
+      "execution_authority": false,
+      "expected_authority": "none",
+      "id": "bench_subject_manifest_cannot_mint_execution_authority",
+      "manifest_ref": "manifest:bench-subject-synthetic-pass"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for exact inspection-bench physical/as-built/configuration subject binding. Contains no vendor selection, dimensions, operating parameters, control commands, or semiconductor process parameters.",
+  "schema": "semi-eqp-met-001e2-bench-subject-corpus-v1"
+}
