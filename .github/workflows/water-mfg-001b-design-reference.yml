@@ -1,0 +1,57 @@
+name: WATER-MFG-001B Design Packet Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/engineering/WATER_MFG_001B_ENG_DESIGN_PACKET.md'
+      - 'docs/release/evidence/water-mfg-001b-eng-design-packet-v1.json'
+      - 'scripts/validate_water_mfg_001b_design.py'
+      - '.github/workflows/water-mfg-001b-design-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify exact source ancestry and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE='9343350ff6a4657715b446080d365595df0097c8'
+          git merge-base --is-ancestor "$SOURCE" HEAD
+          test "$(git rev-list --count "$SOURCE"..HEAD)" -eq 1
+
+          mapfile -t changed < <(git diff --name-only "$SOURCE"...HEAD | sort)
+          expected=(
+            '.github/workflows/water-mfg-001b-design-reference.yml'
+            'scripts/validate_water_mfg_001b_design.py'
+          )
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do
+            test "${changed[$i]}" = "${expected[$i]}"
+          done
+
+      - name: Verify frozen source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:docs/release/evidence/water-mfg-001b-eng-design-packet-v1.json)" = 'c7a30476e48ba72c650d77e8265b41af09795bf1'
+          test "$(git rev-parse HEAD:docs/engineering/WATER_MFG_001B_ENG_DESIGN_PACKET.md)" = '889b9e45de1cd8faf32c8fc296f005c18b7dea8f'
+
+      - name: Execute independent WATER design-packet oracle
+        run: python3 scripts/validate_water_mfg_001b_design.py
+
+      - name: Require clean repository postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all)"
