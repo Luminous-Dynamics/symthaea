@@ -1,0 +1,44 @@
+name: ENG-DESIGN 001B Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/engineering/ENG_DESIGN_001B_THREAD_INTEGRITY.md'
+      - 'docs/release/evidence/eng-design-001b-thread-integrity-reference-v1.json'
+      - 'scripts/validate_eng_design_001b.py'
+      - '.github/workflows/eng-design-001b-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bind exact source and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_head='09e3d12bfda49c3b98a76c811ea4ec1f28ad29b4'
+          git cat-file -e "${source_head}^{commit}"
+          git merge-base --is-ancestor "$source_head" HEAD
+          test "$(git rev-parse "$source_head:docs/engineering/ENG_DESIGN_001B_THREAD_INTEGRITY.md")" = 'd79130f9737f5cc78e6c81d8f182c72e6100c7e6'
+          test "$(git rev-parse "$source_head:docs/release/evidence/eng-design-001b-thread-integrity-reference-v1.json")" = 'a43f72bfb5915cb816e25a2fec85805acdd459d9'
+          mapfile -t changed < <(git diff --name-only "$source_head" HEAD | sort)
+          expected=(
+            '.github/workflows/eng-design-001b-reference.yml'
+            'scripts/validate_eng_design_001b.py'
+          )
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected
+          printf '%s\n' "${changed[@]}" > /tmp/actual
+          diff -u /tmp/expected /tmp/actual
+      - name: Independent design-thread integrity oracle
+        run: python3 scripts/validate_eng_design_001b.py
+      - name: Clean postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
