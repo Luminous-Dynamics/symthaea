@@ -1,0 +1,26 @@
+name: FAB-ANALYTIC-001A Reaction Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-fabrication-kernel/src/analytical.rs'
+      - 'scripts/qualify_fab_analytic_001a_reaction.sh'
+      - '.github/workflows/fab-analytic-001a-reaction.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact reaction-force compile/regression qualifier
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Execute source-bound qualification
+        shell: bash
+        run: bash scripts/qualify_fab_analytic_001a_reaction.sh
