@@ -1,0 +1,180 @@
+name: SYM-FV-007B Evidence Freshness
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/evidence/EvidenceFreshness.lean"
+      - "docs/formal/sym-fv-007b-evidence-freshness-v1.json"
+      - "scripts/validate_sym_fv_007b.py"
+      - ".github/workflows/sym-fv-007b-evidence-freshness.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-007b-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  evidence-freshness:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      EXACT_PARENT: f4b7fbc16aa132d60860f52a49843e9a6ccc8b7e
+      PARENT_BLOB: 4684326db9d980647914bca180c88cb7fad4ec7e
+      CHILD_BLOB: 21e8a2633be61b96d1c66c7b589fdd179ce2758e
+      REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact parent, blobs, and child scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD"
+          test "$(git merge-base "$EXACT_PARENT" HEAD)" = "$EXACT_PARENT"
+          test "$(git rev-parse HEAD:formal/lean/evidence/EvidenceComposition.lean)" = "$PARENT_BLOB"
+          test "$(git rev-parse HEAD:formal/lean/evidence/EvidenceFreshness.lean)" = "$CHILD_BLOB"
+
+          mapfile -t changed < <(git diff --name-only "$EXACT_PARENT"...HEAD | sort)
+          expected=(
+            ".github/workflows/sym-fv-007b-evidence-freshness.yml"
+            "docs/formal/sym-fv-007b-evidence-freshness-v1.json"
+            "formal/lean/evidence/EvidenceFreshness.lean"
+            "scripts/validate_sym_fv_007b.py"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${expected_sorted[@]}") <(printf '%s\n' "${changed[@]}")
+
+      - name: Static theorem contract and hostile controls
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/validate_sym_fv_007b.py
+          python3 scripts/validate_sym_fv_007b.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Prove known-bad rejection and typecheck composed theorem subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/sym-fv-007b-known-bad.lean <<'LEAN'
+          theorem deliberately_invalid_007b : False := by
+            exact True.intro
+          LEAN
+
+          cat formal/lean/evidence/EvidenceComposition.lean \
+              formal/lean/evidence/EvidenceFreshness.lean \
+              > /tmp/sym-fv-007b-subject.lean
+
+          nix develop .#formal --command sh -c '
+            set -eu
+            lean --version > /tmp/sym-fv-007b-lean-version.txt 2>&1
+
+            set +e
+            lean /tmp/sym-fv-007b-known-bad.lean > /tmp/sym-fv-007b-known-bad-output.txt 2>&1
+            bad_status=$?
+            set -e
+            printf "%s\n" "$bad_status" > /tmp/sym-fv-007b-known-bad-status.txt
+            test "$bad_status" -ne 0
+
+            lean /tmp/sym-fv-007b-subject.lean > /tmp/sym-fv-007b-lean-output.txt 2>&1
+          '
+
+          cat /tmp/sym-fv-007b-lean-version.txt
+          cat /tmp/sym-fv-007b-lean-output.txt
+          test "$(cat /tmp/sym-fv-007b-known-bad-status.txt)" -ne 0
+          ! grep -Fq 'sorryAx' /tmp/sym-fv-007b-lean-output.txt
+          ! grep -Fq '.sorry' /tmp/sym-fv-007b-lean-output.txt
+          ! grep -Fqi 'error:' /tmp/sym-fv-007b-lean-output.txt
+
+          for theorem in \
+            stale_reference_not_admissible \
+            fail_result_not_admissible \
+            blocked_result_not_admissible \
+            environment_failure_not_admissible \
+            advancing_live_generation_invalidates_prior_reference \
+            composite_admission_implies_root_current_and_pass \
+            composite_admission_implies_dependency_current_and_pass \
+            stale_dependency_blocks_composite \
+            nonpass_dependency_blocks_composite \
+            adding_dependency_requires_that_dependency_admissible \
+            adding_admissible_dependency_preserves_composite; do
+              grep -Fq "$theorem" /tmp/sym-fv-007b-lean-output.txt
+          done
+
+      - name: Postflight and exact-head receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+          receipt = {
+              "schema": "symthaea.formal.sym-fv-007b-qualification.v1",
+              "tracking_issue": 5972,
+              "authority": "EvidenceOnly",
+              "evidence_class": "AbstractFormalTheorem",
+              "result": "LeanTypechecked",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent": os.environ["EXACT_PARENT"],
+              "parent_is_ancestor": git("merge-base", os.environ["EXACT_PARENT"], "HEAD") == os.environ["EXACT_PARENT"],
+              "parent_theorem_blob": os.environ["PARENT_BLOB"],
+              "child_theorem_blob": os.environ["CHILD_BLOB"],
+              "lean_version": pathlib.Path("/tmp/sym-fv-007b-lean-version.txt").read_text().strip(),
+              "known_bad_exit_status": int(pathlib.Path("/tmp/sym-fv-007b-known-bad-status.txt").read_text().strip()),
+              "proof_sha256": sha256("formal/lean/evidence/EvidenceFreshness.lean"),
+              "manifest_sha256": sha256("docs/formal/sym-fv-007b-evidence-freshness-v1.json"),
+              "validator_sha256": sha256("scripts/validate_sym_fv_007b.py"),
+              "static_contract": "PASS",
+              "hostile_controls": "PASS",
+              "lean_exit_zero": True,
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-trusted-wall-clock-freshness",
+                  "not-distributed-currentness",
+                  "not-distributed-finality",
+                  "not-dag-acyclicity",
+                  "not-validator-refinement",
+                  "not-runtime-authorization",
+              ],
+          }
+          out = pathlib.Path("/tmp/sym-fv-007b-receipt.json")
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(out.read_text())
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-007b-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/sym-fv-007b-lean-version.txt
+            /tmp/sym-fv-007b-known-bad-output.txt
+            /tmp/sym-fv-007b-known-bad-status.txt
+            /tmp/sym-fv-007b-lean-output.txt
+            /tmp/sym-fv-007b-receipt.json
+          if-no-files-found: error
+          retention-days: 30
