@@ -1,0 +1,63 @@
+{
+  "schema": "symthaea.formal.sym-fv-007a-evidence-composition.v1",
+  "tracking_issue": 5961,
+  "parent_issue": 5945,
+  "evidence_class": "AbstractFormalTheorem",
+  "authority": "EvidenceOnly",
+  "parent_receipt_contract": {
+    "pr": 5879,
+    "commit": "89f31822c97596c35ca078071775035b74b6c92b",
+    "schema_path": "docs/formal/formal_evidence_receipt_v1.schema.json",
+    "schema_blob": "26b966da5a4ee16eb48023033e7324d6f14a3707"
+  },
+  "proof_subject": {
+    "path": "formal/lean/evidence/EvidenceComposition.lean",
+    "blob": "4684326db9d980647914bca180c88cb7fad4ec7e"
+  },
+  "evidence_classes": [
+    "abstractFormalTheorem",
+    "extractedSourceRefinement",
+    "deductiveImplementationProof",
+    "boundedModelSafety",
+    "temporalModelEvidence",
+    "boundedTraceConformance",
+    "runtimeQualification"
+  ],
+  "composition_contract": {
+    "primary_class": "root-preserved",
+    "subject": "root-preserved",
+    "scope": "root-preserved",
+    "assumptions": "monotone-accumulation",
+    "class_ordering": "none"
+  },
+  "theorems": [
+    "compose_one_preserves_primary_class",
+    "compose_one_preserves_subject",
+    "compose_one_preserves_scope",
+    "compose_one_preserves_root_assumptions",
+    "compose_one_preserves_dependency_assumptions",
+    "compose_many_preserves_primary_class",
+    "compose_many_preserves_subject",
+    "compose_many_preserves_scope",
+    "compose_many_preserves_root_assumptions",
+    "compose_many_preserves_head_dependency_assumptions"
+  ],
+  "hostile_controls": [
+    "dependency-class-cannot-replace-root-class",
+    "dependency-subject-cannot-replace-root-subject",
+    "dependency-scope-cannot-replace-root-scope",
+    "root-assumptions-cannot-be-dropped",
+    "dependency-assumptions-cannot-be-dropped",
+    "synthetic-total-evidence-ranking-forbidden",
+    "proof-holes-and-user-axioms-forbidden"
+  ],
+  "claim_ceiling": "Local abstract receipt-composition invariants only; no freshness, DAG, validator-refinement, theorem-truth, or runtime-authority claim.",
+  "nonclaims": [
+    "not-truth-of-underlying-dependency-claims",
+    "not-json-or-python-validator-refinement",
+    "not-freshness-or-invalidation-theorem",
+    "not-dag-acyclicity-theorem",
+    "not-total-ordering-of-evidence-quality",
+    "not-runtime-authorization"
+  ]
+}
