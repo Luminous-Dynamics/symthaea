@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-devsim-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Evidence-bounded DEVSIM semiconductor TCAD adapter boundary for Symthaea"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["devsim", "tcad", "semiconductor", "simulation"]
+categories = ["simulation", "science"]
+
+[dependencies]
+blake3 = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
