@@ -52,7 +52,10 @@ inductive OutcomeDisposition where
   | EnvironmentFailure
   deriving DecidableEq, Repr
 
-/-- Canonical result-to-disposition mapping shared with SYM-FV-INFRA-003B. -/
+/--
+Operational workflow disposition. This mirrors SYM-FV-INFRA-003B and is not,
+by itself, a truth value for the underlying system property.
+-/
 def disposition : CanonicalResult → OutcomeDisposition
   | .SemanticSuccess => .Pass
   | .SemanticCounterexample => .Fail
@@ -67,6 +70,33 @@ def disposition : CanonicalResult → OutcomeDisposition
   | .EnvironmentUnavailable => .EnvironmentFailure
   | .ToolInstallationFailure => .EnvironmentFailure
   | .RunnerInfrastructureFailure => .EnvironmentFailure
+
+/--
+Semantic meaning of a canonical result. This is deliberately orthogonal to
+workflow disposition: a proof/qualification failure is operationally `Fail`
+but is not counterevidence that the system property itself is false.
+-/
+inductive SemanticPolarity where
+  | PositiveSupport
+  | SemanticCounterevidence
+  | QualificationNegative
+  | NoSemanticConclusion
+  deriving DecidableEq, Repr
+
+def semanticPolarity : CanonicalResult → SemanticPolarity
+  | .SemanticSuccess => .PositiveSupport
+  | .SemanticCounterexample => .SemanticCounterevidence
+  | .ProofOrQualificationFailure => .QualificationNegative
+  | .UnsupportedBoundary => .NoSemanticConclusion
+  | .InsufficientBound => .NoSemanticConclusion
+  | .ResourceExhaustion => .NoSemanticConclusion
+  | .MissingPrerequisite => .NoSemanticConclusion
+  | .StaleSubjectOrDependency => .NoSemanticConclusion
+  | .AmbiguousOrUnknownOutcome => .NoSemanticConclusion
+  | .UnclassifiedToolCrash => .NoSemanticConclusion
+  | .EnvironmentUnavailable => .NoSemanticConclusion
+  | .ToolInstallationFailure => .NoSemanticConclusion
+  | .RunnerInfrastructureFailure => .NoSemanticConclusion
 
 structure EvidenceReceipt where
   evidenceId : EvidenceIdentity
@@ -179,9 +209,9 @@ def ClaimTransfer
 
 /--
 A receipt may positively support an obligation only if every structural binding
-matches. Evidence-class and property-kind compatibility are deliberately exact
-in this first kernel, so composition cannot manufacture a stronger class or
-turn safety evidence into liveness evidence.
+matches and the canonical result carries positive semantic support. The
+operational `Pass` requirement is retained independently so the calculus binds
+both workflow disposition and semantic meaning.
 -/
 def Supports
     (refinements : List RefinementWitness)
@@ -194,7 +224,8 @@ def Supports
   e.evidenceClass = o.requiredClass ∧
   e.propertyKind = o.propertyKind ∧
   SubjectTransfer refinements e o ∧
-  ClaimTransfer entailments e o
+  ClaimTransfer entailments e o ∧
+  semanticPolarity e.result = .PositiveSupport
 
 /-- Positive reachability is first-class when the obligation requires it. -/
 def ReachabilitySatisfied
@@ -208,15 +239,19 @@ def ReachabilitySatisfied
     w.subject = o.subject ∧
     w.claim = o.claim
 
-/-- Semantically or procedurally conflicting current dispositions remain visible. -/
+/--
+Semantic contradiction requires positive support versus genuine semantic
+counterevidence at the same exact subject/claim/generation. Generic workflow
+`Fail` is intentionally insufficient.
+-/
 def Conflicting (left right : EvidenceReceipt) : Prop :=
   left.subject = right.subject ∧
   left.claim = right.claim ∧
   left.generation = right.generation ∧
   left.validity = .Current ∧
   right.validity = .Current ∧
-  disposition left.result = .Pass ∧
-  disposition right.result = .Fail
+  semanticPolarity left.result = .PositiveSupport ∧
+  semanticPolarity right.result = .SemanticCounterevidence
 
 def ConflictFree (receipts : List EvidenceReceipt) : Prop :=
   ∀ left, left ∈ receipts →
@@ -225,8 +260,8 @@ def ConflictFree (receipts : List EvidenceReceipt) : Prop :=
 
 /--
 Dependency evidence is recursively closed. Every declared prerequisite must be
-present as a current semantic Pass, strictly lower in the well-founded rank,
-and itself dependency-closed.
+present as a current positive-support Pass, strictly lower in the well-founded
+rank, and itself dependency-closed.
 -/
 inductive EvidenceClosed
     (rank : EvidenceIdentity → Nat)
@@ -235,6 +270,7 @@ inductive EvidenceClosed
   | intro (e : EvidenceReceipt)
       (current : e.validity = .Current)
       (passed : disposition e.result = .Pass)
+      (positive : semanticPolarity e.result = .PositiveSupport)
       (dependencies :
         ∀ dependency,
           dependency ∈ e.dependencies →
@@ -306,6 +342,31 @@ inductive DependencyPath
       DependencyPath rank b c →
       DependencyPath rank a c
 
+theorem proof_failure_is_fail_without_refutation :
+    disposition .ProofOrQualificationFailure = .Fail ∧
+    semanticPolarity .ProofOrQualificationFailure = .QualificationNegative := by
+  exact ⟨rfl, rfl⟩
+
+theorem qualification_failure_not_counterevidence :
+    semanticPolarity .ProofOrQualificationFailure ≠ .SemanticCounterevidence := by
+  intro h
+  cases h
+
+theorem semantic_counterexample_is_counterevidence :
+    disposition .SemanticCounterexample = .Fail ∧
+    semanticPolarity .SemanticCounterexample = .SemanticCounterevidence := by
+  exact ⟨rfl, rfl⟩
+
+theorem resource_exhaustion_is_blocked_semantically_neutral :
+    disposition .ResourceExhaustion = .Blocked ∧
+    semanticPolarity .ResourceExhaustion = .NoSemanticConclusion := by
+  exact ⟨rfl, rfl⟩
+
+theorem environment_failure_is_semantically_neutral :
+    disposition .EnvironmentUnavailable = .EnvironmentFailure ∧
+    semanticPolarity .EnvironmentUnavailable = .NoSemanticConclusion := by
+  exact ⟨rfl, rfl⟩
+
 theorem blocked_cannot_support
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
@@ -329,6 +390,30 @@ theorem environment_failure_cannot_support
   have hpass : disposition e.result = .Pass := hs.2.1
   rw [henv] at hpass
   cases hpass
+
+theorem qualification_failure_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (e : EvidenceReceipt)
+    (o : Obligation)
+    (hqualification : semanticPolarity e.result = .QualificationNegative) :
+    ¬ Supports refinements entailments e o := by
+  intro hs
+  have hpositive : semanticPolarity e.result = .PositiveSupport := hs.2.2.2.2.2.2.2
+  rw [hqualification] at hpositive
+  cases hpositive
+
+theorem semantic_counterevidence_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (e : EvidenceReceipt)
+    (o : Obligation)
+    (hcounter : semanticPolarity e.result = .SemanticCounterevidence) :
+    ¬ Supports refinements entailments e o := by
+  intro hs
+  have hpositive : semanticPolarity e.result = .PositiveSupport := hs.2.2.2.2.2.2.2
+  rw [hcounter] at hpositive
+  cases hpositive
 
 theorem superseded_cannot_support
     (refinements : List RefinementWitness)
@@ -421,7 +506,7 @@ theorem mismatched_claim_requires_entailment
       w.generation = o.generation ∧
       w.strongClaim = e.claim ∧
       w.weakClaim = o.claim := by
-  have hclaim : ClaimTransfer entailments e o := hs.2.2.2.2.2.2
+  have hclaim : ClaimTransfer entailments e o := hs.2.2.2.2.2.2.1
   cases hclaim with
   | inl hexact => exact False.elim (hmismatch hexact)
   | inr hentails => exact hentails
@@ -475,7 +560,16 @@ theorem evidence_closed_is_current_pass
     (hclosed : EvidenceClosed rank receipts e) :
     e.validity = .Current ∧ disposition e.result = .Pass := by
   cases hclosed with
-  | intro _ current passed _ => exact ⟨current, passed⟩
+  | intro _ current passed _ _ => exact ⟨current, passed⟩
+
+theorem evidence_closed_is_positive_support
+    (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt)
+    (e : EvidenceReceipt)
+    (hclosed : EvidenceClosed rank receipts e) :
+    semanticPolarity e.result = .PositiveSupport := by
+  cases hclosed with
+  | intro _ _ _ positive _ => exact positive
 
 theorem evidence_closed_rejects_self_dependency
     (rank : EvidenceIdentity → Nat)
@@ -484,7 +578,7 @@ theorem evidence_closed_rejects_self_dependency
     (hclosed : EvidenceClosed rank receipts e)
     (hself : e.evidenceId ∈ e.dependencies) : False := by
   cases hclosed with
-  | intro _ _ _ dependencies =>
+  | intro _ _ _ _ dependencies =>
       have hexists := dependencies e.evidenceId hself
       cases hexists with
       | intro prerequisite hrest =>
@@ -492,6 +586,22 @@ theorem evidence_closed_rejects_self_dependency
           have hlt : rank prerequisite.evidenceId < rank e.evidenceId := hrest.2.2.1
           rw [hid] at hlt
           exact (Nat.lt_irrefl (rank e.evidenceId)) hlt
+
+theorem qualification_failure_cannot_create_semantic_conflict
+    (left right : EvidenceReceipt)
+    (hqualification : right.result = .ProofOrQualificationFailure) :
+    ¬ Conflicting left right := by
+  intro hconflict
+  have hcounter : semanticPolarity right.result = .SemanticCounterevidence :=
+    hconflict.2.2.2.2.2.2
+  rw [hqualification] at hcounter
+  cases hcounter
+
+theorem conflict_requires_semantic_counterevidence
+    (left right : EvidenceReceipt)
+    (hconflict : Conflicting left right) :
+    semanticPolarity right.result = .SemanticCounterevidence := by
+  exact hconflict.2.2.2.2.2.2
 
 theorem closed_requires_every_mandatory_obligation
     (rank : EvidenceIdentity → Nat)
@@ -555,11 +665,19 @@ theorem support_non_amplification_summary
     e.evidenceClass = o.requiredClass ∧
     e.propertyKind = o.propertyKind ∧
     SubjectTransfer refinements e o ∧
-    ClaimTransfer entailments e o := by
+    ClaimTransfer entailments e o ∧
+    semanticPolarity e.result = .PositiveSupport := by
   exact hs
 
+#print axioms proof_failure_is_fail_without_refutation
+#print axioms qualification_failure_not_counterevidence
+#print axioms semantic_counterexample_is_counterevidence
+#print axioms resource_exhaustion_is_blocked_semantically_neutral
+#print axioms environment_failure_is_semantically_neutral
 #print axioms blocked_cannot_support
 #print axioms environment_failure_cannot_support
+#print axioms qualification_failure_cannot_support
+#print axioms semantic_counterevidence_cannot_support
 #print axioms superseded_cannot_support
 #print axioms invalidated_cannot_support
 #print axioms stale_generation_cannot_support
@@ -571,7 +689,10 @@ theorem support_non_amplification_summary
 #print axioms same_provenance_cannot_count_as_independent
 #print axioms required_reachability_empty_rejected
 #print axioms evidence_closed_is_current_pass
+#print axioms evidence_closed_is_positive_support
 #print axioms evidence_closed_rejects_self_dependency
+#print axioms qualification_failure_cannot_create_semantic_conflict
+#print axioms conflict_requires_semantic_counterevidence
 #print axioms closed_requires_every_mandatory_obligation
 #print axioms contradictory_current_evidence_prevents_closure
 #print axioms dependency_path_decreases
