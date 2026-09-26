@@ -1,0 +1,126 @@
+{
+  "authority": "representation_only_no_physical_execution_authority",
+  "cases": [
+    {
+      "expected_disposition": "QualitativeOnly",
+      "id": "sharp_image_without_scale_reference",
+      "image_quality_ref": "quality:sharp",
+      "raw_observation_ref": "obs:optical-001",
+      "scale_reference_ref": null
+    },
+    {
+      "calibration_currentness": "current",
+      "calibration_ref": "cal:optical-current",
+      "coverage_profile_ref": "coverage:local-center",
+      "expected_disposition": "CandidateLocalDimensionalMeasurement",
+      "id": "current_scale_reference_and_current_calibration",
+      "raw_observation_ref": "obs:optical-002",
+      "reference_currentness": "current",
+      "scale_reference_ref": "ref:scale-current"
+    },
+    {
+      "expected_disposition": "UncalibratedNominalScaleOnly",
+      "id": "nominal_magnification_without_physical_scale_reference",
+      "nominal_magnification_ref": "optics:nominal-mag",
+      "scale_reference_ref": null
+    },
+    {
+      "calibration_currentness": "current",
+      "calibration_ref": "cal:center",
+      "coverage_profile_ref": "coverage:center-only",
+      "edge_characterization_ref": null,
+      "expected_disposition": "CoverageLimited",
+      "id": "center_field_calibrated_edges_uncharacterized"
+    },
+    {
+      "calibration_currentness": "current",
+      "calibration_ref": "cal:optical-current",
+      "expected_disposition": "ReferenceStaleOrMissing",
+      "id": "current_calibration_with_stale_reference_artifact",
+      "reference_currentness": "stale",
+      "scale_reference_ref": "ref:scale-old"
+    },
+    {
+      "expected_identity_relation": "distinct",
+      "friendly_camera_name": "camera-main",
+      "id": "same_friendly_camera_changed_optics",
+      "imager_ref": "device:camera-a",
+      "optics_ref_a": "optics:path-a",
+      "optics_ref_b": "optics:path-b"
+    },
+    {
+      "configuration_ref_a": "config:optics-a",
+      "configuration_ref_b": "config:optics-b",
+      "expected_disposition": "CalibrationTransferUnestablished",
+      "id": "material_focus_or_zoom_change_requires_transfer_evidence",
+      "material_setting_change": "focus_or_zoom_profile_changed",
+      "transfer_evidence_ref": null
+    },
+    {
+      "expected_identity_relation": "distinct",
+      "id": "remount_changes_optical_transform",
+      "post_mount_ref": "mount:b",
+      "post_transform_ref": "transform:optical-b",
+      "pre_mount_ref": "mount:a",
+      "pre_transform_ref": "transform:optical-a"
+    },
+    {
+      "derived_image_ref": "derived:corrected-003",
+      "distortion_transform_ref": "transform:distortion-a",
+      "expected_lineage_relation": "derived_from_raw_no_new_physical_observation",
+      "id": "distortion_correction_is_derived",
+      "raw_observation_ref": "obs:optical-003"
+    },
+    {
+      "derived_superresolution_ref": "derived:sr-004",
+      "expected_disposition": "DerivedEnhancementOnly",
+      "expected_physical_witness_count": 1,
+      "id": "software_superresolution_does_not_create_physical_resolution_witness",
+      "raw_observation_ref": "obs:optical-004"
+    },
+    {
+      "derived_artifact_refs": [
+        "derived:crop-005",
+        "derived:resample-005"
+      ],
+      "expected_physical_witness_count": 1,
+      "id": "crop_resample_one_raw_one_physical_witness",
+      "raw_observation_ref": "obs:optical-005"
+    },
+    {
+      "expected_disposition": "CoverageLimited",
+      "id": "local_scale_reference_requested_for_whole_field",
+      "requested_scope": "whole_field",
+      "scale_reference_ref": "ref:local-scale",
+      "scale_reference_scope": "local_region"
+    },
+    {
+      "derived_measurement_ref": "derived:orphan-scalar",
+      "expected_error": "LineageInvalid",
+      "id": "derived_scalar_without_raw_image",
+      "raw_observation_ref": null
+    },
+    {
+      "expected_history": "both_preserved",
+      "historical_raw_observation_ref": "obs:optical-historical",
+      "id": "recalibration_new_epoch_preserves_history",
+      "new_calibration_ref": "cal:new",
+      "old_calibration_ref": "cal:old"
+    },
+    {
+      "expected_disposition": "SoftwareReplayOnly",
+      "expected_fresh_physical_witnesses": 0,
+      "id": "software_replay_not_fresh_optical_acquisition",
+      "raw_observation_ref": "obs:optical-006",
+      "replay_ref": "replay:optical-006"
+    },
+    {
+      "execution_authority": false,
+      "expected_authority": "none",
+      "id": "optical_evidence_cannot_mint_execution_authority",
+      "optical_evidence_ref": "evidence:optical-synthetic-pass"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for optical scale, distortion, configuration/currentness, and raw-to-derived semantics. Contains no hardware dimensions, optical powers, exposure values, vendor parameters, or semiconductor process parameters.",
+  "schema": "semi-eqp-met-001d-optical-corpus-v1"
+}
