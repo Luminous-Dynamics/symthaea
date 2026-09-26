@@ -1,0 +1,50 @@
+name: ENG-DESIGN-002A Processing Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_eng_design_002a_processing.py'
+      - '.github/workflows/eng-design-002a-processing.yml'
+      - 'docs/engineering/ENG_DESIGN_002A_PROCESSING_CONTRACT.md'
+      - 'docs/release/evidence/eng-design-002a-processing-reference-v1.json'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Bind exact source and qualifier delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=2a64a1e185d96a804190751ab7bb0e6b3f6db087
+          CONTRACT_BLOB=1b6d50e2f35886cea72090509d3a5177e9a43fd7
+          CORPUS_BLOB=e002cf6c558e9fb37c64587768030f207b1700f1
+
+          test "$(git rev-parse HEAD^)" = "$SOURCE"
+          test "$(git rev-list --count "$SOURCE"..HEAD)" = "1"
+          test "$(git rev-parse HEAD:docs/engineering/ENG_DESIGN_002A_PROCESSING_CONTRACT.md)" = "$CONTRACT_BLOB"
+          test "$(git rev-parse HEAD:docs/release/evidence/eng-design-002a-processing-reference-v1.json)" = "$CORPUS_BLOB"
+
+          mapfile -t changed < <(git diff --name-only "$SOURCE"..HEAD | sort)
+          expected=(
+            ".github/workflows/eng-design-002a-processing.yml"
+            "scripts/validate_eng_design_002a_processing.py"
+          )
+          printf '%s\n' "${expected[@]}" | sort > /tmp/expected
+          printf '%s\n' "${changed[@]}" > /tmp/actual
+          diff -u /tmp/expected /tmp/actual
+
+      - name: Execute independent processing oracle
+        run: python3 scripts/validate_eng_design_002a_processing.py
+
+      - name: Clean postflight
+        run: test -z "$(git status --porcelain)"
