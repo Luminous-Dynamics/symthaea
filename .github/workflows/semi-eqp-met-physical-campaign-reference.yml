@@ -1,0 +1,20 @@
+name: SEMI-EQP-MET Physical Campaign Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/semi-eqp-met-001e-reference.py'
+      - 'docs/release/evidence/semi-eqp-met-001e-physical-campaign-corpus-v1.json'
+      - '.github/workflows/semi-eqp-met-physical-campaign-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run independent SEMI-EQP-MET-001E reference oracle
+        run: python3 scripts/semi-eqp-met-001e-reference.py
