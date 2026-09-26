@@ -76,13 +76,15 @@ jobs:
               return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
           mapping = json.loads(Path(os.environ["MAPPING"]).read_text())
+          disposition = "SemanticSuccess"
           receipt = {
               "schema": "symthaea.formal.outcome-mapping.qualification.v1",
               "tracking_issue": 6054,
               "authority": "EvidenceOnly",
-              "result": "Pass",
+              "result": mapping["dispositions"][disposition],
               "qualification_kind": "CanonicalOutcomeMappingQualified",
-              "outcome_disposition": "SemanticSuccess",
+              "outcome_disposition": disposition,
+              "semantic_polarity": mapping["semantic_polarity"][disposition],
               "raw_tool_outcome": "MappingValidatorAndHostileMutantsPassed",
               "mapping_schema_version": mapping["schema"],
               "mapping_schema_digest": sha256(os.environ["MAPPING"]),
@@ -98,6 +100,7 @@ jobs:
                   "not-outcome-taxonomy-completeness",
                   "not-tool-specific-implementation-refinement",
                   "not-evidence-class-promotion",
+                  "not-automatic-claim-refutation",
                   "not-runtime-authority"
               ]
           }
@@ -118,7 +121,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Admit only canonical PASS
+      - name: Admit only canonical positive support
         shell: bash
         run: |
           set -euo pipefail
@@ -130,5 +133,7 @@ jobs:
               raise SystemExit(f"SYM-FV-INFRA-003B not admitted: {receipt['result']}")
           if receipt["outcome_disposition"] != "SemanticSuccess":
               raise SystemExit("SYM-FV-INFRA-003B PASS without SemanticSuccess disposition")
-          print("SYM-FV-INFRA-003B admission: PASS")
+          if receipt["semantic_polarity"] != "PositiveSupport":
+              raise SystemExit("SYM-FV-INFRA-003B PASS without PositiveSupport semantic polarity")
+          print("SYM-FV-INFRA-003B admission: PASS + PositiveSupport")
           PY
