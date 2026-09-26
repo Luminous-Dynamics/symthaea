@@ -1,0 +1,152 @@
+name: SYM-FV-004A Hamming Core
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/hdc/BinaryHVBind.lean"
+      - "formal/lean/hdc/BinaryHVHamming.lean"
+      - "docs/formal/sym-fv-004a-hamming-core-v1.json"
+      - "scripts/validate_sym_fv_004a.py"
+      - "crates/bridges/symthaea-lean-bridge/tests/binaryhv_hamming_formal_audit.rs"
+      - "crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs"
+      - "crates/bridges/symthaea-lean-bridge/src/axiom_gate.rs"
+      - "crates/bridges/symthaea-proof-audit/**"
+      - "crates/core/symthaea-core/src/hdc/binary_hv.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-fv-004a-hamming.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-004a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  hamming-core:
+    name: Core-Lean BinaryHV Hamming semantics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact stack and semantic subjects
+        shell: bash
+        run: |
+          set -euo pipefail
+          stack_parent=a607dc2611dd04b60b91e3f6b74ffd726d5666a9
+          semantic_parent=2199cf04634e81d85592ed0479a5c3d2d0fb6ac8
+          theorem=formal/lean/hdc/BinaryHVBind.lean
+          production=crates/core/symthaea-core/src/hdc/binary_hv.rs
+          test "$(git rev-parse "$semantic_parent:$theorem")" = f724618781b2660d1e76e45a69dcf796a792d76d
+          test "$(git rev-parse "HEAD:$theorem")" = f724618781b2660d1e76e45a69dcf796a792d76d
+          test "$(git rev-parse "HEAD:$production")" = 22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056
+          git merge-base --is-ancestor "$stack_parent" HEAD
+          git diff --name-only "$stack_parent"..HEAD | sort
+
+      - name: Static contract and hostile controls
+        run: python3 scripts/validate_sym_fv_004a.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Format-check child audit consumer
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            cargo fmt --check -p symthaea-lean-bridge
+          '
+
+      - name: Audit all Hamming theorems through real Lean
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            rustc --version | tee /tmp/sym-fv-004a-rust-version.txt
+            lean --version | tee /tmp/sym-fv-004a-lean-version.txt
+            SYMTHAEA_LEAN_FORMAL_AUDIT=1 \
+              cargo test -p symthaea-lean-bridge --test binaryhv_hamming_formal_audit -- --nocapture \
+              | tee /tmp/sym-fv-004a-audit-output.txt
+          '
+
+      - name: Postflight immutability and receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          receipt = {
+              'schema': 'symthaea.formal.sym-fv-004a-hamming-core-receipt.v1',
+              'tracking_issue': 5717,
+              'stack_parent_pr': 5884,
+              'stack_parent_head': 'a607dc2611dd04b60b91e3f6b74ffd726d5666a9',
+              'semantic_parent_pr': 5801,
+              'evidence_class': 'AbstractFormalTheorem',
+              'head': git('rev-parse', 'HEAD'),
+              'tree': git('rev-parse', 'HEAD^{tree}'),
+              'parent_theorem_blob': git('rev-parse', 'HEAD:formal/lean/hdc/BinaryHVBind.lean'),
+              'production_future_target_blob': git('rev-parse', 'HEAD:crates/core/symthaea-core/src/hdc/binary_hv.rs'),
+              'hamming_theorem_blob': git('rev-parse', 'HEAD:formal/lean/hdc/BinaryHVHamming.lean'),
+              'hamming_theorem_sha256': sha256('formal/lean/hdc/BinaryHVHamming.lean'),
+              'contract_sha256': sha256('docs/formal/sym-fv-004a-hamming-core-v1.json'),
+              'validator_sha256': sha256('scripts/validate_sym_fv_004a.py'),
+              'audit_test_sha256': sha256('crates/bridges/symthaea-lean-bridge/tests/binaryhv_hamming_formal_audit.rs'),
+              'workflow_sha256': sha256('.github/workflows/sym-fv-004a-hamming.yml'),
+              'rust_version': Path('/tmp/sym-fv-004a-rust-version.txt').read_text().strip(),
+              'lean_version': Path('/tmp/sym-fv-004a-lean-version.txt').read_text().strip(),
+              'theorem_count': 7,
+              'policy': 'constitutional',
+              'lean_dependency_class': 'core-lean-only',
+              'mathlib_required': False,
+              'static_contract': 'PASS',
+              'negative_controls': 'PASS',
+              'real_lean_audit_exit_zero': True,
+              'repository_postflight_clean': True,
+              'nonclaims': [
+                  'not-production-rust-refinement',
+                  'not-simd-proof',
+                  'not-rustc-llvm-native-binary-proof',
+                  'not-floating-point-similarity-proof',
+                  'not-runtime-authority',
+              ],
+          }
+          out = Path('/tmp/sym-fv-004a-receipt.json')
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(out.read_text())
+          PY
+
+      - name: Retain formal evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-004a-${{ github.sha }}
+          path: |
+            /tmp/sym-fv-004a-rust-version.txt
+            /tmp/sym-fv-004a-lean-version.txt
+            /tmp/sym-fv-004a-audit-output.txt
+            /tmp/sym-fv-004a-receipt.json
+          if-no-files-found: error
+          retention-days: 30
