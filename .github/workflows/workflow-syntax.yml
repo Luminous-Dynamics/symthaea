@@ -177,3 +177,71 @@ jobs:
             echo "shellcheck_integration=false"
             echo "pyflakes_integration=false"
           } | tee workflow-syntax-receipt.txt
+
+  formal-workflow-safety:
+    name: Formal workflow fail-closed contract
+    # Unlike the heavier actionlint job, this guard intentionally runs on draft
+    # PRs because formal evidence PRs remain draft until qualification succeeds.
+    runs-on: ubuntu-slim
+    timeout-minutes: 3
+    steps:
+      - name: Checkout exact source subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Assert exact checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+
+      - name: Select changed workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > /tmp/formal-contract-workflows.txt
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              git fetch --no-tags origin "${GITHUB_BASE_REF}"
+              git diff --diff-filter=ACMRT --name-only \
+                "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+                > /tmp/formal-contract-workflows.txt
+              ;;
+            push)
+              if git rev-parse HEAD^ >/dev/null 2>&1; then
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
+                  '.github/workflows/*.yml' '.github/workflows/*.yaml' \
+                  > /tmp/formal-contract-workflows.txt
+              else
+                find .github/workflows -maxdepth 1 -type f \
+                  \( -name '*.yml' -o -name '*.yaml' \) -print \
+                  | sed 's#^./##' | sort > /tmp/formal-contract-workflows.txt
+              fi
+              ;;
+            workflow_dispatch)
+              find .github/workflows -maxdepth 1 -type f \
+                \( -name '*.yml' -o -name '*.yaml' \) -print \
+                | sed 's#^./##' | sort > /tmp/formal-contract-workflows.txt
+              ;;
+            *)
+              echo "unexpected event: ${GITHUB_EVENT_NAME}" >&2
+              exit 1
+              ;;
+          esac
+          cat /tmp/formal-contract-workflows.txt
+
+      - name: Self-test and enforce formal qualification contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < /tmp/formal-contract-workflows.txt
+          if [ "${#files[@]}" -eq 0 ]; then
+            python3 .github/scripts/check-formal-workflow-safety.py --self-test
+          else
+            python3 .github/scripts/check-formal-workflow-safety.py \
+              --self-test "${files[@]}"
+          fi
