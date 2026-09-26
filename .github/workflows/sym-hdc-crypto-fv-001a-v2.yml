@@ -34,11 +34,13 @@ jobs:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Record exact Git subject
+      - name: Record exact Git subject and repaired stack parent
         run: |
           set -euo pipefail
           EXPECTED="${{ github.event.pull_request.head.sha || github.sha }}"
+          PARENT="a4d4506c57902f96b6c260e7e9c56f9fc2e654c3"
           test "$(git rev-parse HEAD)" = "$EXPECTED"
+          test "$(git merge-base "$PARENT" HEAD)" = "$PARENT"
           git rev-parse HEAD
           git rev-parse HEAD^{tree}
           git status --porcelain=v1 --untracked-files=all
@@ -117,6 +119,7 @@ jobs:
               "head": git("rev-parse", "HEAD"),
               "tree": git("rev-parse", "HEAD^{tree}"),
               "parent_commit": PARENT,
+              "merge_base_with_parent": git("merge-base", PARENT, "HEAD"),
               "parent_theorem_blob": git("rev-parse", "HEAD:formal/lean/hdc/BinaryHVBind.lean"),
               "child_theorem_blob": git("rev-parse", "HEAD:formal/lean/hdc/HdcCryptoAttacks.lean"),
               "standalone_crypto_blob": git("rev-parse", "HEAD:crates/core/symthaea-hdc-crypto/src/crypto.rs"),
@@ -128,6 +131,7 @@ jobs:
               "manifest_sha256": sha256("docs/formal/sym-hdc-crypto-fv-001a-v2.json"),
               "validator_sha256": sha256("scripts/validate_sym_hdc_crypto_fv_001a_v2.py"),
               "exact_head_checkout": True,
+              "exact_stack_parent_head_bound": True,
               "known_bad_lean_subject_rejected": True,
               "lean_exit_zero": True,
               "sorryAx_absent": True,
