@@ -1,0 +1,131 @@
+{
+  "authority": "representation_only_no_physical_execution_authority",
+  "cases": [
+    {
+      "commanded_position_ref": "position:command-a",
+      "expected_disposition": "PositionUnobserved",
+      "id": "command_without_physical_reference_observation",
+      "reference_observation_ref": null
+    },
+    {
+      "commanded_position_ref": "position:command-b",
+      "controller_readback_ref": "position:controller-b",
+      "controller_relation": "agrees_under_profile",
+      "expected_disposition": "ControllerConsistentOnly",
+      "id": "command_and_controller_readback_agree_without_independent_reference",
+      "independent_reference_ref": null
+    },
+    {
+      "commanded_position_ref": "position:command-c",
+      "expected_disposition": "DiscrepancyObserved",
+      "id": "command_differs_from_independent_observed_position",
+      "independent_observed_position_ref": "position:reference-d"
+    },
+    {
+      "configuration_ref": "config:bench-a",
+      "expected_disposition": "CandidateRepeatabilityEvidence",
+      "id": "clustered_revisits_under_same_configuration",
+      "revisit_observation_refs": [
+        "obs:revisit-a1",
+        "obs:revisit-a2",
+        "obs:revisit-a3"
+      ],
+      "revisit_relation": "clustered_under_profile"
+    },
+    {
+      "absolute_reference_ref": null,
+      "configuration_ref": "config:bench-a",
+      "expected_disposition": "RepeatabilityOnly",
+      "id": "repeatability_without_absolute_reference",
+      "revisit_relation": "clustered_under_profile"
+    },
+    {
+      "absolute_reference_ref": "ref:absolute-position-a",
+      "calibration_currentness": "current",
+      "calibration_ref": "cal:position-a",
+      "configuration_ref": "config:bench-a",
+      "expected_disposition": "CandidateAbsolutePositionMeasurement",
+      "id": "current_absolute_reference_and_current_calibration"
+    },
+    {
+      "absolute_reference_ref": "ref:absolute-position-a",
+      "calibration_currentness": "stale",
+      "calibration_ref": "cal:position-old",
+      "expected_disposition": "CalibrationStaleOrMissing",
+      "id": "stale_calibration_blocks_absolute_position_claim"
+    },
+    {
+      "expected_identity_relation": "distinct",
+      "id": "remount_changes_transform_identity",
+      "post_remount_configuration_ref": "config:bench-b",
+      "post_transform_ref": "transform:b",
+      "pre_remount_configuration_ref": "config:bench-a",
+      "pre_transform_ref": "transform:a"
+    },
+    {
+      "expected_history": "preserved_with_new_measurement_context",
+      "historical_observation_ref": "obs:historical-a",
+      "id": "remount_fresh_calibration_new_epoch_preserves_history",
+      "post_calibration_ref": "cal:epoch-b",
+      "post_configuration_ref": "config:bench-b",
+      "pre_calibration_ref": "cal:epoch-a",
+      "pre_configuration_ref": "config:bench-a"
+    },
+    {
+      "correction_transform_ref": "transform:correction-a",
+      "derived_corrected_position_ref": "derived:position-a",
+      "discrepancy_ref": "discrepancy:a",
+      "expected_lineage_relation": "derived_correction_preserves_original_discrepancy",
+      "id": "correction_preserves_original_discrepancy",
+      "raw_observation_ref": "obs:raw-position-a"
+    },
+    {
+      "configuration_ref_a": "config:stage-physical-a",
+      "configuration_ref_b": "config:stage-physical-b",
+      "expected_identity_relation": "distinct",
+      "friendly_name": "stage-main",
+      "id": "same_friendly_stage_name_different_physical_configuration"
+    },
+    {
+      "expected_timing_relation": "preserve_distinct_no_simultaneity_inference",
+      "id": "source_and_receive_timestamps_preserved_separately",
+      "receive_clock_ref": "clock:host-a",
+      "receive_timestamp_ref": "time:receive-event-a",
+      "source_clock_ref": "clock:source-a",
+      "source_timestamp_ref": "time:source-event-a"
+    },
+    {
+      "expected_disposition": "SoftwareReplayOnly",
+      "expected_fresh_physical_witnesses": 0,
+      "id": "software_replay_is_not_fresh_repeatability_evidence",
+      "original_observation_ref": "obs:physical-a",
+      "replay_ref": "replay:software-a"
+    },
+    {
+      "expected_disposition": "CoverageLimited",
+      "id": "local_reference_supports_local_position_claim_only",
+      "reference_observation_ref": "obs:local-reference-a",
+      "reference_scope": "local_region",
+      "requested_scope": "whole_sample"
+    },
+    {
+      "derived_corrected_refs": [
+        "derived:position-b1",
+        "derived:position-b2"
+      ],
+      "expected_lineage_relation": "multiple_derivations_one_physical_witness",
+      "expected_physical_witness_count": 1,
+      "id": "multiple_corrected_derivations_from_one_raw_observation",
+      "raw_observation_ref": "obs:physical-b"
+    },
+    {
+      "calibration_ref": "cal:synthetic-current",
+      "execution_authority": false,
+      "expected_authority": "none",
+      "id": "motion_evidence_cannot_mint_execution_authority",
+      "motion_evidence_ref": "evidence:motion-synthetic-pass"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for motion discrepancy, revisit, remount, calibration-context, and derived-correction semantics. Contains no hardware dimensions, operating values, motion commands, or semiconductor process parameters.",
+  "schema": "semi-eqp-met-001c-motion-corpus-v1"
+}
