@@ -12,6 +12,10 @@
     "blob": "259ba64888d8492bafc123b72d67b70da9282c36",
     "relationship": "reused-exact-repaired-abstract-xor-algebra"
   },
+  "theorem_file": {
+    "path": "formal/lean/hdc/HdcCryptoAttacks.lean",
+    "blob": "67d44281d03252101eb01d6ac9713ea7638044de"
+  },
   "theorem_subjects": [
     "recover_derived_from_known_pair",
     "universal_known_pair_forgery",
@@ -44,6 +48,7 @@
   },
   "qualification_contract": {
     "exact_pr_head_checkout": true,
+    "exact_stack_parent_head_binding": true,
     "known_bad_lean_subject_must_fail": true,
     "prover_exit_must_propagate": true,
     "sorryAx_forbidden": true,
@@ -61,6 +66,8 @@
   ],
   "negative_controls": [
     "parent-algebra-drift",
+    "invalidated-v1-parent-reintroduction",
+    "theorem-file-drift",
     "duplicate-model-injection",
     "forgery-theorem-deletion",
     "one-share-theorem-deletion",
