@@ -1,0 +1,178 @@
+name: SYM-FV-007A Evidence Composition
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/evidence/EvidenceComposition.lean"
+      - "docs/formal/sym-fv-007a-evidence-composition-v1.json"
+      - "scripts/validate_sym_fv_007a.py"
+      - ".github/workflows/sym-fv-007a-evidence-composition.yml"
+      - "flake.nix"
+      - "flake.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-007a-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  evidence-composition:
+    name: Lean evidence composition algebra
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      PARENT_SHA: 89f31822c97596c35ca078071775035b74b6c92b
+      PARENT_SCHEMA_BLOB: 26b966da5a4ee16eb48023033e7324d6f14a3707
+      PROOF_BLOB: 4684326db9d980647914bca180c88cb7fad4ec7e
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact lineage and child scope
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${SUBJECT_SHA}"
+          test "$(git merge-base "${PARENT_SHA}" HEAD)" = "${PARENT_SHA}"
+          test "$(git rev-parse "${PARENT_SHA}:docs/formal/formal_evidence_receipt_v1.schema.json")" = "${PARENT_SCHEMA_BLOB}"
+          test "$(git rev-parse HEAD:formal/lean/evidence/EvidenceComposition.lean)" = "${PROOF_BLOB}"
+
+          mapfile -t changed < <(git diff --name-only "${PARENT_SHA}"...HEAD | sort)
+          expected=(
+            .github/workflows/sym-fv-007a-evidence-composition.yml
+            docs/formal/sym-fv-007a-evidence-composition-v1.json
+            formal/lean/evidence/EvidenceComposition.lean
+            scripts/validate_sym_fv_007a.py
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${#changed[@]}" -eq "${#expected_sorted[@]}"
+          for i in "${!changed[@]}"; do
+            test "${changed[$i]}" = "${expected_sorted[$i]}"
+          done
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Static contract and hostile controls
+        run: python3 scripts/validate_sym_fv_007a.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Prove Lean failures propagate
+        run: |
+          set -euo pipefail
+          cat > /tmp/sym-fv-007a-known-bad.lean <<'LEAN'
+          theorem sym_fv_007a_known_bad : False := by
+            trivial
+          LEAN
+          set +e
+          nix develop .#formal --command lean /tmp/sym-fv-007a-known-bad.lean \
+            > /tmp/sym-fv-007a-known-bad-output.txt 2>&1
+          rc=$?
+          set -e
+          cat /tmp/sym-fv-007a-known-bad-output.txt
+          if [ "${rc}" -eq 0 ]; then
+            echo "known-bad Lean subject unexpectedly succeeded" >&2
+            exit 1
+          fi
+          printf '%s\n' "${rc}" > /tmp/sym-fv-007a-known-bad-exit.txt
+
+      - name: Typecheck exact Lean theorem subject
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command bash -c '
+            set -euo pipefail
+            lean --version > /tmp/sym-fv-007a-lean-version.txt
+            lean formal/lean/evidence/EvidenceComposition.lean \
+              > /tmp/sym-fv-007a-lean-output.txt 2>&1
+          '
+          cat /tmp/sym-fv-007a-lean-version.txt
+          cat /tmp/sym-fv-007a-lean-output.txt
+          if grep -Eq 'sorryAx|declaration uses .sorry|error:' /tmp/sym-fv-007a-lean-output.txt; then
+            echo "Lean output contains a forbidden proof hole or residual error" >&2
+            exit 1
+          fi
+
+      - name: Emit exact-head receipt
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          requested = os.environ["SUBJECT_SHA"]
+          head = git("rev-parse", "HEAD")
+          if head != requested:
+              raise SystemExit("receipt subject mismatch")
+
+          known_bad_exit = int(Path("/tmp/sym-fv-007a-known-bad-exit.txt").read_text().strip())
+          if known_bad_exit == 0:
+              raise SystemExit("known-bad Lean subject did not fail")
+
+          receipt = {
+              "schema": "symthaea.formal.sym-fv-007a-qualification-receipt.v1",
+              "tracking_issue": 5961,
+              "parent_issue": 5945,
+              "parent_receipt_pr": 5879,
+              "evidence_class": "AbstractFormalTheorem",
+              "authority": "EvidenceOnly",
+              "result": "LeanTypecheckedFailClosed",
+              "requested_subject_sha": requested,
+              "head": head,
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent_sha": os.environ["PARENT_SHA"],
+              "parent_schema_blob": os.environ["PARENT_SCHEMA_BLOB"],
+              "proof_blob": os.environ["PROOF_BLOB"],
+              "proof_sha256": sha256("formal/lean/evidence/EvidenceComposition.lean"),
+              "manifest_sha256": sha256("docs/formal/sym-fv-007a-evidence-composition-v1.json"),
+              "validator_sha256": sha256("scripts/validate_sym_fv_007a.py"),
+              "lean_version": Path("/tmp/sym-fv-007a-lean-version.txt").read_text().strip(),
+              "known_bad_lean_rejected": True,
+              "known_bad_lean_exit": known_bad_exit,
+              "lean_exit_zero": True,
+              "forbidden_lean_output_absent": True,
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-truth-of-underlying-dependency-claims",
+                  "not-json-or-python-validator-refinement",
+                  "not-freshness-or-dag-theorem",
+                  "not-runtime-authorization"
+              ]
+          }
+          Path("/tmp/sym-fv-007a-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-007a-${{ env.SUBJECT_SHA }}
+          path: |
+            /tmp/sym-fv-007a-known-bad-output.txt
+            /tmp/sym-fv-007a-known-bad-exit.txt
+            /tmp/sym-fv-007a-lean-version.txt
+            /tmp/sym-fv-007a-lean-output.txt
+            /tmp/sym-fv-007a-receipt.json
+          if-no-files-found: error
+          retention-days: 30
