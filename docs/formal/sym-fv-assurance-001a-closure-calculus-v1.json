@@ -9,7 +9,7 @@
     "relationship": "qualification-pattern-and-formal-substrate-parent-not-semantic-premise"
   },
   "evidence_class": "AbstractFormalTheorem",
-  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "status_at_source_creation": "source-implemented-polarity-repair-not-yet-executed-qualified",
   "proof_subject": {
     "path": "formal/lean/assurance/Closure.lean",
     "requires_mathlib": false,
@@ -25,6 +25,13 @@
       "Blocked",
       "EnvironmentFailure"
     ],
+    "semantic_polarities": [
+      "PositiveSupport",
+      "SemanticCounterevidence",
+      "QualificationNegative",
+      "NoSemanticConclusion"
+    ],
+    "semantic_polarity": "workflow disposition is orthogonal to positive support, counterevidence, qualification-negative, and no-semantic-conclusion meaning",
     "validity_states": [
       "Current",
       "Superseded",
@@ -46,8 +53,15 @@
     "dependency_discipline": "strictly rank-decreasing EvidenceClosed and DependencyPath"
   },
   "required_theorems": [
+    "proof_failure_is_fail_without_refutation",
+    "qualification_failure_not_counterevidence",
+    "semantic_counterexample_is_counterevidence",
+    "resource_exhaustion_is_blocked_semantically_neutral",
+    "environment_failure_is_semantically_neutral",
     "blocked_cannot_support",
     "environment_failure_cannot_support",
+    "qualification_failure_cannot_support",
+    "semantic_counterevidence_cannot_support",
     "superseded_cannot_support",
     "invalidated_cannot_support",
     "stale_generation_cannot_support",
@@ -59,7 +73,10 @@
     "same_provenance_cannot_count_as_independent",
     "required_reachability_empty_rejected",
     "evidence_closed_is_current_pass",
+    "evidence_closed_is_positive_support",
     "evidence_closed_rejects_self_dependency",
+    "qualification_failure_cannot_create_semantic_conflict",
+    "conflict_requires_semantic_counterevidence",
     "closed_requires_every_mandatory_obligation",
     "contradictory_current_evidence_prevents_closure",
     "dependency_path_decreases",
@@ -67,8 +84,13 @@
     "support_non_amplification_summary"
   ],
   "required_negative_semantics": [
+    "workflow-fail-is-not-automatically-semantic-refutation",
+    "proof-or-qualification-failure-is-qualification-negative-not-counterevidence",
+    "semantic-counterexample-is-explicit-counterevidence",
     "blocked-does-not-close",
+    "blocked-results-have-no-semantic-conclusion",
     "environment-failure-does-not-close-or-falsify",
+    "semantic-counterevidence-cannot-positive-support",
     "superseded-does-not-close-current",
     "invalidated-does-not-close-current",
     "stale-generation-does-not-close-current",
@@ -79,9 +101,11 @@
     "assumptions-cannot-disappear-on-exact-transfer",
     "shared-provenance-does-not-count-as-independent",
     "required-reachability-needs-positive-witness",
-    "contradictory-current-evidence-prevents-closure",
+    "qualification-failure-cannot-create-semantic-conflict",
+    "semantic-conflict-requires-explicit-counterevidence",
+    "contradictory-current-semantic-evidence-prevents-closure",
     "mandatory-obligations-are-conjunctive",
-    "declared-prerequisites-must-be-recursively-current-pass",
+    "declared-prerequisites-must-be-recursively-current-pass-and-positive-support",
     "dependency-self-cycle-is-rejected-by-rank-decrease",
     "dependency-cycle-is-rejected-by-rank-decrease"
   ],
@@ -93,7 +117,8 @@
     "sorryAx_forbidden": true,
     "residual_error_marker_forbidden": true,
     "repository_postflight_clean_required": true,
-    "parent_ancestor_required": true
+    "parent_ancestor_required": true,
+    "semantic_polarity_static_mutants_required": true
   },
   "nonclaims": [
     "closure-calculus-is-not-soundness-of-imported-verifiers",
@@ -105,7 +130,8 @@
     "source-authored-theorem-is-not-executed-qualified-theorem"
   ],
   "successor_gates": {
-    "001b_executable_vectors": "blocked-until-this-exact-subject-is-executed-qualified",
+    "001a_evidence_backed_warrants": "blocked-until-this-polarity-aware-exact-subject-is-executed-qualified",
+    "001b_executable_vectors": "blocked-until-001a-evidence-backed-warrant-semantics-are-qualified-or-explicitly-deferred",
     "001c_validator_refinement": "blocked-until-001b-vectors-are-frozen",
     "001d_real-adoption": "blocked-until-001c-refinement-is-qualified"
   }
