@@ -12,6 +12,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEAN = ROOT / "formal/lean/evidence/EvidenceFreshness.lean"
 MANIFEST = ROOT / "docs/formal/sym-fv-007b-evidence-freshness-v1.json"
+WORKFLOW = ROOT / ".github/workflows/sym-fv-007b-evidence-freshness.yml"
 
 PARENT_HEAD = "f4b7fbc16aa132d60860f52a49843e9a6ccc8b7e"
 PARENT_BLOB = "4684326db9d980647914bca180c88cb7fad4ec7e"
@@ -40,7 +41,16 @@ def git_blob(path: str) -> str:
     return subprocess.check_output(["git", "rev-parse", f"HEAD:{path}"], text=True).strip()
 
 
-def validate(source: str, manifest: dict, *, check_blobs: bool = True) -> None:
+def validate_workflow(workflow: str) -> None:
+    require('"result": "Pass"' in workflow,
+            "qualification receipt must use canonical Pass result")
+    require('"proof_checker_outcome": "LeanTypechecked"' in workflow,
+            "Lean checker outcome must be recorded separately")
+    require('"result": "LeanTypechecked"' not in workflow,
+            "checker outcome may not replace canonical qualification result")
+
+
+def validate(source: str, manifest: dict, workflow: str, *, check_blobs: bool = True) -> None:
     require(manifest["schema"] == "symthaea.formal.sym-fv-007b-evidence-freshness.v1", "schema drift")
     require(manifest["tracking_issue"] == 5972, "tracking issue drift")
     require(manifest["parent"]["head"] == PARENT_HEAD, "parent head drift")
@@ -48,6 +58,8 @@ def validate(source: str, manifest: dict, *, check_blobs: bool = True) -> None:
     require(manifest["authority"] == "EvidenceOnly", "authority escalation")
     require(manifest["evidence_class"] == "AbstractFormalTheorem", "evidence class drift")
     require(manifest["qualification_results"] == ["Pass", "Fail", "Blocked", "EnvironmentFailure"], "result census drift")
+    require(manifest["qualification_receipt_result"] == "Pass", "qualification receipt result drift")
+    require(manifest["proof_checker_outcome"] == "LeanTypechecked", "checker outcome drift")
     require(manifest["admission_rule"] == "ExactGenerationAndPassOnly", "admission rule drift")
     require(manifest["theorem_blob"] == THEOREM_BLOB, "child theorem blob drift")
     require(manifest["theorems"] == THEOREMS, "theorem census drift")
@@ -78,35 +90,41 @@ def validate(source: str, manifest: dict, *, check_blobs: bool = True) -> None:
     for pattern in forbidden:
         require(re.search(pattern, source, flags=re.MULTILINE) is None, f"forbidden proof escape: {pattern}")
 
+    validate_workflow(workflow)
 
-def expect_reject(name: str, source: str, manifest: dict) -> None:
+
+def expect_reject(name: str, source: str, manifest: dict, workflow: str) -> None:
     try:
-        validate(source, manifest, check_blobs=False)
+        validate(source, manifest, workflow, check_blobs=False)
     except Exception:
         return
     raise AssertionError(f"hostile mutant unexpectedly accepted: {name}")
 
 
-def self_test(source: str, manifest: dict) -> None:
+def self_test(source: str, manifest: dict, workflow: str) -> None:
     expect_reject(
         "remove-generation-currentness",
         source.replace("ref.observedGeneration = ref.liveGeneration", "True", 1),
         manifest,
+        workflow,
     )
     expect_reject(
         "blocked-as-pass",
         source.replace("| blocked", "| pass", 1),
         manifest,
+        workflow,
     )
     expect_reject(
         "environment-failure-as-pass",
         source.replace("| environmentFailure", "| pass", 1),
         manifest,
+        workflow,
     )
     expect_reject(
         "ignore-dependencies",
         source.replace("Admissible root ∧ DependenciesAdmissible dependencies", "Admissible root", 1),
         manifest,
+        workflow,
     )
     expect_reject(
         "stale-auto-refresh",
@@ -116,32 +134,47 @@ def self_test(source: str, manifest: dict) -> None:
             1,
         ),
         manifest,
+        workflow,
     )
     expect_reject(
         "theorem-drop",
         source.replace("theorem stale_dependency_blocks_composite", "theorem stale_dependency_blocks_composite_REMOVED", 1),
         manifest,
+        workflow,
     )
     expect_reject(
         "proof-hole",
         source.replace("exact hStale h.1", "sorry", 1),
         manifest,
+        workflow,
     )
 
     mutant = json.loads(json.dumps(manifest))
     mutant["authority"] = "RuntimeAuthority"
-    expect_reject("authority-escalation", source, mutant)
+    expect_reject("authority-escalation", source, mutant, workflow)
 
     mutant = json.loads(json.dumps(manifest))
     mutant["parent"]["head"] = "0" * 40
-    expect_reject("parent-drift", source, mutant)
+    expect_reject("parent-drift", source, mutant, workflow)
+
+    mutant = json.loads(json.dumps(manifest))
+    mutant["qualification_receipt_result"] = "LeanTypechecked"
+    expect_reject("manifest-result-conflation", source, mutant, workflow)
+
+    expect_reject(
+        "workflow-result-conflation",
+        source,
+        manifest,
+        workflow.replace('"result": "Pass"', '"result": "LeanTypechecked"', 1),
+    )
 
 
 def main() -> int:
     source = LEAN.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    validate(source, manifest)
-    self_test(source, manifest)
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    validate(source, manifest, workflow)
+    self_test(source, manifest, workflow)
     print("SYM-FV-007B static contract: PASS")
     return 0
 
