@@ -105,7 +105,33 @@
           "uniqueItems": true,
           "items": {"type": "string", "minLength": 1}
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"state": {"const": "Closed"}}, "required": ["state"]},
+          "then": {"required": ["support"], "not": {"required": ["obligation"]}}
+        },
+        {
+          "if": {"properties": {"state": {"const": "Open"}}, "required": ["state"]},
+          "then": {"required": ["obligation"], "not": {"required": ["support"]}}
+        },
+        {
+          "if": {"properties": {"state": {"const": "NotApplicable"}}, "required": ["state"]},
+          "then": {"required": ["reason"], "not": {"required": ["support"]}}
+        },
+        {
+          "if": {"properties": {"state": {"const": "ImportedAssurance"}}, "required": ["state"]},
+          "then": {"required": ["provider", "profile", "claim_ceiling", "support"]}
+        },
+        {
+          "if": {"properties": {"state": {"const": "BoundedOnly"}}, "required": ["state"]},
+          "then": {"required": ["bound", "support"]}
+        },
+        {
+          "if": {"properties": {"state": {"const": "Unknown"}}, "required": ["state"]},
+          "then": {"required": ["reason"], "not": {"required": ["support"]}}
+        }
+      ]
     }
   }
 }
