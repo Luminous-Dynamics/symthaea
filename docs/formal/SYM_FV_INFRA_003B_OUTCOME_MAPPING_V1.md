@@ -1,6 +1,6 @@
 # SYM-FV-INFRA-003B — Verifier Outcome Mapping v1
 
-`SYM-FV-INFRA-003` defines the canonical formal-evidence result vocabulary:
+`SYM-FV-INFRA-003` defines the canonical operational result vocabulary:
 
 ```text
 Pass
@@ -9,7 +9,7 @@ Blocked
 EnvironmentFailure
 ```
 
-This child defines the semantic mapping layer between raw tool/lane outcomes and those four states.
+This child defines the reviewed semantic layer between raw tool/lane outcomes and those operational states **without confusing workflow disposition with the semantic meaning of the evidence**.
 
 ## Rule
 
@@ -18,14 +18,21 @@ A raw verifier outcome does not become an evidence result directly.
 ```text
 raw tool outcome
       ↓
-outcome disposition
-      ↓
-canonical result
+reviewed outcome disposition
+      ├──> operational result
+      └──> semantic polarity
 ```
 
-The mapping is closed-world. Unknown or ambiguous outcomes default to `Blocked`, never `Pass`.
+The mappings are closed-world. Unknown or ambiguous outcomes default to:
 
-## Canonical dispositions
+```text
+operational result = Blocked
+semantic polarity  = NoSemanticConclusion
+```
+
+never `Pass` and never semantic counterevidence.
+
+## Operational mapping
 
 ```text
 SemanticSuccess             -> Pass
@@ -43,13 +50,75 @@ ToolInstallationFailure     -> EnvironmentFailure
 RunnerInfrastructureFailure -> EnvironmentFailure
 ```
 
-## Hostile controls
-
-A hostile mutant is considered successfully rejected only when the lane observes the expected semantic failure/counterexample class.
+## Semantic polarity
 
 ```text
-mutant + semantic counterexample
-= valid negative control
+SemanticSuccess             -> PositiveSupport
+SemanticCounterexample      -> SemanticCounterevidence
+ProofOrQualificationFailure -> QualificationNegative
+UnsupportedBoundary         -> NoSemanticConclusion
+InsufficientBound           -> NoSemanticConclusion
+ResourceExhaustion          -> NoSemanticConclusion
+MissingPrerequisite         -> NoSemanticConclusion
+StaleSubjectOrDependency    -> NoSemanticConclusion
+AmbiguousOrUnknownOutcome   -> NoSemanticConclusion
+UnclassifiedToolCrash       -> NoSemanticConclusion
+EnvironmentUnavailable      -> NoSemanticConclusion
+ToolInstallationFailure     -> NoSemanticConclusion
+RunnerInfrastructureFailure -> NoSemanticConclusion
+```
+
+The critical boundary is:
+
+```text
+workflow Fail
+!= property false
+```
+
+A proof or qualification failure means the attempted evidence did not establish its obligation. It does **not** by itself establish the negation of the subject property.
+
+Only an explicit `SemanticCounterexample` carries `SemanticCounterevidence` polarity in this mapping generation.
+
+## Examples
+
+Lean:
+
+```text
+exact theorem elaborates + axiom policy passes
+  -> SemanticSuccess
+  -> Pass + PositiveSupport
+
+exact theorem fails elaboration
+  -> ProofOrQualificationFailure
+  -> Fail + QualificationNegative
+```
+
+Kani / model checking:
+
+```text
+property satisfied within exact harness/bound
+  -> SemanticSuccess
+  -> Pass + PositiveSupport for that bounded evidence class
+
+real assertion/property counterexample
+  -> SemanticCounterexample
+  -> Fail + SemanticCounterevidence
+
+unwind/solver/resource exhaustion
+  -> InsufficientBound / ResourceExhaustion
+  -> Blocked + NoSemanticConclusion
+```
+
+## Hostile controls
+
+A hostile mutant is considered semantically rejected only when the lane observes the expected semantic counterexample/failure class required by the lane contract.
+
+```text
+mutant + genuine semantic counterexample
+= candidate valid negative control
+
+mutant + proof harness failed to elaborate
+!= evidence the mutant property is false
 
 mutant + unwind exhaustion
 != valid negative control
@@ -61,7 +130,7 @@ mutant + runner failure
 != valid negative control
 ```
 
-This prevents model-checker incompleteness or environmental failure from masquerading as mutation sensitivity.
+This prevents verifier incompleteness, proof-authoring failure, or environmental failure from masquerading as mutation sensitivity.
 
 ## Receipt binding
 
@@ -70,12 +139,24 @@ Receipts consuming this mapping should record:
 ```text
 result
 outcome_disposition
+semantic_polarity
 raw_tool_outcome
 mapping_schema_version
 mapping_schema_digest
 ```
 
-Changing the mapping creates a new evidence generation. Historical receipts are not rewritten.
+Changing either operational disposition or semantic polarity creates a new evidence generation. Historical receipts are not rewritten.
+
+## Refutation boundary
+
+```text
+SemanticCounterevidence
+!= automatic refutation of any same-named claim
+```
+
+The assurance calculus still needs an explicit subject/claim/refutation relation and admissibility checks before counterevidence can defeat a closure claim.
+
+This mapping only classifies the semantic polarity of the observed verifier outcome.
 
 ## Non-equivalences
 
@@ -86,7 +167,8 @@ canonical outcome mapping
 != completeness of the tool taxonomy
 != implementation refinement
 != evidence-class promotion
+!= automatic claim refutation
 != runtime authority
 ```
 
-`Pass` remains evidence-class-specific. For example, Kani `Pass` is still only `BoundedModelSafety` within the recorded harness and bounds; it does not become an unbounded theorem.
+`Pass` remains evidence-class-specific. For example, Kani `Pass` is still only bounded model evidence within the recorded harness and bounds; it does not become an unbounded theorem.
