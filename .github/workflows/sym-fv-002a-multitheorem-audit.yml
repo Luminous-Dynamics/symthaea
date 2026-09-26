@@ -3,6 +3,7 @@ name: SYM-FV-002A Multi-Theorem Audit
 on:
   pull_request:
     paths:
+      - "docs/formal/SYM_FV_002A_MULTI_THEOREM_AUDIT_V1.md"
       - "crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs"
       - "crates/bridges/symthaea-lean-bridge/src/lib.rs"
       - "crates/bridges/symthaea-lean-bridge/tests/binaryhv_bind_formal_audit.rs"
@@ -49,6 +50,7 @@ jobs:
           from pathlib import Path
           expected = {
               '.github/workflows/sym-fv-002a-multitheorem-audit.yml',
+              'docs/formal/SYM_FV_002A_MULTI_THEOREM_AUDIT_V1.md',
               'crates/bridges/symthaea-lean-bridge/src/lib.rs',
               'crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs',
               'crates/bridges/symthaea-lean-bridge/tests/binaryhv_bind_formal_audit.rs',
@@ -101,6 +103,7 @@ jobs:
           parent = '2199cf04634e81d85592ed0479a5c3d2d0fb6ac8'
           proof = Path('formal/lean/hdc/BinaryHVBind.lean')
           touched = [
+              Path('docs/formal/SYM_FV_002A_MULTI_THEOREM_AUDIT_V1.md'),
               Path('crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs'),
               Path('crates/bridges/symthaea-lean-bridge/src/lib.rs'),
               Path('crates/bridges/symthaea-lean-bridge/tests/binaryhv_bind_formal_audit.rs'),
@@ -124,6 +127,7 @@ jobs:
               'theorem_count': 8,
               'policy': 'constitutional',
               'real_lean_subprocess_required': True,
+              'hostile_spec_mutation_required': True,
               'audit_test_exit_zero': True,
               'repository_postflight_clean': True,
               'child_artifacts': {str(path): sha256(path) for path in touched},
