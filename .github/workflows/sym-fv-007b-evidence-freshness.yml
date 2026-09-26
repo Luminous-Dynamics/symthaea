@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: sym-fv-007b-${{ github.event.pull_request.head.sha || github.sha }}
-  cancel-in-progress: false
+  group: sym-fv-007b-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   evidence-freshness:
