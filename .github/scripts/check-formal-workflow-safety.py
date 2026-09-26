@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Fail closed on unsafe formal-evidence GitHub workflow shapes.
 
-This is intentionally a structural ratchet, not a YAML interpreter. It protects
-proof/model-checking qualification workflows from status-masking and source-head
-ambiguity that can turn a red prover into misleading green evidence.
+This structural ratchet protects proof/model-checking qualification workflows
+from status masking, source-head ambiguity, and evidence-result vocabulary drift.
 
-The generic draft-runner policy remains owned by check-workflow-draft-safety.py.
-This checker adds formal-specific invariants: exact-head checkout, pinned checkout
-action, non-persistent credentials, no `prover | tee` authority path, no
-continue-on-error, and hostile-prover controls for Lean lanes.
+Generic draft-runner policy remains owned by check-workflow-draft-safety.py.
+This checker adds formal-specific invariants: exact-head checkout, pinned checkout,
+non-persistent credentials, no prover-through-tee authority, hostile-prover
+controls for Lean lanes, and canonical formal-evidence qualification results.
 """
 
 from __future__ import annotations
@@ -39,6 +38,13 @@ LEAN_COMMAND = re.compile(r"(?im)(?:^|[;&|()]\s*|\s)lean(?:\s|$)")
 CONTINUE_ON_ERROR = re.compile(r"(?im)^\s*continue-on-error:\s*true\s*$")
 PULL_REQUEST_TARGET = re.compile(r"(?m)^\s*pull_request_target\s*:")
 
+# Match receipt-like Python/JSON assignments embedded in workflow scripts.
+RESULT_ASSIGNMENT = re.compile(r'''["']result["']\s*:\s*["']([^"']+)["']''')
+DETAIL_ASSIGNMENT = re.compile(
+    r'''["'](?:proof_checker_outcome|translation_outcome|model_checker_outcome|qualification_kind|semantic_result_class)["']\s*:'''
+)
+CANONICAL_RESULTS = {"Pass", "Fail", "Blocked", "EnvironmentFailure"}
+
 EXACT_REF = 'ref: ${{ github.event.pull_request.head.sha || github.sha }}'
 PERSIST_FALSE = "persist-credentials: false"
 FETCH_FULL = "fetch-depth: 0"
@@ -63,6 +69,24 @@ def is_formal_workflow(path: Path, text: str) -> bool:
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise SafetyError(message)
+
+
+def validate_result_vocabulary(path: Path, text: str) -> None:
+    results = RESULT_ASSIGNMENT.findall(text)
+    for result in results:
+        require(
+            result in CANONICAL_RESULTS,
+            f"{path}: formal receipt result must be one of {sorted(CANONICAL_RESULTS)}, got {result!r}; move tool-specific detail into a separate outcome/kind field",
+        )
+
+    # If a workflow emits a tool-specific qualification/checker field, it must
+    # also emit at least one canonical result state. This prevents a detailed
+    # checker outcome from silently becoming the admission state by omission.
+    if DETAIL_ASSIGNMENT.search(text):
+        require(
+            bool(results),
+            f"{path}: tool-specific qualification detail exists without canonical result",
+        )
 
 
 def validate_formal_workflow(path: Path, text: str) -> None:
@@ -107,22 +131,13 @@ def validate_formal_workflow(path: Path, text: str) -> None:
         f"{path}: prover/test command may not pipe into tee as authority: {match.group(0).strip() if match else ''}",
     )
 
-    # Lean theorem lanes must prove that a deliberately invalid subject is
-    # observed as failure and must keep the axiom/error sentinels visible.
     if LEAN_COMMAND.search(text):
         lowered = text.lower()
-        require(
-            "known-bad" in lowered,
-            f"{path}: Lean formal workflow lacks a known-bad rejection control",
-        )
-        require(
-            "sorryax" in lowered,
-            f"{path}: Lean formal workflow lacks an explicit sorryAx rejection sentinel",
-        )
-        require(
-            "error:" in lowered,
-            f"{path}: Lean formal workflow lacks an explicit Lean error-marker sentinel/control",
-        )
+        require("known-bad" in lowered, f"{path}: Lean formal workflow lacks a known-bad rejection control")
+        require("sorryax" in lowered, f"{path}: Lean formal workflow lacks an explicit sorryAx rejection sentinel")
+        require("error:" in lowered, f"{path}: Lean formal workflow lacks an explicit Lean error-marker sentinel/control")
+
+    validate_result_vocabulary(path, text)
 
 
 def self_test() -> None:
@@ -147,20 +162,23 @@ jobs:
           grep -q 'error:' /tmp/known-bad-output.txt
           if ! lean proof.lean > /tmp/output.txt 2>&1; then cat /tmp/output.txt; exit 1; fi
           if grep -q 'sorryAx' /tmp/output.txt; then exit 1; fi
+          python3 - <<'PY'
+          receipt = {
+              "result": "Pass",
+              "proof_checker_outcome": "LeanTypechecked",
+          }
+          PY
 '''
     validate_formal_workflow(Path("sym-fv-safe.yml"), safe)
 
     mutants = {
         "unpinned checkout": safe.replace(
-            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-            "actions/checkout@v6",
+            "actions/checkout@11d5960a326750d5838078e36cf38b85af677262", "actions/checkout@v6"
         ),
         "missing exact ref": safe.replace(
             "          ref: ${{ github.event.pull_request.head.sha || github.sha }}\n", ""
         ),
-        "persistent credentials": safe.replace(
-            "persist-credentials: false", "persist-credentials: true"
-        ),
+        "persistent credentials": safe.replace("persist-credentials: false", "persist-credentials: true"),
         "prover tee": safe.replace(
             "if ! lean proof.lean > /tmp/output.txt 2>&1; then cat /tmp/output.txt; exit 1; fi",
             "lean proof.lean | tee /tmp/output.txt",
@@ -170,6 +188,8 @@ jobs:
         ),
         "missing known-bad": safe.replace("known-bad", "negative-control"),
         "pull request target": safe.replace("  pull_request:", "  pull_request_target:"),
+        "tool-specific result": safe.replace('"result": "Pass"', '"result": "LeanTypechecked"'),
+        "missing canonical result": safe.replace('              "result": "Pass",\n', ""),
     }
     for label, mutant in mutants.items():
         try:
@@ -179,15 +199,19 @@ jobs:
         else:
             raise AssertionError(f"unsafe formal workflow mutant admitted: {label}")
 
+    # All four canonical states are legal admission outcomes. Their meaning is
+    # interpreted by evidence admission logic, not by this structural checker.
+    for result in sorted(CANONICAL_RESULTS):
+        candidate = safe.replace('"result": "Pass"', f'"result": "{result}"')
+        validate_formal_workflow(Path(f"canonical-{result}.yml"), candidate)
+
 
 def main() -> int:
     self_test()
     if not WORKFLOW_DIR.is_dir():
         fail(f"workflow directory not found: {WORKFLOW_DIR}")
 
-    workflows = sorted(
-        p for p in WORKFLOW_DIR.iterdir() if p.is_file() and p.suffix in {".yml", ".yaml"}
-    )
+    workflows = sorted(p for p in WORKFLOW_DIR.iterdir() if p.is_file() and p.suffix in {".yml", ".yaml"})
     formal: list[Path] = []
     for path in workflows:
         text = path.read_text(encoding="utf-8")
@@ -202,6 +226,7 @@ def main() -> int:
     print("formal_workflow_safety=PASS")
     print(f"workflows_total={len(workflows)}")
     print(f"formal_workflows_checked={len(formal)}")
+    print("canonical_qualification_results=" + ",".join(sorted(CANONICAL_RESULTS)))
     for path in formal:
         print(f"formal_workflow={path}")
     return 0
