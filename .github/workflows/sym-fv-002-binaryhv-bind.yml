@@ -56,13 +56,41 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: Typecheck Lean theorem subject
+      - name: Prove the wrapper propagates Lean failure
+        run: |
+          set -euo pipefail
+          cat > /tmp/sym-fv-002-known-bad.lean <<'LEAN'
+          example : False := by
+            trivial
+          LEAN
+          if nix develop .#formal --command sh -c 'lean /tmp/sym-fv-002-known-bad.lean > /tmp/sym-fv-002-known-bad-output.txt 2>&1'; then
+            cat /tmp/sym-fv-002-known-bad-output.txt
+            echo "known-bad Lean subject incorrectly returned success" >&2
+            exit 1
+          fi
+          cat /tmp/sym-fv-002-known-bad-output.txt
+          grep -q 'error:' /tmp/sym-fv-002-known-bad-output.txt
+
+      - name: Typecheck Lean theorem subject fail-closed
         run: |
           set -euo pipefail
           nix develop .#formal --command sh -c '
             set -eu
-            lean --version | tee /tmp/sym-fv-002-lean-version.txt
-            lean formal/lean/hdc/BinaryHVBind.lean | tee /tmp/sym-fv-002-lean-output.txt
+            lean --version > /tmp/sym-fv-002-lean-version.txt
+            cat /tmp/sym-fv-002-lean-version.txt
+            if ! lean formal/lean/hdc/BinaryHVBind.lean > /tmp/sym-fv-002-lean-output.txt 2>&1; then
+              cat /tmp/sym-fv-002-lean-output.txt
+              exit 1
+            fi
+            cat /tmp/sym-fv-002-lean-output.txt
+            if grep -q "sorryAx" /tmp/sym-fv-002-lean-output.txt; then
+              echo "forbidden sorryAx in Lean axiom census" >&2
+              exit 1
+            fi
+            if grep -q "error:" /tmp/sym-fv-002-lean-output.txt; then
+              echo "Lean output contains an error marker despite zero exit" >&2
+              exit 1
+            fi
           '
 
       - name: Postflight immutability and receipt
@@ -84,6 +112,8 @@ jobs:
               "manifest": root / "docs/formal/sym-fv-002-binaryhv-bind-v1.json",
               "validator": root / "scripts/validate_sym_fv_002.py",
               "flake_lock": root / "flake.lock",
+              "lean_output": Path("/tmp/sym-fv-002-lean-output.txt"),
+              "known_bad_output": Path("/tmp/sym-fv-002-known-bad-output.txt"),
           }
 
           def git(*args):
@@ -93,9 +123,9 @@ jobs:
               return hashlib.sha256(path.read_bytes()).hexdigest()
 
           receipt = {
-              "schema": "symthaea.formal.sym-fv-002-qualification-receipt.v1",
+              "schema": "symthaea.formal.sym-fv-002-qualification-receipt.v2",
               "evidence_class": "AbstractFormalTheorem",
-              "result": "LeanTypechecked",
+              "result": "LeanTypecheckedAndAxiomClean",
               "head": git("rev-parse", "HEAD"),
               "tree": git("rev-parse", "HEAD^{tree}"),
               "source_commit": source_commit,
@@ -108,9 +138,14 @@ jobs:
               "validator_sha256": sha256(paths["validator"]),
               "flake_lock_blob": git("rev-parse", "HEAD:flake.lock"),
               "flake_lock_sha256": sha256(paths["flake_lock"]),
+              "lean_output_sha256": sha256(paths["lean_output"]),
+              "known_bad_output_sha256": sha256(paths["known_bad_output"]),
               "static_contract": "PASS",
               "negative_controls": "PASS",
+              "known_bad_lean_subject_rejected": True,
               "lean_exit_zero": True,
+              "sorryAx_absent": True,
+              "lean_error_markers_absent": True,
               "repository_postflight_clean": True,
               "nonclaims": [
                   "not-rust-refinement",
@@ -132,6 +167,7 @@ jobs:
           path: |
             /tmp/sym-fv-002-lean-version.txt
             /tmp/sym-fv-002-lean-output.txt
+            /tmp/sym-fv-002-known-bad-output.txt
             /tmp/sym-fv-002-receipt.json
           if-no-files-found: error
           retention-days: 30
