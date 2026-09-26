@@ -1,0 +1,20 @@
+name: PROD-EQP Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_prod_eqp_001a.py'
+      - 'docs/release/evidence/prod-eqp-001a-productive-machine-reference-v1.json'
+      - '.github/workflows/prod-eqp-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Execute independent productive-machine validator
+        run: python3 scripts/validate_prod_eqp_001a.py
