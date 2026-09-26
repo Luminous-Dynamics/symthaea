@@ -94,13 +94,36 @@
       "nonclaims": ["backend soundness", "circuit correctness", "zero knowledge"]
     },
     {
+      "id": "XENIA-REPLAY-WINDOW",
+      "owner": "xenia-wire",
+      "claim": "ReplayWindow rejects duplicates/stale sequences and preserves stream/epoch isolation within the reviewed bounded model domain",
+      "evidence_refs": ["xenia-wire#73", "xenia-wire#74", "luminous-dynamics#3192"],
+      "assumptions": ["bounded Kani harness domain and recorded unwind bound until broader proof/refinement exists"],
+      "blocking_dependencies": ["draft Kani lane must execute and admit canonical Pass", "standalone-to-monorepo subject relation before cross-repo reuse"],
+      "current_qualification": {"result": "Blocked", "reason": "Kani candidate authored on draft PR; exact-head bounded proof has not executed"},
+      "closure": {
+        "mathematical_spec": "Open",
+        "source_refinement": "Open",
+        "bounded_implementation_safety": "Open",
+        "distributed_model": "NotApplicable",
+        "compiler_assurance": "Open",
+        "dependency_closure": "Open",
+        "build_identity": "Open",
+        "artifact_identity": "Open",
+        "release_identity": "Open",
+        "runtime_identity": "Open",
+        "cross_repo_subject_closure": "Open"
+      },
+      "nonclaims": ["unbounded replay-security theorem", "AEAD cryptographic security", "session/key-management correctness", "cross-repository subject closure"]
+    },
+    {
       "id": "PULSE-REPLAY-RECONCILIATION",
       "owner": "mycelix-pulse",
-      "claim": "Duplicate/replayed logical message identities are rejected without corrupting the modeled reconciliation state",
-      "evidence_refs": ["luminous-dynamics#3193"],
-      "assumptions": ["bounded model domain until broader proof/refinement exists"],
-      "blocking_dependencies": ["canonical Quint model", "production Rust transition seam", "state projection"],
-      "current_qualification": {"result": "Blocked", "reason": "model-based conformance pilot not implemented"},
+      "claim": "Duplicate/replayed logical operation identities are rejected without corrupting the modeled reconciliation state",
+      "evidence_refs": ["luminous-dynamics#3193", "luminous-dynamics#3211"],
+      "assumptions": ["bounded model domain until broader proof/refinement exists", "Holochain remains agent-centric rather than a global-consensus substrate"],
+      "blocking_dependencies": ["repair remote-origin/local-author persistence boundary", "freeze canonical dedup index", "separate vector-clock Equal from Concurrent", "reject dependency cycles/unresolved in-batch dependencies", "extract production-owned pure reconciliation kernel", "canonical Quint model", "state projection"],
+      "current_qualification": {"result": "Blocked", "reason": "source-level reconciliation blockers must be repaired before model-based conformance can be admissible"},
       "closure": {
         "mathematical_spec": "Open",
         "source_refinement": "Open",
@@ -114,7 +137,7 @@
         "runtime_identity": "Open",
         "cross_repo_subject_closure": "Open"
       },
-      "nonclaims": ["global consensus", "unbounded liveness", "whole-Holochain correctness"]
+      "nonclaims": ["global consensus", "unbounded liveness", "whole-Holochain correctness", "persistence correctness before integration qualification"]
     },
     {
       "id": "EVIDENCE-NON-AMPLIFICATION",
