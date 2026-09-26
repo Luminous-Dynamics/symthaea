@@ -48,6 +48,10 @@ def validate_workflow(workflow: str) -> None:
             "Lean checker outcome must be recorded separately")
     require('"result": "LeanTypechecked"' not in workflow,
             "checker outcome may not replace canonical qualification result")
+    require('group: sym-fv-007b-${{ github.event.pull_request.number || github.ref }}' in workflow,
+            "PR-scoped concurrency group required")
+    require('cancel-in-progress: true' in workflow,
+            "superseded PR-head proof runs must be cancelled")
 
 
 def validate(source: str, manifest: dict, workflow: str, *, check_blobs: bool = True) -> None:
@@ -60,6 +64,7 @@ def validate(source: str, manifest: dict, workflow: str, *, check_blobs: bool = 
     require(manifest["qualification_results"] == ["Pass", "Fail", "Blocked", "EnvironmentFailure"], "result census drift")
     require(manifest["qualification_receipt_result"] == "Pass", "qualification receipt result drift")
     require(manifest["proof_checker_outcome"] == "LeanTypechecked", "checker outcome drift")
+    require(manifest["qualification_lifecycle"] == "CancelSupersededPrRuns", "qualification lifecycle drift")
     require(manifest["admission_rule"] == "ExactGenerationAndPassOnly", "admission rule drift")
     require(manifest["theorem_blob"] == THEOREM_BLOB, "child theorem blob drift")
     require(manifest["theorems"] == THEOREMS, "theorem census drift")
@@ -161,11 +166,21 @@ def self_test(source: str, manifest: dict, workflow: str) -> None:
     mutant["qualification_receipt_result"] = "LeanTypechecked"
     expect_reject("manifest-result-conflation", source, mutant, workflow)
 
+    mutant = json.loads(json.dumps(manifest))
+    mutant["qualification_lifecycle"] = "KeepSupersededRuns"
+    expect_reject("manifest-stale-run-policy-drift", source, mutant, workflow)
+
     expect_reject(
         "workflow-result-conflation",
         source,
         manifest,
         workflow.replace('"result": "Pass"', '"result": "LeanTypechecked"', 1),
+    )
+    expect_reject(
+        "stale-runs-not-cancelled",
+        source,
+        manifest,
+        workflow.replace('cancel-in-progress: true', 'cancel-in-progress: false', 1),
     )
 
 
