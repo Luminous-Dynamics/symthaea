@@ -1,0 +1,194 @@
+name: SYM-FV-002A v2 Multi-Theorem Audit
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/SYM_FV_002A_MULTI_THEOREM_AUDIT_V2.md"
+      - "crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs"
+      - "crates/bridges/symthaea-lean-bridge/src/lib.rs"
+      - "crates/bridges/symthaea-lean-bridge/tests/binaryhv_bind_formal_audit.rs"
+      - "formal/lean/hdc/BinaryHVBind.lean"
+      - "crates/bridges/symthaea-proof-audit/**"
+      - "crates/bridges/symthaea-lean-bridge/src/axiom_gate.rs"
+      - "crates/bridges/symthaea-lean-bridge/src/subprocess.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-fv-002a-multitheorem-audit-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-002a-v2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  audit-v2:
+    name: End-to-end BinaryHV theorem-set audit v2
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact parent theorem subject and child scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          parent=a4d4506c57902f96b6c260e7e9c56f9fc2e654c3
+          proof=formal/lean/hdc/BinaryHVBind.lean
+          expected_proof_blob=259ba64888d8492bafc123b72d67b70da9282c36
+          test "$(git rev-parse HEAD)" = "$expected_head"
+          test "$(git rev-parse "$parent:$proof")" = "$expected_proof_blob"
+          test "$(git rev-parse "HEAD:$proof")" = "$expected_proof_blob"
+          git diff --name-only "$parent" HEAD | sort > /tmp/sym-fv-002a-v2-paths.txt
+          cat /tmp/sym-fv-002a-v2-paths.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          expected = {
+              '.github/workflows/sym-fv-002a-multitheorem-audit-v2.yml',
+              'docs/formal/SYM_FV_002A_MULTI_THEOREM_AUDIT_V2.md',
+              'crates/bridges/symthaea-lean-bridge/src/lib.rs',
+              'crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs',
+              'crates/bridges/symthaea-lean-bridge/tests/binaryhv_bind_formal_audit.rs',
+          }
+          observed = set(Path('/tmp/sym-fv-002a-v2-paths.txt').read_text().splitlines())
+          if observed != expected:
+              raise SystemExit(f'unexpected child scope: {sorted(observed ^ expected)}')
+          PY
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Unit-qualify audit adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            cargo fmt -p symthaea-lean-bridge -- --check
+            if ! cargo test -p symthaea-lean-bridge --lib theorem_set_audit -- --nocapture > /tmp/sym-fv-002a-v2-unit-output.txt 2>&1; then
+              cat /tmp/sym-fv-002a-v2-unit-output.txt
+              exit 1
+            fi
+            cat /tmp/sym-fv-002a-v2-unit-output.txt
+          '
+
+      - name: Prove direct Lean failure propagates
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/sym-fv-002a-v2-known-bad.lean <<'LEAN'
+          example : False := by
+            trivial
+          LEAN
+          if nix develop .#formal --command sh -c 'lean /tmp/sym-fv-002a-v2-known-bad.lean > /tmp/sym-fv-002a-v2-known-bad-output.txt 2>&1'; then
+            cat /tmp/sym-fv-002a-v2-known-bad-output.txt
+            echo "known-bad Lean subject incorrectly returned success" >&2
+            exit 1
+          fi
+          cat /tmp/sym-fv-002a-v2-known-bad-output.txt
+          grep -q 'error:' /tmp/sym-fv-002a-v2-known-bad-output.txt
+
+      - name: Audit all BinaryHV theorems through real Lean and proof policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          nix develop .#formal --command sh -c '
+            set -eu
+            rustc --version > /tmp/sym-fv-002a-v2-rust-version.txt
+            lean --version > /tmp/sym-fv-002a-v2-lean-version.txt
+            cat /tmp/sym-fv-002a-v2-rust-version.txt
+            cat /tmp/sym-fv-002a-v2-lean-version.txt
+            if ! SYMTHAEA_LEAN_FORMAL_AUDIT=1 cargo test -p symthaea-lean-bridge --test binaryhv_bind_formal_audit -- --nocapture > /tmp/sym-fv-002a-v2-audit-output.txt 2>&1; then
+              cat /tmp/sym-fv-002a-v2-audit-output.txt
+              exit 1
+            fi
+            cat /tmp/sym-fv-002a-v2-audit-output.txt
+          '
+          if grep -q 'sorryAx' /tmp/sym-fv-002a-v2-audit-output.txt; then
+            echo "formal audit output contains forbidden sorryAx" >&2
+            exit 1
+          fi
+
+      - name: Postflight immutability and v2 receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          parent = 'a4d4506c57902f96b6c260e7e9c56f9fc2e654c3'
+          proof = Path('formal/lean/hdc/BinaryHVBind.lean')
+          touched = [
+              Path('docs/formal/SYM_FV_002A_MULTI_THEOREM_AUDIT_V2.md'),
+              Path('crates/bridges/symthaea-lean-bridge/src/theorem_set_audit.rs'),
+              Path('crates/bridges/symthaea-lean-bridge/src/lib.rs'),
+              Path('crates/bridges/symthaea-lean-bridge/tests/binaryhv_bind_formal_audit.rs'),
+              Path('.github/workflows/sym-fv-002a-multitheorem-audit-v2.yml'),
+          ]
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          def sha256(path):
+              return hashlib.sha256(path.read_bytes()).hexdigest()
+
+          receipt = {
+              'schema': 'symthaea.formal.sym-fv-002a-multitheorem-audit.v2',
+              'tracking_issue': 5881,
+              'invalidated_predecessor_pr': 5884,
+              'evidence_class': 'AbstractFormalTheorem',
+              'head': git('rev-parse', 'HEAD'),
+              'tree': git('rev-parse', 'HEAD^{tree}'),
+              'parent_head': parent,
+              'proof_blob': git('rev-parse', 'HEAD:formal/lean/hdc/BinaryHVBind.lean'),
+              'proof_sha256': sha256(proof),
+              'rust_version': Path('/tmp/sym-fv-002a-v2-rust-version.txt').read_text().strip(),
+              'lean_version': Path('/tmp/sym-fv-002a-v2-lean-version.txt').read_text().strip(),
+              'theorem_count': 8,
+              'policy': 'constitutional',
+              'real_lean_subprocess_required': True,
+              'hostile_spec_mutation_required': True,
+              'known_bad_lean_subject_rejected': True,
+              'exact_head_checkout': True,
+              'audit_test_exit_zero': True,
+              'repository_postflight_clean': True,
+              'child_artifacts': {str(path): sha256(path) for path in touched},
+              'nonclaims': [
+                  'not-rust-refinement',
+                  'not-simd-proof',
+                  'not-rustc-or-llvm-proof',
+                  'not-native-binary-verification',
+                  'not-runtime-authority',
+              ],
+          }
+          out = Path('/tmp/sym-fv-002a-v2-receipt.json')
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+          print(out.read_text())
+          PY
+
+      - name: Retain audit evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-002a-v2-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/sym-fv-002a-v2-unit-output.txt
+            /tmp/sym-fv-002a-v2-known-bad-output.txt
+            /tmp/sym-fv-002a-v2-rust-version.txt
+            /tmp/sym-fv-002a-v2-lean-version.txt
+            /tmp/sym-fv-002a-v2-audit-output.txt
+            /tmp/sym-fv-002a-v2-receipt.json
+          if-no-files-found: error
+          retention-days: 30
