@@ -2,9 +2,9 @@
 """Validate the SYM-FV-006 formal evidence receipt v1 contract.
 
 Zero third-party dependencies. This validates the repository's schema contract and,
-when receipt paths are supplied, the semantic invariants JSON Schema alone cannot
-express (statement digest, immutable PASS subject, mutation outcome, and evidence
-class identity against SYM-FV-000).
+when receipt paths are supplied, semantic invariants JSON Schema alone cannot
+express: statement identity, immutable PASS subjects, explicit mutation-control
+applicability, and evidence-class identity against SYM-FV-000.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 EXPECTED_SCHEMA = "symthaea.formal-evidence.receipt.v1"
 EXPECTED_AUTHORITY = "EvidenceOnly"
 EXPECTED_COMPOSITION = "DependenciesDoNotPromotePrimaryEvidenceClass"
+CONTROL_POLICIES = {"Required", "NotApplicable"}
 
 
 class ContractError(ValueError):
@@ -117,6 +118,15 @@ def validate_schema_contract(schema: dict, classes: list[str]) -> None:
             "receipt primary_evidence_class enum must exactly match SYM-FV-000 evidence classes"
         )
 
+    controls = _require_object(props.get("controls"), "schema.properties.controls")
+    control_required = controls.get("required")
+    if not isinstance(control_required, list) or not {"policy", "mutations"}.issubset(control_required):
+        raise ContractError("controls must require explicit policy and mutation census")
+    control_props = _require_object(controls.get("properties"), "controls.properties")
+    policy_values = _require_object(control_props.get("policy"), "controls.policy").get("enum")
+    if policy_values != ["Required", "NotApplicable"]:
+        raise ContractError("mutation-control policy enum drift")
+
     composition = _require_object(props.get("composition"), "schema.properties.composition")
     comp_props = _require_object(composition.get("properties"), "composition.properties")
     rule = _require_object(comp_props.get("composition_rule"), "composition_rule")
@@ -205,7 +215,22 @@ def validate_receipt(receipt: dict, classes: list[str]) -> None:
             raise ContractError(f"external_models[{idx}].status is invalid")
 
     controls = _require_object(receipt.get("controls"), "controls")
+    policy = controls.get("policy")
+    if policy not in CONTROL_POLICIES:
+        raise ContractError("controls.policy must be Required or NotApplicable")
     mutations = _require_list(controls.get("mutations"), "controls.mutations")
+    reason = controls.get("not_applicable_reason")
+
+    if policy == "Required":
+        if not mutations:
+            raise ContractError("Required mutation policy must declare at least one mutation")
+        if reason is not None:
+            raise ContractError("Required mutation policy must not carry not_applicable_reason")
+    else:
+        if mutations:
+            raise ContractError("NotApplicable mutation policy must have an empty mutation census")
+        _require_text(reason, "controls.not_applicable_reason")
+
     for idx, mutation in enumerate(mutations):
         item = _require_object(mutation, f"mutations[{idx}]")
         _require_text(item.get("id"), f"mutations[{idx}].id")
@@ -264,11 +289,12 @@ def validate_receipt(receipt: dict, classes: list[str]) -> None:
     if result == "Pass":
         if pre != post or not clean:
             raise ContractError("PASS requires immutable subject bytes and a clean checkout")
-        bad_mutants = [
-            m for m in mutations if m.get("observed_result") != "ExpectedFail"
-        ]
-        if bad_mutants:
-            raise ContractError("PASS requires every declared mutation control to ExpectedFail")
+        if policy == "Required":
+            bad_mutants = [
+                m for m in mutations if m.get("observed_result") != "ExpectedFail"
+            ]
+            if bad_mutants:
+                raise ContractError("PASS requires every required mutation control to ExpectedFail")
         if primary in {"ExtractedSourceRefinement", "DeductiveImplementationProof"}:
             if any(model.get("status") == "UnsupportedBoundary" for model in external):
                 raise ContractError(
@@ -276,7 +302,7 @@ def validate_receipt(receipt: dict, classes: list[str]) -> None:
                 )
 
 
-def _fixture(classes: list[str]) -> dict:
+def _fixture() -> dict:
     statement = "forall a b, extracted_bind(a,b) = abstract_bind(a,b)"
     z64 = "0" * 64
     return {
@@ -310,13 +336,14 @@ def _fixture(classes: list[str]) -> dict:
             "axiom_or_assumption_census": [],
         },
         "controls": {
+            "policy": "Required",
             "mutations": [
                 {
                     "id": "wrong-operator",
                     "expected_detection": "semantic theorem mismatch",
                     "observed_result": "ExpectedFail",
                 }
-            ]
+            ],
         },
         "qualification": {
             "result": "Pass",
@@ -337,45 +364,63 @@ def _fixture(classes: list[str]) -> dict:
     }
 
 
+def _must_reject(candidate: dict, message: str, classes: list[str]) -> None:
+    try:
+        validate_receipt(candidate, classes)
+    except ContractError:
+        return
+    raise ContractError(f"self-test failed: {message}")
+
+
 def self_test(classes: list[str]) -> None:
-    valid = _fixture(classes)
+    valid = _fixture()
     validate_receipt(valid, classes)
 
     mutant = json.loads(json.dumps(valid))
     mutant["claim"]["statement"] += " "
-    try:
-        validate_receipt(mutant, classes)
-    except ContractError:
-        pass
-    else:
-        raise ContractError("self-test failed: statement-digest drift was accepted")
+    _must_reject(mutant, "statement-digest drift was accepted", classes)
 
     mutant = json.loads(json.dumps(valid))
     mutant["immutability"]["post_subject_sha256"] = "f" * 64
-    try:
-        validate_receipt(mutant, classes)
-    except ContractError:
-        pass
-    else:
-        raise ContractError("self-test failed: mutable PASS subject was accepted")
+    _must_reject(mutant, "mutable PASS subject was accepted", classes)
 
     mutant = json.loads(json.dumps(valid))
     mutant["controls"]["mutations"][0]["observed_result"] = "UnexpectedPass"
-    try:
-        validate_receipt(mutant, classes)
-    except ContractError:
-        pass
-    else:
-        raise ContractError("self-test failed: unexpected-pass mutant was accepted")
+    _must_reject(mutant, "unexpected-pass mutant was accepted", classes)
 
     mutant = json.loads(json.dumps(valid))
     mutant["primary_evidence_class"] = ["AbstractFormalTheorem", "RuntimeQualification"]
-    try:
-        validate_receipt(mutant, classes)
-    except ContractError:
-        pass
-    else:
-        raise ContractError("self-test failed: multiple primary evidence classes were accepted")
+    _must_reject(mutant, "multiple primary evidence classes were accepted", classes)
+
+    mutant = json.loads(json.dumps(valid))
+    mutant["controls"]["mutations"] = []
+    _must_reject(mutant, "Required controls with an empty mutation census were accepted", classes)
+
+    mutant = json.loads(json.dumps(valid))
+    mutant["controls"] = {"policy": "NotApplicable", "mutations": []}
+    _must_reject(mutant, "NotApplicable controls without a reason were accepted", classes)
+
+    mutant = json.loads(json.dumps(valid))
+    mutant["controls"] = {
+        "policy": "NotApplicable",
+        "not_applicable_reason": "No semantic mutation applies to this synthetic evidence class.",
+        "mutations": [
+            {
+                "id": "should-not-exist",
+                "expected_detection": "none",
+                "observed_result": "ExpectedFail",
+            }
+        ],
+    }
+    _must_reject(mutant, "NotApplicable controls carrying mutations were accepted", classes)
+
+    explicit_na = json.loads(json.dumps(valid))
+    explicit_na["controls"] = {
+        "policy": "NotApplicable",
+        "not_applicable_reason": "No semantic mutation applies to this synthetic evidence class.",
+        "mutations": [],
+    }
+    validate_receipt(explicit_na, classes)
 
 
 def main(argv: list[str]) -> int:
