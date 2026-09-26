@@ -1,0 +1,44 @@
+name: BUILT-SITE-001A Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/engineering/BUILT_SITE_001A_TERRESTRIAL_SITE_EVIDENCE.md'
+      - 'docs/release/evidence/built-site-001a-terrestrial-site-evidence-reference-v1.json.gz'
+      - 'scripts/validate_built_site_001a.py'
+      - '.github/workflows/built-site-001a-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Bind exact source and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_HEAD=b402691fbeef492b02efe8460f5ad4fd5faf8ad3
+          DOC_BLOB=d80de04cca7201af7b220293aed1cc39030df823
+          CORPUS_BLOB=b22989f02061cbdf91c715f7592f5e53d69d5381
+          git merge-base --is-ancestor "$SOURCE_HEAD" HEAD
+          test "$(git rev-list --count "$SOURCE_HEAD..HEAD")" = 1
+          test "$(git rev-parse "$SOURCE_HEAD:docs/engineering/BUILT_SITE_001A_TERRESTRIAL_SITE_EVIDENCE.md")" = "$DOC_BLOB"
+          test "$(git rev-parse "$SOURCE_HEAD:docs/release/evidence/built-site-001a-terrestrial-site-evidence-reference-v1.json.gz")" = "$CORPUS_BLOB"
+          mapfile -t changed < <(git diff --name-only "$SOURCE_HEAD...HEAD" | sort)
+          expected=(
+            .github/workflows/built-site-001a-reference.yml
+            scripts/validate_built_site_001a.py
+          )
+          test "${#changed[@]}" = "${#expected[@]}"
+          for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
+      - name: Execute independent stdlib-only oracle
+        run: python3 scripts/validate_built_site_001a.py
+      - name: Clean postflight
+        shell: bash
+        run: test -z "$(git status --porcelain)"
