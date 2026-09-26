@@ -1,0 +1,26 @@
+name: TE-BENCH-001D2 workbook fixture custody
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/te-bench-001d2-validate-fixture.py'
+      - 'docs/release/evidence/te-bench-001d1-hostile-workbook-fixture-v1.manifest.json'
+      - 'docs/release/evidence/te-bench-001d1-hostile-workbook-fixture-v1.xlsx.b64.part*'
+      - 'docs/release/evidence/te-bench-001d1-hostile-workbook-transport-v1.json'
+      - '.github/workflows/te-bench-001d2-fixture-custody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate hostile workbook fixture custody
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Reconstruct and validate exact synthetic XLSX fixture
+        run: python3 scripts/te-bench-001d2-validate-fixture.py
