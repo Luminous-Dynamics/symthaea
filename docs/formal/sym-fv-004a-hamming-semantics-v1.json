@@ -1,0 +1,56 @@
+{
+  "schema": "symthaea.formal.sym-fv-004a-hamming-semantics.v1",
+  "issue": 5717,
+  "program": "SYM-FV-004A",
+  "evidence_class": "AbstractFormalTheorem",
+  "parent": {
+    "program": "SYM-FV-002",
+    "commit": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+    "theorem_path": "formal/lean/hdc/BinaryHVBind.lean",
+    "theorem_blob": "259ba64888d8492bafc123b72d67b70da9282c36"
+  },
+  "abstract_subject": {
+    "dimension": 16384,
+    "binary_hv": "Fin 16384 -> Bool",
+    "bind": "pointwise Bool.xor",
+    "popcount": "exact Nat count of true bits across the fixed width",
+    "hamming_distance": "popcount(bind(a,b))"
+  },
+  "theorems": [
+    "hamming_eq_popcount_bind",
+    "popcount_zero",
+    "hamming_self",
+    "hamming_comm",
+    "common_left_bind_pairwise_xor",
+    "hamming_common_left_bind_invariant",
+    "hamming_common_right_bind_invariant"
+  ],
+  "production_future_refinement_target": {
+    "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+    "blob": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056",
+    "functions": [
+      "BinaryHV::hamming_distance_scalar",
+      "BinaryHV::similarity_scalar"
+    ],
+    "status": "not-proved-here"
+  },
+  "dependency_policy": {
+    "lean_environment": "repository .#formal shell",
+    "mathlib_required": false,
+    "reason": "exact integer Hamming semantics can be expressed in core Lean without introducing a second package/toolchain lineage"
+  },
+  "downstream": [
+    "SYM-FV-004B production scalar Hamming refinement",
+    "SYM-FV-004C exact normalized similarity plus f32 error contract",
+    "SYM-HDC-CRYPTO-FV-001B repaired-lineage Hamming-isometry corollary"
+  ],
+  "nonclaims": [
+    "not-production-rust-refinement",
+    "not-f32-similarity-proof",
+    "not-simd-proof",
+    "not-aeneas-extraction",
+    "not-compiler-or-native-binary-proof",
+    "not-runtime-authority",
+    "not-semantic-security-proof"
+  ]
+}
