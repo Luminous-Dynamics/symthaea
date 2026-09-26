@@ -1,0 +1,47 @@
+{
+  "schema": "symthaea.formal.sym-fv-007b-evidence-freshness.v1",
+  "tracking_issue": 5972,
+  "parent": {
+    "pr": 5962,
+    "head": "f4b7fbc16aa132d60860f52a49843e9a6ccc8b7e",
+    "inherited_theorem_path": "formal/lean/evidence/EvidenceComposition.lean",
+    "inherited_theorem_blob": "4684326db9d980647914bca180c88cb7fad4ec7e"
+  },
+  "authority": "EvidenceOnly",
+  "evidence_class": "AbstractFormalTheorem",
+  "qualification_results": [
+    "Pass",
+    "Fail",
+    "Blocked",
+    "EnvironmentFailure"
+  ],
+  "admission_rule": "ExactGenerationAndPassOnly",
+  "theorem_path": "formal/lean/evidence/EvidenceFreshness.lean",
+  "theorem_blob": "21e8a2633be61b96d1c66c7b589fdd179ce2758e",
+  "theorems": [
+    "stale_reference_not_admissible",
+    "fail_result_not_admissible",
+    "blocked_result_not_admissible",
+    "environment_failure_not_admissible",
+    "advancing_live_generation_invalidates_prior_reference",
+    "composite_admission_implies_root_current_and_pass",
+    "composite_admission_implies_dependency_current_and_pass",
+    "stale_dependency_blocks_composite",
+    "nonpass_dependency_blocks_composite",
+    "adding_dependency_requires_that_dependency_admissible",
+    "adding_admissible_dependency_preserves_composite"
+  ],
+  "claim_ceiling": [
+    "LocalExactGenerationFreshness",
+    "QualificationResultBlockingPropagation"
+  ],
+  "nonclaims": [
+    "TrustedWallClockFreshness",
+    "DistributedCurrentness",
+    "DistributedFinality",
+    "DagAcyclicity",
+    "DependencyClaimTruth",
+    "ReceiptValidatorRefinement",
+    "RuntimeAuthorization"
+  ]
+}
