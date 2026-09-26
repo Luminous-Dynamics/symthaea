@@ -1,0 +1,58 @@
+{
+  "schema": "symthaea.formal.sym-fv-002p-a.v1",
+  "issue": 5930,
+  "cyclic_instantiation_issue": 5937,
+  "stack_parent_pr": 5801,
+  "stack_parent_head": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+  "inherited_subject": {
+    "path": "formal/lean/hdc/BinaryHVBind.lean",
+    "blob": "259ba64888d8492bafc123b72d67b70da9282c36"
+  },
+  "formal_subject": "formal/lean/hdc/PermutationAction.lean",
+  "evidence_class": "AbstractFormalTheorem",
+  "semantic_layer": "generic-index-permutation-action",
+  "orientation": "destination-bit-reads-inverse-mapped-source-index",
+  "future_production_targets": [
+    {
+      "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+      "blob": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056",
+      "relationship": "future-refinement-target-not-proved-here"
+    },
+    {
+      "path": "crates/core/symthaea-hdc-crypto/src/binary_hv.rs",
+      "blob": "9fe5409c3edfcdc6112a61b125c1b278f9eb0d4a",
+      "relationship": "separate-future-refinement-target-not-proved-equivalent"
+    }
+  ],
+  "required_properties": [
+    "identity-action",
+    "zero-preservation",
+    "xor-bind-homomorphism",
+    "composition",
+    "inverse-after-permute",
+    "permute-after-inverse",
+    "injectivity",
+    "surjectivity",
+    "bijectivity"
+  ],
+  "negative_controls": [
+    "remove-left-inverse-obligation",
+    "remove-right-inverse-obligation",
+    "delete-xor-homomorphism",
+    "delete-bijectivity",
+    "redefine-binaryhv",
+    "redefine-bind",
+    "claim-cyclic-offset-arithmetic",
+    "claim-production-rust-refinement",
+    "claim-two-production-implementations-equivalent"
+  ],
+  "cryptanalysis_consumers": [5931, 5932, 5933],
+  "nonclaims": [
+    "not-cyclic-offset-instantiation",
+    "not-production-rust-refinement",
+    "not-equivalence-of-production-implementations",
+    "not-hamming-theorem",
+    "not-cryptographic-security",
+    "not-native-binary-proof"
+  ]
+}
