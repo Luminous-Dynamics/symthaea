@@ -1,0 +1,21 @@
+name: CIV Domain Gap Owner Coverage Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_civ_domain_gap_001a.py'
+      - 'docs/release/evidence/civ-domain-gap-001a-owner-coverage-matrix-v1.json'
+      - 'docs/release/evidence/civ-value-000-critical-domain-matrix-v1.json'
+      - '.github/workflows/civ-domain-gap-owner-coverage-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+      - name: Execute independent owner-coverage validator
+        run: python3 scripts/validate_civ_domain_gap_001a.py
