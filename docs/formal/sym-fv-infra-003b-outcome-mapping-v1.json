@@ -1,0 +1,76 @@
+{
+  "schema": "symthaea.formal.outcome-mapping.v1",
+  "tracking_issue": 6054,
+  "parent_issue": 5978,
+  "parent_pr": 6008,
+  "authority": "EvidenceOnly",
+  "canonical_results": [
+    "Pass",
+    "Fail",
+    "Blocked",
+    "EnvironmentFailure"
+  ],
+  "closed_world_default": "Blocked",
+  "dispositions": {
+    "SemanticSuccess": "Pass",
+    "SemanticCounterexample": "Fail",
+    "ProofOrQualificationFailure": "Fail",
+    "UnsupportedBoundary": "Blocked",
+    "InsufficientBound": "Blocked",
+    "ResourceExhaustion": "Blocked",
+    "MissingPrerequisite": "Blocked",
+    "StaleSubjectOrDependency": "Blocked",
+    "AmbiguousOrUnknownOutcome": "Blocked",
+    "UnclassifiedToolCrash": "Blocked",
+    "EnvironmentUnavailable": "EnvironmentFailure",
+    "ToolInstallationFailure": "EnvironmentFailure",
+    "RunnerInfrastructureFailure": "EnvironmentFailure"
+  },
+  "hostile_control_requirement": {
+    "accepted_only_on_expected_semantic_failure": true,
+    "resource_exhaustion_must_not_count_as_rejection": true,
+    "insufficient_bound_must_not_count_as_rejection": true,
+    "environment_failure_must_not_count_as_rejection": true
+  },
+  "receipt_fields": [
+    "result",
+    "outcome_disposition",
+    "raw_tool_outcome",
+    "mapping_schema_version",
+    "mapping_schema_digest"
+  ],
+  "examples": {
+    "kani": {
+      "verification_successful": "SemanticSuccess",
+      "assertion_counterexample": "SemanticCounterexample",
+      "unwinding_assertion": "InsufficientBound",
+      "solver_resource_exhaustion": "ResourceExhaustion",
+      "tool_install_failure": "ToolInstallationFailure"
+    },
+    "aeneas": {
+      "ExtractedAndLeanTypechecked": "SemanticSuccess",
+      "UnsupportedDependencyBoundary": "UnsupportedBoundary",
+      "unsupported_rust_feature": "UnsupportedBoundary",
+      "missing_pinned_tool": "EnvironmentUnavailable"
+    },
+    "lean": {
+      "admitted_with_axiom_policy": "SemanticSuccess",
+      "exact_subject_elaboration_failure": "ProofOrQualificationFailure",
+      "missing_toolchain_dependency": "EnvironmentUnavailable"
+    },
+    "quint": {
+      "bounded_property_satisfied": "SemanticSuccess",
+      "model_counterexample": "SemanticCounterexample",
+      "trace_generation_resource_exhaustion": "ResourceExhaustion",
+      "rust_driver_environment_failure": "EnvironmentUnavailable"
+    }
+  },
+  "nonclaims": [
+    "VerifierCorrectness",
+    "TheoremTruth",
+    "OutcomeTaxonomyCompleteness",
+    "ImplementationRefinement",
+    "EvidenceClassPromotion",
+    "RuntimeAuthority"
+  ]
+}
