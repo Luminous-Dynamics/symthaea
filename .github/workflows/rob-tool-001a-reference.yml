@@ -1,0 +1,48 @@
+name: ROB-TOOL-001A Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - docs/engineering/ROB_TOOL_001A_SPECIALIZATION.md
+      - docs/release/evidence/rob-tool-001a-specialization-reference-v1.json
+      - scripts/validate_rob_tool_001a.py
+      - .github/workflows/rob-tool-001a-reference.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Qualify exact frozen ROB-TOOL subject
+        env:
+          SOURCE_HEAD: 2123035a2333f4c9f129477fc5ec4f4283527c71
+          SOURCE_DOC_BLOB: 2ac8551668ecdd5af69e93056336a91d44438639
+          SOURCE_CORPUS_BLOB: bb6ad382c4fcb97b957e347174e0ebeb797dc708
+        run: |
+          set -euo pipefail
+
+          test "$(git merge-base "$SOURCE_HEAD" HEAD)" = "$SOURCE_HEAD"
+          test "$(git rev-list --count "$SOURCE_HEAD"..HEAD)" -eq 1
+
+          expected="$(printf '%s\n' \
+            '.github/workflows/rob-tool-001a-reference.yml' \
+            'scripts/validate_rob_tool_001a.py' | sort)"
+          actual="$(git diff --name-only "$SOURCE_HEAD"...HEAD | sort)"
+          test "$actual" = "$expected"
+
+          test "$(git rev-parse "$SOURCE_HEAD:docs/engineering/ROB_TOOL_001A_SPECIALIZATION.md")" = "$SOURCE_DOC_BLOB"
+          test "$(git rev-parse "$SOURCE_HEAD:docs/release/evidence/rob-tool-001a-specialization-reference-v1.json")" = "$SOURCE_CORPUS_BLOB"
+
+          python3 scripts/validate_rob_tool_001a.py
+
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
