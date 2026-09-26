@@ -79,9 +79,11 @@ structure EvidenceReceipt where
   validity : EvidenceValidity
   assumptions : List Assumption
   provenanceRoot : ProvenanceRoot
+  dependencies : List EvidenceIdentity
   deriving Repr
 
 structure Obligation where
+  generation : GenerationIdentity
   subject : SubjectIdentity
   claim : ClaimIdentity
   requiredClass : EvidenceClass
@@ -97,6 +99,7 @@ into another. Assumptions may either remain explicit on the target or be
 explicitly discharged by this witness.
 -/
 structure RefinementWitness where
+  generation : GenerationIdentity
   sourceSubject : SubjectIdentity
   targetSubject : SubjectIdentity
   sourceClaim : ClaimIdentity
@@ -107,6 +110,7 @@ structure RefinementWitness where
 
 /-- Directional claim entailment. `strongClaim` may support `weakClaim`, not vice versa. -/
 structure ClaimEntailmentWitness where
+  generation : GenerationIdentity
   strongClaim : ClaimIdentity
   weakClaim : ClaimIdentity
   current : Bool
@@ -117,6 +121,7 @@ Independence is stronger than distinct receipt IDs. The witness binds two exact
 evidence identities, their provenance roots, and an explicit reviewed basis.
 -/
 structure IndependenceWitness where
+  generation : GenerationIdentity
   leftEvidence : EvidenceIdentity
   rightEvidence : EvidenceIdentity
   leftProvenance : ProvenanceRoot
@@ -127,6 +132,7 @@ structure IndependenceWitness where
   deriving Repr
 
 structure ReachabilityWitness where
+  generation : GenerationIdentity
   subject : SubjectIdentity
   claim : ClaimIdentity
   current : Bool
@@ -139,7 +145,8 @@ def AssumptionsAllowed
 
 /--
 Subject transfer is exact by default. Crossing subject boundaries requires a
-current typed refinement witness whose claim endpoints also match.
+current typed refinement witness for this exact evidence generation whose claim
+endpoints also match.
 -/
 def SubjectTransfer
     (refinements : List RefinementWitness)
@@ -150,6 +157,7 @@ def SubjectTransfer
   ∃ w,
     w ∈ refinements ∧
     w.current = true ∧
+    w.generation = o.generation ∧
     w.sourceSubject = e.subject ∧
     w.targetSubject = o.subject ∧
     w.sourceClaim = e.claim ∧
@@ -165,6 +173,7 @@ def ClaimTransfer
   ∃ w,
     w ∈ entailments ∧
     w.current = true ∧
+    w.generation = o.generation ∧
     w.strongClaim = e.claim ∧
     w.weakClaim = o.claim
 
@@ -181,6 +190,7 @@ def Supports
     (o : Obligation) : Prop :=
   e.validity = .Current ∧
   disposition e.result = .Pass ∧
+  e.generation = o.generation ∧
   e.evidenceClass = o.requiredClass ∧
   e.propertyKind = o.propertyKind ∧
   SubjectTransfer refinements e o ∧
@@ -194,10 +204,11 @@ def ReachabilitySatisfied
   ∃ w,
     w ∈ witnesses ∧
     w.current = true ∧
+    w.generation = o.generation ∧
     w.subject = o.subject ∧
     w.claim = o.claim
 
-/-- Semantically contradictory current evidence is never silently preference-resolved. -/
+/-- Semantically or procedurally conflicting current dispositions remain visible. -/
 def Conflicting (left right : EvidenceReceipt) : Prop :=
   left.subject = right.subject ∧
   left.claim = right.claim ∧
@@ -213,11 +224,34 @@ def ConflictFree (receipts : List EvidenceReceipt) : Prop :=
       ¬ Conflicting left right
 
 /--
+Dependency evidence is recursively closed. Every declared prerequisite must be
+present as a current semantic Pass, strictly lower in the well-founded rank,
+and itself dependency-closed.
+-/
+inductive EvidenceClosed
+    (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt) :
+    EvidenceReceipt → Prop where
+  | intro (e : EvidenceReceipt)
+      (current : e.validity = .Current)
+      (passed : disposition e.result = .Pass)
+      (dependencies :
+        ∀ dependency,
+          dependency ∈ e.dependencies →
+          ∃ prerequisite,
+            prerequisite ∈ receipts ∧
+            prerequisite.evidenceId = dependency ∧
+            rank prerequisite.evidenceId < rank e.evidenceId ∧
+            EvidenceClosed rank receipts prerequisite) :
+      EvidenceClosed rank receipts e
+
+/--
 Finite first-kernel closure: every mandatory obligation has current admissible
-positive support and any required positive reachability witness, while the
-current evidence set is conflict-free.
+positive support, a recursively closed dependency tree, and any required
+positive reachability witness, while the current evidence set is conflict-free.
 -/
 def Closed
+    (rank : EvidenceIdentity → Nat)
     (receipts : List EvidenceReceipt)
     (obligations : List Obligation)
     (refinements : List RefinementWitness)
@@ -228,11 +262,13 @@ def Closed
     ∃ e,
       e ∈ receipts ∧
       Supports refinements entailments e o ∧
+      EvidenceClosed rank receipts e ∧
       ReachabilitySatisfied reachability o
 
 /--
-An explicit independence claim requires both distinct evidence identities and
-distinct provenance roots plus a current declared independence witness.
+An explicit independence claim requires distinct evidence identities, distinct
+provenance roots, and a current declared independence basis for the same
+closure generation.
 -/
 def IndependentSupport
     (refinements : List RefinementWitness)
@@ -247,6 +283,8 @@ def IndependentSupport
   ∃ w,
     w ∈ independence ∧
     w.current = true ∧
+    w.generation = left.generation ∧
+    w.generation = right.generation ∧
     w.basisDeclared = true ∧
     w.leftEvidence = left.evidenceId ∧
     w.rightEvidence = right.evidenceId ∧
@@ -254,10 +292,8 @@ def IndependentSupport
     w.rightProvenance = right.provenanceRoot
 
 /--
-Dependency justification is well-founded by construction when every dependency
-step strictly lowers a natural-number rank. This gives the finite kernel a
-simple explicit anti-cycle discipline without pretending to solve recursive
-fixed-point assurance.
+A rank-decreasing dependency path gives an explicit finite anti-cycle witness
+for the same order used by `EvidenceClosed`.
 -/
 inductive DependencyPath
     (rank : EvidenceIdentity → Nat) :
@@ -318,6 +354,16 @@ theorem invalidated_cannot_support
   rw [hinvalidated] at hcurrent
   cases hcurrent
 
+theorem stale_generation_cannot_support
+    (refinements : List RefinementWitness)
+    (entailments : List ClaimEntailmentWitness)
+    (e : EvidenceReceipt)
+    (o : Obligation)
+    (hstale : e.generation ≠ o.generation) :
+    ¬ Supports refinements entailments e o := by
+  intro hs
+  exact hstale hs.2.2.1
+
 theorem evidence_class_non_amplification
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
@@ -326,7 +372,7 @@ theorem evidence_class_non_amplification
     (hmismatch : e.evidenceClass ≠ o.requiredClass) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  exact hmismatch hs.2.2.1
+  exact hmismatch hs.2.2.2.1
 
 theorem safety_cannot_close_liveness
     (refinements : List RefinementWitness)
@@ -337,7 +383,7 @@ theorem safety_cannot_close_liveness
     (hliveness : o.propertyKind = .Liveness) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  have hkind : e.propertyKind = o.propertyKind := hs.2.2.2.1
+  have hkind : e.propertyKind = o.propertyKind := hs.2.2.2.2.1
   rw [hsafety, hliveness] at hkind
   cases hkind
 
@@ -351,12 +397,13 @@ theorem mismatched_subject_requires_refinement
     ∃ w,
       w ∈ refinements ∧
       w.current = true ∧
+      w.generation = o.generation ∧
       w.sourceSubject = e.subject ∧
       w.targetSubject = o.subject ∧
       w.sourceClaim = e.claim ∧
       w.targetClaim = o.claim ∧
       AssumptionsAllowed e.assumptions o.assumptions w.dischargedAssumptions := by
-  have hsubject : SubjectTransfer refinements e o := hs.2.2.2.2.1
+  have hsubject : SubjectTransfer refinements e o := hs.2.2.2.2.2.1
   cases hsubject with
   | inl hexact => exact False.elim (hmismatch hexact.1)
   | inr hrefinement => exact hrefinement
@@ -371,9 +418,10 @@ theorem mismatched_claim_requires_entailment
     ∃ w,
       w ∈ entailments ∧
       w.current = true ∧
+      w.generation = o.generation ∧
       w.strongClaim = e.claim ∧
       w.weakClaim = o.claim := by
-  have hclaim : ClaimTransfer entailments e o := hs.2.2.2.2.2
+  have hclaim : ClaimTransfer entailments e o := hs.2.2.2.2.2.2
   cases hclaim with
   | inl hexact => exact False.elim (hmismatch hexact)
   | inr hentails => exact hentails
@@ -384,7 +432,7 @@ theorem exact_subject_support_preserves_assumptions
     (o : Obligation)
     (hs : Supports [] entailments e o) :
     AssumptionsAllowed e.assumptions o.assumptions [] := by
-  have hsubject : SubjectTransfer [] e o := hs.2.2.2.2.1
+  have hsubject : SubjectTransfer [] e o := hs.2.2.2.2.2.1
   cases hsubject with
   | inl hexact => exact hexact.2
   | inr hrefinement =>
@@ -420,23 +468,51 @@ theorem required_reachability_empty_rejected
           have hmember : w ∈ ([] : List ReachabilityWitness) := hw.1
           cases hmember
 
+theorem evidence_closed_is_current_pass
+    (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt)
+    (e : EvidenceReceipt)
+    (hclosed : EvidenceClosed rank receipts e) :
+    e.validity = .Current ∧ disposition e.result = .Pass := by
+  cases hclosed with
+  | intro _ current passed _ => exact ⟨current, passed⟩
+
+theorem evidence_closed_rejects_self_dependency
+    (rank : EvidenceIdentity → Nat)
+    (receipts : List EvidenceReceipt)
+    (e : EvidenceReceipt)
+    (hclosed : EvidenceClosed rank receipts e)
+    (hself : e.evidenceId ∈ e.dependencies) : False := by
+  cases hclosed with
+  | intro _ _ _ dependencies =>
+      have hexists := dependencies e.evidenceId hself
+      cases hexists with
+      | intro prerequisite hrest =>
+          have hid : prerequisite.evidenceId = e.evidenceId := hrest.2.1
+          have hlt : rank prerequisite.evidenceId < rank e.evidenceId := hrest.2.2.1
+          rw [hid] at hlt
+          exact (Nat.lt_irrefl (rank e.evidenceId)) hlt
+
 theorem closed_requires_every_mandatory_obligation
+    (rank : EvidenceIdentity → Nat)
     (receipts : List EvidenceReceipt)
     (obligations : List Obligation)
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (reachability : List ReachabilityWitness)
-    (hclosed : Closed receipts obligations refinements entailments reachability)
+    (hclosed : Closed rank receipts obligations refinements entailments reachability)
     (o : Obligation)
     (hmember : o ∈ obligations)
     (hmandatory : o.mandatory = true) :
     ∃ e,
       e ∈ receipts ∧
       Supports refinements entailments e o ∧
+      EvidenceClosed rank receipts e ∧
       ReachabilitySatisfied reachability o := by
   exact hclosed.2 o hmember hmandatory
 
 theorem contradictory_current_evidence_prevents_closure
+    (rank : EvidenceIdentity → Nat)
     (receipts : List EvidenceReceipt)
     (obligations : List Obligation)
     (refinements : List RefinementWitness)
@@ -446,7 +522,7 @@ theorem contradictory_current_evidence_prevents_closure
     (hleft : left ∈ receipts)
     (hright : right ∈ receipts)
     (hconflict : Conflicting left right) :
-    ¬ Closed receipts obligations refinements entailments reachability := by
+    ¬ Closed rank receipts obligations refinements entailments reachability := by
   intro hclosed
   exact (hclosed.1 left hleft right hright) hconflict
 
@@ -475,6 +551,7 @@ theorem support_non_amplification_summary
     (hs : Supports refinements entailments e o) :
     e.validity = .Current ∧
     disposition e.result = .Pass ∧
+    e.generation = o.generation ∧
     e.evidenceClass = o.requiredClass ∧
     e.propertyKind = o.propertyKind ∧
     SubjectTransfer refinements e o ∧
@@ -485,6 +562,7 @@ theorem support_non_amplification_summary
 #print axioms environment_failure_cannot_support
 #print axioms superseded_cannot_support
 #print axioms invalidated_cannot_support
+#print axioms stale_generation_cannot_support
 #print axioms evidence_class_non_amplification
 #print axioms safety_cannot_close_liveness
 #print axioms mismatched_subject_requires_refinement
@@ -492,6 +570,8 @@ theorem support_non_amplification_summary
 #print axioms exact_subject_support_preserves_assumptions
 #print axioms same_provenance_cannot_count_as_independent
 #print axioms required_reachability_empty_rejected
+#print axioms evidence_closed_is_current_pass
+#print axioms evidence_closed_rejects_self_dependency
 #print axioms closed_requires_every_mandatory_obligation
 #print axioms contradictory_current_evidence_prevents_closure
 #print axioms dependency_path_decreases
