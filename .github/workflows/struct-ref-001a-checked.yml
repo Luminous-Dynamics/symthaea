@@ -1,0 +1,33 @@
+name: STRUCT-REF-001A Checked Facade Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-structural/src/checked.rs'
+      - 'crates/domains/symthaea-structural/src/lib.rs'
+      - 'scripts/qualify_struct_ref_001a_checked.sh'
+      - '.github/workflows/struct-ref-001a-checked.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Exact checked-facade compile/regression qualifier
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show Rust toolchain
+        run: |
+          rustup show
+          cargo --version
+          rustc --version
+
+      - name: Execute source-bound qualifier
+        run: bash scripts/qualify_struct_ref_001a_checked.sh
