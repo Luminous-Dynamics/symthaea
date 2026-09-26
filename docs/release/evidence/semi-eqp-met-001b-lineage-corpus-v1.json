@@ -1,0 +1,139 @@
+{
+  "authority": "representation_only_no_physical_execution_authority",
+  "cases": [
+    {
+      "device_ref_a": "device:synthetic-camera-001",
+      "device_ref_b": "device:synthetic-camera-002",
+      "expected_identity_relation": "distinct",
+      "friendly_name": "camera-a",
+      "id": "same_name_different_device_ref"
+    },
+    {
+      "expected_identity_relation": "distinct",
+      "id": "same_imager_changed_optics_mount",
+      "imager_ref": "device:synthetic-camera-001",
+      "mount_ref_a": "mount:synthetic-a",
+      "mount_ref_b": "mount:synthetic-b",
+      "optics_ref_a": "optics:synthetic-a",
+      "optics_ref_b": "optics:synthetic-b"
+    },
+    {
+      "expected_identity_relation": "distinct",
+      "id": "remount_transform_changes_context",
+      "physical_device_ref": "device:synthetic-camera-001",
+      "transform_ref_a": "transform:synthetic-t0",
+      "transform_ref_b": "transform:synthetic-t1"
+    },
+    {
+      "expected_derived_identity_relation": "distinct",
+      "expected_physical_root_relation": "same",
+      "id": "parser_change_preserves_raw_root",
+      "parser_ref_a": "parser:synthetic-v1",
+      "parser_ref_b": "parser:synthetic-v2",
+      "raw_artifact_digest": "sha256:synthetic-raw-001",
+      "raw_observation_ref": "obs:synthetic-raw-001"
+    },
+    {
+      "derived_artifact_ref": "derived:synthetic-enhanced-002",
+      "expected_lineage": "derived_from_raw",
+      "expected_physical_witness_count": 1,
+      "id": "derived_enhancement_same_physical_root",
+      "raw_artifact_digest": "sha256:synthetic-raw-002",
+      "raw_observation_ref": "obs:synthetic-raw-002",
+      "transform_ref": "transform:synthetic-enhance-v1"
+    },
+    {
+      "derived_artifact_ref": "derived:synthetic-measurement-orphan",
+      "expected_error": "LineageInvalid",
+      "id": "orphan_derived_measurement_rejected",
+      "raw_artifact_digest": null,
+      "raw_observation_ref": null
+    },
+    {
+      "calibration_ref_a": "cal:synthetic-epoch-1",
+      "calibration_ref_b": "cal:synthetic-epoch-2",
+      "expected_measurement_context_relation": "distinct",
+      "expected_raw_identity_relation": "same",
+      "id": "calibration_epoch_change_preserves_raw",
+      "raw_observation_ref": "obs:synthetic-raw-003"
+    },
+    {
+      "calibration_currentness": "stale",
+      "calibration_ref": "cal:synthetic-epoch-1",
+      "expected_disposition": "CalibrationStaleOrMissing",
+      "id": "stale_calibration_limits_claim",
+      "raw_observation_ref": "obs:synthetic-raw-004"
+    },
+    {
+      "expected_timing_relation": "distinct_preserved",
+      "id": "source_receive_timestamps_preserved",
+      "raw_observation_ref": "obs:synthetic-raw-005",
+      "receive_clock_ref": "clock:synthetic-host",
+      "receive_timestamp": "t:synthetic-host-20",
+      "source_clock_ref": "clock:synthetic-source",
+      "source_timestamp": "t:synthetic-source-10"
+    },
+    {
+      "expected_new_physical_witnesses": 0,
+      "expected_replay_class": "SoftwareReplay",
+      "id": "replay_not_fresh_physical_observation",
+      "original_observation_ref": "obs:synthetic-raw-006",
+      "replay_artifact_ref": "replay:synthetic-006"
+    },
+    {
+      "derived_artifact_refs": [
+        "derived:synthetic-crop-007",
+        "derived:synthetic-enhance-007"
+      ],
+      "expected_derived_artifact_count": 2,
+      "expected_physical_witness_count": 1,
+      "id": "two_derivations_one_physical_witness",
+      "raw_observation_ref": "obs:synthetic-raw-007"
+    },
+    {
+      "declared_order_semantics": "set",
+      "evidence_refs": [
+        "obs:synthetic-raw-008",
+        "obs:synthetic-raw-008"
+      ],
+      "expected_error": "DuplicateReference",
+      "id": "duplicate_reference_rejected"
+    },
+    {
+      "ancillary_refs_a": [
+        "ctx:synthetic-a",
+        "ctx:synthetic-b"
+      ],
+      "ancillary_refs_b": [
+        "ctx:synthetic-b",
+        "ctx:synthetic-a"
+      ],
+      "declared_order_semantics": "set",
+      "expected_identity_relation": "same",
+      "id": "unordered_ancillary_refs_canonicalize"
+    },
+    {
+      "expected_error": "SubjectLineageMismatch",
+      "id": "sample_article_mismatch_rejected",
+      "observation_sample_ref": "sample:synthetic-b",
+      "session_sample_ref": "sample:synthetic-a"
+    },
+    {
+      "camera_closure": "external_import",
+      "expected_closure_disposition": "ImportDependent",
+      "expected_operational_disposition": "OperationalEvidencePossible",
+      "id": "imported_subsystem_separates_closure",
+      "operational_instrument_state": "usable_under_profile",
+      "stage_closure": "external_import"
+    },
+    {
+      "binding_complete": true,
+      "calibration_current": true,
+      "expected_authority": "none",
+      "id": "binding_never_mints_execution_authority",
+      "observation_present": true
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for inspection-bench configuration binding and raw-observation lineage. Contains no hardware construction or semiconductor process parameters.",
+  "schema": "semi-eqp-met-001b-lineage-corpus-v1"
+}
