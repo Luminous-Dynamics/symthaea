@@ -11,6 +11,8 @@ Inherited theorem subject:
 
 Route every named theorem through the repository's real Lean subprocess plus `symthaea-proof-audit`, rather than treating retained `#print axioms` text as authority by itself.
 
+For a self-contained theorem source:
+
 ```text
 exact source bytes
   -> strip existing top-level #print axioms probes
@@ -22,6 +24,22 @@ exact source bytes
   -> explicit per-theorem result
 ```
 
+For a stacked theorem subject, the adapter also accepts an ordered list of exact prelude files:
+
+```text
+exact parent theorem source(s), in declared order
+  -> strip inherited #print axioms probes
+  -> concatenate exact prelude bytes
+  + exact child theorem source with retained probes stripped
+  -> extract claimed statement ONLY from the child theorem source
+  -> append one probe for the requested child theorem
+  -> real Lean + proof-audit gate
+```
+
+This is deliberately the formal analogue of the repository's exact-parent Git discipline. A child can reuse the actual parent theorem semantics without copying the model or teaching each workflow its own `cat ... > combined.lean`/grep convention.
+
+Prelude order is semantic and preserved exactly. Missing/unreadable prelude files fail setup. A same-named theorem in a prelude cannot satisfy the child statement extractor because statement identity is taken only from the designated theorem source.
+
 ## v2 repairs
 
 The v1 source idea remains useful, but its evidence lineage was invalidated by #5897. v2 changes the executable contract:
@@ -32,13 +50,14 @@ The v1 source idea remains useful, but its evidence lineage was invalidated by #
 - command status is captured directly before retained output is printed;
 - a known-bad Lean subject must be observed as nonzero;
 - real-Lean integration output is retained only after cargo's own status is authoritative;
-- parser matching requires a theorem identifier boundary, so `theorem tExtra` cannot satisfy a request for `t`.
+- parser matching requires a theorem identifier boundary, so `theorem tExtra` cannot satisfy a request for `t`;
+- composed-source tests require prelude order preservation and strip every inherited axiom probe before the single target probe is added.
 
 ## Non-vacuity
 
 A report accepts only when the requested theorem set is non-empty, setup succeeds, every requested theorem produces one explicit accepted audit result, and cleanup is clean.
 
-Missing Lean, process failure, unsafe theorem identifiers, ambiguous/missing statement extraction, theorem/spec mismatch, `sorryAx`, undeclared axioms, and cleanup failure remain distinct failures.
+Missing Lean, process failure, unsafe theorem identifiers, ambiguous/missing statement extraction, theorem/spec mismatch, `sorryAx`, undeclared axioms, missing prelude files, and cleanup failure remain distinct failures.
 
 ## Initial theorem census
 
@@ -56,6 +75,18 @@ The repaired BinaryHV theorem subject contributes eight cases:
 All use `AxiomPolicy::constitutional()`.
 
 A hostile expected-statement mutation changes `bit_bind` from XOR to OR and must be rejected through the same real-Lean audit path.
+
+## Downstream consumers after qualification
+
+The composed-source API is intended to replace bespoke proof concatenation in:
+
+- rebuilt `SYM-HDC-CRYPTO-FV-001A v2` / #5905;
+- rebuilt `SYM-HDC-CRYPTO-FV-001B v2` / #5906;
+- `SYM-FV-004A` Hamming semantics / #5903;
+- later `SYM-FV-003` extracted-source refinement subjects;
+- ZK/LTC theorem families whose Lean files intentionally extend a pinned formal parent.
+
+Migration of those consumers is downstream of this adapter's own exact-head qualification; source-authored adapter code does not grant them proof-audit authority by declaration.
 
 ## Evidence boundary
 
