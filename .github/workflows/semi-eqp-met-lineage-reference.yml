@@ -1,0 +1,21 @@
+name: SEMI-EQP-MET Lineage Qualification
+
+on:
+  pull_request:
+    paths:
+      - "scripts/semi-eqp-met-001b-reference.py"
+      - "docs/release/evidence/semi-eqp-met-001b-lineage-corpus-v1.json"
+      - ".github/workflows/semi-eqp-met-lineage-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lineage-reference:
+    name: Frozen 16-case lineage corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run independent SEMI-EQP-MET lineage validator
+        run: python3 scripts/semi-eqp-met-001b-reference.py
