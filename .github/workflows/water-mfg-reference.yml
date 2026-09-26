@@ -1,0 +1,20 @@
+name: WATER-MFG Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/release/evidence/water-mfg-001a-nonpotable-module-reference-v1.json'
+      - 'scripts/validate_water_mfg_001a.py'
+      - '.github/workflows/water-mfg-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate WATER-MFG-001A exact reference corpus
+        run: python3 scripts/validate_water_mfg_001a.py
