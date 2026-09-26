@@ -1,0 +1,80 @@
+{
+  "schema": "symthaea.formal.sym-hdc-crypto-fv-001b.v2",
+  "parent_issue": 5844,
+  "evidence_class": "AbstractFormalTheorem",
+  "invalidated_predecessor_pr": 5886,
+  "stack_parent": {
+    "pr": 5905,
+    "commit": "b485a5713e5e8d971342a93f1a6e514512052b9e",
+    "superseded_commit": "604388ab2d3b59cccf34e456342a7376f000ae8a",
+    "relationship": "semantic-child-of-final-strengthened-001a-v2"
+  },
+  "inherited_subjects": [
+    {
+      "path": "formal/lean/hdc/BinaryHVBind.lean",
+      "blob": "259ba64888d8492bafc123b72d67b70da9282c36",
+      "relationship": "repaired-abstract-xor-algebra"
+    },
+    {
+      "path": "formal/lean/hdc/HdcCryptoAttacks.lean",
+      "blob": "67d44281d03252101eb01d6ac9713ea7638044de",
+      "relationship": "rebuilt-001a-v2-attack-algebra"
+    }
+  ],
+  "theorem_file": {
+    "path": "formal/lean/hdc/HdcCryptoCommonMask.lean",
+    "blob": "f100281fd520cbb8014a48561c7ccd24f9b968b8"
+  },
+  "theorem_subjects": [
+    "common_mask_preserves_pairwise_xor",
+    "common_mask_leaks_pairwise_relation",
+    "common_mask_preserves_pairwise_xor_swapped"
+  ],
+  "production_refinement_target": {
+    "commit": "b485a5713e5e8d971342a93f1a6e514512052b9e",
+    "path": "crates/core/symthaea-hdc-crypto/src/fhe.rs",
+    "blob": "bd67fdc42dc9ed598b2c93f80995324db066c9a7",
+    "symbols": ["EncryptedHV::encrypt", "EncryptedHV::encrypted_similarity", "CollectiveWisdomPool"],
+    "relationship": "future-refinement-target-not-proved-here"
+  },
+  "canonical_metric_dependency": {
+    "issue": 5717,
+    "pr": 5903,
+    "relationship": "derive-hamming-isometry-only-from-canonical-SYM-FV-004A-semantics"
+  },
+  "claim": "reusing one XOR mask for two abstract BinaryHV plaintexts preserves their exact pairwise XOR relation",
+  "coverage": {
+    "kind": "Universal",
+    "scope": "all abstract 16384-bit BinaryHV x, y, and masks"
+  },
+  "qualification_contract": {
+    "exact_pr_head_checkout": true,
+    "exact_stack_parent_head_binding": true,
+    "known_bad_lean_subject_must_fail": true,
+    "prover_exit_must_propagate": true,
+    "sorryAx_forbidden": true,
+    "lean_error_markers_forbidden": true,
+    "repository_postflight_clean": true
+  },
+  "claim_ceiling": [
+    "abstract-common-mask-pairwise-xor-only",
+    "not-hamming-theorem-in-this-line",
+    "not-production-rust-refinement",
+    "not-semantic-security-proof",
+    "not-proof-all-hdc-cryptography-insecure",
+    "not-compiler-or-native-binary-proof",
+    "not-runtime-authority"
+  ],
+  "negative_controls": [
+    "different-second-mask",
+    "wrong-rhs",
+    "theorem-deletion",
+    "proof-hole-injection",
+    "semantic-root-redefinition",
+    "parent-blob-drift",
+    "stale-stack-parent-head",
+    "production-source-rebinding",
+    "claim-escalation",
+    "known-bad-prover-subject"
+  ]
+}
