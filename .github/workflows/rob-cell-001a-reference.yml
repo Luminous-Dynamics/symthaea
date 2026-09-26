@@ -1,0 +1,51 @@
+name: ROB-CELL-001A Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/release/evidence/rob-cell-001a-application-composition-reference-v1.json.gz'
+      - 'scripts/validate_rob_cell_001a.py'
+      - '.github/workflows/rob-cell-001a-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact source ancestry and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_HEAD='2d90694568d20c9405731d753c5a4a1f28312205'
+          test "$(git rev-list --count "$SOURCE_HEAD..HEAD")" = '1'
+          git merge-base --is-ancestor "$SOURCE_HEAD" HEAD
+          test "$(git rev-list --count "HEAD..$SOURCE_HEAD")" = '0'
+          actual="$(git diff --name-only "$SOURCE_HEAD" HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/rob-cell-001a-reference.yml' 'scripts/validate_rob_cell_001a.py' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+
+      - name: Hard-bind frozen source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_HEAD='2d90694568d20c9405731d753c5a4a1f28312205'
+          test "$(git rev-parse "$SOURCE_HEAD:docs/engineering/ROB_CELL_001A_APPLICATION_COMPOSITION.md")" = '15e2e29352664f359ffc94dff18bed4b62dc15e8'
+          test "$(git rev-parse "$SOURCE_HEAD:docs/release/evidence/rob-cell-001a-application-composition-reference-v1.json.gz")" = 'd2da5d89d6be3a957b87c836788ff42de6d08c90'
+
+      - name: Execute independent reference oracle
+        run: python3 scripts/validate_rob_cell_001a.py
+
+      - name: Clean postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
