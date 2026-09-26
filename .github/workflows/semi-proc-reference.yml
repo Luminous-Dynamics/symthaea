@@ -1,0 +1,21 @@
+name: SEMI-PROC Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - "scripts/semi-proc-001a-reference.py"
+      - "docs/release/evidence/semi-proc-001a-synthetic-corpus-v1.json"
+      - ".github/workflows/semi-proc-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-corpus:
+    name: Frozen 16-case reference corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run independent SEMI-PROC reference validator
+        run: python3 scripts/semi-proc-001a-reference.py
