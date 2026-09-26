@@ -1,0 +1,20 @@
+name: CIV-VALUE Domain Matrix Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/civ-value-000a-reference.py'
+      - 'docs/release/evidence/civ-value-000-critical-domain-matrix-v1.json'
+      - '.github/workflows/civ-value-domain-matrix-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate frozen terrestrial critical-domain matrix
+        run: python3 scripts/civ-value-000a-reference.py
