@@ -1,0 +1,54 @@
+name: BUILT-BIM-001A Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - "docs/engineering/BUILT_BIM_001A_OPENBIM_PROJECTION.md"
+      - "docs/release/evidence/built-bim-001a-openbim-projection-reference-v1.json"
+      - "scripts/validate_built_bim_001a.py"
+      - ".github/workflows/built-bim-001a-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Exact source and scope preflight
+        shell: bash
+        env:
+          SOURCE_HEAD: e806a96f7e0d6d98f338cca8848a8a62fa29024d
+          SOURCE_DOC_BLOB: 3779e6cc6d2e2e032bf9031a0f89d6c4ed07bf2d
+          SOURCE_CORPUS_BLOB: bb1195233f046d4da4fb4ff6d0b52572709d090a
+        run: |
+          set -euo pipefail
+
+          git merge-base --is-ancestor "$SOURCE_HEAD" HEAD
+          test "$(git rev-list --count "$SOURCE_HEAD"..HEAD)" = "1"
+
+          git diff --name-only "$SOURCE_HEAD"..HEAD | sort > /tmp/actual-files
+          printf '%s\n' \
+            '.github/workflows/built-bim-001a-reference.yml' \
+            'scripts/validate_built_bim_001a.py' \
+            | sort > /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+
+          test "$(git rev-parse HEAD:docs/engineering/BUILT_BIM_001A_OPENBIM_PROJECTION.md)" = "$SOURCE_DOC_BLOB"
+          test "$(git rev-parse HEAD:docs/release/evidence/built-bim-001a-openbim-projection-reference-v1.json)" = "$SOURCE_CORPUS_BLOB"
+
+      - name: Execute independent stdlib oracle
+        run: python3 scripts/validate_built_bim_001a.py
+
+      - name: Clean postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
