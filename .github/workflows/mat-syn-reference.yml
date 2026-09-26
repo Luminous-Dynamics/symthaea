@@ -1,0 +1,24 @@
+name: MAT-SYN independent reference
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/mat-syn-001a-reference.py'
+      - 'docs/release/evidence/mat-syn-001a-synthetic-corpus-v2.json'
+      - '.github/workflows/mat-syn-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate MAT-SYN synthetic semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Execute independent known-answer validator
+        run: python3 scripts/mat-syn-001a-reference.py
