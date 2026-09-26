@@ -5,5 +5,9 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 description = "Evidence-bounded analytical semiconductor-device reference models for Symthaea"
 
-# Pure std, zero dependencies. External TCAD/SPICE adapters live elsewhere.
+# Runtime surface remains pure std; qualifier-only tooling is dev-only.
 [dependencies]
+
+[dev-dependencies]
+serde_json = { workspace = true }
+sha2 = { workspace = true }
