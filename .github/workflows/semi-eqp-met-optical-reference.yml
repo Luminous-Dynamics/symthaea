@@ -1,0 +1,20 @@
+name: SEMI-EQP-MET Optical Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/semi-eqp-met-001d-reference.py'
+      - 'docs/release/evidence/semi-eqp-met-001d-optical-corpus-v1.json'
+      - '.github/workflows/semi-eqp-met-optical-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate frozen optical metrology corpus
+        run: python3 scripts/semi-eqp-met-001d-reference.py
