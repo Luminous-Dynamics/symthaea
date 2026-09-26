@@ -124,6 +124,8 @@ def validate_dimension(name: str, dim: Any, path: str) -> set[str]:
         ceiling = dim.get("claim_ceiling")
         require(isinstance(ceiling, list) and ceiling and all(nonempty_text(x) for x in ceiling),
                 f"{path}: ImportedAssurance requires non-empty claim_ceiling")
+        require(support_ids,
+                f"{path}: ImportedAssurance requires exact provider evidence/support identity")
     elif state == "BoundedOnly":
         require(nonempty_text(dim.get("bound")), f"{path}: BoundedOnly requires exact bound/profile")
         require(support_ids, f"{path}: BoundedOnly requires exact supporting evidence")
@@ -227,7 +229,12 @@ def self_test() -> None:
     for state, extra in [
         ("Open", {"obligation": "prove the missing relation"}),
         ("Unknown", {"reason": "not yet classified"}),
-        ("ImportedAssurance", {"provider": "provider", "profile": "v1@sha256:fixture", "claim_ceiling": ["provider claim only"]}),
+        ("ImportedAssurance", {
+            "provider": "provider",
+            "profile": "v1@sha256:fixture",
+            "claim_ceiling": ["provider claim only"],
+            "support": [{"kind": "ProviderReceipt", "identity": "sha256:imported-fixture"}],
+        }),
         ("Closed", {"support": [{"kind": "Receipt", "identity": "sha256:closed-fixture"}]}),
         ("BoundedOnly", {"bound": "2^8 states", "support": [{"kind": "Receipt", "identity": "sha256:bounded-fixture"}]}),
     ]:
@@ -248,8 +255,13 @@ def self_test() -> None:
     expect_reject("bounded-without-bound", mutant)
 
     mutant = synthetic_base()
-    mutant["dimensions"]["DependencyClosure"] = {"state": "ImportedAssurance", "provider": "vendor"}
-    expect_reject("import-without-profile-ceiling", mutant)
+    mutant["dimensions"]["DependencyClosure"] = {
+        "state": "ImportedAssurance",
+        "provider": "vendor",
+        "profile": "v1@sha256:fixture",
+        "claim_ceiling": ["provider claim only"],
+    }
+    expect_reject("import-without-support", mutant)
 
     mutant = synthetic_base()
     mutant["dimensions"]["RuntimeIdentity"] = {"state": "NotApplicable"}
