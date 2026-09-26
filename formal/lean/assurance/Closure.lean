@@ -270,7 +270,7 @@ inductive DependencyPath
       DependencyPath rank b c →
       DependencyPath rank a c
 
- theorem blocked_cannot_support
+theorem blocked_cannot_support
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -278,11 +278,11 @@ inductive DependencyPath
     (hblocked : disposition e.result = .Blocked) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  rcases hs with ⟨_, hpass, _, _, _, _⟩
+  have hpass : disposition e.result = .Pass := hs.2.1
   rw [hblocked] at hpass
   cases hpass
 
- theorem environment_failure_cannot_support
+theorem environment_failure_cannot_support
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -290,11 +290,11 @@ inductive DependencyPath
     (henv : disposition e.result = .EnvironmentFailure) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  rcases hs with ⟨_, hpass, _, _, _, _⟩
+  have hpass : disposition e.result = .Pass := hs.2.1
   rw [henv] at hpass
   cases hpass
 
- theorem superseded_cannot_support
+theorem superseded_cannot_support
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -302,11 +302,11 @@ inductive DependencyPath
     (hsuperseded : e.validity = .Superseded) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  rcases hs with ⟨hcurrent, _, _, _, _, _⟩
+  have hcurrent : e.validity = .Current := hs.1
   rw [hsuperseded] at hcurrent
   cases hcurrent
 
- theorem invalidated_cannot_support
+theorem invalidated_cannot_support
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -314,11 +314,11 @@ inductive DependencyPath
     (hinvalidated : e.validity = .Invalidated) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  rcases hs with ⟨hcurrent, _, _, _, _, _⟩
+  have hcurrent : e.validity = .Current := hs.1
   rw [hinvalidated] at hcurrent
   cases hcurrent
 
- theorem evidence_class_non_amplification
+theorem evidence_class_non_amplification
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -326,10 +326,9 @@ inductive DependencyPath
     (hmismatch : e.evidenceClass ≠ o.requiredClass) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  rcases hs with ⟨_, _, hclass, _, _, _⟩
-  exact hmismatch hclass
+  exact hmismatch hs.2.2.1
 
- theorem safety_cannot_close_liveness
+theorem safety_cannot_close_liveness
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -338,11 +337,11 @@ inductive DependencyPath
     (hliveness : o.propertyKind = .Liveness) :
     ¬ Supports refinements entailments e o := by
   intro hs
-  rcases hs with ⟨_, _, _, hkind, _, _⟩
+  have hkind : e.propertyKind = o.propertyKind := hs.2.2.2.1
   rw [hsafety, hliveness] at hkind
   cases hkind
 
- theorem mismatched_subject_requires_refinement
+theorem mismatched_subject_requires_refinement
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -357,12 +356,12 @@ inductive DependencyPath
       w.sourceClaim = e.claim ∧
       w.targetClaim = o.claim ∧
       AssumptionsAllowed e.assumptions o.assumptions w.dischargedAssumptions := by
-  rcases hs with ⟨_, _, _, _, hsubject, _⟩
-  rcases hsubject with hexact | hrefinement
-  · exact False.elim (hmismatch hexact.1)
-  · exact hrefinement
+  have hsubject : SubjectTransfer refinements e o := hs.2.2.2.2.1
+  cases hsubject with
+  | inl hexact => exact False.elim (hmismatch hexact.1)
+  | inr hrefinement => exact hrefinement
 
- theorem mismatched_claim_requires_entailment
+theorem mismatched_claim_requires_entailment
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
@@ -374,23 +373,27 @@ inductive DependencyPath
       w.current = true ∧
       w.strongClaim = e.claim ∧
       w.weakClaim = o.claim := by
-  rcases hs with ⟨_, _, _, _, _, hclaim⟩
-  rcases hclaim with hexact | hentails
-  · exact False.elim (hmismatch hexact)
-  · exact hentails
+  have hclaim : ClaimTransfer entailments e o := hs.2.2.2.2.2
+  cases hclaim with
+  | inl hexact => exact False.elim (hmismatch hexact)
+  | inr hentails => exact hentails
 
- theorem exact_subject_support_preserves_assumptions
+theorem exact_subject_support_preserves_assumptions
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
     (o : Obligation)
     (hs : Supports [] entailments e o) :
     AssumptionsAllowed e.assumptions o.assumptions [] := by
-  rcases hs with ⟨_, _, _, _, hsubject, _⟩
-  rcases hsubject with hexact | hrefinement
-  · exact hexact.2
-  · simp at hrefinement
+  have hsubject : SubjectTransfer [] e o := hs.2.2.2.2.1
+  cases hsubject with
+  | inl hexact => exact hexact.2
+  | inr hrefinement =>
+      cases hrefinement with
+      | intro w hw =>
+          have hmember : w ∈ ([] : List RefinementWitness) := hw.1
+          cases hmember
 
- theorem same_provenance_cannot_count_as_independent
+theorem same_provenance_cannot_count_as_independent
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (independence : List IndependenceWitness)
@@ -400,20 +403,24 @@ inductive DependencyPath
     ¬ IndependentSupport refinements entailments independence
         left right leftObligation rightObligation := by
   intro hs
-  rcases hs with ⟨_, _, _, hdistinct, _⟩
-  exact hdistinct hsame
+  exact hs.2.2.2.1 hsame
 
- theorem required_reachability_empty_rejected
+theorem required_reachability_empty_rejected
     (o : Obligation)
     (hrequired : o.requiresReachabilityWitness = true) :
     ¬ ReachabilitySatisfied [] o := by
   intro hs
-  rcases hs with hdisabled | hwitness
-  · rw [hrequired] at hdisabled
-    cases hdisabled
-  · simp at hwitness
+  cases hs with
+  | inl hdisabled =>
+      rw [hrequired] at hdisabled
+      cases hdisabled
+  | inr hwitness =>
+      cases hwitness with
+      | intro w hw =>
+          have hmember : w ∈ ([] : List ReachabilityWitness) := hw.1
+          cases hmember
 
- theorem closed_requires_every_mandatory_obligation
+theorem closed_requires_every_mandatory_obligation
     (receipts : List EvidenceReceipt)
     (obligations : List Obligation)
     (refinements : List RefinementWitness)
@@ -429,7 +436,7 @@ inductive DependencyPath
       ReachabilitySatisfied reachability o := by
   exact hclosed.2 o hmember hmandatory
 
- theorem contradictory_current_evidence_prevents_closure
+theorem contradictory_current_evidence_prevents_closure
     (receipts : List EvidenceReceipt)
     (obligations : List Obligation)
     (refinements : List RefinementWitness)
@@ -443,7 +450,7 @@ inductive DependencyPath
   intro hclosed
   exact (hclosed.1 left hleft right hright) hconflict
 
- theorem dependency_path_decreases
+theorem dependency_path_decreases
     (rank : EvidenceIdentity → Nat)
     {from to : EvidenceIdentity}
     (hpath : DependencyPath rank from to) :
@@ -452,7 +459,7 @@ inductive DependencyPath
   | edge hlt => exact hlt
   | trans hab hbc ihab ihbc => exact Nat.lt_trans ihbc ihab
 
- theorem dependency_cycles_rejected
+theorem dependency_cycles_rejected
     (rank : EvidenceIdentity → Nat)
     (evidence : EvidenceIdentity) :
     ¬ DependencyPath rank evidence evidence := by
@@ -460,7 +467,7 @@ inductive DependencyPath
   have hlt : rank evidence < rank evidence := dependency_path_decreases rank hcycle
   exact (Nat.lt_irrefl (rank evidence)) hlt
 
- theorem support_non_amplification_summary
+theorem support_non_amplification_summary
     (refinements : List RefinementWitness)
     (entailments : List ClaimEntailmentWitness)
     (e : EvidenceReceipt)
