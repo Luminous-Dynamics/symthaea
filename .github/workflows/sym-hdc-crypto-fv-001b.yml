@@ -1,0 +1,149 @@
+name: SYM-HDC-CRYPTO-FV-001B Common Mask
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/hdc/BinaryHVBind.lean"
+      - "formal/lean/hdc/HdcCryptoAttacks.lean"
+      - "formal/lean/hdc/HdcCryptoCommonMask.lean"
+      - "docs/formal/sym-hdc-crypto-fv-001b-common-mask-v1.json"
+      - "scripts/validate_sym_hdc_crypto_fv_001b.py"
+      - "crates/core/symthaea-hdc-crypto/src/fhe.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-hdc-crypto-fv-001b.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-hdc-crypto-fv-001b-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  common-mask:
+    name: Lean common-mask structural leakage
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact parent and child scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          parent=9d1d279bdfad2dde43c4cde85ccfc98880f51dd1
+          test "$(git rev-parse "$parent:formal/lean/hdc/BinaryHVBind.lean")" = f724618781b2660d1e76e45a69dcf796a792d76d
+          test "$(git rev-parse "$parent:formal/lean/hdc/HdcCryptoAttacks.lean")" = df18652dad946dcc1d22da335eba4ee78838b07e
+          test "$(git rev-parse "$parent:crates/core/symthaea-hdc-crypto/src/fhe.rs")" = bd67fdc42dc9ed598b2c93f80995324db066c9a7
+          test "$(git rev-parse "HEAD:formal/lean/hdc/BinaryHVBind.lean")" = f724618781b2660d1e76e45a69dcf796a792d76d
+          test "$(git rev-parse "HEAD:formal/lean/hdc/HdcCryptoAttacks.lean")" = df18652dad946dcc1d22da335eba4ee78838b07e
+          test "$(git rev-parse "HEAD:crates/core/symthaea-hdc-crypto/src/fhe.rs")" = bd67fdc42dc9ed598b2c93f80995324db066c9a7
+          git diff --name-only "$parent"..HEAD | sort | tee /tmp/sym-hdc-crypto-fv-001b-paths.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          expected = {
+              '.github/workflows/sym-hdc-crypto-fv-001b.yml',
+              'docs/formal/sym-hdc-crypto-fv-001b-common-mask-v1.json',
+              'formal/lean/hdc/HdcCryptoCommonMask.lean',
+              'scripts/validate_sym_hdc_crypto_fv_001b.py',
+          }
+          observed = set(Path('/tmp/sym-hdc-crypto-fv-001b-paths.txt').read_text().splitlines())
+          if observed != expected:
+              raise SystemExit(f'unexpected child scope: {sorted(observed ^ expected)}')
+          PY
+
+      - name: Static contract and hostile controls
+        run: python3 scripts/validate_sym_hdc_crypto_fv_001b.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Typecheck inherited algebra plus common-mask theorem
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            formal/lean/hdc/BinaryHVBind.lean \
+            formal/lean/hdc/HdcCryptoAttacks.lean \
+            formal/lean/hdc/HdcCryptoCommonMask.lean \
+            > /tmp/HdcCryptoCommonMaskCombined.lean
+          nix develop .#formal --command sh -c '
+            set -eu
+            lean --version | tee /tmp/sym-hdc-crypto-fv-001b-lean-version.txt
+            lean /tmp/HdcCryptoCommonMaskCombined.lean | tee /tmp/sym-hdc-crypto-fv-001b-lean-output.txt
+          '
+
+      - name: Postflight immutability and receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          receipt = {
+              'schema': 'symthaea.formal.sym-hdc-crypto-fv-001b-qualification-receipt.v1',
+              'tracking_issue': 5844,
+              'parent_pr': 5861,
+              'evidence_class': 'AbstractFormalTheorem',
+              'result': 'LeanTypechecked',
+              'head': git('rev-parse', 'HEAD'),
+              'tree': git('rev-parse', 'HEAD^{tree}'),
+              'parent_head': '9d1d279bdfad2dde43c4cde85ccfc98880f51dd1',
+              'lean_version': Path('/tmp/sym-hdc-crypto-fv-001b-lean-version.txt').read_text().strip(),
+              'binaryhv_proof_blob': git('rev-parse', 'HEAD:formal/lean/hdc/BinaryHVBind.lean'),
+              'attack_001a_proof_blob': git('rev-parse', 'HEAD:formal/lean/hdc/HdcCryptoAttacks.lean'),
+              'fhe_source_blob': git('rev-parse', 'HEAD:crates/core/symthaea-hdc-crypto/src/fhe.rs'),
+              'common_mask_proof_sha256': sha256('formal/lean/hdc/HdcCryptoCommonMask.lean'),
+              'combined_proof_sha256': sha256('/tmp/HdcCryptoCommonMaskCombined.lean'),
+              'manifest_sha256': sha256('docs/formal/sym-hdc-crypto-fv-001b-common-mask-v1.json'),
+              'validator_sha256': sha256('scripts/validate_sym_hdc_crypto_fv_001b.py'),
+              'static_contract': 'PASS',
+              'negative_controls': 'PASS',
+              'lean_exit_zero': True,
+              'repository_postflight_clean': True,
+              'deferred_hamming_corollary': 'SYM-FV-004',
+              'nonclaims': [
+                  'not-yet-hamming-distance-theorem',
+                  'not-production-rust-refinement',
+                  'not-semantic-security-proof',
+                  'not-proof-all-hdc-cryptography-insecure',
+                  'not-native-binary-proof',
+                  'not-runtime-authority'
+              ]
+          }
+          out = Path('/tmp/sym-hdc-crypto-fv-001b-receipt.json')
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n', encoding='utf-8')
+          print(out.read_text())
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-hdc-crypto-fv-001b-${{ github.sha }}
+          path: |
+            /tmp/HdcCryptoCommonMaskCombined.lean
+            /tmp/sym-hdc-crypto-fv-001b-lean-version.txt
+            /tmp/sym-hdc-crypto-fv-001b-lean-output.txt
+            /tmp/sym-hdc-crypto-fv-001b-receipt.json
+          if-no-files-found: error
+          retention-days: 30
