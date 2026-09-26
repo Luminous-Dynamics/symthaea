@@ -41,13 +41,16 @@
       "IndependenceWitness",
       "ReachabilityWitness"
     ],
-    "dependency_discipline": "strictly rank-decreasing DependencyPath"
+    "generation_binding": "support and transfer witnesses bind exact obligation generation",
+    "dependency_closure": "recursive EvidenceClosed over declared receipt dependencies",
+    "dependency_discipline": "strictly rank-decreasing EvidenceClosed and DependencyPath"
   },
   "required_theorems": [
     "blocked_cannot_support",
     "environment_failure_cannot_support",
     "superseded_cannot_support",
     "invalidated_cannot_support",
+    "stale_generation_cannot_support",
     "evidence_class_non_amplification",
     "safety_cannot_close_liveness",
     "mismatched_subject_requires_refinement",
@@ -55,6 +58,8 @@
     "exact_subject_support_preserves_assumptions",
     "same_provenance_cannot_count_as_independent",
     "required_reachability_empty_rejected",
+    "evidence_closed_is_current_pass",
+    "evidence_closed_rejects_self_dependency",
     "closed_requires_every_mandatory_obligation",
     "contradictory_current_evidence_prevents_closure",
     "dependency_path_decreases",
@@ -66,6 +71,7 @@
     "environment-failure-does-not-close-or-falsify",
     "superseded-does-not-close-current",
     "invalidated-does-not-close-current",
+    "stale-generation-does-not-close-current",
     "evidence-class-does-not-promote",
     "safety-does-not-close-liveness",
     "subject-mismatch-requires-refinement-witness",
@@ -75,6 +81,8 @@
     "required-reachability-needs-positive-witness",
     "contradictory-current-evidence-prevents-closure",
     "mandatory-obligations-are-conjunctive",
+    "declared-prerequisites-must-be-recursively-current-pass",
+    "dependency-self-cycle-is-rejected-by-rank-decrease",
     "dependency-cycle-is-rejected-by-rank-decrease"
   ],
   "qualification": {
