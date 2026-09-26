@@ -1,0 +1,163 @@
+name: SYM-HDC-CRYPTO-FV-001A v2 Attack Algebra
+
+on:
+  pull_request:
+    paths:
+      - "formal/lean/hdc/BinaryHVBind.lean"
+      - "formal/lean/hdc/HdcCryptoAttacks.lean"
+      - "docs/formal/sym-hdc-crypto-fv-001a-v2.json"
+      - "scripts/validate_sym_hdc_crypto_fv_001a_v2.py"
+      - "crates/core/symthaea-hdc-crypto/src/crypto.rs"
+      - "crates/core/symthaea-core/src/hdc/hdc_crypto.rs"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/sym-hdc-crypto-fv-001a-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-hdc-crypto-fv-001a-v2-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  attack-algebra-v2:
+    name: Lean HDC attack algebra v2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Record exact Git subject
+        run: |
+          set -euo pipefail
+          EXPECTED="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$EXPECTED"
+          git rev-parse HEAD
+          git rev-parse HEAD^{tree}
+          git status --porcelain=v1 --untracked-files=all
+
+      - name: Static contract and hostile controls
+        run: python3 scripts/validate_sym_hdc_crypto_fv_001a_v2.py
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Prove wrapper propagates Lean failure
+        run: |
+          set -euo pipefail
+          cat > /tmp/sym-hdc-crypto-fv-001a-v2-known-bad.lean <<'LEAN'
+          example : False := by
+            trivial
+          LEAN
+          if nix develop .#formal --command sh -c 'lean /tmp/sym-hdc-crypto-fv-001a-v2-known-bad.lean > /tmp/sym-hdc-crypto-fv-001a-v2-known-bad-output.txt 2>&1'; then
+            cat /tmp/sym-hdc-crypto-fv-001a-v2-known-bad-output.txt
+            echo "known-bad Lean subject incorrectly returned success" >&2
+            exit 1
+          fi
+          cat /tmp/sym-hdc-crypto-fv-001a-v2-known-bad-output.txt
+          grep -q 'error:' /tmp/sym-hdc-crypto-fv-001a-v2-known-bad-output.txt
+
+      - name: Typecheck exact parent plus attack theorems fail-closed
+        run: |
+          set -euo pipefail
+          cat formal/lean/hdc/BinaryHVBind.lean formal/lean/hdc/HdcCryptoAttacks.lean \
+            > /tmp/HdcCryptoAttacksV2Combined.lean
+          nix develop .#formal --command sh -c '
+            set -eu
+            lean --version > /tmp/sym-hdc-crypto-fv-001a-v2-lean-version.txt
+            cat /tmp/sym-hdc-crypto-fv-001a-v2-lean-version.txt
+            if ! lean /tmp/HdcCryptoAttacksV2Combined.lean > /tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt 2>&1; then
+              cat /tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt
+              exit 1
+            fi
+            cat /tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt
+            if grep -q "sorryAx" /tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt; then
+              echo "forbidden sorryAx in Lean axiom census" >&2
+              exit 1
+            fi
+            if grep -q "error:" /tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt; then
+              echo "Lean output contains an error marker despite zero exit" >&2
+              exit 1
+            fi
+          '
+
+      - name: Postflight immutability and v2 receipt
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
+
+          PARENT = "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3"
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          receipt = {
+              "schema": "symthaea.formal.sym-hdc-crypto-fv-001a-qualification-receipt.v2",
+              "issue": 5857,
+              "parent_issue": 5844,
+              "invalidated_predecessor_pr": 5861,
+              "evidence_class": "AbstractFormalTheorem",
+              "result": "LeanTypecheckedAndAxiomClean",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent_commit": PARENT,
+              "parent_theorem_blob": git("rev-parse", "HEAD:formal/lean/hdc/BinaryHVBind.lean"),
+              "child_theorem_blob": git("rev-parse", "HEAD:formal/lean/hdc/HdcCryptoAttacks.lean"),
+              "standalone_crypto_blob": git("rev-parse", "HEAD:crates/core/symthaea-hdc-crypto/src/crypto.rs"),
+              "core_compat_crypto_blob": git("rev-parse", "HEAD:crates/core/symthaea-core/src/hdc/hdc_crypto.rs"),
+              "lean_version": Path("/tmp/sym-hdc-crypto-fv-001a-v2-lean-version.txt").read_text().strip(),
+              "combined_theorem_sha256": sha256("/tmp/HdcCryptoAttacksV2Combined.lean"),
+              "lean_output_sha256": sha256("/tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt"),
+              "known_bad_output_sha256": sha256("/tmp/sym-hdc-crypto-fv-001a-v2-known-bad-output.txt"),
+              "manifest_sha256": sha256("docs/formal/sym-hdc-crypto-fv-001a-v2.json"),
+              "validator_sha256": sha256("scripts/validate_sym_hdc_crypto_fv_001a_v2.py"),
+              "exact_head_checkout": True,
+              "known_bad_lean_subject_rejected": True,
+              "lean_exit_zero": True,
+              "sorryAx_absent": True,
+              "lean_error_markers_absent": True,
+              "static_contract": "PASS",
+              "negative_controls": "PASS",
+              "repository_postflight_clean": True,
+              "nonclaims": [
+                  "not-production-rust-refinement",
+                  "not-proof-all-hdc-cryptography-insecure",
+                  "not-compiler-or-native-binary-proof",
+                  "not-runtime-authority",
+                  "not-secure-replacement"
+              ]
+          }
+          Path("/tmp/sym-hdc-crypto-fv-001a-v2-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(receipt, indent=2, sort_keys=True))
+          PY
+
+      - name: Retain proof evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-hdc-crypto-fv-001a-v2-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/HdcCryptoAttacksV2Combined.lean
+            /tmp/sym-hdc-crypto-fv-001a-v2-lean-version.txt
+            /tmp/sym-hdc-crypto-fv-001a-v2-lean-output.txt
+            /tmp/sym-hdc-crypto-fv-001a-v2-known-bad-output.txt
+            /tmp/sym-hdc-crypto-fv-001a-v2-receipt.json
+          if-no-files-found: error
+          retention-days: 30
