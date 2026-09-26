@@ -1,0 +1,41 @@
+name: TE-BENCH-001D2 workbook fixture custody
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    paths:
+      - 'scripts/te-bench-001d2-validate-fixture.py'
+      - 'docs/release/evidence/te-bench-001d1-hostile-workbook-fixture-v1.manifest.json'
+      - 'docs/release/evidence/te-bench-001d1-hostile-workbook-fixture-v1.xlsx.b64.part*'
+      - 'docs/release/evidence/te-bench-001d1-hostile-workbook-transport-v1.json'
+      - '.github/workflows/te-bench-001d2-fixture-custody.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate hostile workbook fixture custody
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact subject checkout
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Reconstruct and validate exact synthetic XLSX fixture
+        run: python3 scripts/te-bench-001d2-validate-fixture.py
