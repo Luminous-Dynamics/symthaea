@@ -1,0 +1,72 @@
+{
+  "schema": "symthaea.formal.sym-hdc-crypto-fv-001a.v2",
+  "issue": 5857,
+  "parent_issue": 5844,
+  "evidence_class": "AbstractFormalTheorem",
+  "invalidated_predecessor_pr": 5861,
+  "stack_parent": {
+    "issue": 5715,
+    "pr": 5801,
+    "commit": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+    "path": "formal/lean/hdc/BinaryHVBind.lean",
+    "blob": "259ba64888d8492bafc123b72d67b70da9282c36",
+    "relationship": "reused-exact-repaired-abstract-xor-algebra"
+  },
+  "theorem_subjects": [
+    "recover_derived_from_known_pair",
+    "universal_known_pair_forgery",
+    "forged_tag_is_accepted",
+    "one_share_recovers_secret"
+  ],
+  "production_refinement_targets": [
+    {
+      "commit": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+      "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+      "blob": "59c0ea6bc92fd1d67a9f764bb396918fd823331a",
+      "symbols": ["HdcMac::compute", "HdcShare", "HdcThresholdSharing::split", "HdcThresholdSharing::split_secure"],
+      "relationship": "future-refinement-target-not-proved-here"
+    },
+    {
+      "commit": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+      "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+      "blob": "a232b0b699f5d0301fe052b0e013f289194c13b6",
+      "symbols": ["HdcMac::compute", "HdcShare", "HdcThresholdSharing::split", "HdcThresholdSharing::split_secure"],
+      "relationship": "compatibility-copy-must-be-refined-separately"
+    }
+  ],
+  "attack_claims": {
+    "mac": "one known valid message/tag pair reveals the reusable derived XOR mask and enables valid tags for arbitrary chosen messages",
+    "threshold": "one returned share record contains secret XOR mask and the same mask, therefore one record recovers the secret"
+  },
+  "coverage": {
+    "kind": "Universal",
+    "scope": "all abstract 16384-bit BinaryHV messages, derived masks, secrets, and share masks"
+  },
+  "qualification_contract": {
+    "exact_pr_head_checkout": true,
+    "known_bad_lean_subject_must_fail": true,
+    "prover_exit_must_propagate": true,
+    "sorryAx_forbidden": true,
+    "lean_error_markers_forbidden": true,
+    "repository_postflight_clean": true
+  },
+  "claim_ceiling": [
+    "abstract-attack-algebra-only",
+    "not-production-rust-refinement",
+    "not-proof-all-hdc-cryptography-insecure",
+    "not-commitment-context-or-fhe-proof-yet",
+    "not-secure-replacement",
+    "not-compiler-or-native-binary-proof",
+    "not-runtime-authority"
+  ],
+  "negative_controls": [
+    "parent-algebra-drift",
+    "duplicate-model-injection",
+    "forgery-theorem-deletion",
+    "one-share-theorem-deletion",
+    "proof-hole-injection",
+    "source-rebinding",
+    "claim-escalation",
+    "known-bad-prover-subject"
+  ]
+}
