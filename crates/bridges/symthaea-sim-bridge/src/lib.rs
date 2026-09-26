@@ -754,15 +754,51 @@ impl MetricEncoder {
     }
 }
 
+/// Environment inheritance policy for an external solver process.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum SolverEnvironmentPolicy {
+    /// Preserve the parent environment and apply explicit additions/overrides.
+    /// This is retained for legacy callers and is not a qualification boundary.
+    #[default]
+    Inherit,
+    /// Clear the parent environment and admit only explicitly bound variables.
+    /// Qualification-capable callers must also provide an absolute current
+    /// directory and an absolute solver executable path.
+    ClearAndExplicit,
+}
+
+/// Deterministic audit representation of the process context that a
+/// [`CommandSolver`] will apply.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SolverExecutionContextMetadata {
+    pub schema_id: String,
+    pub current_dir: Option<String>,
+    pub environment_policy: SolverEnvironmentPolicy,
+    /// Explicit bindings are sorted here even though the compatibility-facing
+    /// [`CommandSolver::env`] field remains a `HashMap`.
+    pub environment: std::collections::BTreeMap<String, String>,
+}
+
 /// Helper for backends that execute external command-line solvers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandSolver {
-    /// Name of the executable.
+    /// Name or path of the executable.
     pub cmd: String,
     /// Arguments to pass.
     pub args: Vec<String>,
-    /// Environment variables.
+    /// Explicit environment variables. Under [`SolverEnvironmentPolicy::Inherit`]
+    /// these add to/override the inherited environment. Under
+    /// [`SolverEnvironmentPolicy::ClearAndExplicit`] these are the entire child
+    /// environment.
     pub env: std::collections::HashMap<String, String>,
+    /// Explicit process working directory. Legacy callers may omit this; a
+    /// qualification-capable clear environment requires an absolute path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_dir: Option<String>,
+    /// Whether the child inherits the parent environment.
+    #[serde(default)]
+    pub environment_policy: SolverEnvironmentPolicy,
     /// Wall-clock execution limit in milliseconds.
     #[serde(default = "default_solver_timeout_ms")]
     pub timeout_ms: u64,
@@ -771,6 +807,7 @@ pub struct CommandSolver {
     pub max_output_bytes: usize,
 }
 
+const SOLVER_EXECUTION_CONTEXT_SCHEMA_ID: &str = "symthaea-solver-execution-context-v1";
 const MAX_SOLVER_TIMEOUT_MS: u64 = 24 * 60 * 60 * 1000;
 const MAX_SOLVER_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
 /// How long to keep draining output after the direct child process exits.
@@ -855,12 +892,14 @@ fn drain_nonblocking<R: Read>(
 }
 
 impl CommandSolver {
-    /// Construct a new command solver.
+    /// Construct a new command solver using legacy environment/cwd inheritance.
     pub fn new(cmd: impl Into<String>) -> Self {
         Self {
             cmd: cmd.into(),
             args: Vec::new(),
             env: std::collections::HashMap::new(),
+            current_dir: None,
+            environment_policy: SolverEnvironmentPolicy::Inherit,
             timeout_ms: default_solver_timeout_ms(),
             max_output_bytes: default_solver_output_limit(),
         }
@@ -869,6 +908,24 @@ impl CommandSolver {
     /// Add an argument.
     pub fn arg(mut self, arg: impl Into<String>) -> Self {
         self.args.push(arg.into());
+        self
+    }
+
+    /// Add or replace one explicit environment binding.
+    pub fn env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.env.insert(key.into(), value.into());
+        self
+    }
+
+    /// Set the process working directory.
+    pub fn current_dir(mut self, current_dir: impl Into<String>) -> Self {
+        self.current_dir = Some(current_dir.into());
+        self
+    }
+
+    /// Select the environment inheritance policy.
+    pub fn environment_policy(mut self, policy: SolverEnvironmentPolicy) -> Self {
+        self.environment_policy = policy;
         self
     }
 
@@ -884,22 +941,94 @@ impl CommandSolver {
         self
     }
 
-    /// Execute the solver, spawning `cmd` with `args`/`env`, and return its
-    /// captured stdout. Execution is killed on timeout or as soon as either
-    /// output stream exceeds the configured retention limit.
-    ///
-    /// Returns `SimulationError::Adapter` if the process cannot be spawned
-    /// (e.g. the solver binary is not installed) or exits with a non-zero
-    /// status. Callers must not assume a successful exit means the solver's
-    /// results are convergent -- that determination requires parsing the
-    /// returned stdout, which is solver-specific and is the caller's
-    /// responsibility.
-    pub fn execute(&self) -> Result<String, SimulationError> {
+    /// Return a deterministic, serializable representation of the declared
+    /// process context. This is suitable for binding into solver-closure
+    /// evidence as configuration/environment input; it is not itself a proof
+    /// that every semantic input has been captured.
+    pub fn execution_context_metadata(
+        &self,
+    ) -> Result<SolverExecutionContextMetadata, SimulationError> {
+        self.validate_execution_context()?;
+        Ok(SolverExecutionContextMetadata {
+            schema_id: SOLVER_EXECUTION_CONTEXT_SCHEMA_ID.into(),
+            current_dir: self.current_dir.clone(),
+            environment_policy: self.environment_policy,
+            environment: self
+                .env
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+        })
+    }
+
+    fn validate_execution_context(&self) -> Result<(), SimulationError> {
         if self.cmd.trim().is_empty() {
             return Err(SimulationError::Adapter(
                 "solver command cannot be empty".into(),
             ));
         }
+        if self.cmd.contains('\0') {
+            return Err(SimulationError::Adapter(
+                "solver command cannot contain NUL".into(),
+            ));
+        }
+
+        if let Some(current_dir) = self.current_dir.as_deref() {
+            if current_dir.trim().is_empty() || current_dir.contains('\0') {
+                return Err(SimulationError::Adapter(
+                    "solver current directory must be a non-empty NUL-free path".into(),
+                ));
+            }
+        }
+
+        for (key, value) in &self.env {
+            if key.trim().is_empty() || key.contains('=') || key.contains('\0') {
+                return Err(SimulationError::Adapter(format!(
+                    "invalid solver environment key {key:?}"
+                )));
+            }
+            if value.contains('\0') {
+                return Err(SimulationError::Adapter(format!(
+                    "solver environment value for {key:?} contains NUL"
+                )));
+            }
+        }
+
+        if self.environment_policy == SolverEnvironmentPolicy::ClearAndExplicit {
+            if !std::path::Path::new(&self.cmd).is_absolute() {
+                return Err(SimulationError::Adapter(
+                    "clear-and-explicit solver execution requires an absolute executable path"
+                        .into(),
+                ));
+            }
+            let current_dir = self.current_dir.as_deref().ok_or_else(|| {
+                SimulationError::Adapter(
+                    "clear-and-explicit solver execution requires an explicit current directory"
+                        .into(),
+                )
+            })?;
+            if !std::path::Path::new(current_dir).is_absolute() {
+                return Err(SimulationError::Adapter(
+                    "clear-and-explicit solver execution requires an absolute current directory"
+                        .into(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute the solver, spawning `cmd` with the declared cwd/environment
+    /// policy, and return its captured stdout. Execution is killed on timeout
+    /// or as soon as either output stream exceeds the configured retention
+    /// limit.
+    ///
+    /// Returns `SimulationError::Adapter` if the process context is invalid,
+    /// the process cannot be spawned, or it exits with a non-zero status.
+    /// Callers must not assume a successful exit means the solver's results are
+    /// convergent -- that determination requires solver-specific parsing.
+    pub fn execute(&self) -> Result<String, SimulationError> {
+        self.validate_execution_context()?;
         if self.timeout_ms == 0 || self.timeout_ms > MAX_SOLVER_TIMEOUT_MS {
             return Err(SimulationError::Adapter(format!(
                 "solver timeout must be between 1 ms and {MAX_SOLVER_TIMEOUT_MS} ms"
@@ -911,15 +1040,20 @@ impl CommandSolver {
             )));
         }
 
-        let mut child = std::process::Command::new(&self.cmd)
-            .args(&self.args)
-            .envs(&self.env)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                SimulationError::Adapter(format!("failed to spawn '{}': {e}", self.cmd))
-            })?;
+        let mut command = std::process::Command::new(&self.cmd);
+        command.args(&self.args);
+        if self.environment_policy == SolverEnvironmentPolicy::ClearAndExplicit {
+            command.env_clear();
+        }
+        command.envs(&self.env);
+        if let Some(current_dir) = self.current_dir.as_deref() {
+            command.current_dir(current_dir);
+        }
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+        let mut child = command.spawn().map_err(|e| {
+            SimulationError::Adapter(format!("failed to spawn '{}': {e}", self.cmd))
+        })?;
 
         let mut stdout = child.stdout.take().ok_or_else(|| {
             SimulationError::Adapter(format!("failed to capture '{}' stdout", self.cmd))
@@ -1453,6 +1587,87 @@ mod tests {
             serde_json::from_str(r#"{"cmd":"echo","args":[],"env":{}}"#).unwrap();
         assert_eq!(solver.timeout_ms, default_solver_timeout_ms());
         assert_eq!(solver.max_output_bytes, default_solver_output_limit());
+        assert_eq!(solver.current_dir, None);
+        assert_eq!(solver.environment_policy, SolverEnvironmentPolicy::Inherit);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_solver_explicit_current_directory_is_observed() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-sim-bridge-cwd-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let output = CommandSolver::new("/bin/pwd")
+            .current_dir(dir.to_string_lossy().into_owned())
+            .execute()
+            .expect("pwd should observe explicit current directory");
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(output.trim(), dir.to_string_lossy());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn command_solver_clear_and_explicit_removes_ambient_environment() {
+        let output = CommandSolver::new("/usr/bin/env")
+            .current_dir("/")
+            .environment_policy(SolverEnvironmentPolicy::ClearAndExplicit)
+            .env("SYMTHAEA_EXPLICIT", "bound")
+            .execute()
+            .expect("env should run with a cleared environment");
+        assert!(output.lines().any(|line| line == "SYMTHAEA_EXPLICIT=bound"));
+        assert!(!output.lines().any(|line| line.starts_with("PATH=")));
+    }
+
+    #[test]
+    fn command_solver_execution_context_metadata_is_canonical() {
+        let left = CommandSolver::new("echo")
+            .env("Z", "last")
+            .env("A", "first")
+            .execution_context_metadata()
+            .unwrap();
+        let right = CommandSolver::new("echo")
+            .env("A", "first")
+            .env("Z", "last")
+            .execution_context_metadata()
+            .unwrap();
+        assert_eq!(left, right);
+        assert_eq!(
+            left.schema_id,
+            "symthaea-solver-execution-context-v1"
+        );
+    }
+
+    #[test]
+    fn command_solver_clear_and_explicit_rejects_ambient_paths() {
+        let missing_cwd = CommandSolver::new("/usr/bin/env")
+            .environment_policy(SolverEnvironmentPolicy::ClearAndExplicit)
+            .execute()
+            .unwrap_err();
+        assert!(matches!(missing_cwd, SimulationError::Adapter(_)));
+
+        let relative_cmd = CommandSolver::new("env")
+            .current_dir("/")
+            .environment_policy(SolverEnvironmentPolicy::ClearAndExplicit)
+            .execute()
+            .unwrap_err();
+        assert!(matches!(relative_cmd, SimulationError::Adapter(_)));
+
+        let relative_cwd = CommandSolver::new("/usr/bin/env")
+            .current_dir("relative")
+            .environment_policy(SolverEnvironmentPolicy::ClearAndExplicit)
+            .execute()
+            .unwrap_err();
+        assert!(matches!(relative_cwd, SimulationError::Adapter(_)));
+    }
+
+    #[test]
+    fn command_solver_rejects_invalid_environment_before_spawn() {
+        let mut solver = CommandSolver::new("echo");
+        solver.env.insert(String::new(), "value".into());
+        let err = solver.execute().unwrap_err();
+        assert!(matches!(err, SimulationError::Adapter(_)));
     }
 
     #[test]
