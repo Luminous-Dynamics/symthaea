@@ -1,0 +1,229 @@
+{
+  "cases": [
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.021543333155362943584159148335201598003082598943956387769914262774100598948068294",
+      "id": "thermal_250",
+      "operation": "thermal_voltage",
+      "rel_tolerance": "5e-13",
+      "temperature_kelvin": "250"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.025851999786435532300990978002241917603699118732747665323897115328920718737681953",
+      "id": "thermal_300",
+      "operation": "thermal_voltage",
+      "rel_tolerance": "5e-13",
+      "temperature_kelvin": "300"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.030160666417508121017822807669282237204315638521538942877879967883740838527295612",
+      "id": "thermal_350",
+      "operation": "thermal_voltage",
+      "rel_tolerance": "5e-13",
+      "temperature_kelvin": "350"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "-0.00000000000099956333550964380706405977473491544075613314746338831200060246279886037381596298",
+      "id": "current_m0p2",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "-0.2"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.000000000000",
+      "id": "current_0",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.000000000046854861294181942862347507812114731713343053800945942836065844406621187562030040",
+      "id": "current_0p1",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.1"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.0000000022890877494853930553181797463558230020880374041653515260940509707830264139886478",
+      "id": "current_0p2",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.2"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.00000010959083160312876966149069562147194443563812778853653440322349146089952063095579",
+      "id": "current_0p3",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.3"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.0000052445009003430723801032918863699128071352261965022897704743277353495439437369781",
+      "id": "current_0p4",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.4"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.00025097490999799133945098084136675670516258253345201581209698632829510616905538496",
+      "id": "current_0p5",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.5"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "27.504800182701097498696171646632921226303954997034645156497066899168642724552984",
+      "id": "current_0p8",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.8"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.000000000038681727071833608686929118117638878527417178442891712520705841962729122318561777",
+      "id": "conductance_0",
+      "operation": "conductance",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.000000088584549296143631908777611713122989352234269049597700972613356756945021370322271",
+      "id": "conductance_0p2",
+      "operation": "conductance",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.2"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.0097081430091020320878737437349989803677912080041908574479665248495905949692207947",
+      "id": "conductance_0p5",
+      "operation": "conductance",
+      "profile_id": "p300_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.5"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.0000011161779358568309190834199300764223717259872168860147943576349863817809179534164",
+      "id": "temp250_current_0p3",
+      "operation": "current",
+      "profile_id": "p250_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.3"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.000000020882816721589253934429497455736629488623018208386335349794057155608701841827801",
+      "id": "temp350_current_0p3",
+      "operation": "current",
+      "profile_id": "p350_n1_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.3"
+    },
+    {
+      "abs_tolerance": "1e-18",
+      "expected": "0.000000030184809811781953838195815439436275208651085663988233605771010205564068580960051",
+      "id": "ideality1p5_current_0p4",
+      "operation": "current",
+      "profile_id": "p300_n1p5_is1e-12",
+      "rel_tolerance": "5e-13",
+      "voltage_volts": "0.4"
+    },
+    {
+      "expected_error": "NonPositiveTemperature",
+      "id": "thermal_zero_temp",
+      "operation": "thermal_voltage",
+      "temperature_kelvin": "0"
+    },
+    {
+      "expected_error": "NonFiniteTemperature",
+      "id": "thermal_nan",
+      "operation": "thermal_voltage",
+      "temperature_kelvin": "NaN"
+    },
+    {
+      "expected_error": "VoltageOutsideDomain",
+      "id": "current_out_of_domain",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "voltage_volts": "0.9"
+    },
+    {
+      "expected_error": "NonFiniteVoltage",
+      "id": "current_nan_voltage",
+      "operation": "current",
+      "profile_id": "p300_n1_is1e-12",
+      "voltage_volts": "NaN"
+    }
+  ],
+  "generator": {
+    "constants": {
+      "boltzmann_j_per_k": "1.380649e-23",
+      "elementary_charge_c": "1.602176634e-19"
+    },
+    "equations": {
+      "conductance": "I_s*exp(V/(n*V_T))/(n*V_T)",
+      "current": "I_s*(exp(V/(n*V_T))-1)",
+      "thermal_voltage": "k_B*T/q"
+    },
+    "language": "Python decimal",
+    "precision_digits": 80
+  },
+  "profiles": [
+    {
+      "id": "p300_n1_is1e-12",
+      "ideality_factor": "1",
+      "saturation_current_amps": "1e-12",
+      "temperature_kelvin": "300",
+      "voltage_max_volts": "0.8",
+      "voltage_min_volts": "-0.2"
+    },
+    {
+      "id": "p250_n1_is1e-12",
+      "ideality_factor": "1",
+      "saturation_current_amps": "1e-12",
+      "temperature_kelvin": "250",
+      "voltage_max_volts": "0.8",
+      "voltage_min_volts": "-0.2"
+    },
+    {
+      "id": "p350_n1_is1e-12",
+      "ideality_factor": "1",
+      "saturation_current_amps": "1e-12",
+      "temperature_kelvin": "350",
+      "voltage_max_volts": "0.8",
+      "voltage_min_volts": "-0.2"
+    },
+    {
+      "id": "p300_n1p5_is1e-12",
+      "ideality_factor": "1.5",
+      "saturation_current_amps": "1e-12",
+      "temperature_kelvin": "300",
+      "voltage_max_volts": "0.8",
+      "voltage_min_volts": "-0.2"
+    }
+  ],
+  "purpose": "Independent high-precision known-answer corpus for symthaea-semiconductor analytical diode V1. Synthetic parameters only; not fit to TCAD, datasheets, or physical measurements.",
+  "schema": "eng-semi-ref-001b-known-answers-v1"
+}
