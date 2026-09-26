@@ -1,0 +1,43 @@
+name: ENG-DESIGN Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'docs/release/evidence/eng-design-001-process-reference-v1.json'
+      - 'scripts/validate_eng_design_001.py'
+      - '.github/workflows/eng-design-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bind exact source and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_HEAD='0cc3a61871192e011299290b64514b4b341e5f1f'
+          git merge-base --is-ancestor "$SOURCE_HEAD" HEAD
+
+          actual="$(git diff --name-only "$SOURCE_HEAD"...HEAD | sort)"
+          expected="$(printf '%s\n' \
+            '.github/workflows/eng-design-reference.yml' \
+            'scripts/validate_eng_design_001.py' | sort)"
+          test "$actual" = "$expected"
+
+          test "$(git rev-parse "$SOURCE_HEAD:docs/release/evidence/eng-design-001-process-reference-v1.json")" = '06735324785a554a0c149251df217f06898dae35'
+          test "$(git rev-parse "$SOURCE_HEAD:docs/engineering/ENG_DESIGN_001_EVIDENCE_BOUND_DESIGN_PROCESS.md")" = '75525cf29229525a4a8c12b933fc910e358b6986'
+          test "$(git rev-parse "$SOURCE_HEAD:docs/engineering/templates/ENGINEERING_DESIGN_QUALIFICATION_PACKET.md")" = '24cd0a5cc8a7f0458626eb99edf85cee01d75a41'
+          test "$(git rev-parse "$SOURCE_HEAD:docs/compliance/adr/ADR-TEMPLATE.md")" = '7e62cf95c759fff0b3362626954ab621a6a866a5'
+
+      - name: Execute independent design-process oracle
+        run: python3 scripts/validate_eng_design_001.py
