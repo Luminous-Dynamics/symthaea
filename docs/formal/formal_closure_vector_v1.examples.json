@@ -99,7 +99,7 @@
         "extensions": {
           "GuestImplementationRefinement": {"state": "Open", "obligation": "prove guest Rust computes this exact relation", "followup_issue": 5842},
           "ImageMethodIdBinding": {"state": "Open", "obligation": "bind exact guest image/method ID and journal encoding"},
-          "ProofSystemSoundness": {"state": "ImportedAssurance", "provider": "RISC Zero", "profile": "external imported assurance plane; exact version/profile must be supplied by a future composition receipt", "claim_ceiling": ["provider assurance does not prove this application guest"]},
+          "ProofSystemSoundness": {"state": "Open", "obligation": "import an exact RISC Zero provider/profile/version assurance receipt with explicit claim ceiling before treating proof-system assurance as present"},
           "ReplayCurrentness": {"state": "Open", "obligation": "compose proof validity with freshness/nonce-use state"},
           "AuthorizationAdmission": {"state": "Open", "obligation": "application authorization remains separate from proof validity"}
         }
