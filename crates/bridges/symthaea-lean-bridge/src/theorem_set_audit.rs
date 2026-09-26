@@ -1,12 +1,18 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-//! Fail-closed auditing for a set of named Lean theorems in one source file.
+//! Fail-closed auditing for named Lean theorem sets.
 //!
 //! Existing `#print axioms` lines are stripped from the exact source bytes;
 //! each requested theorem then receives one safe probe in a create-new temporary
 //! file and is sent through `axiom_gate::audit_lean_file`, which invokes real
 //! Lean and applies `symthaea-proof-audit` policy/spec checks.
+//!
+//! A theorem subject may also depend on exact prelude files. In that case the
+//! adapter composes the stripped preludes in caller-supplied order before the
+//! theorem source, while extracting the theorem statement only from the theorem
+//! source itself. This supports exact parent -> child formal lineages without
+//! teaching workflows to concatenate proof files or parse Lean output.
 //!
 //! The declaration extractor intentionally supports only simple
 //! `theorem name ... := ...` subjects. Unsupported or ambiguous syntax fails
@@ -116,42 +122,50 @@ fn temp_component(theorem: &str) -> String {
         .collect()
 }
 
-pub fn audit_lean_theorem_set<P: AsRef<Path>>(
-    source_path: P,
+fn setup_error(message: String) -> TheoremSetAuditReport {
+    TheoremSetAuditReport {
+        results: Vec::new(),
+        setup_error: Some(message),
+        cleanup_errors: Vec::new(),
+    }
+}
+
+fn read_source(path: &Path) -> Result<String, TheoremSetAuditReport> {
+    fs::read_to_string(path).map_err(|error| setup_error(format!("read {}: {error}", path.display())))
+}
+
+fn compose_stripped_sources(preludes: &[String], theorem_source: &str) -> String {
+    let mut combined = String::new();
+    for prelude in preludes {
+        combined.push_str(&strip_axiom_probe_lines(prelude));
+        if !combined.ends_with('\n') {
+            combined.push('\n');
+        }
+    }
+    combined.push_str(&strip_axiom_probe_lines(theorem_source));
+    combined
+}
+
+fn audit_source_text(
+    theorem_source: &str,
+    base: &str,
     cases: &[TheoremAuditCase<'_>],
     policy: &AxiomPolicy,
 ) -> TheoremSetAuditReport {
-    let source_path = source_path.as_ref();
-    let source = match fs::read_to_string(source_path) {
-        Ok(source) => source,
-        Err(error) => {
-            return TheoremSetAuditReport {
-                results: Vec::new(),
-                setup_error: Some(format!("read {}: {error}", source_path.display())),
-                cleanup_errors: Vec::new(),
-            };
-        }
-    };
-
-    let base = strip_axiom_probe_lines(&source);
     let nonce = TEMP_NONCE.fetch_add(1, Ordering::Relaxed);
     let dir = std::env::temp_dir().join(format!(
         "symthaea_lean_theorem_audit_{}_{}",
         std::process::id(), nonce
     ));
     if let Err(error) = fs::create_dir(&dir) {
-        return TheoremSetAuditReport {
-            results: Vec::new(),
-            setup_error: Some(format!("create audit temp dir {}: {error}", dir.display())),
-            cleanup_errors: Vec::new(),
-        };
+        return setup_error(format!("create audit temp dir {}: {error}", dir.display()));
     }
 
     let mut results = Vec::with_capacity(cases.len());
     let mut cleanup_errors = Vec::new();
 
     for case in cases {
-        let observed_statement = match extract_simple_theorem_statement(&source, case.theorem) {
+        let observed_statement = match extract_simple_theorem_statement(theorem_source, case.theorem) {
             Ok(statement) => statement,
             Err(error) => {
                 results.push(TheoremAuditResult {
@@ -165,7 +179,7 @@ pub fn audit_lean_theorem_set<P: AsRef<Path>>(
             }
         };
 
-        let probed = match with_axiom_probe(&base, case.theorem) {
+        let probed = match with_axiom_probe(base, case.theorem) {
             Ok(script) => script,
             Err(error) => {
                 results.push(TheoremAuditResult {
@@ -228,6 +242,44 @@ pub fn audit_lean_theorem_set<P: AsRef<Path>>(
     }
 }
 
+/// Audit a self-contained Lean theorem source file.
+pub fn audit_lean_theorem_set<P: AsRef<Path>>(
+    source_path: P,
+    cases: &[TheoremAuditCase<'_>],
+    policy: &AxiomPolicy,
+) -> TheoremSetAuditReport {
+    audit_composed_lean_theorem_set(&[], source_path.as_ref(), cases, policy)
+}
+
+/// Audit a theorem source after exact prelude files have been prepended.
+///
+/// Prelude order is semantic and is preserved exactly. Existing axiom probes
+/// are stripped from every fragment before composition. The observed theorem
+/// statement is extracted only from `theorem_source_path`, so a theorem with
+/// the same short name in a prelude cannot satisfy or confuse the target spec.
+pub fn audit_composed_lean_theorem_set(
+    prelude_paths: &[&Path],
+    theorem_source_path: &Path,
+    cases: &[TheoremAuditCase<'_>],
+    policy: &AxiomPolicy,
+) -> TheoremSetAuditReport {
+    let theorem_source = match read_source(theorem_source_path) {
+        Ok(source) => source,
+        Err(report) => return report,
+    };
+
+    let mut preludes = Vec::with_capacity(prelude_paths.len());
+    for path in prelude_paths {
+        match read_source(path) {
+            Ok(source) => preludes.push(source),
+            Err(report) => return report,
+        }
+    }
+
+    let base = compose_stripped_sources(&preludes, &theorem_source);
+    audit_source_text(&theorem_source, &base, cases, policy)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,6 +314,34 @@ mod tests {
     fn duplicate_declaration_fails_closed() {
         let src = "theorem t : True := by trivial\ntheorem t : True := by trivial\n";
         assert!(extract_simple_theorem_statement(src, "t").is_err());
+    }
+
+    #[test]
+    fn composed_sources_preserve_order_and_strip_all_probes() {
+        let preludes = vec![
+            "def parentA : Bool := true\n#print axioms parentA\n".to_string(),
+            "def parentB : Bool := false\n#print axioms parentB\n".to_string(),
+        ];
+        let theorem_source =
+            "theorem child : parentA = true := by rfl\n#print axioms child\n";
+        let composed = compose_stripped_sources(&preludes, theorem_source);
+        let a = composed.find("def parentA").unwrap();
+        let b = composed.find("def parentB").unwrap();
+        let child = composed.find("theorem child").unwrap();
+        assert!(a < b && b < child);
+        assert!(!composed.contains("#print axioms"));
+    }
+
+    #[test]
+    fn target_statement_extraction_does_not_search_preludes() {
+        let prelude = "theorem target : False := by trivial\n";
+        let theorem_source = "theorem target : True := by trivial\n";
+        let composed = compose_stripped_sources(&[prelude.to_string()], theorem_source);
+        assert!(composed.matches("theorem target").count() == 2);
+        assert_eq!(
+            extract_simple_theorem_statement(theorem_source, "target").unwrap(),
+            ": True"
+        );
     }
 
     #[test]
