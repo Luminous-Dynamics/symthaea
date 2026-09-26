@@ -1,0 +1,39 @@
+name: MAG-005C independent reference
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
+    paths:
+      - 'scripts/mag-005c-001a-reference.py'
+      - 'docs/release/evidence/mag-005c-001a-synthetic-scorecard-corpus-v1.json'
+      - '.github/workflows/mag-005c-scorecard-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate MAG-005C synthetic scorecard semantics
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.action != 'closed')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact subject checkout
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+
+      - name: Execute independent known-answer scorer
+        run: python3 scripts/mag-005c-001a-reference.py
