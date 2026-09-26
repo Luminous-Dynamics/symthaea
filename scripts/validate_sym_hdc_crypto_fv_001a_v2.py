@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PARENT_COMMIT = "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3"
 PARENT_PATH = "formal/lean/hdc/BinaryHVBind.lean"
 PARENT_BLOB = "259ba64888d8492bafc123b72d67b70da9282c36"
+INVALIDATED_V1_PARENT_BLOB = "f724618781b2660d1e76e45a69dcf796a792d76d"
 CHILD_PATH = ROOT / "formal/lean/hdc/HdcCryptoAttacks.lean"
 MANIFEST_PATH = ROOT / "docs/formal/sym-hdc-crypto-fv-001a-v2.json"
 EXPECTED_SCHEMA = "symthaea.formal.sym-hdc-crypto-fv-001a.v2"
@@ -87,6 +88,8 @@ def validate_manifest(manifest: dict) -> None:
     parent = manifest.get("stack_parent", {})
     if parent.get("commit") != PARENT_COMMIT or parent.get("blob") != PARENT_BLOB:
         fail("manifest parent binding drift")
+    if parent.get("blob") == INVALIDATED_V1_PARENT_BLOB:
+        fail("invalidated v1 parent theorem blob reintroduced")
     targets = {x["path"]: x["blob"] for x in manifest.get("production_refinement_targets", [])}
     if targets != SOURCE_TARGETS:
         fail("production source bindings drift")
@@ -109,6 +112,8 @@ def main() -> int:
     child = CHILD_PATH.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
+    if PARENT_BLOB == INVALIDATED_V1_PARENT_BLOB:
+        fail("repaired parent blob unexpectedly equals invalidated v1 blob")
     if git("rev-parse", f"{PARENT_COMMIT}:{PARENT_PATH}") != PARENT_BLOB:
         fail("immutable parent theorem blob mismatch")
     if git("rev-parse", f"HEAD:{PARENT_PATH}") != PARENT_BLOB:
@@ -126,14 +131,11 @@ def main() -> int:
     validate_child_text(child)
     validate_manifest(manifest)
 
-    # Hostile controls must be rejected by the same structural predicate.
     mutants = {
         "forgery theorem deletion": re.sub(
             r"(?s)theorem universal_known_pair_forgery.*?(?=\n/-- Abstract verifier)", "", child, count=1
         ),
-        "proof hole injection": child.replace(
-            "exact unbind_right secret mask", "sorry", 1
-        ),
+        "proof hole injection": child.replace("exact unbind_right secret mask", "sorry", 1),
         "duplicate BinaryHV model": "abbrev BinaryHV : Type := Nat\n" + child,
     }
     for label, mutant in mutants.items():
@@ -144,7 +146,6 @@ def main() -> int:
         else:
             fail(f"hostile control unexpectedly admitted: {label}")
 
-    # Manifest binding mutation must also be rejected.
     mutant_manifest = json.loads(json.dumps(manifest))
     mutant_manifest["stack_parent"]["blob"] = "0" * 40
     try:
@@ -153,6 +154,15 @@ def main() -> int:
         pass
     else:
         fail("hostile parent-binding mutation unexpectedly admitted")
+
+    stale_manifest = json.loads(json.dumps(manifest))
+    stale_manifest["stack_parent"]["blob"] = INVALIDATED_V1_PARENT_BLOB
+    try:
+        validate_manifest(stale_manifest)
+    except AssertionError:
+        pass
+    else:
+        fail("invalidated v1 lineage unexpectedly admitted")
 
     print("SYM-HDC-CRYPTO-FV-001A v2 static admission: PASS")
     return 0
