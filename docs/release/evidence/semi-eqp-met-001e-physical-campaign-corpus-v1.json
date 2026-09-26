@@ -1,0 +1,149 @@
+{
+  "authority": "representation_only_no_physical_execution_authority",
+  "cases": [
+    {
+      "calibration_currentness": "current",
+      "calibration_ref": "cal:bench-epoch-7",
+      "campaign_mode": "claim_bearing",
+      "constitution_frozen_before_acquisition": true,
+      "expected_disposition": "CandidateClaimRunUnderFrozenProfile",
+      "heldout_leakage": false,
+      "heldout_region_ref": "region:heldout-a",
+      "id": "preregistered_current_reference_candidate_claim_run",
+      "raw_observation_ref": "obs:raw-001",
+      "session_ref": "session:claim-001",
+      "target_currentness": "current",
+      "target_ref": "target:ref-artifact-a"
+    },
+    {
+      "campaign_mode": "exploratory",
+      "constitution_frozen_before_acquisition": false,
+      "expected_error": "ExploratoryCannotBecomeClaimBearingRetroactively",
+      "id": "exploratory_run_cannot_be_promoted_retroactively",
+      "posthoc_promotion_requested": true,
+      "raw_observation_ref": "obs:explore-001"
+    },
+    {
+      "campaign_mode": "claim_bearing",
+      "constitution_frozen_before_acquisition": true,
+      "expected_error": "HeldoutLeakage",
+      "heldout_leakage": true,
+      "heldout_region_ref": "region:heldout-b",
+      "id": "heldout_region_used_for_tuning_invalidates_claim",
+      "raw_observation_ref": "obs:raw-002"
+    },
+    {
+      "campaign_target_ref": "target:ref-artifact-a",
+      "expected_error": "TargetIdentityMismatch",
+      "id": "reference_target_identity_mismatch",
+      "observation_target_ref": "target:ref-artifact-b",
+      "raw_observation_ref": "obs:raw-003"
+    },
+    {
+      "calibration_currentness": "current",
+      "expected_disposition": "ReferenceCurrentnessInsufficient",
+      "id": "stale_reference_artifact_narrows_measurement",
+      "raw_observation_ref": "obs:raw-004",
+      "target_currentness": "stale",
+      "target_ref": "target:ref-artifact-c"
+    },
+    {
+      "calibration_currentness": "stale",
+      "calibration_ref": "cal:old",
+      "expected_disposition": "CalibrationCurrentnessInsufficient",
+      "id": "stale_calibration_narrows_measurement",
+      "raw_observation_ref": "obs:raw-005",
+      "target_currentness": "current",
+      "target_ref": "target:ref-artifact-d"
+    },
+    {
+      "expected_error": "CalibrationTransferUnsupported",
+      "id": "remount_without_transfer_evidence_blocks_prior_calibration",
+      "post_remount_configuration_ref": "config:bench-b",
+      "pre_remount_configuration_ref": "config:bench-a",
+      "prior_calibration_ref": "cal:bench-a",
+      "raw_observation_ref": "obs:raw-006",
+      "transfer_evidence_ref": null
+    },
+    {
+      "expected_disposition": "NewCalibrationContext",
+      "expected_history": "prior_and_fresh_preserved",
+      "fresh_calibration_currentness": "current",
+      "fresh_calibration_ref": "cal:bench-b",
+      "historical_calibration_refs": [
+        "cal:bench-a"
+      ],
+      "id": "remount_with_fresh_calibration_preserves_history",
+      "post_remount_configuration_ref": "config:bench-b",
+      "pre_remount_configuration_ref": "config:bench-a"
+    },
+    {
+      "campaign_mode": "claim_bearing",
+      "expected_disposition": "AbortedRetainedNotQualified",
+      "id": "aborted_run_is_retained_not_passed",
+      "partial_raw_observation_refs": [
+        "obs:partial-1",
+        "obs:partial-2"
+      ],
+      "run_state": "aborted",
+      "session_ref": "session:claim-009"
+    },
+    {
+      "expected_disposition": "CoverageIncomplete",
+      "id": "partial_coverage_cannot_satisfy_full_profile",
+      "observed_coverage_ref": "coverage:center-only",
+      "raw_observation_ref": "obs:raw-010",
+      "required_coverage_ref": "coverage:full-target"
+    },
+    {
+      "expected_relation": "RepeatedSessionSameArticleNotIndependentTargetReplication",
+      "id": "repeat_session_supports_repeatability_not_new_target_replication",
+      "same_physical_target": true,
+      "session_refs": [
+        "session:r1",
+        "session:r2"
+      ],
+      "target_ref": "target:ref-artifact-e"
+    },
+    {
+      "expected_relation": "SoftwareReplayNoFreshPhysicalRun",
+      "fresh_physical_acquisition": false,
+      "id": "software_replay_not_fresh_campaign_run",
+      "raw_artifact_digest": "sha256:synthetic-raw-011",
+      "replay_of_raw_artifact_digest": "sha256:synthetic-raw-011"
+    },
+    {
+      "derived_artifact_refs": [
+        "derived:measure-1",
+        "derived:overlay-1",
+        "derived:corrected-1"
+      ],
+      "expected_physical_witness_count": 1,
+      "id": "derived_outputs_do_not_multiply_physical_witnesses",
+      "raw_observation_ref": "obs:raw-012"
+    },
+    {
+      "expected_disposition": "EvidenceIncomplete",
+      "id": "missing_session_custody_is_evidence_incomplete",
+      "raw_observation_ref": "obs:raw-013",
+      "session_ref": null,
+      "target_ref": "target:ref-artifact-f"
+    },
+    {
+      "acceptance_criteria_changed_after_reveal": true,
+      "constitution_frozen_before_acquisition": true,
+      "expected_error": "PostRevealCriteriaChange",
+      "id": "acceptance_criteria_changed_after_reveal_invalidates_claim",
+      "results_revealed": true
+    },
+    {
+      "benchmark_result_ref": "benchmark:synthetic-001e-pass",
+      "execution_authority": false,
+      "expected_authority": "none",
+      "id": "campaign_evidence_mints_no_execution_authority",
+      "physical_campaign_result_ref": "campaign:synthetic-001e-pass"
+    }
+  ],
+  "purpose": "Synthetic known-answer cases for preregistered benign inspection-bench physical reference-target campaign semantics. No hardware control or semiconductor process parameters.",
+  "schema": "semi-eqp-met-001e-physical-campaign-corpus-v1"
+}
