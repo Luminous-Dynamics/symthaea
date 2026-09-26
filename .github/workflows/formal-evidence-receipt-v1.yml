@@ -1,0 +1,60 @@
+name: Formal Evidence Receipt v1
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/formal_evidence_receipt_v1.schema.json"
+      - "docs/formal/FORMAL_EVIDENCE_RECEIPT_V1.md"
+      - "scripts/validate_formal_evidence_receipt_v1.py"
+      - ".github/workflows/formal-evidence-receipt-v1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: formal-evidence-receipt-v1-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Record exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Validate receipt contract and hostile self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_formal_evidence_receipt_v1.py | tee /tmp/formal-evidence-receipt-v1.txt
+          grep -Fx 'FORMAL_EVIDENCE_RECEIPT_V1_PASS' /tmp/formal-evidence-receipt-v1.txt
+
+      - name: Static authority-boundary audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc=docs/formal/FORMAL_EVIDENCE_RECEIPT_V1.md
+          grep -F 'DependenciesDoNotPromotePrimaryEvidenceClass' "$doc"
+          grep -F 'proof/evidence receipt' "$doc"
+          grep -F '!= authorization' "$doc"
+          grep -F 'does **not** replace it' "$doc"
+
+      - name: Prove checkout immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
