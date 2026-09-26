@@ -1,0 +1,143 @@
+{
+  "schema": "symthaea.formal.verification-closure-matrix.v1",
+  "tracking_issue": 6027,
+  "authority": "EvidenceOnly",
+  "closure_states": [
+    "Closed",
+    "Open",
+    "NotApplicable",
+    "ImportedAssurance",
+    "BoundedOnly",
+    "Unknown"
+  ],
+  "dimensions": [
+    "mathematical_spec",
+    "source_refinement",
+    "bounded_implementation_safety",
+    "distributed_model",
+    "compiler_assurance",
+    "dependency_closure",
+    "build_identity",
+    "artifact_identity",
+    "release_identity",
+    "runtime_identity",
+    "cross_repo_subject_closure"
+  ],
+  "obligations": [
+    {
+      "id": "HDC-XOR-SEMANTICS",
+      "owner": "symthaea",
+      "claim": "BinaryHV bind has the reviewed pointwise XOR semantics",
+      "evidence_refs": ["PR#5801", "PR#5884"],
+      "assumptions": [],
+      "blocking_dependencies": ["exact-head qualification of the repaired theorem lineage"],
+      "current_qualification": {"result": "Blocked", "reason": "exact-head proof lanes not yet qualified"},
+      "closure": {
+        "mathematical_spec": "Open",
+        "source_refinement": "Open",
+        "bounded_implementation_safety": "Open",
+        "distributed_model": "NotApplicable",
+        "compiler_assurance": "Open",
+        "dependency_closure": "Open",
+        "build_identity": "Open",
+        "artifact_identity": "Open",
+        "release_identity": "Open",
+        "runtime_identity": "NotApplicable",
+        "cross_repo_subject_closure": "Open"
+      },
+      "nonclaims": ["production Rust refinement", "compiler correctness", "native binary verification"]
+    },
+    {
+      "id": "AUTHORITY-NON-PROMOTION",
+      "owner": "symthaea",
+      "claim": "Non-promoting authority transitions cannot mint stronger authority than the reviewed root permits",
+      "evidence_refs": ["PR#5803"],
+      "assumptions": [],
+      "blocking_dependencies": ["exact-head authority-kernel qualification"],
+      "current_qualification": {"result": "Blocked", "reason": "queued/executed evidence not yet admitted"},
+      "closure": {
+        "mathematical_spec": "Open",
+        "source_refinement": "Open",
+        "bounded_implementation_safety": "Open",
+        "distributed_model": "Open",
+        "compiler_assurance": "Open",
+        "dependency_closure": "Open",
+        "build_identity": "Open",
+        "artifact_identity": "Open",
+        "release_identity": "Open",
+        "runtime_identity": "Open",
+        "cross_repo_subject_closure": "Open"
+      },
+      "nonclaims": ["Mycelix implementation refinement", "runtime authorization"]
+    },
+    {
+      "id": "ZKP-BACKEND-CAPABILITY-HONESTY",
+      "owner": "mycelix",
+      "claim": "Backend selection cannot present structural/reserved backends as operational proof backends",
+      "evidence_refs": ["luminous-dynamics#3030", "luminous-dynamics#3100"],
+      "assumptions": [],
+      "blocking_dependencies": ["canonical-root qualification", "backend-capability theorem qualification"],
+      "current_qualification": {"result": "Blocked", "reason": "candidate evidence not yet qualified"},
+      "closure": {
+        "mathematical_spec": "Open",
+        "source_refinement": "Open",
+        "bounded_implementation_safety": "Open",
+        "distributed_model": "NotApplicable",
+        "compiler_assurance": "Open",
+        "dependency_closure": "Open",
+        "build_identity": "Open",
+        "artifact_identity": "Open",
+        "release_identity": "Open",
+        "runtime_identity": "Open",
+        "cross_repo_subject_closure": "Open"
+      },
+      "nonclaims": ["backend soundness", "circuit correctness", "zero knowledge"]
+    },
+    {
+      "id": "PULSE-REPLAY-RECONCILIATION",
+      "owner": "mycelix-pulse",
+      "claim": "Duplicate/replayed logical message identities are rejected without corrupting the modeled reconciliation state",
+      "evidence_refs": ["luminous-dynamics#3193"],
+      "assumptions": ["bounded model domain until broader proof/refinement exists"],
+      "blocking_dependencies": ["canonical Quint model", "production Rust transition seam", "state projection"],
+      "current_qualification": {"result": "Blocked", "reason": "model-based conformance pilot not implemented"},
+      "closure": {
+        "mathematical_spec": "Open",
+        "source_refinement": "Open",
+        "bounded_implementation_safety": "Open",
+        "distributed_model": "Open",
+        "compiler_assurance": "Open",
+        "dependency_closure": "Open",
+        "build_identity": "Open",
+        "artifact_identity": "Open",
+        "release_identity": "Open",
+        "runtime_identity": "Open",
+        "cross_repo_subject_closure": "Open"
+      },
+      "nonclaims": ["global consensus", "unbounded liveness", "whole-Holochain correctness"]
+    },
+    {
+      "id": "EVIDENCE-NON-AMPLIFICATION",
+      "owner": "symthaea-formal-infra",
+      "claim": "Evidence composition preserves root evidence class/subject/scope and cannot silently drop required assumptions",
+      "evidence_refs": ["PR#5962", "PR#5973", "PR#6008"],
+      "assumptions": [],
+      "blocking_dependencies": ["007A/007B exact-head qualification", "canonical result-vocabulary admission"],
+      "current_qualification": {"result": "Blocked", "reason": "dependent qualification lanes not yet admitted"},
+      "closure": {
+        "mathematical_spec": "Open",
+        "source_refinement": "Open",
+        "bounded_implementation_safety": "NotApplicable",
+        "distributed_model": "NotApplicable",
+        "compiler_assurance": "Open",
+        "dependency_closure": "Open",
+        "build_identity": "Open",
+        "artifact_identity": "Open",
+        "release_identity": "NotApplicable",
+        "runtime_identity": "NotApplicable",
+        "cross_repo_subject_closure": "NotApplicable"
+      },
+      "nonclaims": ["truth of dependency claims", "runtime authority", "universal confidence score"]
+    }
+  ]
+}
