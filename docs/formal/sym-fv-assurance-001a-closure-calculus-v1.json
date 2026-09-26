@@ -1,0 +1,104 @@
+{
+  "schema": "symthaea.formal.sym-fv-assurance-001a-closure-calculus.v1",
+  "issue": 6073,
+  "parent_issue": 5801,
+  "parent_repaired_head": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+  "parent_proof": {
+    "path": "formal/lean/hdc/BinaryHVBind.lean",
+    "blob": "259ba64888d8492bafc123b72d67b70da9282c36",
+    "relationship": "qualification-pattern-and-formal-substrate-parent-not-semantic-premise"
+  },
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "proof_subject": {
+    "path": "formal/lean/assurance/Closure.lean",
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "namespace": "Symthaea.Formal.Assurance",
+    "proof_holes_permitted": false,
+    "axiom_census": "Lean #print axioms output retained by qualification run"
+  },
+  "semantic_kernel": {
+    "canonical_dispositions": [
+      "Pass",
+      "Fail",
+      "Blocked",
+      "EnvironmentFailure"
+    ],
+    "validity_states": [
+      "Current",
+      "Superseded",
+      "Invalidated"
+    ],
+    "property_kinds": [
+      "Safety",
+      "Liveness",
+      "Other"
+    ],
+    "transfer_witnesses": [
+      "RefinementWitness",
+      "ClaimEntailmentWitness",
+      "IndependenceWitness",
+      "ReachabilityWitness"
+    ],
+    "dependency_discipline": "strictly rank-decreasing DependencyPath"
+  },
+  "required_theorems": [
+    "blocked_cannot_support",
+    "environment_failure_cannot_support",
+    "superseded_cannot_support",
+    "invalidated_cannot_support",
+    "evidence_class_non_amplification",
+    "safety_cannot_close_liveness",
+    "mismatched_subject_requires_refinement",
+    "mismatched_claim_requires_entailment",
+    "exact_subject_support_preserves_assumptions",
+    "same_provenance_cannot_count_as_independent",
+    "required_reachability_empty_rejected",
+    "closed_requires_every_mandatory_obligation",
+    "contradictory_current_evidence_prevents_closure",
+    "dependency_path_decreases",
+    "dependency_cycles_rejected",
+    "support_non_amplification_summary"
+  ],
+  "required_negative_semantics": [
+    "blocked-does-not-close",
+    "environment-failure-does-not-close-or-falsify",
+    "superseded-does-not-close-current",
+    "invalidated-does-not-close-current",
+    "evidence-class-does-not-promote",
+    "safety-does-not-close-liveness",
+    "subject-mismatch-requires-refinement-witness",
+    "claim-mismatch-requires-directional-entailment",
+    "assumptions-cannot-disappear-on-exact-transfer",
+    "shared-provenance-does-not-count-as-independent",
+    "required-reachability-needs-positive-witness",
+    "contradictory-current-evidence-prevents-closure",
+    "mandatory-obligations-are-conjunctive",
+    "dependency-cycle-is-rejected-by-rank-decrease"
+  ],
+  "qualification": {
+    "environment": "nix develop .#formal",
+    "exact_pr_head_required": true,
+    "known_bad_lean_subject_required": true,
+    "lean_nonzero_fails": true,
+    "sorryAx_forbidden": true,
+    "residual_error_marker_forbidden": true,
+    "repository_postflight_clean_required": true,
+    "parent_ancestor_required": true
+  },
+  "nonclaims": [
+    "closure-calculus-is-not-soundness-of-imported-verifiers",
+    "closure-calculus-does-not-prove-truth-of-imported-premises",
+    "closure-calculus-is-not-production-validator-refinement",
+    "closure-calculus-is-not-xenia-pulse-or-finance-system-proof",
+    "closure-calculus-is-not-runtime-authorization",
+    "closure-calculus-is-not-legal-or-safety-certification",
+    "source-authored-theorem-is-not-executed-qualified-theorem"
+  ],
+  "successor_gates": {
+    "001b_executable_vectors": "blocked-until-this-exact-subject-is-executed-qualified",
+    "001c_validator_refinement": "blocked-until-001b-vectors-are-frozen",
+    "001d_real-adoption": "blocked-until-001c-refinement-is-qualified"
+  }
+}
