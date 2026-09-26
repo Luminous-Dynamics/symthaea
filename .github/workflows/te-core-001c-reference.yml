@@ -1,0 +1,24 @@
+name: TE-CORE-001C independent reference
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/te-core-001b-reference.py'
+      - 'docs/release/evidence/te-core-001b-synthetic-evidence-corpus-v1.json'
+      - '.github/workflows/te-core-001c-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate TE-CORE-001B synthetic semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Execute independent known-answer reference
+        run: python3 scripts/te-core-001b-reference.py
