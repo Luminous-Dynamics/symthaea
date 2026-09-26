@@ -2,7 +2,7 @@ name: ION-001C independent reference
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - 'scripts/ion-001b-reference.py'
       - 'docs/release/evidence/ion-001b-synthetic-transport-corpus-v1.json'
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   validate:
     name: Validate ION-001B synthetic transport semantics
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.action != 'closed')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
