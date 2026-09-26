@@ -2,7 +2,7 @@ name: SSE-DATA-001E2 independent leakage graph oracle
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, closed]
     paths:
       - 'scripts/sse-data-001e2-reference.py'
       - 'docs/release/evidence/sse-data-001e1-synthetic-leakage-graph-corpus-v1.json'
@@ -19,7 +19,7 @@ concurrency:
 jobs:
   validate:
     name: Validate SSE leakage graph semantics
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && github.event.action != 'closed')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
