@@ -1,0 +1,24 @@
+name: ION-001C independent reference
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/ion-001b-reference.py'
+      - 'docs/release/evidence/ion-001b-synthetic-transport-corpus-v1.json'
+      - '.github/workflows/ion-001c-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate ION-001B synthetic transport semantics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Execute independent known-answer reference
+        run: python3 scripts/ion-001b-reference.py
