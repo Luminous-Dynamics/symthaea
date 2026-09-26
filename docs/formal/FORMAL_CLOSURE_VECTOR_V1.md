@@ -50,7 +50,7 @@ Domains may add `extensions`, but extension values use the same state contract.
 : Requires a reason. It may not be used merely to hide an inconvenient gap.
 
 `ImportedAssurance`
-: Requires provider, exact profile/version identity, and claim ceiling. Imported assurance is not local proof.
+: Requires provider, exact profile/version identity, claim ceiling, **and exact provider evidence/support identity**. A provider name, product name, paper, certification label, or version string by itself is not imported evidence. Imported assurance is not local proof.
 
 `BoundedOnly`
 : Requires an exact bound/profile and exact supporting evidence. Finite-state or bounded evidence must remain visibly bounded.
@@ -79,6 +79,15 @@ AbstractFormalTheorem receipt
 
 Each transition needs compatible exact evidence.
 
+Likewise:
+
+```text
+named external provider/profile
+!= ImportedAssurance
+```
+
+until an exact provider evidence/support identity and its claim ceiling are bound.
+
 ## Extensions
 
 Extensions exist for domain-local assurance seams without changing the horizontal vocabulary.
@@ -104,6 +113,8 @@ They do not become global core dimensions merely because one domain needs them.
 3. abstract ZKP balance statement relation.
 
 The examples deliberately preserve queued/source-authored states as `Open`/`Unknown`; they do not manufacture `Closed` from unexecuted workflows.
+
+The ZKP fixture deliberately leaves `ProofSystemSoundness` as `Open` until an exact RISC Zero assurance profile/receipt is imported. Merely knowing that the external proof system has its own assurance work is not enough to mark the dimension `ImportedAssurance`.
 
 ## Boundary
 
