@@ -1,0 +1,21 @@
+name: CIV-VALUE Reference Chain Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/civ-value-pilot-001-reference.py'
+      - 'docs/release/evidence/civ-value-pilot-001-reference-chains-v1.json'
+      - 'docs/release/evidence/civ-value-000-critical-domain-matrix-v1.json'
+      - '.github/workflows/civ-value-reference-chains.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate frozen terrestrial resource-to-service chains
+        run: python3 scripts/civ-value-pilot-001-reference.py
