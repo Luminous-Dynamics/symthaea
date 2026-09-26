@@ -2,8 +2,9 @@
 """Static admission gate for SYM-FV-ASSURANCE-001A.
 
 Lean itself remains the proof authority. This script binds the intended theorem
-surface, canonical disposition mapping, repaired parent lineage, and hostile
-source mutations so the workflow fails closed before invoking the prover.
+surface, canonical disposition + semantic-polarity mapping, repaired parent
+lineage, and hostile source mutations so the workflow fails closed before
+invoking the prover.
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ REQUIRED_TYPES = (
     "EvidenceValidity",
     "CanonicalResult",
     "OutcomeDisposition",
+    "SemanticPolarity",
     "EvidenceReceipt",
     "Obligation",
     "RefinementWitness",
@@ -44,6 +46,7 @@ REQUIRED_TYPES = (
 
 REQUIRED_DEFS = (
     "disposition",
+    "semanticPolarity",
     "AssumptionsAllowed",
     "SubjectTransfer",
     "ClaimTransfer",
@@ -56,8 +59,15 @@ REQUIRED_DEFS = (
 )
 
 REQUIRED_THEOREMS = (
+    "proof_failure_is_fail_without_refutation",
+    "qualification_failure_not_counterevidence",
+    "semantic_counterexample_is_counterevidence",
+    "resource_exhaustion_is_blocked_semantically_neutral",
+    "environment_failure_is_semantically_neutral",
     "blocked_cannot_support",
     "environment_failure_cannot_support",
+    "qualification_failure_cannot_support",
+    "semantic_counterevidence_cannot_support",
     "superseded_cannot_support",
     "invalidated_cannot_support",
     "stale_generation_cannot_support",
@@ -69,7 +79,10 @@ REQUIRED_THEOREMS = (
     "same_provenance_cannot_count_as_independent",
     "required_reachability_empty_rejected",
     "evidence_closed_is_current_pass",
+    "evidence_closed_is_positive_support",
     "evidence_closed_rejects_self_dependency",
+    "qualification_failure_cannot_create_semantic_conflict",
+    "conflict_requires_semantic_counterevidence",
     "closed_requires_every_mandatory_obligation",
     "contradictory_current_evidence_prevents_closure",
     "dependency_path_decreases",
@@ -91,6 +104,22 @@ EXPECTED_DISPOSITION_ARMS = (
     ".EnvironmentUnavailable => .EnvironmentFailure",
     ".ToolInstallationFailure => .EnvironmentFailure",
     ".RunnerInfrastructureFailure => .EnvironmentFailure",
+)
+
+EXPECTED_POLARITY_ARMS = (
+    ".SemanticSuccess => .PositiveSupport",
+    ".SemanticCounterexample => .SemanticCounterevidence",
+    ".ProofOrQualificationFailure => .QualificationNegative",
+    ".UnsupportedBoundary => .NoSemanticConclusion",
+    ".InsufficientBound => .NoSemanticConclusion",
+    ".ResourceExhaustion => .NoSemanticConclusion",
+    ".MissingPrerequisite => .NoSemanticConclusion",
+    ".StaleSubjectOrDependency => .NoSemanticConclusion",
+    ".AmbiguousOrUnknownOutcome => .NoSemanticConclusion",
+    ".UnclassifiedToolCrash => .NoSemanticConclusion",
+    ".EnvironmentUnavailable => .NoSemanticConclusion",
+    ".ToolInstallationFailure => .NoSemanticConclusion",
+    ".RunnerInfrastructureFailure => .NoSemanticConclusion",
 )
 
 REQUIRED_NONCLAIMS = {
@@ -179,6 +208,9 @@ def validate_contract(manifest: dict, proof: str) -> None:
     for arm in EXPECTED_DISPOSITION_ARMS:
         if arm not in proof:
             raise ContractError(f"canonical disposition arm missing/drifted: {arm}")
+    for arm in EXPECTED_POLARITY_ARMS:
+        if arm not in proof:
+            raise ContractError(f"canonical semantic-polarity arm missing/drifted: {arm}")
 
     supports_match = re.search(
         r"def\s+Supports\b(?P<body>.*?)(?=\n/-- Positive reachability)",
@@ -196,10 +228,39 @@ def validate_contract(manifest: dict, proof: str) -> None:
         "e.propertyKind = o.propertyKind",
         "SubjectTransfer refinements e o",
         "ClaimTransfer entailments e o",
+        "semanticPolarity e.result = .PositiveSupport",
     )
     for term in required_support_terms:
         if term not in supports:
             raise ContractError(f"Supports lost mandatory term: {term}")
+
+    conflict_match = re.search(
+        r"def\s+Conflicting\b(?P<body>.*?)(?=\ndef\s+ConflictFree)",
+        proof,
+        re.S,
+    )
+    if not conflict_match:
+        raise ContractError("Conflicting body not found")
+    conflict = conflict_match.group("body")
+    for term in (
+        "semanticPolarity left.result = .PositiveSupport",
+        "semanticPolarity right.result = .SemanticCounterevidence",
+    ):
+        if term not in conflict:
+            raise ContractError(f"semantic conflict term missing: {term}")
+    if "disposition right.result = .Fail" in conflict:
+        raise ContractError("generic workflow Fail incorrectly used as semantic counterevidence")
+
+    evidence_closed_match = re.search(
+        r"inductive\s+EvidenceClosed\b(?P<body>.*?)(?=\n/--\nFinite first-kernel closure)",
+        proof,
+        re.S,
+    )
+    if not evidence_closed_match:
+        raise ContractError("EvidenceClosed body not found")
+    evidence_closed = evidence_closed_match.group("body")
+    if "semanticPolarity e.result = .PositiveSupport" not in evidence_closed:
+        raise ContractError("recursive evidence closure lost positive semantic support gate")
 
     closed_match = re.search(
         r"def\s+Closed\b(?P<body>.*?)(?=\n/--\nAn explicit independence claim)",
@@ -250,10 +311,19 @@ def validate_contract(manifest: dict, proof: str) -> None:
         raise ContractError("manifest dependency closure drift")
     if kernel.get("dependency_discipline") != "strictly rank-decreasing EvidenceClosed and DependencyPath":
         raise ContractError("manifest dependency discipline drift")
+    if kernel.get("semantic_polarity") != "workflow disposition is orthogonal to positive support, counterevidence, qualification-negative, and no-semantic-conclusion meaning":
+        raise ContractError("manifest semantic polarity drift")
     if set(kernel.get("canonical_dispositions", [])) != {
         "Pass", "Fail", "Blocked", "EnvironmentFailure"
     }:
         raise ContractError("manifest disposition vocabulary drift")
+    if set(kernel.get("semantic_polarities", [])) != {
+        "PositiveSupport",
+        "SemanticCounterevidence",
+        "QualificationNegative",
+        "NoSemanticConclusion",
+    }:
+        raise ContractError("manifest semantic polarity vocabulary drift")
 
     nonclaims = set(manifest.get("nonclaims", []))
     if not REQUIRED_NONCLAIMS.issubset(nonclaims):
@@ -296,6 +366,29 @@ def main() -> int:
             "blocked-promoted-to-pass",
             manifest,
             proof.replace(".ResourceExhaustion => .Blocked", ".ResourceExhaustion => .Pass", 1),
+        )
+        expect_reject(
+            "proof-failure-promoted-to-counterevidence",
+            manifest,
+            proof.replace(
+                ".ProofOrQualificationFailure => .QualificationNegative",
+                ".ProofOrQualificationFailure => .SemanticCounterevidence",
+                1,
+            ),
+        )
+        expect_reject(
+            "positive-polarity-gate-deleted",
+            manifest,
+            proof.replace("semanticPolarity e.result = .PositiveSupport", "True", 1),
+        )
+        expect_reject(
+            "semantic-conflict-downgraded-to-generic-fail",
+            manifest,
+            proof.replace(
+                "semanticPolarity right.result = .SemanticCounterevidence",
+                "disposition right.result = .Fail",
+                1,
+            ),
         )
         expect_reject(
             "generation-gate-deleted",
