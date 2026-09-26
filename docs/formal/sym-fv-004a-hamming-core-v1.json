@@ -1,0 +1,73 @@
+{
+  "schema": "symthaea.formal.sym-fv-004a-hamming-core.v1",
+  "issue": 5717,
+  "stack_parent_pr": 5884,
+  "stack_parent_head": "a607dc2611dd04b60b91e3f6b74ffd726d5666a9",
+  "semantic_parent_pr": 5801,
+  "semantic_parent_head": "2199cf04634e81d85592ed0479a5c3d2d0fb6ac8",
+  "semantic_parent_theorem": {
+    "path": "formal/lean/hdc/BinaryHVBind.lean",
+    "blob": "f724618781b2660d1e76e45a69dcf796a792d76d"
+  },
+  "production_future_refinement_target": {
+    "relationship": "future-refinement-target-not-proved-here",
+    "path": "crates/core/symthaea-core/src/hdc/binary_hv.rs",
+    "blob": "22a56cfaedf5b0cb7d8ff8b73c41ed4caf8d7056",
+    "functions": [
+      "BinaryHV::hamming_distance_scalar",
+      "BinaryHV::similarity_scalar"
+    ]
+  },
+  "evidence_class": "AbstractFormalTheorem",
+  "lean_dependency_class": "core-lean-only",
+  "mathlib_required": false,
+  "definitions": {
+    "bit_count": "Fin.foldl over all HdcDimension bit positions",
+    "mismatch_vector": "pointwise Bool inequality, deliberately independent from bind",
+    "hamming_distance": "bitCount(mismatchVector(a,b))"
+  },
+  "theorems": [
+    "Symthaea.Formal.HDC.mismatch_bit",
+    "Symthaea.Formal.HDC.mismatchVector_eq_bind",
+    "Symthaea.Formal.HDC.hamming_eq_bitCount_bind",
+    "Symthaea.Formal.HDC.hamming_symm",
+    "Symthaea.Formal.HDC.mismatch_bind_right_invariant",
+    "Symthaea.Formal.HDC.hamming_bind_right_invariant",
+    "Symthaea.Formal.HDC.hamming_bind_left_invariant"
+  ],
+  "licensed_claims": [
+    "the abstract 16384-bit mismatch vector equals abstract XOR binding",
+    "abstract Hamming distance equals exact true-bit count of abstract XOR binding",
+    "abstract Hamming distance is symmetric",
+    "binding one common XOR mask into both abstract vectors preserves their mismatch vector",
+    "common XOR masking is an exact abstract Hamming isometry"
+  ],
+  "deferred": {
+    "sym_fv_004b": [
+      "Rust byte-array count_ones refinement",
+      "Aeneas/source-semantics relationship",
+      "SIMD popcount relationship"
+    ],
+    "sym_fv_004c": [
+      "exact normalized mathematical similarity",
+      "f32 conversion and division relationship",
+      "floating-point error bound"
+    ]
+  },
+  "nonclaims": [
+    "not-production-rust-refinement",
+    "not-simd-proof",
+    "not-rustc-llvm-native-binary-proof",
+    "not-floating-point-similarity-proof",
+    "not-semantic-quality-or-cognition-proof",
+    "not-runtime-authority"
+  ],
+  "qualification": {
+    "proof_policy": "AxiomPolicy::constitutional() via SYM-FV-002A theorem_set_audit",
+    "requires_real_lean": true,
+    "requires_exact_parent_blob": true,
+    "requires_exact_production_target_blob": true,
+    "requires_hostile_wrong-statement_rejection": true,
+    "requires_repository_postflight_clean": true
+  }
+}
