@@ -19,13 +19,15 @@ PARENT_COMMIT = "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3"
 PARENT_PATH = "formal/lean/hdc/BinaryHVBind.lean"
 PARENT_BLOB = "259ba64888d8492bafc123b72d67b70da9282c36"
 INVALIDATED_V1_PARENT_BLOB = "f724618781b2660d1e76e45a69dcf796a792d76d"
-CHILD_PATH = ROOT / "formal/lean/hdc/HdcCryptoAttacks.lean"
+CHILD_REL = "formal/lean/hdc/HdcCryptoAttacks.lean"
+CHILD_BLOB = "67d44281d03252101eb01d6ac9713ea7638044de"
+CHILD_PATH = ROOT / CHILD_REL
 MANIFEST_PATH = ROOT / "docs/formal/sym-hdc-crypto-fv-001a-v2.json"
 EXPECTED_SCHEMA = "symthaea.formal.sym-hdc-crypto-fv-001a.v2"
 EXPECTED_FILES = {
     ".github/workflows/sym-hdc-crypto-fv-001a-v2.yml",
     "docs/formal/sym-hdc-crypto-fv-001a-v2.json",
-    "formal/lean/hdc/HdcCryptoAttacks.lean",
+    CHILD_REL,
     "scripts/validate_sym_hdc_crypto_fv_001a_v2.py",
 }
 SOURCE_TARGETS = {
@@ -78,8 +80,10 @@ def validate_child_text(text: str) -> None:
     for token in FORBIDDEN_PROOF_HOLES:
         if re.search(rf"\b{token}\b", lowered):
             fail(f"proof hole token present: {token}")
-    if re.search(r"(?m)^axiom\s+", text):
-        fail("child introduces an axiom")
+    if re.search(r"(?m)^\s*(?:axiom|opaque)\s+", text):
+        fail("child introduces axiom/opaque authority")
+    if "import Mathlib" in text:
+        fail("unexpected Mathlib dependency")
 
 
 def validate_manifest(manifest: dict) -> None:
@@ -90,6 +94,9 @@ def validate_manifest(manifest: dict) -> None:
         fail("manifest parent binding drift")
     if parent.get("blob") == INVALIDATED_V1_PARENT_BLOB:
         fail("invalidated v1 parent theorem blob reintroduced")
+    theorem_file = manifest.get("theorem_file", {})
+    if theorem_file.get("path") != CHILD_REL or theorem_file.get("blob") != CHILD_BLOB:
+        fail("child theorem-file binding drift")
     targets = {x["path"]: x["blob"] for x in manifest.get("production_refinement_targets", [])}
     if targets != SOURCE_TARGETS:
         fail("production source bindings drift")
@@ -98,6 +105,7 @@ def validate_manifest(manifest: dict) -> None:
     qc = manifest.get("qualification_contract", {})
     for key in (
         "exact_pr_head_checkout",
+        "exact_stack_parent_head_binding",
         "known_bad_lean_subject_must_fail",
         "prover_exit_must_propagate",
         "sorryAx_forbidden",
@@ -108,16 +116,29 @@ def validate_manifest(manifest: dict) -> None:
             fail(f"qualification invariant disabled: {key}")
 
 
+def expect_reject(label: str, fn) -> None:
+    try:
+        fn()
+    except AssertionError:
+        print(f"negative control {label}: REJECTED")
+        return
+    fail(f"hostile control unexpectedly admitted: {label}")
+
+
 def main() -> int:
     child = CHILD_PATH.read_text(encoding="utf-8")
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
     if PARENT_BLOB == INVALIDATED_V1_PARENT_BLOB:
         fail("repaired parent blob unexpectedly equals invalidated v1 blob")
+    if git("merge-base", PARENT_COMMIT, "HEAD") != PARENT_COMMIT:
+        fail("repaired stack parent is not an ancestor of child HEAD")
     if git("rev-parse", f"{PARENT_COMMIT}:{PARENT_PATH}") != PARENT_BLOB:
         fail("immutable parent theorem blob mismatch")
     if git("rev-parse", f"HEAD:{PARENT_PATH}") != PARENT_BLOB:
         fail("child does not inherit exact repaired parent theorem blob")
+    if git("rev-parse", f"HEAD:{CHILD_REL}") != CHILD_BLOB:
+        fail("child theorem blob drift")
     for path, blob in SOURCE_TARGETS.items():
         if git("rev-parse", f"{PARENT_COMMIT}:{path}") != blob:
             fail(f"immutable production blob mismatch: {path}")
@@ -139,30 +160,27 @@ def main() -> int:
         "duplicate BinaryHV model": "abbrev BinaryHV : Type := Nat\n" + child,
     }
     for label, mutant in mutants.items():
-        try:
-            validate_child_text(mutant)
-        except AssertionError:
-            pass
-        else:
-            fail(f"hostile control unexpectedly admitted: {label}")
+        expect_reject(label, lambda mutant=mutant: validate_child_text(mutant))
 
-    mutant_manifest = json.loads(json.dumps(manifest))
-    mutant_manifest["stack_parent"]["blob"] = "0" * 40
-    try:
-        validate_manifest(mutant_manifest)
-    except AssertionError:
-        pass
-    else:
-        fail("hostile parent-binding mutation unexpectedly admitted")
+    parent_manifest = json.loads(json.dumps(manifest))
+    parent_manifest["stack_parent"]["blob"] = "0" * 40
+    expect_reject("parent binding mutation", lambda: validate_manifest(parent_manifest))
 
     stale_manifest = json.loads(json.dumps(manifest))
     stale_manifest["stack_parent"]["blob"] = INVALIDATED_V1_PARENT_BLOB
-    try:
-        validate_manifest(stale_manifest)
-    except AssertionError:
-        pass
-    else:
-        fail("invalidated v1 lineage unexpectedly admitted")
+    expect_reject("invalidated v1 lineage", lambda: validate_manifest(stale_manifest))
+
+    theorem_manifest = json.loads(json.dumps(manifest))
+    theorem_manifest["theorem_file"]["blob"] = "0" * 40
+    expect_reject("theorem file rebinding", lambda: validate_manifest(theorem_manifest))
+
+    source_manifest = json.loads(json.dumps(manifest))
+    source_manifest["production_refinement_targets"][0]["blob"] = "0" * 40
+    expect_reject("source rebinding", lambda: validate_manifest(source_manifest))
+
+    claim_manifest = json.loads(json.dumps(manifest))
+    claim_manifest["claim_ceiling"].append("production-rust-refinement-proved")
+    expect_reject("claim escalation", lambda: validate_manifest(claim_manifest))
 
     print("SYM-HDC-CRYPTO-FV-001A v2 static admission: PASS")
     return 0
