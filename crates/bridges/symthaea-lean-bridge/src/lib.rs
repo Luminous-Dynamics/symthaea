@@ -37,6 +37,7 @@ pub mod sanitize; // Shared identifier/statement sanitization for generated Lean
 pub mod subprocess; // Bounded-time, bounded-memory Lean subprocess execution
 pub mod tactic;
 pub mod term;
+pub mod theorem_set_audit; // Multi-theorem real-Lean axiom/spec audit adapter
 pub mod z3_to_lean;
 
 /// Crate version — bumped when emitted Lean surface format changes.
