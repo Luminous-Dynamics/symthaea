@@ -1,0 +1,109 @@
+{
+  "schema": "symthaea.formal.closure-vector-examples.v1",
+  "note": "These are review fixtures over current source-authored subjects. They do not assert qualification PASS.",
+  "records": [
+    {
+      "schema": "symthaea.formal.closure-vector.v1",
+      "claim_id": "SYM-FV-002.BinaryHVBind.abstract-algebra",
+      "subject": {
+        "repository": "Luminous-Dynamics/symthaea",
+        "commit": "a4d4506c57902f96b6c260e7e9c56f9fc2e654c3",
+        "semantic_subject": "formal/lean/hdc/BinaryHVBind.lean"
+      },
+      "claim_ceiling": [
+        "source-authored abstract BinaryHV XOR theorem candidate",
+        "not qualified PASS until exact-head evidence executes",
+        "not Rust source refinement",
+        "not optimized implementation proof",
+        "not compiler or native binary proof"
+      ],
+      "dimensions": {
+        "TheoremStatementIdentity": {"state": "Open", "obligation": "qualify exact repaired theorem statement and axiom census", "followup_issue": 5715},
+        "MathematicalSpecification": {"state": "Open", "obligation": "exact-head Lean qualification remains pending", "followup_issue": 5715},
+        "CheckerIndependence": {"state": "Open", "obligation": "run independently checked Lean admission profile", "followup_issue": 6011},
+        "SourceRefinement": {"state": "Open", "obligation": "prove production scalar Rust bind refines the abstract theorem", "followup_issue": 5716},
+        "OptimizedImplementationRelation": {"state": "Open", "obligation": "relate SIMD/runtime-dispatched implementations to verified scalar reference", "followup_issue": 5718},
+        "CompilerSemantics": {"state": "Open", "obligation": "no compiler/native-code correctness theorem is currently admitted"},
+        "DependencyClosure": {"state": "Unknown", "reason": "exact proof dependency closure has not yet been represented as a qualified closure vector"},
+        "BuildIdentity": {"state": "NotApplicable", "reason": "this claim is an abstract theorem about the Lean model, not a built executable"},
+        "ArtifactIdentity": {"state": "NotApplicable", "reason": "this abstract theorem claim does not identify a production artifact"},
+        "ReleaseIdentity": {"state": "NotApplicable", "reason": "this abstract theorem claim does not identify a release"},
+        "RuntimeIdentity": {"state": "NotApplicable", "reason": "this abstract theorem claim does not identify a running process"},
+        "EnvironmentRealization": {"state": "Open", "obligation": "exact formal environment qualification remains pending"},
+        "DistributedAssumptions": {"state": "NotApplicable", "reason": "BinaryHV XOR algebra is not a distributed-system claim"},
+        "CrossRepositorySubjectClosure": {"state": "Unknown", "reason": "matching source paths/blobs across monorepo and standalone do not by themselves establish complete subject closure"}
+      }
+    },
+    {
+      "schema": "symthaea.formal.closure-vector.v1",
+      "claim_id": "SYM-FV-007A.evidence-composition-non-amplification",
+      "subject": {
+        "repository": "Luminous-Dynamics/symthaea",
+        "commit": "f4b7fbc16aa132d60860f52a49843e9a6ccc8b7e",
+        "semantic_subject": "formal evidence composition algebra"
+      },
+      "claim_ceiling": [
+        "source-authored evidence-composition theorem candidate",
+        "dependency composition cannot rewrite root class/subject/scope in the model",
+        "not receipt implementation refinement",
+        "not runtime authorization"
+      ],
+      "dimensions": {
+        "TheoremStatementIdentity": {"state": "Open", "obligation": "exact-head theorem qualification remains queued", "followup_issue": 5961},
+        "MathematicalSpecification": {"state": "Open", "obligation": "exact-head Lean qualification remains queued", "followup_issue": 5961},
+        "CheckerIndependence": {"state": "Open", "obligation": "apply independent Lean checker profile", "followup_issue": 6011},
+        "SourceRefinement": {"state": "Open", "obligation": "refine receipt/schema/validator implementation into this algebra", "followup_issue": 5945},
+        "OptimizedImplementationRelation": {"state": "NotApplicable", "reason": "no optimized implementation path is part of this claim"},
+        "CompilerSemantics": {"state": "NotApplicable", "reason": "the claim is not about compiled production semantics"},
+        "DependencyClosure": {"state": "Open", "obligation": "parent receipt-contract exact evidence must qualify and remain current"},
+        "BuildIdentity": {"state": "NotApplicable", "reason": "the theorem claim does not identify a shipped executable"},
+        "ArtifactIdentity": {"state": "NotApplicable", "reason": "the theorem claim does not identify a shipped artifact"},
+        "ReleaseIdentity": {"state": "NotApplicable", "reason": "the theorem claim does not identify a release"},
+        "RuntimeIdentity": {"state": "NotApplicable", "reason": "the theorem claim does not identify a running process"},
+        "EnvironmentRealization": {"state": "Open", "obligation": "formal environment exact-head evidence remains pending"},
+        "DistributedAssumptions": {"state": "NotApplicable", "reason": "the evidence algebra is not a distributed protocol theorem"},
+        "CrossRepositorySubjectClosure": {"state": "NotApplicable", "reason": "this theorem is scoped to the Symthaea formal evidence model only"}
+      }
+    },
+    {
+      "schema": "symthaea.formal.closure-vector.v1",
+      "claim_id": "SYM-ZK-FV-001A.balance-statement-relation",
+      "subject": {
+        "repository": "Luminous-Dynamics/symthaea",
+        "commit": "54834f750385cd75d4516c6fecdf61d39492cfc1",
+        "semantic_subject": "abstract balance statement relation"
+      },
+      "claim_ceiling": [
+        "source-authored abstract balance relation theorem candidate",
+        "not guest Rust refinement",
+        "not RISC Zero proof-system soundness",
+        "not zero-knowledge theorem",
+        "not verifier/image-ID binding",
+        "not replay/currentness or authorization"
+      ],
+      "dimensions": {
+        "TheoremStatementIdentity": {"state": "Open", "obligation": "qualify exact relation statement", "followup_issue": 5841},
+        "MathematicalSpecification": {"state": "Open", "obligation": "exact-head Lean qualification remains queued", "followup_issue": 5841},
+        "CheckerIndependence": {"state": "Open", "obligation": "apply independent Lean checker profile", "followup_issue": 6011},
+        "SourceRefinement": {"state": "Open", "obligation": "prove exact guest implementation refines relation", "followup_issue": 5842},
+        "OptimizedImplementationRelation": {"state": "NotApplicable", "reason": "no optimized implementation relation is part of the abstract statement claim"},
+        "CompilerSemantics": {"state": "Open", "obligation": "guest compiler/zkVM execution semantics remain a separate assurance plane"},
+        "DependencyClosure": {"state": "Unknown", "reason": "exact guest/proof-system dependency closure is outside the abstract relation theorem"},
+        "BuildIdentity": {"state": "Open", "obligation": "bind exact guest build when implementation refinement begins"},
+        "ArtifactIdentity": {"state": "Open", "obligation": "bind exact guest image/method artifact in a later tranche"},
+        "ReleaseIdentity": {"state": "NotApplicable", "reason": "the abstract statement relation does not identify a deployed release"},
+        "RuntimeIdentity": {"state": "NotApplicable", "reason": "the abstract statement relation does not identify a running verifier"},
+        "EnvironmentRealization": {"state": "Open", "obligation": "formal proof environment exact-head qualification remains pending"},
+        "DistributedAssumptions": {"state": "NotApplicable", "reason": "the balance relation itself is not a distributed-system theorem"},
+        "CrossRepositorySubjectClosure": {"state": "NotApplicable", "reason": "this abstract relation is owned by the Symthaea zkVM statement program"},
+        "extensions": {
+          "GuestImplementationRefinement": {"state": "Open", "obligation": "prove guest Rust computes this exact relation", "followup_issue": 5842},
+          "ImageMethodIdBinding": {"state": "Open", "obligation": "bind exact guest image/method ID and journal encoding"},
+          "ProofSystemSoundness": {"state": "ImportedAssurance", "provider": "RISC Zero", "profile": "external imported assurance plane; exact version/profile must be supplied by a future composition receipt", "claim_ceiling": ["provider assurance does not prove this application guest"]},
+          "ReplayCurrentness": {"state": "Open", "obligation": "compose proof validity with freshness/nonce-use state"},
+          "AuthorizationAdmission": {"state": "Open", "obligation": "application authorization remains separate from proof validity"}
+        }
+      }
+    }
+  ]
+}
