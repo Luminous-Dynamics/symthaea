@@ -1,0 +1,19 @@
+name: SEMI-EQP-MET Bench Subject Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/semi-eqp-met-001e2-reference.py'
+      - 'docs/release/evidence/semi-eqp-met-001e2-bench-subject-corpus-v1.json'
+      - '.github/workflows/semi-eqp-met-bench-subject-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run independent bench-subject reference oracle
+        run: python3 scripts/semi-eqp-met-001e2-reference.py
