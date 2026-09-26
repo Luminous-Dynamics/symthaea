@@ -241,6 +241,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "policy",
         "mutations"
       ],
       "properties": {
@@ -273,6 +274,16 @@
               }
             }
           }
+        },
+        "policy": {
+          "enum": [
+            "Required",
+            "NotApplicable"
+          ]
+        },
+        "not_applicable_reason": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
