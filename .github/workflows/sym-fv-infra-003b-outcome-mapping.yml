@@ -1,0 +1,139 @@
+name: SYM-FV-INFRA-003B Outcome Mapping
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/formal/sym-fv-infra-003b-outcome-mapping-v1.json"
+      - "docs/formal/SYM_FV_INFRA_003B_OUTCOME_MAPPING_V1.md"
+      - ".github/scripts/validate-formal-outcome-mapping.py"
+      - ".github/workflows/sym-fv-infra-003b-outcome-mapping.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-infra-003b-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  qualify:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXACT_PARENT: 03715daf3f972d20ffcf198061f5af8f5b98ed48
+      REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      MAPPING: docs/formal/sym-fv-infra-003b-outcome-mapping-v1.json
+      VALIDATOR: .github/scripts/validate-formal-outcome-mapping.py
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact parent and four-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD"
+          test "$(git merge-base "$EXACT_PARENT" HEAD)" = "$EXACT_PARENT"
+          mapfile -t changed < <(git diff --name-only "$EXACT_PARENT"...HEAD | sort)
+          expected=(
+            ".github/scripts/validate-formal-outcome-mapping.py"
+            ".github/workflows/sym-fv-infra-003b-outcome-mapping.yml"
+            "docs/formal/SYM_FV_INFRA_003B_OUTCOME_MAPPING_V1.md"
+            "docs/formal/sym-fv-infra-003b-outcome-mapping-v1.json"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${expected_sorted[@]}") <(printf '%s\n' "${changed[@]}")
+
+      - name: Validate mapping and hostile mutants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 "$VALIDATOR" > /tmp/outcome-mapping.log 2>&1
+          cat /tmp/outcome-mapping.log
+
+      - name: Build exact-head receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+          mapping = json.loads(Path(os.environ["MAPPING"]).read_text())
+          disposition = "SemanticSuccess"
+          receipt = {
+              "schema": "symthaea.formal.outcome-mapping.qualification.v1",
+              "tracking_issue": 6054,
+              "authority": "EvidenceOnly",
+              "result": mapping["dispositions"][disposition],
+              "qualification_kind": "CanonicalOutcomeMappingQualified",
+              "outcome_disposition": disposition,
+              "semantic_polarity": mapping["semantic_polarity"][disposition],
+              "raw_tool_outcome": "MappingValidatorAndHostileMutantsPassed",
+              "mapping_schema_version": mapping["schema"],
+              "mapping_schema_digest": sha256(os.environ["MAPPING"]),
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent": os.environ["EXACT_PARENT"],
+              "parent_is_ancestor": git("merge-base", os.environ["EXACT_PARENT"], "HEAD") == os.environ["EXACT_PARENT"],
+              "validator_blob": git("rev-parse", "HEAD:" + os.environ["VALIDATOR"]),
+              "mapping_blob": git("rev-parse", "HEAD:" + os.environ["MAPPING"]),
+              "nonclaims": [
+                  "not-verifier-correctness",
+                  "not-theorem-truth",
+                  "not-outcome-taxonomy-completeness",
+                  "not-tool-specific-implementation-refinement",
+                  "not-evidence-class-promotion",
+                  "not-automatic-claim-refutation",
+                  "not-runtime-authority"
+              ]
+          }
+          Path("/tmp/sym-fv-infra-003b-receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(Path("/tmp/sym-fv-infra-003b-receipt.json").read_text())
+          PY
+
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Retain qualification evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-infra-003b-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/sym-fv-infra-003b-receipt.json
+            /tmp/outcome-mapping.log
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Admit only canonical positive support
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          receipt = json.loads(Path("/tmp/sym-fv-infra-003b-receipt.json").read_text())
+          if receipt["result"] != "Pass":
+              raise SystemExit(f"SYM-FV-INFRA-003B not admitted: {receipt['result']}")
+          if receipt["outcome_disposition"] != "SemanticSuccess":
+              raise SystemExit("SYM-FV-INFRA-003B PASS without SemanticSuccess disposition")
+          if receipt["semantic_polarity"] != "PositiveSupport":
+              raise SystemExit("SYM-FV-INFRA-003B PASS without PositiveSupport semantic polarity")
+          print("SYM-FV-INFRA-003B admission: PASS + PositiveSupport")
+          PY
