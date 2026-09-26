@@ -58,7 +58,7 @@ theorem fail_result_not_admissible
     ¬ Admissible ref := by
   intro h
   rw [hResult] at h
-  exact QualificationResult.noConfusion h.2
+  cases h.2
 
 theorem blocked_result_not_admissible
     {Subject Scope Assumption : Type}
@@ -67,7 +67,7 @@ theorem blocked_result_not_admissible
     ¬ Admissible ref := by
   intro h
   rw [hResult] at h
-  exact QualificationResult.noConfusion h.2
+  cases h.2
 
 theorem environment_failure_not_admissible
     {Subject Scope Assumption : Type}
@@ -76,7 +76,7 @@ theorem environment_failure_not_admissible
     ¬ Admissible ref := by
   intro h
   rw [hResult] at h
-  exact QualificationResult.noConfusion h.2
+  cases h.2
 
 theorem advancing_live_generation_invalidates_prior_reference
     {Subject Scope Assumption : Type}
