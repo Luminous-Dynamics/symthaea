@@ -156,7 +156,21 @@ function exists.
 
 ## Mutation and negative controls
 
-Each declared hostile control records:
+Mutation applicability is never implicit. Every receipt declares exactly one
+control policy:
+
+```text
+Required
+```
+
+or:
+
+```text
+NotApplicable
+```
+
+`Required` means the mutation census must be non-empty. Each hostile control
+records:
 
 ```text
 id
@@ -171,11 +185,25 @@ where `observed_result` is one of:
 - `NotRun`
 - `InfrastructureFailure`
 
-A positive receipt may be `Pass` only when every declared mutation control
-actually reaches `ExpectedFail`.
+A positive receipt with `Required` controls may be `Pass` only when every
+mutation actually reaches `ExpectedFail`.
 
-This prevents a tool-installation error, parser crash, or skipped mutant from
-being misreported as semantic mutation sensitivity.
+`NotApplicable` is not an empty-list shortcut. It requires an empty mutation
+census **and a non-empty reason explaining why semantic mutation is not
+applicable to that evidence subject**.
+
+```text
+[] mutations
+!= controls passed
+
+NotApplicable
++ explicit reason
+!= mutation sensitivity established
+```
+
+This prevents vacuous success and also prevents a tool-installation error,
+parser crash, or skipped mutant from being misreported as semantic mutation
+sensitivity.
 
 ## Qualification result
 
@@ -283,10 +311,10 @@ qualification head/run identity
 pre/post subject digests
 ```
 
-Aeneas' current Lean workflow explicitly uses a Rust -> Charon -> LLBC -> Aeneas
--> Lean pipeline, and generated external-function templates can require
-hand-maintained models. Those models therefore belong in the receipt's explicit
-trust boundary, not in an invisible build step.
+The Aeneas path uses a Rust -> Charon -> LLBC -> Aeneas -> Lean pipeline, and
+generated external-function templates can require hand-maintained models. Those
+models therefore belong in the receipt's explicit trust boundary, not in an
+invisible build step.
 
 ## Verus-specific instantiation
 
@@ -326,6 +354,16 @@ python3 scripts/validate_formal_evidence_receipt_v1.py path/to/receipt.json [...
 
 The validator is intentionally zero-dependency. It verifies both the repository
 schema contract and semantic invariants JSON Schema alone cannot express.
+
+Its synthetic hostile self-tests reject at least:
+
+- statement-digest drift;
+- mutable PASS subjects;
+- semantic mutants that unexpectedly pass;
+- multiple primary evidence classes;
+- `Required` controls with an empty mutation census;
+- `NotApplicable` without an explicit reason;
+- `NotApplicable` carrying hidden mutations.
 
 ## Deliberate nonclaims
 
