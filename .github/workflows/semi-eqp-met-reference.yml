@@ -1,0 +1,21 @@
+name: SEMI-EQP-MET Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - "scripts/semi-eqp-met-001a-reference.py"
+      - "docs/release/evidence/semi-eqp-met-001a-synthetic-corpus-v1.json"
+      - ".github/workflows/semi-eqp-met-reference.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-corpus:
+    name: Frozen 16-case inspection benchmark corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run independent SEMI-EQP-MET reference validator
+        run: python3 scripts/semi-eqp-met-001a-reference.py
