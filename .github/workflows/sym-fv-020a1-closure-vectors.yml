@@ -1,0 +1,115 @@
+name: SYM-FV-020A1 Closure Vectors
+
+on:
+  pull_request:
+    paths:
+      - "docs/formal/FORMAL_CLOSURE_VECTOR_V1.md"
+      - "docs/formal/formal_closure_vector_v1.schema.json"
+      - "docs/formal/formal_closure_vector_v1.examples.json"
+      - "scripts/validate_formal_closure_vector_v1.py"
+      - ".github/workflows/sym-fv-020a1-closure-vectors.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-fv-020a1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  closure-vector-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXACT_PARENT: eae17187e199e3a53d108b437c0215b5ff812261
+      REQUESTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact lineage and five-file scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$REQUESTED_HEAD"
+          test "$(git merge-base "$EXACT_PARENT" HEAD)" = "$EXACT_PARENT"
+          mapfile -t changed < <(git diff --name-only "$EXACT_PARENT"...HEAD | sort)
+          expected=(
+            ".github/workflows/sym-fv-020a1-closure-vectors.yml"
+            "docs/formal/FORMAL_CLOSURE_VECTOR_V1.md"
+            "docs/formal/formal_closure_vector_v1.examples.json"
+            "docs/formal/formal_closure_vector_v1.schema.json"
+            "scripts/validate_formal_closure_vector_v1.py"
+          )
+          mapfile -t expected_sorted < <(printf '%s\n' "${expected[@]}" | sort)
+          diff -u <(printf '%s\n' "${expected_sorted[@]}") <(printf '%s\n' "${changed[@]}")
+
+      - name: Validate schema, seeded subjects, and hostile controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile scripts/validate_formal_closure_vector_v1.py
+          python3 scripts/validate_formal_closure_vector_v1.py | tee /tmp/sym-fv-020a1-validator.txt
+          grep -qx 'formal_closure_vector_v1=PASS' /tmp/sym-fv-020a1-validator.txt
+
+      - name: Postflight and exact-head receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def sha256(path):
+              return hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+
+          receipt = {
+              "schema": "symthaea.formal.sym-fv-020a1-qualification.v1",
+              "tracking_issue": 6013,
+              "authority": "EvidenceOnly",
+              "result": "Pass",
+              "qualification_kind": "ClosureVectorContractQualified",
+              "head": git("rev-parse", "HEAD"),
+              "tree": git("rev-parse", "HEAD^{tree}"),
+              "parent": os.environ["EXACT_PARENT"],
+              "parent_is_ancestor": git("merge-base", os.environ["EXACT_PARENT"], "HEAD") == os.environ["EXACT_PARENT"],
+              "artifacts": {
+                  "schema_sha256": sha256("docs/formal/formal_closure_vector_v1.schema.json"),
+                  "examples_sha256": sha256("docs/formal/formal_closure_vector_v1.examples.json"),
+                  "validator_sha256": sha256("scripts/validate_formal_closure_vector_v1.py"),
+                  "boundary_doc_sha256": sha256("docs/formal/FORMAL_CLOSURE_VECTOR_V1.md"),
+              },
+              "nonclaims": [
+                  "not-theorem-truth",
+                  "not-receipt-implementation-refinement",
+                  "not-production-correctness",
+                  "not-runtime-authority",
+              ],
+          }
+          out = pathlib.Path("/tmp/sym-fv-020a1-receipt.json")
+          out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print(out.read_text())
+          PY
+
+      - name: Retain closure-vector evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sym-fv-020a1-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            /tmp/sym-fv-020a1-validator.txt
+            /tmp/sym-fv-020a1-receipt.json
+          if-no-files-found: error
+          retention-days: 30
