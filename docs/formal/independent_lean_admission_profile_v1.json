@@ -1,0 +1,92 @@
+{
+  "schema": "symthaea.formal.independent-lean-admission-profile.v1",
+  "tracking_issue": 6014,
+  "authority": "EvidenceOnly",
+  "status": "CandidateProfileNeedsQualification",
+  "lean": {
+    "repository": "leanprover/lean4",
+    "toolchain": "v4.34.1",
+    "release_date": "2026-09-24"
+  },
+  "tools": {
+    "landrun": {
+      "repository": "zouuup/landrun",
+      "commit": "5ed4a3db3a4ad930d577215c6b9abaa19df7f99f"
+    },
+    "lean4export": {
+      "repository": "leanprover/lean4export",
+      "commit": "076e8e57707e813375e8f9da8bf989799ace9680",
+      "build_rule": "build against the exact workspace lean-toolchain; moving/default toolchain forbidden"
+    },
+    "comparator": {
+      "repository": "leanprover/comparator",
+      "commit": "d03acab154d269c06e60e4de7e4cc85deebff94b"
+    },
+    "nanoda": {
+      "repository": "robsimmons/nanoda_lib",
+      "commit": "68d5ca9db226849b41a6fff59d796ff19d0a8840"
+    }
+  },
+  "upstream_reference": {
+    "profile": "leanprover/lean-eval SECURITY pin table observed 2026-09-26",
+    "lean_version_in_reference_profile": "v4.34.0",
+    "candidate_difference": "Symthaea candidate uses Lean v4.34.1; compatibility must execute before admission"
+  },
+  "compatibility": {
+    "lean_4_34_1_with_pinned_lean4export": "NeedsQualification",
+    "lean_4_34_1_with_pinned_comparator": "NeedsQualification",
+    "nanoda_export_replay": "NeedsQualification",
+    "landrun_sandbox_profile": "NeedsQualification"
+  },
+  "required_checkers": [
+    "OfficialLeanKernel",
+    "Nanoda"
+  ],
+  "optional_later_profile": {
+    "name": "IndependentLeanParanoid",
+    "status": "NotAdmittedByThisProfile",
+    "note": "additional comparator-supported external kernels require separate immutable pins and qualification"
+  },
+  "statement_binding": {
+    "challenge_statement_must_be_content_addressed": true,
+    "solution_bridge_must_be_fixed_and_reviewed": true,
+    "export_must_bind_exact_challenge_and_solution_subject": true,
+    "proof_receipt_may_not_survive_statement_digest_change": true
+  },
+  "axiom_policy": {
+    "mode": "ConstitutionalAllowlist",
+    "sorry_ax_forbidden": true,
+    "undeclared_axioms_forbidden": true,
+    "policy_identity_required_in_receipt": true
+  },
+  "qualification_result_mapping": {
+    "all_required_checkers_accept_and_axiom_policy_accepts": "Pass",
+    "checker_disagreement": "Blocked",
+    "checker_or_sandbox_unavailable": "EnvironmentFailure",
+    "malformed_or_rejected_proof_subject": "Fail"
+  },
+  "diagnostic_classes": [
+    "OfficialAcceptsExternalRejects",
+    "OfficialRejectsExternalAccepts",
+    "ExternalCheckerUnavailable",
+    "ExportIncompatible",
+    "SandboxUnavailable",
+    "AxiomPolicyRejected",
+    "StatementBindingMismatch"
+  ],
+  "claim_ceiling": [
+    "independent checker agreement strengthens checker-trust evidence for the same theorem subject",
+    "does not strengthen theorem statement semantics",
+    "does not establish Rust source refinement",
+    "does not establish compiler or native binary correctness",
+    "does not grant runtime authority"
+  ],
+  "nonclaims": [
+    "ComparatorPipelineQualified",
+    "Lean4341CompatibilityEstablished",
+    "NanodaAgreementExecuted",
+    "TheoremTruthEstablishedByThisManifest",
+    "SourceRefinementEstablished",
+    "RuntimeAuthority"
+  ]
+}
