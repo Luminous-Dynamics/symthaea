@@ -1,0 +1,42 @@
+name: ENG-DESIGN-004A Poetic Engineering Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_eng_design_004a_poetic.py'
+      - '.github/workflows/eng-design-004a-poetic.yml'
+      - 'docs/engineering/ENG_DESIGN_004A_POETIC_ENGINEERING.md'
+      - 'docs/release/evidence/eng-design-004a-poetic-engineering-reference-v1.json'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - name: Verify exact source subject and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=24076677fbed65536c1abe86ad50b22eee6a1b67
+          test "$(git rev-parse HEAD^)" = "$SOURCE"
+          test "$(git rev-parse HEAD^:docs/engineering/ENG_DESIGN_004A_POETIC_ENGINEERING.md)" = "f496f926af38ef0ec66643f04ab198c64ac7174a"
+          test "$(git rev-parse HEAD^:docs/release/evidence/eng-design-004a-poetic-engineering-reference-v1.json)" = "aef8e7637ba958dc6c8c99ca49a58c1b28ddf3aa"
+          mapfile -t files < <(git diff --name-only HEAD^..HEAD | sort)
+          expected=(
+            ".github/workflows/eng-design-004a-poetic.yml"
+            "scripts/validate_eng_design_004a_poetic.py"
+          )
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = "${expected[0]}"
+          test "${files[1]}" = "${expected[1]}"
+      - name: Execute independent oracle
+        run: python3 scripts/validate_eng_design_004a_poetic.py
+      - name: Clean postflight
+        shell: bash
+        run: test -z "$(git status --porcelain)"
