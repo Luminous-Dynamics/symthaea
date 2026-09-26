@@ -26,7 +26,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sym-fv-002-${{ github.ref }}
+  group: sym-fv-002-${{ github.event.pull_request.head.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -40,10 +40,12 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Record exact Git subject
         run: |
           set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
           git rev-parse HEAD
           git rev-parse HEAD^{tree}
           git status --porcelain=v1 --untracked-files=all
@@ -142,6 +144,7 @@ jobs:
               "known_bad_output_sha256": sha256(paths["known_bad_output"]),
               "static_contract": "PASS",
               "negative_controls": "PASS",
+              "exact_head_checkout": True,
               "known_bad_lean_subject_rejected": True,
               "lean_exit_zero": True,
               "sorryAx_absent": True,
@@ -163,7 +166,7 @@ jobs:
       - name: Retain proof evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: sym-fv-002-${{ github.sha }}
+          name: sym-fv-002-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             /tmp/sym-fv-002-lean-version.txt
             /tmp/sym-fv-002-lean-output.txt
