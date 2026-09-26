@@ -38,7 +38,7 @@ jobs:
       - name: Prove builder is failed tree plus builder only
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "$ORIGINAL_PARENT"
+          test "$(git rev-parse "$FAILED_SOURCE^")" = "$ORIGINAL_PARENT"
           test "$(git rev-parse "$FAILED_SOURCE^{tree}")" = "$FAILED_TREE"
           mapfile -t changed < <(git diff --name-only "$FAILED_SOURCE" HEAD)
           test "${#changed[@]}" -eq 1
@@ -69,23 +69,42 @@ jobs:
           test -z "$(git diff --name-only | grep -v "^${PACKAGE_PATH}/" || true)"
           git diff --check
           git diff --stat "$FAILED_SOURCE" -- "$PACKAGE_PATH"
-          git diff "$FAILED_SOURCE" -- "$PACKAGE_PATH" > /tmp/mag-exp-002r-rustfmt.patch
 
       - name: Construct one-commit repair with original parent
         run: |
           set -euo pipefail
           rm "$BUILDER_WORKFLOW"
           git add -A "$PACKAGE_PATH" "$BUILDER_WORKFLOW"
-          test -z "$(git diff --cached --name-only | grep -v "^${PACKAGE_PATH}/" || true)"
           TREE=$(git write-tree)
+
+          # The builder workflow exists only in the temporary builder subject.
+          # Validate the candidate tree against the scientific parent rather
+          # than incorrectly treating that intentional deletion as contamination.
+          mapfile -t parent_delta < <(git diff --name-only "$ORIGINAL_PARENT" "$TREE")
+          test "${#parent_delta[@]}" -gt 0
+          test -z "$(printf '%s\n' "${parent_delta[@]}" | grep -v "^${PACKAGE_PATH}/" || true)"
+
+          # The only difference between the failed scientific subject and the
+          # reconstructed candidate must likewise remain inside the experiment crate.
+          mapfile -t canonical_delta < <(git diff --name-only "$FAILED_SOURCE" "$TREE")
+          test "${#canonical_delta[@]}" -gt 0
+          test -z "$(printf '%s\n' "${canonical_delta[@]}" | grep -v "^${PACKAGE_PATH}/" || true)"
+          git diff --check "$ORIGINAL_PARENT" "$TREE"
+
+          if git cat-file -e "$TREE:$BUILDER_WORKFLOW" 2>/dev/null; then
+            echo "Builder workflow leaked into reconstructed scientific tree" >&2
+            exit 1
+          fi
+
           export GIT_AUTHOR_NAME='Tristan Stoltz'
           export GIT_AUTHOR_EMAIL='tristan.stoltz@evolvingresonantcocreationism.com'
           export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
           export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
           COMMIT=$(printf '%s\n' 'MAG-EXP-002R: reconstruct executable readiness experiment with pinned rustfmt' | git commit-tree "$TREE" -p "$ORIGINAL_PARENT")
           test "$(git rev-parse "$COMMIT^")" = "$ORIGINAL_PARENT"
+          test "$(git rev-parse "$COMMIT^{tree}")" = "$TREE"
           test -z "$(git diff --name-only "$ORIGINAL_PARENT" "$COMMIT" | grep -v "^${PACKAGE_PATH}/" || true)"
-          printf 'REPAIR_COMMIT=%s\nREPAIR_TREE=%s\n' "$COMMIT" "$(git rev-parse "$COMMIT^{tree}")"
+          printf 'REPAIR_COMMIT=%s\nREPAIR_TREE=%s\n' "$COMMIT" "$TREE"
           git push origin "$COMMIT:refs/heads/$TARGET_BRANCH"
 
       - name: Prove pushed identity
@@ -94,4 +113,5 @@ jobs:
           REMOTE=$(git ls-remote origin "refs/heads/$TARGET_BRANCH" | cut -f1)
           test -n "$REMOTE"
           test "$(git rev-parse "$REMOTE^")" = "$ORIGINAL_PARENT"
+          test -z "$(git diff --name-only "$ORIGINAL_PARENT" "$REMOTE" | grep -v "^${PACKAGE_PATH}/" || true)"
           printf 'PUSHED_REPAIR=%s\nPUSHED_TREE=%s\n' "$REMOTE" "$(git rev-parse "$REMOTE^{tree}")"
