@@ -10,7 +10,14 @@
     "Blocked",
     "EnvironmentFailure"
   ],
+  "semantic_polarity_states": [
+    "PositiveSupport",
+    "SemanticCounterevidence",
+    "QualificationNegative",
+    "NoSemanticConclusion"
+  ],
   "closed_world_default": "Blocked",
+  "closed_world_semantic_default": "NoSemanticConclusion",
   "dispositions": {
     "SemanticSuccess": "Pass",
     "SemanticCounterexample": "Fail",
@@ -26,8 +33,25 @@
     "ToolInstallationFailure": "EnvironmentFailure",
     "RunnerInfrastructureFailure": "EnvironmentFailure"
   },
+  "semantic_polarity": {
+    "SemanticSuccess": "PositiveSupport",
+    "SemanticCounterexample": "SemanticCounterevidence",
+    "ProofOrQualificationFailure": "QualificationNegative",
+    "UnsupportedBoundary": "NoSemanticConclusion",
+    "InsufficientBound": "NoSemanticConclusion",
+    "ResourceExhaustion": "NoSemanticConclusion",
+    "MissingPrerequisite": "NoSemanticConclusion",
+    "StaleSubjectOrDependency": "NoSemanticConclusion",
+    "AmbiguousOrUnknownOutcome": "NoSemanticConclusion",
+    "UnclassifiedToolCrash": "NoSemanticConclusion",
+    "EnvironmentUnavailable": "NoSemanticConclusion",
+    "ToolInstallationFailure": "NoSemanticConclusion",
+    "RunnerInfrastructureFailure": "NoSemanticConclusion"
+  },
   "hostile_control_requirement": {
     "accepted_only_on_expected_semantic_failure": true,
+    "semantic_counterevidence_required_for_refutation": true,
+    "qualification_failure_must_not_count_as_counterevidence": true,
     "resource_exhaustion_must_not_count_as_rejection": true,
     "insufficient_bound_must_not_count_as_rejection": true,
     "environment_failure_must_not_count_as_rejection": true
@@ -35,6 +59,7 @@
   "receipt_fields": [
     "result",
     "outcome_disposition",
+    "semantic_polarity",
     "raw_tool_outcome",
     "mapping_schema_version",
     "mapping_schema_digest"
@@ -65,12 +90,19 @@
       "rust_driver_environment_failure": "EnvironmentUnavailable"
     }
   },
+  "semantic_rules": [
+    "operational-fail-does-not-by-itself-refute-property",
+    "only-semantic-counterevidence-may-participate-in-refutation",
+    "qualification-negative-prevents-positive-admission-without-implying-property-false",
+    "no-semantic-conclusion-carries-neither-positive-support-nor-refutation-authority"
+  ],
   "nonclaims": [
     "VerifierCorrectness",
     "TheoremTruth",
     "OutcomeTaxonomyCompleteness",
     "ImplementationRefinement",
     "EvidenceClassPromotion",
+    "RefutationWithoutExplicitClaimRelation",
     "RuntimeAuthority"
   ]
 }
