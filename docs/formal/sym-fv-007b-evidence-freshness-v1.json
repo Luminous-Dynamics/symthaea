@@ -17,6 +17,7 @@
   ],
   "qualification_receipt_result": "Pass",
   "proof_checker_outcome": "LeanTypechecked",
+  "qualification_lifecycle": "CancelSupersededPrRuns",
   "admission_rule": "ExactGenerationAndPassOnly",
   "theorem_path": "formal/lean/evidence/EvidenceFreshness.lean",
   "theorem_blob": "21e8a2633be61b96d1c66c7b589fdd179ce2758e",
