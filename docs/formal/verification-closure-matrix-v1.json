@@ -120,10 +120,10 @@
       "id": "PULSE-REPLAY-RECONCILIATION",
       "owner": "mycelix-pulse",
       "claim": "Duplicate/replayed logical operation identities are rejected without corrupting the modeled reconciliation state",
-      "evidence_refs": ["luminous-dynamics#3193", "luminous-dynamics#3211"],
+      "evidence_refs": ["luminous-dynamics#3193", "luminous-dynamics#3211", "luminous-dynamics#3221", "luminous-dynamics#3222", "luminous-dynamics#3224", "luminous-dynamics#3223"],
       "assumptions": ["bounded model domain until broader proof/refinement exists", "Holochain remains agent-centric rather than a global-consensus substrate"],
-      "blocking_dependencies": ["repair remote-origin/local-author persistence boundary", "freeze canonical dedup index", "separate vector-clock Equal from Concurrent", "reject dependency cycles/unresolved in-batch dependencies", "extract production-owned pure reconciliation kernel", "canonical Quint model", "state projection"],
-      "current_qualification": {"result": "Blocked", "reason": "source-level reconciliation blockers must be repaired before model-based conformance can be admissible"},
+      "blocking_dependencies": ["qualify production-owned reconciliation kernel (#3221)", "qualify coordinator shared-kernel adapter and admitted-dependency semantics (#3224)", "replace foreign SyncOperation re-authoring with provenance-bound import receipts (#3223)", "freeze provenance-aware durable dedup identity and equivocation handling (#3223)", "qualify Holochain source-record/import persistence fixtures", "canonical Quint model over post-A3 state", "production state projection and deterministic trace driver"],
+      "current_qualification": {"result": "Blocked", "reason": "A1/A2 exact-head RuntimeQualification is still queued and A3 provenance/dedup persistence is not yet implemented; Quint conformance is intentionally downstream"},
       "closure": {
         "mathematical_spec": "Open",
         "source_refinement": "Open",
@@ -137,7 +137,7 @@
         "runtime_identity": "Open",
         "cross_repo_subject_closure": "Open"
       },
-      "nonclaims": ["global consensus", "unbounded liveness", "whole-Holochain correctness", "persistence correctness before integration qualification"]
+      "nonclaims": ["global consensus", "unbounded liveness", "whole-Holochain correctness", "foreign provenance correctness before A3 integration qualification", "Quint PASS compensates for persistence/provenance defects"]
     },
     {
       "id": "EVIDENCE-NON-AMPLIFICATION",
