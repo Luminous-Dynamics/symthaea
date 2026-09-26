@@ -1,0 +1,69 @@
+{
+  "schema": "symthaea.formal.hdc-crypto-fv-001b-common-mask.v1",
+  "tracking_issue": 5844,
+  "parent_pr": 5861,
+  "authority": "EvidenceOnly",
+  "evidence_class": "AbstractFormalTheorem",
+  "exact_parent": {
+    "commit": "9d1d279bdfad2dde43c4cde85ccfc98880f51dd1",
+    "abstract_hdc_proof": {
+      "path": "formal/lean/hdc/BinaryHVBind.lean",
+      "blob": "f724618781b2660d1e76e45a69dcf796a792d76d"
+    },
+    "attack_proof": {
+      "path": "formal/lean/hdc/HdcCryptoAttacks.lean",
+      "blob": "df18652dad946dcc1d22da335eba4ee78838b07e"
+    }
+  },
+  "production_future_refinement_target": {
+    "commit": "9d1d279bdfad2dde43c4cde85ccfc98880f51dd1",
+    "path": "crates/core/symthaea-hdc-crypto/src/fhe.rs",
+    "blob": "bd67fdc42dc9ed598b2c93f80995324db066c9a7",
+    "symbols": [
+      "EncryptedHV::encrypt",
+      "EncryptedHV::encrypted_similarity",
+      "CollectiveWisdomPool"
+    ],
+    "source_semantics": [
+      "EncryptedHV::encrypt stores plaintext.bind(mask)",
+      "same-mask encrypted similarity is documented as the true similarity",
+      "CollectiveWisdomPool deliberately reuses one mask and is quarantined as non-privacy-preserving"
+    ],
+    "relationship": "future-refinement-target-not-proved-here"
+  },
+  "formal_subject": {
+    "path": "formal/lean/hdc/HdcCryptoCommonMask.lean",
+    "namespace": "Symthaea.Formal.HDC.CryptoCommonMask",
+    "reuses_parent_binaryhv": true,
+    "defines_hamming_distance": false,
+    "theorems": [
+      "common_mask_preserves_pairwise_xor",
+      "common_mask_leaks_pairwise_relation",
+      "common_mask_preserves_pairwise_xor_swapped"
+    ]
+  },
+  "primary_claim": "For every abstract 16384-bit BinaryHV x, y, and mask, XOR-masking x and y with the same mask preserves their entire pairwise XOR relation exactly.",
+  "deferred_corollaries": [
+    {
+      "target": "SYM-FV-004",
+      "statement": "derive exact Hamming-distance preservation only after Hamming/popcount semantics are independently formalized"
+    }
+  ],
+  "required_negative_controls": [
+    "different-mask-on-second-operand",
+    "wrong-rhs",
+    "theorem-deletion",
+    "proof-hole",
+    "parent-algebra-redefinition",
+    "production-source-rebinding",
+    "claim-escalation-to-hamming-or-production-refinement"
+  ],
+  "nonclaims": [
+    "pairwise-xor-theorem-is-not-yet-a-hamming-distance-theorem",
+    "abstract-theorem-is-not-production-rust-refinement",
+    "abstract-theorem-is-not-proof-that-all-hdc-cryptography-is-insecure",
+    "abstract-theorem-is-not-a-semantic-security-theorem",
+    "abstract-theorem-is-not-a-rustc-llvm-or-native-binary-proof",
+    "abstract-theorem-grants-no-runtime-authority"
+  ]
+}
