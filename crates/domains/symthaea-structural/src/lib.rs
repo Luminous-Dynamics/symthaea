@@ -23,6 +23,9 @@
 //!   elimination), with static-determinacy checks; member design check ties
 //!   solved forces to axial stress and compression-member buckling safety.
 //!
+//! Evidence-bearing callers should use [`checked`] so invalid mathematical
+//! domains and non-finite results fail closed before becoming evidence.
+//!
 //! Not yet: 3D / frame solvers (stiffness matrix), indeterminate structures,
 //! dynamics — the intended next direction.
 //!
@@ -42,6 +45,7 @@
 //! ```
 
 pub mod beam;
+pub mod checked;
 pub mod design;
 pub mod material;
 pub mod member;
@@ -49,6 +53,7 @@ pub mod section;
 pub mod truss;
 
 pub use beam::{Beam, BeamResult, LoadCase};
+pub use checked::{CheckedBeamResult, CheckedStructuralError};
 pub use design::{DesignError, MemberCheck, MemberProperty, check_truss_members};
 pub use material::Material;
 pub use member::{axial_elongation, axial_strain, axial_stress, euler_buckling_load};
