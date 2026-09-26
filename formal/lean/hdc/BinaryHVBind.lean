@@ -32,38 +32,39 @@ theorem bit_bind (a b : BinaryHV) (i : BitIndex) :
 /-- Zero is a right identity for binding. -/
 theorem bind_zero_right (a : BinaryHV) : bind a zero = a := by
   funext i
-  cases h : a i <;> rfl
+  cases h : a i <;> simp [bind, zero, h]
 
 /-- Zero is a left identity for binding. -/
 theorem bind_zero_left (a : BinaryHV) : bind zero a = a := by
   funext i
-  cases h : a i <;> rfl
+  cases h : a i <;> simp [bind, zero, h]
 
 /-- Every BinaryHV is its own inverse under XOR binding. -/
 theorem bind_self_inverse (a : BinaryHV) : bind a a = zero := by
   funext i
-  cases h : a i <;> rfl
+  cases h : a i <;> simp [bind, zero, h]
 
 /-- XOR binding is commutative. -/
 theorem bind_comm (a b : BinaryHV) : bind a b = bind b a := by
   funext i
-  cases ha : a i <;> cases hb : b i <;> rfl
+  cases ha : a i <;> cases hb : b i <;> simp [bind, ha, hb]
 
 /-- XOR binding is associative. -/
 theorem bind_assoc (a b c : BinaryHV) :
     bind (bind a b) c = bind a (bind b c) := by
   funext i
-  cases ha : a i <;> cases hb : b i <;> cases hc : c i <;> rfl
+  cases ha : a i <;> cases hb : b i <;> cases hc : c i <;>
+    simp [bind, ha, hb, hc]
 
 /-- Binding with the same right operand recovers the original vector. -/
 theorem unbind_right (a b : BinaryHV) : bind (bind a b) b = a := by
   funext i
-  cases ha : a i <;> cases hb : b i <;> rfl
+  cases ha : a i <;> cases hb : b i <;> simp [bind, ha, hb]
 
 /-- Binding with the same left operand recovers the other vector. -/
 theorem unbind_left (a b : BinaryHV) : bind (bind a b) a = b := by
   funext i
-  cases ha : a i <;> cases hb : b i <;> rfl
+  cases ha : a i <;> cases hb : b i <;> simp [bind, ha, hb]
 
 -- Retain the exact trusted-axiom census in the Lean checker output.
 #print axioms bit_bind
