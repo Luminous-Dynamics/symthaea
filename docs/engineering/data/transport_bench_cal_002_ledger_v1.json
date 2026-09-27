@@ -1,0 +1,98 @@
+{
+  "schema": "transport-bench-cal-002-ledger-v1",
+  "issue": 6277,
+  "status": "SourceContractOnly",
+  "registry_dependencies": [
+    {
+      "issue": 6255,
+      "role": "external benchmark architecture"
+    },
+    {
+      "issue": 6264,
+      "role": "benchmark-to-physical transfer calibration"
+    },
+    {
+      "issue": 6270,
+      "role": "minimal complementary portfolio"
+    }
+  ],
+  "evidence_use_states": [
+    "ObservedOnly",
+    "Calibrating",
+    "ConditionallyDecisionRelevant",
+    "TransferFailed",
+    "OutOfProfile",
+    "Expired",
+    "Retired"
+  ],
+  "required_bindings": [
+    "external_registry_generation",
+    "benchmark_entry_id",
+    "benchmark_version",
+    "task",
+    "split",
+    "evaluator",
+    "symthaea_subject_generation",
+    "odd_profile",
+    "decision_proposition",
+    "transfer_hypothesis",
+    "independent_transfer_target",
+    "common_mode_roots",
+    "baseline_identity",
+    "ablation_identities",
+    "development_exposure",
+    "confirmatory_exposure",
+    "rights_use_disposition",
+    "resource_context",
+    "currentness_conditions",
+    "claim_ceiling"
+  ],
+  "prospective_fields": [
+    "hypothesis_id",
+    "predicted_observable",
+    "expected_direction",
+    "uncertainty_interval",
+    "benchmark_subject",
+    "decision_proposition",
+    "independent_target",
+    "common_mode_roots",
+    "development_exposure",
+    "confirmatory_exposure",
+    "baseline",
+    "ablations"
+  ],
+  "outcome_fields": [
+    "observed_result",
+    "transfer_class",
+    "direction_correct",
+    "effect_estimate",
+    "interval_coverage",
+    "failure_mode",
+    "applicability_boundary",
+    "decision_consequence"
+  ],
+  "records": [],
+  "mutation_requirements": [
+    "benchmark_pass_to_decision_relevance",
+    "post_result_hypothesis_change",
+    "post_result_confirmatory_target_selection",
+    "silent_benchmark_version_change",
+    "evaluator_substitution",
+    "common_mode_root_removal",
+    "physical_transfer_failure_omission",
+    "retroactive_out_of_profile_laundering",
+    "expired_to_current",
+    "rights_change_ignored",
+    "model_generation_change_without_requalification",
+    "odd_expansion_without_transfer",
+    "score_to_authority",
+    "single_sample_to_mode_wide_claim",
+    "evidence_state_to_actuator_authority",
+    "historical_record_overwrite",
+    "baseline_removal_after_result",
+    "redundancy_as_independence",
+    "decision_consequence_without_new_hypothesis",
+    "uncertainty_collapse"
+  ],
+  "claim_ceiling": "DecisionBoundBenchmarkCalibrationMetadataOnly"
+}
