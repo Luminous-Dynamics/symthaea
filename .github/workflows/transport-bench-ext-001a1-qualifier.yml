@@ -1,0 +1,77 @@
+name: TRANSPORT-BENCH-EXT-001A1 exact-head qualifier
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'scripts/validate_transport_bench_ext_001a.py'
+      - '.github/workflows/transport-bench-ext-001a1-qualifier.yml'
+      - 'docs/engineering/TRANSPORT_BENCH_EXT_001A.md'
+      - 'docs/engineering/data/transport_bench_ext_001a_registry_v1.json'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Record runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse HEAD
+          git rev-parse HEAD^ || true
+          command -v python3
+          python3 --version
+          sha256sum "$(command -v python3)" || true
+          uname -a
+          cat /etc/os-release
+
+      - name: Bind exact frozen source and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE='9e00c54f5f5c319df2c25d4af4a2381a21ffc4e9'
+          SOURCE_TREE='ff87b6915904e7d4a82862c0e4e101dc0d51e099'
+          DOC_BLOB='f5e095e66d331c62cc97dd6a327d965c0d5bd1ec'
+          REG_BLOB='9a062ed4258ef0af148faf4f33d865cc5e749287'
+          REG_SHA256='87cbe6e38b84aaeecfa188997774b64aec209b314f158b2f7867ee9f34b29665'
+
+          test "$(git rev-parse HEAD^)" = "$SOURCE"
+          test "$(git rev-parse "$SOURCE^{tree}")" = "$SOURCE_TREE"
+          test "$(git rev-parse "$SOURCE:docs/engineering/TRANSPORT_BENCH_EXT_001A.md")" = "$DOC_BLOB"
+          test "$(git rev-parse "$SOURCE:docs/engineering/data/transport_bench_ext_001a_registry_v1.json")" = "$REG_BLOB"
+          test "$(sha256sum docs/engineering/data/transport_bench_ext_001a_registry_v1.json | awk '{print $1}')" = "$REG_SHA256"
+
+          actual="$(git diff --name-only "$SOURCE"..HEAD | LC_ALL=C sort)"
+          expected="$(printf '%s\n' '.github/workflows/transport-bench-ext-001a1-qualifier.yml' 'scripts/validate_transport_bench_ext_001a.py' | LC_ALL=C sort)"
+          test "$actual" = "$expected"
+
+      - name: Independent registry oracle and mutations
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_transport_bench_ext_001a.py \
+            docs/engineering/data/transport_bench_ext_001a_registry_v1.json \
+            --mutations
+
+      - name: Postflight source immutability and clean tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE='9e00c54f5f5c319df2c25d4af4a2381a21ffc4e9'
+          test "$(git rev-parse "$SOURCE:docs/engineering/TRANSPORT_BENCH_EXT_001A.md")" = 'f5e095e66d331c62cc97dd6a327d965c0d5bd1ec'
+          test "$(git rev-parse "$SOURCE:docs/engineering/data/transport_bench_ext_001a_registry_v1.json")" = '9a062ed4258ef0af148faf4f33d865cc5e749287'
+          test "$(sha256sum docs/engineering/data/transport_bench_ext_001a_registry_v1.json | awk '{print $1}')" = '87cbe6e38b84aaeecfa188997774b64aec209b314f158b2f7867ee9f34b29665'
+          git diff --exit-code "$SOURCE" -- \
+            docs/engineering/TRANSPORT_BENCH_EXT_001A.md \
+            docs/engineering/data/transport_bench_ext_001a_registry_v1.json
+          test -z "$(git status --porcelain --untracked-files=all)"
