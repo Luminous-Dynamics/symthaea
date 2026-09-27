@@ -1,0 +1,61 @@
+name: IND-COMP Reference Qualification
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_ind_comp_001a.py'
+      - 'docs/release/evidence/ind-comp-001a-functional-component-reference-v1.json'
+      - '.github/workflows/ind-comp-reference.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  reference-qualification:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Verify exact qualifier lineage and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha }}'
+          expected_parent='b2346d0383567063893e37ce219ec15f631a9cb7'
+          actual_head="$(git rev-parse HEAD)"
+          actual_parent="$(git rev-parse HEAD^)"
+          test "$actual_head" = "$expected_head"
+          test "$actual_parent" = "$expected_parent"
+          changed="$(git diff --name-only "$actual_parent" "$actual_head" | sort)"
+          expected_changed=$'.github/workflows/ind-comp-reference.yml\nscripts/validate_ind_comp_001a.py'
+          test "$changed" = "$expected_changed"
+          printf 'QUALIFIER_HEAD=%s\nSOURCE_PARENT=%s\nQUALIFIER_SCOPE=%s\n' "$actual_head" "$actual_parent" "$changed"
+
+      - name: Record execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          py="$(readlink -f "$(command -v python3)")"
+          printf 'PYTHON_PATH=%s\n' "$py"
+          sha256sum "$py"
+          python3 --version
+          uname -a
+          cat /etc/os-release
+
+      - name: Execute independent functional-component validator
+        run: python3 scripts/validate_ind_comp_001a.py
+
+      - name: Postflight exact-head and clean-tree check
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = 'b2346d0383567063893e37ce219ec15f631a9cb7'
+          test -z "$(git status --porcelain)"
+          echo 'POSTFLIGHT_EXACT_HEAD_AND_CLEAN_TREE=PASS'
