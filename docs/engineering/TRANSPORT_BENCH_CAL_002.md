@@ -6,10 +6,7 @@ Parent programs: #6264, #6270, #6255.
 
 ## Core theorem
 
-benchmark result
-NaN
-NaN
-NaN
+benchmark result != decision permission != permanent evidence validity != transfer validity outside its calibrated profile
 
 A benchmark may be useful evidence for one narrowly declared engineering proposition while remaining irrelevant to another. The same benchmark result must not be silently reused after its benchmark, evaluator, model, ODD, physical article, measurement basis, rights, or transfer calibration changes.
 
