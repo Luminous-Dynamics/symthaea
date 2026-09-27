@@ -1,0 +1,77 @@
+name: MAT-ENG-TIM-001A1 exact-head qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_mat_eng_tim_001a.py'
+      - '.github/workflows/mat-eng-tim-001a1-qualifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-oracle:
+    name: Independent MAT-ENG-TIM-001A oracle
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Verify exact qualifier lineage and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha || github.sha }}'
+          expected_source='e2cff3b2b16e4424b53a2a1838c27bed4f508a64'
+          expected_parent='fbd7a754ea8389ca93f7680d93ed8b48553e6376'
+          actual_head="$(git rev-parse HEAD)"
+          actual_source="$(git rev-parse HEAD^)"
+          actual_parent="$(git rev-parse HEAD^^)"
+          test "$actual_head" = "$expected_head"
+          test "$actual_source" = "$expected_source"
+          test "$actual_parent" = "$expected_parent"
+          changed="$(git diff --name-only "$actual_source" "$actual_head" | sort)"
+          expected_changed=$'.github/workflows/mat-eng-tim-001a1-qualifier.yml\nscripts/validate_mat_eng_tim_001a.py'
+          test "$changed" = "$expected_changed"
+          printf 'QUALIFIER_HEAD=%s\nSOURCE_HEAD=%s\nSOURCE_PARENT=%s\nQUALIFIER_SCOPE=%s\n' "$actual_head" "$actual_source" "$actual_parent" "$changed"
+
+      - name: Verify frozen source blobs and corpus digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^:docs/engineering/MAT_ENG_TIM_001A.md)" = 'a330661fb8e0462a2a1bab5ca6c0d03ed30ef1d7'
+          test "$(git rev-parse HEAD^:docs/engineering/data/mat_eng_tim_001a_reference_v1.json)" = 'dd677417337cfb1372e556cc90423b7b02e74573'
+          test "$(sha256sum docs/engineering/data/mat_eng_tim_001a_reference_v1.json | awk '{print $1}')" = 'b975e03078278879e2907d72c92b3f39d8e59e92ae970076aa9f8347726e046f'
+          echo 'FROZEN_SOURCE_BINDING=PASS'
+
+      - name: Record execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          py="$(readlink -f "$(command -v python3)")"
+          printf 'PYTHON_PATH=%s\n' "$py"
+          sha256sum "$py"
+          python3 --version
+          uname -a
+          cat /etc/os-release
+
+      - name: Run independent stdlib oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_mat_eng_tim_001a.py
+
+      - name: Postflight exact-head and clean-tree check
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha || github.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = 'e2cff3b2b16e4424b53a2a1838c27bed4f508a64'
+          test -z "$(git status --porcelain)"
+          echo 'POSTFLIGHT_EXACT_HEAD_AND_CLEAN_TREE=PASS'
