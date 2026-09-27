@@ -1,0 +1,239 @@
+{
+  "schema": "symthaea.bio-millennium.source-criterion-contract.v1",
+  "contract_generation": 1,
+  "source_binding": {
+    "publisher": "FutureHouse / Edison Scientific",
+    "source_title": "The Millennium Problems for Biology",
+    "source_url": "https://millenniumproblems.bio/",
+    "announcement_url": "https://www.futurehouse.org/news/millennium-problems-for-biology",
+    "retrieved_date": "2026-09-27",
+    "source_is_living": true,
+    "local_semantics": "structured paraphrase of the retrieved live criteria; not a replacement for the source",
+    "source_snapshot_vendored": false
+  },
+  "authority": {
+    "classification": "source-bound-local-criterion-facets",
+    "official_source_is_external": true,
+    "local_paraphrase_is_official_source": false,
+    "scientific_result_claimed": false,
+    "challenge_solved_claimed": false,
+    "experimental_authority_granted": false
+  },
+  "criteria": [
+    {
+      "id": "MPB-2026-09-23-01",
+      "ordinal": 1,
+      "title": "Origins of life",
+      "required_outcome": "laboratory emergence of self-replicating RNA/protein-based cells from plausible chemical precursors and energy",
+      "facets": [
+        "unassisted emergence from the proposed precursor environment",
+        "cell-like compartment with a defined boundary",
+        "abundance increase of at least 10^6 under supplied precursor/energy conditions",
+        "continued division must remain physically plausible rather than requiring monotonic shrinkage",
+        "heritable information must causally influence cellular molecular composition"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": true
+    },
+    {
+      "id": "MPB-2026-09-23-02",
+      "ordinal": 2,
+      "title": "Cryopreservation",
+      "required_outcome": "reversible whole-body cryopreservation and recovery of live wild-type adult mice",
+      "facets": [
+        "intact adult wild-type animals",
+        "frozen or vitrified state maintained for at least 24 hours",
+        "post-recovery viability above 99%",
+        "no permanent organ damage or bodily harm",
+        "ethics approval required"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": true
+    },
+    {
+      "id": "MPB-2026-09-23-03",
+      "ordinal": 3,
+      "title": "The reverse translatase",
+      "required_outcome": "purified catalyst or fixed complex that processively converts arbitrary untagged peptide sequence information into a compatible nucleic-acid strand without a nucleic-acid template",
+      "facets": [
+        "no preattached sequence barcode",
+        "no residue-specific operator cycle",
+        "no database lookup",
+        "downstream compatibility with ordinary amplification/sequencing chemistry",
+        "at least 100 preregistered random peptide sequences",
+        "each preregistered peptide at least 50 residues",
+        "at least 90% sequence accuracy",
+        "average read length at least 25 residues",
+        "average read quality at least Q10"
+      ],
+      "evidence_modes": ["ProspectiveCommittedPrediction", "ExternalExperimentalObservation"],
+      "prospective_constraints": true,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-04",
+      "ordinal": 4,
+      "title": "Improve Rubisco",
+      "required_outcome": "Rubisco beyond the stated natural specificity/turnover comparison frontier",
+      "facets": [
+        "candidate catalyzes RuBP carboxylation",
+        "CO2/O2 specificity at least as high as the stated Galdieria Partita control",
+        "turnover at least as high as the stated maize control",
+        "paired enzyme assays use the named controls"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-05",
+      "ordinal": 5,
+      "title": "The quadruplet cell",
+      "required_outcome": "living replicating cell using bona fide uninterrupted nonoverlapping quadruplet codons for all protein-coding sequences, including translation machinery",
+      "facets": [
+        "no detectable triplet decoding",
+        "quadruplet encoding must not effectively collapse to triplet decoding",
+        "mutation non-synonymy probability should be comparable across codon positions"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": true
+    },
+    {
+      "id": "MPB-2026-09-23-06",
+      "ordinal": 6,
+      "title": "Somatic limb regeneration",
+      "required_outcome": "reproducible adult wild-type mouse limb regeneration after amputation",
+      "facets": [
+        "regenerated limb is functionally indistinguishable from controls under the stated motor testing",
+        "sensory perception is indistinguishable from controls",
+        "blinded observers cannot distinguish regenerated versus control limb from non-invasive observation",
+        "ethics approval required"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation", "IndependentReplication"],
+      "prospective_constraints": false,
+      "whole_system": true
+    },
+    {
+      "id": "MPB-2026-09-23-07",
+      "ordinal": 7,
+      "title": "Bacterial production of gene therapies",
+      "required_outcome": "bacterial production of infectious replication-incompetent AAV and lentivirus with specified genome/capsid properties",
+      "facets": [
+        "particles contain a pre-specified viral genome",
+        "physical-capsid to viral-genome ratio comparable to mammalian-cell production",
+        "infectious-unit to viral-genome ratio comparable to mammalian-cell production",
+        "viral genomes are nuclease-resistant",
+        "AAV-only demonstration is identified by the source as partial success"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-08",
+      "ordinal": 8,
+      "title": "Programmable proteases",
+      "required_outcome": "prospectively designed protease efficiently cleaves a blinded accessible site in an endogenous folded protein in living cells",
+      "facets": [
+        "design target is provided prospectively after preregistration",
+        "no target-specific screening/evolution after target release except protein production for assay",
+        "design-to-protein production deadline is 24 hours",
+        "catalytic efficiency comparable to widely used site-specific proteases",
+        "proteome-wide off-target cleavage comparable to widely used site-specific proteases",
+        "20 preregistered sites",
+        "success rate greater than 80%"
+      ],
+      "evidence_modes": ["ProspectiveCommittedPrediction", "ExternalExperimentalObservation"],
+      "prospective_constraints": true,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-09",
+      "ordinal": 9,
+      "title": "Cell-penetrating protein binders",
+      "required_outcome": "zero-shot protein binders reliably engage preregistered intracellular targets in living cells after extracellular administration",
+      "facets": [
+        "no further evolution or optimization",
+        "targets are preregistered before design",
+        "extracellular administration at pharmacologically supported concentrations",
+        "plausible therapeutic cell-entry mechanism",
+        "disallowed entry routes include transfection, intrabody expression and electroporation",
+        "20 preregistered targets",
+        "success rate 80% or greater",
+        "design-to-protein production deadline is 24 hours",
+        "no target-specific wet-lab work after target release except protein production for assay"
+      ],
+      "evidence_modes": ["ProspectiveCommittedPrediction", "ExternalExperimentalObservation"],
+      "prospective_constraints": true,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-10",
+      "ordinal": 10,
+      "title": "Protein amplification chain reaction",
+      "required_outcome": "single-pot input-protein-dependent exponential synthesis of full-length sequence-faithful polypeptide copies without nucleic-acid template or preformed cognate scaffold",
+      "facets": [
+        "at least 100 preregistered random peptide sequences",
+        "each preregistered peptide at least 50 residues",
+        "at least 1000x abundance amplification",
+        "at least 90% per-residue sequence accuracy",
+        "no explicit peptide sequencing as the amplification method",
+        "no reverse-translation nucleic-acid intermediate"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-11",
+      "ordinal": 11,
+      "title": "5' polymerases",
+      "required_outcome": "complete set of 3'>5' polymerases corresponding to the major 5'>3' classes",
+      "facets": [
+        "3'>5' DNA polymerase",
+        "3'>5' RNA polymerase",
+        "3'>5' reverse transcriptase",
+        "3'>5' RDRP",
+        "processivity comparable to or better than the named reference enzymes",
+        "error characteristics comparable to or better than the named reference enzymes"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": false
+    },
+    {
+      "id": "MPB-2026-09-23-12",
+      "ordinal": 12,
+      "title": "New nitrogenases",
+      "required_outcome": "new nitrogenase with no sequence or structural homology to the natural family and measurable N2-to-ammonia activity",
+      "facets": [
+        "N2 to ammonia conversion",
+        "activity at least on the order of naturally occurring nitrogenases",
+        "below the source-defined sequence-similarity thresholds",
+        "below the source-defined structure-similarity thresholds relative to known nitrogenase/nitrogenase-like proteins"
+      ],
+      "evidence_modes": ["ExternalExperimentalObservation"],
+      "prospective_constraints": false,
+      "whole_system": false
+    }
+  ],
+  "global_source_rules": [
+    "This contract is a date-bound structured paraphrase of the live source, not a replacement for the source.",
+    "A later source revision requires a new contract generation and must not silently rescore prior results.",
+    "Numeric thresholds and named comparator references are source facts captured for local binding; they are not local inventions.",
+    "Evidence-mode declarations are local custody metadata and do not alter the external challenge wording.",
+    "A computational prediction cannot satisfy an experimental criterion unless a future source revision explicitly changes that criterion.",
+    "Prospective constraints must be evaluated against immutable preregistration lineage; later knowledge or design changes create a new lineage.",
+    "Partial-success language from the source must remain distinct from completion."
+  ],
+  "review_flags": [
+    "verify the exact current spelling/identity of named biological comparators before executable benchmarking",
+    "bind exact assay/protocol semantics only in later source-bound evaluation artifacts",
+    "do not infer unlisted replication requirements",
+    "do not turn source prose into a single scalar score",
+    "do not add operational wet-lab instructions to this contract"
+  ]
+}
