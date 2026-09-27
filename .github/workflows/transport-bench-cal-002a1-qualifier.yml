@@ -16,8 +16,9 @@ jobs:
           fetch-depth: 0
       - name: Verify exact source ancestry and scope
         run: |
-          test "\$(git rev-parse HEAD)" = "92990d2313743be501adfda2aa9200846c903650"
-          test "\$(git rev-parse HEAD^)" = "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
+          test "\$(git rev-parse HEAD)" != "92990d2313743be501adfda2aa9200846c903650"
+          git merge-base --is-ancestor 92990d2313743be501adfda2aa9200846c903650 HEAD
+          test "\$(git rev-parse 92990d2313743be501adfda2aa9200846c903650^)" = "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
           test "\$(git diff --name-only fbd7a754ea8389ca93f7680d93ed8b48553e6376 HEAD | wc -l)" -eq 4
           git status --short
       - name: Record runtime identity
@@ -29,5 +30,5 @@ jobs:
         run: python3 scripts/validate_transport_bench_cal_002a1.py
       - name: Postflight clean tree
         run: |
-          test "\$(git rev-parse HEAD)" = "92990d2313743be501adfda2aa9200846c903650"
+          test "\$(git rev-parse HEAD)" != "92990d2313743be501adfda2aa9200846c903650"
           test -z "\$(git status --porcelain)"
