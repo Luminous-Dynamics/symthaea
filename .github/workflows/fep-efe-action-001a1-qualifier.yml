@@ -1,0 +1,100 @@
+name: FEP-EFE-ACTION-001A1 exact-head qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_fep_efe_action_001a.py'
+      - '.github/workflows/fep-efe-action-001a1-qualifier.yml'
+      - 'docs/fep/FEP_EFE_ACTION_001A.md'
+      - 'docs/fep/data/fep_efe_action_001a_reference_v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Capture execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "qualifier_head=$(git rev-parse HEAD)"
+          echo "python_path=$(command -v python3)"
+          python3 --version
+          PYTHON_REAL="$(realpath "$(command -v python3)")"
+          echo "python_realpath=$PYTHON_REAL"
+          sha256sum "$PYTHON_REAL"
+          python3 - <<'PY'
+          import decimal, platform, sys
+          print('python_version_full=' + sys.version.replace('\n', ' '))
+          print('python_implementation=' + platform.python_implementation())
+          print('platform=' + platform.platform())
+          print('decimal_module=' + str(decimal.__file__))
+          PY
+          uname -a
+          cat /etc/os-release
+
+      - name: Bind exact clarified source ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
+          PARENT=fbd7a754ea8389ca93f7680d93ed8b48553e6376
+          test "$(git rev-parse HEAD^)" = "$SOURCE"
+          test "$(git rev-parse HEAD^^)" = "$PARENT"
+
+      - name: Bind exact clarified source blobs digest and profile
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
+          test "$(git rev-parse "$SOURCE:docs/fep/FEP_EFE_ACTION_001A.md")" = "af204b5352758007b86688ce5d8769e520b7595e"
+          test "$(git rev-parse "$SOURCE:docs/fep/data/fep_efe_action_001a_reference_v1.json")" = "1a43de933de8b96b05b8f0f1ee274a3c29119386"
+          python3 - <<'PY'
+          import hashlib, json, subprocess
+          source='8384812e06b90563f2d52e573cb22910529a12e4'
+          path='docs/fep/data/fep_efe_action_001a_reference_v1.json'
+          data=subprocess.check_output(['git','show',f'{source}:{path}'])
+          got=hashlib.sha256(data).hexdigest()
+          want='3eeb5fe88a4e6893414fcfac9139912ba1312d219a656f99f417e2aeb6a53858'
+          assert got == want, (got, want)
+          corpus=json.loads(data)
+          assert corpus['reference_profile'] == 'DiagonalGaussianPredictedEntropyDeltaV1'
+          assert corpus['novelty_profile'] == 'ActionEventCountNoveltyV1'
+          assert corpus['novelty_event_class'] == 'CommittedAction'
+          assert [c['id'] for c in corpus['cases']] == [f'F{i:02d}' for i in range(1,26)]
+          PY
+
+      - name: Enforce qualifier-only diff scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git diff --name-only HEAD^ HEAD | sort)"
+          expected="$(printf '%s\n' '.github/workflows/fep-efe-action-001a1-qualifier.yml' 'scripts/validate_fep_efe_action_001a.py' | sort)"
+          test "$actual" = "$expected"
+
+      - name: Independent semantic oracle and hostile mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_fep_efe_action_001a.py --source-ref HEAD^
+
+      - name: Postflight source immutability and cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=8384812e06b90563f2d52e573cb22910529a12e4
+          test "$(git rev-parse "$SOURCE:docs/fep/FEP_EFE_ACTION_001A.md")" = "af204b5352758007b86688ce5d8769e520b7595e"
+          test "$(git rev-parse "$SOURCE:docs/fep/data/fep_efe_action_001a_reference_v1.json")" = "1a43de933de8b96b05b8f0f1ee274a3c29119386"
+          git diff --exit-code HEAD^ HEAD -- docs/fep/FEP_EFE_ACTION_001A.md docs/fep/data/fep_efe_action_001a_reference_v1.json
+          test -z "$(git status --porcelain)"
