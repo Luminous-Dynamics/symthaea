@@ -1,0 +1,29 @@
+name: BIO-MILLENNIUM-001C Source Criterion Contract
+
+on:
+  push:
+    branches:
+      - bio-millennium-001c-source-criterion-contract
+  pull_request:
+    paths:
+      - docs/research/biology/millennium_problems_source_manifest_v1.json
+      - docs/research/biology/millennium_problems_source_criterion_contract_v1.json
+      - scripts/verify_bio_millennium_001c.py
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify JSON and source-bound custody
+        run: |
+          set -euo pipefail
+          python3 -m json.tool docs/research/biology/millennium_problems_source_manifest_v1.json >/dev/null
+          python3 -m json.tool docs/research/biology/millennium_problems_source_criterion_contract_v1.json >/dev/null
+          python3 scripts/verify_bio_millennium_001c.py
