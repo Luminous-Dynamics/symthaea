@@ -1,0 +1,176 @@
+name: ROB-DESIGN-001C0C Normalized Mechanics Qualification
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rob-design-001c0c-normalized.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rob-design-001c0c-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PACKAGE: symthaea-robot-design
+  C0A_SOURCE: 1c5f146eb5c1f381dfe72993cde2ac04b6cf1562
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  exact-head-c0c-qualification:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Bind exact qualifier and source topology
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head="${{ github.event.pull_request.head.sha || github.sha }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected_parent="${{ github.event.pull_request.base.sha }}"
+          else
+            expected_parent="$(git rev-parse HEAD^)"
+          fi
+          echo "EXPECTED_PARENT=$expected_parent" >> "$GITHUB_ENV"
+          test "$(git rev-parse HEAD)" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = "$expected_parent"
+          test "$(git rev-parse "$expected_parent^")" = "$C0A_SOURCE"
+          test -z "$(git status --porcelain=v1)"
+
+          mapfile -t qualifier_actual < <(git diff --name-only "$expected_parent" HEAD | LC_ALL=C sort)
+          qualifier_expected=(".github/workflows/rob-design-001c0c-normalized.yml")
+          mapfile -t qualifier_expected < <(printf '%s\n' "${qualifier_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${qualifier_expected[@]}") <(printf '%s\n' "${qualifier_actual[@]}")
+
+          mapfile -t source_actual < <(git diff --name-only "$C0A_SOURCE" "$expected_parent" | LC_ALL=C sort)
+          source_expected=(
+            "crates/domains/symthaea-robot-design/src/c0_normalized.rs"
+            "crates/domains/symthaea-robot-design/src/lib.rs"
+          )
+          mapfile -t source_expected < <(printf '%s\n' "${source_expected[@]}" | LC_ALL=C sort)
+          diff -u <(printf '%s\n' "${source_expected[@]}") <(printf '%s\n' "${source_actual[@]}")
+          git diff --quiet "$C0A_SOURCE" "$expected_parent" -- \
+            Cargo.toml Cargo.lock crates/domains/symthaea-robot-design/Cargo.toml \
+            crates/domains/symthaea-robot-design/src/canonical.rs \
+            crates/domains/symthaea-robot-design/src/exact_parameters.rs \
+            crates/domains/symthaea-robot-design/src/c0_joint_link_coupon.rs
+
+      - name: Bind frozen source and workspace bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum Cargo.toml Cargo.lock crates/domains/symthaea-robot-design/Cargo.toml \
+            > "$RUNNER_TEMP/workspace-inputs.sha256"
+          find crates/domains/symthaea-robot-design -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > "$RUNNER_TEMP/c0c-source.sha256"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set auto-self-update disable
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt,clippy
+          rustup override set 1.96.0
+          rustc --version | grep -F 'rustc 1.96.0'
+          cargo --version | grep -F 'cargo 1.96.0'
+
+      - name: Diagnose metadata and lock immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/rob-design-c0c-evidence"
+          mkdir -p "$evidence_dir"
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          cargo metadata --format-version 1 > "$evidence_dir/cargo-metadata.json" 2> "$evidence_dir/cargo-metadata.stderr"
+          cmp -s "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
+          cp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
+          test -z "$(git status --porcelain=v1)"
+
+      - name: Independent exact-rational oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/rob-design-c0c-evidence"
+          python3 - <<'PY' | tee "$evidence_dir/independent-rational-reference.txt"
+          from fractions import Fraction
+
+          b0, h0 = 20_000, 6_000
+          b, h = 16_000, 7_200
+          mass = Fraction(b*h, b0*h0)
+          deflection = Fraction(b0*h0**3, b*h**3)
+          stress = Fraction(b0*h0**2, b*h**2)
+          assert mass == Fraction(24, 25)
+          assert deflection == Fraction(625, 864)
+          assert stress == Fraction(125, 144)
+          assert Fraction(48, 50) == mass
+          print(f"mass={mass.numerator}/{mass.denominator}")
+          print(f"deflection={deflection.numerator}/{deflection.denominator}")
+          print(f"stress={stress.numerator}/{stress.denominator}")
+          print("independent_reference=PASS")
+          PY
+
+      - name: Rustfmt
+        run: cargo fmt --check -p "$PACKAGE"
+
+      - name: Locked compile
+        run: cargo check -p "$PACKAGE" --all-targets --locked
+
+      - name: Focused tests
+        run: cargo test -p "$PACKAGE" --locked -- --nocapture
+
+      - name: Strict Clippy
+        run: cargo clippy -p "$PACKAGE" --all-targets --locked -- -D warnings
+
+      - name: Source postflight immutability
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/Cargo.lock.before" ]; then cp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock; fi
+          test -z "$(git status --porcelain=v1)"
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+          sha256sum -c "$RUNNER_TEMP/workspace-inputs.sha256"
+          sha256sum -c "$RUNNER_TEMP/c0c-source.sha256"
+
+      - name: Write evidence receipt
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence_dir="$RUNNER_TEMP/rob-design-c0c-evidence"
+          mkdir -p "$evidence_dir"
+          {
+            echo "program=ROB-DESIGN-001C0C"
+            echo "authority=normalized-mechanics-source-local-qualification"
+            echo "parent_execution_status=IN_FLIGHT"
+            echo "c0a_source_sha=$C0A_SOURCE"
+            echo "source_subject_sha=$EXPECTED_PARENT"
+            echo "qualifier_sha=$(git rev-parse HEAD)"
+            echo "job_status=${{ job.status }}"
+            echo "qualification_claim=SOURCE_LOCAL_ONLY_PARENT_INFLIGHT"
+            echo "absolute_structural_claim=NONE"
+            echo "physical_claim=NONE"
+            echo "fabrication_authority=NONE"
+          } > "$evidence_dir/receipt.txt"
+          cp "$RUNNER_TEMP/workspace-inputs.sha256" "$evidence_dir/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/c0c-source.sha256" "$evidence_dir/" 2>/dev/null || true
+          find "$evidence_dir" -type f ! -name sha256sums.txt -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha256sum > "$evidence_dir/sha256sums.txt"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rob-design-c0c-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/rob-design-c0c-evidence/
+          if-no-files-found: error
+          retention-days: 90
