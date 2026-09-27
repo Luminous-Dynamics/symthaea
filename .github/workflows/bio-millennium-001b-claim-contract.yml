@@ -1,0 +1,31 @@
+name: BIO-MILLENNIUM-001B Claim Contract
+
+on:
+  push:
+    branches:
+      - bio-millennium-001b-claim-contract
+  pull_request:
+    branches:
+      - main
+    paths:
+      - docs/research/biology/millennium_problems_source_manifest_v1.json
+      - docs/research/biology/millennium_problems_claim_contract_v1.json
+      - scripts/verify_bio_millennium_001b.py
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify exact JSON and contract semantics
+        run: |
+          set -euo pipefail
+          python3 -m json.tool docs/research/biology/millennium_problems_source_manifest_v1.json >/dev/null
+          python3 -m json.tool docs/research/biology/millennium_problems_claim_contract_v1.json >/dev/null
+          python3 scripts/verify_bio_millennium_001b.py
