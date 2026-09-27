@@ -1,0 +1,75 @@
+name: TRANSPORT-BENCH-EXT-001B1 exact-head qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_transport_bench_ext_001b.py'
+      - '.github/workflows/transport-bench-ext-001b1-qualifier.yml'
+      - 'docs/engineering/TRANSPORT_BENCH_EXT_001B.md'
+      - 'docs/engineering/data/transport_bench_ext_001b_extension_v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact source parent and qualifier scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "256462280b568366f057d200b8839223eb9a4474"
+          test "$(git rev-parse 'HEAD^:docs/engineering/TRANSPORT_BENCH_EXT_001B.md')" = "fc23592da4321a2c36594e3e3cd477fe526ee282"
+          test "$(git rev-parse 'HEAD^:docs/engineering/data/transport_bench_ext_001b_extension_v1.json')" = "83aa13f396a2feefaedfd0efa5aa4b3ca2ff78b4"
+          mapfile -t changed < <(git diff --name-only HEAD^ HEAD | sort)
+          expected=(
+            ".github/workflows/transport-bench-ext-001b1-qualifier.yml"
+            "scripts/validate_transport_bench_ext_001b.py"
+          )
+          mapfile -t expected < <(printf '%s\n' "${expected[@]}" | sort)
+          test "${#changed[@]}" -eq "${#expected[@]}"
+          for i in "${!expected[@]}"; do test "${changed[$i]}" = "${expected[$i]}"; done
+
+      - name: Record runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v python3
+          python3 --version
+          python3 - <<'PY'
+          import hashlib, platform, sys
+          p = sys.executable
+          print("python_executable", p)
+          with open(p, "rb") as f:
+              print("python_sha256", hashlib.sha256(f.read()).hexdigest())
+          print("python_full", sys.version.replace("\n", " "))
+          print("platform", platform.platform())
+          print("kernel", platform.release())
+          PY
+          uname -a
+          cat /etc/os-release
+
+      - name: Independent registry oracle and hostile mutations
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_transport_bench_ext_001b.py \
+            docs/engineering/data/transport_bench_ext_001b_extension_v1.json
+
+      - name: Postflight source immutability and clean tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "256462280b568366f057d200b8839223eb9a4474"
+          test "$(git rev-parse 'HEAD^:docs/engineering/TRANSPORT_BENCH_EXT_001B.md')" = "fc23592da4321a2c36594e3e3cd477fe526ee282"
+          test "$(git rev-parse 'HEAD^:docs/engineering/data/transport_bench_ext_001b_extension_v1.json')" = "83aa13f396a2feefaedfd0efa5aa4b3ca2ff78b4"
+          test -z "$(git status --porcelain --untracked-files=all)"
