@@ -1,0 +1,101 @@
+name: SYM-INT-001B exact qualification
+
+on:
+  pull_request:
+    branches:
+      - sym-int-001b-readonly-analysis-protocol
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  qualify-exact-analysis-protocol:
+    if: github.event.pull_request.head.ref == 'sym-int-001bq-exact-qualifier'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUBJECT_SHA: 1bb8665575ab5b48e114ddb689d43cc38df9d4e9
+      PARENT_SHA: 5e1e819685d2ef31e6ae2d961c6ccd26221392e2
+      CRATE: symthaea-communication
+      CRATE_DIR: crates/core/symthaea-communication
+    steps:
+      - name: Checkout exact subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SUBJECT_SHA }}
+          fetch-depth: 0
+
+      - name: Verify exact subject and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SUBJECT_SHA"
+          git cat-file -e "$PARENT_SHA^{commit}"
+          git diff --name-only "$PARENT_SHA" "$SUBJECT_SHA" | sort > /tmp/actual-files
+          printf '%s\n' \
+            "$CRATE_DIR/src/artifact.rs" \
+            "$CRATE_DIR/src/artifact/analysis_protocol.rs" | sort > /tmp/expected-files
+          diff -u /tmp/expected-files /tmp/actual-files
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Verify pinned toolchain and lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(rustc --version | awk '{print $2}')" = '1.96.0'
+          test -s Cargo.lock
+          git diff --exit-code -- Cargo.lock rust-toolchain.toml
+
+      - name: Check scoped orphan-module wiring
+        shell: bash
+        run: |
+          set -euo pipefail
+          scripts/check-orphan-modules.sh "$CRATE_DIR"
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path "$CRATE_DIR/Cargo.toml" -- --check
+
+      - name: Test communication crate
+        run: cargo test --locked -p "$CRATE"
+
+      - name: Clippy communication crate
+        run: cargo clippy --locked -p "$CRATE" --all-targets -- -D warnings
+
+      - name: Write exact qualification capsule
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qualification
+          {
+            echo 'subject=SYM-INT-001B'
+            echo "subject_sha=$SUBJECT_SHA"
+            echo "parent_sha=$PARENT_SHA"
+            echo "qualified_head=$(git rev-parse HEAD)"
+            echo "cargo_lock_sha256=$(sha256sum Cargo.lock | awk '{print $1}')"
+            echo "rust_toolchain_sha256=$(sha256sum rust-toolchain.toml | awk '{print $1}')"
+            rustc -Vv
+            cargo -V
+            echo 'checks=exact scope; pinned Rust 1.96.0; root Cargo.lock unchanged; scoped orphan check; cargo fmt; cargo test -p symthaea-communication; cargo clippy -p symthaea-communication -D warnings'
+            echo 'source_sha256_begin'
+            sha256sum \
+              "$CRATE_DIR/src/artifact.rs" \
+              "$CRATE_DIR/src/artifact/analysis_protocol.rs"
+            echo 'source_sha256_end'
+          } > qualification/SYM-INT-001B-exact.txt
+
+      - name: Upload qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: sym-int-001b-exact-${{ env.SUBJECT_SHA }}
+          path: qualification/SYM-INT-001B-exact.txt
+          if-no-files-found: error
+          retention-days: 30
