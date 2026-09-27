@@ -11,6 +11,7 @@
 
 mod canonical;
 pub mod c0_applicability;
+pub mod c0_enumeration;
 pub mod c0_joint_link_coupon;
 pub mod c0_normalized;
 pub mod exact_parameters;
