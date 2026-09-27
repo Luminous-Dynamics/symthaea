@@ -1,0 +1,128 @@
+{
+  "schema": "symthaea.bio-millennium.claim-contract.v1",
+  "contract_generation": 1,
+  "parent_source_manifest": {
+    "schema": "symthaea.bio-millennium.challenge-source-manifest.v1",
+    "manifest_generation": 1,
+    "path": "docs/research/biology/millennium_problems_source_manifest_v1.json"
+  },
+  "authority": {
+    "classification": "local-claim-mapping-only",
+    "official_criterion_semantics_frozen": false,
+    "scientific_result_claimed": false,
+    "challenge_solved_claimed": false,
+    "experimental_authority_granted": false
+  },
+  "claim_classes": [
+    {
+      "id": "HypothesisProposal",
+      "status": "proposal",
+      "may_support": ["candidate mechanism", "candidate design", "testable hypothesis"],
+      "cannot_satisfy": ["physical observation", "independent replication", "official challenge criterion"]
+    },
+    {
+      "id": "InSilicoPrediction",
+      "status": "computational",
+      "may_support": ["model prediction", "candidate prioritization", "prospective prediction when committed before outcome"],
+      "cannot_satisfy": ["physical observation", "independent replication", "official challenge criterion"]
+    },
+    {
+      "id": "SimulationResult",
+      "status": "computational",
+      "may_support": ["simulation claim", "model consequence", "candidate prioritization"],
+      "cannot_satisfy": ["physical observation", "independent replication", "official challenge criterion"]
+    },
+    {
+      "id": "RetrospectiveBenchmarkResult",
+      "status": "retrospective",
+      "may_support": ["historical benchmark claim", "retrospective rediscovery claim"],
+      "cannot_satisfy": ["prospective prediction credit", "physical observation", "independent replication", "official challenge criterion"]
+    },
+    {
+      "id": "ProspectiveCommittedPrediction",
+      "status": "prospective",
+      "may_support": ["prospective prediction claim"],
+      "cannot_satisfy": ["physical observation", "independent replication", "official challenge criterion"]
+    },
+    {
+      "id": "ExternalExperimentalObservation",
+      "status": "experimental",
+      "may_support": ["physical observation", "experimental outcome"],
+      "cannot_satisfy": ["independent replication", "official challenge criterion"]
+    },
+    {
+      "id": "IndependentReplication",
+      "status": "replication",
+      "may_support": ["replicated observation"],
+      "cannot_satisfy": ["official challenge criterion unless a later source-bound contract explicitly permits it"]
+    },
+    {
+      "id": "OfficialChallengeCriterionEvidence",
+      "status": "official-criterion",
+      "may_support": ["official challenge criterion evaluation"],
+      "cannot_satisfy": []
+    }
+  ],
+  "claim_roles": [
+    {
+      "id": "proposal",
+      "accepted_classes": ["HypothesisProposal"]
+    },
+    {
+      "id": "model_prediction",
+      "accepted_classes": ["InSilicoPrediction", "SimulationResult"]
+    },
+    {
+      "id": "retrospective_result",
+      "accepted_classes": ["RetrospectiveBenchmarkResult"]
+    },
+    {
+      "id": "prospective_result",
+      "accepted_classes": ["ProspectiveCommittedPrediction"]
+    },
+    {
+      "id": "experimental_observation",
+      "accepted_classes": ["ExternalExperimentalObservation", "IndependentReplication"]
+    },
+    {
+      "id": "official_criterion",
+      "accepted_classes": ["OfficialChallengeCriterionEvidence"]
+    }
+  ],
+  "global_invariants": [
+    "proposal != prediction",
+    "prediction != simulation result",
+    "simulation result != physical observation",
+    "retrospective result != prospective result",
+    "model agreement != independent evidence",
+    "formal proof of a model consequence != proof that the biological model is true",
+    "official challenge semantics are not locally invented by this contract",
+    "official criterion satisfaction remains unresolved until a separately source-bound criterion contract permits a specific evidence class",
+    "hypothesis or prediction revision creates a new lineage and cannot receive retroactive prospective credit",
+    "a claim class cannot be upgraded merely by confidence, model count, or repeated language generation"
+  ],
+  "challenge_profiles": [
+    {"id": "MPB-2026-09-23-01", "domain": "origins-of-life", "primary_scales": ["life", "molecular", "environment"]},
+    {"id": "MPB-2026-09-23-02", "domain": "cryopreservation", "primary_scales": ["molecular", "cell", "tissue"]},
+    {"id": "MPB-2026-09-23-03", "domain": "reverse-translatase", "primary_scales": ["molecular", "information", "translation"]},
+    {"id": "MPB-2026-09-23-04", "domain": "improve-rubisco", "primary_scales": ["molecular", "catalysis", "protein"]},
+    {"id": "MPB-2026-09-23-05", "domain": "quadruplet-cell", "primary_scales": ["cell", "information", "translation"]},
+    {"id": "MPB-2026-09-23-06", "domain": "somatic-limb-regeneration", "primary_scales": ["cell", "tissue", "organism"]},
+    {"id": "MPB-2026-09-23-07", "domain": "bacterial-production-of-gene-therapies", "primary_scales": ["cell", "process", "molecular"]},
+    {"id": "MPB-2026-09-23-08", "domain": "programmable-proteases", "primary_scales": ["molecular", "protein", "catalysis"]},
+    {"id": "MPB-2026-09-23-09", "domain": "cell-penetrating-protein-binders", "primary_scales": ["molecular", "protein", "cell"]},
+    {"id": "MPB-2026-09-23-10", "domain": "protein-amplification-chain-reaction", "primary_scales": ["molecular", "protein", "reaction"]},
+    {"id": "MPB-2026-09-23-11", "domain": "5-prime-polymerases", "primary_scales": ["molecular", "information", "translation"]},
+    {"id": "MPB-2026-09-23-12", "domain": "new-nitrogenases", "primary_scales": ["molecular", "catalysis", "metalloenzyme"]}
+  ],
+  "negative_space": {
+    "unresolved_until_source_bound": [
+      "exact official acceptance thresholds",
+      "allowed assay modalities for each challenge",
+      "required replication design for each challenge",
+      "whether simulation is acceptable for any particular official criterion",
+      "whether a particular external observation qualifies as official criterion evidence"
+    ],
+    "reason": "The external challenge is a living project; this local claim contract must not manufacture official semantics."
+  }
+}
