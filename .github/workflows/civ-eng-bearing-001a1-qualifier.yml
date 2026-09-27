@@ -1,0 +1,82 @@
+name: CIV-ENG-BEARING-001A1 exact-head qualifier
+
+on:
+  pull_request:
+    branches:
+      - civ-eng-bearing-001a-contract
+    paths:
+      - 'scripts/validate_civ_eng_bearing_001a.py'
+      - '.github/workflows/civ-eng-bearing-001a1-qualifier.yml'
+      - 'docs/engineering/CIV_ENG_BEARING_001A.md'
+      - 'docs/engineering/data/civ_eng_bearing_001a_reference_v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Verify exact qualifier lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED_SOURCE='c0f46c7fe0687fd516c1c9d3e217afee25784b05'
+          HEAD_SHA="$(git rev-parse HEAD)"
+          EVENT_HEAD='${{ github.event.pull_request.head.sha }}'
+          if [ -n "$EVENT_HEAD" ] && [ "$HEAD_SHA" != "$EVENT_HEAD" ]; then
+            echo "HEAD mismatch: $HEAD_SHA != $EVENT_HEAD" >&2
+            exit 1
+          fi
+          PARENT="$(git rev-parse HEAD^)"
+          test "$PARENT" = "$EXPECTED_SOURCE"
+          mapfile -t CHANGED < <(git diff --name-only "$EXPECTED_SOURCE" HEAD | sort)
+          printf '%s\n' "${CHANGED[@]}"
+          test "${#CHANGED[@]}" -eq 2
+          test "${CHANGED[0]}" = '.github/workflows/civ-eng-bearing-001a1-qualifier.yml'
+          test "${CHANGED[1]}" = 'scripts/validate_civ_eng_bearing_001a.py'
+
+      - name: Record execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, os, pathlib, platform, sys
+          p=pathlib.Path(sys.executable).resolve()
+          print('python=',sys.version)
+          print('implementation=',platform.python_implementation())
+          print('executable=',sys.executable)
+          print('realpath=',p)
+          print('python_sha256=',hashlib.sha256(p.read_bytes()).hexdigest())
+          print('platform=',platform.platform())
+          print('kernel=',platform.release())
+          print('runner_os=',os.environ.get('RUNNER_OS'))
+          PY
+          git rev-parse HEAD
+          git status --short
+
+      - name: Run independent oracle
+        run: python3 scripts/validate_civ_eng_bearing_001a.py
+
+      - name: Source postflight and clean tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = 'c0f46c7fe0687fd516c1c9d3e217afee25784b05'
+          test "$(git hash-object docs/engineering/CIV_ENG_BEARING_001A.md)" = '14ec1fda1199b7bcdd840cc1b961ed2651943996'
+          test "$(git hash-object docs/engineering/data/civ_eng_bearing_001a_reference_v1.json)" = 'c9f7344acf21f9f84ad2f87a1cb82febd5f5d024'
+          python3 - <<'PY'
+          import hashlib, pathlib
+          p=pathlib.Path('docs/engineering/data/civ_eng_bearing_001a_reference_v1.json')
+          got=hashlib.sha256(p.read_bytes()).hexdigest()
+          exp='f9558e789ae9095830b50b0066cf5dca6eea0fd23c2ae1b2e3f51984bb46fab6'
+          assert got == exp, (got, exp)
+          PY
+          test -z "$(git status --porcelain)"
