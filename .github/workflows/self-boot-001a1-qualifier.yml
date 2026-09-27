@@ -1,0 +1,76 @@
+name: SELF-BOOT-001A1 exact-head qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_self_boot_001a.py'
+      - '.github/workflows/self-boot-001a1-qualifier.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-oracle:
+    name: Independent SELF-BOOT-001A oracle
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Verify exact qualifier lineage and scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha || github.sha }}'
+          expected_parent='d790fefd3afdb66b948a6f719f8d072f68b601d3'
+          expected_source_parent='fbd7a754ea8389ca93f7680d93ed8b48553e6376'
+          actual_head="$(git rev-parse HEAD)"
+          actual_parent="$(git rev-parse HEAD^)"
+          actual_source_parent="$(git rev-parse HEAD^^)"
+          test "$actual_head" = "$expected_head"
+          test "$actual_parent" = "$expected_parent"
+          test "$actual_source_parent" = "$expected_source_parent"
+          changed="$(git diff --name-only "$actual_parent" "$actual_head" | sort)"
+          expected_changed=$'.github/workflows/self-boot-001a1-qualifier.yml\nscripts/validate_self_boot_001a.py'
+          test "$changed" = "$expected_changed"
+          printf 'QUALIFIER_HEAD=%s\nSOURCE_HEAD=%s\nSOURCE_PARENT=%s\nQUALIFIER_SCOPE=%s\n' "$actual_head" "$actual_parent" "$actual_source_parent" "$changed"
+
+      - name: Verify frozen source blobs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^:docs/engineering/SELF_BOOT_001A.md)" = '697616085fc0a14145ae75927eb1d67b53dbd63f'
+          test "$(git rev-parse HEAD^:docs/engineering/data/self_boot_001a_reference_v1.json)" = '1c274423b91d5202cd16d9be3b304078d3feddee'
+          echo 'FROZEN_SOURCE_BLOBS=PASS'
+
+      - name: Record execution environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          py="$(readlink -f "$(command -v python3)")"
+          printf 'PYTHON_PATH=%s\n' "$py"
+          sha256sum "$py"
+          python3 --version
+          uname -a
+          cat /etc/os-release
+
+      - name: Run independent stdlib oracle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_self_boot_001a.py
+
+      - name: Postflight exact-head and clean-tree check
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_head='${{ github.event.pull_request.head.sha || github.sha }}'
+          test "$(git rev-parse HEAD)" = "$expected_head"
+          test "$(git rev-parse HEAD^)" = 'd790fefd3afdb66b948a6f719f8d072f68b601d3'
+          test -z "$(git status --porcelain)"
+          echo 'POSTFLIGHT_EXACT_HEAD_AND_CLEAN_TREE=PASS'
