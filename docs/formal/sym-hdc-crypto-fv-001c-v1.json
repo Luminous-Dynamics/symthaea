@@ -1,0 +1,80 @@
+{
+  "schema": "symthaea.formal.sym-hdc-crypto-fv-001c.v1",
+  "issue": 6126,
+  "parent_issue": 5844,
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "stack_parent": {
+    "pr": 5905,
+    "commit": "b485a5713e5e8d971342a93f1a6e514512052b9e",
+    "relationship": "reuses-exact-001a-v2-share-attack-algebra"
+  },
+  "inherited_subjects": [
+    {
+      "path": "formal/lean/hdc/BinaryHVBind.lean",
+      "blob": "259ba64888d8492bafc123b72d67b70da9282c36",
+      "relationship": "canonical-repaired-xor-algebra"
+    },
+    {
+      "path": "formal/lean/hdc/HdcCryptoAttacks.lean",
+      "blob": "67d44281d03252101eb01d6ac9713ea7638044de",
+      "relationship": "owns-AbstractShare-makeShare-recoverOne-and-minimal-one-share-theorem"
+    }
+  ],
+  "theorem_file": {
+    "path": "formal/lean/hdc/HdcThresholdShareLeakage.lean",
+    "blob": "0b063aa74447560176ff14db17d5e2fd3e234eab",
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "required_theorems": [
+      "indexed_share_recovers_secret",
+      "one_share_recovery_ignores_threshold_declaration",
+      "threshold_gt_one_still_allows_one_share_recovery",
+      "share_index_is_irrelevant_to_recovery"
+    ],
+    "proof_holes_permitted": false,
+    "axiom_census": "Lean #print axioms output retained by qualification run"
+  },
+  "abstract_subject": {
+    "split_precondition": "1 <= k AND k <= n AND k % 2 = 1",
+    "record_shape": "index plus inherited AbstractShare{share,mask}",
+    "share_relation": "share = secret XOR mask",
+    "one_record_recovery": "share XOR same mask = secret",
+    "threshold_interpretation": "recovery theorem is independent of valid k,n and remains true when k > 1"
+  },
+  "production_refinement_target": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "b485a5713e5e8d971342a93f1a6e514512052b9e",
+    "path": "crates/core/symthaea-hdc-crypto/src/crypto.rs",
+    "blob": "59c0ea6bc92fd1d67a9f764bb396918fd823331a",
+    "symbols": [
+      "HdcShare",
+      "HdcThresholdSharing::split",
+      "HdcThresholdSharing::split_secure",
+      "HdcThresholdSharing::recover"
+    ],
+    "relationship": "future-exact-rust-refinement-target-not-proved-here"
+  },
+  "compatibility_inventory": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit": "b485a5713e5e8d971342a93f1a6e514512052b9e",
+    "path": "crates/core/symthaea-core/src/hdc/hdc_crypto.rs",
+    "blob": "a232b0b699f5d0301fe052b0e013f289194c13b6",
+    "relationship": "separate-duplicated-implementation-no-automatic-proof-transfer"
+  },
+  "hostile_controls": [
+    "wrong-mask-record-must-not-satisfy-universal-recovery",
+    "maskless-record-must-not-satisfy-universal-recovery",
+    "non-xor-share-construction-must-not-inherit-theorem",
+    "stale-parent-or-source-binding-must-fail-static-contract"
+  ],
+  "security_interpretation": "for this exact abstract record shape, one returned record reveals the whole secret even when the declared threshold is greater than one",
+  "nonclaims": [
+    "not-production-rust-refinement",
+    "not-proof-all-threshold-cryptography-is-insecure",
+    "not-proof-all-hdc-cryptography-is-insecure",
+    "not-compatibility-copy-refinement",
+    "not-secure-replacement",
+    "not-production-cryptographic-authority"
+  ]
+}
