@@ -1,0 +1,34 @@
+name: transport-bench-cal-002a1-independent-qualifier
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qualifier head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Verify exact source ancestry and scope
+        run: |
+          test "\$(git rev-parse HEAD)" != "92990d2313743be501adfda2aa9200846c903650"
+          git merge-base --is-ancestor 92990d2313743be501adfda2aa9200846c903650 HEAD
+          test "\$(git rev-parse 92990d2313743be501adfda2aa9200846c903650^)" = "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
+          test "\$(git diff --name-only fbd7a754ea8389ca93f7680d93ed8b48553e6376 HEAD | wc -l)" -eq 4
+          git status --short
+      - name: Record runtime identity
+        run: |
+          python3 --version
+          python3 -c 'import hashlib,sys; print(hashlib.sha256(open(sys.executable,"rb").read()).hexdigest())'
+          uname -a
+      - name: Run independent stdlib oracle
+        run: python3 scripts/validate_transport_bench_cal_002a1.py
+      - name: Postflight clean tree
+        run: |
+          test "\$(git rev-parse HEAD)" != "92990d2313743be501adfda2aa9200846c903650"
+          test -z "\$(git status --porcelain)"
