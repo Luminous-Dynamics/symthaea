@@ -75,7 +75,7 @@ def main():
     if subprocess.call(["git","merge-base","--is-ancestor",SOURCE_HEAD,"HEAD"]) != 0: raise ValueError("source head is not an ancestor of qualifier head")
     if git("rev-parse","HEAD")==SOURCE_HEAD: raise ValueError("qualifier has no independent changes")
     if git("rev-parse",SOURCE_HEAD+"^")!=SOURCE_PARENT: raise ValueError("source parent mismatch")
-    paths=sorted(git("diff","--name-only",SOURCE_PARENT,QUALIFIER_HEAD).splitlines())
+    paths=sorted(git("diff","--name-only",SOURCE_PARENT,"HEAD").splitlines())
     expected=sorted(["docs/engineering/TRANSPORT_BENCH_CAL_002.md","docs/engineering/data/transport_bench_cal_002_ledger_v1.json",".github/workflows/transport-bench-cal-002a1-qualifier.yml","scripts/validate_transport_bench_cal_002a1.py"])
     if paths!=expected: raise ValueError("source scope drift: "+repr(paths))
     n=mutations(data)
