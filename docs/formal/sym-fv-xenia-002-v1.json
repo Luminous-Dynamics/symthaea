@@ -1,0 +1,79 @@
+{
+  "schema": "symthaea.formal.sym-fv-xenia-002.v1",
+  "issue": 6144,
+  "evidence_class": "AbstractFormalTheorem",
+  "status_at_source_creation": "source-implemented-not-yet-executed-qualified",
+  "exact_parent": {
+    "branch": "main",
+    "commit": "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
+  },
+  "cross_repository_design_target": {
+    "repository": "Luminous-Dynamics/xenia-wire",
+    "issue": 78,
+    "profile": "XEN-WIRE-V2-001",
+    "relationship": "abstract-sequence-allocator-premise-no-production-source-refinement-yet"
+  },
+  "theorem_file": {
+    "path": "formal/lean/security/XeniaV2SequenceAllocator.lean",
+    "blob": "c9c4320876bc5653de294ae7cd10e745d1e3c8d0",
+    "requires_mathlib": false,
+    "requires_user_axioms": false,
+    "required_theorems": [
+      "allocate_success_shape",
+      "allocate_success_in_range",
+      "allocate_success_returns_current",
+      "allocate_success_advances_exactly_once",
+      "allocate_refuses_when_exhausted",
+      "allocate_refuses_at_exact_limit",
+      "allocator_state_strictly_monotone_on_success",
+      "consecutive_successors",
+      "consecutive_successes_are_distinct"
+    ],
+    "proof_holes_permitted": false,
+    "axiom_census": "Lean #print axioms output retained by qualification run"
+  },
+  "abstract_subject": {
+    "sequence_domain": "Nat",
+    "sequence_limit": "2^64",
+    "success_rule": "if next < 2^64 return next and advance next by one",
+    "exhaustion_rule": "if next >= 2^64 return None",
+    "reason_for_nat": "abstract theorem must be non-wrapping; Rust u64 overflow/refinement is separate"
+  },
+  "proved_if_qualified": [
+    "successful allocations are strictly below 2^64",
+    "success returns exactly the pre-state sequence",
+    "success advances state exactly once",
+    "allocation refuses at and beyond 2^64",
+    "two consecutive successful allocations differ by exactly one",
+    "two consecutive successful allocations are distinct",
+    "allocator state is strictly monotone across success"
+  ],
+  "hostile_controls": [
+    "allocator-that-wraps-to-zero-at-exhaustion-must-fail",
+    "allocator-that-succeeds-without-advancing-state-must-fail",
+    "generic-known-bad-Lean-subject-must-return-nonzero",
+    "claim-escalation-to-Rust-u64-refinement-must-be-rejected-by-contract"
+  ],
+  "future_composition": {
+    "sibling_issue": 6141,
+    "sibling_pr": 6142,
+    "relationship": "after independent qualification, compose distinct-successful-sequences with fixed-IV nonce injectivity in a separate evidence step"
+  },
+  "future_refinement_obligations": [
+    "Rust u64 guard executes before any wrapping arithmetic can authorize a seal",
+    "successful seal consumes exactly one allocator success",
+    "failed seal semantics do not reopen an already-consumed sequence if the admitted profile forbids that",
+    "key-IV context reset lifecycle",
+    "exclusive sender ownership",
+    "AEAD usage limit may terminate earlier than sequence exhaustion"
+  ],
+  "nonclaims": [
+    "not-rust-u64-refinement",
+    "not-compiled-overflow-or-panic-proof",
+    "not-key-iv-reset-lifecycle-proof",
+    "not-exclusive-sender-ownership-proof",
+    "not-fresh-context-generation-proof",
+    "not-aead-usage-limit-analysis",
+    "not-production-xenia-v2-qualification"
+  ]
+}
