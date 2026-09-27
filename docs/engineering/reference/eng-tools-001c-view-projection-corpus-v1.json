@@ -1,0 +1,249 @@
+{
+  "authority": "reference-only",
+  "cases": [
+    {
+      "expect": "ProjectionAccepted",
+      "id": "C01",
+      "input": {
+        "claim_ceiling": "PlanningOnly",
+        "currentness": "Current",
+        "quantity": {
+          "display_unit": "mm",
+          "unit_id": "si:mm",
+          "value": 12.5
+        },
+        "schema": {
+          "kind": "C0FeasibilityProjectionV1",
+          "major": 1,
+          "minor": 0,
+          "namespace": "luminous.engineering.view"
+        },
+        "source_class": "PlanningAssumption",
+        "subject": {
+          "generation": "g1",
+          "id": "c0-profile-alpha",
+          "kind": "C0FeasibilityProfile",
+          "owner": "ENG-REF-C0"
+        }
+      },
+      "name": "known_c0_projection_decodes"
+    },
+    {
+      "expect": "UnsupportedProjectionSchema",
+      "id": "C02",
+      "input": {
+        "schema": {
+          "kind": "C0FeasibilityProjectionV1",
+          "major": 9,
+          "minor": 0,
+          "namespace": "luminous.engineering.view"
+        }
+      },
+      "name": "unknown_major_schema_rejected"
+    },
+    {
+      "expect": "RequiredFieldMissing",
+      "id": "C03",
+      "input": {
+        "parameter": {
+          "id": "width",
+          "unit_id": "si:mm"
+        },
+        "schema": {
+          "kind": "C0FeasibilityProjectionV1",
+          "major": 1,
+          "minor": 0,
+          "namespace": "luminous.engineering.view"
+        }
+      },
+      "name": "missing_parameter_not_zero"
+    },
+    {
+      "expect": "UnknownDispositionVisible",
+      "id": "C04",
+      "input": {
+        "finding": {
+          "code": "FUTURE_DISPOSITION_X"
+        },
+        "schema": {
+          "kind": "C0FeasibilityProjectionV1",
+          "major": 1,
+          "minor": 0,
+          "namespace": "luminous.engineering.view"
+        }
+      },
+      "name": "unknown_disposition_visible"
+    },
+    {
+      "expect": "SourceClassPreserved",
+      "id": "C05",
+      "input": {
+        "a": {
+          "source_class": "ObservedPhysical",
+          "value": 1.0
+        },
+        "b": {
+          "source_class": "Synthetic",
+          "value": 1.0
+        }
+      },
+      "name": "equal_numeric_physical_synthetic_distinct"
+    },
+    {
+      "expect": "CurrentnessPreserved",
+      "id": "C06",
+      "input": {
+        "a": {
+          "currentness": "Current",
+          "label": "fixture-A"
+        },
+        "b": {
+          "currentness": "Stale",
+          "label": "fixture-A"
+        }
+      },
+      "name": "same_label_currentness_distinct"
+    },
+    {
+      "expect": "SemanticIdentityUnchanged",
+      "id": "C07",
+      "input": {
+        "after": {
+          "generation": "g1",
+          "id": "article-1",
+          "label": "Baseline coupon"
+        },
+        "before": {
+          "generation": "g1",
+          "id": "article-1",
+          "label": "Coupon A"
+        }
+      },
+      "name": "friendly_label_change_nonsemantic"
+    },
+    {
+      "expect": "SemanticIdentityChanged",
+      "id": "C08",
+      "input": {
+        "after": {
+          "generation": "g2",
+          "id": "article-1"
+        },
+        "before": {
+          "generation": "g1",
+          "id": "article-1"
+        }
+      },
+      "name": "source_generation_change_semantic"
+    },
+    {
+      "expect": "SemanticIdentityUnchanged",
+      "id": "C09",
+      "input": {
+        "machine": {
+          "finding": "InstrumentNoiseDominates",
+          "subject": "c0-profile-alpha"
+        },
+        "rendered": [
+          "Noise dominates",
+          "Instrument noise exceeds planning margin"
+        ]
+      },
+      "name": "rendered_prose_change_nonsemantic"
+    },
+    {
+      "expect": "NoAuthorityPromotion",
+      "id": "C10",
+      "input": {
+        "schema": {
+          "kind": "C0FeasibilityProjectionV1",
+          "major": 1,
+          "minor": 0,
+          "namespace": "luminous.engineering.view"
+        },
+        "unknown": {
+          "approved": true,
+          "current": true,
+          "safe": true
+        }
+      },
+      "name": "authority_looking_unknown_field_cannot_mint"
+    },
+    {
+      "expect": "PayloadBoundExceeded",
+      "id": "C11",
+      "input": {
+        "declared_items": 1000001,
+        "limit": 10000
+      },
+      "name": "oversized_payload_rejected"
+    },
+    {
+      "expect": "NonFiniteQuantityRejected",
+      "id": "C12",
+      "input": {
+        "unit_id": "si:mm",
+        "value_repr": "NaN"
+      },
+      "name": "nonfinite_quantity_rejected"
+    },
+    {
+      "expect": "UnitIdentityMissing",
+      "id": "C13",
+      "input": {
+        "value": 42.0
+      },
+      "name": "missing_unit_identity_rejected"
+    },
+    {
+      "expect": "SourceClassPreserved",
+      "id": "C14",
+      "input": {
+        "display_label": "Observed physical",
+        "source_class": "Synthetic"
+      },
+      "name": "synthetic_cannot_relabel_physical"
+    },
+    {
+      "expect": "NoDesignAcceptancePromotion",
+      "id": "C15",
+      "input": {
+        "artifact_kind": "PlanningProposal",
+        "fields": {
+          "accepted": true
+        }
+      },
+      "name": "proposal_cannot_deserialize_as_accepted_design"
+    },
+    {
+      "expect": "CanonicalRoundTripStable",
+      "id": "C16",
+      "input": {
+        "finding_codes": [
+          "FeasibleForPlanning",
+          "ReferenceStrategyIncomplete"
+        ],
+        "schema": {
+          "kind": "C0FeasibilityProjectionV1",
+          "major": 1,
+          "minor": 0,
+          "namespace": "luminous.engineering.view"
+        },
+        "subject": {
+          "generation": "g1",
+          "id": "c0-profile-alpha",
+          "kind": "C0FeasibilityProfile",
+          "owner": "ENG-REF-C0"
+        }
+      },
+      "name": "canonical_roundtrip_deterministic"
+    }
+  ],
+  "claim_ceiling": "projection semantics only; no underlying engineering truth or authority",
+  "issue": "Luminous-Dynamics/symthaea#6134",
+  "payload_item_limit_reference": 10000,
+  "schema": "eng-tools-001c-view-projection-corpus-v1",
+  "supported_major_schema_versions": [
+    1
+  ]
+}
