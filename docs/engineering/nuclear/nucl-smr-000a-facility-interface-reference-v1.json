@@ -1,0 +1,242 @@
+{
+  "cases": [
+    {
+      "expected_primary_disposition": "SyntheticMappingComplete",
+      "id": "C01",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "current interface + complete synthetic refs"
+    },
+    {
+      "expected_primary_disposition": "VendorInterfaceStale",
+      "id": "C02",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "vendor interface generation changes after facility mapping"
+    },
+    {
+      "expected_primary_disposition": "VendorInterfaceStale",
+      "id": "C03",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "friendly reactor model label unchanged but interface revision changes"
+    },
+    {
+      "expected_primary_disposition": "SiteApplicabilityReviewRequired",
+      "id": "C04",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "same reactor interface mapped to materially different synthetic site generation"
+    },
+    {
+      "expected_primary_disposition": "SiteEvidenceIncomplete",
+      "id": "C05",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "synthetic site identity present but required site evidence ref missing"
+    },
+    {
+      "expected_primary_disposition": "CivilInterfaceUnresolved",
+      "id": "C06",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "civil envelope mapped while foundation/site evidence unresolved"
+    },
+    {
+      "expected_primary_disposition": "ThermalInterfaceUnresolved",
+      "id": "C07",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "thermal interface category present but external requirement ref missing"
+    },
+    {
+      "expected_primary_disposition": "GridAuthorityMissing",
+      "id": "C08",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "electrical/grid mapping present but external grid-authority ref missing"
+    },
+    {
+      "expected_primary_disposition": "UtilityCommonModeDetected",
+      "id": "C09",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "two nominally redundant facility utilities share one upstream dependency"
+    },
+    {
+      "expected_primary_disposition": "AsBuiltEvidenceIncomplete",
+      "id": "C10",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "as-designed/BIM marks component installed while as-built observation absent"
+    },
+    {
+      "expected_primary_disposition": "AsBuiltContradiction",
+      "id": "C11",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "synthetic as-built observation conflicts with exact design generation"
+    },
+    {
+      "expected_primary_disposition": "IntegratedCommissioningIncomplete",
+      "id": "C12",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "component commissioning synthetic PASS while integrated commissioning evidence absent"
+    },
+    {
+      "expected_primary_disposition": "ClaimPromotionRejected",
+      "id": "C13",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "virtual commissioning synthetic PASS offered as physical/nuclear commissioning"
+    },
+    {
+      "expected_primary_disposition": "SyntheticSourceClassRejected",
+      "id": "C14",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "synthetic twin value offered as physical observation"
+    },
+    {
+      "expected_primary_disposition": "ExternalSafetyReviewRequired",
+      "id": "C15",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "external safety interface requirement changes for current facility generation"
+    },
+    {
+      "expected_primary_disposition": "ExternalSecurityReviewRequired",
+      "id": "C16",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "external security interface is marked affected by bounded facility change"
+    },
+    {
+      "expected_primary_disposition": "ExternalSafeguardsReviewRequired",
+      "id": "C17",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "external safeguards interface is marked affected by bounded facility change"
+    },
+    {
+      "expected_primary_disposition": "SelectiveRequalificationRequired",
+      "id": "C18",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "foundation-only change affects reactor civil interface while unrelated warehouse/logistics refs are proven unaffected"
+    },
+    {
+      "expected_primary_disposition": "ExternalSafetyReviewRequired",
+      "id": "C19",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "maintenance replacement changes exact externally classified interface dependency"
+    },
+    {
+      "expected_primary_disposition": "ExternalClassificationUnknown",
+      "id": "C20",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "required security/safeguards classification field is unavailable"
+    },
+    {
+      "expected_primary_disposition": "ClaimPromotionRejected",
+      "id": "C21",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "generic facility engineering calculation presented as licensed reactor safety analysis"
+    },
+    {
+      "expected_primary_disposition": "ClaimPromotionRejected",
+      "id": "C22",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "browser/UI planning proposal presented as licensed design acceptance"
+    },
+    {
+      "expected_primary_disposition": "HistoricalFailureRetained",
+      "id": "C23",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "corrected facility generation closes after earlier commissioning failure"
+    },
+    {
+      "expected_primary_disposition": "NoBuildOrOperateAuthority",
+      "id": "C24",
+      "required_claim_ceiling": "software_semantics_only",
+      "stimulus": "all synthetic N0 interface checks close under declared profile"
+    }
+  ],
+  "claim_ceiling": {
+    "allows": [
+      "synthetic_interface_representation",
+      "dependency_currentness_reasoning",
+      "3S_reference_routing",
+      "virtual_commissioning_planning"
+    ],
+    "denies": [
+      "reactor_design",
+      "nuclear_safety_analysis",
+      "site_suitability",
+      "structural_adequacy",
+      "radiological_protection",
+      "physical_security_effectiveness",
+      "safeguards_compliance",
+      "emergency_plan_adequacy",
+      "licensing",
+        "construction_readiness",
+      "commissioning_authorization",
+      "procurement_authority",
+      "physical_nuclear_operation"
+    ]
+  },
+  "dispositions": [
+    "SyntheticMappingComplete",
+    "VendorInterfaceStale",
+    "SiteApplicabilityReviewRequired",
+    "SiteEvidenceIncomplete",
+    "CivilInterfaceUnresolved",
+    "ThermalInterfaceUnresolved",
+    "GridAuthorityMissing",
+    "UtilityCommonModeDetected",
+    "AsBuiltEvidenceIncomplete",
+    "AsBuiltContradiction",
+    "IntegratedCommissioningIncomplete",
+    "ExternalSafetyReviewRequired",
+    "ExternalSecurityReviewRequired",
+    "ExternalSafeguardsReviewRequired",
+    "ExternalClassificationUnknown",
+    "ClaimPromotionRejected",
+    "SyntheticSourceClassRejected",
+    "SelectiveRequalificationRequired",
+    "HistoricalFailureRetained",
+    "NoBuildOrOperateAuthority"
+  ],
+  "facility_subject": {
+    "civil_generation": "SYNTH_CIVIL_G1",
+    "commissioning_graph_generation": "SYNTH_CX_G1",
+    "electrical_grid_generation": "SYNTH_ELECTRICAL_G1",
+    "maintenance_logistics_generation": "SYNTH_MAINT_G1",
+    "site_generation": "SYNTH_SITE_G1",
+    "thermal_bop_generation": "SYNTH_THERMAL_G1",
+    "twin_composition_generation": "SYNTH_TWIN_G1",
+    "utility_generation": "SYNTH_UTIL_G1"
+  },
+  "issue": 6136,
+  "profile": "SyntheticSmrFacilityInterfaceDemonstratorV1",
+  "reactor_interface": {
+    "identity": {
+      "interface_generation": "SYNTH_IFACE_G1",
+      "model": "SYNTHETIC_SMR_MODULE",
+      "vendor": "SYNTHETIC_VENDOR"
+    },
+    "jurisdiction_ref": "SYNTHETIC_JURISDICTION_PROFILE",
+    "kind": "SyntheticLicensedReactorInterfaceV1",
+    "prohibited_detail_classes": [
+      "reactor_core_geometry",
+      "fuel_composition_or_enrichment",
+      "fuel_management",
+      "criticality",
+      "accident_source_terms",
+      "protection_setpoints_or_trip_logic",
+      "security_vulnerabilities_or_response_tactics",
+      "safeguards_sensitive_material_inventory_or_evasion",
+      "plant_operating_instructions"
+    ],
+    "roles": [
+      "CivilFoundationInterface",
+      "ThermalServiceInterface",
+      "ElectricalPowerInterface",
+      "GridExportInterface",
+      "AuxiliaryUtilityInterface",
+      "EnvironmentalInterface",
+      "MaintenanceHandlingInterface",
+      "DataBoundaryInterface",
+      "WasteServiceInterface",
+      "EmergencySupportInterface",
+      "SafetyInterfaceRef",
+      "SecurityInterfaceRef",
+      "SafeguardsInterfaceRef"
+    ]
+  },
+  "schema": "nucl-smr-000a-facility-interface-reference-v1",
+  "source_parent": "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
+}
