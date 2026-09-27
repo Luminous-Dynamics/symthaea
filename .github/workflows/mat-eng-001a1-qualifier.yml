@@ -1,0 +1,57 @@
+name: MAT-ENG-001A1 exact-head qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_mat_eng_001a.py'
+      - '.github/workflows/mat-eng-001a1-qualifier.yml'
+      - 'docs/engineering/MAT_ENG_001A.md'
+      - 'docs/engineering/data/mat_eng_001a_reference_v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qualifier head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify exact source parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_HEAD='1c0e5e2c8a3102cfb11cc5032fce843c662d3d18'
+          test "$(git rev-parse HEAD^)" = "$SOURCE_HEAD"
+
+      - name: Verify qualifier diff scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_HEAD='1c0e5e2c8a3102cfb11cc5032fce843c662d3d18'
+          mapfile -t files < <(git diff --name-only "$SOURCE_HEAD"..HEAD | sort)
+          printf '%s\n' "${files[@]}"
+          test "${#files[@]}" -eq 2
+          test "${files[0]}" = '.github/workflows/mat-eng-001a1-qualifier.yml'
+          test "${files[1]}" = 'scripts/validate_mat_eng_001a.py'
+
+      - name: Verify frozen source blobs unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:docs/engineering/MAT_ENG_001A.md)" = '326c8a00bec9f0110d1b7a059b09c8e297254da8'
+          test "$(git rev-parse HEAD:docs/engineering/data/mat_eng_001a_reference_v1.json)" = '1a69a8db13c3093a29674271aba505e39e2bede3'
+
+      - name: Independent stdlib oracle
+        run: python3 scripts/validate_mat_eng_001a.py
+
+      - name: Postflight frozen-source immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD:docs/engineering/MAT_ENG_001A.md)" = '326c8a00bec9f0110d1b7a059b09c8e297254da8'
+          test "$(git rev-parse HEAD:docs/engineering/data/mat_eng_001a_reference_v1.json)" = '1a69a8db13c3093a29674271aba505e39e2bede3'
