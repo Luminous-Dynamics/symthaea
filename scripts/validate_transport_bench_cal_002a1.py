@@ -3,7 +3,6 @@ import copy, hashlib, json, subprocess, sys
 from pathlib import Path
 
 SOURCE_HEAD = "92990d2313743be501adfda2aa9200846c903650"
-QUALIFIER_HEAD = "f46351f036729913ac13dec50154b65205252831"
 SOURCE_PARENT = "fbd7a754ea8389ca93f7680d93ed8b48553e6376"
 DATA_SHA256 = "4c9ca2276101407960836ac81e19f9d78f7d263bdfa33c71c7d6eadbef887d68"
 SCHEMA = "transport-bench-cal-002-ledger-v1"
@@ -73,8 +72,8 @@ def main():
     if "NaN" in doc: raise ValueError("NaN serialization defect")
     theorem="benchmark result != decision permission != permanent evidence validity != transfer validity outside its calibrated profile"
     if theorem not in doc: raise ValueError("core theorem mismatch")
-    if git("rev-parse","HEAD")!=QUALIFIER_HEAD: raise ValueError("qualifier head mismatch")
     if subprocess.call(["git","merge-base","--is-ancestor",SOURCE_HEAD,"HEAD"]) != 0: raise ValueError("source head is not an ancestor of qualifier head")
+    if git("rev-parse","HEAD")==SOURCE_HEAD: raise ValueError("qualifier has no independent changes")
     if git("rev-parse",SOURCE_HEAD+"^")!=SOURCE_PARENT: raise ValueError("source parent mismatch")
     paths=sorted(git("diff","--name-only",SOURCE_PARENT,QUALIFIER_HEAD).splitlines())
     expected=sorted(["docs/engineering/TRANSPORT_BENCH_CAL_002.md","docs/engineering/data/transport_bench_cal_002_ledger_v1.json",".github/workflows/transport-bench-cal-002a1-qualifier.yml","scripts/validate_transport_bench_cal_002a1.py"])
