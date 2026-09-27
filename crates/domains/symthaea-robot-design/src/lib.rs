@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 mod canonical;
+pub mod c0_joint_link_coupon;
 pub mod exact_parameters;
 
 pub use canonical::*;
