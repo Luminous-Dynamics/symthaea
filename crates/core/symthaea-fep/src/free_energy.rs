@@ -356,7 +356,8 @@ pub struct ExpectedFreeEnergyComputer {
     /// to be (`ALIFE_MULTIAGENT_GENESIS_PLAN_2026-07-25.md`, Gate 5).
     #[serde(default)]
     pub precision_overrides: Option<Vec<f64>>,
-    /// Action history for novelty computation
+    /// Committed-action history for novelty computation.
+    /// Candidate scoring and selection never mutate this history.
     pub action_history: VecDeque<usize>,
 }
 
@@ -397,7 +398,7 @@ impl ExpectedFreeEnergyComputer {
     /// G(π) = Pragmatic + Epistemic
     ///      = E_q[D_KL[q(o|s) || p̃(o)]] + E_q[H[p(o|s)]]
     pub fn compute(
-        &mut self,
+        &self,
         action: usize,
         state: &HiddenState,
         model: &GenerativeModel,
@@ -416,14 +417,8 @@ impl ExpectedFreeEnergyComputer {
         // Higher uncertainty reduction = better (negate for minimization)
         let epistemic = self.compute_epistemic_value(&predicted_state, state);
 
-        // Novelty: How often have we taken this action?
+        // Novelty: How often has this action been committed?
         let novelty = self.compute_novelty(action);
-
-        // Record action in history
-        self.action_history.push_back(action);
-        if self.action_history.len() > 100 {
-            self.action_history.pop_front();
-        }
 
         // Total expected free energy (lower is better)
         let total = self.pragmatic_weight * pragmatic + self.epistemic_weight * epistemic
@@ -437,6 +432,19 @@ impl ExpectedFreeEnergyComputer {
             novelty,
             predicted_state,
             expected_observation: expected_obs,
+        }
+    }
+
+    /// Record one action commitment at the owning generic-FEP boundary.
+    ///
+    /// Candidate evaluation through [`Self::compute`] and selection through
+    /// `ActiveInferenceAgent::select_action` are intentionally pure with respect
+    /// to novelty history. The current compatibility commitment boundary is
+    /// `ActiveInferenceAgent::act`; #606 will make that lifecycle explicit.
+    pub fn record_committed_action(&mut self, action: usize) {
+        self.action_history.push_back(action);
+        if self.action_history.len() > 100 {
+            self.action_history.pop_front();
         }
     }
 
