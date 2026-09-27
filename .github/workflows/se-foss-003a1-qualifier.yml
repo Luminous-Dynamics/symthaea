@@ -1,0 +1,73 @@
+name: SE-FOSS-003A1 exact-head qualifier
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/validate_se_foss_003a.py'
+      - '.github/workflows/se-foss-003a1-qualifier.yml'
+      - 'docs/engineering/SE_FOSS_003A.md'
+      - 'docs/engineering/data/se_foss_003a_reference_v1.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout qualifier head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Bind exact source ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=541cdecd268718d5164b12c7291f26558f7b1dae
+          PARENT=fbd7a754ea8389ca93f7680d93ed8b48553e6376
+          test "$(git rev-parse HEAD^)" = "$SOURCE"
+          test "$(git rev-parse HEAD^^)" = "$PARENT"
+
+      - name: Bind exact source blobs and digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=541cdecd268718d5164b12c7291f26558f7b1dae
+          test "$(git rev-parse "$SOURCE:docs/engineering/SE_FOSS_003A.md")" = "8278e612ac54e8bb0f47a6ae605136c284fce3e1"
+          test "$(git rev-parse "$SOURCE:docs/engineering/data/se_foss_003a_reference_v1.json")" = "fb5484df52cf30fc09ab21f3b67ff497264b5697"
+          python3 - <<'PY'
+          import hashlib, subprocess
+          source='541cdecd268718d5164b12c7291f26558f7b1dae'
+          path='docs/engineering/data/se_foss_003a_reference_v1.json'
+          data=subprocess.check_output(['git','show',f'{source}:{path}'])
+          got=hashlib.sha256(data).hexdigest()
+          want='ee1a66b8fa4fa3ccb312e14252363eb6c05c960f0d195de1623a3c770f6f59b3'
+          assert got == want, (got, want)
+          PY
+
+      - name: Enforce qualifier-only diff scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git diff --name-only HEAD^ HEAD | sort)"
+          expected="$(printf '%s\n' '.github/workflows/se-foss-003a1-qualifier.yml' 'scripts/validate_se_foss_003a.py' | sort)"
+          test "$actual" = "$expected"
+
+      - name: Independent semantic oracle and mutation suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate_se_foss_003a.py --source-ref HEAD^
+
+      - name: Postflight source immutability
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE=541cdecd268718d5164b12c7291f26558f7b1dae
+          test "$(git rev-parse "$SOURCE:docs/engineering/SE_FOSS_003A.md")" = "8278e612ac54e8bb0f47a6ae605136c284fce3e1"
+          test "$(git rev-parse "$SOURCE:docs/engineering/data/se_foss_003a_reference_v1.json")" = "fb5484df52cf30fc09ab21f3b67ff497264b5697"
+          git diff --exit-code HEAD^ HEAD -- docs/engineering/SE_FOSS_003A.md docs/engineering/data/se_foss_003a_reference_v1.json
+          git status --porcelain
