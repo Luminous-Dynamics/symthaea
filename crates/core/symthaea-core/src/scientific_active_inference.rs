@@ -56,7 +56,7 @@ pub struct ScientificTestRanking {
 pub enum ScientificActiveInferenceError {
     EmptyForecasts, EmptyModelId, EmptyLineage, InvalidPrior, PriorsDoNotNormalize,
     EmptyTestId, NegativeCost, EmptyOutcomes, EmptyOutcomeId, InvalidUtility,
-    ProbabilityWidthMismatch, InvalidProbability, ProbabilitiesDoNotNormalize, HorizonMismatch,
+    ProbabilityWidthMismatch, InvalidProbability, ProbabilitiesDoNotNormalize, HorizonMismatch, InvalidWeight,
 }
 impl fmt::Display for ScientificActiveInferenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "{self:?}") }
