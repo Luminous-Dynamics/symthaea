@@ -35,6 +35,20 @@ pub struct CandidatePredictionBinding {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VerificationFailure {
+    CommitmentIntegrity,
+    PayloadDigestMismatch,
+    BindingDigestMismatch,
+    CandidateIdMismatch,
+    SourceCandidateIdMismatch,
+    TestSpecificationMismatch,
+    MeasurementSpecificationMismatch,
+    LineageDigestMismatch,
+    ProvenanceLineageMismatch,
+    InvalidBinding(BindingError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BindingError {
     EmptyPredictionPayload,
     MissingBindingField(&'static str),
@@ -112,25 +126,59 @@ pub struct CandidatePredictionCommitment {
 
 impl CandidatePredictionCommitment {
     /// Verify every independently recomputable identity relationship.
+    ///
+    /// Malformed bindings still return Err; a well-formed but mismatched
+    /// envelope returns Ok(false), preserving the original API.
     pub fn verify_binding(
         &self,
         binding: &CandidatePredictionBinding,
     ) -> Result<bool, BindingError> {
-        let binding_digest = binding.digest()?;
-        let payload_digest = binding.payload_digest()?;
-        let lineage_digest = binding.lineage_digest()?;
+        match self.verify_binding_detailed(binding) {
+            Ok(()) => Ok(true),
+            Err(VerificationFailure::InvalidBinding(error)) => Err(error),
+            Err(_) => Ok(false),
+        }
+    }
 
-        Ok(
-            self.commitment.verify_integrity()
-                && self.commitment.payload_digest() == payload_digest
-                && self.binding_digest == binding_digest
-                && self.candidate_id == binding.candidate_id
-                && self.source_candidate_id == binding.source_candidate_id
-                && self.test_specification_id == binding.test_specification_id
-                && self.measurement_specification_id == binding.measurement_specification_id
-                && self.lineage_digest == lineage_digest
-                && self.commitment.provenance().model_lineage == lineage_digest,
-        )
+    /// Verify the envelope and identify the first integrity relationship that
+    /// does not hold. This is a pure diagnostic operation.
+    pub fn verify_binding_detailed(
+        &self,
+        binding: &CandidatePredictionBinding,
+    ) -> Result<(), VerificationFailure> {
+        binding.validate().map_err(VerificationFailure::InvalidBinding)?;
+        let binding_digest = binding.digest().map_err(VerificationFailure::InvalidBinding)?;
+        let payload_digest = binding.payload_digest().map_err(VerificationFailure::InvalidBinding)?;
+        let lineage_digest = binding.lineage_digest().map_err(VerificationFailure::InvalidBinding)?;
+
+        if !self.commitment.verify_integrity() {
+            return Err(VerificationFailure::CommitmentIntegrity);
+        }
+        if self.commitment.payload_digest() != payload_digest {
+            return Err(VerificationFailure::PayloadDigestMismatch);
+        }
+        if self.binding_digest != binding_digest {
+            return Err(VerificationFailure::BindingDigestMismatch);
+        }
+        if self.candidate_id != binding.candidate_id {
+            return Err(VerificationFailure::CandidateIdMismatch);
+        }
+        if self.source_candidate_id != binding.source_candidate_id {
+            return Err(VerificationFailure::SourceCandidateIdMismatch);
+        }
+        if self.test_specification_id != binding.test_specification_id {
+            return Err(VerificationFailure::TestSpecificationMismatch);
+        }
+        if self.measurement_specification_id != binding.measurement_specification_id {
+            return Err(VerificationFailure::MeasurementSpecificationMismatch);
+        }
+        if self.lineage_digest != lineage_digest {
+            return Err(VerificationFailure::LineageDigestMismatch);
+        }
+        if self.commitment.provenance().model_lineage != lineage_digest {
+            return Err(VerificationFailure::ProvenanceLineageMismatch);
+        }
+        Ok(())
     }
 
     /// Supersede this envelope without allowing the raw commitment primitive to
@@ -408,6 +456,103 @@ mod tests {
             ),
             Err(BindingError::SourceMismatch)
         );
+    }
+
+    #[test]
+    fn detailed_verification_reports_each_integrity_class() {
+        let c = candidate();
+        let binding = binding_for(&c, b"forecast");
+        let make = || {
+            commit_candidate_envelope(
+                &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+                "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+            ).unwrap()
+        };
+
+        let mut commitment = make();
+        let mut value = serde_json::to_value(&commitment.commitment).unwrap();
+        value["event_id"] = serde_json::Value::String("sha256:tampered".into());
+        commitment.commitment = serde_json::from_value(value).unwrap();
+        assert_eq!(commitment.verify_binding_detailed(&binding), Err(VerificationFailure::CommitmentIntegrity));
+
+        let mut payload = make();
+        payload.commitment = ProspectivePredictionCommitment::commit(
+            "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"tampered",
+        ).unwrap();
+        assert_eq!(payload.verify_binding_detailed(&binding), Err(VerificationFailure::PayloadDigestMismatch));
+
+        let mut digest = make();
+        digest.binding_digest = "sha256:tampered".into();
+        assert_eq!(digest.verify_binding_detailed(&binding), Err(VerificationFailure::BindingDigestMismatch));
+
+        let mut candidate_id = make();
+        candidate_id.candidate_id = "tampered".into();
+        assert_eq!(candidate_id.verify_binding_detailed(&binding), Err(VerificationFailure::CandidateIdMismatch));
+
+        let mut source_id = make();
+        source_id.source_candidate_id = "tampered".into();
+        assert_eq!(source_id.verify_binding_detailed(&binding), Err(VerificationFailure::SourceCandidateIdMismatch));
+
+        let mut test_spec = make();
+        test_spec.test_specification_id = "tampered".into();
+        assert_eq!(test_spec.verify_binding_detailed(&binding), Err(VerificationFailure::TestSpecificationMismatch));
+
+        let mut measurement = make();
+        measurement.measurement_specification_id = "tampered".into();
+        assert_eq!(measurement.verify_binding_detailed(&binding), Err(VerificationFailure::MeasurementSpecificationMismatch));
+
+        let mut lineage = make();
+        lineage.lineage_digest = "sha256:tampered".into();
+        assert_eq!(lineage.verify_binding_detailed(&binding), Err(VerificationFailure::LineageDigestMismatch));
+
+        let mut provenance_lineage = make();
+        provenance_lineage.commitment = {
+            let mut value = serde_json::to_value(&provenance_lineage.commitment).unwrap();
+            let wrong = lineage_digest("wrong-left", &c.right_lineage);
+            value["provenance"]["model_lineage"] = serde_json::Value::String(wrong);
+            serde_json::from_value(value).unwrap()
+        };
+        assert_eq!(
+            provenance_lineage.verify_binding_detailed(&binding),
+            Err(VerificationFailure::ProvenanceLineageMismatch)
+        );
+    }
+
+    #[test]
+    fn detailed_verification_preserves_malformed_binding_error() {
+        let c = candidate();
+        let envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        let mut binding = binding_for(&c, b"forecast");
+        binding.prediction_payload.clear();
+
+        assert_eq!(
+            envelope.verify_binding_detailed(&binding),
+            Err(VerificationFailure::InvalidBinding(BindingError::EmptyPredictionPayload))
+        );
+        assert_eq!(
+            envelope.verify_binding(&binding),
+            Err(BindingError::EmptyPredictionPayload)
+        );
+    }
+
+    #[test]
+    fn detailed_verification_reports_typed_mismatch() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.lineage_digest = "sha256:tampered".into();
+
+        assert_eq!(
+            envelope.verify_binding_detailed(&binding_for(&c, b"forecast")),
+            Err(VerificationFailure::LineageDigestMismatch)
+        );
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
     }
 
     #[test]
