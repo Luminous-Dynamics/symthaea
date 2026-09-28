@@ -206,6 +206,26 @@ def derived_snapshot(cases):
         for case in cases
     }
 
+def canonical_invalidation_plan(cases, graph, changed_ref):
+    """Build a canonical, replayable invalidation-plan identity."""
+    plan = graph_invalidation_plan(cases, graph, changed_ref)
+    payload = {
+        "schema": "mat-converge-002-invalidation-plan-v1",
+        "graph_schema": graph["schema"],
+        "changed_ref": plan["changed_ref"],
+        "direct_case_ids": plan["direct_case_ids"],
+        "transitive_case_ids": plan["transitive_case_ids"],
+        "recompute_case_ids": plan["recompute_case_ids"],
+    }
+    return {
+        "schema": payload["schema"],
+        "changed_ref": changed_ref,
+        "direct_case_ids": plan["direct_case_ids"],
+        "transitive_case_ids": plan["transitive_case_ids"],
+        "recompute_case_ids": plan["recompute_case_ids"],
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
+
 def graph_invalidation_plan(cases, graph, changed_ref):
     """Return deterministic direct/transitive impact for one immutable graph ref."""
     direct = graph_direct_case_ids(cases, graph, changed_ref)
@@ -407,6 +427,29 @@ def main():
         fail("invalidation plan transitive fanout drift")
     if plan["recompute_case_ids"] != expected_graph_closure:
         fail("invalidation plan recomputation set drift")
+    canonical_plan = canonical_invalidation_plan(cases, graph, "process/G1")
+    if canonical_plan["schema"] != "mat-converge-002-invalidation-plan-v1":
+        fail("invalidation plan schema drift")
+    if canonical_plan["direct_case_ids"] != direct_graph_cases:
+        fail("canonical invalidation plan direct fanout drift")
+    if canonical_plan["transitive_case_ids"] != expected_graph_closure:
+        fail("canonical invalidation plan closure drift")
+    if canonical_plan["recompute_case_ids"] != expected_graph_closure:
+        fail("canonical invalidation plan recomputation drift")
+    plan_payload = {
+        "schema": canonical_plan["schema"],
+        "graph_schema": graph["schema"],
+        "changed_ref": canonical_plan["changed_ref"],
+        "direct_case_ids": canonical_plan["direct_case_ids"],
+        "transitive_case_ids": canonical_plan["transitive_case_ids"],
+        "recompute_case_ids": canonical_plan["recompute_case_ids"],
+    }
+    if canonical_plan["digest"] != hashlib.sha256(canonical(plan_payload)).hexdigest():
+        fail("invalidation plan digest is not self-consistent")
+    key_permuted_plan = json.loads(json.dumps(canonical_plan))
+    key_permuted_plan["recompute_case_ids"] = list(reversed(key_permuted_plan["recompute_case_ids"]))
+    if key_permuted_plan["digest"] == canonical_plan["digest"]:
+        fail("recomputation ordering was incorrectly treated as representational")
     if graph_invalidation_plan(cases, graph, "unknown/immutable-ref") != {
         "changed_ref": "unknown/immutable-ref",
         "direct_case_ids": [],
@@ -414,6 +457,9 @@ def main():
         "recompute_case_ids": [],
     }:
         fail("unknown graph ref did not fail closed in invalidation plan")
+    unknown_plan = canonical_invalidation_plan(cases, graph, "unknown/immutable-ref")
+    if unknown_plan["direct_case_ids"] != [] or unknown_plan["recompute_case_ids"] != []:
+        fail("unknown canonical invalidation plan did not fail closed")
     actual_changed = "process/G3"
     if actual_changed in set(localized_projection["C02"]):
         fail("case-local projection accepted an unqualified replacement generation")
