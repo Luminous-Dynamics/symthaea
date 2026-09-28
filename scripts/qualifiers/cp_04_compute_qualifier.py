@@ -16,6 +16,23 @@ SCENARIOS={"C01":"complete-thread","C02":"model-parameter-generation-changed","C
 CASE_GUARDS={"C05":"CP-COMP-HISTORICAL","C06":"CP-COMP-COVERAGE","C10":"CP-COMP-DEPENDENCY","C16":"CP-COMP-NEGATIVE","C17":"CP-COMP-AUTHORITY","C18":"CP-COMP-CURRENTNESS"}
 GUARDS={"CP-COMP-COVERAGE":"coverage","CP-COMP-AUTHORITY":"authority","CP-COMP-NEGATIVE":"negative-evidence","CP-COMP-DEPENDENCY":"dependency-boundary","CP-COMP-CURRENTNESS":"currentness","CP-COMP-HISTORICAL":"historical-identity","CP-COMP-INVARIANT":"invariant-integrity"}
 FAILURES=[]
+COMPUTE_GRAPH={
+ "schema":"cp-04-compute-dependency-graph-v1",
+ "nodes":["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"],
+ "edges":[["requirement","representation"],["representation","model"],["model","runtime"],["runtime","accelerator"],["accelerator","deployment"],["deployment","execution"],["execution","observation"],["observation","statistics"],["statistics","disposition"]]
+}
+def graph_identity():
+    return digest({"schema":COMPUTE_GRAPH["schema"],"nodes":sorted(COMPUTE_GRAPH["nodes"]),"edges":sorted([list(e) for e in COMPUTE_GRAPH["edges"]])})
+def dependency_closure(changed):
+    adjacency={n:set() for n in COMPUTE_GRAPH["nodes"]}
+    for a,b in COMPUTE_GRAPH["edges"]:
+        adjacency[a].add(b); adjacency[b].add(a)
+    seen=set(changed); todo=list(changed)
+    while todo:
+        n=todo.pop()
+        for nxt in adjacency.get(n,set()):
+            if nxt not in seen: seen.add(nxt); todo.append(nxt)
+    return sorted(seen)
 def canonical(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
 def digest(v): return hashlib.sha256(canonical(v)).hexdigest()
 def fail(m, guard_id):
@@ -24,7 +41,7 @@ def fail(m, guard_id):
 def eq(a,b,m,guard_id="CP-COMP-INVARIANT"):
     if a!=b: fail(f"{m}: expected {b!r}, got {a!r}",guard_id)
 def replay_input(c):
-    return {"schema":c["schema"],"authority":c["authority"],"claim_ceiling":c["claim_ceiling"],"replay_semantics":c["replay_semantics"],"case_manifest":[{"case_id":x["case_id"],"scenario":x["scenario"]} for x in c["cases"]]}
+    return {"schema":c["schema"],"authority":c["authority"],"claim_ceiling":c["claim_ceiling"],"replay_semantics":c["replay_semantics"],"graph_identity":graph_identity(),"case_manifest":[{"case_id":x["case_id"],"scenario":x["scenario"]} for x in c["cases"]]}
 def source_audit():
     source=SOURCE.read_text(encoding="utf-8")
     tree=ast.parse(source)
@@ -67,12 +84,16 @@ def mutations(c):
         out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
     return out
 def receipt(c,m,r,manifest_sha,source_sha):
-    p={"schema":"cp-04-compute-qualification-receipt-v1","corpus_sha256":digest(c),"replay_input_sha256":r,"mutation_manifest_sha256":manifest_sha,"oracle_source_sha256":source_sha,"guard_registry_sha256":digest(GUARDS),"mutation_results":m,"claim_ceiling":c["claim_ceiling"],"disposition":"PASS","physical_execution_authority":False}
+    p={"schema":"cp-04-compute-qualification-receipt-v1","corpus_sha256":digest(c),"replay_input_sha256":r,"graph_identity_sha256":graph_identity(),"mutation_manifest_sha256":manifest_sha,"oracle_source_sha256":source_sha,"guard_registry_sha256":digest(GUARDS),"mutation_results":m,"claim_ceiling":c["claim_ceiling"],"disposition":"PASS","physical_execution_authority":False}
     p["receipt_sha256"]=digest(p); return p
 def main():
     c=json.loads(CORPUS.read_text(encoding="utf-8")); mfest=json.loads(MANIFEST.read_text(encoding="utf-8"))
     source_sha=source_audit(); validate(c); validate_manifest(mfest); r=digest(replay_input(c)); muts=mutations(c)
+    closure=dependency_closure(["model"])
+    if not {"model","runtime","accelerator","deployment","execution","observation","statistics","disposition"}.issubset(closure): fail("model dependency closure incomplete","CP-COMP-DEPENDENCY")
+    deployment_closure=dependency_closure(["deployment"])
+    if "model" in deployment_closure or "representation" in deployment_closure: fail("downstream change invalidated upstream compute identity","CP-COMP-DEPENDENCY")
     if FAILURES or not all(x["rejected"] for x in muts):
         print("CP-04 COMPUTE QUALIFIER FAIL"); [print(" -",x) for x in FAILURES]; raise SystemExit(1)
-    q=receipt(c,muts,r,digest(mfest),source_sha); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("oracle_source_sha256="+q["oracle_source_sha256"]); print("guard_registry_sha256="+q["guard_registry_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
+    q=receipt(c,muts,r,digest(mfest),source_sha); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("graph_identity_sha256="+q["graph_identity_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("oracle_source_sha256="+q["oracle_source_sha256"]); print("guard_registry_sha256="+q["guard_registry_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
 if __name__=="__main__": main()
