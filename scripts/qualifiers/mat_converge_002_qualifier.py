@@ -50,11 +50,37 @@ def main():
     doc=json.loads(raw)
     if doc.get("schema") != "mat-converge-002-fixture-v1":
         fail("schema mismatch")
-    check(doc.get("cases", []))
+    cases = doc.get("cases", [])
+    check(cases)
+    mutations = [
+        ("remove-process-ref", "C02"),
+        ("change-profile-ref", "C03"),
+        ("change-disposition", "C16"),
+    ]
+    for name, target in mutations:
+        mutated = [dict(c) for c in cases]
+        for i, case in enumerate(mutated):
+            if case["id"] != target:
+                continue
+            case = dict(case)
+            if name == "remove-process-ref":
+                case["refs"] = dict(case["refs"])
+                case["refs"].pop("process", None)
+            elif name == "change-profile-ref":
+                case["refs"] = dict(case["refs"])
+                case["refs"]["profile"] = "profile/P9"
+            else:
+                case["outcome"] = "supported"
+            mutated[i] = case
+        try:
+            check(mutated)
+        except AssertionError:
+            continue
+        fail(f"mutation escaped oracle: {name}")
     print(json.dumps({
         "qualifier":"MAT-CONVERGE-002A1","schema":"1",
         "fixture_sha256":hashlib.sha256(raw).hexdigest(),
-        "case_count":len(doc["cases"]),"disposition":"PASS",
+        "case_count":len(cases),"disposition":"PASS",
         "claim_ceiling":doc["claim_ceiling"]},sort_keys=True,indent=2))
     return 0
 
