@@ -1,9 +1,8 @@
 name: TEMP MEM-TXN-001A-R1 Rustfmt materializer
 
 on:
-  push:
-    branches:
-      - temp/mem-txn-001a-r1-rustfmt
+  pull_request:
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
