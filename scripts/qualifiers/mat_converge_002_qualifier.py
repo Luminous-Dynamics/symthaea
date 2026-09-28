@@ -209,6 +209,7 @@ def derived_snapshot(cases):
 def recomputation_snapshot(cases, graph, invalidation_plan):
     """Create a deterministic two-phase replay artifact for selected cases."""
     selected = set(invalidation_plan["recompute_case_ids"])
+    projections = dependency_projection(cases, graph)
     records = []
     for case in cases:
         if case["id"] not in selected:
@@ -216,7 +217,7 @@ def recomputation_snapshot(cases, graph, invalidation_plan):
         records.append({
             "case_id": case["id"],
             "historical_identity": immutable_record_identity(case),
-            "dependency_projection": dependency_projection(cases, graph)[case["id"]],
+            "dependency_projection": projections[case["id"]],
         })
     payload = {
         "schema": "mat-converge-002-recomputation-snapshot-v1",
