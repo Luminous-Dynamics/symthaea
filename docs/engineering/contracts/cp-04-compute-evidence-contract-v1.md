@@ -113,7 +113,7 @@ CIV-Service can project separately qualified compute capability into availabilit
 Engineering qualification cannot grant production execution authority. Physical execution remains behind hardware, OS/runtime, HAL, operator, commissioning, and safety boundaries.
 
 ## Replay semantics
-Replay identity uses immutable case order and exact representation/model/runtime/toolchain/accelerator/deployment/execution/observation/statistical/dependency/currentness/applicability identities. Derived dispositions are excluded from replay identity. Equivalent immutable inputs must yield equivalent dispositions. The qualifier adversarially verifies that corpus-level identity fields and every case scenario affect replay identity, while changing only a derived disposition does not.
+Replay identity uses immutable case order and exact representation/model/runtime/toolchain/accelerator/deployment/execution/observation/statistical/dependency/currentness/applicability identities. Derived dispositions are excluded from replay identity. Equivalent immutable inputs must yield equivalent dispositions. The qualifier adversarially verifies that corpus-level identity fields and every case scenario affect replay identity, while changing only a derived disposition does not. It also verifies the replay schema, case count, case order, and scenario binding explicitly.
 
 ## Adversarial requirements
 The qualifier must reject/narrow:
