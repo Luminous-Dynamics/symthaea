@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/prospective-commitment-audit-1.0.0.schema.json",
+  "title": "Prospective Commitment Audit Projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id","parent_event_ids","challenge_id","criteria_generation","mapping_generation","actor_id","created_at","knowledge_cutoff","exposure_cutoff","binding_digest","lineage_digest","audit_digest"],
+  "properties": {
+    "event_id": {"type":"string","minLength":1},
+    "parent_event_ids": {"type":"array","items":{"type":"string","minLength":1}},
+    "challenge_id": {"type":"string","minLength":1},
+    "criteria_generation": {"type":"string","minLength":1},
+    "mapping_generation": {"type":"string","minLength":1},
+    "actor_id": {"type":"string","minLength":1},
+    "created_at": {"type":"string","minLength":1},
+    "knowledge_cutoff": {"type":"string","minLength":1},
+    "exposure_cutoff": {"type":"string","minLength":1},
+    "binding_digest": {"type":"string","minLength":1},
+    "lineage_digest": {"type":"string","minLength":1},
+    "audit_digest": {"type":"string","minLength":1}
+  },
+  "x-authority": "prospective_audit_only",
+  "x-non-equivalences": [
+    "audit projection is not experimental evidence",
+    "supersession is lineage history, not corroboration",
+    "audit integrity does not establish scientific truth",
+    "audit ordering is not candidate ranking",
+    "audit records do not imply experimental execution"
+  ]
+}
