@@ -2055,6 +2055,126 @@ mod tests {
     }
 
     #[test]
+    fn every_enumerated_candidate_has_independently_recomputed_identity() {
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(1).unwrap(),
+                    upper: C0LengthUmV1::new(3).unwrap(),
+                    step_um: 1,
+                },
+            },
+        ])
+        .unwrap();
+
+        for candidate in domain.enumerate().unwrap() {
+            let independently_constructed =
+                ExactDesignParameterSetV1::new(candidate.parameters.clone()).unwrap();
+            assert_eq!(candidate.id().unwrap(), independently_constructed.id().unwrap());
+            assert_eq!(
+                candidate.canonical_transcript().unwrap(),
+                independently_constructed.canonical_transcript().unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn parameter_set_serde_permutation_preserves_identity() {
+        let first = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                value: C0LengthUmV1::new(10).unwrap(),
+            },
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                value: C0LengthUmV1::new(20).unwrap(),
+            },
+        ])
+        .unwrap();
+        let second = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                value: C0LengthUmV1::new(20).unwrap(),
+            },
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                value: C0LengthUmV1::new(10).unwrap(),
+            },
+        ])
+        .unwrap();
+
+        let first_json = serde_json::to_string(&first).unwrap();
+        let second_json = serde_json::to_string(&second).unwrap();
+        let first_restored: ExactDesignParameterSetV1 =
+            serde_json::from_str(&first_json).unwrap();
+        let second_restored: ExactDesignParameterSetV1 =
+            serde_json::from_str(&second_json).unwrap();
+
+        assert_eq!(first_restored.id().unwrap(), second_restored.id().unwrap());
+        assert_eq!(
+            first_restored.canonical_transcript().unwrap(),
+            second_restored.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
+    fn search_domain_serde_permutation_preserves_identity() {
+        let first = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(30).unwrap(),
+                    C0LengthUmV1::new(40).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+        let second = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(30).unwrap(),
+                    C0LengthUmV1::new(40).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        let first_restored: ExactDesignSearchDomainV1 =
+            serde_json::from_str(&serde_json::to_string(&first).unwrap()).unwrap();
+        let second_restored: ExactDesignSearchDomainV1 =
+            serde_json::from_str(&serde_json::to_string(&second).unwrap()).unwrap();
+
+        assert_eq!(first_restored.id().unwrap(), second_restored.id().unwrap());
+        assert_eq!(
+            first_restored.canonical_transcript().unwrap(),
+            second_restored.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
     fn identity_helpers_round_trip() {
         let id = ParameterIdV1::new("section_width").unwrap();
         let set = ExactDesignParameterSetV1::new(vec![ExactDesignLengthParameterV1 { id, value: C0LengthUmV1::new(20_000).unwrap() }]).unwrap();
