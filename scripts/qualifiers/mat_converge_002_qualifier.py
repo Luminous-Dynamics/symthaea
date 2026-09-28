@@ -577,8 +577,12 @@ def main():
 
     # A derived-only recomputation changes the result identity, while the
     # immutable replay inputs and recomputation boundary remain unchanged.
+    session_recomputed_cases = json.loads(json.dumps(cases))
+    for case in session_recomputed_cases:
+        if case["id"] in set(expected_graph_closure):
+            case["outcome"] = "recomputed-disposition"
     session_recomputed = replay_session(
-        cases, graph, canonical_plan, disposition_mutated
+        cases, graph, canonical_plan, session_recomputed_cases
     )
     if session_recomputed["base_replay_digest"] != session_baseline["base_replay_digest"]:
         fail("derived recomputation changed base replay identity")
