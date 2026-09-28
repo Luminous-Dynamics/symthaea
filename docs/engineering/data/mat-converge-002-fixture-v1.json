@@ -430,7 +430,16 @@
         "C13",
         "C14",
         "C15"
-      ]
+      ],
+      "graph_only_case_reasons": {
+        "C06": "case-level adversarial ranking control",
+        "C08": "case-level negative-evidence control",
+        "C11": "case-level population-inference control",
+        "C12": "case-level measurement-feasibility control",
+        "C13": "case-level manufacturing-feasibility control",
+        "C14": "case-level lower-tail engineering control",
+        "C15": "case-level evaluator-correlation control"
+      }
     },
     "case_ids": [
       "C01",
