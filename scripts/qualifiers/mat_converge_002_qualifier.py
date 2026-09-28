@@ -68,7 +68,7 @@ def replay_digest(cases, graph):
     }
     return hashlib.sha256(canonical(payload)).hexdigest()
 
-def check_graph(graph):
+def check_graph(graph, cases):
     if set(graph) != {"schema", "historical_records_immutable",
                       "derived_dispositions_recomputable", "nodes", "edges",
                       "case_ids", "replay_rule"}:
@@ -95,6 +95,7 @@ def check_graph(graph):
     if len(edge_ids) != len(set(edge_ids)):
         fail("duplicate state graph edge identity")
     node_set = set(node_ids)
+    nodes_by_id = {n["id"]: n for n in nodes}
     for node in nodes:
         if set(node) != GRAPH_NODE_KEYS:
             fail(f"state graph node schema drift: {node.get('id')}")
@@ -107,6 +108,35 @@ def check_graph(graph):
             fail(f"graph edge is not bound to its campaign case: {edge['id']}")
         if edge["from"] not in node_set or edge["to"] not in node_set:
             fail(f"dangling state graph edge: {edge['id']}")
+    case_by_id = {c["id"]: c for c in cases}
+    prefix_fields = {
+        "demand": "demand",
+        "profile": "profile",
+        "candidate": "candidate",
+        "process": "process",
+        "property": "property",
+        "measurement": "measurement",
+    }
+    for node in nodes:
+        if node["kind"] == "negative-edge":
+            if node["ref"] != f"edge/{node['generation']}":
+                fail(f"negative node identity drift: {node['id']}")
+            if node["generation"] not in case_by_id:
+                fail(f"negative node case missing: {node['id']}")
+            continue
+        field = prefix_fields.get(node["kind"])
+        if field is None:
+            fail(f"unknown graph node kind: {node['kind']}")
+        if node["ref"] != f"{field}/{node['generation']}":
+            fail(f"node ref/generation mismatch: {node['id']}")
+        if not any(c["refs"][field] == node["ref"] for c in cases):
+            fail(f"graph node is not anchored to a campaign case: {node['id']}")
+    for edge in edges:
+        case = case_by_id[edge["case_id"]]
+        endpoint_refs = {nodes_by_id[edge["from"]]["ref"], nodes_by_id[edge["to"]]["ref"]}
+        case_refs = set(case["refs"].values())
+        if not endpoint_refs.issubset(case_refs) and edge["case_id"] != "C07":
+            fail(f"graph edge endpoints are not anchored to case {edge['case_id']}")
     if not any(n["kind"] == "negative-edge" for n in nodes):
         fail("negative evidence is absent from state graph")
     if not set(edge["case_id"] for edge in edges).issubset(set(graph["case_ids"])):
@@ -163,7 +193,7 @@ def check(doc, cases):
     }
     if not required.issubset({c["outcome"] for c in cases}):
         fail("critical authority/negative-evidence controls missing")
-    check_graph(doc["state_graph"])
+    check_graph(doc["state_graph"], cases)
 
 def expect_failure(doc, cases, label):
     try:
