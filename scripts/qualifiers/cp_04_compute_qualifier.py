@@ -18,6 +18,12 @@ SCENARIOS={"C01":"complete-thread","C02":"model-parameter-generation-changed","C
 CASE_GUARDS={"C05":"CP-COMP-HISTORICAL","C06":"CP-COMP-COVERAGE","C10":"CP-COMP-DEPENDENCY","C16":"CP-COMP-NEGATIVE","C17":"CP-COMP-AUTHORITY","C18":"CP-COMP-CURRENTNESS"}
 GUARDS={"CP-COMP-COVERAGE":"coverage","CP-COMP-AUTHORITY":"authority","CP-COMP-NEGATIVE":"negative-evidence","CP-COMP-DEPENDENCY":"dependency-boundary","CP-COMP-CURRENTNESS":"currentness","CP-COMP-HISTORICAL":"historical-identity","CP-COMP-INVARIANT":"invariant-integrity"}
 FAILURES=[]
+IDENTITY_FIELDS=[
+    "compute_subject_generation","representation_identity","model_identity","model_parameters_identity",
+    "runtime_identity","toolchain_identity","accelerator_identity","deployment_artifact_identity",
+    "execution_context_identity","observation_identity","statistics_identity","dependency_identity",
+    "currentness_identity","applicability_identity"
+]
 EXPECTED_GRAPH_NODES=["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"]
 EXPECTED_GRAPH_EDGES=[["requirement","representation"],["representation","model"],["model","runtime"],["runtime","accelerator"],["accelerator","deployment"],["deployment","execution"],["execution","observation"],["observation","statistics"],["statistics","disposition"]]
 EXPECTED_CLOSURES={
@@ -86,7 +92,15 @@ def dependency_closure(changed,graph):
                 seen.add(nxt); todo.append(nxt)
     return sorted(seen)
 def replay_input(c,graph):
-    return {"schema":c["schema"],"authority":c["authority"],"claim_ceiling":c["claim_ceiling"],"replay_semantics":c["replay_semantics"],"graph_identity":graph_identity(graph),"case_manifest":[{"case_id":x["case_id"],"scenario":x["scenario"]} for x in c["cases"]]}
+    return {
+        "schema":c["schema"],"authority":c["authority"],"claim_ceiling":c["claim_ceiling"],
+        "replay_semantics":c["replay_semantics"],"graph_identity":graph_identity(graph),
+        "case_manifest":[
+            {"case_id":x["case_id"],"scenario":x["scenario"],
+             "immutable_identity":{k:x["immutable_identity"][k] for k in IDENTITY_FIELDS}}
+            for x in c["cases"]
+        ],
+    }
 def validate_replay_boundary(c,graph):
     baseline=digest(replay_input(c,graph))
     for field,value in (("schema","cp-04-compute-corpus-v1-mutated"),("authority","broader_authority"),("claim_ceiling","broader_claims"),("replay_semantics","mutable history")):
@@ -124,6 +138,14 @@ def validate_replay_completeness(c,graph):
     eq(len(baseline["case_manifest"]),len(c["cases"]),"replay case coverage","CP-COMP-INVARIANT")
     eq([x["case_id"] for x in baseline["case_manifest"]],[x["case_id"] for x in c["cases"]],"replay case order","CP-COMP-INVARIANT")
     eq([x["scenario"] for x in baseline["case_manifest"]],[x["scenario"] for x in c["cases"]],"replay scenario binding","CP-COMP-INVARIANT")
+    for item,case in zip(baseline["case_manifest"],c["cases"]):
+        eq(set(item["immutable_identity"]),set(IDENTITY_FIELDS),f"replay identity field set for {case['case_id']}","CP-COMP-INVARIANT")
+        eq(item["immutable_identity"],case["immutable_identity"],f"replay immutable identity binding for {case['case_id']}","CP-COMP-INVARIANT")
+    for field in IDENTITY_FIELDS:
+        mutated=deepcopy(c)
+        mutated["cases"][0]["immutable_identity"][field]+="-mutated"
+        if digest(replay_input(mutated,graph))==digest(replay_input(c,graph)):
+            fail(f"replay identity ignores immutable identity field {field}","CP-COMP-INVARIANT")
 
 def validate(c):
     eq(c.get("schema"),SCHEMA,"schema")
@@ -139,6 +161,12 @@ def validate(c):
         fail("duplicate case IDs","CP-COMP-COVERAGE")
     for x in cases:
         cid=x.get("case_id")
+        identity=x.get("immutable_identity")
+        if not isinstance(identity,dict):
+            fail(f"{cid}: immutable identity missing","CP-COMP-COVERAGE"); continue
+        eq(set(identity),set(IDENTITY_FIELDS),f"{cid} immutable identity field set","CP-COMP-COVERAGE")
+        if any(not isinstance(identity.get(k),str) or not identity.get(k) for k in IDENTITY_FIELDS):
+            fail(f"{cid}: immutable identity values must be non-empty strings","CP-COMP-COVERAGE")
         if not isinstance(x.get("scenario"),str):
             fail(f"{cid}: scenario missing","CP-COMP-COVERAGE")
         eq(x.get("scenario"),SCENARIOS.get(cid),"case scenario",CASE_GUARDS.get(cid,"CP-COMP-COVERAGE"))
