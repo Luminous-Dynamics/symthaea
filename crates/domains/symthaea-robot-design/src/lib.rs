@@ -1576,6 +1576,105 @@ mod tests {
     }
 
     #[test]
+    fn values_domain_requires_strict_canonical_order() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let base = |values: Vec<C0LengthUmV1>| ExactDesignSearchDomainV1 {
+            schema_id: EXACT_SEARCH_DOMAIN_SCHEMA_ID.to_string(),
+            schema_version: EXACT_SEARCH_DOMAIN_SCHEMA_VERSION,
+            parameters: vec![ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Values(values),
+            }],
+        };
+
+        let duplicate = base(vec![
+            C0LengthUmV1::new(20_000).unwrap(),
+            C0LengthUmV1::new(20_000).unwrap(),
+        ]);
+        assert_eq!(
+            duplicate.validate(),
+            Err(RobotDesignError::DuplicateDomainValue("section_width".to_string()))
+        );
+
+        let unsorted = base(vec![
+            C0LengthUmV1::new(21_000).unwrap(),
+            C0LengthUmV1::new(20_000).unwrap(),
+        ]);
+        assert_eq!(
+            unsorted.validate(),
+            Err(RobotDesignError::NonCanonicalDomainOrder(
+                "section_width".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn range_cardinality_is_exact_at_boundary() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id,
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(1).unwrap(),
+                upper: C0LengthUmV1::new(u64::MAX).unwrap(),
+                step_um: u64::MAX - 1,
+            },
+        }])
+        .unwrap();
+
+        let sets = domain.enumerate().unwrap();
+        assert_eq!(sets.len(), 2);
+        assert_eq!(
+            sets[1]
+                .parameter(&ParameterIdV1::new("section_width").unwrap())
+                .unwrap()
+                .value_um(),
+            u64::MAX
+        );
+    }
+
+    #[test]
+    fn range_validation_rejects_zero_step_and_non_terminating_ranges() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let zero_step = ExactDesignSearchDomainV1 {
+            schema_id: EXACT_SEARCH_DOMAIN_SCHEMA_ID.to_string(),
+            schema_version: EXACT_SEARCH_DOMAIN_SCHEMA_VERSION,
+            parameters: vec![ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(20_000).unwrap(),
+                    upper: C0LengthUmV1::new(22_000).unwrap(),
+                    step_um: 0,
+                },
+            }],
+        };
+        assert_eq!(
+            zero_step.validate(),
+            Err(RobotDesignError::InvalidDomainRange(
+                "section_width".to_string()
+            ))
+        );
+
+        let non_terminating = ExactDesignSearchDomainV1 {
+            schema_id: EXACT_SEARCH_DOMAIN_SCHEMA_ID.to_string(),
+            schema_version: EXACT_SEARCH_DOMAIN_SCHEMA_VERSION,
+            parameters: vec![ExactDesignParameterDomainV1 {
+                id,
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(20_000).unwrap(),
+                    upper: C0LengthUmV1::new(22_001).unwrap(),
+                    step_um: 1_000,
+                },
+            }],
+        };
+        assert_eq!(
+            non_terminating.validate(),
+            Err(RobotDesignError::NonTerminatingDomainRange(
+                "section_width".to_string()
+            ))
+        );
+    }
+
+    #[test]
     fn domain_enumeration_preflights_cartesian_cardinality() {
         let domain = ExactDesignSearchDomainV1::new(vec![
             ExactDesignParameterDomainV1 {
