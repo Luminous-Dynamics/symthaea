@@ -15,6 +15,10 @@
       "guard_id": "CP-COMP-DEPENDENCY"
     },
     {
+      "mutation_id": "reverse-model-runtime-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
       "mutation_id": "add-graph-cycle",
       "guard_id": "CP-COMP-DEPENDENCY"
     },
