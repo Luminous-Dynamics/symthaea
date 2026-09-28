@@ -1081,6 +1081,16 @@ def main():
     if replay_digest(disposition_mutated, graph) != baseline_digest:
         fail("derived disposition mutated replay identity")
 
+    expected_mutations = set(EXPECTED_CATEGORIES)
+    observed_mutations = [item["mutation"] for item in FAILURE_DIAGNOSTICS]
+    if len(observed_mutations) != len(expected_mutations):
+        fail("adversarial mutation count drift")
+    if set(observed_mutations) != expected_mutations:
+        missing = sorted(expected_mutations - set(observed_mutations))
+        extra = sorted(set(observed_mutations) - expected_mutations)
+        fail("adversarial mutation identity drift: missing=" + ",".join(missing) + ";extra=" + ",".join(extra))
+    if len(observed_mutations) != len(set(observed_mutations)):
+        fail("adversarial mutation diagnostics contain duplicate identities")
     observed_categories = {item["category"] for item in FAILURE_DIAGNOSTICS}
     missing_categories = sorted(REQUIRED_FAILURE_CATEGORIES - observed_categories)
     if missing_categories:
@@ -1093,6 +1103,7 @@ def main():
         "replay_digest": baseline_digest,
         "case_count": len(cases),
         "mutation_count": len(FAILURE_DIAGNOSTICS),
+        "diagnostic_schema": "mat-converge-002-diagnostic-v1",
         "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v2",
         "mutation_manifest_digest": mutation_manifest_digest(cases, graph),
         "mutation_manifest_projection_digest": mutation_manifest_projection_digest(manifest),
