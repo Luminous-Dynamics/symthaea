@@ -8,6 +8,7 @@
     "source_candidate_id",
     "test_specification_id",
     "measurement_specification_id",
+    "lineage_digest",
     "binding_digest"
   ],
   "properties": {
@@ -27,6 +28,10 @@
       "type": "string",
       "minLength": 1
     },
+    "lineage_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
     "binding_digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
@@ -40,5 +45,5 @@
     "prediction commitment is not official criterion evidence",
     "model-implied likelihood is not a calibrated experimental probability"
   ],
-  "description": "A verifiable envelope around an immutable prospective prediction commitment. Prediction bytes remain caller-held; the binding digest makes their canonical candidate binding reproducible."
+  "description": "A verifiable envelope around an immutable prospective prediction commitment. The canonical binding includes both model lineages, and lineage_digest must match the embedded prospective provenance model_lineage."
 }
