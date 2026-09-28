@@ -309,6 +309,7 @@ impl ExactDesignParameterSetV1 {
         if self.parameters.is_empty() { return Err(RobotDesignError::EmptyCollection("parameters")); }
         let mut ids = BTreeSet::new();
         for parameter in &self.parameters {
+            validate_parameter_id(parameter.id.as_str())?;
             parameter.value.validate()?;
             if !ids.insert(parameter.id.clone()) {
                 return Err(RobotDesignError::DuplicateParameterId(parameter.id.to_string()));
@@ -396,6 +397,7 @@ impl ExactDesignSearchDomainV1 {
         if self.parameters.is_empty() { return Err(RobotDesignError::EmptyCollection("search-domain parameters")); }
         let mut ids = BTreeSet::new();
         for parameter in &self.parameters {
+            validate_parameter_id(parameter.id.as_str())?;
             if !ids.insert(parameter.id.clone()) {
                 return Err(RobotDesignError::DuplicateParameterId(parameter.id.to_string()));
             }
@@ -1387,6 +1389,38 @@ mod tests {
             }],
         };
         assert_eq!(set.validate(), Err(RobotDesignError::InvalidDesignLength));
+    }
+
+    #[test]
+    fn deserialized_invalid_parameter_id_cannot_pass_parameter_validation() {
+        let set = ExactDesignParameterSetV1 {
+            schema_id: EXACT_PARAMETER_SCHEMA_ID.to_string(),
+            schema_version: EXACT_PARAMETER_SCHEMA_VERSION,
+            parameters: vec![ExactDesignLengthParameterV1 {
+                id: ParameterIdV1("section width".to_string()),
+                value: C0LengthUmV1::new(20_000).unwrap(),
+            }],
+        };
+        assert!(matches!(
+            set.validate(),
+            Err(RobotDesignError::InvalidSemanticId { kind: "parameter", .. })
+        ));
+    }
+
+    #[test]
+    fn deserialized_invalid_parameter_id_cannot_pass_domain_validation() {
+        let domain = ExactDesignSearchDomainV1 {
+            schema_id: EXACT_SEARCH_DOMAIN_SCHEMA_ID.to_string(),
+            schema_version: EXACT_SEARCH_DOMAIN_SCHEMA_VERSION,
+            parameters: vec![ExactDesignParameterDomainV1 {
+                id: ParameterIdV1("section width".to_string()),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(20_000).unwrap()]),
+            }],
+        };
+        assert!(matches!(
+            domain.validate(),
+            Err(RobotDesignError::InvalidSemanticId { kind: "parameter", .. })
+        ));
     }
 
     #[test]
