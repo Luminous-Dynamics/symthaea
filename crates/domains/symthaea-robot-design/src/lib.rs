@@ -2190,6 +2190,114 @@ mod tests {
 
 
     #[test]
+    fn exact_parameter_set_serde_rejects_invalid_parameter_identity() {
+        let duplicate: Result<ExactDesignParameterSetV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.exact-parameters.v1","schema_version":1,"parameters":[{"id":"section_width","value":20000},{"id":"section_width","value":21000}]}"#,
+        );
+        assert!(duplicate.is_err());
+
+        let invalid_id: Result<ExactDesignParameterSetV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.exact-parameters.v1","schema_version":1,"parameters":[{"id":"bad id","value":20000}]}"#,
+        );
+        assert!(invalid_id.is_err());
+    }
+
+    #[test]
+    fn exact_parameter_set_serde_rejects_unsupported_schema_version() {
+        let result: Result<ExactDesignParameterSetV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.exact-parameters.v1","schema_version":2,"parameters":[{"id":"section_width","value":20000}]}"#,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_rejects_invalid_domain_semantics() {
+        let duplicate_ids: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Values":[20000]}},{"id":"section_width","domain":{"Values":[21000]}}]}"#,
+        );
+        assert!(duplicate_ids.is_err());
+
+        let unsorted_values: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Values":[21000,20000]}}]}"#,
+        );
+        assert!(unsorted_values.is_err());
+
+        let duplicate_values: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Values":[20000,20000]}}]}"#,
+        );
+        assert!(duplicate_values.is_err());
+
+        let non_terminating: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Range":{"lower":20000,"upper":22001,"step_um":1000}}}]}"#,
+        );
+        assert!(non_terminating.is_err());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_rejects_unsupported_schema_version() {
+        let result: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":2,"parameters":[{"id":"section_width","domain":{"Values":[20000]}}]}"#,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_round_trip_preserves_values_identity() {
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(20_000).unwrap(),
+                    C0LengthUmV1::new(21_000).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        let json = serde_json::to_string(&domain).unwrap();
+        let restored: ExactDesignSearchDomainV1 = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, domain);
+        assert_eq!(restored.id().unwrap(), domain.id().unwrap());
+        assert_eq!(restored.canonical_transcript().unwrap(), domain.canonical_transcript().unwrap());
+    }
+
+    #[test]
+    fn enumerated_candidate_identity_matches_independent_parameter_set() {
+        let width = ParameterIdV1::new("section_width").unwrap();
+        let height = ParameterIdV1::new("section_height").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: height.clone(),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(30_000).unwrap()]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: width.clone(),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(20_000).unwrap()]),
+            },
+        ])
+        .unwrap();
+
+        let candidate = domain.enumerate().unwrap().into_iter().next().unwrap();
+        let independent = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 {
+                id: width,
+                value: C0LengthUmV1::new(20_000).unwrap(),
+            },
+            ExactDesignLengthParameterV1 {
+                id: height,
+                value: C0LengthUmV1::new(30_000).unwrap(),
+            },
+        ])
+        .unwrap();
+
+        assert_eq!(candidate.id().unwrap(), independent.id().unwrap());
+        assert_eq!(
+            candidate.canonical_transcript().unwrap(),
+            independent.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
     fn invalid_semantic_id_is_rejected_at_construction() {
         assert!(matches!(
             DesignComponentId::new("contains spaces"),
