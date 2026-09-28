@@ -49,7 +49,7 @@ def graph_identity(graph):
             for n in graph["nodes"]
         ],
         "edges": [
-            {k: e[k] for k in ("id", "from", "to", "kind", "historical")}
+            {k: e[k] for k in ("id", "case_id", "from", "to", "kind", "historical")}
             for e in graph["edges"]
         ],
         "case_ids": graph["case_ids"],
