@@ -653,6 +653,8 @@ def main():
         "replay_digest": baseline_digest,
         "case_count": len(cases),
         "mutation_count": len(FAILURE_DIAGNOSTICS),
+        "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v1",
+        "mutation_manifest_digest": mutation_manifest_digest(),
         "failure_categories": {
             category: sum(1 for item in FAILURE_DIAGNOSTICS if item["category"] == category)
             for category in sorted({item["category"] for item in FAILURE_DIAGNOSTICS})
