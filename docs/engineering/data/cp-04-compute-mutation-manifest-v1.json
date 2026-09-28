@@ -69,6 +69,10 @@
     {
       "mutation_id": "erase-C05",
       "guard_id": "CP-COMP-HISTORICAL"
+    },
+    {
+      "mutation_id": "mutate-C02-model-identity",
+      "guard_id": "CP-COMP-DEPENDENCY"
     }
   ]
 }
