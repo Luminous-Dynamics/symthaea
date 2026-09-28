@@ -14,7 +14,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Bind exact checked-out head
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Verify source is present
         run: test -f crates/domains/symthaea-materials/src/legacy_advisory.rs
+      - name: Capture source blob identity
+        run: git hash-object crates/domains/symthaea-materials/src/legacy_advisory.rs
+
       - name: Run independent standard-library oracle
         run: python3 scripts/qualifiers/legacy_advisory_qualifier.py crates/domains/symthaea-materials/src/legacy_advisory.rs
+      - name: Verify qualifier left source immutable
+        run: git diff --exit-code -- crates/domains/symthaea-materials/src/legacy_advisory.rs
