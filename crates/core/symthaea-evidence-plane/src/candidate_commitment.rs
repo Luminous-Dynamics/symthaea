@@ -70,7 +70,7 @@ impl CandidatePredictionBinding {
     pub fn digest(&self) -> Result<String, BindingError> {
         let bytes = self.canonical_bytes()?;
         let mut hasher = Sha256::new();
-        hasher.update(b"symthaea:candidate-prediction-binding:v1\\0");
+        hasher.update(b"symthaea:candidate-prediction-binding:v1\0");
         hasher.update((bytes.len() as u64).to_be_bytes());
         hasher.update(bytes);
         Ok(format!("sha256:{:x}", hasher.finalize()))
@@ -198,7 +198,7 @@ fn binding_for(
 
 fn lineage_digest(left: &str, right: &str) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(b"symthaea:candidate-model-lineage:v1\\0");
+    hasher.update(b"symthaea:candidate-model-lineage:v1\0");
     for value in [left, right] {
         hasher.update((value.len() as u64).to_be_bytes());
         hasher.update(value.as_bytes());
