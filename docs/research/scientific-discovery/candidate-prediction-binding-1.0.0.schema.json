@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Candidate Prediction Commitment Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "source_candidate_id",
+    "test_specification_id",
+    "measurement_specification_id",
+    "lineage_digest",
+    "binding_digest"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "source_candidate_id": { "type": "string", "minLength": 1 },
+    "test_specification_id": { "type": "string", "minLength": 1 },
+    "measurement_specification_id": { "type": "string", "minLength": 1 },
+    "lineage_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "binding_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "x-authority": "prospective_commitment_only",
+  "x-non_equivalences": [
+    "candidate specification is not test execution",
+    "prediction commitment is not an observation",
+    "prediction commitment is not replication",
+    "prediction commitment is not official criterion evidence",
+    "model-implied likelihood is not a calibrated experimental probability"
+  ],
+  "description": "A verifiable envelope around an immutable prospective prediction commitment. The canonical binding includes both model lineages; the embedded commitment payload digest, binding digest, lineage digest, and event identity are independently verifiable."
+}
