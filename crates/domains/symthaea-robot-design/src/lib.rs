@@ -1465,6 +1465,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn deserialized_zero_length_cannot_pass_parameter_validation() {
         let set = ExactDesignParameterSetV1 {
             schema_id: EXACT_PARAMETER_SCHEMA_ID.to_string(),
