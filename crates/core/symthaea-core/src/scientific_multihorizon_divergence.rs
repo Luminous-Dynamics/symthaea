@@ -76,6 +76,9 @@ pub fn discover(
     for snapshot in snapshots {
         by_model.entry(snapshot.model_id.as_str()).or_default().push(snapshot);
     }
+    for model_snapshots in by_model.values_mut() {
+        model_snapshots.sort_by(|a, b| a.horizon_seconds.total_cmp(&b.horizon_seconds));
+    }
 
     let model_ids: Vec<&str> = by_model.keys().copied().collect();
     let mut pairs = Vec::with_capacity(model_ids.len().saturating_mul(model_ids.len().saturating_sub(1)) / 2);
@@ -99,9 +102,9 @@ pub fn discover(
             let (max_index, &max_divergence) = divergences
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.total_cmp(b).then_with(|| {
-                    horizons[0].total_cmp(&horizons[0])
-                }))
+                .max_by(|(ia, a), (ib, b)| {
+                    a.total_cmp(b).then_with(|| ib.cmp(ia))
+                })
                 .expect("validated non-empty horizon grid");
             let mean_divergence =
                 divergences.iter().copied().sum::<f32>() / divergences.len() as f32;
