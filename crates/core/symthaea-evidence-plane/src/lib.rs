@@ -519,3 +519,6 @@ mod tests {
 }
 
 pub mod temporal_evidence_gap;
+pub mod temporal_test_candidate;
+pub mod prospective;
+pub mod candidate_commitment;
