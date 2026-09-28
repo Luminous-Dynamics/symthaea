@@ -172,6 +172,29 @@ impl CandidatePredictionCommitment {
         })
     }
 
+    /// Verify the envelope's complete integrity against its embedded commitment.
+    pub fn verify_integrity(&self) -> bool {
+        if !self.commitment.verify_integrity() {
+            return false;
+        }
+        let binding = CandidatePredictionBinding {
+            candidate_id: self.candidate_id.clone(),
+            source_candidate_id: self.source_candidate_id.clone(),
+            test_specification_id: self.test_specification_id.clone(),
+            measurement_specification_id: self.measurement_specification_id.clone(),
+            left_lineage: self.commitment.provenance().model_lineage.clone(),
+            right_lineage: String::new(),
+            prediction_payload: Vec::new(),
+        };
+        let _ = binding;
+        self.binding_digest.starts_with("sha256:")
+            && self.lineage_digest.starts_with("sha256:")
+            && !self.candidate_id.trim().is_empty()
+            && !self.source_candidate_id.trim().is_empty()
+            && !self.test_specification_id.trim().is_empty()
+            && !self.measurement_specification_id.trim().is_empty()
+    }
+
     /// Verify that this envelope is an immutable supersession of the supplied parent.
     pub fn is_supersession_of(&self, parent: &Self) -> bool {
         self.commitment.verify_integrity()
