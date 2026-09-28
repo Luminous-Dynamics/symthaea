@@ -397,14 +397,24 @@ def main():
         fail("partial structural coverage manifest drift")
     if len(graph["edges"]) != len(graph_edge_cases):
         fail("multiple structural edges unexpectedly collapsed to one case")
-    coverage = {
-        "case_level_cases": len(case_ids),
-        "graph_edge_cases": len(graph_edge_cases),
-        "graph_only_cases": len(graph_only_cases),
-        "coverage_mode": "partial-structural-graph-plus-case-oracle",
-    }
-    if coverage["graph_edge_cases"] != 8 or coverage["graph_only_cases"] != 8:
-        fail("coverage accounting drift")
+    declared_coverage = graph.get("coverage")
+    if declared_coverage is None:
+        fail("structural coverage declaration missing")
+    if set(declared_coverage) != {
+        "mode", "case_level_cases", "graph_edge_cases", "graph_only_cases",
+        "graph_only_case_ids",
+    }:
+        fail("structural coverage declaration schema drift")
+    if declared_coverage["mode"] != "partial-structural-graph-plus-case-oracle":
+        fail("unsupported structural coverage mode")
+    if declared_coverage["case_level_cases"] != len(case_ids):
+        fail("case-level coverage count drift")
+    if declared_coverage["graph_edge_cases"] != len(graph_edge_cases):
+        fail("graph-edge coverage count drift")
+    if declared_coverage["graph_only_cases"] != len(graph_only_cases):
+        fail("graph-only coverage count drift")
+    if declared_coverage["graph_only_case_ids"] != graph_only_cases:
+        fail("graph-only coverage identities drift")
 
     # Mutation matrix: every graph node identity change must invalidate
     # exactly the cases structurally dependent on that node.
