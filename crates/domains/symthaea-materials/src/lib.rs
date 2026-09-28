@@ -27,7 +27,8 @@ pub use encoder::MaterialHdcEncoder;
 pub use legacy_advisory::{
     AcquisitionFeatureV1, AdvisoryAgingPredictionV1, AdvisoryAuthorityV1,
     AdvisoryIdentityV1, AdvisoryInputError, AdvisoryMaterialPropertyV1,
-    AdvisorySimilarityResultV1, AdvisoryStabilityPredictionV1,
+    AdvisorySimilarityResultV1, AdvisoryStabilityPredictionV1, AdvisoryMiningPredictionV1,
+    AdvisoryStrategicPredictionV1, AdvisoryMiningActionV1, AdvisoryStrategicActionV1,
 };
 pub use mining::{
     MINING_HORIZON_LABELS, MINING_HORIZONS, MiningFepAction, MiningFepAgent, MiningHdcEncoder,
