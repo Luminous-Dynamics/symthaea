@@ -13,6 +13,24 @@ pub struct CandidatePredictionBinding {
     pub measurement_specification_id:String,
     pub prediction_payload:Vec<u8>,
 }
+
+#[test]
+fn envelope_exposes_reproducible_binding_digest() {
+    let c = candidate("c1");
+    let envelope = commit_candidate_envelope(&c,"challenge-v1","criteria-v1","mapping-v1","actor-v1","2026-09-28T09:00:00Z",provenance(),b"forecast").unwrap();
+    let binding = CandidatePredictionBinding { candidate_id:c.candidate_id.clone(), source_candidate_id:c.source_candidate_id.clone(), test_specification_id:c.test_specification_id.clone(), measurement_specification_id:c.measurement_specification_id.clone(), prediction_payload:b"forecast".to_vec() };
+    assert_eq!(envelope.binding_digest, binding.digest().unwrap());
+    assert!(envelope.verify_binding(&binding).unwrap());
+}
+#[test]
+fn envelope_detects_tampered_binding() {
+    let c = candidate("c1");
+    let envelope = commit_candidate_envelope(&c,"challenge-v1","criteria-v1","mapping-v1","actor-v1","2026-09-28T09:00:00Z",provenance(),b"forecast").unwrap();
+    let mut binding = CandidatePredictionBinding { candidate_id:c.candidate_id, source_candidate_id:c.source_candidate_id, test_specification_id:c.test_specification_id, measurement_specification_id:c.measurement_specification_id, prediction_payload:b"tampered".to_vec() };
+    assert!(!envelope.verify_binding(&binding).unwrap());
+    binding.candidate_id = "c2".into();
+    assert!(!envelope.verify_binding(&binding).unwrap());
+}
 #[derive(Debug,Clone,PartialEq,Eq)]
 pub enum BindingError{EmptyPredictionPayload,MissingBindingField(&'static str),Serialization,Commitment(CommitmentError)}
 impl From<CommitmentError> for BindingError{fn from(e:CommitmentError)->Self{Self::Commitment(e)}}
@@ -21,7 +39,7 @@ impl From<CommitmentError> for BindingError{fn from(e:CommitmentError)->Self{Sel
 pub fn commit_candidate(candidate:&TemporalTestCandidateSpec,challenge_id:&str,criteria_generation:&str,mapping_generation:&str,actor_id:&str,created_at:&str,provenance:ProspectiveProvenance,prediction_payload:&[u8])->Result<ProspectivePredictionCommitment,BindingError>{
     if prediction_payload.is_empty(){return Err(BindingError::EmptyPredictionPayload);}
     let binding=CandidatePredictionBinding{candidate_id:candidate.candidate_id.clone(),source_candidate_id:candidate.source_candidate_id.clone(),test_specification_id:candidate.test_specification_id.clone(),measurement_specification_id:candidate.measurement_specification_id.clone(),prediction_payload:prediction_payload.to_vec()};
-    let bytes=serde_json::to_vec(&binding).expect("serializing a concrete candidate binding cannot fail");
+    let bytes=binding.canonical_bytes()?;
     Ok(ProspectivePredictionCommitment::commit(challenge_id,criteria_generation,mapping_generation,actor_id,created_at,provenance,&bytes)?)
 }
 
