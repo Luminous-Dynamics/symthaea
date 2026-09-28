@@ -435,11 +435,28 @@ def check(doc, cases):
         fail("critical authority/negative-evidence controls missing")
     check_graph(doc["state_graph"], cases)
 
+def failure_category(message):
+    """Normalize oracle failures into stable diagnostic classes."""
+    text = message.lower()
+    if any(token in text for token in ("authority", "physical-authority", "advisory")):
+        return "authority"
+    if any(token in text for token in ("negative", "tombstone")):
+        return "negative-evidence"
+    if any(token in text for token in ("coverage", "case coverage", "graph coverage")):
+        return "coverage"
+    if any(token in text for token in ("historical", "immutable", "generation", "ref")):
+        return "historical-identity"
+    if any(token in text for token in ("dependency", "closure", "fanout")):
+        return "dependency-boundary"
+    if any(token in text for token in ("schema", "ordering")):
+        return "schema-integrity"
+    return "invariant-integrity"
+
 def expect_failure(doc, cases, label):
     try:
         check(doc, cases)
-    except AssertionError:
-        return
+    except AssertionError as exc:
+        return failure_category(str(exc))
     fail(f"mutation escaped oracle: {label}")
 
 def main():
