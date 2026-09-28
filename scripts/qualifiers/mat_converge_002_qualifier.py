@@ -206,6 +206,18 @@ def derived_snapshot(cases):
         for case in cases
     }
 
+def graph_direct_case_ids(cases, graph, changed_ref):
+    """Return case IDs on edges directly incident to changed_ref."""
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    return sorted(
+        edge["case_id"]
+        for edge in graph["edges"]
+        if changed_ref in {
+            node_by_id[edge["from"]]["ref"],
+            node_by_id[edge["to"]]["ref"],
+        }
+    )
+
 def graph_dependency_closure(cases, graph, changed_ref):
     """Return case IDs in the undirected immutable graph component of changed_ref."""
     node_by_id = {n["id"]: n for n in graph["nodes"]}
@@ -370,10 +382,13 @@ def main():
     if dependency_delta(baseline_projection, localized_projection) != ["C02"]:
         fail("historical generation mutation cascaded beyond its dependent case")
     expected_graph_closure = graph_dependency_closure(cases, graph, "process/G1")
-    if expected_graph_closure != ["C02", "C04"]:
-        fail("unexpected process dependency closure in baseline graph")
-    if dependency_delta(baseline_projection, localized_projection_with_graph) != ["C01", "C02", "C04", "C07", "C09", "C10", "C16"]:
-        fail("graph generation mutation does not expose its true dependent cases")
+    if expected_graph_closure != ["C01", "C02", "C03", "C04", "C05", "C07", "C09", "C10", "C16"]:
+        fail("unexpected transitive process dependency closure in baseline graph")
+    direct_graph_cases = graph_direct_case_ids(cases, graph, "process/G1")
+    if direct_graph_cases != ["C02", "C04"]:
+        fail("unexpected direct process dependency fanout")
+    if not set(direct_graph_cases).issubset(expected_graph_closure):
+        fail("transitive closure dropped a directly dependent graph case")
     actual_changed = "process/G3"
     if actual_changed in set(localized_projection["C02"]):
         fail("case-local projection accepted an unqualified replacement generation")
@@ -499,10 +514,11 @@ def main():
         else:
             if expected != ["C01", "C02", "C03", "C04", "C05", "C07", "C09", "C10", "C16"]:
                 fail(f"core graph component closure drift for {node_id}: {expected}")
+        direct_graph_expected = graph_direct_case_ids(cases, graph, original_ref)
+        if direct_graph_expected and not set(direct_graph_expected).issubset(expected):
+            fail(f"transitive closure dropped direct graph fanout for {node_id}")
         if node_id == "N07" and direct_expected != ["C07"]:
             fail(f"negative-edge direct fanout mismatch: {direct_expected}")
-        if node_id != "N07" and node_id != "N06" and not set(expected).issuperset(direct_expected):
-            fail(f"transitive closure does not cover direct fanout for {node_id}")
         # The graph mutation is an invalidation plan, not a rewrite of history:
         # the selected cases are exactly the records eligible for recomputation.
         if set(expected) != set(graph_dependency_closure(cases, graph, original_ref)):
