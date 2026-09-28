@@ -28,6 +28,26 @@ EXPECTED = {
 FIELDS = ("demand", "profile", "candidate", "process", "property", "measurement")
 GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
 GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
+EXPECTED_GRAPH_NODE_IDENTITIES = {
+    "N01": ("demand", "demand/D1", "D1"),
+    "N02": ("candidate", "candidate/A", "A"),
+    "N03": ("process", "process/G1", "G1"),
+    "N04": ("property", "property/E1", "E1"),
+    "N05": ("measurement", "measurement/M1", "M1"),
+    "N06": ("profile", "profile/P1", "P1"),
+    "N07": ("negative-edge", "edge/C07", "C07"),
+}
+EXPECTED_GRAPH_EDGE_IDENTITIES = {
+    "edge/C01": ("C01", "candidate-link"),
+    "edge/C02": ("C02", "process-generation"),
+    "edge/C03": ("C03", "profile-binding"),
+    "edge/C04": ("C04", "evaluation"),
+    "edge/C05": ("C05", "measurement-generation"),
+    "edge/C07": ("C07", "negative-evidence"),
+    "edge/C09": ("C09", "authority-separation"),
+    "edge/C10": ("C10", "cross-authority-distinctness"),
+    "edge/C16": ("C16", "synthetic-disposition"),
+}
 REPLAY_ORDERING = "case manifest order is significant; graph node and edge order are identity-insignificant"
 COVERAGE_REASONS = {
     "C06": "case-level adversarial ranking control",
@@ -44,7 +64,7 @@ class OracleFailure(AssertionError):
         super().__init__(message)
         self.guard_id = guard_id
 
-def fail(msg, guard_id):
+def fail(msg, guard_id="MAT-MUT-INVARIANT_INTEGRITY"):
     raise OracleFailure(guard_id, msg)
 
 FAILURE_DIAGNOSTICS = []
@@ -87,7 +107,10 @@ EXPECTED_GUARDS = {
 def failure_category(exc):
     if not isinstance(exc, OracleFailure):
         raise AssertionError("unstructured oracle diagnostic")
-    return exc.guard_id.split(":", 1)[1]
+    prefix = "MAT-MUT-"
+    if not exc.guard_id.startswith(prefix):
+        raise AssertionError("oracle diagnostic guard namespace drift")
+    return exc.guard_id[len(prefix):].lower().replace("_", "-")
 
 def record_failure(doc, cases, label, expected_category):
     try:
@@ -186,6 +209,10 @@ def check_graph(graph, cases):
         fail("state graph is empty", "MAT-MUT-SCHEMA_INTEGRITY")
     node_ids = [n["id"] for n in nodes]
     edge_ids = [e["id"] for e in edges]
+    if set(node_ids) != set(EXPECTED_GRAPH_NODE_IDENTITIES):
+        fail("state graph node identity coverage drift", "MAT-MUT-SCHEMA_INTEGRITY")
+    if set(edge_ids) != set(EXPECTED_GRAPH_EDGE_IDENTITIES):
+        fail("state graph edge identity coverage drift", "MAT-MUT-SCHEMA_INTEGRITY")
     if len(node_ids) != len(set(node_ids)):
         fail("duplicate state graph node identity")
     if len(edge_ids) != len(set(edge_ids)):
@@ -195,6 +222,9 @@ def check_graph(graph, cases):
     for node in nodes:
         if set(node) != GRAPH_NODE_KEYS:
             fail(f"state graph node schema drift: {node.get('id')}", "MAT-MUT-SCHEMA_INTEGRITY")
+        expected_kind, expected_ref, expected_generation = EXPECTED_GRAPH_NODE_IDENTITIES[node["id"]]
+        if node["kind"] != expected_kind:
+            fail(f"graph node kind drift: {node['id']}", "MAT-MUT-SCHEMA_INTEGRITY")
     for edge in edges:
         if set(edge) != GRAPH_EDGE_KEYS:
             fail(f"state graph edge schema drift: {edge.get('id')}", "MAT-MUT-SCHEMA_INTEGRITY")
