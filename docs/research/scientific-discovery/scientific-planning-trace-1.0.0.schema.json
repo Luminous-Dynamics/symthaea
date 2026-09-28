@@ -6,6 +6,8 @@
   "type": "object",
   "required": [
     "schema_version",
+    "gap_plan",
+    "metrics",
     "gap_candidate_ids",
     "frontier",
     "admissibility",
@@ -15,6 +17,15 @@
   "properties": {
     "schema_version": {
       "const": "mycelix.symthaea.scientific-planning-trace.1.0.0"
+    },
+    "gap_plan": {
+      "type": "object",
+      "description": "Canonical 002H evidence-gap plan consumed by this trace."
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Exact planner-supplied metric bridge for each gap candidate.",
+      "items": { "type": "object" }
     },
     "gap_candidate_ids": {
       "type": "array",
