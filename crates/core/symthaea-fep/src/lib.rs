@@ -145,6 +145,7 @@ pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
 pub mod scientific;
+pub mod scientific_frontier_admissibility;
 mod motor;
 mod td_learning;
 pub mod types;
