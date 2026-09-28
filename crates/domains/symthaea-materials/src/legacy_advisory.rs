@@ -395,10 +395,10 @@ mod tests {
         let action = AdvisoryMiningActionV1 {
             identity: AdvisoryIdentityV1::new("critical_minerals", "mining-fep-v1", "fixture-v1"),
             authority: AdvisoryAuthorityV1::Advisory,
-            action: MiningFepAction::NoOp,
+            action: MiningFepAction::ContinueExtraction,
         };
         assert_eq!(action.authority, AdvisoryAuthorityV1::Advisory);
-        assert_eq!(action.action, MiningFepAction::NoOp);
+        assert_eq!(action.action, MiningFepAction::ContinueExtraction);
     }
 
     #[test]
