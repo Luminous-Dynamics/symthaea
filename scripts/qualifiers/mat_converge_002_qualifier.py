@@ -632,6 +632,55 @@ def main():
     else:
         fail("cross-epoch replay artifacts were composable")
 
+    # Replay-session tamper matrix: every independently addressable artifact
+    # binding is mandatory. Recomputing the outer digest must not make a splice valid.
+    session_fields = (
+        "base_replay_digest",
+        "invalidation_plan_digest",
+        "recomputation_snapshot_digest",
+        "recomputed_result_digest",
+    )
+    for field in session_fields:
+        tampered = json.loads(json.dumps(session_baseline))
+        tampered[field] = "f" * 64
+        tampered["digest"] = hashlib.sha256(canonical({
+            "schema": tampered["schema"],
+            "base_replay_digest": tampered["base_replay_digest"],
+            "invalidation_plan_digest": tampered["invalidation_plan_digest"],
+            "recomputation_snapshot_digest": tampered["recomputation_snapshot_digest"],
+            "recomputed_result_digest": tampered["recomputed_result_digest"],
+        })).hexdigest()
+        try:
+            validate_replay_session(
+                cases, graph, canonical_plan, cases, tampered
+            )
+        except AssertionError:
+            pass
+        else:
+            fail(f"tampered replay-session binding escaped oracle: {field}")
+
+    # Session identity must also move when the immutable graph epoch changes.
+    graph_epoch = json.loads(json.dumps(graph))
+    graph_epoch["schema"] = "mat-converge-002-state-graph-v2"
+    graph_epoch_plan = canonical_invalidation_plan(cases, graph_epoch, "process/G1")
+    if graph_epoch_plan["digest"] == canonical_plan["digest"]:
+        fail("graph schema epoch change did not alter invalidation identity")
+    graph_epoch_session = replay_session(
+        cases, graph_epoch, graph_epoch_plan, cases
+    )
+    if graph_epoch_session["base_replay_digest"] == session_baseline["base_replay_digest"]:
+        fail("graph schema epoch change did not alter replay identity")
+    if graph_epoch_session["digest"] == session_baseline["digest"]:
+        fail("graph schema epoch change did not alter session identity")
+
+    # Replay generation is observational: producing a session must not mutate
+    # the historical case manifest or immutable graph.
+    cases_before_session = json.loads(json.dumps(cases))
+    graph_before_session = json.loads(json.dumps(graph))
+    replay_session(cases, graph, canonical_plan, cases)
+    if cases != cases_before_session or graph != graph_before_session:
+        fail("replay-session generation mutated historical inputs")
+
     # A derived-only recomputation changes the result identity, while the
     # immutable replay inputs and recomputation boundary remain unchanged.
     session_recomputed_cases = json.loads(json.dumps(cases))
