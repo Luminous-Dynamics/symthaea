@@ -372,6 +372,39 @@ def main():
     if not any(c["id"] == "C07" and c["outcome"] == "negative-edge-addressable" for c in with_new_case):
         fail("historical negative edge became unreachable after recomputation")
 
+    # Bidirectional traceability: every graph endpoint must be attributable
+    # to its bound case, while the campaign manifest may include cases that are
+    # intentionally covered only by the case-level oracle.
+    case_ids = {case["id"] for case in cases}
+    graph_edge_cases = {edge["case_id"] for edge in graph["edges"]}
+    if not graph_edge_cases.issubset(case_ids):
+        fail("graph contains edge coverage for an unknown case")
+    case_refs = {
+        case["id"]: set(case["refs"].values())
+        for case in cases
+    }
+    for edge in graph["edges"]:
+        from_ref = node_by_id[edge["from"]]["ref"]
+        to_ref = node_by_id[edge["to"]]["ref"]
+        if edge["case_id"] not in case_refs:
+            fail(f"graph edge is not attributable to a case: {edge['id']}")
+        allowed = case_refs[edge["case_id"]]
+        if edge["id"] != "edge/C07" and not ({from_ref, to_ref} <= allowed):
+            fail(f"graph dependency is not attributable to its case: {edge['id']}")
+    graph_only_cases = sorted(case_ids - graph_edge_cases)
+    if graph_only_cases != ["C03", "C05", "C06", "C08", "C11", "C12", "C13", "C14"]:
+        fail("partial structural coverage manifest drift")
+    if len(graph["edges"]) != len(graph_edge_cases):
+        fail("multiple structural edges unexpectedly collapsed to one case")
+    coverage = {
+        "case_level_cases": len(case_ids),
+        "graph_edge_cases": len(graph_edge_cases),
+        "graph_only_cases": len(graph_only_cases),
+        "coverage_mode": "partial-structural-graph-plus-case-oracle",
+    }
+    if coverage["graph_edge_cases"] != 8 or coverage["graph_only_cases"] != 8:
+        fail("coverage accounting drift")
+
     # Mutation matrix: every graph node identity change must invalidate
     # exactly the cases structurally dependent on that node.
     node_mutation_expectations = {
