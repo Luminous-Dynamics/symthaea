@@ -389,6 +389,37 @@ mod tests {
     }
 
     #[test]
+    fn invalid_gregorian_dates_are_rejected() {
+        for cutoff in [
+            "2026-02-29T09:00:00Z",
+            "2026-04-31T09:00:00Z",
+            "2026-00-10T09:00:00Z",
+        ] {
+            assert_eq!(
+                ProspectiveProvenance::new(
+                    "sha256:input", "sha256:artifact", "model:v1", cutoff, "2026-05-01T09:00:00Z",
+                ),
+                Err(CommitmentError::InvalidCutoff)
+            );
+        }
+    }
+
+    #[test]
+    fn leap_day_is_accepted_only_in_leap_years() {
+        assert!(ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2028-02-29T09:00:00Z", "2028-03-01T09:00:00Z",
+        ).is_ok());
+        assert_eq!(
+            ProspectiveProvenance::new(
+                "sha256:input", "sha256:artifact", "model:v1",
+                "2100-02-29T09:00:00Z", "2100-03-01T09:00:00Z",
+            ),
+            Err(CommitmentError::InvalidCutoff)
+        );
+    }
+
+    #[test]
     fn empty_prediction_is_rejected() {
         let result = ProspectivePredictionCommitment::commit(
             "MPB-2026-09-23-01",
