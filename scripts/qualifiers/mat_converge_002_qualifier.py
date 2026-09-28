@@ -216,9 +216,9 @@ def check_graph(graph, cases):
     if set(edge_ids) != set(EXPECTED_GRAPH_EDGE_IDENTITIES):
         fail("state graph edge identity coverage drift", "MAT-MUT-SCHEMA_INTEGRITY")
     if len(node_ids) != len(set(node_ids)):
-        fail("duplicate state graph node identity")
+        fail("duplicate state graph node identity", "MAT-MUT-SCHEMA_INTEGRITY")
     if len(edge_ids) != len(set(edge_ids)):
-        fail("duplicate state graph edge identity")
+        fail("duplicate state graph edge identity", "MAT-MUT-SCHEMA_INTEGRITY")
     node_set = set(node_ids)
     nodes_by_id = {n["id"]: n for n in nodes}
     for node in nodes:
@@ -231,11 +231,11 @@ def check_graph(graph, cases):
         if set(edge) != GRAPH_EDGE_KEYS:
             fail(f"state graph edge schema drift: {edge.get('id')}", "MAT-MUT-SCHEMA_INTEGRITY")
         if edge["historical"] is not True:
-            fail(f"non-historical edge: {edge['id']}")
+            fail(f"non-historical edge: {edge['id']}", "MAT-MUT-HISTORICAL_IDENTITY")
         if edge["case_id"] not in EXPECTED or edge["id"] != f"edge/{edge['case_id']}":
             fail(f"graph edge is not bound to its campaign case: {edge['id']}", "MAT-MUT-SCHEMA_INTEGRITY")
         if edge["from"] not in node_set or edge["to"] not in node_set:
-            fail(f"dangling state graph edge: {edge['id']}")
+            fail(f"dangling state graph edge: {edge['id']}", "MAT-MUT-SCHEMA_INTEGRITY")
     case_by_id = {c["id"]: c for c in cases}
     prefix_fields = {
         "demand": "demand",
@@ -416,13 +416,13 @@ def graph_dependency_closure(cases, graph, changed_ref):
 
 def check(doc, cases): 
     if doc.get("campaign_id") != "MAT-CONVERGE-002A1":
-        fail("campaign identity missing")
+        fail("campaign identity missing", "MAT-MUT-SCHEMA_INTEGRITY")
     if doc.get("record_schema") != "integration-edge-v1":
-        fail("record schema mismatch")
+        fail("record schema mismatch", "MAT-MUT-SCHEMA_INTEGRITY")
     if doc.get("replay_semantics") != (
         "historical refs are immutable inputs; dispositions are derived outputs"
     ):
-        fail("replay semantics missing")
+        fail("replay semantics missing", "MAT-MUT-SCHEMA_INTEGRITY")
     if "C07" not in {c["id"] for c in cases}:
         fail("negative evidence case missing", "MAT-MUT-NEGATIVE_EVIDENCE")
     if [c["id"] for c in cases] != list(EXPECTED):
@@ -517,7 +517,7 @@ def recomputed_result_digest(cases, invalidation_plan):
         for case in cases if case["id"] in selected
     ]
     if {record["case_id"] for record in records} != selected:
-        fail("recomputed result does not cover the invalidation boundary")
+        fail("recomputed result does not cover the invalidation boundary", "MAT-MUT-DEPENDENCY_BOUNDARY")
     payload = {
         "schema": "mat-converge-002-recomputed-result-v1",
         "invalidation_plan_digest": invalidation_plan["digest"],
@@ -528,10 +528,10 @@ def recomputed_result_digest(cases, invalidation_plan):
 def validate_recomputation_snapshot(cases, graph, invalidation_plan, snapshot):
     expected_plan = canonical_invalidation_plan(cases, graph, invalidation_plan["changed_ref"])
     if invalidation_plan != expected_plan:
-        fail("recomputation snapshot uses a non-canonical invalidation plan")
+        fail("recomputation snapshot uses a non-canonical invalidation plan", "MAT-MUT-DEPENDENCY_BOUNDARY")
     expected_snapshot = recomputation_snapshot(cases, graph, expected_plan)
     if snapshot != expected_snapshot:
-        fail("recomputation snapshot does not match its immutable inputs")
+        fail("recomputation snapshot does not match its immutable inputs", "MAT-MUT-HISTORICAL_IDENTITY")
 
 def replay_session(cases, graph, invalidation_plan, recomputed_cases):
     validate_recomputation_snapshot(
@@ -558,7 +558,7 @@ def validate_replay_session(cases, graph, invalidation_plan, recomputed_cases, s
         cases, graph, invalidation_plan["changed_ref"]
     )
     if invalidation_plan != expected_plan:
-        fail("replay session uses a non-canonical invalidation plan")
+        fail("replay session uses a non-canonical invalidation plan", "MAT-MUT-DEPENDENCY_BOUNDARY")
     snapshot = recomputation_snapshot(cases, graph, expected_plan)
     expected_result = recomputed_result_digest(recomputed_cases, expected_plan)
     payload = {
@@ -570,7 +570,7 @@ def validate_replay_session(cases, graph, invalidation_plan, recomputed_cases, s
     }
     expected = {**payload, "digest": hashlib.sha256(canonical(payload)).hexdigest()}
     if session != expected:
-        fail("replay session binding mismatch")
+        fail("replay session binding mismatch", "MAT-MUT-DEPENDENCY_BOUNDARY")
 
 def main():
     if len(sys.argv) != 2:
@@ -580,13 +580,13 @@ def main():
     raw = path.read_bytes()
     doc = json.loads(raw)
     if doc.get("schema") != "mat-converge-002-fixture-v1":
-        fail("schema mismatch")
+        fail("schema mismatch", "MAT-MUT-SCHEMA_INTEGRITY")
     cases = doc.get("cases", [])
     check(doc, cases)
     graph = doc["state_graph"]
     manifest = mutation_manifest(cases, graph)
     if manifest["schema"] != "mat-converge-002-mutation-manifest-v3":
-        fail("mutation manifest schema drift")
+        fail("mutation manifest schema drift", "MAT-MUT-COVERAGE")
     validate_mutation_manifest(cases, graph, manifest)
     if set(manifest["categories"]) != REQUIRED_FAILURE_CATEGORIES:
         fail("mutation manifest category coverage drift", "MAT-MUT-COVERAGE")
@@ -766,7 +766,7 @@ def main():
     except AssertionError:
         pass
     else:
-        fail("cross-epoch replay artifacts were composable")
+        fail("cross-epoch replay artifacts were composable", "MAT-MUT-DEPENDENCY_BOUNDARY")
 
     # Replay-session tamper matrix: every independently addressable artifact
     # binding is mandatory. Recomputing the outer digest must not make a splice valid.
