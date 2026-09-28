@@ -96,11 +96,10 @@ write_receipt() {
         printf 'status\t%s\n' "$final_status"
         printf 'exit_code\t%s\n' "$exit_code"
         printf 'terminal_stage\t%s\n' "$terminal_stage"
-        printf 'authority_scope\tengineering-software-contract-only\n        printf 'qualification_amendment\tv3-supersedes-v2-format-scope-repair\n'\n        printf 'format_gate_policy\tfrozen-subject-format-non-authoritative\n'\n        printf 'subject_sha_invariant\tunchanged-from-v1-v2\n'
-        printf 'scientific_lockbox_execution\tnot-performed\n'
-        printf 'human_perceptual_authority\tnone\n'
-        printf 'artistic_quality_authority\tnone\n'
-        printf 'product_authority\tnone\n'
+        printf 'authority_scope\tengineering-software-contract-only\n'
+        printf 'qualification_amendment\tv3-supersedes-v2-format-scope-repair\n'
+        printf 'format_gate_policy\tfrozen-subject-format-non-authoritative\n'
+        printf 'subject_sha_invariant\tunchanged-from-v1-v2\n'
         printf 'qualification_provider\t%s\n' "$provider"
         printf 'environment_authority\tobserved-not-hermetic-capsule-qualified\n'
         printf 'receipt_attestation\tnone\n'
