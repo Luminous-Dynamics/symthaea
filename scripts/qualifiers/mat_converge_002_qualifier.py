@@ -661,6 +661,7 @@ def main():
         "mutation_count": len(FAILURE_DIAGNOSTICS),
         "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v2",
         "mutation_manifest_digest": mutation_manifest_digest(cases, graph),
+        "mutation_manifest_projection_digest": mutation_manifest_projection_digest(manifest),
         "failure_categories": {
             category: sum(1 for item in FAILURE_DIAGNOSTICS if item["category"] == category)
             for category in sorted({item["category"] for item in FAILURE_DIAGNOSTICS})
