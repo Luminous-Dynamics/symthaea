@@ -47,6 +47,7 @@
 //! at the monorepo root for the audit trail behind this crate.
 
 pub mod discovery_graph;
+pub mod information_gain;
 pub mod prospective;
 pub mod seed_plan;
 pub mod task_validator;
