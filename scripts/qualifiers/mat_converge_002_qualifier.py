@@ -145,7 +145,21 @@ def check_graph(graph, cases):
     if not required_edges.issubset(edge_ids):
         fail("critical state graph edges missing")
 
-def check(doc, cases):
+def dependency_projection(cases, graph):
+    """Return the immutable case/graph refs that each case disposition may depend on."""
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    projection = {}
+    for case in cases:
+        refs = set(case["refs"].values())
+        for edge in graph["edges"]:
+            if edge["case_id"] != case["id"]:
+                continue
+            refs.add(node_by_id[edge["from"]]["ref"])
+            refs.add(node_by_id[edge["to"]]["ref"])
+        projection[case["id"]] = tuple(sorted(refs))
+    return projection
+
+def check(doc, cases): 
     if doc.get("campaign_id") != "MAT-CONVERGE-002A1":
         fail("campaign identity missing")
     if doc.get("record_schema") != "integration-edge-v1":
@@ -215,6 +229,7 @@ def main():
     check(doc, cases)
     graph = doc["state_graph"]
     baseline_digest = replay_digest(cases, graph)
+    baseline_projection = dependency_projection(cases, graph)
     mutations = [
         ("remove-process-ref", "C02"),
         ("change-process-generation", "C02"),
@@ -253,6 +268,19 @@ def main():
             case["refs"]["property"] = "property/E9"
         expect_failure(doc, mutated, name)
 
+    # Localized invalidation: changing one immutable generation must not alter
+    # the dependency projection of unrelated campaign cases.
+    localized = json.loads(json.dumps(cases))
+    localized_case = next(c for c in localized if c["id"] == "C02")
+    localized_case["process"] = "G3"
+    localized_case["refs"]["process"] = "process/G3"
+    try:
+        check(doc, localized)
+    except AssertionError:
+        pass
+    else:
+        fail("historical mutation unexpectedly accepted as qualified fixture")
+
     graph_mutations = [
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
         ("delete-graph-negative-edge", lambda g: g["edges"].remove(next(e for e in g["edges"] if e["id"] == "edge/C07"))),
@@ -268,6 +296,13 @@ def main():
         mutated_doc = json.loads(json.dumps(doc))
         mutated_doc["state_graph"] = mutated_graph
         expect_failure(mutated_doc, cases, name)
+
+    if set(baseline_projection) != set(EXPECTED):
+        fail("dependency projection coverage drift")
+    if baseline_projection["C01"] == baseline_projection["C02"]:
+        fail("distinct process generations collapsed dependency identity")
+    if baseline_projection["C01"] != baseline_projection["C09"]:
+        fail("authority-only case changed its immutable dependency projection")
 
     disposition_mutated = json.loads(json.dumps(cases))
     disposition_mutated[0]["outcome"] = "recomputed-disposition"
