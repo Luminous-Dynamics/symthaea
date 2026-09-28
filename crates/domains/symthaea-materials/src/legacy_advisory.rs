@@ -307,8 +307,8 @@ mod tests {
         assert_eq!(sp.dim(), HDC_DIMENSION);
         let mi = AdvisoryIdentityV1 { domain: "critical_minerals".into(), model_generation: "mining-predictor-v1".into(), input_generation: "synthetic-fixture-v1".into() };
         let si = AdvisoryIdentityV1 { domain: "strategic_materials".into(), model_generation: "strategic-predictor-v1".into(), input_generation: "synthetic-fixture-v1".into() };
-        let ma = AdvisoryMiningPredictionV1 { identity: mi.clone(), authority: AdvisoryAuthorityV1::Advisory, horizon_seconds: 86_400.0, predicted_state: mp.as_slice().to_vec() };
-        let sa = AdvisoryStrategicPredictionV1 { identity: si.clone(), authority: AdvisoryAuthorityV1::Advisory, horizon_seconds: 86_400.0, predicted_state: sp.as_slice().to_vec() };
+        let ma = AdvisoryMiningPredictionV1 { identity: mi.clone(), authority: AdvisoryAuthorityV1::Advisory, horizon_seconds: 86_400.0, predicted_state: mp.values.clone() };
+        let sa = AdvisoryStrategicPredictionV1 { identity: si.clone(), authority: AdvisoryAuthorityV1::Advisory, horizon_seconds: 86_400.0, predicted_state: sp.values.clone() };
         assert_eq!(ma.authority, AdvisoryAuthorityV1::Advisory);
         assert_eq!(sa.authority, AdvisoryAuthorityV1::Advisory);
     }
