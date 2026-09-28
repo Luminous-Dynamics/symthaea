@@ -217,6 +217,9 @@ impl C0LengthUmV1 {
         if value_um == 0 { Err(RobotDesignError::InvalidDesignLength) } else { Ok(Self(value_um)) }
     }
     pub const fn value_um(self) -> u64 { self.0 }
+    pub const fn validate(self) -> Result<(), RobotDesignError> {
+        if self.0 == 0 { Err(RobotDesignError::InvalidDesignLength) } else { Ok(()) }
+    }
     pub fn millimetres(self) -> ExactRationalV1 {
         ExactRationalV1::new(self.0 as u128, 1_000).expect("fixed non-zero denominator")
     }
@@ -306,6 +309,7 @@ impl ExactDesignParameterSetV1 {
         if self.parameters.is_empty() { return Err(RobotDesignError::EmptyCollection("parameters")); }
         let mut ids = BTreeSet::new();
         for parameter in &self.parameters {
+            parameter.value.validate()?;
             if !ids.insert(parameter.id.clone()) {
                 return Err(RobotDesignError::DuplicateParameterId(parameter.id.to_string()));
             }
@@ -398,6 +402,7 @@ impl ExactDesignSearchDomainV1 {
             match &parameter.domain {
                 ExactLengthDomainV1::Values(values) => {
                     if values.is_empty() { return Err(RobotDesignError::EmptyCollection("domain values")); }
+                    for value in values { value.validate()?; }
                     let mut sorted = values.clone();
                     sorted.sort_unstable();
                     sorted.dedup();
@@ -409,6 +414,8 @@ impl ExactDesignSearchDomainV1 {
                     }
                 }
                 ExactLengthDomainV1::Range { lower, upper, step_um } => {
+                    lower.validate()?;
+                    upper.validate()?;
                     if *step_um == 0 || lower > upper {
                         return Err(RobotDesignError::InvalidDomainRange(parameter.id.to_string()));
                     }
@@ -1326,6 +1333,32 @@ mod tests {
     #[test]
     fn exact_length_conversion_is_reduced_rational() {
         assert_eq!(C0LengthUmV1::new(20_000).unwrap().millimetres(), ExactRationalV1 { numerator: 20, denominator: 1 });
+    }
+
+    #[test]
+    fn deserialized_zero_length_cannot_pass_parameter_validation() {
+        let set = ExactDesignParameterSetV1 {
+            schema_id: EXACT_PARAMETER_SCHEMA_ID.to_string(),
+            schema_version: EXACT_PARAMETER_SCHEMA_VERSION,
+            parameters: vec![ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                value: C0LengthUmV1(0),
+            }],
+        };
+        assert_eq!(set.validate(), Err(RobotDesignError::InvalidDesignLength));
+    }
+
+    #[test]
+    fn deserialized_zero_length_cannot_pass_domain_validation() {
+        let domain = ExactDesignSearchDomainV1 {
+            schema_id: EXACT_SEARCH_DOMAIN_SCHEMA_ID.to_string(),
+            schema_version: EXACT_SEARCH_DOMAIN_SCHEMA_VERSION,
+            parameters: vec![ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1(0)]),
+            }],
+        };
+        assert_eq!(domain.validate(), Err(RobotDesignError::InvalidDesignLength));
     }
 
     #[test]
