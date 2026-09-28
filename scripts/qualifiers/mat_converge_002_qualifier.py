@@ -570,8 +570,11 @@ def mutation_manifest_digest(cases, graph):
     return hashlib.sha256(canonical(mutation_manifest(cases, graph))).hexdigest()
 
 def mutation_manifest_projection(manifest):
+    """Project every identity-bearing manifest field, including guard taxonomy."""
     return {
         "schema": manifest["schema"],
+        "guard_registry_schema": manifest["guard_registry_schema"],
+        "guard_registry_digest": manifest["guard_registry_digest"],
         "fixture_schema": manifest["fixture_schema"],
         "graph_schema": manifest["graph_schema"],
         "categories": list(manifest["categories"]),
@@ -654,6 +657,18 @@ def main():
     }
     if set(GUARD_CATEGORIES) != expected_guard_ids:
         fail("guard registry identity drift", "MAT-MUT-INVARIANT_INTEGRITY")
+    if any(
+        failure_category(OracleFailure(guard_id, "message-a"))
+        != failure_category(OracleFailure(guard_id, "message-b"))
+        for guard_id in GUARD_CATEGORIES
+    ):
+        fail("guard classification depends on diagnostic prose", "MAT-MUT-INVARIANT_INTEGRITY")
+    if any(
+        EXPECTED_GUARDS[label] not in GUARD_CATEGORIES
+        or GUARD_CATEGORIES[EXPECTED_GUARDS[label]] != EXPECTED_CATEGORIES[label]
+        for label in EXPECTED_CATEGORIES
+    ):
+        fail("mutation guard registry/category binding drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if len(sys.argv) != 2:
         print("usage: mat_converge_002_qualifier.py PATH", file=sys.stderr)
         return 2
