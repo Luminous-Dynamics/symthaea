@@ -231,6 +231,17 @@ def recomputation_snapshot(cases, graph, invalidation_plan):
         "digest": hashlib.sha256(canonical(payload)).hexdigest(),
     }
 
+def validate_recomputation_snapshot(cases, graph, invalidation_plan, snapshot):
+    """Verify that a snapshot is bound to the exact canonical invalidation plan."""
+    expected_plan = canonical_invalidation_plan(
+        cases, graph, invalidation_plan["changed_ref"]
+    )
+    if invalidation_plan["digest"] != expected_plan["digest"]:
+        fail("invalidation plan digest does not match its canonical inputs")
+    expected_snapshot = recomputation_snapshot(cases, graph, expected_plan)
+    if snapshot != expected_snapshot:
+        fail("recomputation snapshot is not bound to canonical plan inputs")
+
 def canonical_invalidation_plan(cases, graph, changed_ref):
     """Build a canonical, replayable invalidation-plan identity."""
     plan = graph_invalidation_plan(cases, graph, changed_ref)
@@ -502,8 +513,71 @@ def main():
     }
     if replay_snapshot["digest"] != hashlib.sha256(canonical(snapshot_payload)).hexdigest():
         fail("recomputation snapshot digest is not self-consistent")
+    validate_recomputation_snapshot(cases, graph, canonical_plan, replay_snapshot)
+
+    # Representation-equivalent replay must survive an independently rebuilt
+    # graph object, not merely a reordered view of the original object.
+    rebuilt_graph = {
+        "schema": graph["schema"],
+        "historical_records_immutable": graph["historical_records_immutable"],
+        "derived_dispositions_recomputable": graph["derived_dispositions_recomputable"],
+        "nodes": [
+            {"id": node["id"], "kind": node["kind"], "ref": node["ref"],
+             "generation": node["generation"]}
+            for node in sorted(graph["nodes"], key=lambda node: node["id"], reverse=True)
+        ],
+        "edges": [
+            {"id": edge["id"], "case_id": edge["case_id"], "from": edge["from"],
+             "to": edge["to"], "kind": edge["kind"], "historical": edge["historical"]}
+            for edge in sorted(graph["edges"], key=lambda edge: edge["id"], reverse=True)
+        ],
+        "case_ids": list(graph["case_ids"]),
+        "replay_rule": graph["replay_rule"],
+        "ordering_semantics": graph["ordering_semantics"],
+        "dependency_closure": graph["dependency_closure"],
+        "coverage": json.loads(json.dumps(graph["coverage"])),
+    }
+    rebuilt_plan = canonical_invalidation_plan(cases, rebuilt_graph, "process/G1")
+    rebuilt_snapshot = recomputation_snapshot(cases, rebuilt_graph, rebuilt_plan)
+    if graph_identity(rebuilt_graph) != graph_identity(graph):
+        fail("independently rebuilt graph changed graph identity")
+    if replay_digest(cases, rebuilt_graph) != baseline_digest:
+        fail("independently rebuilt graph changed replay identity")
+    if rebuilt_plan["digest"] != canonical_plan["digest"]:
+        fail("independently rebuilt graph changed invalidation-plan identity")
+    if rebuilt_snapshot["digest"] != replay_snapshot["digest"]:
+        fail("independently rebuilt graph changed recomputation identity")
+
+    # Tampering with any plan boundary or its binding must be detected before
+    # a recomputation snapshot can be treated as replayable.
+    for field in ("direct_case_ids", "transitive_case_ids", "recompute_case_ids"):
+        tampered_plan = json.loads(json.dumps(canonical_plan))
+        tampered_plan[field] = []
+        try:
+            validate_recomputation_snapshot(cases, graph, tampered_plan, replay_snapshot)
+        except AssertionError:
+            pass
+        else:
+            fail(f"tampered invalidation plan escaped binding oracle: {field}")
+
+    tampered_digest_plan = json.loads(json.dumps(canonical_plan))
+    tampered_digest_plan["digest"] = "0" * 64
+    try:
+        validate_recomputation_snapshot(cases, graph, tampered_digest_plan, replay_snapshot)
+    except AssertionError:
+        pass
+    else:
+        fail("tampered invalidation plan digest escaped binding oracle")
 
     # Derived dispositions are intentionally excluded from the snapshot identity.
+    # The case manifest order is semantic: changing it changes the canonical
+    # recomputation record order and therefore its identity.
+    manifest_reordered_snapshot = recomputation_snapshot(
+        case_order_permuted, graph, canonical_invalidation_plan(case_order_permuted, graph, "process/G1")
+    )
+    if manifest_reordered_snapshot["digest"] == replay_snapshot["digest"]:
+        fail("case manifest reordering lost recomputation identity")
+
     disposition_mutated = json.loads(json.dumps(cases))
     for case in disposition_mutated:
         if case["id"] in set(expected_graph_closure):
