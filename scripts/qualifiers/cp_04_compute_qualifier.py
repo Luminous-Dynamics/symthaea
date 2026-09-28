@@ -150,7 +150,7 @@ def validate(c):
 def validate_manifest(m):
     eq(m.get("schema"),"cp-04-compute-mutation-manifest-v1","manifest schema")
     eq(m.get("guard_registry"),GUARDS,"guard registry")
-    expected=["remove-model-runtime-edge","reverse-model-runtime-edge","duplicate-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
+    expected=["remove-model-runtime-edge","reverse-model-runtime-edge","duplicate-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","duplicate-model-node","dangling-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
     eq([x.get("mutation_id") for x in m.get("mutations",[])],expected,"mutation manifest")
     for x in m.get("mutations",[]):
         if x.get("guard_id") not in GUARDS:
@@ -164,6 +164,8 @@ def mutations(c,graph):
         ("rename-graph-node",lambda g:g["nodes"].__setitem__(2,"model-v2"),"CP-COMP-DEPENDENCY"),
         ("add-graph-field",lambda g:g.__setitem__("unbound","unexpected"),"CP-COMP-DEPENDENCY"),
         ("malformed-graph-edge",lambda g:g["edges"].__setitem__(2,["model"]),"CP-COMP-DEPENDENCY"),
+        ("duplicate-model-node",lambda g:g["nodes"].append("model"),"CP-COMP-DEPENDENCY"),
+        ("dangling-graph-edge",lambda g:g["edges"].append(["model","missing-node"]),"CP-COMP-DEPENDENCY"),
     ]
     case_specs=[
         ("drop-C06",lambda x:x["cases"].pop(5),"CP-COMP-COVERAGE"),
@@ -209,6 +211,9 @@ def main():
     validate_replay_boundary(c,graph)
     validate_replay_completeness(c,graph)
     muts=mutations(c,graph)
+    manifest_pairs=[(x.get("mutation_id"),x.get("guard_id")) for x in manifest.get("mutations",[])]
+    actual_pairs=[(x["mutation_id"],x["guard_id"]) for x in muts]
+    eq(actual_pairs,manifest_pairs,"mutation implementation/manifest binding","CP-COMP-INVARIANT")
     for node,expected_closure in EXPECTED_CLOSURES.items():
         if dependency_closure([node],graph)!=expected_closure:
             fail(f"{node} invalidation closure incorrect","CP-COMP-DEPENDENCY")
@@ -231,6 +236,13 @@ def main():
         for x in FAILURES: print(" -",x)
         raise SystemExit(1)
     q=receipt(c,muts,replay_sha,graph_sha,digest(manifest),source_sha)
+    receipt_body=deepcopy(q)
+    receipt_body.pop("receipt_sha256")
+    eq(digest(receipt_body),q["receipt_sha256"],"receipt self-verification","CP-COMP-INVARIANT")
+    if FAILURES:
+        print("CP-04 COMPUTE QUALIFIER FAIL")
+        for x in FAILURES: print(" -",x)
+        raise SystemExit(1)
     print("CP-04 COMPUTE QUALIFIER PASS")
     for k in ("corpus_sha256","replay_input_sha256","graph_identity_sha256","mutation_manifest_sha256","oracle_source_sha256","guard_registry_sha256","receipt_sha256"):
         print(k+"="+q[k])
