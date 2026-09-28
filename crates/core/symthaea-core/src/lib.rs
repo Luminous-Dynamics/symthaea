@@ -96,6 +96,8 @@ pub mod physics;
 pub mod synthesis_trait;
 /// Shared temporal prediction trait for O(1) CfC-based forecasting.
 pub mod temporal;
+/// Scientific active-inference decision support over competing temporal forecasts.
+pub mod scientific_active_inference;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;
