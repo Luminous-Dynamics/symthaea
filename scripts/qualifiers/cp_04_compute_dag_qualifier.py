@@ -159,11 +159,11 @@ def graph_identity(g):
     })
 
 MUTATIONS = (
-    ("remove-model-runtime-edge", "CP-COMP-DAG-MUTATION", lambda g: g["edges"].remove(["model", "executes_with", "runtime"])),
-    ("reverse-model-runtime-edge", "CP-COMP-DAG-MUTATION", lambda g: g["edges"].__setitem__(3, ["runtime", "executes_with", "model"])),
-    ("duplicate-model-runtime-edge", "CP-COMP-DAG-MUTATION", lambda g: g["edges"].append(["model", "executes_with", "runtime"])),
-    ("change-edge-type", "CP-COMP-DAG-MUTATION", lambda g: g["edges"].__setitem__(3, ["model", "requires", "runtime"])),
-    ("rename-node", "CP-COMP-DAG-MUTATION", lambda g: g["node_types"].__setitem__(2, "model_v2")),
+    ("remove-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].remove(["model", "executes_with", "runtime"])),
+    ("reverse-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["runtime", "executes_with", "model"])),
+    ("duplicate-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].append(["model", "executes_with", "runtime"])),
+    ("change-edge-type", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "requires", "runtime"])),
+    ("rename-node", "CP-COMP-DAG-TYPING", lambda g: g["node_types"].__setitem__(2, "model_v2")),
     ("add-graph-field", "CP-COMP-DAG-SCHEMA", lambda g: g.__setitem__("unexpected", True)),
     ("malformed-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with"])),
     ("dangling-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with", "missing"])),
