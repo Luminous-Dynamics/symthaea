@@ -97,6 +97,12 @@ impl RobotDesignId {
     pub fn to_hex(self) -> String {
         self.0.to_hex()
     }
+
+    pub const fn from_digest(digest: ContentDigest) -> Self { Self(digest) }
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self { Self(ContentDigest::from_bytes(bytes)) }
+    pub fn from_hex(value: &str) -> Result<Self, RobotDesignError> {
+        Ok(Self(ContentDigest::from_bytes(parse_digest_hex(value)?)))
+    }
 }
 
 impl fmt::Display for RobotDesignId {
@@ -199,6 +205,289 @@ pub struct ControlInterfaceDesignV1 {
     pub id: ControlInterfaceId,
     /// Semantic interface/profile identity only; never a live ControlLease/capability.
     pub semantic_profile: String,
+}
+
+/// Exact positive designer-chosen length in micrometres.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct C0LengthUmV1(u64);
+
+impl C0LengthUmV1 {
+    pub const fn new(value_um: u64) -> Result<Self, RobotDesignError> {
+        if value_um == 0 { Err(RobotDesignError::InvalidDesignLength) } else { Ok(Self(value_um)) }
+    }
+    pub const fn value_um(self) -> u64 { self.0 }
+    pub fn millimetres(self) -> ExactRationalV1 {
+        ExactRationalV1::new(self.0 as u128, 1_000).expect("fixed non-zero denominator")
+    }
+    pub fn f32_bits(self) -> Result<u32, RobotDesignError> {
+        let value = self.0 as f32;
+        if value.is_finite() { Ok(value.to_bits()) } else { Err(RobotDesignError::FloatConversionOverflow) }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ExactRationalV1 { pub numerator: u128, pub denominator: u128 }
+
+impl ExactRationalV1 {
+    pub fn new(numerator: u128, denominator: u128) -> Result<Self, RobotDesignError> {
+        if denominator == 0 { return Err(RobotDesignError::InvalidRational); }
+        let divisor = gcd_u128(numerator, denominator);
+        Ok(Self { numerator: numerator / divisor, denominator: denominator / divisor })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ParameterIdV1(String);
+
+impl ParameterIdV1 {
+    pub fn new(value: impl Into<String>) -> Result<Self, RobotDesignError> {
+        let value = value.into();
+        validate_parameter_id(&value)?;
+        Ok(Self(value))
+    }
+    pub fn as_str(&self) -> &str { &self.0 }
+}
+
+impl fmt::Display for ParameterIdV1 {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(&self.0) }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactDesignLengthParameterV1 { pub id: ParameterIdV1, pub value: C0LengthUmV1 }
+
+pub const EXACT_PARAMETER_SCHEMA_ID: &str = "symthaea.robot-design.exact-parameters.v1";
+pub const EXACT_PARAMETER_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactDesignParameterSetV1 {
+    pub schema_id: String,
+    pub schema_version: u32,
+    pub parameters: Vec<ExactDesignLengthParameterV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ParameterSetId(ContentDigest);
+
+impl ParameterSetId {
+    pub const fn from_digest(digest: ContentDigest) -> Self { Self(digest) }
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self { Self(ContentDigest::from_bytes(bytes)) }
+    pub fn from_hex(value: &str) -> Result<Self, RobotDesignError> {
+        Ok(Self(ContentDigest::from_bytes(parse_digest_hex(value)?)))
+    }
+    pub const fn digest(self) -> ContentDigest { self.0 }
+    pub fn to_hex(self) -> String { self.0.to_hex() }
+}
+
+impl fmt::Display for ParameterSetId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(&self.to_hex()) }
+}
+
+impl ExactDesignParameterSetV1 {
+    pub fn new(parameters: Vec<ExactDesignLengthParameterV1>) -> Result<Self, RobotDesignError> {
+        let value = Self {
+            schema_id: EXACT_PARAMETER_SCHEMA_ID.to_string(),
+            schema_version: EXACT_PARAMETER_SCHEMA_VERSION,
+            parameters,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+    pub fn validate(&self) -> Result<(), RobotDesignError> {
+        if self.schema_id != EXACT_PARAMETER_SCHEMA_ID || self.schema_version != EXACT_PARAMETER_SCHEMA_VERSION {
+            return Err(RobotDesignError::UnsupportedParameterSchema {
+                schema_id: self.schema_id.clone(), schema_version: self.schema_version
+            });
+        }
+        if self.parameters.is_empty() { return Err(RobotDesignError::EmptyCollection("parameters")); }
+        let mut ids = BTreeSet::new();
+        for parameter in &self.parameters {
+            if !ids.insert(parameter.id.clone()) {
+                return Err(RobotDesignError::DuplicateParameterId(parameter.id.to_string()));
+            }
+        }
+        Ok(())
+    }
+    pub fn canonical_transcript(&self) -> Result<Vec<u8>, RobotDesignError> {
+        self.validate()?;
+        let mut parameters = self.parameters.iter().collect::<Vec<_>>();
+        parameters.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut out = Vec::new();
+        put_str(&mut out, EXACT_PARAMETER_SCHEMA_ID);
+        put_u32(&mut out, EXACT_PARAMETER_SCHEMA_VERSION);
+        put_len(&mut out, parameters.len());
+        for parameter in parameters {
+            put_str(&mut out, parameter.id.as_str());
+            put_u64(&mut out, parameter.value.value_um());
+        }
+        Ok(out)
+    }
+    pub fn id(&self) -> Result<ParameterSetId, RobotDesignError> {
+        Ok(ParameterSetId(hash_transcript(&self.canonical_transcript()?)))
+    }
+    pub fn parameter(&self, id: &ParameterIdV1) -> Option<C0LengthUmV1> {
+        self.parameters.iter().find(|p| &p.id == id).map(|p| p.value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExactLengthDomainV1 {
+    Values(Vec<C0LengthUmV1>),
+    Range { lower: C0LengthUmV1, upper: C0LengthUmV1, step_um: u64 },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactDesignParameterDomainV1 { pub id: ParameterIdV1, pub domain: ExactLengthDomainV1 }
+
+pub const EXACT_SEARCH_DOMAIN_SCHEMA_ID: &str = "symthaea.robot-design.search-domain.v1";
+pub const EXACT_SEARCH_DOMAIN_SCHEMA_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExactDesignSearchDomainV1 {
+    pub schema_id: String,
+    pub schema_version: u32,
+    pub parameters: Vec<ExactDesignParameterDomainV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SearchDomainId(ContentDigest);
+
+impl SearchDomainId {
+    pub const fn from_digest(digest: ContentDigest) -> Self { Self(digest) }
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self { Self(ContentDigest::from_bytes(bytes)) }
+    pub fn from_hex(value: &str) -> Result<Self, RobotDesignError> {
+        Ok(Self(ContentDigest::from_bytes(parse_digest_hex(value)?)))
+    }
+    pub const fn digest(self) -> ContentDigest { self.0 }
+    pub fn to_hex(self) -> String { self.0.to_hex() }
+}
+
+impl fmt::Display for SearchDomainId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result { formatter.write_str(&self.to_hex()) }
+}
+
+impl ExactDesignSearchDomainV1 {
+    pub fn new(parameters: Vec<ExactDesignParameterDomainV1>) -> Result<Self, RobotDesignError> {
+        let value = Self {
+            schema_id: EXACT_SEARCH_DOMAIN_SCHEMA_ID.to_string(),
+            schema_version: EXACT_SEARCH_DOMAIN_SCHEMA_VERSION,
+            parameters,
+        };
+        value.validate()?;
+        Ok(value)
+    }
+    pub fn validate(&self) -> Result<(), RobotDesignError> {
+        if self.schema_id != EXACT_SEARCH_DOMAIN_SCHEMA_ID || self.schema_version != EXACT_SEARCH_DOMAIN_SCHEMA_VERSION {
+            return Err(RobotDesignError::UnsupportedSearchDomainSchema {
+                schema_id: self.schema_id.clone(), schema_version: self.schema_version
+            });
+        }
+        if self.parameters.is_empty() { return Err(RobotDesignError::EmptyCollection("search-domain parameters")); }
+        let mut ids = BTreeSet::new();
+        for parameter in &self.parameters {
+            if !ids.insert(parameter.id.clone()) {
+                return Err(RobotDesignError::DuplicateParameterId(parameter.id.to_string()));
+            }
+            match &parameter.domain {
+                ExactLengthDomainV1::Values(values) => {
+                    if values.is_empty() { return Err(RobotDesignError::EmptyCollection("domain values")); }
+                    let mut sorted = values.clone();
+                    sorted.sort_unstable();
+                    sorted.dedup();
+                    if sorted.len() != values.len() {
+                        return Err(RobotDesignError::DuplicateDomainValue(parameter.id.to_string()));
+                    }
+                    if sorted != *values {
+                        return Err(RobotDesignError::NonCanonicalDomainOrder(parameter.id.to_string()));
+                    }
+                }
+                ExactLengthDomainV1::Range { lower, upper, step_um } => {
+                    if *step_um == 0 || lower > upper {
+                        return Err(RobotDesignError::InvalidDomainRange(parameter.id.to_string()));
+                    }
+                    if (upper.value_um() - lower.value_um()) % *step_um != 0 {
+                        return Err(RobotDesignError::NonTerminatingDomainRange(parameter.id.to_string()));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn canonical_transcript(&self) -> Result<Vec<u8>, RobotDesignError> {
+        self.validate()?;
+        let mut parameters = self.parameters.iter().collect::<Vec<_>>();
+        parameters.sort_by(|a, b| a.id.cmp(&b.id));
+        let mut out = Vec::new();
+        put_str(&mut out, EXACT_SEARCH_DOMAIN_SCHEMA_ID);
+        put_u32(&mut out, EXACT_SEARCH_DOMAIN_SCHEMA_VERSION);
+        put_len(&mut out, parameters.len());
+        for parameter in parameters {
+            put_str(&mut out, parameter.id.as_str());
+            match &parameter.domain {
+                ExactLengthDomainV1::Values(values) => {
+                    put_u8(&mut out, 0);
+                    put_len(&mut out, values.len());
+                    for value in values { put_u64(&mut out, value.value_um()); }
+                }
+                ExactLengthDomainV1::Range { lower, upper, step_um } => {
+                    put_u8(&mut out, 1);
+                    put_u64(&mut out, lower.value_um());
+                    put_u64(&mut out, upper.value_um());
+                    put_u64(&mut out, *step_um);
+                }
+            }
+        }
+        Ok(out)
+    }
+    pub fn id(&self) -> Result<SearchDomainId, RobotDesignError> {
+        Ok(SearchDomainId(hash_transcript(&self.canonical_transcript()?)))
+    }
+    pub fn enumerate(&self) -> Result<Vec<ExactDesignParameterSetV1>, RobotDesignError> {
+        self.validate()?;
+        let mut dimensions = Vec::with_capacity(self.parameters.len());
+        for parameter in &self.parameters {
+            let values = match &parameter.domain {
+                ExactLengthDomainV1::Values(values) => values.clone(),
+                ExactLengthDomainV1::Range { lower, upper, step_um } => {
+                    let span = upper.value_um() - lower.value_um();
+                    let count = span.checked_div(*step_um).and_then(|n| n.checked_add(1))
+                        .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
+                    let count = usize::try_from(count).map_err(|_| RobotDesignError::DomainEnumerationOverflow)?;
+                    let mut values = Vec::with_capacity(count);
+                    for index in 0..count {
+                        let offset = (*step_um as u128).checked_mul(index as u128)
+                            .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
+                        let value = (lower.value_um() as u128).checked_add(offset)
+                            .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
+                        values.push(C0LengthUmV1::new(u64::try_from(value)
+                            .map_err(|_| RobotDesignError::DomainEnumerationOverflow)?)?);
+                    }
+                    values
+                }
+            };
+            dimensions.push((parameter.id.clone(), values));
+        }
+        let mut output = vec![Vec::<ExactDesignLengthParameterV1>::new()];
+        for (id, values) in dimensions {
+            let mut next = Vec::new();
+            for partial in &output {
+                for value in &values {
+                    let mut candidate = partial.clone();
+                    candidate.push(ExactDesignLengthParameterV1 { id: id.clone(), value: *value });
+                    next.push(candidate);
+                }
+            }
+            output = next;
+        }
+        output.into_iter().map(ExactDesignParameterSetV1::new).collect()
+    }
 }
 
 /// As-designed engineering subject. It intentionally contains no physical authority.
@@ -516,6 +805,17 @@ pub enum RobotDesignError {
     KinematicCycle,
     DuplicateMaterialAssignment(String),
     InvalidLineage(&'static str),
+    InvalidDesignLength,
+    FloatConversionOverflow,
+    InvalidRational,
+    UnsupportedParameterSchema { schema_id: String, schema_version: u32 },
+    DuplicateParameterId(String),
+    UnsupportedSearchDomainSchema { schema_id: String, schema_version: u32 },
+    DuplicateDomainValue(String),
+    NonCanonicalDomainOrder(String),
+    InvalidDomainRange(String),
+    NonTerminatingDomainRange(String),
+    DomainEnumerationOverflow,
 }
 
 impl fmt::Display for RobotDesignError {
@@ -551,6 +851,17 @@ impl fmt::Display for RobotDesignError {
                 )
             }
             Self::InvalidLineage(message) => write!(formatter, "invalid design lineage: {message}"),
+            Self::InvalidDesignLength => formatter.write_str("design length must be positive"),
+            Self::FloatConversionOverflow => formatter.write_str("design length cannot be represented as finite f32"),
+            Self::InvalidRational => formatter.write_str("rational denominator must be non-zero"),
+            Self::UnsupportedParameterSchema { schema_id, schema_version } => write!(formatter, "unsupported exact-parameter schema {schema_id}@{schema_version}"),
+            Self::DuplicateParameterId(id) => write!(formatter, "duplicate parameter id: {id}"),
+            Self::UnsupportedSearchDomainSchema { schema_id, schema_version } => write!(formatter, "unsupported search-domain schema {schema_id}@{schema_version}"),
+            Self::DuplicateDomainValue(id) => write!(formatter, "duplicate domain value for parameter: {id}"),
+            Self::NonCanonicalDomainOrder(id) => write!(formatter, "domain values for parameter {id} are not canonically sorted"),
+            Self::InvalidDomainRange(id) => write!(formatter, "invalid domain range for parameter: {id}"),
+            Self::NonTerminatingDomainRange(id) => write!(formatter, "domain range for parameter {id} does not terminate exactly"),
+            Self::DomainEnumerationOverflow => formatter.write_str("domain enumeration exceeds representable capacity"),
         }
     }
 }
@@ -667,6 +978,47 @@ fn validate_kinematic_acyclic(
     } else {
         Err(RobotDesignError::KinematicCycle)
     }
+}
+
+fn validate_parameter_id(value: &str) -> Result<(), RobotDesignError> {
+    let valid = !value.is_empty() && value.len() <= 128
+        && value.bytes().all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'_' | b'-'));
+    if valid { Ok(()) } else {
+        Err(RobotDesignError::InvalidSemanticId { kind: "parameter", value: value.to_string() })
+    }
+}
+
+fn gcd_u128(mut left: u128, mut right: u128) -> u128 {
+    while right != 0 { let remainder = left % right; left = right; right = remainder; }
+    left.max(1)
+}
+
+fn hash_transcript(transcript: &[u8]) -> ContentDigest {
+    ContentDigest::from_bytes(Sha256::digest(transcript).into())
+}
+
+fn parse_digest_hex(value: &str) -> Result<[u8; 32], RobotDesignError> {
+    if value.len() != 64 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(RobotDesignError::InvalidSemanticText("digest hex"));
+    }
+    let mut bytes = [0u8; 32];
+    for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        bytes[index] = (hex_nibble(pair[0]) << 4) | hex_nibble(pair[1]);
+    }
+    Ok(bytes)
+}
+
+fn hex_nibble(byte: u8) -> u8 {
+    match byte {
+        b'0'..=b'9' => byte - b'0',
+        b'a'..=b'f' => byte - b'a' + 10,
+        b'A'..=b'F' => byte - b'A' + 10,
+        _ => unreachable!("validated hexadecimal input"),
+    }
+}
+
+fn put_u64(out: &mut Vec<u8>, value: u64) {
+    out.extend_from_slice(&value.to_be_bytes());
 }
 
 fn put_u8(out: &mut Vec<u8>, value: u8) {
@@ -921,6 +1273,67 @@ mod tests {
             subject.design_id(),
             Err(RobotDesignError::UnsupportedSchema { .. })
         ));
+    }
+
+    #[test]
+    fn exact_parameter_identity_ignores_insertion_order() {
+        let width = ParameterIdV1::new("section_width").unwrap();
+        let height = ParameterIdV1::new("section_height").unwrap();
+        let a = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 { id: width.clone(), value: C0LengthUmV1::new(20_000).unwrap() },
+            ExactDesignLengthParameterV1 { id: height.clone(), value: C0LengthUmV1::new(30_000).unwrap() },
+        ]).unwrap();
+        let b = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 { id: height, value: C0LengthUmV1::new(30_000).unwrap() },
+            ExactDesignLengthParameterV1 { id: width, value: C0LengthUmV1::new(20_000).unwrap() },
+        ]).unwrap();
+        assert_eq!(a.id().unwrap(), b.id().unwrap());
+    }
+
+    #[test]
+    fn parameter_identity_changes_for_one_micrometre() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let a = ExactDesignParameterSetV1::new(vec![ExactDesignLengthParameterV1 { id: id.clone(), value: C0LengthUmV1::new(20_000).unwrap() }]).unwrap();
+        let b = ExactDesignParameterSetV1::new(vec![ExactDesignLengthParameterV1 { id, value: C0LengthUmV1::new(20_001).unwrap() }]).unwrap();
+        assert_ne!(a.id().unwrap(), b.id().unwrap());
+    }
+
+    #[test]
+    fn search_domain_identity_is_separate_from_parameter_identity() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let selected = ExactDesignParameterSetV1::new(vec![ExactDesignLengthParameterV1 { id: id.clone(), value: C0LengthUmV1::new(20_000).unwrap() }]).unwrap();
+        let narrow = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 { id: id.clone(), domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(20_000).unwrap()]) }]).unwrap();
+        let broad = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 { id, domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(19_000).unwrap(), C0LengthUmV1::new(20_000).unwrap()]) }]).unwrap();
+        assert_eq!(selected.parameter(&ParameterIdV1::new("section_width").unwrap()).unwrap().value_um(), 20_000);
+        assert_ne!(narrow.id().unwrap(), broad.id().unwrap());
+        assert_ne!(narrow.id().unwrap().digest(), selected.id().unwrap().digest());
+    }
+
+    #[test]
+    fn exact_length_conversion_is_reduced_rational() {
+        assert_eq!(C0LengthUmV1::new(20_000).unwrap().millimetres(), ExactRationalV1 { numerator: 20, denominator: 1 });
+    }
+
+    #[test]
+    fn domain_enumeration_is_exact_and_deterministic() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id,
+            domain: ExactLengthDomainV1::Range { lower: C0LengthUmV1::new(20_000).unwrap(), upper: C0LengthUmV1::new(22_000).unwrap(), step_um: 1_000 },
+        }]).unwrap();
+        let sets = domain.enumerate().unwrap();
+        assert_eq!(sets.len(), 3);
+        assert_eq!(sets[1].parameter(&ParameterIdV1::new("section_width").unwrap()).unwrap().value_um(), 21_000);
+    }
+
+    #[test]
+    fn identity_helpers_round_trip() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let set = ExactDesignParameterSetV1::new(vec![ExactDesignLengthParameterV1 { id, value: C0LengthUmV1::new(20_000).unwrap() }]).unwrap();
+        let parameter_id = set.id().unwrap();
+        assert_eq!(ParameterSetId::from_hex(&parameter_id.to_hex()).unwrap(), parameter_id);
+        let robot_id = base_subject().design_id().unwrap();
+        assert_eq!(RobotDesignId::from_hex(&robot_id.to_hex()).unwrap(), robot_id);
     }
 
     #[test]
