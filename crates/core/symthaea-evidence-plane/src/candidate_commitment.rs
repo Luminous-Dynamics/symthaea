@@ -86,7 +86,8 @@ impl CandidatePredictionCommitment {
                 && self.source_candidate_id == binding.source_candidate_id
                 && self.test_specification_id == binding.test_specification_id
                 && self.measurement_specification_id == binding.measurement_specification_id
-                && self.lineage_digest == lineage_digest(&binding.left_lineage, &binding.right_lineage),
+                && self.lineage_digest == lineage_digest(&binding.left_lineage, &binding.right_lineage)
+                && self.commitment.provenance().model_lineage == self.lineage_digest,
         )
     }
 }
@@ -123,6 +124,7 @@ pub fn commit_candidate_envelope(
     prediction_payload: &[u8],
 ) -> Result<CandidatePredictionCommitment, BindingError> {
     let binding = binding_for(candidate, prediction_payload);
+    validate_provenance_lineage(candidate, &provenance)?;
     let bytes = binding.canonical_bytes()?;
     let binding_digest = binding.digest()?;
     let commitment = ProspectivePredictionCommitment::commit(
@@ -231,7 +233,7 @@ mod tests {
     fn envelope_detects_tampered_binding() {
         let c = candidate("c1");
         let envelope = commit_candidate_envelope(&c, "challenge-v1", "criteria-v1", "mapping-v1",
-            "actor-v1", "2026-09-28T09:00:00Z", provenance(), b"forecast").unwrap();
+            "actor-v1", "2026-09-28T09:00:00Z", provenance(&c), b"forecast").unwrap();
         let mut binding = binding_for(&c, b"tampered");
         assert!(!envelope.verify_binding(&binding).unwrap());
         binding.candidate_id = "c2".into();
