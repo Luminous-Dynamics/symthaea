@@ -116,7 +116,7 @@ pub fn build(
         )
         .cmp(&candidate_id(
             &b.candidate.left_model_id,
-            &b.candidate.candidate.right_model_id,
+            &b.candidate.right_model_id,
             &b.candidate.outcome_id,
         ))
     });
