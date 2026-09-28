@@ -417,6 +417,21 @@
       }
     ],
     "replay_rule": "replay digest is over immutable node/edge identities; derived dispositions are excluded",
+    "coverage": {
+      "mode": "partial-structural-graph-plus-case-oracle",
+      "case_level_cases": 16,
+      "graph_edge_cases": 9,
+      "graph_only_cases": 7,
+      "graph_only_case_ids": [
+        "C06",
+        "C08",
+        "C11",
+        "C12",
+        "C13",
+        "C14",
+        "C15"
+      ]
+    },
     "case_ids": [
       "C01",
       "C02",
