@@ -99,6 +99,9 @@ pub mod temporal;
 /// Scientific active-inference decision support over competing temporal forecasts.
 #[allow(missing_docs)]
 pub mod scientific_active_inference;
+/// Model-implied outcome likelihoods from predicted HDC trajectories.
+#[allow(missing_docs)]
+pub mod scientific_outcome_likelihood;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;
