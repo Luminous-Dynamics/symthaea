@@ -367,22 +367,22 @@ impl TemporalPolicyExecutionDomain {
     ) -> Result<TemporalPolicyGrant<K>, TemporalPolicyError> {
         let now = self.clock.now();
 
-        if let Some(policy_expiry) = admission.expires_at {
-            if policy_expiry < now {
-                return Err(TemporalPolicyError::AdmissionAlreadyExpired {
-                    expiry: policy_expiry,
-                    now,
-                });
-            }
+        if let Some(policy_expiry) = admission.expires_at
+            && policy_expiry < now
+        {
+            return Err(TemporalPolicyError::AdmissionAlreadyExpired {
+                expiry: policy_expiry,
+                now,
+            });
         }
 
-        if let Some(execution_expiry) = expires_at {
-            if execution_expiry < now {
-                return Err(TemporalPolicyError::ExecutionAlreadyExpired {
-                    expiry: execution_expiry,
-                    now,
-                });
-            }
+        if let Some(execution_expiry) = expires_at
+            && execution_expiry < now
+        {
+            return Err(TemporalPolicyError::ExecutionAlreadyExpired {
+                expiry: execution_expiry,
+                now,
+            });
         }
 
         match admission.expires_at {

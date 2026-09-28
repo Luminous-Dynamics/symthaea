@@ -466,14 +466,14 @@ impl std::error::Error for BudgetGuardedAuthorizeError {
 /// authority that may be retried, retained, or explicitly released by the host.
 #[derive(Debug)]
 pub struct BudgetGuardedAuthorizeFailure {
-    budget_lease: BudgetLease,
+    budget_lease: Box<BudgetLease>,
     error: BudgetGuardedAuthorizeError,
 }
 
 impl BudgetGuardedAuthorizeFailure {
     fn new(budget_lease: BudgetLease, error: BudgetGuardedAuthorizeError) -> Self {
         Self {
-            budget_lease,
+            budget_lease: Box::new(budget_lease),
             error,
         }
     }
@@ -490,12 +490,12 @@ impl BudgetGuardedAuthorizeFailure {
 
     /// Consume the failure and recover the exact original lease.
     pub fn into_budget_lease(self) -> BudgetLease {
-        self.budget_lease
+        *self.budget_lease
     }
 
     /// Consume the failure into the original lease plus rejection reason.
     pub fn into_parts(self) -> (BudgetLease, BudgetGuardedAuthorizeError) {
-        (self.budget_lease, self.error)
+        (*self.budget_lease, self.error)
     }
 
     /// Consume the failure and retain only the compatibility error.
