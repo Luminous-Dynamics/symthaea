@@ -39,6 +39,8 @@ pub struct ScientificPlanningMetrics {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ScientificPlanningTrace {
     pub schema_version: String,
+    pub gap_plan: GapAwareOutcomePlan,
+    pub metrics: Vec<ScientificPlanningMetrics>,
     pub gap_candidate_ids: Vec<String>,
     pub frontier: ScientificDecisionFrontier,
     pub admissibility: ScientificAdmissibilityResult,
@@ -80,7 +82,18 @@ fn candidate_id(
     right_model_id: &str,
     outcome_id: &str,
 ) -> String {
-    format!("{left_model_id}|{right_model_id}|{outcome_id}")
+    // Length-prefix each component so arbitrary model/outcome IDs cannot
+    // collide merely because they contain the separator.
+    format!(
+        "{}:{}{}:{}{}:{}{}",
+        left_model_id.len(),
+        left_model_id,
+        right_model_id.len(),
+        right_model_id,
+        outcome_id.len(),
+        outcome_id,
+        ""
+    )
 }
 
 fn expected_candidate(
@@ -217,6 +230,8 @@ pub fn build(
 
     Ok(ScientificPlanningTrace {
         schema_version: SCHEMA_VERSION.into(),
+        gap_plan: canonical_gap_plan,
+        metrics: canonical_metrics,
         gap_candidate_ids: expected_ids.into_iter().collect(),
         frontier: frontier_result,
         admissibility,
