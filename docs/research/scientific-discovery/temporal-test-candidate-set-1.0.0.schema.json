@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mycelix.symthaea.scientific.temporal_test_candidate_set.1.0.0",
+  "title": "Temporal Scientific Test Candidate Set",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "candidates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "required": ["candidates"],
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "candidate_id": {"type":"string","minLength":1},
+        "left_model_id": {"type":"string","minLength":1},
+        "right_model_id": {"type":"string","minLength":1},
+        "left_lineage": {"type":"string","minLength":1},
+        "right_lineage": {"type":"string","minLength":1},
+        "outcome_id": {"type":"string","minLength":1},
+        "horizon_seconds": {"type":"number","exclusiveMinimum":0},
+        "advances_unmet_predicates": {"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true},
+        "test_specification_id": {"type":"string","minLength":1},
+        "measurement_specification_id": {"type":"string","minLength":1},
+        "estimated_cost": {"type":"number"},
+        "pragmatic_risk": {"type":"number"},
+        "source_candidate_id": {"type":"string","minLength":1}
+      },
+      "required": ["candidate_id","left_model_id","right_model_id","left_lineage","right_lineage","outcome_id","horizon_seconds","advances_unmet_predicates","test_specification_id","measurement_specification_id","estimated_cost","pragmatic_risk","source_candidate_id"]
+    }
+  },
+  "authority": "decision_support_only",
+  "non_equivalences": [
+    "candidate_test_is_not_an_experiment_execution",
+    "candidate_test_is_not_an_observation",
+    "computational_discrimination_is_not_evidence",
+    "planning_cost_is_not_observed_cost",
+    "planning_risk_is_not_observed_risk",
+    "deterministic_order_is_not_a_winner",
+    "candidate_test_is_not_replication",
+    "candidate_test_is_not_millennium_criterion_evidence"
+  ]
+}
