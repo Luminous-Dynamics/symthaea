@@ -11,6 +11,18 @@
   },
   "mutations": [
     {
+      "mutation_id": "remove-model-runtime-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "add-graph-cycle",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "rename-graph-node",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
       "mutation_id": "drop-C06",
       "guard_id": "CP-COMP-COVERAGE"
     },
