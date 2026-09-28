@@ -12,6 +12,22 @@ use serde::{Deserialize, Serialize};
 
 /// Explicit ceiling for legacy materials outputs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Stable ordered case identifiers for the independent MAT-LEGACY-001B1 qualifier.
+///
+/// This is a deterministic software corpus manifest, not scientific evidence.
+pub const LEGACY_ADVISORY_QUALIFIER_CASES_V1: &[&str] = &[
+    "authority-explicit",
+    "model-generation-distinct",
+    "input-generation-distinct",
+    "numeric-match-no-promotion",
+    "fep-action-not-authorization",
+    "malformed-stability-fails-closed",
+    "nonfinite-feature-fails-closed",
+    "serialization-preserves-ceiling",
+    "domain-predictions-advisory",
+    "no-scientific-evidence-conversion",
+];
+
 pub enum AdvisoryAuthorityV1 {
     /// Candidate generation, ranking, or hypothesis support only.
     Advisory,
@@ -268,6 +284,16 @@ impl AcquisitionFeatureV1 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn qualifier_case_manifest_is_ordered_and_unique() {
+        let mut sorted = LEGACY_ADVISORY_QUALIFIER_CASES_V1.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), LEGACY_ADVISORY_QUALIFIER_CASES_V1.len());
+        assert_eq!(LEGACY_ADVISORY_QUALIFIER_CASES_V1.first(), Some(&"authority-explicit"));
+        assert_eq!(LEGACY_ADVISORY_QUALIFIER_CASES_V1.last(), Some(&"no-scientific-evidence-conversion"));
+    }
 
     #[test]
     fn preset_is_explicitly_advisory() {
