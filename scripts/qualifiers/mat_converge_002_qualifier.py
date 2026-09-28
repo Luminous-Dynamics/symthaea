@@ -372,6 +372,30 @@ def main():
     if not any(c["id"] == "C07" and c["outcome"] == "negative-edge-addressable" for c in with_new_case):
         fail("historical negative edge became unreachable after recomputation")
 
+    # Mutation matrix: every graph node identity change must invalidate
+    # exactly the cases structurally dependent on that node.
+    node_mutation_expectations = {
+        "N01": "demand/D1",
+        "N02": "candidate/A",
+        "N03": "process/G1",
+        "N04": "property/E1",
+        "N05": "measurement/M1",
+        "N06": "profile/P1",
+    }
+    for node_id, original_ref in node_mutation_expectations.items():
+        node = next(n for n in graph["nodes"] if n["id"] == node_id)
+        mutated_graph = json.loads(json.dumps(graph))
+        mutated_node = next(n for n in mutated_graph["nodes"] if n["id"] == node_id)
+        field, value = original_ref.split("/", 1)
+        mutated_node["ref"] = f"{field}/{value}-MUTATED"
+        mutated_node["generation"] = mutated_node["generation"] + "-MUTATED"
+        before = dependency_projection(cases, graph)
+        after = dependency_projection(cases, mutated_graph)
+        expected = graph_dependency_closure(cases, graph, original_ref)
+        observed = dependency_delta(before, after)
+        if observed != expected:
+            fail(f"node mutation fanout mismatch for {node_id}: {observed} != {expected}")
+
     graph_mutations = [
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
         ("delete-graph-negative-edge", lambda g: g["edges"].remove(next(e for e in g["edges"] if e["id"] == "edge/C07"))),
