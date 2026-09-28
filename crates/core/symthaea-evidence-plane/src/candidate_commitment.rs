@@ -12,7 +12,16 @@ use sha2::{Digest, Sha256};
 use crate::prospective::{
     CommitmentError, ProspectivePredictionCommitment, ProspectiveProvenance,
 };
-use crate::temporal_test_candidate::TemporalTestCandidateSpec;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CandidatePredictionSource {
+    pub candidate_id: String,
+    pub source_candidate_id: String,
+    pub test_specification_id: String,
+    pub measurement_specification_id: String,
+    pub left_lineage: String,
+    pub right_lineage: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidatePredictionBinding {
@@ -125,7 +134,7 @@ impl CandidatePredictionCommitment {
 }
 
 pub fn commit_candidate(
-    candidate: &TemporalTestCandidateSpec,
+    candidate: &CandidatePredictionSource,
     challenge_id: &str,
     criteria_generation: &str,
     mapping_generation: &str,
@@ -149,7 +158,7 @@ pub fn commit_candidate(
 }
 
 pub fn commit_candidate_envelope(
-    candidate: &TemporalTestCandidateSpec,
+    candidate: &CandidatePredictionSource,
     challenge_id: &str,
     criteria_generation: &str,
     mapping_generation: &str,
@@ -182,7 +191,7 @@ pub fn commit_candidate_envelope(
 }
 
 fn binding_for(
-    candidate: &TemporalTestCandidateSpec,
+    candidate: &CandidatePredictionSource,
     prediction_payload: &[u8],
 ) -> CandidatePredictionBinding {
     CandidatePredictionBinding {
@@ -227,21 +236,14 @@ fn sha256(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
-    fn candidate() -> TemporalTestCandidateSpec {
-        TemporalTestCandidateSpec {
+    fn candidate() -> CandidatePredictionSource {
+        CandidatePredictionSource {
             candidate_id: "test-candidate-1".into(),
-            left_model_id: "model-a".into(),
-            right_model_id: "model-b".into(),
-            left_lineage: "lineage-a".into(),
-            right_lineage: "lineage-b".into(),
-            outcome_id: "outcome-1".into(),
-            horizon_seconds: 60.0,
-            advances_unmet_predicates: ["replication".into()].into_iter().collect(),
+            source_candidate_id: "temporal-source-1".into(),
             test_specification_id: "test-spec-1".into(),
             measurement_specification_id: "measurement-1".into(),
-            estimated_cost: 1.0,
-            pragmatic_risk: 0.1,
-            source_candidate_id: "temporal-source-1".into(),
+            left_lineage: "lineage-a".into(),
+            right_lineage: "lineage-b".into(),
         }
     }
 
