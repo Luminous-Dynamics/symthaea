@@ -51,6 +51,8 @@ impl ProspectiveProvenance {
                 return Err(CommitmentError::MissingField(name));
             }
         }
+        validate_utc_cutoff(&self.knowledge_cutoff)?;
+        validate_utc_cutoff(&self.exposure_cutoff)?;
         if self.exposure_cutoff < self.knowledge_cutoff {
             return Err(CommitmentError::ExposureBeforeKnowledgeCutoff);
         }
@@ -132,6 +134,22 @@ impl ProspectivePredictionCommitment {
     pub fn payload_digest(&self) -> &str { &self.payload_digest }
     pub fn parent_event_ids(&self) -> &[String] { &self.parent_event_ids }
 
+    /// Verify that the immutable event identifier still matches every
+    /// identity-bearing field. This is intended for deserialized records and
+    /// downstream envelope verification; it emits no evidence.
+    pub fn verify_integrity(&self) -> bool {
+        self.event_id == commitment_digest(
+            &self.challenge_id,
+            &self.criteria_generation,
+            &self.mapping_generation,
+            &self.actor_id,
+            &self.created_at,
+            &self.provenance,
+            &self.payload_digest,
+            &self.parent_event_ids,
+        )
+    }
+
     /// Create a superseding commitment. The original remains unchanged.
     pub fn supersede(
         &self,
@@ -169,6 +187,7 @@ pub enum CommitmentError {
     MissingField(&'static str),
     EmptyPredictionPayload,
     ExposureBeforeKnowledgeCutoff,
+    InvalidCutoff,
 }
 
 impl fmt::Display for CommitmentError {
@@ -179,6 +198,7 @@ impl fmt::Display for CommitmentError {
             Self::ExposureBeforeKnowledgeCutoff => {
                 write!(f, "exposure cutoff must not precede knowledge cutoff")
             }
+            Self::InvalidCutoff => write!(f, "cutoff must be canonical UTC YYYY-MM-DDTHH:MM:SSZ"),
         }
     }
 }
@@ -191,6 +211,37 @@ fn require_nonempty(name: &'static str, value: &str) -> Result<(), CommitmentErr
     } else {
         Ok(())
     }
+}
+
+fn validate_utc_cutoff(value: &str) -> Result<(), CommitmentError> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+        || ![0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18]
+            .iter()
+            .all(|&i| bytes[i].is_ascii_digit())
+    {
+        return Err(CommitmentError::InvalidCutoff);
+    }
+    let month = (bytes[5] - b'0') * 10 + bytes[6] - b'0';
+    let day = (bytes[8] - b'0') * 10 + bytes[9] - b'0';
+    let hour = (bytes[11] - b'0') * 10 + bytes[12] - b'0';
+    let minute = (bytes[14] - b'0') * 10 + bytes[15] - b'0';
+    let second = (bytes[17] - b'0') * 10 + bytes[18] - b'0';
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return Err(CommitmentError::InvalidCutoff);
+    }
+    Ok(())
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -308,6 +359,22 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn tampered_event_id_fails_integrity_verification() {
+        let mut value = commit(b"prediction");
+        value.event_id = "sha256:tampered".into();
+        assert!(!value.verify_integrity());
+    }
+
+    #[test]
+    fn malformed_cutoff_is_rejected_before_lexical_comparison() {
+        let result = ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2026-09-28T08:00:00Z", "2026-09-28T09:00Z",
+        );
+        assert_eq!(result, Err(CommitmentError::InvalidCutoff));
+    }
+
     fn empty_prediction_is_rejected() {
         let result = ProspectivePredictionCommitment::commit(
             "MPB-2026-09-23-01",
