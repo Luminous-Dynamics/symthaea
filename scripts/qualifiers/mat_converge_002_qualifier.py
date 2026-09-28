@@ -1171,7 +1171,7 @@ def main():
         "replay_digest": baseline_digest,
         "case_count": len(cases),
         "mutation_count": len(FAILURE_DIAGNOSTICS),
-        "diagnostic_schema": "mat-converge-002-diagnostic-v1",
+        "diagnostic_schema": "mat-converge-002-diagnostic-v2",
         "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v3",
         "mutation_manifest_digest": mutation_manifest_digest(cases, graph),
         "mutation_manifest_projection_digest": mutation_manifest_projection_digest(manifest),
