@@ -146,6 +146,7 @@ pub mod hierarchical;
 pub mod markov_blanket;
 pub mod scientific;
 pub mod scientific_frontier_admissibility;
+pub mod scientific_planning_trace;
 mod motor;
 mod td_learning;
 pub mod types;
