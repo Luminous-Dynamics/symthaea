@@ -22,13 +22,14 @@ def eq(a,b,m):
 def replay_input(c):
     return {"schema":c["schema"],"authority":c["authority"],"claim_ceiling":c["claim_ceiling"],"replay_semantics":c["replay_semantics"],"case_manifest":[{"case_id":x["case_id"],"scenario":x["scenario"]} for x in c["cases"]]}
 def source_audit():
-    tree=ast.parse(SOURCE.read_text(encoding="utf-8"))
+    source=SOURCE.read_text(encoding="utf-8")
+    tree=ast.parse(source)
     for n in ast.walk(tree):
         if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="fail" and len(n.args)!=1: fail("source audit: fail() signature changed")
     forbidden={"symthaea","torch","numpy","pandas","onnx","tensorflow"}
     for n in ast.walk(tree):
-        if isinstance(n,(ast.Import,ast.ImportFrom)) and any(a.name.split(".")[0] in forbidden for a in n.names):
-            fail("source audit: forbidden production/runtime import")
+        if isinstance(n,(ast.Import,ast.ImportFrom)) and any(a.name.split(".")[0] in forbidden for a in n.names): fail("source audit: forbidden production/runtime import")
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 def validate(c):
     eq(c.get("schema"),SCHEMA,"schema"); eq(c.get("authority"),AUTHORITY,"authority"); eq(c.get("claim_ceiling"),CEILING,"claim ceiling")
     eq(c.get("replay_semantics"),"historical identities are immutable inputs; dispositions are derived outputs","replay semantics")
@@ -58,13 +59,13 @@ def mutations(c):
         if not caught: fail(f"mutation {label} was not rejected by {guard}")
         out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
     return out
-def receipt(c,m,r,manifest_sha):
-    p={"schema":"cp-04-compute-qualification-receipt-v1","corpus_sha256":digest(c),"replay_input_sha256":r,"mutation_manifest_sha256":manifest_sha,"mutation_results":m,"claim_ceiling":c["claim_ceiling"],"disposition":"PASS","physical_execution_authority":False}
+def receipt(c,m,r,manifest_sha,source_sha):
+    p={"schema":"cp-04-compute-qualification-receipt-v1","corpus_sha256":digest(c),"replay_input_sha256":r,"mutation_manifest_sha256":manifest_sha,"oracle_source_sha256":source_sha,"guard_registry_sha256":digest(GUARDS),"mutation_results":m,"claim_ceiling":c["claim_ceiling"],"disposition":"PASS","physical_execution_authority":False}
     p["receipt_sha256"]=digest(p); return p
 def main():
     c=json.loads(CORPUS.read_text(encoding="utf-8")); mfest=json.loads(MANIFEST.read_text(encoding="utf-8"))
-    source_audit(); validate(c); validate_manifest(mfest); r=digest(replay_input(c)); muts=mutations(c)
+    source_sha=source_audit(); validate(c); validate_manifest(mfest); r=digest(replay_input(c)); muts=mutations(c)
     if FAILURES or not all(x["rejected"] for x in muts):
         print("CP-04 COMPUTE QUALIFIER FAIL"); [print(" -",x) for x in FAILURES]; raise SystemExit(1)
-    q=receipt(c,muts,r,digest(mfest)); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
+    q=receipt(c,muts,r,digest(mfest),source_sha); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("oracle_source_sha256="+q["oracle_source_sha256"]); print("guard_registry_sha256="+q["guard_registry_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
 if __name__=="__main__": main()
