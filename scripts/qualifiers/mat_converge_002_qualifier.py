@@ -166,6 +166,26 @@ def dependency_delta(before, after):
         if before[case_id] != after[case_id]
     )
 
+def immutable_record_identity(case):
+    """Digest the historical case identity without derived disposition."""
+    payload = {
+        "schema": "integration-edge-v1",
+        "case_id": case["id"],
+        "refs": {field: case["refs"][field] for field in FIELDS},
+    }
+    return hashlib.sha256(canonical(payload).encode()).hexdigest()
+
+def derived_snapshot(cases):
+    """Canonical derived records used only to test recomputation stability."""
+    return {
+        case["id"]: canonical({
+            "case_id": case["id"],
+            "dependency_digest": immutable_record_identity(case),
+            "disposition": case["outcome"],
+        })
+        for case in cases
+    }
+
 def graph_dependency_closure(cases, graph, changed_ref):
     """Return cases whose immutable graph path contains changed_ref."""
     node_by_id = {n["id"]: n for n in graph["nodes"]}
@@ -325,6 +345,32 @@ def main():
     for case_id in (case_id for case_id in EXPECTED if case_id != "C02"):
         if baseline_projection[case_id] != localized_projection[case_id]:
             fail(f"unrelated dependency projection changed: {case_id}")
+
+    # Recompute stability: a dependency mutation may change only the
+    # derived record(s) whose immutable dependency identity changed.
+    baseline_snapshot = derived_snapshot(cases)
+    recomputed_snapshot = derived_snapshot(localized)
+    changed_records = sorted(
+        case_id for case_id in baseline_snapshot
+        if baseline_snapshot[case_id] != recomputed_snapshot[case_id]
+    )
+    if changed_records != ["C02"]:
+        fail("recomputation changed unrelated derived records")
+
+    # Negative evidence is append-only in identity: adding a newer successful
+    # case must not make the historical negative edge disappear or change.
+    with_new_case = json.loads(json.dumps(cases))
+    negative = next(c for c in with_new_case if c["id"] == "C07")
+    negative_identity = immutable_record_identity(negative)
+    newer = json.loads(json.dumps(negative))
+    newer["id"] = "C17"
+    newer["outcome"] = "supported"
+    newer["refs"]["process"] = newer["refs"]["process"]
+    with_new_case.append(newer)
+    if immutable_record_identity(next(c for c in with_new_case if c["id"] == "C07")) != negative_identity:
+        fail("newer result rewrote historical negative evidence identity")
+    if not any(c["id"] == "C07" and c["outcome"] == "negative-edge-addressable" for c in with_new_case):
+        fail("historical negative edge became unreachable after recomputation")
 
     graph_mutations = [
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
