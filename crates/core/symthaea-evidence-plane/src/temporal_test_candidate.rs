@@ -66,15 +66,21 @@ impl fmt::Display for TemporalTestCandidateError {
 
 impl std::error::Error for TemporalTestCandidateError {}
 
-fn candidate_id(candidate: &TemporalOutcomeDiscrimination) -> String {
-    format!(
-        "{}:{}:{}:{:08x}:{}",
-        candidate.left_model_id,
-        candidate.right_model_id,
-        candidate.outcome_id,
-        candidate.horizon_seconds.to_bits(),
-        candidate.left_lineage
-    )
+/// Return the canonical, unambiguous source identity for a temporal discrimination candidate.
+pub fn source_candidate_id(candidate: &TemporalOutcomeDiscrimination) -> String {
+    let fields = [
+        candidate.left_model_id.as_str(),
+        candidate.right_model_id.as_str(),
+        candidate.left_lineage.as_str(),
+        candidate.right_lineage.as_str(),
+        candidate.outcome_id.as_str(),
+    ];
+    let mut identity = String::from("temporal-discrimination-v1");
+    for field in fields {
+        identity.push_str(&format!(":{}:{}", field.len(), field));
+    }
+    identity.push_str(&format!(":h:{:08x}", candidate.horizon_seconds.to_bits()));
+    identity
 }
 
 /// Materialize caller-supplied executable test specifications from 002N gaps.
@@ -90,7 +96,7 @@ pub fn materialize(
 
     for assessment in &plan.assessments {
         for candidate in &assessment.candidates {
-            sources.insert(candidate_id(candidate), (assessment, candidate));
+            sources.insert(source_candidate_id(candidate), (assessment, candidate));
         }
     }
 
@@ -238,7 +244,7 @@ mod tests {
     }
 
     fn source_id(horizon: f32) -> String {
-        format!("a:b:o1:{:08x}:la", horizon.to_bits())
+        { let p = plan(); let candidate = p.assessments.iter().flat_map(|a| a.candidates.iter()).find(|c| c.horizon_seconds == horizon).unwrap(); source_candidate_id(candidate) }
     }
 
     fn input(horizon: f32) -> TemporalTestCandidateSpecInput {
@@ -299,5 +305,17 @@ mod tests {
         let a = materialize(&plan(), &[input(1.0), input(2.0)]).unwrap();
         let b = materialize(&plan(), &[input(2.0), input(1.0)]).unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn source_identity_is_deterministic_and_delimiter_safe() {
+        let p = plan();
+        let candidate = &p.assessments[0].candidates[0];
+        assert_eq!(source_candidate_id(candidate), source_candidate_id(candidate));
+        let mut altered = candidate.clone();
+        altered.left_model_id = format!("{}:{}", candidate.left_model_id, candidate.right_model_id);
+        altered.right_model_id = candidate.outcome_id.clone();
+        altered.outcome_id = candidate.right_model_id.clone();
+        assert_ne!(source_candidate_id(candidate), source_candidate_id(&altered));
     }
 }
