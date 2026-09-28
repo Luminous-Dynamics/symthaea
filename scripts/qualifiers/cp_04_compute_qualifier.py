@@ -16,13 +16,29 @@ SCENARIOS={"C01":"complete-thread","C02":"model-parameter-generation-changed","C
 CASE_GUARDS={"C05":"CP-COMP-HISTORICAL","C06":"CP-COMP-COVERAGE","C10":"CP-COMP-DEPENDENCY","C16":"CP-COMP-NEGATIVE","C17":"CP-COMP-AUTHORITY","C18":"CP-COMP-CURRENTNESS"}
 GUARDS={"CP-COMP-COVERAGE":"coverage","CP-COMP-AUTHORITY":"authority","CP-COMP-NEGATIVE":"negative-evidence","CP-COMP-DEPENDENCY":"dependency-boundary","CP-COMP-CURRENTNESS":"currentness","CP-COMP-HISTORICAL":"historical-identity","CP-COMP-INVARIANT":"invariant-integrity"}
 FAILURES=[]
+GRAPH_NODES=["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"]
+GRAPH_EDGES=[["requirement","representation"],["representation","model"],["model","runtime"],["runtime","accelerator"],["accelerator","deployment"],["deployment","execution"],["execution","observation"],["observation","statistics"],["statistics","disposition"]]
 COMPUTE_GRAPH={
  "schema":"cp-04-compute-dependency-graph-v1",
- "nodes":["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"],
- "edges":[["requirement","representation"],["representation","model"],["model","runtime"],["runtime","accelerator"],["accelerator","deployment"],["deployment","execution"],["execution","observation"],["observation","statistics"],["statistics","disposition"]]
+ "nodes":GRAPH_NODES,
+ "edges":GRAPH_EDGES
 }
 def graph_identity():
     return digest({"schema":COMPUTE_GRAPH["schema"],"nodes":sorted(COMPUTE_GRAPH["nodes"]),"edges":sorted([list(e) for e in COMPUTE_GRAPH["edges"]])})
+def validate_graph(g):
+    if not isinstance(g,dict): fail("dependency graph must be object","CP-COMP-DEPENDENCY"); return
+    eq(g.get("schema"),"cp-04-compute-dependency-graph-v1","graph schema","CP-COMP-DEPENDENCY")
+    eq(g.get("nodes"),GRAPH_NODES,"graph node identity","CP-COMP-DEPENDENCY")
+    eq(g.get("edges"),GRAPH_EDGES,"graph edge identity","CP-COMP-DEPENDENCY")
+    if len(g.get("nodes",[])) != len(set(g.get("nodes",[]))): fail("dependency graph contains duplicate node","CP-COMP-DEPENDENCY")
+    nodes=set(g.get("nodes",[]))
+    if any(len(e)!=2 or e[0] not in nodes or e[1] not in nodes for e in g.get("edges",[])): fail("dependency graph contains dangling edge","CP-COMP-DEPENDENCY")
+    adjacency={n:[] for n in nodes}
+    for a,b in g.get("edges",[]): adjacency[a].append(b)
+    def visit(n,path):
+        if n in path: return True
+        return any(visit(x,path|{n}) for x in adjacency[n])
+    if any(visit(n,set()) for n in nodes): fail("dependency graph contains cycle","CP-COMP-DEPENDENCY")
 def dependency_closure(changed):
     # Directed descendants: a changed dependency invalidates its consumers,
     # never its prerequisites.
@@ -77,10 +93,14 @@ def validate_manifest(m):
     for x in m.get("mutations",[]):
         if x.get("guard_id") not in GUARDS: fail(f"unknown guard: {x.get('guard_id')}","CP-COMP-INVARIANT")
 def mutations(c):
-    specs=[("drop-C06",lambda x:x["cases"].pop(5),"CP-COMP-COVERAGE"),("promote-C17",lambda x:x["cases"][16].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-AUTHORITY"),("rewrite-C16",lambda x:x["cases"][15].update(scenario="no-result"),"CP-COMP-NEGATIVE"),("collapse-C10",lambda x:x["cases"][9].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-DEPENDENCY"),("change-C18",lambda x:x["cases"][17].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-CURRENTNESS"),("erase-C05",lambda x:x["cases"][4].update(scenario="complete-thread"),"CP-COMP-HISTORICAL")]
+    specs=[
+        ("remove-model-runtime-edge",lambda x:x[0]["edges"].remove(["model","runtime"]),"CP-COMP-DEPENDENCY"),
+        ("add-graph-cycle",lambda x:x[0]["edges"].append(["disposition","model"]),"CP-COMP-DEPENDENCY"),
+        ("rename-graph-node",lambda x:x[0]["nodes"].__setitem__(2,"model-v2"),"CP-COMP-DEPENDENCY"),
+("drop-C06",lambda x:x["cases"].pop(5),"CP-COMP-COVERAGE"),("promote-C17",lambda x:x["cases"][16].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-AUTHORITY"),("rewrite-C16",lambda x:x["cases"][15].update(scenario="no-result"),"CP-COMP-NEGATIVE"),("collapse-C10",lambda x:x["cases"][9].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-DEPENDENCY"),("change-C18",lambda x:x["cases"][17].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-CURRENTNESS"),("erase-C05",lambda x:x["cases"][4].update(scenario="complete-thread"),"CP-COMP-HISTORICAL")]
     out=[]
     for label,mut,guard in specs:
-        y=deepcopy(c); old=FAILURES[:]; FAILURES.clear(); mut(y); validate(y); caught=bool(FAILURES); detail=FAILURES[:]; FAILURES.clear(); FAILURES.extend(old)
+        y=deepcopy(c); old=FAILURES[:]; FAILURES.clear(); graph=deepcopy(COMPUTE_GRAPH); mut([graph]); validate_graph(graph); validate(y); caught=bool(FAILURES); detail=FAILURES[:]; FAILURES.clear(); FAILURES.extend(old)
         if not caught: fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
         out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
     return out
@@ -89,7 +109,7 @@ def receipt(c,m,r,manifest_sha,source_sha):
     p["receipt_sha256"]=digest(p); return p
 def main():
     c=json.loads(CORPUS.read_text(encoding="utf-8")); mfest=json.loads(MANIFEST.read_text(encoding="utf-8"))
-    source_sha=source_audit(); validate(c); validate_manifest(mfest); r=digest(replay_input(c)); muts=mutations(c)
+    source_sha=source_audit(); validate(c); validate_manifest(mfest); validate_graph(COMPUTE_GRAPH); r=digest(replay_input(c)); muts=mutations(c)
     closure=dependency_closure(["model"])
     if not {"model","runtime","accelerator","deployment","execution","observation","statistics","disposition"}.issubset(closure): fail("model dependency closure incomplete","CP-COMP-DEPENDENCY")
     deployment_closure=dependency_closure(["deployment"])
