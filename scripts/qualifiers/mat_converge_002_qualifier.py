@@ -39,8 +39,13 @@ COVERAGE_REASONS = {
     "C15": "case-level evaluator-correlation control",
 }
 
-def fail(msg):
-    raise AssertionError(msg)
+class OracleFailure(AssertionError):
+    def __init__(self, guard_id, message):
+        super().__init__(message)
+        self.guard_id = guard_id
+
+def fail(msg, guard_id):
+    raise OracleFailure(guard_id, msg)
 
 FAILURE_DIAGNOSTICS = []
 REQUIRED_FAILURE_CATEGORIES = {
@@ -74,25 +79,44 @@ EXPECTED_CATEGORIES = {
     "rewrite-property-node-kind": "schema-integrity",
     "rewrite-case-coverage-manifest": "coverage",
 }
-def failure_category(message):
-    text = message.lower()
-    if any(token in text for token in ("authority", "physical-authority", "advisory")): return "authority"
-    if any(token in text for token in ("negative", "tombstone")): return "negative-evidence"
-    if any(token in text for token in ("coverage", "case coverage", "graph coverage")): return "coverage"
-    if any(token in text for token in ("historical", "immutable", "generation", "ref")): return "historical-identity"
-    if any(token in text for token in ("dependency", "closure", "fanout")): return "dependency-boundary"
-    if any(token in text for token in ("schema", "ordering")): return "schema-integrity"
-    return "invariant-integrity"
+EXPECTED_GUARDS = {
+    label: f"MAT-MUT-{category.upper().replace('-', '_')}"
+    for label, category in EXPECTED_CATEGORIES.items()
+}
+
+def failure_category(exc):
+    if not isinstance(exc, OracleFailure):
+        raise AssertionError("unstructured oracle diagnostic")
+    return exc.guard_id.split(":", 1)[1]
+
 def record_failure(doc, cases, label, expected_category):
     try:
         check(doc, cases)
-    except AssertionError as exc:
-        actual_category = failure_category(str(exc))
+    except OracleFailure as exc:
+        actual_category = failure_category(exc)
+        expected_guard = EXPECTED_GUARDS[label]
+        if exc.guard_id != expected_guard:
+            fail(
+                f"mutation guard drift: {label}: expected {expected_guard}, got {exc.guard_id}",
+                "MAT-ORACLE:invariant-integrity",
+            )
         if actual_category != expected_category:
-            fail(f"mutation category drift: {label}: expected {expected_category}, got {actual_category}")
-        FAILURE_DIAGNOSTICS.append({"mutation": label, "category": actual_category})
+            fail(
+                f"mutation category drift: {label}: expected {expected_category}, got {actual_category}",
+                "MAT-ORACLE:invariant-integrity",
+            )
+        FAILURE_DIAGNOSTICS.append({
+            "mutation": label,
+            "category": actual_category,
+            "guard_id": exc.guard_id,
+        })
         return actual_category
-    fail(f"mutation escaped oracle: {label}")
+    except AssertionError:
+        fail(
+            f"mutation produced an unstructured diagnostic: {label}",
+            "MAT-ORACLE:invariant-integrity",
+        )
+    fail(f"mutation escaped oracle: {label}", "MAT-ORACLE:invariant-integrity")
 
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
@@ -137,29 +161,29 @@ def check_graph(graph, cases):
                       "derived_dispositions_recomputable", "nodes", "edges",
                       "case_ids", "replay_rule", "ordering_semantics",
                       "dependency_closure", "coverage"}:
-        fail("state graph schema drift")
+        fail("state graph schema drift", "MAT-MUT-SCHEMA_INTEGRITY")
     if graph["schema"] != "mat-converge-002-state-graph-v1":
-        fail("state graph schema mismatch")
+        fail("state graph schema mismatch", "MAT-MUT-SCHEMA_INTEGRITY")
     if graph["historical_records_immutable"] is not True:
-        fail("historical graph records are not immutable")
+        fail("historical graph records are not immutable", "MAT-MUT-HISTORICAL_IDENTITY")
     if graph["derived_dispositions_recomputable"] is not True:
-        fail("derived dispositions are not declared recomputable")
+        fail("derived dispositions are not declared recomputable", "MAT-MUT-INVARIANT_INTEGRITY")
     if graph["replay_rule"] != (
         "replay digest is over immutable node/edge identities; derived dispositions are excluded"
     ):
-        fail("state graph replay rule mismatch")
+        fail("state graph replay rule mismatch", "MAT-MUT-SCHEMA_INTEGRITY")
     if graph["ordering_semantics"] != REPLAY_ORDERING:
-        fail("state graph ordering semantics mismatch")
+        fail("state graph ordering semantics mismatch", "MAT-MUT-SCHEMA_INTEGRITY")
     if graph["dependency_closure"] != (
         "undirected-connected-component over immutable graph nodes; "
         "all incident edge case IDs are invalidated"
     ):
-        fail("state graph dependency closure semantics mismatch")
+        fail("state graph dependency closure semantics mismatch", "MAT-MUT-DEPENDENCY_BOUNDARY")
     nodes, edges = graph["nodes"], graph["edges"]
     if graph["case_ids"] != list(EXPECTED):
-        fail("state graph case coverage drift")
+        fail("state graph case coverage drift", "MAT-MUT-COVERAGE")
     if not nodes or not edges:
-        fail("state graph is empty")
+        fail("state graph is empty", "MAT-MUT-SCHEMA_INTEGRITY")
     node_ids = [n["id"] for n in nodes]
     edge_ids = [e["id"] for e in edges]
     if len(node_ids) != len(set(node_ids)):
@@ -170,14 +194,14 @@ def check_graph(graph, cases):
     nodes_by_id = {n["id"]: n for n in nodes}
     for node in nodes:
         if set(node) != GRAPH_NODE_KEYS:
-            fail(f"state graph node schema drift: {node.get('id')}")
+            fail(f"state graph node schema drift: {node.get('id')}", "MAT-MUT-SCHEMA_INTEGRITY")
     for edge in edges:
         if set(edge) != GRAPH_EDGE_KEYS:
-            fail(f"state graph edge schema drift: {edge.get('id')}")
+            fail(f"state graph edge schema drift: {edge.get('id')}", "MAT-MUT-SCHEMA_INTEGRITY")
         if edge["historical"] is not True:
             fail(f"non-historical edge: {edge['id']}")
         if edge["case_id"] not in EXPECTED or edge["id"] != f"edge/{edge['case_id']}":
-            fail(f"graph edge is not bound to its campaign case: {edge['id']}")
+            fail(f"graph edge is not bound to its campaign case: {edge['id']}", "MAT-MUT-SCHEMA_INTEGRITY")
         if edge["from"] not in node_set or edge["to"] not in node_set:
             fail(f"dangling state graph edge: {edge['id']}")
     case_by_id = {c["id"]: c for c in cases}
@@ -192,30 +216,30 @@ def check_graph(graph, cases):
     for node in nodes:
         if node["kind"] == "negative-edge":
             if node["ref"] != f"edge/{node['generation']}":
-                fail(f"negative node identity drift: {node['id']}")
+                fail(f"negative node identity drift: {node['id']}", "MAT-MUT-NEGATIVE_EVIDENCE")
             if node["generation"] not in case_by_id:
-                fail(f"negative node case missing: {node['id']}")
+                fail(f"negative node case missing: {node['id']}", "MAT-MUT-NEGATIVE_EVIDENCE")
             continue
         field = prefix_fields.get(node["kind"])
         if field is None:
-            fail(f"unknown graph node kind: {node['kind']}")
+            fail(f"unknown graph node kind: {node['kind']}", "MAT-MUT-SCHEMA_INTEGRITY")
         if node["ref"] != f"{field}/{node['generation']}":
-            fail(f"node ref/generation mismatch: {node['id']}")
+            fail(f"node ref/generation mismatch: {node['id']}", "MAT-MUT-HISTORICAL_IDENTITY")
         if not any(c["refs"][field] == node["ref"] for c in cases):
-            fail(f"graph node is not anchored to a campaign case: {node['id']}")
+            fail(f"graph node is not anchored to a campaign case: {node['id']}", "MAT-MUT-HISTORICAL_IDENTITY")
     for edge in edges:
         case = case_by_id[edge["case_id"]]
         endpoint_refs = {nodes_by_id[edge["from"]]["ref"], nodes_by_id[edge["to"]]["ref"]}
         case_refs = set(case["refs"].values())
         if not endpoint_refs.issubset(case_refs) and edge["case_id"] != "C07":
-            fail(f"graph edge endpoints are not anchored to case {edge['case_id']}")
+            fail(f"graph edge endpoints are not anchored to case {edge['case_id']}", "MAT-MUT-SCHEMA_INTEGRITY")
     if not any(n["kind"] == "negative-edge" for n in nodes):
-        fail("negative evidence is absent from state graph")
+        fail("negative evidence is absent from state graph", "MAT-MUT-NEGATIVE_EVIDENCE")
     if not set(edge["case_id"] for edge in edges).issubset(set(graph["case_ids"])):
-        fail("graph edge references uncovered case")
+        fail("graph edge references uncovered case", "MAT-MUT-COVERAGE")
     required_edges = {"edge/C07", "edge/C09", "edge/C10", "edge/C16"}
     if not required_edges.issubset(edge_ids):
-        fail("critical state graph edges missing")
+        fail("critical state graph edges missing", "MAT-MUT-NEGATIVE_EVIDENCE")
 
 def dependency_projection(cases, graph):
     """Return the immutable case/graph refs that each case disposition may depend on."""
@@ -367,37 +391,41 @@ def check(doc, cases):
         "historical refs are immutable inputs; dispositions are derived outputs"
     ):
         fail("replay semantics missing")
+    if "C07" not in {c["id"] for c in cases}:
+        fail("negative evidence case missing", "MAT-MUT-NEGATIVE_EVIDENCE")
     if [c["id"] for c in cases] != list(EXPECTED):
-        fail("case order drift")
+        fail("case order drift", "MAT-MUT-COVERAGE")
     required_keys = {"id", "demand", "profile", "candidate", "process",
                      "property", "measurement", "outcome", "refs"}
+    by_id = {c["id"]: c for c in cases}
+    if by_id.get("C09", {}).get("outcome") != EXPECTED["C09"]:
+        fail("authority boundary lost", "MAT-MUT-AUTHORITY")
     for c in cases:
         if set(c) != required_keys:
-            fail(f"schema drift in {c['id']}")
+            fail(f"schema drift in {c['id']}", "MAT-MUT-SCHEMA_INTEGRITY")
         if c["outcome"] != EXPECTED[c["id"]]:
-            fail(f"unexpected disposition for {c['id']}")
+            fail(f"unexpected disposition for {c['id']}", "MAT-MUT-INVARIANT_INTEGRITY")
         if set(c["refs"]) != set(FIELDS):
-            fail(f"reference set drift in {c['id']}")
+            fail(f"reference set drift in {c['id']}", "MAT-MUT-SCHEMA_INTEGRITY")
         for field in FIELDS:
             if c["refs"][field] != f"{field}/{c[field]}":
-                fail(f"non-derived reference in {c['id']}:{field}")
-    by_id = {c["id"]: c for c in cases}
+                fail(f"non-derived reference in {c['id']}:{field}", "MAT-MUT-HISTORICAL_IDENTITY")
     if by_id["C02"]["process"] != "G2" or by_id["C02"]["property"] != "E1":
-        fail("process generation rewrote historical chemistry evidence")
+        fail("process generation rewrote historical chemistry evidence", "MAT-MUT-HISTORICAL_IDENTITY")
     if by_id["C03"]["profile"] == "P1":
-        fail("profile change collapsed")
+        fail("profile change collapsed", "MAT-MUT-HISTORICAL_IDENTITY")
     if by_id["C04"]["property"] != "E2":
-        fail("evaluator dependency collapsed")
+        fail("evaluator dependency collapsed", "MAT-MUT-HISTORICAL_IDENTITY")
     if by_id["C05"]["measurement"] != "M2":
-        fail("measurement-generation dependency collapsed")
+        fail("measurement-generation dependency collapsed", "MAT-MUT-HISTORICAL_IDENTITY")
     if by_id["C07"]["outcome"] != "negative-edge-addressable" or by_id["C08"]["outcome"] != "negative-edge-addressable":
-        fail("negative evidence lost")
+        fail("negative evidence lost", "MAT-MUT-NEGATIVE_EVIDENCE")
     if by_id["C09"]["outcome"] != "advisory-equal-to-measurement-stays-advisory":
-        fail("authority boundary lost")
+        fail("authority boundary lost", "MAT-MUT-AUTHORITY")
     if by_id["C10"]["outcome"] != "dft-equal-to-experiment-stays-distinct":
-        fail("independent evidence identity collapsed")
+        fail("independent evidence identity collapsed", "MAT-MUT-AUTHORITY")
     if by_id["C16"]["outcome"] != "synthetic-pass-no-physical-authority":
-        fail("synthetic PASS acquired physical authority")
+        fail("synthetic PASS acquired physical authority", "MAT-MUT-AUTHORITY")
     required = {
         "advisory-equal-to-measurement-stays-advisory",
         "dft-equal-to-experiment-stays-distinct",
@@ -405,7 +433,7 @@ def check(doc, cases):
         "synthetic-pass-no-physical-authority",
     }
     if not required.issubset({c["outcome"] for c in cases}):
-        fail("critical authority/negative-evidence controls missing")
+        fail("critical authority/negative-evidence controls missing", "MAT-MUT-AUTHORITY")
     check_graph(doc["state_graph"], cases)
 
 def expect_failure(doc, cases, label):
@@ -418,10 +446,10 @@ def expect_failure(doc, cases, label):
 
 def mutation_manifest(cases, graph):
     return {
-        "schema": "mat-converge-002-mutation-manifest-v2",
+        "schema": "mat-converge-002-mutation-manifest-v3",
         "categories": sorted(REQUIRED_FAILURE_CATEGORIES),
         "mutations": [
-            {"id": label, "category": EXPECTED_CATEGORIES[label]}
+            {"id": label, "category": EXPECTED_CATEGORIES[label], "guard_id": EXPECTED_GUARDS[label]}
             for label in sorted(EXPECTED_CATEGORIES)
         ],
         "fixture_schema": "mat-converge-002-fixture-v1",
@@ -432,7 +460,7 @@ def mutation_manifest(cases, graph):
 def validate_mutation_manifest(cases, graph, manifest):
     expected = mutation_manifest(cases, graph)
     if manifest != expected:
-        fail("mutation manifest does not match fixture, graph, or oracle corpus")
+        fail("mutation manifest does not match fixture, graph, or oracle corpus", "MAT-MUT-COVERAGE")
 
 def mutation_manifest_digest(cases, graph):
     return hashlib.sha256(canonical(mutation_manifest(cases, graph))).hexdigest()
@@ -525,11 +553,11 @@ def main():
     check(doc, cases)
     graph = doc["state_graph"]
     manifest = mutation_manifest(cases, graph)
-    if manifest["schema"] != "mat-converge-002-mutation-manifest-v2":
+    if manifest["schema"] != "mat-converge-002-mutation-manifest-v3":
         fail("mutation manifest schema drift")
     validate_mutation_manifest(cases, graph, manifest)
     if set(manifest["categories"]) != REQUIRED_FAILURE_CATEGORIES:
-        fail("mutation manifest category coverage drift")
+        fail("mutation manifest category coverage drift", "MAT-MUT-COVERAGE")
     baseline_digest = replay_digest(cases, graph)
     baseline_projection = dependency_projection(cases, graph)
     mutations = [
@@ -921,30 +949,30 @@ def main():
             fail(f"graph dependency is not attributable to its case: {edge['id']}")
     graph_only_cases = sorted(case_ids - graph_edge_cases)
     if graph_only_cases != ["C06", "C08", "C11", "C12", "C13", "C14", "C15"]:
-        fail("partial structural coverage manifest drift")
+        fail("partial structural coverage manifest drift", "MAT-MUT-COVERAGE")
     if len(graph["edges"]) != len(graph_edge_cases):
         fail("multiple structural edges unexpectedly collapsed to one case")
     declared_coverage = graph.get("coverage")
     if declared_coverage is None:
-        fail("structural coverage declaration missing")
+        fail("structural coverage declaration missing", "MAT-MUT-COVERAGE")
     if set(declared_coverage) != {
         "mode", "case_level_cases", "graph_edge_cases", "graph_only_cases",
         "graph_only_case_ids", "graph_only_case_reasons",
     }:
-        fail("structural coverage declaration schema drift")
+        fail("structural coverage declaration schema drift", "MAT-MUT-COVERAGE")
     if declared_coverage["mode"] != "partial-structural-graph-plus-case-oracle":
-        fail("unsupported structural coverage mode")
+        fail("unsupported structural coverage mode", "MAT-MUT-COVERAGE")
     if declared_coverage["case_level_cases"] != len(case_ids):
-        fail("case-level coverage count drift")
+        fail("case-level coverage count drift", "MAT-MUT-COVERAGE")
     if declared_coverage["graph_edge_cases"] != len(graph_edge_cases):
-        fail("graph-edge coverage count drift")
+        fail("graph-edge coverage count drift", "MAT-MUT-COVERAGE")
     if declared_coverage["graph_only_cases"] != len(graph_only_cases):
-        fail("graph-only coverage count drift")
+        fail("graph-only coverage count drift", "MAT-MUT-COVERAGE")
     if declared_coverage["graph_only_case_ids"] != graph_only_cases:
-        fail("graph-only coverage identities drift")
+        fail("graph-only coverage identities drift", "MAT-MUT-COVERAGE")
     reasons = declared_coverage.get("graph_only_case_reasons")
     if reasons != {case_id: COVERAGE_REASONS[case_id] for case_id in graph_only_cases}:
-        fail("graph-only coverage reasons drift")
+        fail("graph-only coverage reasons drift", "MAT-MUT-COVERAGE")
 
     # Coverage metadata is itself qualified: changing the declared
     # classification, counts, identities, or explanations must fail.
@@ -1091,6 +1119,14 @@ def main():
         fail("adversarial mutation identity drift: missing=" + ",".join(missing) + ";extra=" + ",".join(extra))
     if len(observed_mutations) != len(set(observed_mutations)):
         fail("adversarial mutation diagnostics contain duplicate identities")
+    if any("guard_id" not in item for item in FAILURE_DIAGNOSTICS):
+        fail("adversarial diagnostics missing stable guard identity", "MAT-MUT-INVARIANT_INTEGRITY")
+    if {item["guard_id"] for item in FAILURE_DIAGNOSTICS} != set(EXPECTED_GUARDS.values()):
+        fail("adversarial diagnostic guard coverage drift", "MAT-MUT-INVARIANT_INTEGRITY")
+    if len(FAILURE_DIAGNOSTICS) != len(set(item["guard_id"] for item in FAILURE_DIAGNOSTICS)):
+        # Multiple mutations may share a semantic guard, so guard IDs are not
+        # required to be unique; mutation IDs remain the unique adversarial keys.
+        pass
     observed_categories = {item["category"] for item in FAILURE_DIAGNOSTICS}
     missing_categories = sorted(REQUIRED_FAILURE_CATEGORIES - observed_categories)
     if missing_categories:
@@ -1104,7 +1140,7 @@ def main():
         "case_count": len(cases),
         "mutation_count": len(FAILURE_DIAGNOSTICS),
         "diagnostic_schema": "mat-converge-002-diagnostic-v1",
-        "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v2",
+        "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v3",
         "mutation_manifest_digest": mutation_manifest_digest(cases, graph),
         "mutation_manifest_projection_digest": mutation_manifest_projection_digest(manifest),
         "failure_categories": {
