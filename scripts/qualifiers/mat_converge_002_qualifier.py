@@ -448,7 +448,16 @@ def main():
         fail("invalidation plan digest is not self-consistent")
     key_permuted_plan = json.loads(json.dumps(canonical_plan))
     key_permuted_plan["recompute_case_ids"] = list(reversed(key_permuted_plan["recompute_case_ids"]))
-    if key_permuted_plan["digest"] == canonical_plan["digest"]:
+    permuted_payload = {
+        "schema": key_permuted_plan["schema"],
+        "graph_schema": graph["schema"],
+        "changed_ref": key_permuted_plan["changed_ref"],
+        "direct_case_ids": key_permuted_plan["direct_case_ids"],
+        "transitive_case_ids": key_permuted_plan["transitive_case_ids"],
+        "recompute_case_ids": key_permuted_plan["recompute_case_ids"],
+    }
+    permuted_digest = hashlib.sha256(canonical(permuted_payload)).hexdigest()
+    if permuted_digest == canonical_plan["digest"]:
         fail("recomputation ordering was incorrectly treated as representational")
     if graph_invalidation_plan(cases, graph, "unknown/immutable-ref") != {
         "changed_ref": "unknown/immutable-ref",
