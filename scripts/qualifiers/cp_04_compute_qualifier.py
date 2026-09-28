@@ -202,6 +202,7 @@ def mutations(c,graph):
         ("collapse-C10",lambda x:x["cases"][9].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-DEPENDENCY"),
         ("change-C18",lambda x:x["cases"][17].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-CURRENTNESS"),
         ("erase-C05",lambda x:x["cases"][4].update(scenario="complete-thread"),"CP-COMP-HISTORICAL"),
+        ("mutate-C02-model-identity",lambda x:x["cases"][1]["immutable_identity"].update(model_identity="synthetic:C02:model-mutated"),"CP-COMP-DEPENDENCY"),
     ]
     out=[]
     for label,mut,guard in graph_specs:
