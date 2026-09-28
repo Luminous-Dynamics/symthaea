@@ -247,7 +247,7 @@ mod tests {
         }
     }
 
-    fn provenance(candidate: &TemporalTestCandidateSpec) -> ProspectiveProvenance {
+    fn provenance(candidate: &CandidatePredictionSource) -> ProspectiveProvenance {
         ProspectiveProvenance::new(
             "sha256:input",
             "sha256:artifact",
