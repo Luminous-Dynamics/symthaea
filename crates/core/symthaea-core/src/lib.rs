@@ -105,6 +105,9 @@ pub mod scientific_outcome_likelihood;
 /// Pairwise divergence discovery over competing scientific trajectories.
 #[allow(missing_docs)]
 pub mod scientific_trajectory_divergence;
+/// Model-implied outcome discrimination between competing scientific trajectories.
+#[allow(missing_docs)]
+pub mod scientific_trajectory_outcome_discrimination;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;
