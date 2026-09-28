@@ -1729,6 +1729,31 @@ mod tests {
     }
 
     #[test]
+    fn search_domain_identity_changes_when_range_step_changes() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let make_domain = |step_um| {
+            ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(20_000).unwrap(),
+                    upper: C0LengthUmV1::new(22_000).unwrap(),
+                    step_um,
+                },
+            }])
+            .unwrap()
+        };
+
+        let one_mm = make_domain(1_000);
+        let two_mm = make_domain(2_000);
+
+        assert_ne!(one_mm.id().unwrap(), two_mm.id().unwrap());
+        assert_ne!(
+            one_mm.canonical_transcript().unwrap(),
+            two_mm.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
     fn domain_enumeration_order_is_identity_stable() {
         let make_domain = |first: &str, second: &str| {
             ExactDesignSearchDomainV1::new(vec![
