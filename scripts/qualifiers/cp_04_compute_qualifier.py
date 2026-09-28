@@ -87,6 +87,24 @@ def dependency_closure(changed,graph):
     return sorted(seen)
 def replay_input(c,graph):
     return {"schema":c["schema"],"authority":c["authority"],"claim_ceiling":c["claim_ceiling"],"replay_semantics":c["replay_semantics"],"graph_identity":graph_identity(graph),"case_manifest":[{"case_id":x["case_id"],"scenario":x["scenario"]} for x in c["cases"]]}
+def validate_replay_boundary(c,graph):
+    baseline=digest(replay_input(c,graph))
+    for field,value in (("schema","cp-04-compute-corpus-v1-mutated"),("authority","broader_authority"),("claim_ceiling","broader_claims"),("replay_semantics","mutable history")):
+        mutated=deepcopy(c); mutated[field]=value
+        if digest(replay_input(mutated,graph))==baseline:
+            fail(f"replay identity ignores historical corpus field {field}","CP-COMP-INVARIANT")
+    for case in c["cases"]:
+        mutated=deepcopy(c)
+        for candidate in mutated["cases"]:
+            if candidate["case_id"]==case["case_id"]:
+                candidate["scenario"]=candidate["scenario"]+"-mutated"
+                break
+        if digest(replay_input(mutated,graph))==baseline:
+            fail(f"replay identity ignores scenario for {case['case_id']}","CP-COMP-INVARIANT")
+    mutated=deepcopy(c)
+    mutated["cases"][0]["expected_disposition"]="DerivedMutation"
+    if digest(replay_input(mutated,graph))!=baseline:
+        fail("replay identity incorrectly depends on derived disposition","CP-COMP-INVARIANT")
 def source_audit():
     source=SOURCE.read_text(encoding="utf-8")
     tree=ast.parse(source)
@@ -180,6 +198,7 @@ def main():
     validate(c); validate_manifest(manifest); validate_graph(graph)
     graph_sha=graph_identity(graph)
     replay_sha=digest(replay_input(c,graph))
+    validate_replay_boundary(c,graph)
     muts=mutations(c,graph)
     for node,expected_closure in EXPECTED_CLOSURES.items():
         if dependency_closure([node],graph)!=expected_closure:
