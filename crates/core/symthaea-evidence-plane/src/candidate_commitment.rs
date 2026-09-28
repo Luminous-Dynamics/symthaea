@@ -23,6 +23,27 @@ pub struct CandidatePredictionSource {
     pub right_lineage: String,
 }
 
+impl CandidatePredictionSource {
+    /// Validate the identity-only source boundary before any prediction payload
+    /// is attached. This keeps discovery adapters from constructing ambiguous
+    /// commitment inputs.
+    pub fn validate(&self) -> Result<(), BindingError> {
+        for (name, value) in [
+            ("candidate_id", &self.candidate_id),
+            ("source_candidate_id", &self.source_candidate_id),
+            ("test_specification_id", &self.test_specification_id),
+            ("measurement_specification_id", &self.measurement_specification_id),
+            ("left_lineage", &self.left_lineage),
+            ("right_lineage", &self.right_lineage),
+        ] {
+            if value.trim().is_empty() {
+                return Err(BindingError::MissingBindingField(name));
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidatePredictionBinding {
     pub candidate_id: String,
@@ -58,6 +79,33 @@ pub enum BindingError {
     Commitment(CommitmentError),
 }
 
+impl VerificationFailure {
+    /// Stable machine-readable diagnostic code for downstream logs and metrics.
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::CommitmentIntegrity => "commitment_integrity",
+            Self::PayloadDigestMismatch => "payload_digest_mismatch",
+            Self::BindingDigestMismatch => "binding_digest_mismatch",
+            Self::CandidateIdMismatch => "candidate_id_mismatch",
+            Self::SourceCandidateIdMismatch => "source_candidate_id_mismatch",
+            Self::TestSpecificationMismatch => "test_specification_mismatch",
+            Self::MeasurementSpecificationMismatch => "measurement_specification_mismatch",
+            Self::LineageDigestMismatch => "lineage_digest_mismatch",
+            Self::ProvenanceLineageMismatch => "provenance_lineage_mismatch",
+            Self::InvalidBinding(_) => "invalid_binding",
+        }
+    }
+}
+
+impl std::fmt::Display for VerificationFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidBinding(error) => write!(f, "{}: {error:?}", self.code()),
+            _ => write!(f, "{}", self.code()),
+        }
+    }
+}
+
 impl From<CommitmentError> for BindingError {
     fn from(value: CommitmentError) -> Self {
         Self::Commitment(value)
@@ -65,6 +113,26 @@ impl From<CommitmentError> for BindingError {
 }
 
 impl CandidatePredictionBinding {
+    /// Construct a binding from a validated, domain-neutral candidate source.
+    pub fn from_source(
+        source: &CandidatePredictionSource,
+        prediction_payload: &[u8],
+    ) -> Result<Self, BindingError> {
+        source.validate()?;
+        if prediction_payload.is_empty() {
+            return Err(BindingError::EmptyPredictionPayload);
+        }
+        Ok(Self {
+            candidate_id: source.candidate_id.clone(),
+            source_candidate_id: source.source_candidate_id.clone(),
+            test_specification_id: source.test_specification_id.clone(),
+            measurement_specification_id: source.measurement_specification_id.clone(),
+            left_lineage: source.left_lineage.clone(),
+            right_lineage: source.right_lineage.clone(),
+            prediction_payload: prediction_payload.to_vec(),
+        })
+    }
+
     pub fn validate(&self) -> Result<(), BindingError> {
         for (name, value) in [
             ("candidate_id", &self.candidate_id),
@@ -295,15 +363,8 @@ fn binding_for(
     candidate: &CandidatePredictionSource,
     prediction_payload: &[u8],
 ) -> CandidatePredictionBinding {
-    CandidatePredictionBinding {
-        candidate_id: candidate.candidate_id.clone(),
-        source_candidate_id: candidate.source_candidate_id.clone(),
-        test_specification_id: candidate.test_specification_id.clone(),
-        measurement_specification_id: candidate.measurement_specification_id.clone(),
-        left_lineage: candidate.left_lineage.clone(),
-        right_lineage: candidate.right_lineage.clone(),
-        prediction_payload: prediction_payload.to_vec(),
-    }
+    CandidatePredictionBinding::from_source(candidate, prediction_payload)
+        .expect("test candidate source and payload are valid")
 }
 
 fn lineage_digest(left: &str, right: &str) -> String {
@@ -455,6 +516,32 @@ mod tests {
                 &changed, "actor-v2", "2026-09-28T10:00:00Z", provenance(&c), b"forecast-v2",
             ),
             Err(BindingError::SourceMismatch)
+        );
+    }
+
+    #[test]
+    fn verification_failure_codes_are_stable_and_distinct() {
+        let failures = [
+            VerificationFailure::CommitmentIntegrity,
+            VerificationFailure::PayloadDigestMismatch,
+            VerificationFailure::BindingDigestMismatch,
+            VerificationFailure::CandidateIdMismatch,
+            VerificationFailure::SourceCandidateIdMismatch,
+            VerificationFailure::TestSpecificationMismatch,
+            VerificationFailure::MeasurementSpecificationMismatch,
+            VerificationFailure::LineageDigestMismatch,
+            VerificationFailure::ProvenanceLineageMismatch,
+            VerificationFailure::InvalidBinding(BindingError::EmptyPredictionPayload),
+        ];
+        let codes: Vec<&str> = failures.iter().map(VerificationFailure::code).collect();
+        let mut unique = codes.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(codes.len(), unique.len());
+        assert_eq!(VerificationFailure::LineageDigestMismatch.to_string(), "lineage_digest_mismatch");
+        assert_eq!(
+            VerificationFailure::InvalidBinding(BindingError::EmptyPredictionPayload).to_string(),
+            "invalid_binding: EmptyPredictionPayload"
         );
     }
 
