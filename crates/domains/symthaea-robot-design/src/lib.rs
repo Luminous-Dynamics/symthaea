@@ -251,6 +251,7 @@ impl C0LengthUmV1 {
 pub struct ExactRationalV1 { numerator: u128, denominator: u128 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct ExactRationalWireV1 { numerator: u128, denominator: u128 }
 
 impl TryFrom<ExactRationalWireV1> for ExactRationalV1 {
