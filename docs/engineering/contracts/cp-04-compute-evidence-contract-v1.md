@@ -63,6 +63,14 @@ A new semantic generation is required when an evidence-relevant dependency chang
 
 Historical executions and observations remain attached to their original generation. Requalification derives a new disposition; it never rewrites history.
 
+## Dependency graph and invalidation
+The compute evidence thread is represented by the versioned directed graph used by the independent qualifier. Each edge means that a change to the upstream identity can invalidate downstream derived evidence; it does not rewrite or invalidate upstream historical records.
+
+Canonical graph order:
+`requirement -> representation -> model -> runtime -> accelerator -> deployment -> execution -> observation -> statistics -> engineering disposition`
+
+The graph identity is part of replay identity and the qualification receipt. The qualifier rejects missing required edges, dangling nodes/edges, duplicate nodes, cycles, or graph identities that differ from the registered CP-04 graph. A deployment change therefore invalidates deployment and downstream execution/observation/statistical/disposition evidence, but does not retroactively change the historical model or representation identity. Graph changes themselves require a new graph generation and requalification.
+
 ## Closed evidence thread
 `requirement -> representation -> model -> runtime/toolchain -> accelerator/config -> deployment -> execution context -> observation -> uncertainty/statistics -> engineering disposition`
 
