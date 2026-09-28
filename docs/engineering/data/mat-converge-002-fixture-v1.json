@@ -417,6 +417,7 @@
       }
     ],
     "replay_rule": "replay digest is over immutable node/edge identities; derived dispositions are excluded",
+    "ordering_semantics": "case manifest order is significant; graph node and edge order are identity-insignificant",
     "coverage": {
       "mode": "partial-structural-graph-plus-case-oracle",
       "case_level_cases": 16,
