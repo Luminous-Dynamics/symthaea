@@ -228,17 +228,31 @@ fn validate_utc_cutoff(value: &str) -> Result<(), CommitmentError> {
     {
         return Err(CommitmentError::InvalidCutoff);
     }
+    let year = (bytes[0] - b'0') as u32 * 1000
+        + (bytes[1] - b'0') as u32 * 100
+        + (bytes[2] - b'0') as u32 * 10
+        + (bytes[3] - b'0') as u32;
     let month = (bytes[5] - b'0') * 10 + bytes[6] - b'0';
     let day = (bytes[8] - b'0') * 10 + bytes[9] - b'0';
     let hour = (bytes[11] - b'0') * 10 + bytes[12] - b'0';
     let minute = (bytes[14] - b'0') * 10 + bytes[15] - b'0';
     let second = (bytes[17] - b'0') * 10 + bytes[18] - b'0';
     if !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
         || hour > 23
         || minute > 59
         || second > 59
     {
+        return Err(CommitmentError::InvalidCutoff);
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => unreachable!(),
+    };
+    if day == 0 || day > days_in_month {
         return Err(CommitmentError::InvalidCutoff);
     }
     Ok(())
