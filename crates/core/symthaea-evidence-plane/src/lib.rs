@@ -1,3 +1,5 @@
+pub mod prospective;
+pub mod candidate_commitment;
 pub mod scientific_decision_frontier;
 pub mod gap_aware_outcome_planner;
 pub mod temporal_evidence_gap;
