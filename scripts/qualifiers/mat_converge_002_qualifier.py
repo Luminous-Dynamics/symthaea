@@ -90,6 +90,12 @@ def main():
     cases = doc.get("cases", [])
     check(doc, cases)
     graph = doc["state_graph"]
+    manifest = mutation_manifest(cases, graph)
+    if manifest["schema"] != "mat-converge-002-mutation-manifest-v2":
+        fail("mutation manifest schema drift")
+    validate_mutation_manifest(cases, graph, manifest)
+    if set(manifest["categories"]) != REQUIRED_FAILURE_CATEGORIES:
+        fail("mutation manifest category coverage drift")
     baseline_digest = replay_digest(cases, graph)
     baseline_projection = dependency_projection(cases, graph)
     mutations = [
