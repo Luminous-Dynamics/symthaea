@@ -111,6 +111,9 @@ pub mod scientific_trajectory_outcome_discrimination;
 /// Multi-horizon divergence across explicit scientific trajectory snapshots.
 #[allow(missing_docs)]
 pub mod scientific_multihorizon_divergence;
+/// Horizon-aligned model-implied outcome discrimination over scientific trajectories.
+#[allow(missing_docs)]
+pub mod scientific_temporal_outcome_discrimination;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;
