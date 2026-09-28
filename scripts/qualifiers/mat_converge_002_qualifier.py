@@ -206,6 +206,17 @@ def derived_snapshot(cases):
         for case in cases
     }
 
+def graph_invalidation_plan(cases, graph, changed_ref):
+    """Return deterministic direct/transitive impact for one immutable graph ref."""
+    direct = graph_direct_case_ids(cases, graph, changed_ref)
+    closure = graph_dependency_closure(cases, graph, changed_ref)
+    return {
+        "changed_ref": changed_ref,
+        "direct_case_ids": direct,
+        "transitive_case_ids": closure,
+        "recompute_case_ids": closure,
+    }
+
 def graph_direct_case_ids(cases, graph, changed_ref):
     """Return case IDs on edges directly incident to changed_ref."""
     node_by_id = {n["id"]: n for n in graph["nodes"]}
@@ -389,6 +400,20 @@ def main():
         fail("unexpected direct process dependency fanout")
     if not set(direct_graph_cases).issubset(expected_graph_closure):
         fail("transitive closure dropped a directly dependent graph case")
+    plan = graph_invalidation_plan(cases, graph, "process/G1")
+    if plan["direct_case_ids"] != direct_graph_cases:
+        fail("invalidation plan direct fanout drift")
+    if plan["transitive_case_ids"] != expected_graph_closure:
+        fail("invalidation plan transitive fanout drift")
+    if plan["recompute_case_ids"] != expected_graph_closure:
+        fail("invalidation plan recomputation set drift")
+    if graph_invalidation_plan(cases, graph, "unknown/immutable-ref") != {
+        "changed_ref": "unknown/immutable-ref",
+        "direct_case_ids": [],
+        "transitive_case_ids": [],
+        "recompute_case_ids": [],
+    }:
+        fail("unknown graph ref did not fail closed in invalidation plan")
     actual_changed = "process/G3"
     if actual_changed in set(localized_projection["C02"]):
         fail("case-local projection accepted an unqualified replacement generation")
@@ -527,6 +552,9 @@ def main():
     # Unknown immutable refs have no graph impact; fail-closed means no accidental fanout.
     if graph_dependency_closure(cases, graph, "unknown/immutable-ref") != []:
         fail("unknown graph ref acquired an accidental dependency closure")
+    negative_plan = graph_invalidation_plan(cases, graph, "edge/C07")
+    if negative_plan["direct_case_ids"] != ["C07"] or negative_plan["recompute_case_ids"] != ["C07"]:
+        fail("negative-edge tombstone acquired an unrelated invalidation fanout")
 
     # The negative-edge node is a first-class historical tombstone: mutating
     # its case identity must be caught rather than allowing negative evidence
