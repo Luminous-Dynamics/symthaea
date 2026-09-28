@@ -241,6 +241,25 @@ mod tests {
     }
 
     #[test]
+    fn envelope_rejects_embedded_provenance_lineage_tampering() {
+        let c = candidate("c1");
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        let bad_provenance = ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", lineage_digest("tampered", "l2"),
+            "2026-09-28T08:00:00Z", "2026-09-28T09:00:00Z",
+        ).unwrap();
+        envelope.commitment = ProspectivePredictionCommitment::commit(
+            "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", bad_provenance,
+            &binding_for(&c, b"forecast").canonical_bytes().unwrap(),
+        ).unwrap();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
+    }
+
+    #[test]
     fn rejects_empty_prediction() {
         assert_eq!(commit(&candidate("c1"), b""), Err(BindingError::EmptyPredictionPayload));
     }
