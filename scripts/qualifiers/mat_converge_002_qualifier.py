@@ -46,6 +46,7 @@ FAILURE_DIAGNOSTICS = []
 REQUIRED_FAILURE_CATEGORIES = {
     "authority", "negative-evidence", "coverage",
     "historical-identity", "dependency-boundary", "schema-integrity",
+    "invariant-integrity",
 }
 EXPECTED_CATEGORIES = {
     "remove-process-ref": "historical-identity",
