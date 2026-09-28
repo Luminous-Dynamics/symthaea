@@ -172,7 +172,7 @@
       "process": "G1",
       "property": "E5",
       "measurement": "M1",
-      "outcome": "dfT-equal-to-experiment-stays-distinct",
+      "outcome": "dft-equal-to-experiment-stays-distinct",
       "refs": {
         "demand": "demand/D1",
         "profile": "profile/P1",
@@ -290,5 +290,8 @@
         "measurement": "measurement/M1"
       }
     }
-  ]
+  ],
+  "campaign_id": "MAT-CONVERGE-002A1",
+  "record_schema": "integration-edge-v1",
+  "replay_semantics": "historical refs are immutable inputs; dispositions are derived outputs"
 }
