@@ -162,7 +162,10 @@ def mutations(c,graph):
         mutated=deepcopy(c); mut(mutated); validate(mutated)
         caught=bool(FAILURES); detail=FAILURES[:]
         FAILURES.clear(); FAILURES.extend(old)
-        if not caught: fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
+        if not caught:
+            fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
+        elif not any(d["guard_id"] == guard for d in detail):
+            fail(f"mutation {label} was rejected by the wrong guard","CP-COMP-INVARIANT")
         out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
     return out
 def receipt(c,m,r,graph_sha,manifest_sha,source_sha):
