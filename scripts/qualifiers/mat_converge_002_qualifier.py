@@ -206,6 +206,30 @@ def derived_snapshot(cases):
         for case in cases
     }
 
+def recomputation_snapshot(cases, graph, invalidation_plan):
+    """Create a deterministic two-phase replay artifact for selected cases."""
+    selected = set(invalidation_plan["recompute_case_ids"])
+    records = []
+    for case in cases:
+        if case["id"] not in selected:
+            continue
+        records.append({
+            "case_id": case["id"],
+            "historical_identity": immutable_record_identity(case),
+            "dependency_projection": dependency_projection(cases, graph)[case["id"]],
+        })
+    payload = {
+        "schema": "mat-converge-002-recomputation-snapshot-v1",
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "records": records,
+    }
+    return {
+        "schema": payload["schema"],
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "records": records,
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
+
 def canonical_invalidation_plan(cases, graph, changed_ref):
     """Build a canonical, replayable invalidation-plan identity."""
     plan = graph_invalidation_plan(cases, graph, changed_ref)
@@ -459,6 +483,42 @@ def main():
     permuted_digest = hashlib.sha256(canonical(permuted_payload)).hexdigest()
     if permuted_digest == canonical_plan["digest"]:
         fail("recomputation ordering was incorrectly treated as representational")
+
+    # Two-phase replay artifact: the plan fixes the recomputation boundary,
+    # while the snapshot binds only the immutable historical identities selected
+    # by that plan.
+    replay_snapshot = recomputation_snapshot(cases, graph, canonical_plan)
+    if replay_snapshot["schema"] != "mat-converge-002-recomputation-snapshot-v1":
+        fail("recomputation snapshot schema drift")
+    if replay_snapshot["invalidation_plan_digest"] != canonical_plan["digest"]:
+        fail("recomputation snapshot lost plan binding")
+    if [record["case_id"] for record in replay_snapshot["records"]] != expected_graph_closure:
+        fail("recomputation snapshot selected the wrong cases")
+    snapshot_payload = {
+        "schema": replay_snapshot["schema"],
+        "invalidation_plan_digest": replay_snapshot["invalidation_plan_digest"],
+        "records": replay_snapshot["records"],
+    }
+    if replay_snapshot["digest"] != hashlib.sha256(canonical(snapshot_payload)).hexdigest():
+        fail("recomputation snapshot digest is not self-consistent")
+
+    # Derived dispositions are intentionally excluded from the snapshot identity.
+    disposition_mutated = json.loads(json.dumps(cases))
+    for case in disposition_mutated:
+        if case["id"] in set(expected_graph_closure):
+            case["outcome"] = "recomputed-disposition"
+    mutated_snapshot = recomputation_snapshot(disposition_mutated, graph, canonical_plan)
+    if mutated_snapshot["digest"] != replay_snapshot["digest"]:
+        fail("derived disposition mutated replay snapshot identity")
+
+    # Historical identity mutation must alter the replay artifact.
+    historical_mutated = json.loads(json.dumps(cases))
+    historical_case = next(c for c in historical_mutated if c["id"] == "C02")
+    historical_case["process"] = "G99"
+    historical_case["refs"]["process"] = "process/G99"
+    historical_snapshot = recomputation_snapshot(historical_mutated, graph, canonical_plan)
+    if historical_snapshot["digest"] == replay_snapshot["digest"]:
+        fail("historical dependency mutation did not alter replay snapshot identity")
     if graph_invalidation_plan(cases, graph, "unknown/immutable-ref") != {
         "changed_ref": "unknown/immutable-ref",
         "direct_case_ids": [],
