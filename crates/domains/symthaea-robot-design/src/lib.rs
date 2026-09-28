@@ -54,8 +54,16 @@ impl fmt::Display for ContentDigest {
 macro_rules! semantic_id_type {
     ($name:ident, $kind:literal) => {
         #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-        #[serde(transparent)]
+        #[serde(transparent, try_from = "String")]
         pub struct $name(String);
+
+        impl TryFrom<String> for $name {
+            type Error = RobotDesignError;
+
+            fn try_from(value: String) -> Result<Self, Self::Error> {
+                Self::new(value)
+            }
+        }
 
         impl $name {
             pub fn new(value: impl Into<String>) -> Result<Self, RobotDesignError> {
