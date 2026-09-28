@@ -428,6 +428,21 @@ def main():
     if reasons != {case_id: COVERAGE_REASONS[case_id] for case_id in graph_only_cases}:
         fail("graph-only coverage reasons drift")
 
+    # Coverage metadata is itself qualified: changing the declared
+    # classification, counts, identities, or explanations must fail.
+    coverage_mutations = [
+        ("coverage-mode", lambda c: c.__setitem__("mode", "full-graph")),
+        ("coverage-case-count", lambda c: c.__setitem__("case_level_cases", 15)),
+        ("coverage-edge-count", lambda c: c.__setitem__("graph_edge_cases", 8)),
+        ("coverage-only-count", lambda c: c.__setitem__("graph_only_cases", 8)),
+        ("coverage-only-identities", lambda c: c["graph_only_case_ids"].pop()),
+        ("coverage-only-reason", lambda c: c["graph_only_case_reasons"].__setitem__("C06", "mutated-reason")),
+    ]
+    for name, mutate in coverage_mutations:
+        mutated_doc = json.loads(json.dumps(doc))
+        mutate(mutated_doc["state_graph"]["coverage"])
+        expect_failure(mutated_doc, cases, name)
+
     # Mutation matrix: every graph node identity change must invalidate
     # exactly the cases structurally dependent on that node.
     node_mutation_expectations = {
