@@ -1,0 +1,98 @@
+{
+  "schema": "cp-04-compute-corpus-v1",
+  "authority": "representation_only_no_physical_execution_authority",
+  "claim_ceiling": "deterministic compute identity, generation, dependency, evidence-separation, replay, negative-result, and authority semantics over synthetic/reference workflows only",
+  "replay_semantics": "historical identities are immutable inputs; dispositions are derived outputs",
+  "cases": [
+    {
+      "case_id": "C01",
+      "scenario": "complete-thread",
+      "expected_disposition": "CurrentAndApplicable"
+    },
+    {
+      "case_id": "C02",
+      "scenario": "model-parameter-generation-changed",
+      "expected_disposition": "DependencyChanged"
+    },
+    {
+      "case_id": "C03",
+      "scenario": "runtime-toolchain-changed",
+      "expected_disposition": "ConfigurationMismatch"
+    },
+    {
+      "case_id": "C04",
+      "scenario": "accelerator-configuration-changed",
+      "expected_disposition": "ConfigurationMismatch"
+    },
+    {
+      "case_id": "C05",
+      "scenario": "deployment-artifact-changed",
+      "expected_disposition": "DeploymentMismatch"
+    },
+    {
+      "case_id": "C06",
+      "scenario": "execution-observation-missing",
+      "expected_disposition": "ObservationMissing"
+    },
+    {
+      "case_id": "C07",
+      "scenario": "uncertainty-missing",
+      "expected_disposition": "UncertaintyInsufficient"
+    },
+    {
+      "case_id": "C08",
+      "scenario": "single-benchmark-not-population",
+      "expected_disposition": "PopulationInferenceBlocked"
+    },
+    {
+      "case_id": "C09",
+      "scenario": "tail-envelope-failure",
+      "expected_disposition": "HardEnvelopeFailure"
+    },
+    {
+      "case_id": "C10",
+      "scenario": "correlated-channels",
+      "expected_disposition": "CommonModeNotIndependent"
+    },
+    {
+      "case_id": "C11",
+      "scenario": "model-output-equals-measurement",
+      "expected_disposition": "AuthoritySeparated"
+    },
+    {
+      "case_id": "C12",
+      "scenario": "stale-currentness",
+      "expected_disposition": "Stale"
+    },
+    {
+      "case_id": "C13",
+      "scenario": "lossy-cfc-snapshot",
+      "expected_disposition": "StateRestorationUnresolved"
+    },
+    {
+      "case_id": "C14",
+      "scenario": "operational-event-not-qualification",
+      "expected_disposition": "AuthoritySeparated"
+    },
+    {
+      "case_id": "C15",
+      "scenario": "attestation-not-performance",
+      "expected_disposition": "AuthoritySeparated"
+    },
+    {
+      "case_id": "C16",
+      "scenario": "negative-result-retained",
+      "expected_disposition": "HistoricalNegativeRetained"
+    },
+    {
+      "case_id": "C17",
+      "scenario": "synthetic-pass",
+      "expected_disposition": "NoPhysicalExecutionAuthority"
+    },
+    {
+      "case_id": "C18",
+      "scenario": "workload-profile-changed",
+      "expected_disposition": "RequalificationRequired"
+    }
+  ]
+}
