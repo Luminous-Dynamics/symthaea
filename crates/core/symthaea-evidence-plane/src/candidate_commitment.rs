@@ -40,6 +40,7 @@ pub enum BindingError {
     MissingBindingField(&'static str),
     Serialization,
     LineageMismatch,
+    SourceMismatch,
     Commitment(CommitmentError),
 }
 
@@ -130,6 +131,58 @@ impl CandidatePredictionCommitment {
                 && self.lineage_digest == lineage_digest
                 && self.commitment.provenance().model_lineage == lineage_digest,
         )
+    }
+
+    /// Supersede this envelope without allowing the raw commitment primitive to
+    /// bypass candidate identity and lineage invariants. A changed candidate
+    /// source must be committed as a new candidate, not a supersession.
+    pub fn supersede(
+        &self,
+        candidate: &CandidatePredictionSource,
+        actor_id: &str,
+        created_at: &str,
+        provenance: ProspectiveProvenance,
+        prediction_payload: &[u8],
+    ) -> Result<Self, BindingError> {
+        if candidate.candidate_id != self.candidate_id
+            || candidate.source_candidate_id != self.source_candidate_id
+            || candidate.test_specification_id != self.test_specification_id
+            || candidate.measurement_specification_id != self.measurement_specification_id
+            || lineage_digest(&candidate.left_lineage, &candidate.right_lineage) != self.lineage_digest
+        {
+            return Err(BindingError::SourceMismatch);
+        }
+        validate_provenance_lineage(candidate, &provenance)?;
+        let binding = binding_for(candidate, prediction_payload);
+        let bytes = binding.canonical_bytes()?;
+        let commitment = self.commitment.supersede(
+            actor_id,
+            created_at,
+            &bytes,
+            provenance,
+        )?;
+        Ok(Self {
+            commitment,
+            candidate_id: binding.candidate_id,
+            source_candidate_id: binding.source_candidate_id,
+            test_specification_id: binding.test_specification_id,
+            measurement_specification_id: binding.measurement_specification_id,
+            lineage_digest: binding.lineage_digest()?,
+            binding_digest: binding.digest()?,
+        })
+    }
+
+    /// Verify that this envelope is an immutable supersession of the supplied parent.
+    pub fn is_supersession_of(&self, parent: &Self) -> bool {
+        self.commitment.verify_integrity()
+            && parent.commitment.verify_integrity()
+            && self.commitment.parent_event_ids().len() == 1
+            && self.commitment.parent_event_ids()[0] == parent.commitment.event_id()
+            && self.candidate_id == parent.candidate_id
+            && self.source_candidate_id == parent.source_candidate_id
+            && self.test_specification_id == parent.test_specification_id
+            && self.measurement_specification_id == parent.measurement_specification_id
+            && self.lineage_digest == parent.lineage_digest
     }
 }
 
@@ -323,6 +376,84 @@ mod tests {
             ),
             Err(BindingError::LineageMismatch)
         );
+    }
+
+    #[test]
+    fn envelope_supersession_preserves_parent_and_rebinds_payload() {
+        let c = candidate();
+        let original = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast-v1",
+        ).unwrap();
+        let replacement = original.supersede(
+            &c, "actor-v2", "2026-09-28T10:00:00Z", provenance(&c), b"forecast-v2",
+        ).unwrap();
+        assert!(replacement.is_supersession_of(&original));
+        assert_ne!(replacement.commitment.event_id(), original.commitment.event_id());
+        assert!(replacement.verify_binding(&binding_for(&c, b"forecast-v2")).unwrap());
+    }
+
+    #[test]
+    fn envelope_supersession_rejects_changed_source_identity() {
+        let c = candidate();
+        let original = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        let mut changed = c.clone();
+        changed.candidate_id = "different-candidate".into();
+        assert_eq!(
+            original.supersede(
+                &changed, "actor-v2", "2026-09-28T10:00:00Z", provenance(&c), b"forecast-v2",
+            ),
+            Err(BindingError::SourceMismatch)
+        );
+    }
+
+    #[test]
+    fn tampered_outer_binding_digest_fails_verification() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.binding_digest = "sha256:tampered".into();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
+    }
+
+    #[test]
+    fn tampered_outer_lineage_digest_fails_verification() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.lineage_digest = "sha256:tampered".into();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
+    }
+
+    #[test]
+    fn tampered_outer_identity_fails_verification() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.candidate_id = "tampered-candidate".into();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
+    }
+
+    #[test]
+    fn envelope_serde_round_trip_retains_integrity() {
+        let c = candidate();
+        let original = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        let encoded = serde_json::to_vec(&original).unwrap();
+        let decoded: CandidatePredictionCommitment = serde_json::from_slice(&encoded).unwrap();
+        assert_eq!(decoded, original);
+        assert!(decoded.verify_binding(&binding_for(&c, b"forecast")).unwrap());
     }
 
     #[test]

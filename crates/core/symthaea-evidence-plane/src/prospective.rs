@@ -228,17 +228,31 @@ fn validate_utc_cutoff(value: &str) -> Result<(), CommitmentError> {
     {
         return Err(CommitmentError::InvalidCutoff);
     }
+    let year = (bytes[0] - b'0') as u32 * 1000
+        + (bytes[1] - b'0') as u32 * 100
+        + (bytes[2] - b'0') as u32 * 10
+        + (bytes[3] - b'0') as u32;
     let month = (bytes[5] - b'0') * 10 + bytes[6] - b'0';
     let day = (bytes[8] - b'0') * 10 + bytes[9] - b'0';
     let hour = (bytes[11] - b'0') * 10 + bytes[12] - b'0';
     let minute = (bytes[14] - b'0') * 10 + bytes[15] - b'0';
     let second = (bytes[17] - b'0') * 10 + bytes[18] - b'0';
     if !(1..=12).contains(&month)
-        || !(1..=31).contains(&day)
         || hour > 23
         || minute > 59
         || second > 59
     {
+        return Err(CommitmentError::InvalidCutoff);
+    }
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => unreachable!(),
+    };
+    if day == 0 || day > days_in_month {
         return Err(CommitmentError::InvalidCutoff);
     }
     Ok(())
@@ -372,6 +386,37 @@ mod tests {
             "2026-09-28T08:00:00Z", "2026-09-28T09:00Z",
         );
         assert_eq!(result, Err(CommitmentError::InvalidCutoff));
+    }
+
+    #[test]
+    fn invalid_gregorian_dates_are_rejected() {
+        for cutoff in [
+            "2026-02-29T09:00:00Z",
+            "2026-04-31T09:00:00Z",
+            "2026-00-10T09:00:00Z",
+        ] {
+            assert_eq!(
+                ProspectiveProvenance::new(
+                    "sha256:input", "sha256:artifact", "model:v1", cutoff, "2026-05-01T09:00:00Z",
+                ),
+                Err(CommitmentError::InvalidCutoff)
+            );
+        }
+    }
+
+    #[test]
+    fn leap_day_is_accepted_only_in_leap_years() {
+        assert!(ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2028-02-29T09:00:00Z", "2028-03-01T09:00:00Z",
+        ).is_ok());
+        assert_eq!(
+            ProspectiveProvenance::new(
+                "sha256:input", "sha256:artifact", "model:v1",
+                "2100-02-29T09:00:00Z", "2100-03-01T09:00:00Z",
+            ),
+            Err(CommitmentError::InvalidCutoff)
+        );
     }
 
     #[test]
