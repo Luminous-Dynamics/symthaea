@@ -1754,6 +1754,64 @@ mod tests {
     }
 
     #[test]
+    fn search_domain_identity_changes_when_range_bounds_change() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let make_domain = |lower_um, upper_um| {
+            ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(lower_um).unwrap(),
+                    upper: C0LengthUmV1::new(upper_um).unwrap(),
+                    step_um: 1_000,
+                },
+            }])
+            .unwrap()
+        };
+
+        let baseline = make_domain(20_000, 22_000);
+        let lower_changed = make_domain(21_000, 22_000);
+        let upper_changed = make_domain(20_000, 23_000);
+
+        assert_ne!(baseline.id().unwrap(), lower_changed.id().unwrap());
+        assert_ne!(baseline.id().unwrap(), upper_changed.id().unwrap());
+        assert_ne!(
+            baseline.canonical_transcript().unwrap(),
+            lower_changed.canonical_transcript().unwrap()
+        );
+        assert_ne!(
+            baseline.canonical_transcript().unwrap(),
+            upper_changed.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
+    fn search_domain_identity_changes_when_values_change() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let make_domain = |values| {
+            ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Values(values),
+            }])
+            .unwrap()
+        };
+
+        let baseline = make_domain(vec![
+            C0LengthUmV1::new(20_000).unwrap(),
+            C0LengthUmV1::new(21_000).unwrap(),
+        ]);
+        let changed = make_domain(vec![
+            C0LengthUmV1::new(20_000).unwrap(),
+            C0LengthUmV1::new(22_000).unwrap(),
+        ]);
+
+        assert_ne!(baseline.id().unwrap(), changed.id().unwrap());
+        assert_ne!(
+            baseline.canonical_transcript().unwrap(),
+            changed.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
     fn domain_enumeration_sequence_is_lexicographic_by_canonical_parameter_order() {
         let domain = ExactDesignSearchDomainV1::new(vec![
             ExactDesignParameterDomainV1 {
