@@ -28,7 +28,7 @@ def digest(v):
 def load_graph():
     return json.loads(GRAPH.read_text(encoding="utf-8"))
 def graph_identity(g):
-    return digest({"schema":g["schema"],"nodes":g["nodes"],"edges":g["edges"]})
+    return digest(g)
 def fail(m,guard_id):
     if guard_id not in GUARDS:
         raise ValueError(f"unregistered guard: {guard_id}")
@@ -39,16 +39,21 @@ def eq(a,b,m,guard_id="CP-COMP-INVARIANT"):
 def validate_graph(g):
     if not isinstance(g,dict):
         fail("dependency graph must be object","CP-COMP-DEPENDENCY"); return
+    eq(set(g.keys()),{"schema","nodes","edges"},"graph top-level schema","CP-COMP-DEPENDENCY")
     eq(g.get("schema"),"cp-04-compute-dependency-graph-v1","graph schema","CP-COMP-DEPENDENCY")
-    eq(g.get("nodes"),EXPECTED_GRAPH_NODES,"graph node identity","CP-COMP-DEPENDENCY")
-    eq(g.get("edges"),EXPECTED_GRAPH_EDGES,"graph edge identity","CP-COMP-DEPENDENCY")
-    nodes=g.get("nodes",[])
-    edges=g.get("edges",[])
+    nodes=g.get("nodes")
+    edges=g.get("edges")
+    if not isinstance(nodes,list) or any(not isinstance(n,str) for n in nodes):
+        fail("dependency graph nodes must be an ordered list of strings","CP-COMP-DEPENDENCY"); return
+    if not isinstance(edges,list) or any(not isinstance(e,list) or len(e)!=2 or any(not isinstance(x,str) for x in e) for e in edges):
+        fail("dependency graph edges must be ordered 2-tuples of strings","CP-COMP-DEPENDENCY"); return
+    eq(nodes,EXPECTED_GRAPH_NODES,"graph node identity","CP-COMP-DEPENDENCY")
+    eq(edges,EXPECTED_GRAPH_EDGES,"graph edge identity","CP-COMP-DEPENDENCY")
     if len(nodes)!=len(set(nodes)):
         fail("dependency graph contains duplicate node","CP-COMP-DEPENDENCY")
     node_set=set(nodes)
-    if any(not isinstance(e,list) or len(e)!=2 or e[0] not in node_set or e[1] not in node_set for e in edges):
-        fail("dependency graph contains dangling edge","CP-COMP-DEPENDENCY")
+    if any(e[0] not in node_set or e[1] not in node_set for e in edges):
+        fail("dependency graph contains dangling edge","CP-COMP-DEPENDENCY"); return
     adjacency={n:[] for n in node_set}
     for a,b in edges:
         adjacency[a].append(b)
@@ -107,7 +112,7 @@ def validate(c):
 def validate_manifest(m):
     eq(m.get("schema"),"cp-04-compute-mutation-manifest-v1","manifest schema")
     eq(m.get("guard_registry"),GUARDS,"guard registry")
-    expected=["remove-model-runtime-edge","add-graph-cycle","rename-graph-node","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
+    expected=["remove-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
     eq([x.get("mutation_id") for x in m.get("mutations",[])],expected,"mutation manifest")
     for x in m.get("mutations",[]):
         if x.get("guard_id") not in GUARDS:
@@ -117,6 +122,8 @@ def mutations(c,graph):
         ("remove-model-runtime-edge",lambda g:g["edges"].remove(["model","runtime"]),"CP-COMP-DEPENDENCY"),
         ("add-graph-cycle",lambda g:g["edges"].append(["disposition","model"]),"CP-COMP-DEPENDENCY"),
         ("rename-graph-node",lambda g:g["nodes"].__setitem__(2,"model-v2"),"CP-COMP-DEPENDENCY"),
+        ("add-graph-field",lambda g:g.__setitem__("unbound","unexpected"),"CP-COMP-DEPENDENCY"),
+        ("malformed-graph-edge",lambda g:g["edges"].__setitem__(2,["model"]),"CP-COMP-DEPENDENCY"),
     ]
     case_specs=[
         ("drop-C06",lambda x:x["cases"].pop(5),"CP-COMP-COVERAGE"),
@@ -156,6 +163,14 @@ def main():
     muts=mutations(c,graph)
     if not {"model","runtime","accelerator","deployment","execution","observation","statistics","disposition"}.issubset(dependency_closure(["model"],graph)):
         fail("model dependency closure incomplete","CP-COMP-DEPENDENCY")
+    derived_only=deepcopy(c)
+    derived_only["cases"][0]["expected_disposition"]="DerivedOnly"
+    if digest(replay_input(c,graph))!=digest(replay_input(derived_only,graph)):
+        fail("replay input incorrectly depends on derived disposition","CP-COMP-INVARIANT")
+    altered_graph=deepcopy(graph)
+    altered_graph["edges"]=altered_graph["edges"][:-1]
+    if graph_identity(altered_graph)==graph_sha:
+        fail("graph identity is not sensitive to graph changes","CP-COMP-DEPENDENCY")
     deployment=dependency_closure(["deployment"],graph)
     if not {"deployment","execution","observation","statistics","disposition"}.issubset(deployment) or "model" in deployment or "representation" in deployment:
         fail("deployment invalidation boundary incorrect","CP-COMP-DEPENDENCY")
