@@ -65,6 +65,7 @@ def graph_identity(graph):
         "case_ids": graph["case_ids"],
         "replay_rule": graph["replay_rule"],
         "ordering_semantics": graph["ordering_semantics"],
+        "dependency_closure": graph["dependency_closure"],
     }
 
 def replay_digest(cases, graph):
@@ -82,7 +83,8 @@ def replay_digest(cases, graph):
 def check_graph(graph, cases):
     if set(graph) != {"schema", "historical_records_immutable",
                       "derived_dispositions_recomputable", "nodes", "edges",
-                      "case_ids", "replay_rule", "ordering_semantics", "coverage"}:
+                      "case_ids", "replay_rule", "ordering_semantics",
+                      "dependency_closure", "coverage"}:
         fail("state graph schema drift")
     if graph["schema"] != "mat-converge-002-state-graph-v1":
         fail("state graph schema mismatch")
@@ -96,6 +98,11 @@ def check_graph(graph, cases):
         fail("state graph replay rule mismatch")
     if graph["ordering_semantics"] != REPLAY_ORDERING:
         fail("state graph ordering semantics mismatch")
+    if graph["dependency_closure"] != (
+        "undirected-connected-component over immutable graph nodes; "
+        "all incident edge case IDs are invalidated"
+    ):
+        fail("state graph dependency closure semantics mismatch")
     nodes, edges = graph["nodes"], graph["edges"]
     if graph["case_ids"] != list(EXPECTED):
         fail("state graph case coverage drift")
@@ -200,20 +207,35 @@ def derived_snapshot(cases):
     }
 
 def graph_dependency_closure(cases, graph, changed_ref):
-    """Return cases whose immutable graph path contains changed_ref."""
+    """Return case IDs in the undirected immutable graph component of changed_ref."""
     node_by_id = {n["id"]: n for n in graph["nodes"]}
+    start_nodes = {
+        node_id for node_id, node in node_by_id.items()
+        if node["ref"] == changed_ref
+    }
+    if not start_nodes:
+        return []
+
+    adjacency = {node_id: set() for node_id in node_by_id}
+    edge_cases = {}
+    for edge in graph["edges"]:
+        adjacency[edge["from"]].add(edge["to"])
+        adjacency[edge["to"]].add(edge["from"])
+        edge_cases[edge["id"]] = edge["case_id"]
+
+    reachable = set(start_nodes)
+    frontier = list(sorted(start_nodes))
+    while frontier:
+        node_id = frontier.pop(0)
+        for neighbor in sorted(adjacency[node_id]):
+            if neighbor not in reachable:
+                reachable.add(neighbor)
+                frontier.append(neighbor)
+
     return sorted(
-        case["id"]
-        for case in cases
-        if changed_ref in {
-            node_by_id[edge["from"]]["ref"]
-            for edge in graph["edges"]
-            if edge["case_id"] == case["id"]
-        } | {
-            node_by_id[edge["to"]]["ref"]
-            for edge in graph["edges"]
-            if edge["case_id"] == case["id"]
-        }
+        edge_cases[edge["id"]]
+        for edge in graph["edges"]
+        if edge["from"] in reachable or edge["to"] in reachable
     )
 
 def check(doc, cases): 
@@ -415,7 +437,7 @@ def main():
         fail("structural coverage declaration missing")
     if set(declared_coverage) != {
         "mode", "case_level_cases", "graph_edge_cases", "graph_only_cases",
-        "graph_only_case_ids",
+        "graph_only_case_ids", "graph_only_case_reasons",
     }:
         fail("structural coverage declaration schema drift")
     if declared_coverage["mode"] != "partial-structural-graph-plus-case-oracle":
@@ -456,9 +478,9 @@ def main():
         "N04": "property/E1",
         "N05": "measurement/M1",
         "N06": "profile/P1",
+        "N07": "edge/C07",
     }
     for node_id, original_ref in node_mutation_expectations.items():
-        node = next(n for n in graph["nodes"] if n["id"] == node_id)
         mutated_graph = json.loads(json.dumps(graph))
         mutated_node = next(n for n in mutated_graph["nodes"] if n["id"] == node_id)
         field, value = original_ref.split("/", 1)
@@ -466,10 +488,29 @@ def main():
         mutated_node["generation"] = mutated_node["generation"] + "-MUTATED"
         before = dependency_projection(cases, graph)
         after = dependency_projection(cases, mutated_graph)
+        direct_expected = dependency_delta(before, after)
         expected = graph_dependency_closure(cases, graph, original_ref)
-        observed = dependency_delta(before, after)
-        if observed != expected:
-            fail(f"node mutation fanout mismatch for {node_id}: {observed} != {expected}")
+        if node_id == "N06":
+            if expected != ["C03"]:
+                fail(f"profile node closure drift: {expected}")
+        elif node_id == "N07":
+            if expected != ["C07"]:
+                fail(f"negative-edge node closure drift: {expected}")
+        else:
+            if expected != ["C01", "C02", "C03", "C04", "C05", "C07", "C09", "C10", "C16"]:
+                fail(f"core graph component closure drift for {node_id}: {expected}")
+        if node_id == "N07" and direct_expected != ["C07"]:
+            fail(f"negative-edge direct fanout mismatch: {direct_expected}")
+        if node_id != "N07" and node_id != "N06" and not set(expected).issuperset(direct_expected):
+            fail(f"transitive closure does not cover direct fanout for {node_id}")
+        # The graph mutation is an invalidation plan, not a rewrite of history:
+        # the selected cases are exactly the records eligible for recomputation.
+        if set(expected) != set(graph_dependency_closure(cases, graph, original_ref)):
+            fail(f"non-deterministic recomputation closure for {node_id}")
+
+    # Unknown immutable refs have no graph impact; fail-closed means no accidental fanout.
+    if graph_dependency_closure(cases, graph, "unknown/immutable-ref") != []:
+        fail("unknown graph ref acquired an accidental dependency closure")
 
     # The negative-edge node is a first-class historical tombstone: mutating
     # its case identity must be caught rather than allowing negative evidence
