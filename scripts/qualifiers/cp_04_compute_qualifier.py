@@ -151,7 +151,10 @@ def mutations(c,graph):
         mutated=deepcopy(graph); mut(mutated); validate_graph(mutated)
         caught=bool(FAILURES); detail=FAILURES[:]
         FAILURES.clear(); FAILURES.extend(old)
-        if not caught: fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
+        if not caught:
+            fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
+        elif not any(d["guard_id"] == guard for d in detail):
+            fail(f"mutation {label} was rejected by the wrong guard","CP-COMP-INVARIANT")
         out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
     for label,mut,guard in case_specs:
         old=FAILURES[:]; FAILURES.clear()
@@ -176,6 +179,9 @@ def main():
     for node,expected_closure in EXPECTED_CLOSURES.items():
         if dependency_closure([node],graph)!=expected_closure:
             fail(f"{node} invalidation closure incorrect","CP-COMP-DEPENDENCY")
+    derived_only=deepcopy(c)
+    for case in derived_only["cases"]:
+        case["expected_disposition"]="SyntheticDerivedDisposition"
     if digest(replay_input(c,graph))!=digest(replay_input(derived_only,graph)):
         fail("replay input incorrectly depends on derived disposition","CP-COMP-INVARIANT")
     altered_graph=deepcopy(graph)
