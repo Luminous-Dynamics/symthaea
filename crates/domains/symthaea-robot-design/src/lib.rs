@@ -1769,7 +1769,7 @@ mod tests {
         assert_eq!(forward_ids, reversed_ids);
     }
 
-    #[te    #[test]
+    #[test]
     fn domain_enumeration_candidates_are_canonical_by_parameter_id() {
         let domain = ExactDesignSearchDomainV1::new(vec![
             ExactDesignParameterDomainV1 {
@@ -1839,7 +1839,7 @@ mod tests {
         assert_ne!(narrow.id().unwrap(), broad.id().unwrap());
     }
 
-st]
+    #[test]
     fn domain_enumeration_is_exact_and_deterministic() {
         let id = ParameterIdV1::new("section_width").unwrap();
         let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
