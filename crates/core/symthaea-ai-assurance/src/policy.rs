@@ -896,6 +896,10 @@ impl std::error::Error for PolicyError {
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The private digest helper keeps every domain-separated admission field explicit and auditable rather than hiding identity-bearing inputs in an opaque aggregate.",
+)]
 fn compute_admission_digest(
     action_binding: [u8; 32],
     scope: &Scope,

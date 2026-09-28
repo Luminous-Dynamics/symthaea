@@ -406,6 +406,10 @@ impl<K: CapabilityKind, H> EffectGuardedAction<K, Authorized, H> {
     /// classify what happened using [`EffectAttemptOutcome`]. This means
     /// application-level failure and uncertainty still produce an `Executed`
     /// lineage that can be independently observed and resolved.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The failure retains the authorized effect action so exact preflight rejection remains recoverable without fabricating an attempt.",
+    )]
     pub fn execute_attempt_with<F>(
         self,
         attempt: F,
@@ -694,6 +698,10 @@ pub type EffectInnerExecutionError = PolicyGuardedExecutionError<BudgetAdapterEr
 /// Only the `Preflight` variant can currently return the original authorized
 /// wrapper intact. `RejectedBeforeAttempt` is still tracked by issue #140 because
 /// lower wrappers currently consume themselves on pre-adapter error.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "The preflight variant intentionally retains the full authorized effect action; boxing would change this public recovery representation.",
+)]
 pub enum EffectAttemptFailure<K: CapabilityKind, H> {
     /// This facade rejected exact execution authority before delegating into the
     /// lower effect path. The original authorized action is recoverable.
@@ -786,8 +794,9 @@ fn validate_temporal_evidence(
             current_epoch,
         });
     }
-    if let Some(expires_at) = temporal.execution_expires_at() {
-        if expires_at < now {
+    if let Some(expires_at) = temporal.execution_expires_at()
+        && expires_at < now
+    {
             return Err(ExecutionPreflightError::ExpiredExecutionGrant { expires_at, now });
         }
     }
