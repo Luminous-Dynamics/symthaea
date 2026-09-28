@@ -21,7 +21,7 @@ from collections import defaultdict
 SUBJECT_SHA = "f3a38ed769d5d2477e6ec5094919150e48638710"
 BASE_SHA = "646b74d184ad908429956d17faaf949364311d1e"
 SCRIPT_PATH = pathlib.Path(
-    ".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh"
+    ".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v2.sh"
 )
 EXPECTED_FILES = [
     "crates/domains/symthaea-muse/src/evidence_digest.rs",

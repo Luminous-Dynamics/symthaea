@@ -13,7 +13,7 @@
 # Preferred local invocation:
 #
 #   nix develop -c bash \
-#     .github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh
+#     .github/qualification/qualify-melothaea-prog-suite-tonal-chain-v2.sh
 
 set -euo pipefail
 
@@ -31,7 +31,7 @@ cd "$outer_root"
 
 qualifier_sha="$(git rev-parse HEAD)"
 qualifier_tree="$(git rev-parse 'HEAD^{tree}')"
-script_path=".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh"
+script_path=".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v2.sh"
 receipt_path="${MEL_TONAL_QUAL_RECEIPT:-${TMPDIR:-/tmp}/melothaea-prog-suite-tonal-chain-qualification-v2.tsv}"
 worktree=""
 status="FAIL"
