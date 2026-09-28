@@ -320,11 +320,33 @@ pub const EXACT_PARAMETER_SCHEMA_ID: &str = "symthaea.robot-design.exact-paramet
 pub const EXACT_PARAMETER_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "ExactDesignParameterSetWireV1")]
 pub struct ExactDesignParameterSetV1 {
     pub schema_id: String,
     pub schema_version: u32,
     pub parameters: Vec<ExactDesignLengthParameterV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExactDesignParameterSetWireV1 {
+    schema_id: String,
+    schema_version: u32,
+    parameters: Vec<ExactDesignLengthParameterV1>,
+}
+
+impl TryFrom<ExactDesignParameterSetWireV1> for ExactDesignParameterSetV1 {
+    type Error = RobotDesignError;
+
+    fn try_from(value: ExactDesignParameterSetWireV1) -> Result<Self, Self::Error> {
+        let set = Self {
+            schema_id: value.schema_id,
+            schema_version: value.schema_version,
+            parameters: value.parameters,
+        };
+        set.validate()?;
+        Ok(set)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -409,11 +431,33 @@ pub const EXACT_SEARCH_DOMAIN_SCHEMA_ID: &str = "symthaea.robot-design.search-do
 pub const EXACT_SEARCH_DOMAIN_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "ExactDesignSearchDomainWireV1")]
 pub struct ExactDesignSearchDomainV1 {
     pub schema_id: String,
     pub schema_version: u32,
     pub parameters: Vec<ExactDesignParameterDomainV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ExactDesignSearchDomainWireV1 {
+    schema_id: String,
+    schema_version: u32,
+    parameters: Vec<ExactDesignParameterDomainV1>,
+}
+
+impl TryFrom<ExactDesignSearchDomainWireV1> for ExactDesignSearchDomainV1 {
+    type Error = RobotDesignError;
+
+    fn try_from(value: ExactDesignSearchDomainWireV1) -> Result<Self, Self::Error> {
+        let domain = Self {
+            schema_id: value.schema_id,
+            schema_version: value.schema_version,
+            parameters: value.parameters,
+        };
+        domain.validate()?;
+        Ok(domain)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -2100,6 +2144,32 @@ mod tests {
         assert_eq!(restored, domain);
         assert_eq!(restored.id().unwrap(), domain.id().unwrap());
         assert_eq!(restored.canonical_transcript().unwrap(), domain.canonical_transcript().unwrap());
+    }
+
+    #[test]
+    fn exact_parameter_set_serde_rejects_semantically_invalid_payloads() {
+        let empty: Result<ExactDesignParameterSetV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.exact-parameters.v1","schema_version":1,"parameters":[]}"#,
+        );
+        assert!(empty.is_err());
+
+        let wrong_schema: Result<ExactDesignParameterSetV1, _> = serde_json::from_str(
+            r#"{"schema_id":"other","schema_version":1,"parameters":[{"id":"section_width","value":20000}]}"#,
+        );
+        assert!(wrong_schema.is_err());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_rejects_semantically_invalid_payloads() {
+        let empty: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[]}"#,
+        );
+        assert!(empty.is_err());
+
+        let zero_step: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Range":{"lower":20000,"upper":22000,"step_um":0}}}]}"#,
+        );
+        assert!(zero_step.is_err());
     }
 
     #[test]
