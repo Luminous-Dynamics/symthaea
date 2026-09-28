@@ -1558,7 +1558,7 @@ mod tests {
     #[test]
     fn exact_domain_serde_rejects_unknown_variant_fields() {
         let result: Result<ExactLengthDomainV1, _> =
-            serde_json::from_str(r#"{\"Range\":{\"lower\":1,\"upper\":2,\"step_um\":1,\"extra\":1}}"#);
+            serde_json::from_str(r#"{"Range":{"lower":1,"upper":2,"step_um":1,"extra":1}}"#);
         assert!(result.is_err());
     }
 
