@@ -1,0 +1,166 @@
+{
+  "schema": "mat-converge-002-fixture-v1",
+  "claim_ceiling": "deterministic composition and anti-drift semantics over synthetic/reference materials workflows only",
+  "cases": [
+    {
+      "id": "C01",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "supported"
+    },
+    {
+      "id": "C02",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G2",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "historical-chemistry-unchanged"
+    },
+    {
+      "id": "C03",
+      "demand": "D1",
+      "profile": "P2",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "profile-rebind-required"
+    },
+    {
+      "id": "C04",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E2",
+      "measurement": "M1",
+      "outcome": "evaluator-dependent"
+    },
+    {
+      "id": "C05",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M2",
+      "outcome": "measurement-generation-dependent"
+    },
+    {
+      "id": "C06",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "B",
+      "process": "G1",
+      "property": "E3",
+      "measurement": "M1",
+      "outcome": "candidate-ranking-does-not-mutate-evidence"
+    },
+    {
+      "id": "C07",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "C",
+      "process": "G1",
+      "property": "E4",
+      "measurement": "M1",
+      "outcome": "negative-edge-addressable"
+    },
+    {
+      "id": "C08",
+      "demand": "D2",
+      "profile": "P1",
+      "candidate": "C",
+      "process": "G1",
+      "property": "E4",
+      "measurement": "M1",
+      "outcome": "negative-edge-addressable"
+    },
+    {
+      "id": "C09",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "advisory-equal-to-measurement-stays-advisory"
+    },
+    {
+      "id": "C10",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "D",
+      "process": "G1",
+      "property": "E5",
+      "measurement": "M1",
+      "outcome": "dfT-equal-to-experiment-stays-distinct"
+    },
+    {
+      "id": "C11",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "one-specimen-not-population"
+    },
+    {
+      "id": "C12",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "high-eig-unmeasurable-rejected"
+    },
+    {
+      "id": "C13",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "high-eig-manufacturing-infeasible-rejected"
+    },
+    {
+      "id": "C14",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "lower-tail-hard-envelope-fails"
+    },
+    {
+      "id": "C15",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "correlated-evaluators-not-independent"
+    },
+    {
+      "id": "C16",
+      "demand": "D1",
+      "profile": "P1",
+      "candidate": "A",
+      "process": "G1",
+      "property": "E1",
+      "measurement": "M1",
+      "outcome": "synthetic-pass-no-physical-authority"
+    }
+  ]
+}
