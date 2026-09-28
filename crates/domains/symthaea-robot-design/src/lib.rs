@@ -240,7 +240,7 @@ impl C0LengthUmV1 {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(try_from = "ExactRationalWireV1")]
-pub struct ExactRationalV1 { pub numerator: u128, pub denominator: u128 }
+pub struct ExactRationalV1 { numerator: u128, denominator: u128 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 struct ExactRationalWireV1 { numerator: u128, denominator: u128 }
@@ -261,6 +261,10 @@ impl ExactRationalV1 {
         let divisor = gcd_u128(numerator, denominator);
         Ok(Self { numerator: numerator / divisor, denominator: denominator / divisor })
     }
+
+    pub const fn numerator(self) -> u128 { self.numerator }
+
+    pub const fn denominator(self) -> u128 { self.denominator }
 
     /// Re-check invariants after deserialization or other untrusted construction.
     pub fn validate(self) -> Result<(), RobotDesignError> {
@@ -1418,7 +1422,7 @@ mod tests {
 
     #[test]
     fn exact_length_conversion_is_reduced_rational() {
-        assert_eq!(C0LengthUmV1::new(20_000).unwrap().millimetres(), ExactRationalV1 { numerator: 20, denominator: 1 });
+        assert_eq!(C0LengthUmV1::new(20_000).unwrap().millimetres(), ExactRationalV1::new(20, 1).unwrap());
     }
 
     #[test]
@@ -1446,15 +1450,19 @@ mod tests {
     }
 
     #[test]
-    fn deserialized_noncanonical_rational_fails_validation() {
-        let rational = ExactRationalV1 { numerator: 20, denominator: 1000 };
-        assert_eq!(rational.validate(), Err(RobotDesignError::NonCanonicalRational));
+    fn exact_rational_constructor_canonicalizes() {
+        let rational = ExactRationalV1::new(20, 1_000).unwrap();
+        assert_eq!(rational.numerator(), 1);
+        assert_eq!(rational.denominator(), 50);
+        assert_eq!(rational.validate(), Ok(()));
     }
 
     #[test]
-    fn deserialized_zero_denominator_rational_fails_validation() {
-        let rational = ExactRationalV1 { numerator: 1, denominator: 0 };
-        assert_eq!(rational.validate(), Err(RobotDesignError::InvalidRational));
+    fn exact_rational_constructor_rejects_zero_denominator() {
+        assert_eq!(
+            ExactRationalV1::new(1, 0),
+            Err(RobotDesignError::InvalidRational)
+        );
     }
 
     fn deserialized_zero_length_cannot_pass_parameter_validation() {
