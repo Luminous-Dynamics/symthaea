@@ -232,7 +232,7 @@ def recomputation_snapshot(cases, graph, invalidation_plan):
     }
 
 def recomputed_result_digest(cases, invalidation_plan):
-    """Digest only the derived dispositions selected by the immutable plan."""
+    """Digest only the complete derived result selected by the immutable plan."""
     selected = set(invalidation_plan["recompute_case_ids"])
     records = [
         {
@@ -242,6 +242,8 @@ def recomputed_result_digest(cases, invalidation_plan):
         for case in cases
         if case["id"] in selected
     ]
+    if {record["case_id"] for record in records} != selected:
+        fail("recomputed result does not cover the complete invalidation boundary")
     return hashlib.sha256(canonical({
         "schema": "mat-converge-002-recomputed-result-v1",
         "invalidation_plan_digest": invalidation_plan["digest"],
@@ -269,6 +271,33 @@ def replay_session(cases, graph, invalidation_plan, recomputed_cases):
         **payload,
         "digest": hashlib.sha256(canonical(payload)).hexdigest(),
     }
+
+def validate_replay_session(cases, graph, invalidation_plan, recomputed_cases, session):
+    """Verify that every replay-session field belongs to one replay epoch."""
+    expected_plan = canonical_invalidation_plan(
+        cases, graph, invalidation_plan["changed_ref"]
+    )
+    if invalidation_plan != expected_plan:
+        fail("replay session references a non-canonical invalidation plan")
+    expected_snapshot = recomputation_snapshot(cases, graph, expected_plan)
+    expected_result_digest = recomputed_result_digest(
+        recomputed_cases, expected_plan
+    )
+    payload = {
+        "schema": "mat-converge-002-replay-session-v1",
+        "base_replay_digest": replay_digest(cases, graph),
+        "invalidation_plan_digest": expected_plan["digest"],
+        "recomputation_snapshot_digest": expected_snapshot["digest"],
+        "recomputed_result_digest": expected_result_digest,
+    }
+    expected = {
+        **payload,
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
+    if session != expected:
+        fail("replay session mixes artifacts from different replay epochs")
+    return expected
+
 
 def validate_recomputation_snapshot(cases, graph, invalidation_plan, snapshot):
     """Verify that a snapshot is bound to the exact canonical invalidation plan."""
@@ -574,6 +603,34 @@ def main():
     }
     if session_baseline["digest"] != hashlib.sha256(canonical(session_payload)).hexdigest():
         fail("replay session digest is not self-consistent")
+    validate_replay_session(cases, graph, canonical_plan, cases, session_baseline)
+
+    # Cross-epoch composition is forbidden: a session must not accept a result
+    # produced under a different invalidation boundary.
+    alternate_plan = canonical_invalidation_plan(cases, graph, "profile/P1")
+    alternate_cases = json.loads(json.dumps(cases))
+    alternate_cases[2]["outcome"] = "alternate-recomputed-disposition"
+    alternate_session = replay_session(
+        cases, graph, alternate_plan, alternate_cases
+    )
+    mixed_session = json.loads(json.dumps(session_baseline))
+    mixed_session["invalidation_plan_digest"] = alternate_session["invalidation_plan_digest"]
+    mixed_session["recomputed_result_digest"] = alternate_session["recomputed_result_digest"]
+    mixed_session["digest"] = hashlib.sha256(canonical({
+        "schema": mixed_session["schema"],
+        "base_replay_digest": mixed_session["base_replay_digest"],
+        "invalidation_plan_digest": mixed_session["invalidation_plan_digest"],
+        "recomputation_snapshot_digest": mixed_session["recomputation_snapshot_digest"],
+        "recomputed_result_digest": mixed_session["recomputed_result_digest"],
+    })).hexdigest()
+    try:
+        validate_replay_session(
+            cases, graph, canonical_plan, alternate_cases, mixed_session
+        )
+    except AssertionError:
+        pass
+    else:
+        fail("cross-epoch replay artifacts were composable")
 
     # A derived-only recomputation changes the result identity, while the
     # immutable replay inputs and recomputation boundary remain unchanged.
