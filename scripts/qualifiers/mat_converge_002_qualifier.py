@@ -42,6 +42,57 @@ COVERAGE_REASONS = {
 def fail(msg):
     raise AssertionError(msg)
 
+FAILURE_DIAGNOSTICS = []
+REQUIRED_FAILURE_CATEGORIES = {
+    "authority", "negative-evidence", "coverage",
+    "historical-identity", "dependency-boundary", "schema-integrity",
+}
+EXPECTED_CATEGORIES = {
+    "remove-process-ref": "historical-identity",
+    "change-process-generation": "historical-identity",
+    "change-profile-ref": "historical-identity",
+    "change-evaluator-generation": "historical-identity",
+    "change-measurement-generation": "historical-identity",
+    "change-ranking-only": "schema-integrity",
+    "delete-negative-case": "negative-evidence",
+    "promote-authority": "authority",
+    "change-disposition": "invariant-integrity",
+    "rewrite-historical-ref": "historical-identity",
+    "rewrite-negative-node-tombstone": "negative-evidence",
+    "coverage-mode": "coverage",
+    "coverage-case-count": "coverage",
+    "coverage-edge-count": "coverage",
+    "coverage-only-count": "coverage",
+    "coverage-only-identities": "coverage",
+    "coverage-only-reason": "coverage",
+    "rewrite-graph-edge-kind": "schema-integrity",
+    "delete-graph-negative-edge": "negative-evidence",
+    "rewrite-graph-case-binding": "schema-integrity",
+    "rewrite-candidate-node-ref": "historical-identity",
+    "rewrite-process-node-generation": "historical-identity",
+    "rewrite-property-node-kind": "schema-integrity",
+    "rewrite-case-coverage-manifest": "coverage",
+}
+def failure_category(message):
+    text = message.lower()
+    if any(token in text for token in ("authority", "physical-authority", "advisory")): return "authority"
+    if any(token in text for token in ("negative", "tombstone")): return "negative-evidence"
+    if any(token in text for token in ("coverage", "case coverage", "graph coverage")): return "coverage"
+    if any(token in text for token in ("historical", "immutable", "generation", "ref")): return "historical-identity"
+    if any(token in text for token in ("dependency", "closure", "fanout")): return "dependency-boundary"
+    if any(token in text for token in ("schema", "ordering")): return "schema-integrity"
+    return "invariant-integrity"
+def record_failure(doc, cases, label, expected_category):
+    try:
+        check(doc, cases)
+    except AssertionError as exc:
+        actual_category = failure_category(str(exc))
+        if actual_category != expected_category:
+            fail(f"mutation category drift: {label}: expected {expected_category}, got {actual_category}")
+        FAILURE_DIAGNOSTICS.append({"mutation": label, "category": actual_category})
+        return actual_category
+    fail(f"mutation escaped oracle: {label}")
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
 
