@@ -1,0 +1,52 @@
+name: ENV-EXEC-001Q-R1-v2 Focused Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/qual-env-exec-001q-r1-v2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: env-exec-001q-r1-v2-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_SOURCE_SHA: 48d8df94977b058157d2d423b575a04803aedaaf
+
+jobs:
+  xtask:
+    name: ENV-EXEC-001Q-R1-v2 (Rust 1.96)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact source evidence subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SOURCE_SHA }}
+          fetch-depth: 1
+
+      - name: Assert exact source head
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SOURCE_SHA"
+          echo "Qualified source head: $actual"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format changed repair files
+        run: |
+          rustfmt --check             xtask/src/cargo_adapter_commit.rs             xtask/src/cargo_adapter_postflight.rs
+
+      - name: Test xtask
+        run: cargo test --locked -p xtask
+
+      - name: Clippy xtask (all targets)
+        run: cargo clippy --locked -p xtask --all-targets -- -D warnings
