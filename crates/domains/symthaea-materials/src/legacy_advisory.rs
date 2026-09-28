@@ -74,6 +74,41 @@ pub enum AdvisoryInputError {
     UnnormalizedComposition,
 }
 
+
+/// Typed advisory boundary for the critical-minerals mining predictor.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdvisoryMiningPredictionV1 {
+    pub identity: AdvisoryIdentityV1,
+    pub authority: AdvisoryAuthorityV1,
+    pub horizon_seconds: f32,
+    pub predicted_state: Vec<f32>,
+}
+
+/// Typed advisory boundary for the strategic-materials predictor.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdvisoryStrategicPredictionV1 {
+    pub identity: AdvisoryIdentityV1,
+    pub authority: AdvisoryAuthorityV1,
+    pub horizon_seconds: f32,
+    pub predicted_state: Vec<f32>,
+}
+
+/// Typed advisory boundary for a mining FEP action recommendation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct AdvisoryMiningActionV1 {
+    pub identity: AdvisoryIdentityV1,
+    pub authority: AdvisoryAuthorityV1,
+    pub action: crate::mining::MiningFepAction,
+}
+
+/// Typed advisory boundary for a strategic-materials FEP action recommendation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct AdvisoryStrategicActionV1 {
+    pub identity: AdvisoryIdentityV1,
+    pub authority: AdvisoryAuthorityV1,
+    pub action: crate::strategic::StrategicFepAction,
+}
+
 /// A legacy heuristic stability prediction, never a thermodynamic evidence record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryStabilityPredictionV1 {
@@ -255,6 +290,27 @@ mod tests {
         assert_eq!(AdvisoryStabilityPredictionV1::try_predict(&[(26, 1.0)], f64::NAN), Err(AdvisoryInputError::InvalidTemperature));
         assert_eq!(AdvisoryStabilityPredictionV1::try_predict(&[(26, 0.2), (28, 0.2)], 300.0), Err(AdvisoryInputError::UnnormalizedComposition));
         assert!(AdvisoryStabilityPredictionV1::try_predict(&[(26, 0.5), (28, 0.5)], 300.0).is_ok());
+    }
+
+
+    #[test]
+    fn domain_predictions_remain_advisory() {
+        use crate::mining::{MiningHdcEncoder, MiningPredictor, MiningReading};
+        use crate::strategic::{StrategicHdcEncoder, StrategicPredictor, StrategicReading};
+        use symthaea_core::hdc::unified_hv::HDC_DIMENSION;
+
+        let mining = MiningHdcEncoder::new().encode(&MiningReading { ore_grade: 0.5, extraction_rate: 0.7, environmental_impact: 0.1, cost: 0.4 });
+        let strategic = StrategicHdcEncoder::new().encode(&StrategicReading { extreme_temp_resilience: 0.9, radiation_dose: 0.1, time_at_condition: 86_400.0, failure_probability: 0.001 });
+        let mp = MiningPredictor::new().predict_at_horizon(&mining, 86_400.0);
+        let sp = StrategicPredictor::new().predict_at_horizon(&strategic, 86_400.0);
+        assert_eq!(mp.dim(), HDC_DIMENSION);
+        assert_eq!(sp.dim(), HDC_DIMENSION);
+        let mi = AdvisoryIdentityV1 { domain: "critical_minerals".into(), model_generation: "mining-predictor-v1".into(), input_generation: "synthetic-fixture-v1".into() };
+        let si = AdvisoryIdentityV1 { domain: "strategic_materials".into(), model_generation: "strategic-predictor-v1".into(), input_generation: "synthetic-fixture-v1".into() };
+        let ma = AdvisoryMiningPredictionV1 { identity: mi.clone(), authority: AdvisoryAuthorityV1::Advisory, horizon_seconds: 86_400.0, predicted_state: mp.as_slice().to_vec() };
+        let sa = AdvisoryStrategicPredictionV1 { identity: si.clone(), authority: AdvisoryAuthorityV1::Advisory, horizon_seconds: 86_400.0, predicted_state: sp.as_slice().to_vec() };
+        assert_eq!(ma.authority, AdvisoryAuthorityV1::Advisory);
+        assert_eq!(sa.authority, AdvisoryAuthorityV1::Advisory);
     }
 
     #[test]
