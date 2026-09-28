@@ -18,6 +18,8 @@ impl ProspectiveProvenance {
     pub fn new(input: impl Into<String>, artifact: impl Into<String>, lineage: impl Into<String>, knowledge: impl Into<String>, exposure: impl Into<String>) -> Result<Self, CommitmentError> {
         let p=Self { exact_input_digest:input.into(), artifact_digest:artifact.into(), model_lineage:lineage.into(), knowledge_cutoff:knowledge.into(), exposure_cutoff:exposure.into() };
         for (n,v) in [("exact_input_digest",&p.exact_input_digest),("artifact_digest",&p.artifact_digest),("model_lineage",&p.model_lineage),("knowledge_cutoff",&p.knowledge_cutoff),("exposure_cutoff",&p.exposure_cutoff)] { if v.trim().is_empty(){return Err(CommitmentError::MissingField(n));} }
+        validate_cutoff(&p.knowledge_cutoff)?;
+        validate_cutoff(&p.exposure_cutoff)?;
         if p.exposure_cutoff < p.knowledge_cutoff { return Err(CommitmentError::ExposureBeforeKnowledgeCutoff); }
         Ok(p)
     }
@@ -50,8 +52,16 @@ impl ProspectivePredictionCommitment {
         n.parent_event_ids.push(self.event_id.clone());n.event_id=n.digest();Ok(n)
     }
 }
+fn validate_cutoff(value:&str)->Result<(),CommitmentError>{
+    let b=value.as_bytes();
+    if b.len()!=20 || b[4]!=b'-' || b[7]!=b'-' || b[10]!=b'T' || b[13]!=b':' || b[16]!=b':' || b[19]!=b'Z'
+        || ![0,1,2,3,5,6,8,9,11,12,14,15,17,18].iter().all(|&i| b[i].is_ascii_digit()) {
+        return Err(CommitmentError::InvalidCutoff);
+    }
+    Ok(())
+}
 fn hash(bytes:&[u8])->String{let mut h=Sha256::new();h.update(bytes);format!("sha256:{:x}",h.finalize())}
 #[derive(Debug,Clone,PartialEq,Eq)]
-pub enum CommitmentError{MissingField(&'static str),EmptyPredictionPayload,ExposureBeforeKnowledgeCutoff}
+pub enum CommitmentError{MissingField(&'static str),EmptyPredictionPayload,ExposureBeforeKnowledgeCutoff,InvalidCutoff}
 impl fmt::Display for CommitmentError{fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result{write!(f,"{self:?}")}}
 impl std::error::Error for CommitmentError{}
