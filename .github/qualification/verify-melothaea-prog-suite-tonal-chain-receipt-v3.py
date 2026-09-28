@@ -114,6 +114,21 @@ def sha256(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
+def git_blob_sha256(repo: pathlib.Path, revision: str, relative_path: pathlib.Path) -> str:
+    proc = subprocess.run(
+        ["git", "show", f"{revision}:{relative_path.as_posix()}"],
+        cwd=repo,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        raise VerificationError(
+            f"cannot read frozen subject blob {revision}:{relative_path}: "
+            f"{proc.stderr.decode(errors="replace").strip()}"
+        )
+    return hashlib.sha256(proc.stdout).hexdigest()
+
+
 def parse_receipt(path: pathlib.Path) -> tuple[dict[str, str], dict[str, list[str]]]:
     scalars: dict[str, str] = {}
     repeated: dict[str, list[str]] = defaultdict(list)
@@ -230,11 +245,10 @@ def main() -> int:
         raise VerificationError("qualifier script digest mismatch")
 
     for key, relative_path in BOUND_FILES.items():
-        path = repo / relative_path
-        if not path.is_file():
-            raise VerificationError(f"bound subject file missing: {relative_path}")
-        if values[key] != sha256(path):
-            raise VerificationError(f"{key} does not match frozen checkout bytes")
+        if values[key] != git_blob_sha256(repo, SUBJECT_SHA, relative_path):
+            raise VerificationError(
+                f"{key} does not match the bytes at the frozen subject commit"
+            )
 
     actual_subject_tree = run(repo, "git", "rev-parse", f"{SUBJECT_SHA}^{{tree}}")
     actual_parent = run(repo, "git", "rev-parse", f"{SUBJECT_SHA}^")
