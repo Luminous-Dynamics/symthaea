@@ -159,6 +159,13 @@ def dependency_projection(cases, graph):
         projection[case["id"]] = tuple(sorted(refs))
     return projection
 
+def dependency_delta(before, after):
+    """Return case IDs whose immutable dependency projections changed."""
+    return sorted(
+        case_id for case_id in before
+        if before[case_id] != after[case_id]
+    )
+
 def check(doc, cases): 
     if doc.get("campaign_id") != "MAT-CONVERGE-002A1":
         fail("campaign identity missing")
@@ -280,6 +287,15 @@ def main():
         pass
     else:
         fail("historical mutation unexpectedly accepted as qualified fixture")
+
+    # Minimal invalidation: a localized historical generation change must
+    # affect only the case that actually references that generation.
+    localized_projection = dependency_projection(localized, graph)
+    if dependency_delta(baseline_projection, localized_projection) != ["C02"]:
+        fail("historical generation mutation cascaded beyond its dependent case")
+    for case_id in (case_id for case_id in EXPECTED if case_id != "C02"):
+        if baseline_projection[case_id] != localized_projection[case_id]:
+            fail(f"unrelated dependency projection changed: {case_id}")
 
     graph_mutations = [
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
