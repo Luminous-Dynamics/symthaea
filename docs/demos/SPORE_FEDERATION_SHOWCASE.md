@@ -331,6 +331,10 @@ Add provenance export, refusal ledger, and replay qualification.
 
 Package the three-minute public demo script.
 
+### SPORE-FED-001H
+
+Qualify cross-layer evidence seams: identity → claim → verification → policy → execution, with transport delivery kept independent from domain execution. See `crates/domains/symthaea-spore/docs/FEDERATION_EVIDENCE_SEAMS_V1.md`.
+
 ## Non-goals
 
 This showcase does not establish:
