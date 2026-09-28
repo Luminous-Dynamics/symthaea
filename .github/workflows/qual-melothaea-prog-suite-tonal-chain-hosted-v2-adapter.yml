@@ -15,7 +15,7 @@ concurrency:
 env:
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
   UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
-  QUALIFIER_SHA: e62cb5a63da47870bae80c9f422a9eab8cada55f
+  QUALIFIER_SHA: 8425556c041601a72029c2882cd739d9bdc0fb01
   MEL_TONAL_QUAL_RECEIPT: ${{ github.workspace }}/melothaea-prog-suite-tonal-chain-qualification-v3.tsv
 
 jobs:
