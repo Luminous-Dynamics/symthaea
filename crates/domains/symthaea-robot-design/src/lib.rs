@@ -1716,7 +1716,7 @@ mod tests {
         );
     }
 
-    #[te    #[test]
+    #[test]
     fn domain_enumeration_order_is_identity_stable() {
         let make_domain = |first: &str, second: &str| {
             ExactDesignSearchDomainV1::new(vec![
