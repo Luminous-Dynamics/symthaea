@@ -21,7 +21,7 @@ from collections import defaultdict
 SUBJECT_SHA = "f3a38ed769d5d2477e6ec5094919150e48638710"
 BASE_SHA = "646b74d184ad908429956d17faaf949364311d1e"
 SCRIPT_PATH = pathlib.Path(
-    ".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh"
+    ".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v2.sh"
 )
 EXPECTED_FILES = [
     "crates/domains/symthaea-muse/src/evidence_digest.rs",
@@ -40,8 +40,7 @@ GATES = [
     "surface_gate",
     "toolchain_gate",
     "metadata_gate",
-    "fmt_music_theory_gate",
-    "fmt_muse_gate",
+    "fmt_subject_gate",
     "test_music_theory_gate",
     "test_muse_gate",
     "check_music_theory_gate",
@@ -160,8 +159,8 @@ def main() -> int:
         raise VerificationError(f"receipt does not exist: {receipt}")
     values, repeated = parse_receipt(receipt)
 
-    expect(values, "schema", "melothaea-prog-suite-tonal-chain-qualification-v1")
-    expect(values, "qualifier_id", "melothaea-prog-suite-tonal-chain-qualification-v1")
+    expect(values, "schema", "melothaea-prog-suite-tonal-chain-qualification-v2")
+    expect(values, "qualifier_id", "melothaea-prog-suite-tonal-chain-qualification-v2")
     expect(values, "status", "PASS")
     expect(values, "exit_code", "0")
     expect(values, "terminal_stage", "none")
