@@ -166,6 +166,23 @@ def dependency_delta(before, after):
         if before[case_id] != after[case_id]
     )
 
+def graph_dependency_closure(cases, graph, changed_ref):
+    """Return cases whose immutable graph path contains changed_ref."""
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    return sorted(
+        case["id"]
+        for case in cases
+        if changed_ref in {
+            node_by_id[edge["from"]]["ref"]
+            for edge in graph["edges"]
+            if edge["case_id"] == case["id"]
+        } | {
+            node_by_id[edge["to"]]["ref"]
+            for edge in graph["edges"]
+            if edge["case_id"] == case["id"]
+        }
+    )
+
 def check(doc, cases): 
     if doc.get("campaign_id") != "MAT-CONVERGE-002A1":
         fail("campaign identity missing")
@@ -297,8 +314,14 @@ def main():
     localized_projection_with_graph = dependency_projection(localized, localized_graph)
     if dependency_delta(baseline_projection, localized_projection) != ["C02"]:
         fail("historical generation mutation cascaded beyond its dependent case")
+    expected_graph_closure = graph_dependency_closure(cases, graph, "process/G1")
+    if expected_graph_closure != ["C02", "C04"]:
+        fail("unexpected process dependency closure in baseline graph")
     if dependency_delta(baseline_projection, localized_projection_with_graph) != ["C01", "C02", "C04", "C07", "C09", "C10", "C16"]:
         fail("graph generation mutation does not expose its true dependent cases")
+    actual_changed = "process/G3"
+    if actual_changed in set(localized_projection["C02"]):
+        fail("case-local projection accepted an unqualified replacement generation")
     for case_id in (case_id for case_id in EXPECTED if case_id != "C02"):
         if baseline_projection[case_id] != localized_projection[case_id]:
             fail(f"unrelated dependency projection changed: {case_id}")
