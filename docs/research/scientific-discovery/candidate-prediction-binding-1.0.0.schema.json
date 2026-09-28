@@ -4,6 +4,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
+    "commitment",
     "candidate_id",
     "source_candidate_id",
     "test_specification_id",
@@ -12,10 +13,107 @@
     "binding_digest"
   ],
   "properties": {
-    "candidate_id": { "type": "string", "minLength": 1 },
-    "source_candidate_id": { "type": "string", "minLength": 1 },
-    "test_specification_id": { "type": "string", "minLength": 1 },
-    "measurement_specification_id": { "type": "string", "minLength": 1 },
+    "commitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "challenge_id",
+        "criteria_generation",
+        "mapping_generation",
+        "actor_id",
+        "created_at",
+        "provenance",
+        "payload_digest",
+        "parent_event_ids"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criteria_generation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mapping_generation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "exact_input_digest",
+            "artifact_digest",
+            "model_lineage",
+            "knowledge_cutoff",
+            "exposure_cutoff"
+          ],
+          "properties": {
+            "exact_input_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifact_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "model_lineage": {
+              "type": "string",
+              "minLength": 1
+            },
+            "knowledge_cutoff": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            },
+            "exposure_cutoff": {
+              "type": "string",
+              "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+            }
+          }
+        },
+        "payload_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "parent_event_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "measurement_specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "lineage_digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
@@ -31,7 +129,8 @@
     "prediction commitment is not an observation",
     "prediction commitment is not replication",
     "prediction commitment is not official criterion evidence",
-    "model-implied likelihood is not a calibrated experimental probability"
+    "model-implied likelihood is not a calibrated experimental probability",
+    "supersession is lineage history, not experimental corroboration"
   ],
-  "description": "A verifiable envelope around an immutable prospective prediction commitment. The canonical binding includes both model lineages; the embedded commitment payload digest, binding digest, lineage digest, and event identity are independently verifiable."
+  "description": "Serialized CandidatePredictionCommitment envelope. The nested immutable prospective commitment carries its event identity and parent lineage; the outer envelope carries candidate/test/measurement identity and independently verifiable binding and model-lineage digests."
 }
