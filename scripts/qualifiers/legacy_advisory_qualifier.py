@@ -42,6 +42,10 @@ def source_oracle(src: str) -> None:
     body = authority_enum_body(src)
     variants = re.findall(r"^\s*([A-Z][A-Za-z0-9_]*)\s*,?\s*(?://.*)?$", body, re.M)
     assert_true(variants == ["Advisory"], f"unexpected authority variants: {variants!r}")
+    m = re.search(r"LEGACY_ADVISORY_QUALIFIER_CASES_V1: &[&str] = &\\[(?P<body>.*?)\\];", src, re.S)
+    assert_true(m is not None, "qualifier manifest missing")
+    manifest_cases = tuple(re.findall(r'"([^"]+)"', m.group("body")))
+    assert_true(manifest_cases == CASES, "qualifier manifest drifted from independent corpus")
     assert_true("pub authority: AdvisoryAuthorityV1" in src, "typed authority field missing")
     assert_true("model_generation: String" in src and "input_generation: String" in src,
                 "identity generations missing")
@@ -81,6 +85,7 @@ def mutation_oracle(src: str) -> None:
         "remove-scientific-firewall": src.replace(
             "no conversion into source-bearing scientific evidence",
             "conversion into source-bearing scientific evidence", 1),
+        "manifest-case-mutation": src.replace('"authority-explicit",', '"authority-mutated",', 1),
         "constructor-promotes-authority": src.replace(
             "authority: AdvisoryAuthorityV1::Advisory", "authority: AdvisoryAuthorityV1::Evidence", 1),
     }
