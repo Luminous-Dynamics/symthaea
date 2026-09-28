@@ -209,8 +209,16 @@ pub struct ControlInterfaceDesignV1 {
 
 /// Exact positive designer-chosen length in micrometres.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
+#[serde(transparent, try_from = "u64")]
 pub struct C0LengthUmV1(u64);
+
+impl TryFrom<u64> for C0LengthUmV1 {
+    type Error = RobotDesignError;
+
+    fn try_from(value_um: u64) -> Result<Self, Self::Error> {
+        Self::new(value_um)
+    }
+}
 
 impl C0LengthUmV1 {
     pub const fn new(value_um: u64) -> Result<Self, RobotDesignError> {
@@ -231,7 +239,21 @@ impl C0LengthUmV1 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(try_from = "ExactRationalWireV1")]
 pub struct ExactRationalV1 { pub numerator: u128, pub denominator: u128 }
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+struct ExactRationalWireV1 { numerator: u128, denominator: u128 }
+
+impl TryFrom<ExactRationalWireV1> for ExactRationalV1 {
+    type Error = RobotDesignError;
+
+    fn try_from(value: ExactRationalWireV1) -> Result<Self, Self::Error> {
+        let rational = Self::new(value.numerator, value.denominator)?;
+        rational.validate()?;
+        Ok(rational)
+    }
+}
 
 impl ExactRationalV1 {
     pub fn new(numerator: u128, denominator: u128) -> Result<Self, RobotDesignError> {
@@ -253,8 +275,16 @@ impl ExactRationalV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
+#[serde(transparent, try_from = "String")]
 pub struct ParameterIdV1(String);
+
+impl TryFrom<String> for ParameterIdV1 {
+    type Error = RobotDesignError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
+}
 
 impl ParameterIdV1 {
     pub fn new(value: impl Into<String>) -> Result<Self, RobotDesignError> {
@@ -1389,6 +1419,24 @@ mod tests {
     #[test]
     fn exact_length_conversion_is_reduced_rational() {
         assert_eq!(C0LengthUmV1::new(20_000).unwrap().millimetres(), ExactRationalV1 { numerator: 20, denominator: 1 });
+    }
+
+    #[test]
+    fn serde_rejects_zero_length_at_the_type_boundary() {
+        let result: Result<C0LengthUmV1, _> = serde_json::from_str("0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn serde_rejects_invalid_parameter_id_at_the_type_boundary() {
+        let result: Result<ParameterIdV1, _> = serde_json::from_str("\\\"Section Width\\\"");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn serde_rejects_noncanonical_rational_at_the_type_boundary() {
+        let result: Result<ExactRationalV1, _> = serde_json::from_str("{\\\"numerator\\\":20,\\\"denominator\\\":1000}");
+        assert!(result.is_err());
     }
 
     #[test]
