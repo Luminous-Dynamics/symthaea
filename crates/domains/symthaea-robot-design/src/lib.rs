@@ -517,6 +517,8 @@ impl ExactDesignSearchDomainV1 {
     pub fn enumerate(&self) -> Result<Vec<ExactDesignParameterSetV1>, RobotDesignError> {
         self.validate()?;
         let mut dimensions = Vec::with_capacity(self.parameters.len());
+        let mut total = 1usize;
+
         for parameter in &self.parameters {
             let values = match &parameter.domain {
                 ExactLengthDomainV1::Values(values) => values.clone(),
@@ -524,8 +526,12 @@ impl ExactDesignSearchDomainV1 {
                     let span = upper.value_um() - lower.value_um();
                     let count = span.checked_div(*step_um).and_then(|n| n.checked_add(1))
                         .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
-                    let count = usize::try_from(count).map_err(|_| RobotDesignError::DomainEnumerationOverflow)?;
-                    let mut values = Vec::with_capacity(count);
+                    let count = usize::try_from(count)
+                        .map_err(|_| RobotDesignError::DomainEnumerationOverflow)?;
+                    let mut values = Vec::new();
+                    values
+                        .try_reserve_exact(count)
+                        .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
                     for index in 0..count {
                         let offset = (*step_um as u128).checked_mul(index as u128)
                             .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
@@ -537,14 +543,31 @@ impl ExactDesignSearchDomainV1 {
                     values
                 }
             };
+            total = total
+                .checked_mul(values.len())
+                .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
             dimensions.push((parameter.id.clone(), values));
         }
-        let mut output = vec![Vec::<ExactDesignLengthParameterV1>::new()];
+
+        let mut output = Vec::<Vec<ExactDesignLengthParameterV1>>::new();
+        output
+            .try_reserve_exact(total)
+            .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
+        output.push(Vec::new());
+
         for (id, values) in dimensions {
+            let next_len = output
+                .len()
+                .checked_mul(values.len())
+                .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
             let mut next = Vec::new();
+            next.try_reserve_exact(next_len)
+                .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
             for partial in &output {
                 for value in &values {
                     let mut candidate = partial.clone();
+                    candidate.try_reserve_exact(1)
+                        .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
                     candidate.push(ExactDesignLengthParameterV1 { id: id.clone(), value: *value });
                     next.push(candidate);
                 }
@@ -882,6 +905,7 @@ pub enum RobotDesignError {
     InvalidDomainRange(String),
     NonTerminatingDomainRange(String),
     DomainEnumerationOverflow,
+    DomainEnumerationAllocationFailure,
 }
 
 impl fmt::Display for RobotDesignError {
@@ -928,6 +952,7 @@ impl fmt::Display for RobotDesignError {
             Self::InvalidDomainRange(id) => write!(formatter, "invalid domain range for parameter: {id}"),
             Self::NonTerminatingDomainRange(id) => write!(formatter, "domain range for parameter {id} does not terminate exactly"),
             Self::DomainEnumerationOverflow => formatter.write_str("domain enumeration exceeds representable capacity"),
+            Self::DomainEnumerationAllocationFailure => formatter.write_str("domain enumeration allocation failed"),
         }
     }
 }
