@@ -29,6 +29,7 @@ FIELDS = ("demand", "profile", "candidate", "process", "property", "measurement"
 GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
 GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
 REPLAY_ORDERING = "case manifest order is significant; graph node and edge order are identity-insignificant"
+FAILURE_DIAGNOSTICS = []
 COVERAGE_REASONS = {
     "C06": "case-level adversarial ranking control",
     "C08": "case-level negative-evidence control",
@@ -456,7 +457,9 @@ def expect_failure(doc, cases, label):
     try:
         check(doc, cases)
     except AssertionError as exc:
-        return failure_category(str(exc))
+        category = failure_category(str(exc))
+        FAILURE_DIAGNOSTICS.append({"mutation": label, "category": category})
+        return category
     fail(f"mutation escaped oracle: {label}")
 
 def main():
@@ -1028,7 +1031,12 @@ def main():
         "fixture_sha256": hashlib.sha256(raw).hexdigest(),
         "replay_digest": baseline_digest,
         "case_count": len(cases),
-        "mutation_count": len(mutations) + 1 + len(graph_mutations) + len(coverage_mutations),
+        "mutation_count": len(FAILURE_DIAGNOSTICS),
+        "failure_categories": {
+            category: sum(1 for item in FAILURE_DIAGNOSTICS if item["category"] == category)
+            for category in sorted({item["category"] for item in FAILURE_DIAGNOSTICS})
+        },
+        "mutation_diagnostics": FAILURE_DIAGNOSTICS,
         "disposition": "PASS",
         "claim_ceiling": doc["claim_ceiling"],
     }, sort_keys=True, indent=2))
