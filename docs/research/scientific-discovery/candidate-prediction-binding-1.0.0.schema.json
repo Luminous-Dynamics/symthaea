@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Candidate Prediction Binding",
+  "title": "Candidate Prediction Commitment Envelope",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -8,7 +8,7 @@
     "source_candidate_id",
     "test_specification_id",
     "measurement_specification_id",
-    "prediction_payload"
+    "binding_digest"
   ],
   "properties": {
     "candidate_id": {
@@ -27,13 +27,9 @@
       "type": "string",
       "minLength": 1
     },
-    "prediction_payload": {
-      "type": "array",
-      "items": {
-        "type": "integer",
-        "minimum": 0,
-        "maximum": 255
-      }
+    "binding_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
     }
   },
   "x-authority": "prospective_commitment_only",
@@ -43,5 +39,6 @@
     "prediction commitment is not replication",
     "prediction commitment is not official criterion evidence",
     "model-implied likelihood is not a calibrated experimental probability"
-  ]
+  ],
+  "description": "A verifiable envelope around an immutable prospective prediction commitment. Prediction bytes remain caller-held; the binding digest makes their canonical candidate binding reproducible."
 }
