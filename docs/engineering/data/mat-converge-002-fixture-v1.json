@@ -459,6 +459,7 @@
       "C14",
       "C15",
       "C16"
-    ]
+    ],
+    "dependency_closure": "undirected-connected-component over immutable graph nodes; all incident edge case IDs are invalidated"
   }
 }
