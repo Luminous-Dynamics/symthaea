@@ -24,9 +24,10 @@ COMPUTE_GRAPH={
 def graph_identity():
     return digest({"schema":COMPUTE_GRAPH["schema"],"nodes":sorted(COMPUTE_GRAPH["nodes"]),"edges":sorted([list(e) for e in COMPUTE_GRAPH["edges"]])})
 def dependency_closure(changed):
+    # Directed descendants: a changed dependency invalidates its consumers,
+    # never its prerequisites.
     adjacency={n:set() for n in COMPUTE_GRAPH["nodes"]}
-    for a,b in COMPUTE_GRAPH["edges"]:
-        adjacency[a].add(b); adjacency[b].add(a)
+    for a,b in COMPUTE_GRAPH["edges"]: adjacency[a].add(b)
     seen=set(changed); todo=list(changed)
     while todo:
         n=todo.pop()
@@ -92,7 +93,8 @@ def main():
     closure=dependency_closure(["model"])
     if not {"model","runtime","accelerator","deployment","execution","observation","statistics","disposition"}.issubset(closure): fail("model dependency closure incomplete","CP-COMP-DEPENDENCY")
     deployment_closure=dependency_closure(["deployment"])
-    if "model" in deployment_closure or "representation" in deployment_closure: fail("downstream change invalidated upstream compute identity","CP-COMP-DEPENDENCY")
+    if not {"deployment","execution","observation","statistics","disposition"}.issubset(deployment_closure) or "model" in deployment_closure or "representation" in deployment_closure: fail("deployment invalidation boundary incorrect","CP-COMP-DEPENDENCY")
+    if dependency_closure(["runtime"]) != sorted(["runtime","accelerator","deployment","execution","observation","statistics","disposition"]): fail("runtime invalidation closure incorrect","CP-COMP-DEPENDENCY")
     if FAILURES or not all(x["rejected"] for x in muts):
         print("CP-04 COMPUTE QUALIFIER FAIL"); [print(" -",x) for x in FAILURES]; raise SystemExit(1)
     q=receipt(c,muts,r,digest(mfest),source_sha); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("graph_identity_sha256="+q["graph_identity_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("oracle_source_sha256="+q["oracle_source_sha256"]); print("guard_registry_sha256="+q["guard_registry_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
