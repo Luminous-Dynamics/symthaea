@@ -124,7 +124,7 @@ def git_blob_sha256(repo: pathlib.Path, revision: str, relative_path: pathlib.Pa
     if proc.returncode != 0:
         raise VerificationError(
             f"cannot read frozen subject blob {revision}:{relative_path}: "
-            f"{proc.stderr.decode(errors="replace").strip()}"
+            f"{proc.stderr.decode(errors='replace').strip()}"
         )
     return hashlib.sha256(proc.stdout).hexdigest()
 
