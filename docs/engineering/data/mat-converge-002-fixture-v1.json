@@ -293,5 +293,120 @@
   ],
   "campaign_id": "MAT-CONVERGE-002A1",
   "record_schema": "integration-edge-v1",
-  "replay_semantics": "historical refs are immutable inputs; dispositions are derived outputs"
+  "replay_semantics": "historical refs are immutable inputs; dispositions are derived outputs",
+  "state_graph": {
+    "schema": "mat-converge-002-state-graph-v1",
+    "historical_records_immutable": true,
+    "derived_dispositions_recomputable": true,
+    "nodes": [
+      {
+        "id": "N01",
+        "kind": "demand",
+        "ref": "demand/D1",
+        "generation": "D1"
+      },
+      {
+        "id": "N02",
+        "kind": "candidate",
+        "ref": "candidate/A",
+        "generation": "A"
+      },
+      {
+        "id": "N03",
+        "kind": "process",
+        "ref": "process/G1",
+        "generation": "G1"
+      },
+      {
+        "id": "N04",
+        "kind": "property",
+        "ref": "property/E1",
+        "generation": "E1"
+      },
+      {
+        "id": "N05",
+        "kind": "measurement",
+        "ref": "measurement/M1",
+        "generation": "M1"
+      },
+      {
+        "id": "N06",
+        "kind": "profile",
+        "ref": "profile/P1",
+        "generation": "P1"
+      },
+      {
+        "id": "N07",
+        "kind": "negative-edge",
+        "ref": "edge/C07",
+        "generation": "C07"
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge/C01",
+        "from": "N01",
+        "to": "N02",
+        "kind": "candidate-link",
+        "historical": true
+      },
+      {
+        "id": "edge/C02",
+        "from": "N02",
+        "to": "N03",
+        "kind": "process-generation",
+        "historical": true
+      },
+      {
+        "id": "edge/C03",
+        "from": "N02",
+        "to": "N06",
+        "kind": "profile-binding",
+        "historical": true
+      },
+      {
+        "id": "edge/C04",
+        "from": "N03",
+        "to": "N04",
+        "kind": "evaluation",
+        "historical": true
+      },
+      {
+        "id": "edge/C05",
+        "from": "N04",
+        "to": "N05",
+        "kind": "measurement-generation",
+        "historical": true
+      },
+      {
+        "id": "edge/C07",
+        "from": "N02",
+        "to": "N07",
+        "kind": "negative-evidence",
+        "historical": true
+      },
+      {
+        "id": "edge/C09",
+        "from": "N04",
+        "to": "N05",
+        "kind": "authority-separation",
+        "historical": true
+      },
+      {
+        "id": "edge/C10",
+        "from": "N04",
+        "to": "N05",
+        "kind": "cross-authority-distinctness",
+        "historical": true
+      },
+      {
+        "id": "edge/C16",
+        "from": "N01",
+        "to": "N02",
+        "kind": "synthetic-disposition",
+        "historical": true
+      }
+    ],
+    "replay_rule": "replay digest is over immutable node/edge identities; derived dispositions are excluded"
+  }
 }
