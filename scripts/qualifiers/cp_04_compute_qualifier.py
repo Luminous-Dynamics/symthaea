@@ -116,4 +116,48 @@ def main():
     if FAILURES or not all(x["rejected"] for x in muts):
         print("CP-04 COMPUTE QUALIFIER FAIL"); [print(" -",x) for x in FAILURES]; raise SystemExit(1)
     q=receipt(c,muts,r,digest(mfest),source_sha); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("graph_identity_sha256="+q["graph_identity_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("oracle_source_sha256="+q["oracle_source_sha256"]); print("guard_registry_sha256="+q["guard_registry_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
+if __name__=="__main__": main()def mutations(c, graph):
+    graph_specs=[
+        ("remove-model-runtime-edge",lambda g:g["edges"].remove(["model","runtime"]),"CP-COMP-DEPENDENCY"),
+        ("add-graph-cycle",lambda g:g["edges"].append(["disposition","model"]),"CP-COMP-DEPENDENCY"),
+        ("rename-graph-node",lambda g:g["nodes"].__setitem__(2,"model-v2"),"CP-COMP-DEPENDENCY"),
+    ]
+    case_specs=[
+        ("drop-C06",lambda x:x["cases"].pop(5),"CP-COMP-COVERAGE"),
+        ("promote-C17",lambda x:x["cases"][16].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-AUTHORITY"),
+        ("rewrite-C16",lambda x:x["cases"][15].update(scenario="no-result"),"CP-COMP-NEGATIVE"),
+        ("collapse-C10",lambda x:x["cases"][9].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-DEPENDENCY"),
+        ("change-C18",lambda x:x["cases"][17].update(expected_disposition="CurrentAndApplicable"),"CP-COMP-CURRENTNESS"),
+        ("erase-C05",lambda x:x["cases"][4].update(scenario="complete-thread"),"CP-COMP-HISTORICAL"),
+    ]
+    out=[]
+    for label,mut,guard in graph_specs:
+        old_failures=FAILURES[:]; FAILURES.clear()
+        mutated=deepcopy(graph); mut(mutated); validate_graph(mutated)
+        caught=bool(FAILURES); detail=FAILURES[:]
+        FAILURES.clear(); FAILURES.extend(old_failures)
+        if not caught: fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
+        out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
+    for label,mut,guard in case_specs:
+        old_failures=FAILURES[:]; FAILURES.clear()
+        mutated=deepcopy(c); mut(mutated); validate(mutated)
+        caught=bool(FAILURES); detail=FAILURES[:]
+        FAILURES.clear(); FAILURES.extend(old_failures)
+        if not caught: fail(f"mutation {label} was not rejected by {guard}","CP-COMP-INVARIANT")
+        out.append({"mutation_id":label,"guard_id":guard,"rejected":caught,"diagnostics":detail})
+    return out
+def receipt(c,m,r,manifest_sha,source_sha):
+    p={"schema":"cp-04-compute-qualification-receipt-v1","corpus_sha256":digest(c),"replay_input_sha256":r,"graph_identity_sha256":graph_identity(),"mutation_manifest_sha256":manifest_sha,"oracle_source_sha256":source_sha,"guard_registry_sha256":digest(GUARDS),"mutation_results":m,"claim_ceiling":c["claim_ceiling"],"disposition":"PASS","physical_execution_authority":False}
+    p["receipt_sha256"]=digest(p); return p
+def main():
+    c=json.loads(CORPUS.read_text(encoding="utf-8")); mfest=json.loads(MANIFEST.read_text(encoding="utf-8"))
+    source_sha=source_audit(); validate(c); validate_manifest(mfest); validate_graph(COMPUTE_GRAPH); r=digest(replay_input(c)); muts=mutations(c)
+    closure=dependency_closure(["model"])
+    if not {"model","runtime","accelerator","deployment","execution","observation","statistics","disposition"}.issubset(closure): fail("model dependency closure incomplete","CP-COMP-DEPENDENCY")
+    deployment_closure=dependency_closure(["deployment"])
+    if not {"deployment","execution","observation","statistics","disposition"}.issubset(deployment_closure) or "model" in deployment_closure or "representation" in deployment_closure: fail("deployment invalidation boundary incorrect","CP-COMP-DEPENDENCY")
+    if dependency_closure(["runtime"]) != sorted(["runtime","accelerator","deployment","execution","observation","statistics","disposition"]): fail("runtime invalidation closure incorrect","CP-COMP-DEPENDENCY")
+    if FAILURES or not all(x["rejected"] for x in muts):
+        print("CP-04 COMPUTE QUALIFIER FAIL"); [print(" -",x) for x in FAILURES]; raise SystemExit(1)
+    q=receipt(c,muts,r,digest(mfest),source_sha); print("CP-04 COMPUTE QUALIFIER PASS"); print("corpus_sha256="+q["corpus_sha256"]); print("replay_input_sha256="+q["replay_input_sha256"]); print("graph_identity_sha256="+q["graph_identity_sha256"]); print("mutation_manifest_sha256="+q["mutation_manifest_sha256"]); print("oracle_source_sha256="+q["oracle_source_sha256"]); print("guard_registry_sha256="+q["guard_registry_sha256"]); print("receipt_sha256="+q["receipt_sha256"]); print("claim_ceiling="+q["claim_ceiling"]); print("physical_execution_authority=False")
 if __name__=="__main__": main()
