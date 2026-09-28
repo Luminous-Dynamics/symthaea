@@ -40,8 +40,7 @@ GATES = [
     "surface_gate",
     "toolchain_gate",
     "metadata_gate",
-    "fmt_music_theory_gate",
-    "fmt_muse_gate",
+    "fmt_subject_gate",
     "test_music_theory_gate",
     "test_muse_gate",
     "check_music_theory_gate",
@@ -160,8 +159,8 @@ def main() -> int:
         raise VerificationError(f"receipt does not exist: {receipt}")
     values, repeated = parse_receipt(receipt)
 
-    expect(values, "schema", "melothaea-prog-suite-tonal-chain-qualification-v1")
-    expect(values, "qualifier_id", "melothaea-prog-suite-tonal-chain-qualification-v1")
+    expect(values, "schema", "melothaea-prog-suite-tonal-chain-qualification-v2")
+    expect(values, "qualifier_id", "melothaea-prog-suite-tonal-chain-qualification-v2")
     expect(values, "status", "PASS")
     expect(values, "exit_code", "0")
     expect(values, "terminal_stage", "none")

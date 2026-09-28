@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-QUALIFIER_ID="melothaea-prog-suite-tonal-chain-qualification-v1"
+QUALIFIER_ID="melothaea-prog-suite-tonal-chain-qualification-v2"
 SUBJECT_SHA="f3a38ed769d5d2477e6ec5094919150e48638710"
 BASE_SHA="646b74d184ad908429956d17faaf949364311d1e"
 EXPECTED_RUST="1.96.0"
@@ -32,7 +32,7 @@ cd "$outer_root"
 qualifier_sha="$(git rev-parse HEAD)"
 qualifier_tree="$(git rev-parse 'HEAD^{tree}')"
 script_path=".github/qualification/qualify-melothaea-prog-suite-tonal-chain-v1.sh"
-receipt_path="${MEL_TONAL_QUAL_RECEIPT:-${TMPDIR:-/tmp}/melothaea-prog-suite-tonal-chain-qualification-v1.tsv}"
+receipt_path="${MEL_TONAL_QUAL_RECEIPT:-${TMPDIR:-/tmp}/melothaea-prog-suite-tonal-chain-qualification-v2.tsv}"
 worktree=""
 status="FAIL"
 stage="preflight"
@@ -52,8 +52,7 @@ exact_subject_gate="not-run"
 surface_gate="not-run"
 toolchain_gate="not-run"
 metadata_gate="not-run"
-fmt_music_theory_gate="not-run"
-fmt_muse_gate="not-run"
+fmt_subject_gate="not-run"
 test_music_theory_gate="not-run"
 test_muse_gate="not-run"
 check_music_theory_gate="not-run"
@@ -92,7 +91,7 @@ write_receipt() {
     script_sha="$(sha256_file "$outer_root/$script_path")"
     mkdir -p "$(dirname "$receipt_path")" || return 1
     {
-        printf 'schema\tmelothaea-prog-suite-tonal-chain-qualification-v1\n'
+        printf 'schema\tmelothaea-prog-suite-tonal-chain-qualification-v2\n'
         printf 'qualifier_id\t%s\n' "$QUALIFIER_ID"
         printf 'status\t%s\n' "$final_status"
         printf 'exit_code\t%s\n' "$exit_code"
@@ -130,8 +129,7 @@ write_receipt() {
         printf 'surface_gate\t%s\n' "$surface_gate"
         printf 'toolchain_gate\t%s\n' "$toolchain_gate"
         printf 'metadata_gate\t%s\n' "$metadata_gate"
-        printf 'fmt_music_theory_gate\t%s\n' "$fmt_music_theory_gate"
-        printf 'fmt_muse_gate\t%s\n' "$fmt_muse_gate"
+        printf 'fmt_subject_gate\t%s\n' "$fmt_subject_gate"
         printf 'test_music_theory_gate\t%s\n' "$test_music_theory_gate"
         printf 'test_muse_gate\t%s\n' "$test_muse_gate"
         printf 'check_music_theory_gate\t%s\n' "$check_music_theory_gate"
@@ -275,13 +273,14 @@ stage="cargo_metadata"
 cargo metadata --locked --no-deps --format-version 1 >/dev/null
 metadata_gate="pass"
 
-stage="fmt_music_theory"
-cargo fmt -p symthaea-music-theory -- --check
-fmt_music_theory_gate="pass"
-
-stage="fmt_muse"
-cargo fmt -p symthaea-muse -- --check
-fmt_muse_gate="pass"
+stage="fmt_subject_files"
+# v1 used package-wide cargo-fmt gates. The hosted evidence showed those
+# gates fail on unrelated pre-existing formatting before reaching the frozen
+# subject. v2 therefore formats exactly the frozen terminal subject surface.
+rustfmt --edition 2024 --check \
+    "${EXPECTED_FILES[0]}" \
+    "${EXPECTED_FILES[1]}"
+fmt_subject_gate="pass"
 
 stage="test_music_theory"
 cargo test --locked -p symthaea-music-theory prog_suite
