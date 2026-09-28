@@ -1555,6 +1555,13 @@ mod tests {
     }
 
     #[test]
+    fn rational_serde_rejects_unknown_wire_fields() {
+        let result: Result<ExactRationalV1, _> =
+            serde_json::from_str(r#"{"numerator":20,"denominator":1000,"extra":1}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn semantic_ids_reject_invalid_values_at_the_serde_boundary() {
         assert!(serde_json::from_str::<DesignComponentId>(r#""bad id""#).is_err());
         assert!(serde_json::from_str::<DesignJointId>(r#""bad id""#).is_err());
