@@ -102,6 +102,9 @@ pub mod scientific_active_inference;
 /// Model-implied outcome likelihoods from predicted HDC trajectories.
 #[allow(missing_docs)]
 pub mod scientific_outcome_likelihood;
+/// Pairwise divergence discovery over competing scientific trajectories.
+#[allow(missing_docs)]
+pub mod scientific_trajectory_divergence;
 
 /// Runtime configuration and workspace execution primitives for the conscious engine.
 pub mod rt;
