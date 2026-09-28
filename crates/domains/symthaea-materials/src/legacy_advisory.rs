@@ -78,34 +78,48 @@ pub enum AdvisoryInputError {
 /// Typed advisory boundary for the critical-minerals mining predictor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryMiningPredictionV1 {
+    /// Stable advisory identity.
     pub identity: AdvisoryIdentityV1,
+    /// Explicit epistemic ceiling.
     pub authority: AdvisoryAuthorityV1,
+    /// Prediction horizon in seconds.
     pub horizon_seconds: f32,
+    /// Model-predicted HDC state; not an observation.
     pub predicted_state: Vec<f32>,
 }
 
 /// Typed advisory boundary for the strategic-materials predictor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryStrategicPredictionV1 {
+    /// Stable advisory identity.
     pub identity: AdvisoryIdentityV1,
+    /// Explicit epistemic ceiling.
     pub authority: AdvisoryAuthorityV1,
+    /// Prediction horizon in seconds.
     pub horizon_seconds: f32,
+    /// Model-predicted HDC state; not an observation.
     pub predicted_state: Vec<f32>,
 }
 
 /// Typed advisory boundary for a mining FEP action recommendation.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryMiningActionV1 {
+    /// Stable advisory identity.
     pub identity: AdvisoryIdentityV1,
+    /// Explicit epistemic ceiling.
     pub authority: AdvisoryAuthorityV1,
+    /// Model-recommended action; not an authorization.
     pub action: crate::mining::MiningFepAction,
 }
 
 /// Typed advisory boundary for a strategic-materials FEP action recommendation.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryStrategicActionV1 {
+    /// Stable advisory identity.
     pub identity: AdvisoryIdentityV1,
+    /// Explicit epistemic ceiling.
     pub authority: AdvisoryAuthorityV1,
+    /// Model-recommended action; not an authorization.
     pub action: crate::strategic::StrategicFepAction,
 }
 
