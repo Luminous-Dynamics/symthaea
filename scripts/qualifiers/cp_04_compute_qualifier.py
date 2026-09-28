@@ -117,6 +117,14 @@ def source_audit():
         if isinstance(n,(ast.Import,ast.ImportFrom)) and any(a.name.split(".")[0] in forbidden for a in n.names):
             fail("source audit: forbidden production/runtime import","CP-COMP-INVARIANT")
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
+def validate_replay_completeness(c,graph):
+    baseline=replay_input(c,graph)
+    required={"schema","authority","claim_ceiling","replay_semantics","graph_identity","case_manifest"}
+    eq(set(baseline),required,"replay input field set","CP-COMP-INVARIANT")
+    eq(len(baseline["case_manifest"]),len(c["cases"]),"replay case coverage","CP-COMP-INVARIANT")
+    eq([x["case_id"] for x in baseline["case_manifest"]],[x["case_id"] for x in c["cases"]],"replay case order","CP-COMP-INVARIANT")
+    eq([x["scenario"] for x in baseline["case_manifest"]],[x["scenario"] for x in c["cases"]],"replay scenario binding","CP-COMP-INVARIANT")
+
 def validate(c):
     eq(c.get("schema"),SCHEMA,"schema")
     eq(c.get("authority"),AUTHORITY,"authority")
@@ -199,6 +207,7 @@ def main():
     graph_sha=graph_identity(graph)
     replay_sha=digest(replay_input(c,graph))
     validate_replay_boundary(c,graph)
+    validate_replay_completeness(c,graph)
     muts=mutations(c,graph)
     for node,expected_closure in EXPECTED_CLOSURES.items():
         if dependency_closure([node],graph)!=expected_closure:
