@@ -291,19 +291,19 @@ impl PolicyEvaluatorDomain {
         expires_at: Option<SystemTime>,
     ) -> PolicyAdmission {
         let decided_at = self.clock.now();
-        let digest = compute_admission_digest(
+        let digest = compute_admission_digest(PolicyAdmissionDigestInput {
             action_binding,
-            &scope,
+            scope: &scope,
             risk,
             mode,
-            &self.descriptor,
-            self.inner.principal(),
-            &approvals,
+            policy: &self.descriptor,
+            evaluator: self.inner.principal(),
+            approvals: &approvals,
             evidence_snapshot_digest,
             obligations_digest,
             emergency_state_digest,
             decided_at,
-        );
+        });
         let receipt = PolicyAdmissionReceipt {
             action_binding,
             scope: scope.clone(),
@@ -896,43 +896,45 @@ impl std::error::Error for PolicyError {
     }
 }
 
-fn compute_admission_digest(
+struct PolicyAdmissionDigestInput<'a> {
     action_binding: [u8; 32],
-    scope: &Scope,
+    scope: &'a Scope,
     risk: ActionRisk,
     mode: PolicyMode,
-    policy: &PolicyDescriptor,
+    policy: &'a PolicyDescriptor,
     evaluator: PrincipalId,
-    approvals: &ApprovalEvidence,
+    approvals: &'a ApprovalEvidence,
     evidence_snapshot_digest: [u8; 32],
     obligations_digest: [u8; 32],
     emergency_state_digest: [u8; 32],
     decided_at: SystemTime,
-) -> [u8; 32] {
+}
+
+fn compute_admission_digest(input: PolicyAdmissionDigestInput<'_>) -> [u8; 32] {
     let mut hasher = blake3::Hasher::new();
     hasher.update(b"symthaea-ai-assurance/policy-admission-v1\0");
-    hash_field(&mut hasher, &action_binding);
-    hash_field(&mut hasher, scope.namespace().as_bytes());
-    for segment in scope.segments() {
+    hash_field(&mut hasher, &input.action_binding);
+    hash_field(&mut hasher, input.scope.namespace().as_bytes());
+    for segment in input.scope.segments() {
         hash_field(&mut hasher, segment.as_bytes());
     }
-    hash_field(&mut hasher, &[risk_code(risk)]);
-    hash_field(&mut hasher, &[mode.code()]);
-    hash_field(&mut hasher, policy.family().as_bytes());
-    hash_field(&mut hasher, &policy.version().to_le_bytes());
-    hash_field(&mut hasher, &policy.policy_digest());
+    hash_field(&mut hasher, &[risk_code(input.risk)]);
+    hash_field(&mut hasher, &[input.mode.code()]);
+    hash_field(&mut hasher, input.policy.family().as_bytes());
+    hash_field(&mut hasher, &input.policy.version().to_le_bytes());
+    hash_field(&mut hasher, &input.policy.policy_digest());
     hash_field(
         &mut hasher,
-        &policy.evaluator_schema_version().to_le_bytes(),
+        &input.policy.evaluator_schema_version().to_le_bytes(),
     );
-    hash_field(&mut hasher, evaluator.as_uuid().as_bytes());
-    hash_field(&mut hasher, &approvals.policy_digest());
-    hash_field(&mut hasher, &approvals.approval_set_digest());
-    hash_field(&mut hasher, &[u8::from(approvals.satisfied())]);
-    hash_field(&mut hasher, &evidence_snapshot_digest);
-    hash_field(&mut hasher, &obligations_digest);
-    hash_field(&mut hasher, &emergency_state_digest);
-    hash_system_time(&mut hasher, decided_at);
+    hash_field(&mut hasher, input.evaluator.as_uuid().as_bytes());
+    hash_field(&mut hasher, &input.approvals.policy_digest());
+    hash_field(&mut hasher, &input.approvals.approval_set_digest());
+    hash_field(&mut hasher, &[u8::from(input.approvals.satisfied())]);
+    hash_field(&mut hasher, &input.evidence_snapshot_digest);
+    hash_field(&mut hasher, &input.obligations_digest);
+    hash_field(&mut hasher, &input.emergency_state_digest);
+    hash_system_time(&mut hasher, input.decided_at);
     *hasher.finalize().as_bytes()
 }
 

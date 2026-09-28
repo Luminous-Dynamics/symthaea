@@ -810,6 +810,10 @@ impl<K: CapabilityKind, H> PurposeGuardedAction<K, Authorized, H> {
     }
 
     /// Execute through the existing exact-preflight/effect-attempt boundary.
+    /// The failure retains the authority-bearing action by value for exact recovery.
+    /// Its public shape is intentionally preserved; boxing the action would be a breaking
+    /// API change for callers that destructure this failure.
+    #[allow(clippy::result_large_err)]
     pub fn execute_attempt_with<F>(
         self,
         attempt: F,
@@ -994,6 +998,10 @@ impl std::error::Error for BudgetPurposeAuthorizeError {
 }
 
 /// Effect-attempt failure preserving purpose context on recoverable exact preflight rejection.
+/// Preflight intentionally retains the authority-bearing action by value so callers can
+/// recover the exact typestate. The public field shape is compatibility-sensitive; accepting
+/// the large enum layout avoids a breaking API change.
+#[allow(clippy::large_enum_variant)]
 pub enum PurposeEffectAttemptFailure<K: CapabilityKind, H> {
     /// Exact execution preflight rejected before lower effect delegation.
     Preflight {
@@ -1196,10 +1204,10 @@ fn validate_derived_expiry(
     rules: BudgetPurposeRules,
     now: SystemTime,
 ) -> Result<(), BudgetPurposeError> {
-    if let Some(expiry) = requested {
-        if expiry < now {
-            return Err(BudgetPurposeError::PurposeAlreadyExpired { expiry, now });
-        }
+    if let Some(expiry) = requested
+        && expiry < now
+    {
+        return Err(BudgetPurposeError::PurposeAlreadyExpired { expiry, now });
     }
     for parent in [budget_expiry, execution_expiry, policy_expiry]
         .into_iter()

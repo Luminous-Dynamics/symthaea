@@ -416,16 +416,16 @@ impl BudgetAuthorityDomain {
             };
             return Err(BudgetSplitFailure::new(parent, error));
         }
-        if let Some(child_expiry) = child_expires_at {
-            if child_expiry < now {
-                return Err(BudgetSplitFailure::new(
-                    parent,
-                    BudgetError::ExpiredDelegationRequest {
-                        requested: child_expiry,
-                        now,
-                    },
-                ));
-            }
+        if let Some(child_expiry) = child_expires_at
+            && child_expiry < now
+        {
+            return Err(BudgetSplitFailure::new(
+                parent,
+                BudgetError::ExpiredDelegationRequest {
+                    requested: child_expiry,
+                    now,
+                },
+            ));
         }
         if let Some(parent_expiry) = parent.expires_at() {
             match child_expires_at {
@@ -701,13 +701,16 @@ impl BudgetLease {
 /// `Clone` because it owns affine quantitative authority.
 #[derive(Debug)]
 pub struct BudgetSplitFailure {
-    parent: BudgetLease,
+    parent: Box<BudgetLease>,
     error: BudgetError,
 }
 
 impl BudgetSplitFailure {
     fn new(parent: BudgetLease, error: BudgetError) -> Self {
-        Self { parent, error }
+        Self {
+            parent: Box::new(parent),
+            error,
+        }
     }
 
     /// Reason the split was rejected before any output lease was minted.
@@ -722,12 +725,12 @@ impl BudgetSplitFailure {
 
     /// Consume the failure and recover the exact original parent lease.
     pub fn into_parent(self) -> BudgetLease {
-        self.parent
+        *self.parent
     }
 
     /// Consume the failure and return both the original parent and rejection.
     pub fn into_parts(self) -> (BudgetLease, BudgetError) {
-        (self.parent, self.error)
+        (*self.parent, self.error)
     }
 
     /// Consume the failure and retain only the compatibility error.

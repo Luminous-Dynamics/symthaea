@@ -402,6 +402,10 @@ impl<K: CapabilityKind, H> IndependenceGuardedAction<K, RiskAssessed, H> {
 
 impl<K: CapabilityKind, H> IndependenceGuardedAction<K, Authorized, H> {
     /// Execute through the v0.8 exact-preflight/effect-attempt boundary.
+    /// The failure retains the authority-bearing action by value for exact recovery.
+    /// Its public shape is intentionally preserved; boxing the action would be a breaking
+    /// API change for callers that destructure this failure.
+    #[allow(clippy::result_large_err)]
     pub fn execute_attempt_with<F>(
         self,
         attempt: F,
@@ -688,6 +692,10 @@ impl std::error::Error for IndependenceResolutionError {
 
 /// Effect-attempt failure preserving the separation wrapper when v0.8's exact
 /// execution preflight rejects before adapter entry.
+/// Preflight intentionally retains the authority-bearing action by value so callers can
+/// recover the exact typestate. The public field shape is compatibility-sensitive; accepting
+/// the large enum layout avoids a breaking API change.
+#[allow(clippy::large_enum_variant)]
 pub enum IndependenceEffectAttemptFailure<K: CapabilityKind, H> {
     /// Exact execution preflight failed before lower effect delegation; the
     /// original separation-aware authorized action is recoverable.
