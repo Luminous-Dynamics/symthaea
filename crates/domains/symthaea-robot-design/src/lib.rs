@@ -829,6 +829,7 @@ pub enum RobotDesignError {
     InvalidDesignLength,
     FloatConversionOverflow,
     InvalidRational,
+    NonCanonicalRational,
     UnsupportedParameterSchema { schema_id: String, schema_version: u32 },
     DuplicateParameterId(String),
     UnsupportedSearchDomainSchema { schema_id: String, schema_version: u32 },
@@ -1390,7 +1391,6 @@ mod tests {
         assert_eq!(C0LengthUmV1::new(20_000).unwrap().millimetres(), ExactRationalV1 { numerator: 20, denominator: 1 });
     }
 
-    #[test]
     #[test]
     fn deserialized_zero_length_cannot_be_converted_to_float() {
         let length = C0LengthUmV1(0);
