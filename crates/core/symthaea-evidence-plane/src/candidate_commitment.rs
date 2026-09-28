@@ -58,6 +58,33 @@ pub enum BindingError {
     Commitment(CommitmentError),
 }
 
+impl VerificationFailure {
+    /// Stable machine-readable diagnostic code for downstream logs and metrics.
+    pub const fn code(&self) -> &'static str {
+        match self {
+            Self::CommitmentIntegrity => "commitment_integrity",
+            Self::PayloadDigestMismatch => "payload_digest_mismatch",
+            Self::BindingDigestMismatch => "binding_digest_mismatch",
+            Self::CandidateIdMismatch => "candidate_id_mismatch",
+            Self::SourceCandidateIdMismatch => "source_candidate_id_mismatch",
+            Self::TestSpecificationMismatch => "test_specification_mismatch",
+            Self::MeasurementSpecificationMismatch => "measurement_specification_mismatch",
+            Self::LineageDigestMismatch => "lineage_digest_mismatch",
+            Self::ProvenanceLineageMismatch => "provenance_lineage_mismatch",
+            Self::InvalidBinding(_) => "invalid_binding",
+        }
+    }
+}
+
+impl std::fmt::Display for VerificationFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidBinding(error) => write!(f, "{}: {error:?}", self.code()),
+            _ => write!(f, "{}", self.code()),
+        }
+    }
+}
+
 impl From<CommitmentError> for BindingError {
     fn from(value: CommitmentError) -> Self {
         Self::Commitment(value)
@@ -455,6 +482,32 @@ mod tests {
                 &changed, "actor-v2", "2026-09-28T10:00:00Z", provenance(&c), b"forecast-v2",
             ),
             Err(BindingError::SourceMismatch)
+        );
+    }
+
+    #[test]
+    fn verification_failure_codes_are_stable_and_distinct() {
+        let failures = [
+            VerificationFailure::CommitmentIntegrity,
+            VerificationFailure::PayloadDigestMismatch,
+            VerificationFailure::BindingDigestMismatch,
+            VerificationFailure::CandidateIdMismatch,
+            VerificationFailure::SourceCandidateIdMismatch,
+            VerificationFailure::TestSpecificationMismatch,
+            VerificationFailure::MeasurementSpecificationMismatch,
+            VerificationFailure::LineageDigestMismatch,
+            VerificationFailure::ProvenanceLineageMismatch,
+            VerificationFailure::InvalidBinding(BindingError::EmptyPredictionPayload),
+        ];
+        let codes: Vec<&str> = failures.iter().map(VerificationFailure::code).collect();
+        let mut unique = codes.clone();
+        unique.sort_unstable();
+        unique.dedup();
+        assert_eq!(codes.len(), unique.len());
+        assert_eq!(VerificationFailure::LineageDigestMismatch.to_string(), "lineage_digest_mismatch");
+        assert_eq!(
+            VerificationFailure::InvalidBinding(BindingError::EmptyPredictionPayload).to_string(),
+            "invalid_binding: EmptyPredictionPayload"
         );
     }
 
