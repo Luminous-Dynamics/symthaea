@@ -224,6 +224,7 @@ impl C0LengthUmV1 {
         ExactRationalV1::new(self.0 as u128, 1_000).expect("fixed non-zero denominator")
     }
     pub fn f32_bits(self) -> Result<u32, RobotDesignError> {
+        self.validate()?;
         let value = self.0 as f32;
         if value.is_finite() { Ok(value.to_bits()) } else { Err(RobotDesignError::FloatConversionOverflow) }
     }
@@ -237,6 +238,17 @@ impl ExactRationalV1 {
         if denominator == 0 { return Err(RobotDesignError::InvalidRational); }
         let divisor = gcd_u128(numerator, denominator);
         Ok(Self { numerator: numerator / divisor, denominator: denominator / divisor })
+    }
+
+    /// Re-check invariants after deserialization or other untrusted construction.
+    pub fn validate(self) -> Result<(), RobotDesignError> {
+        if self.denominator == 0 {
+            return Err(RobotDesignError::InvalidRational);
+        }
+        if gcd_u128(self.numerator, self.denominator) != 1 {
+            return Err(RobotDesignError::NonCanonicalRational);
+        }
+        Ok(())
     }
 }
 
@@ -1379,6 +1391,24 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn deserialized_zero_length_cannot_be_converted_to_float() {
+        let length = C0LengthUmV1(0);
+        assert_eq!(length.f32_bits(), Err(RobotDesignError::InvalidDesignLength));
+    }
+
+    #[test]
+    fn deserialized_noncanonical_rational_fails_validation() {
+        let rational = ExactRationalV1 { numerator: 20, denominator: 1000 };
+        assert_eq!(rational.validate(), Err(RobotDesignError::NonCanonicalRational));
+    }
+
+    #[test]
+    fn deserialized_zero_denominator_rational_fails_validation() {
+        let rational = ExactRationalV1 { numerator: 1, denominator: 0 };
+        assert_eq!(rational.validate(), Err(RobotDesignError::InvalidRational));
+    }
+
     fn deserialized_zero_length_cannot_pass_parameter_validation() {
         let set = ExactDesignParameterSetV1 {
             schema_id: EXACT_PARAMETER_SCHEMA_ID.to_string(),
