@@ -67,7 +67,7 @@ pub fn plan(
     }
     let known_outcomes: BTreeSet<&str> =
         discrimination.candidates.iter().map(|c| c.outcome_id.as_str()).collect();
-    if let Some(unknown) = mapping_by_outcome
+    if let Some(unknown) = by_outcome
         .keys()
         .find(|id| !known_outcomes.contains(**id))
     {
