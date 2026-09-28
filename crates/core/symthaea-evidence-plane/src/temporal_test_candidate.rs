@@ -306,4 +306,16 @@ mod tests {
         let b = materialize(&plan(), &[input(2.0), input(1.0)]).unwrap();
         assert_eq!(a, b);
     }
+
+    #[test]
+    fn source_identity_is_deterministic_and_delimiter_safe() {
+        let p = plan();
+        let candidate = &p.assessments[0].candidates[0];
+        assert_eq!(source_candidate_id(candidate), source_candidate_id(candidate));
+        let mut altered = candidate.clone();
+        altered.left_model_id = format!("{}:{}", candidate.left_model_id, candidate.right_model_id);
+        altered.right_model_id = candidate.outcome_id.clone();
+        altered.outcome_id = candidate.right_model_id.clone();
+        assert_ne!(source_candidate_id(candidate), source_candidate_id(&altered));
+    }
 }
