@@ -1,0 +1,48 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://luminousdynamics.org/schemas/temporal-outcome-discrimination-1.0.0.schema.json",
+  "title":"Temporal Outcome Discrimination",
+  "description":"Horizon-aligned computational separation between competing scientific trajectories and explicit outcome prototypes. It is not experimental probability, falsification, evidence, truth, confidence, or independence.",
+  "type":"object",
+  "required":["candidates"],
+  "properties":{
+    "candidates":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":[
+          "left_model_id","right_model_id","left_lineage","right_lineage",
+          "horizon_seconds","outcome_id","trajectory_similarity",
+          "trajectory_divergence","left_similarity","right_similarity",
+          "left_likelihood","right_likelihood","likelihood_separation"
+        ],
+        "properties":{
+          "left_model_id":{"type":"string","minLength":1},
+          "right_model_id":{"type":"string","minLength":1},
+          "left_lineage":{"type":"string","minLength":1},
+          "right_lineage":{"type":"string","minLength":1},
+          "horizon_seconds":{"type":"number","exclusiveMinimum":0},
+          "outcome_id":{"type":"string","minLength":1},
+          "trajectory_similarity":{"type":"number"},
+          "trajectory_divergence":{"type":"number"},
+          "left_similarity":{"type":"number"},
+          "right_similarity":{"type":"number"},
+          "left_likelihood":{"type":"number"},
+          "right_likelihood":{"type":"number"},
+          "likelihood_separation":{"type":"number","minimum":0}
+        },
+        "additionalProperties":false
+      }
+    }
+  },
+  "additionalProperties":false,
+  "x-authority":"computational_discrimination_only",
+  "x-non-equivalences":[
+    "model_implied_likelihood_is_not_experimental_probability",
+    "temporal_outcome_separation_is_not_falsification",
+    "computational_separation_is_not_experimental_evidence",
+    "shared_lineage_is_not_independence",
+    "outcome_discrimination_is_not_confidence_or_truth",
+    "candidate_is_not_millennium_criterion_evidence"
+  ]
+}
