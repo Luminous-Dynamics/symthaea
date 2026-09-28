@@ -366,6 +366,57 @@ mod tests {
     }
 
     #[test]
+    fn model_generation_changes_identity_even_when_payload_matches() {
+        let a = AdvisoryIdentityV1::new("materials", "model-v1", "input-v1");
+        let b = AdvisoryIdentityV1::new("materials", "model-v2", "input-v1");
+        let pa = AdvisoryMiningPredictionV1::from_prediction(a.clone(), 10.0, vec![0.25, 0.75]);
+        let pb = AdvisoryMiningPredictionV1::from_prediction(b.clone(), 10.0, vec![0.25, 0.75]);
+        assert_eq!(pa.predicted_state, pb.predicted_state);
+        assert_ne!(pa.identity, pb.identity);
+        assert_eq!(pa.authority, AdvisoryAuthorityV1::Advisory);
+        assert_eq!(pb.authority, AdvisoryAuthorityV1::Advisory);
+    }
+
+    #[test]
+    fn input_generation_changes_identity_even_when_payload_matches() {
+        let a = AdvisoryIdentityV1::new("materials", "model-v1", "input-v1");
+        let b = AdvisoryIdentityV1::new("materials", "model-v1", "input-v2");
+        let fa = AcquisitionFeatureV1::new(a.clone(), "acquisition-score", 0.5);
+        let fb = AcquisitionFeatureV1::new(b.clone(), "acquisition-score", 0.5);
+        assert_eq!(fa.value, fb.value);
+        assert_ne!(fa.identity, fb.identity);
+        assert_eq!(fa.authority, AdvisoryAuthorityV1::Advisory);
+        assert_eq!(fb.authority, AdvisoryAuthorityV1::Advisory);
+    }
+
+    #[test]
+    fn advisory_action_is_not_an_authorization() {
+        use crate::mining::MiningFepAction;
+        let action = AdvisoryMiningActionV1 {
+            identity: AdvisoryIdentityV1::new("critical_minerals", "mining-fep-v1", "fixture-v1"),
+            authority: AdvisoryAuthorityV1::Advisory,
+            action: MiningFepAction::NoOp,
+        };
+        assert_eq!(action.authority, AdvisoryAuthorityV1::Advisory);
+        assert_eq!(action.action, MiningFepAction::NoOp);
+    }
+
+    #[test]
+    fn advisory_payload_cannot_become_scientific_by_numeric_match() {
+        let advisory = AdvisoryStabilityPredictionV1::predict(&[(26, 0.5), (28, 0.5)], 300.0);
+        let numeric_stability = advisory.prediction.is_stable;
+        let numeric_confidence = advisory.prediction.confidence;
+
+        // Equal numbers are intentionally insufficient evidence of common identity,
+        // provenance, calibration, or authority.
+        let hypothetical_measurement = (numeric_stability, numeric_confidence);
+        assert_eq!(hypothetical_measurement.0, advisory.prediction.is_stable);
+        assert_eq!(hypothetical_measurement.1, advisory.prediction.confidence);
+        assert_eq!(advisory.authority, AdvisoryAuthorityV1::Advisory);
+        assert_ne!(advisory.identity.domain, "measured.material.stability");
+    }
+
+    #[test]
     fn serialized_advisory_round_trip_preserves_ceiling() {
         let wrapped = AdvisoryStabilityPredictionV1::predict(&[(26, 0.5), (28, 0.5)], 300.0);
         let json = serde_json::to_string(&wrapped).unwrap();
