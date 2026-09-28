@@ -69,7 +69,7 @@ def failure_category(message):
         return "schema-integrity"
     return "invariant-integrity"
 
-def record_failure(doc, cases, label, EXPECTED_CATEGORIES[label]):
+EXPECTED_CATEGORIES = {\n    "remove-process-ref": "historical-identity",\n    "change-process-generation": "historical-identity",\n    "change-profile-ref": "historical-identity",\n    "change-evaluator-generation": "historical-identity",\n    "change-measurement-generation": "historical-identity",\n    "change-ranking-only": "schema-integrity",\n    "delete-negative-case": "negative-evidence",\n    "promote-authority": "authority",\n    "change-disposition": "invariant-integrity",\n    "rewrite-historical-ref": "historical-identity",\n    "rewrite-negative-node-tombstone": "negative-evidence",\n}\n
     try:
         check(doc, cases)
     except AssertionError as exc:
