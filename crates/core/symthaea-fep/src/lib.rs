@@ -144,6 +144,7 @@ pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
+pub mod scientific;
 mod motor;
 mod td_learning;
 pub mod types;
