@@ -100,6 +100,10 @@ write_receipt() {
         printf 'qualification_amendment\tv3-supersedes-v2-format-scope-repair\n'
         printf 'format_gate_policy\tfrozen-subject-format-non-authoritative\n'
         printf 'subject_sha_invariant\tunchanged-from-v1-v2\n'
+        printf 'scientific_lockbox_execution\tnot-performed\n'
+        printf 'human_perceptual_authority\tnone\n'
+        printf 'artistic_quality_authority\tnone\n'
+        printf 'product_authority\tnone\n'
         printf 'qualification_provider\t%s\n' "$provider"
         printf 'environment_authority\tobserved-not-hermetic-capsule-qualified\n'
         printf 'receipt_attestation\tnone\n'
