@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::temporal_evidence_gap::{TemporalEvidenceGapAssessment, TemporalEvidenceGapPlan};
+use super::temporal_evidence_gap::TemporalEvidenceGapPlan;
+use symthaea_core::scientific_temporal_outcome_discrimination::TemporalOutcomeDiscrimination;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemporalTestCandidateSpec {
@@ -65,7 +66,7 @@ impl fmt::Display for TemporalTestCandidateError {
 
 impl std::error::Error for TemporalTestCandidateError {}
 
-fn candidate_id(candidate: &super::super::scientific_temporal_outcome_discrimination::TemporalOutcomeDiscrimination) -> String {
+fn candidate_id(candidate: &TemporalOutcomeDiscrimination) -> String {
     format!(
         "{}:{}:{}:{:08x}:{}",
         candidate.left_model_id,
