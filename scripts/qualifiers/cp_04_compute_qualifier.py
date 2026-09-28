@@ -23,8 +23,6 @@ COMPUTE_GRAPH={
  "nodes":GRAPH_NODES,
  "edges":GRAPH_EDGES
 }
-def graph_identity():
-    return digest({"schema":COMPUTE_GRAPH["schema"],"nodes":sorted(COMPUTE_GRAPH["nodes"]),"edges":sorted([list(e) for e in COMPUTE_GRAPH["edges"]])})
 def validate_graph(g):
     if not isinstance(g,dict): fail("dependency graph must be object","CP-COMP-DEPENDENCY"); return
     eq(g.get("schema"),"cp-04-compute-dependency-graph-v1","graph schema","CP-COMP-DEPENDENCY")
