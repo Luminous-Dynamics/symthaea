@@ -499,7 +499,7 @@ def main():
         "fixture_sha256": hashlib.sha256(raw).hexdigest(),
         "replay_digest": baseline_digest,
         "case_count": len(cases),
-        "mutation_count": len(mutations) + len(graph_mutations),
+        "mutation_count": len(mutations) + len(graph_mutations) + len(coverage_mutations),
         "disposition": "PASS",
         "claim_ceiling": doc["claim_ceiling"],
     }, sort_keys=True, indent=2))
