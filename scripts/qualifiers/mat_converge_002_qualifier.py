@@ -30,6 +30,10 @@ GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
 GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
 REPLAY_ORDERING = "case manifest order is significant; graph node and edge order are identity-insignificant"
 FAILURE_DIAGNOSTICS = []
+REQUIRED_FAILURE_CATEGORIES = {
+    "authority", "negative-evidence", "coverage",
+    "historical-identity", "dependency-boundary", "schema-integrity",
+}
 COVERAGE_REASONS = {
     "C06": "case-level adversarial ranking control",
     "C08": "case-level negative-evidence control",
@@ -1024,6 +1028,11 @@ def main():
     disposition_mutated[0]["outcome"] = "recomputed-disposition"
     if replay_digest(disposition_mutated, graph) != baseline_digest:
         fail("derived disposition mutated replay identity")
+
+    observed_categories = {item["category"] for item in FAILURE_DIAGNOSTICS}
+    missing_categories = sorted(REQUIRED_FAILURE_CATEGORIES - observed_categories)
+    if missing_categories:
+        fail("adversarial coverage contract missing categories: " + ",".join(missing_categories))
 
     print(json.dumps({
         "qualifier": "MAT-CONVERGE-002A2",
