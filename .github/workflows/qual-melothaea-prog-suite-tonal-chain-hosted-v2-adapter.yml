@@ -1,4 +1,4 @@
-name: QUAL Melothaea ProgSuite Tonal Chain V2 Hosted Adapter
+name: QUAL Melothaea ProgSuite Tonal Chain V3 Hosted Adapter
 
 on:
   pull_request:
@@ -9,23 +9,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: qual-melothaea-prog-suite-tonal-chain-v2-adapter-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
+  group: qual-melothaea-prog-suite-tonal-chain-v3-adapter-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 env:
   CHECKOUT_ACTION_SHA: 11d5960a326750d5838078e36cf38b85af677262
   UPLOAD_ARTIFACT_ACTION_SHA: ea165f8d65b6e75b540449e92b4886f43607fa02
-  QUALIFIER_SHA: c877f2eb7cafce647f1e213c055f34532466ff21
-  MEL_TONAL_QUAL_RECEIPT: ${{ github.workspace }}/melothaea-prog-suite-tonal-chain-qualification-v2.tsv
+  QUALIFIER_SHA: 0f1d148b7d01933e4cdfc0f5e6057a0b70cc6584
+  MEL_TONAL_QUAL_RECEIPT: ${{ github.workspace }}/melothaea-prog-suite-tonal-chain-qualification-v3.tsv
 
 jobs:
   qualify:
-    name: Portable tonal-chain qualification v2
+    name: Portable tonal-chain qualification v3
     runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     steps:
-      - name: Checkout exact v2 qualifier head
+      - name: Checkout exact v3 qualifier head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ env.QUALIFIER_SHA }}
@@ -58,7 +58,7 @@ jobs:
 
       - name: Run portable exact-subject qualifier
         shell: bash
-        run: bash .github/qualification/qualify-melothaea-prog-suite-tonal-chain-v2.sh
+        run: bash .github/qualification/qualify-melothaea-prog-suite-tonal-chain-v3.sh
 
       - name: Verify qualification receipt
         if: always()
@@ -69,7 +69,7 @@ jobs:
             echo 'qualification receipt missing' >&2
             exit 1
           fi
-          python3 .github/qualification/verify-melothaea-prog-suite-tonal-chain-receipt-v2.py "$MEL_TONAL_QUAL_RECEIPT"
+          python3 .github/qualification/verify-melothaea-prog-suite-tonal-chain-receipt-v3.py "$MEL_TONAL_QUAL_RECEIPT"
 
       - name: Publish receipt digest
         if: always()
@@ -80,7 +80,7 @@ jobs:
             digest="$(sha256sum "$MEL_TONAL_QUAL_RECEIPT" | awk '{print $1}')"
             echo "melothaea tonal-chain receipt_sha256=$digest"
             {
-              echo '## Melothaea Tonal-Chain Qualification V2'
+              echo '## Melothaea Tonal-Chain Qualification V3'
               echo
               echo "- receipt SHA-256: \`$digest\`"
               echo '- authority: engineering software contract only'
@@ -93,7 +93,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: melothaea-prog-suite-tonal-chain-v2-${{ github.run_id }}-${{ github.run_attempt }}
+          name: melothaea-prog-suite-tonal-chain-v3-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.MEL_TONAL_QUAL_RECEIPT }}
           if-no-files-found: error
           retention-days: 30
