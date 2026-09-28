@@ -28,6 +28,15 @@ EXPECTED = {
 FIELDS = ("demand", "profile", "candidate", "process", "property", "measurement")
 GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
 GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
+COVERAGE_REASONS = {
+    "C06": "case-level adversarial ranking control",
+    "C08": "case-level negative-evidence control",
+    "C11": "case-level population-inference control",
+    "C12": "case-level measurement-feasibility control",
+    "C13": "case-level manufacturing-feasibility control",
+    "C14": "case-level lower-tail engineering control",
+    "C15": "case-level evaluator-correlation control",
+}
 
 def fail(msg):
     raise AssertionError(msg)
@@ -71,7 +80,7 @@ def replay_digest(cases, graph):
 def check_graph(graph, cases):
     if set(graph) != {"schema", "historical_records_immutable",
                       "derived_dispositions_recomputable", "nodes", "edges",
-                      "case_ids", "replay_rule"}:
+                      "case_ids", "replay_rule", "coverage"}:
         fail("state graph schema drift")
     if graph["schema"] != "mat-converge-002-state-graph-v1":
         fail("state graph schema mismatch")
@@ -415,6 +424,9 @@ def main():
         fail("graph-only coverage count drift")
     if declared_coverage["graph_only_case_ids"] != graph_only_cases:
         fail("graph-only coverage identities drift")
+    reasons = declared_coverage.get("graph_only_case_reasons")
+    if reasons != {case_id: COVERAGE_REASONS[case_id] for case_id in graph_only_cases}:
+        fail("graph-only coverage reasons drift")
 
     # Mutation matrix: every graph node identity change must invalidate
     # exactly the cases structurally dependent on that node.
