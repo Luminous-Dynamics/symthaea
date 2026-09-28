@@ -19,9 +19,9 @@ CASE_GUARDS={"C05":"CP-COMP-HISTORICAL","C06":"CP-COMP-COVERAGE","C10":"CP-COMP-
 GUARDS={"CP-COMP-COVERAGE":"coverage","CP-COMP-AUTHORITY":"authority","CP-COMP-NEGATIVE":"negative-evidence","CP-COMP-DEPENDENCY":"dependency-boundary","CP-COMP-CURRENTNESS":"currentness","CP-COMP-HISTORICAL":"historical-identity","CP-COMP-INVARIANT":"invariant-integrity"}
 FAILURES=[]
 IDENTITY_FIELDS=[
-    "compute_subject_generation","representation_identity","model_identity","model_parameters_identity",
+    "compute_subject_generation","requirement_identity","representation_identity","model_identity","model_parameters_identity",
     "runtime_identity","toolchain_identity","accelerator_identity","deployment_artifact_identity",
-    "execution_context_identity","observation_identity","statistics_identity","dependency_identity",
+    "execution_context_identity","observation_identity","uncertainty_identity","statistics_identity","provenance_identity","dependency_identity",
     "currentness_identity","applicability_identity"
 ]
 EXPECTED_GRAPH_NODES=["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"]
@@ -236,7 +236,11 @@ def main():
     source_sha=source_audit()
     validate(c); validate_manifest(manifest); validate_graph(graph)
     graph_sha=graph_identity(graph)
+    graph_repeat_sha=graph_identity(deepcopy(graph))
+    eq(graph_repeat_sha,graph_sha,"graph identity determinism","CP-COMP-INVARIANT")
     replay_sha=digest(replay_input(c,graph))
+    replay_repeat_sha=digest(replay_input(deepcopy(c),deepcopy(graph)))
+    eq(replay_repeat_sha,replay_sha,"replay identity determinism","CP-COMP-INVARIANT")
     validate_replay_boundary(c,graph)
     validate_replay_completeness(c,graph)
     muts=mutations(c,graph)
