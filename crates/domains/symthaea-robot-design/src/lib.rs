@@ -1769,6 +1769,76 @@ mod tests {
         assert_eq!(forward_ids, reversed_ids);
     }
 
+    #[te    #[test]
+    fn domain_enumeration_candidates_are_canonical_by_parameter_id() {
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("z").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(1).unwrap(),
+                    C0LengthUmV1::new(2).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        for candidate in domain.enumerate().unwrap() {
+            let ids = candidate
+                .parameters
+                .iter()
+                .map(|parameter| parameter.id.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(ids, vec!["a", "z"]);
+        }
+    }
+
+    #[test]
+    fn selected_parameter_identity_is_independent_of_search_domain() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let narrow = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(20_000).unwrap()]),
+            },
+        ])
+        .unwrap();
+        let broad = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id,
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(19_000).unwrap(),
+                    C0LengthUmV1::new(20_000).unwrap(),
+                    C0LengthUmV1::new(21_000).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        let narrow_selected = narrow.enumerate().unwrap().into_iter().next().unwrap();
+        let broad_selected = broad
+            .enumerate()
+            .unwrap()
+            .into_iter()
+            .find(|set| {
+                set.parameter(&ParameterIdV1::new("section_width").unwrap())
+                    .unwrap()
+                    .value_um()
+                    == 20_000
+            })
+            .unwrap();
+
+        assert_eq!(narrow_selected, broad_selected);
+        assert_eq!(narrow_selected.id().unwrap(), broad_selected.id().unwrap());
+        assert_ne!(narrow.id().unwrap(), broad.id().unwrap());
+    }
+
 st]
     fn domain_enumeration_is_exact_and_deterministic() {
         let id = ParameterIdV1::new("section_width").unwrap();
