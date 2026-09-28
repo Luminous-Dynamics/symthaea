@@ -1,0 +1,88 @@
+{
+  "schema": "cp-01-metrology-corpus-v1",
+  "authority": "representation_only_no_physical_execution_authority",
+  "claim_ceiling": "deterministic metrology identity, currentness, dependency, and authority semantics over synthetic/reference workflows only",
+  "cases": [
+    {
+      "id": "C01",
+      "kind": "complete-trace",
+      "expected": "CurrentAndApplicable"
+    },
+    {
+      "id": "C02",
+      "kind": "missing-physical-subject",
+      "expected": "ObservationMissing"
+    },
+    {
+      "id": "C03",
+      "kind": "weak-instrument-identity",
+      "expected": "Unknown"
+    },
+    {
+      "id": "C04",
+      "kind": "distinct-physical-instances",
+      "expected": "CurrentAndApplicable"
+    },
+    {
+      "id": "C05",
+      "kind": "changed-fixture-context",
+      "expected": "ConfigurationMismatch"
+    },
+    {
+      "id": "C06",
+      "kind": "changed-acquisition-context",
+      "expected": "ConfigurationMismatch"
+    },
+    {
+      "id": "C07",
+      "kind": "stale-calibration",
+      "expected": "CalibrationStale"
+    },
+    {
+      "id": "C08",
+      "kind": "reference-mismatch",
+      "expected": "ReferenceMismatch"
+    },
+    {
+      "id": "C09",
+      "kind": "missing-uncertainty",
+      "expected": "UncertaintyInsufficient"
+    },
+    {
+      "id": "C10",
+      "kind": "shared-calibration-root",
+      "expected": "CommonModeNotIndependent"
+    },
+    {
+      "id": "C11",
+      "kind": "single-specimen",
+      "expected": "PopulationInferenceBlocked"
+    },
+    {
+      "id": "C12",
+      "kind": "threshold-unresolved",
+      "expected": "UncertaintyInsufficient"
+    },
+    {
+      "id": "C13",
+      "kind": "measurement-back-action",
+      "expected": "CurrentButApplicabilityUnresolved"
+    },
+    {
+      "id": "C14",
+      "kind": "negative-evidence-retained",
+      "expected": "HistoricalNegativeRetained"
+    },
+    {
+      "id": "C15",
+      "kind": "operational-event-cannot-create-measurement",
+      "expected": "AuthoritySeparated"
+    },
+    {
+      "id": "C16",
+      "kind": "synthetic-pass",
+      "expected": "NoPhysicalExecutionAuthority"
+    }
+  ],
+  "replay_semantics": "historical identities are immutable inputs; dispositions are derived outputs"
+}
