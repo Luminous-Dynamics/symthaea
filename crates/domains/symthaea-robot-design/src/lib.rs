@@ -395,6 +395,7 @@ impl ExactDesignParameterSetV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum ExactLengthDomainV1 {
     Values(Vec<C0LengthUmV1>),
     Range { lower: C0LengthUmV1, upper: C0LengthUmV1, step_um: u64 },
