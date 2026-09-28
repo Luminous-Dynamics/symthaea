@@ -516,9 +516,28 @@ impl ExactDesignSearchDomainV1 {
     }
     pub fn enumerate(&self) -> Result<Vec<ExactDesignParameterSetV1>, RobotDesignError> {
         self.validate()?;
-        let mut dimensions = Vec::with_capacity(self.parameters.len());
-        let mut total = 1usize;
 
+        // Check the Cartesian-product cardinality before materializing any range.
+        // This makes mathematically unrepresentable searches fail closed without
+        // first attempting a potentially enormous allocation.
+        let mut total = 1usize;
+        for parameter in &self.parameters {
+            let count = match &parameter.domain {
+                ExactLengthDomainV1::Values(values) => values.len(),
+                ExactLengthDomainV1::Range { lower, upper, step_um } => {
+                    let span = upper.value_um() - lower.value_um();
+                    let count = span.checked_div(*step_um).and_then(|n| n.checked_add(1))
+                        .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
+                    usize::try_from(count)
+                        .map_err(|_| RobotDesignError::DomainEnumerationOverflow)?
+                }
+            };
+            total = total
+                .checked_mul(count)
+                .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
+        }
+
+        let mut dimensions = Vec::with_capacity(self.parameters.len());
         for parameter in &self.parameters {
             let values = match &parameter.domain {
                 ExactLengthDomainV1::Values(values) => values.clone(),
@@ -543,9 +562,6 @@ impl ExactDesignSearchDomainV1 {
                     values
                 }
             };
-            total = total
-                .checked_mul(values.len())
-                .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
             dimensions.push((parameter.id.clone(), values));
         }
 
