@@ -575,6 +575,10 @@ pub mod web_research;
 
 pub mod knowledge;
 
+// Scientific discovery adapters: temporal candidate identity into the
+// domain-neutral evidence-plane commitment boundary.
+pub mod scientific_discovery;
+
 // Z3 Formal Verification Bridge (Phase 4B — math/science plan)
 // Dual-mode: subprocess z3 binary (SMTLIB2) when available, internal DPLL fallback always.
 // Domain-specific verifiers for ODE solutions, Einstein condition, CSP solutions.
