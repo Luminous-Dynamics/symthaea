@@ -1276,6 +1276,20 @@ mod tests {
     }
 
     #[test]
+    fn exact_parameter_identity_has_golden_cross_language_vector() {
+        let width = ParameterIdV1::new("section_width").unwrap();
+        let height = ParameterIdV1::new("section_height").unwrap();
+        let set = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 { id: width, value: C0LengthUmV1::new(20_000).unwrap() },
+            ExactDesignLengthParameterV1 { id: height, value: C0LengthUmV1::new(30_000).unwrap() },
+        ]).unwrap();
+        assert_eq!(
+            set.id().unwrap().to_hex(),
+            "8212598d5c517ef004c6e29fe267d420fb273016f8f8415251cbb348b52bd463"
+        );
+    }
+
+    #[test]
     fn exact_parameter_identity_ignores_insertion_order() {
         let width = ParameterIdV1::new("section_width").unwrap();
         let height = ParameterIdV1::new("section_height").unwrap();
