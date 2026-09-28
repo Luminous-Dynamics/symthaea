@@ -1443,13 +1443,13 @@ mod tests {
 
     #[test]
     fn serde_rejects_invalid_parameter_id_at_the_type_boundary() {
-        let result: Result<ParameterIdV1, _> = serde_json::from_str("\\\"Section Width\\\"");
+        let result: Result<ParameterIdV1, _> = serde_json::from_str(r#""Section Width""#);
         assert!(result.is_err());
     }
 
     #[test]
     fn serde_rejects_noncanonical_rational_at_the_type_boundary() {
-        let result: Result<ExactRationalV1, _> = serde_json::from_str("{\\\"numerator\\\":20,\\\"denominator\\\":1000}");
+        let result: Result<ExactRationalV1, _> = serde_json::from_str(r#"{"numerator":20,"denominator":1000}"#);
         assert!(result.is_err());
     }
 
@@ -1578,6 +1578,64 @@ mod tests {
         assert!(serde_json::from_str::<SensorSlotId>(r#""bad id""#).is_err());
         assert!(serde_json::from_str::<ControlInterfaceId>(r#""bad id""#).is_err());
     }
+
+
+    #[test]
+    fn exact_parameter_set_serde_round_trip_preserves_identity() {
+        let set = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                value: C0LengthUmV1::new(20_000).unwrap(),
+            },
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("section_height").unwrap(),
+                value: C0LengthUmV1::new(30_000).unwrap(),
+            },
+        ])
+        .unwrap();
+        let json = serde_json::to_string(&set).unwrap();
+        let restored: ExactDesignParameterSetV1 = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, set);
+        assert_eq!(restored.id().unwrap(), set.id().unwrap());
+        assert_eq!(restored.canonical_transcript().unwrap(), set.canonical_transcript().unwrap());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_round_trip_preserves_identity() {
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(20_000).unwrap(),
+                    upper: C0LengthUmV1::new(22_000).unwrap(),
+                    step_um: 1_000,
+                },
+            },
+        ])
+        .unwrap();
+        let json = serde_json::to_string(&domain).unwrap();
+        let restored: ExactDesignSearchDomainV1 = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, domain);
+        assert_eq!(restored.id().unwrap(), domain.id().unwrap());
+        assert_eq!(restored.canonical_transcript().unwrap(), domain.canonical_transcript().unwrap());
+    }
+
+    #[test]
+    fn exact_parameter_set_serde_rejects_unknown_top_level_fields() {
+        let result: Result<ExactDesignParameterSetV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.exact-parameters.v1","schema_version":1,"parameters":[],"extra":1}"#,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_rejects_unknown_top_level_fields() {
+        let result: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[],"extra":1}"#,
+        );
+        assert!(result.is_err());
+    }
+
 
     #[test]
     fn invalid_semantic_id_is_rejected_at_construction() {
