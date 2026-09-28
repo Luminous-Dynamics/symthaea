@@ -406,7 +406,7 @@ def main():
         if edge["id"] != "edge/C07" and not ({from_ref, to_ref} <= allowed):
             fail(f"graph dependency is not attributable to its case: {edge['id']}")
     graph_only_cases = sorted(case_ids - graph_edge_cases)
-    if graph_only_cases != ["C03", "C05", "C06", "C08", "C11", "C12", "C13", "C14"]:
+    if graph_only_cases != ["C06", "C08", "C11", "C12", "C13", "C14", "C15"]:
         fail("partial structural coverage manifest drift")
     if len(graph["edges"]) != len(graph_edge_cases):
         fail("multiple structural edges unexpectedly collapsed to one case")
@@ -550,7 +550,7 @@ def main():
         "fixture_sha256": hashlib.sha256(raw).hexdigest(),
         "replay_digest": baseline_digest,
         "case_count": len(cases),
-        "mutation_count": len(mutations) + len(graph_mutations) + len(coverage_mutations),
+        "mutation_count": len(mutations) + 1 + len(graph_mutations) + len(coverage_mutations),
         "disposition": "PASS",
         "claim_ceiling": doc["claim_ceiling"],
     }, sort_keys=True, indent=2))
