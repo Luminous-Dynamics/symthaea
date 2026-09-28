@@ -20,6 +20,18 @@ GUARDS={"CP-COMP-COVERAGE":"coverage","CP-COMP-AUTHORITY":"authority","CP-COMP-N
 FAILURES=[]
 EXPECTED_GRAPH_NODES=["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"]
 EXPECTED_GRAPH_EDGES=[["requirement","representation"],["representation","model"],["model","runtime"],["runtime","accelerator"],["accelerator","deployment"],["deployment","execution"],["execution","observation"],["observation","statistics"],["statistics","disposition"]]
+EXPECTED_CLOSURES={
+    "requirement":["requirement","representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"],
+    "representation":["representation","model","runtime","accelerator","deployment","execution","observation","statistics","disposition"],
+    "model":["model","runtime","accelerator","deployment","execution","observation","statistics","disposition"],
+    "runtime":["runtime","accelerator","deployment","execution","observation","statistics","disposition"],
+    "accelerator":["accelerator","deployment","execution","observation","statistics","disposition"],
+    "deployment":["deployment","execution","observation","statistics","disposition"],
+    "execution":["execution","observation","statistics","disposition"],
+    "observation":["observation","statistics","disposition"],
+    "statistics":["statistics","disposition"],
+    "disposition":["disposition"],
+}
 
 def canonical(v):
     return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
@@ -161,10 +173,9 @@ def main():
     graph_sha=graph_identity(graph)
     replay_sha=digest(replay_input(c,graph))
     muts=mutations(c,graph)
-    if not {"model","runtime","accelerator","deployment","execution","observation","statistics","disposition"}.issubset(dependency_closure(["model"],graph)):
-        fail("model dependency closure incomplete","CP-COMP-DEPENDENCY")
-    derived_only=deepcopy(c)
-    derived_only["cases"][0]["expected_disposition"]="DerivedOnly"
+    for node,expected_closure in EXPECTED_CLOSURES.items():
+        if dependency_closure([node],graph)!=expected_closure:
+            fail(f"{node} invalidation closure incorrect","CP-COMP-DEPENDENCY")
     if digest(replay_input(c,graph))!=digest(replay_input(derived_only,graph)):
         fail("replay input incorrectly depends on derived disposition","CP-COMP-INVARIANT")
     altered_graph=deepcopy(graph)
