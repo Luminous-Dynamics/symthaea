@@ -1,0 +1,13 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "$id":"https://symthaea.luminousdynamics.io/schemas/scientific-fep-admissibility-1.0.0.json",
+ "title":"Scientific FEP admissibility policy","type":"object","additionalProperties":false,
+ "required":["schema","schema_version","authority","policy","non_equivalences"],
+ "properties":{
+  "schema":{"const":"symthaea.fep.scientific_admissibility"},
+  "schema_version":{"const":"1.0.0"},
+  "authority":{"const":"decision_support_only"},
+  "policy":{"type":"object","additionalProperties":false},
+  "non_equivalences":{"type":"array","minItems":6,"uniqueItems":true,"items":{"type":"string"},"contains":{"const":"admissibility_is_not_scientific_truth"}}
+ }
+}
