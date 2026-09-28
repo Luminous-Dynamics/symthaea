@@ -84,7 +84,6 @@ pub enum PredictionCompilerError {
     NoBindings,
     DuplicatePredictionId(String),
     UnknownFalsifier(String),
-    DuplicateFalsifierBinding(String),
     ExposureBeforeKnowledgeCutoff,
     IncompleteCutoffPair,
 }
@@ -99,7 +98,6 @@ pub fn compile(
     }
 
     let mut seen_predictions = BTreeSet::new();
-    let mut seen_falsifiers = BTreeSet::new();
     let mut compiled = Vec::with_capacity(bindings.len());
 
     for binding in bindings {
@@ -107,11 +105,6 @@ pub fn compile(
         if !seen_predictions.insert(binding.prediction_id.clone()) {
             return Err(PredictionCompilerError::DuplicatePredictionId(
                 binding.prediction_id.clone(),
-            ));
-        }
-        if !seen_falsifiers.insert(binding.falsifier_id.clone()) {
-            return Err(PredictionCompilerError::DuplicateFalsifierBinding(
-                binding.falsifier_id.clone(),
             ));
         }
         let Some(falsifier) = claim.falsifiers.get(&binding.falsifier_id) else {
@@ -234,15 +227,12 @@ mod tests {
     }
 
     #[test]
-    fn refuses_duplicate_prediction_or_falsifier_binding() {
+    fn refuses_duplicate_prediction_but_allows_shared_falsifier() {
         let err = compile(&claim(), &[binding("p-1", "f-1"), binding("p-1", "f-2")]).unwrap_err();
         assert_eq!(err, PredictionCompilerError::DuplicatePredictionId("p-1".into()));
 
-        let err = compile(&claim(), &[binding("p-1", "f-1"), binding("p-2", "f-1")]).unwrap_err();
-        assert_eq!(
-            err,
-            PredictionCompilerError::DuplicateFalsifierBinding("f-1".into())
-        );
+        let out = compile(&claim(), &[binding("p-1", "f-1"), binding("p-2", "f-1")]).unwrap();
+        assert_eq!(out.len(), 2);
     }
 
     #[test]
