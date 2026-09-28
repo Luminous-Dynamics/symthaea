@@ -172,29 +172,6 @@ impl CandidatePredictionCommitment {
         })
     }
 
-    /// Verify the envelope's complete integrity against its embedded commitment.
-    pub fn verify_integrity(&self) -> bool {
-        if !self.commitment.verify_integrity() {
-            return false;
-        }
-        let binding = CandidatePredictionBinding {
-            candidate_id: self.candidate_id.clone(),
-            source_candidate_id: self.source_candidate_id.clone(),
-            test_specification_id: self.test_specification_id.clone(),
-            measurement_specification_id: self.measurement_specification_id.clone(),
-            left_lineage: self.commitment.provenance().model_lineage.clone(),
-            right_lineage: String::new(),
-            prediction_payload: Vec::new(),
-        };
-        let _ = binding;
-        self.binding_digest.starts_with("sha256:")
-            && self.lineage_digest.starts_with("sha256:")
-            && !self.candidate_id.trim().is_empty()
-            && !self.source_candidate_id.trim().is_empty()
-            && !self.test_specification_id.trim().is_empty()
-            && !self.measurement_specification_id.trim().is_empty()
-    }
-
     /// Verify that this envelope is an immutable supersession of the supplied parent.
     pub fn is_supersession_of(&self, parent: &Self) -> bool {
         self.commitment.verify_integrity()
@@ -431,6 +408,39 @@ mod tests {
             ),
             Err(BindingError::SourceMismatch)
         );
+    }
+
+    #[test]
+    fn tampered_outer_binding_digest_fails_verification() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.binding_digest = "sha256:tampered".into();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
+    }
+
+    #[test]
+    fn tampered_outer_lineage_digest_fails_verification() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.lineage_digest = "sha256:tampered".into();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
+    }
+
+    #[test]
+    fn tampered_outer_identity_fails_verification() {
+        let c = candidate();
+        let mut envelope = commit_candidate_envelope(
+            &c, "challenge-v1", "criteria-v1", "mapping-v1", "actor-v1",
+            "2026-09-28T09:00:00Z", provenance(&c), b"forecast",
+        ).unwrap();
+        envelope.candidate_id = "tampered-candidate".into();
+        assert!(!envelope.verify_binding(&binding_for(&c, b"forecast")).unwrap());
     }
 
     #[test]
