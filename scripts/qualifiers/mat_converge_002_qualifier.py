@@ -154,6 +154,35 @@ def guard_registry_digest():
         "mutation_guards": sorted(EXPECTED_GUARDS.items()),
     })).hexdigest()
 
+def oracle_source_digest():
+    return hashlib.sha256(
+        pathlib.Path(__file__).read_bytes()
+    ).hexdigest()
+
+def qualification_receipt_digest(
+    fixture_sha256,
+    replay_digest_value,
+    mutation_manifest_digest_value,
+    mutation_manifest_projection_digest_value,
+    source_audit,
+    claim_ceiling,
+):
+    """Bind the final PASS identity to every independent qualification input."""
+    payload = {
+        "schema": "mat-converge-002-qualification-receipt-v1",
+        "qualifier": "MAT-CONVERGE-002A2",
+        "fixture_sha256": fixture_sha256,
+        "oracle_source_sha256": oracle_source_digest(),
+        "replay_digest": replay_digest_value,
+        "guard_registry_digest": guard_registry_digest(),
+        "mutation_manifest_digest": mutation_manifest_digest_value,
+        "mutation_manifest_projection_digest": mutation_manifest_projection_digest_value,
+        "source_guard_audit": source_audit,
+        "claim_ceiling": claim_ceiling,
+        "disposition": "PASS",
+    }
+    return hashlib.sha256(canonical(payload)).hexdigest()
+
 def source_guard_audit():
     """Static self-audit: every fail() call must carry an explicit guard ID."""
     source = pathlib.Path(__file__).read_text(encoding="utf-8")
@@ -1260,10 +1289,15 @@ def main():
     if missing_categories:
         fail("adversarial coverage contract missing categories: " + ",".join(missing_categories), "MAT-MUT-INVARIANT_INTEGRITY")
 
+    fixture_sha256 = hashlib.sha256(raw).hexdigest()
+    source_audit = source_guard_audit()
+    mutation_manifest_digest_value = mutation_manifest_digest(cases, graph)
+    mutation_manifest_projection_digest_value = mutation_manifest_projection_digest(manifest)
     print(json.dumps({
         "qualifier": "MAT-CONVERGE-002A2",
         "schema": "1",
-        "fixture_sha256": hashlib.sha256(raw).hexdigest(),
+        "fixture_sha256": fixture_sha256,
+        "oracle_source_sha256": oracle_source_digest(),
         "replay_digest": baseline_digest,
         "case_count": len(cases),
         "mutation_count": len(FAILURE_DIAGNOSTICS),
@@ -1271,9 +1305,18 @@ def main():
         "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v4",
         "guard_registry_schema": "mat-converge-002-guard-registry-v1",
         "guard_registry_digest": guard_registry_digest(),
-        "source_guard_audit": source_guard_audit(),
-        "mutation_manifest_digest": mutation_manifest_digest(cases, graph),
-        "mutation_manifest_projection_digest": mutation_manifest_projection_digest(manifest),
+        "source_guard_audit": source_audit,
+        "mutation_manifest_digest": mutation_manifest_digest_value,
+        "mutation_manifest_projection_digest": mutation_manifest_projection_digest_value,
+        "qualification_receipt_schema": "mat-converge-002-qualification-receipt-v1",
+        "qualification_receipt_digest": qualification_receipt_digest(
+            fixture_sha256,
+            baseline_digest,
+            mutation_manifest_digest_value,
+            mutation_manifest_projection_digest_value,
+            source_audit,
+            doc["claim_ceiling"],
+        ),
         "failure_categories": {
             category: sum(1 for item in FAILURE_DIAGNOSTICS if item["category"] == category)
             for category in sorted({item["category"] for item in FAILURE_DIAGNOSTICS})
