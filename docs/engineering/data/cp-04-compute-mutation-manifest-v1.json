@@ -73,6 +73,10 @@
     {
       "mutation_id": "mutate-C02-model-identity",
       "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "mutate-C02-model-identity",
+      "guard_id": "CP-COMP-DEPENDENCY"
     }
   ]
 }
