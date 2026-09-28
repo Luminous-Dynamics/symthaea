@@ -12,6 +12,8 @@ SCHEMA="cp-04-compute-corpus-v1"
 AUTHORITY="representation_only_no_physical_execution_authority"
 CEILING="deterministic compute identity, generation, dependency, evidence-separation, replay, negative-result, and authority semantics over synthetic/reference workflows only"
 EXPECTED={"C01":"CurrentAndApplicable","C02":"DependencyChanged","C03":"ConfigurationMismatch","C04":"ConfigurationMismatch","C05":"DeploymentMismatch","C06":"ObservationMissing","C07":"UncertaintyInsufficient","C08":"PopulationInferenceBlocked","C09":"HardEnvelopeFailure","C10":"CommonModeNotIndependent","C11":"AuthoritySeparated","C12":"Stale","C13":"StateRestorationUnresolved","C14":"AuthoritySeparated","C15":"AuthoritySeparated","C16":"HistoricalNegativeRetained","C17":"NoPhysicalExecutionAuthority","C18":"RequalificationRequired"}
+SCENARIOS={"C01":"complete-thread","C02":"model-parameter-generation-changed","C03":"runtime-toolchain-changed","C04":"accelerator-configuration-changed","C05":"deployment-artifact-changed","C06":"execution-observation-missing","C07":"uncertainty-missing","C08":"single-benchmark-not-population","C09":"tail-envelope-failure","C10":"correlated-channels","C11":"model-output-equals-measurement","C12":"stale-currentness","C13":"lossy-cfc-snapshot","C14":"operational-event-not-qualification","C15":"attestation-not-performance","C16":"negative-result-retained","C17":"synthetic-pass","C18":"workload-profile-changed"}
+CASE_GUARDS={"C05":"CP-COMP-HISTORICAL","C06":"CP-COMP-COVERAGE","C10":"CP-COMP-DEPENDENCY","C16":"CP-COMP-NEGATIVE","C17":"CP-COMP-AUTHORITY","C18":"CP-COMP-CURRENTNESS"}
 GUARDS={"CP-COMP-COVERAGE":"coverage","CP-COMP-AUTHORITY":"authority","CP-COMP-NEGATIVE":"negative-evidence","CP-COMP-DEPENDENCY":"dependency-boundary","CP-COMP-CURRENTNESS":"currentness","CP-COMP-HISTORICAL":"historical-identity","CP-COMP-INVARIANT":"invariant-integrity"}
 FAILURES=[]
 def canonical(v): return json.dumps(v,sort_keys=True,separators=(",",":"),ensure_ascii=True).encode()
@@ -44,7 +46,8 @@ def validate(c):
     for x in cases:
         cid=x.get("case_id")
         if not isinstance(x.get("scenario"),str): fail(f"{cid}: scenario missing","CP-COMP-COVERAGE")
-        eq(x.get("expected_disposition"),EXPECTED.get(cid,"Unknown"),f"{cid} disposition")
+        eq(x.get("scenario"),SCENARIOS.get(cid),"case scenario",CASE_GUARDS.get(cid,"CP-COMP-COVERAGE"))
+        eq(x.get("expected_disposition"),EXPECTED.get(cid,"Unknown"),f"{cid} disposition",CASE_GUARDS.get(cid,"CP-COMP-INVARIANT"))
     guards={"model-output-equals-measurement":"AuthoritySeparated","attestation-not-performance":"AuthoritySeparated","synthetic-pass":"NoPhysicalExecutionAuthority","negative-result-retained":"HistoricalNegativeRetained","lossy-cfc-snapshot":"StateRestorationUnresolved"}
     for x in cases:
         if x["scenario"] in guards: eq(x["expected_disposition"],guards[x["scenario"]],f"{x['case_id']} semantic guard")
