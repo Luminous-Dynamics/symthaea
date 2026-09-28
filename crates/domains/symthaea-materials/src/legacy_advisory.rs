@@ -350,6 +350,22 @@ mod tests {
     }
 
     #[test]
+    fn acquisition_features_reject_non_finite_values() {
+        let id = AdvisoryIdentityV1::new("acquisition", "fixture-v1", "input-v1");
+        assert_eq!(AcquisitionFeatureV1::try_new(id.clone(), "score", f64::NAN), Err(AdvisoryInputError::InvalidFeatureValue));
+        assert!(AcquisitionFeatureV1::try_new(id, "score", 0.5).is_ok());
+    }
+
+    #[test]
+    fn domain_advisory_constructors_force_advisory_authority() {
+        let id = AdvisoryIdentityV1::new("fixture", "model-v1", "input-v1");
+        let mining = AdvisoryMiningPredictionV1::from_prediction(id.clone(), 10.0, vec![0.1, 0.2]);
+        let strategic = AdvisoryStrategicPredictionV1::from_prediction(id, 10.0, vec![0.3, 0.4]);
+        assert_eq!(mining.authority, AdvisoryAuthorityV1::Advisory);
+        assert_eq!(strategic.authority, AdvisoryAuthorityV1::Advisory);
+    }
+
+    #[test]
     fn serialized_advisory_round_trip_preserves_ceiling() {
         let wrapped = AdvisoryStabilityPredictionV1::predict(&[(26, 0.5), (28, 0.5)], 300.0);
         let json = serde_json::to_string(&wrapped).unwrap();
