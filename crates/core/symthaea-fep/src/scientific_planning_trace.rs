@@ -91,8 +91,7 @@ fn candidate_id(
         right_model_id.len(),
         right_model_id,
         outcome_id.len(),
-        outcome_id,
-        ""
+        outcome_id
     )
 }
 
