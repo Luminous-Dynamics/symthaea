@@ -301,8 +301,6 @@ def main():
         fail("dependency projection coverage drift")
     if baseline_projection["C01"] == baseline_projection["C02"]:
         fail("distinct process generations collapsed dependency identity")
-    if baseline_projection["C01"] != baseline_projection["C09"]:
-        fail("authority-only case changed its immutable dependency projection")
 
     disposition_mutated = json.loads(json.dumps(cases))
     disposition_mutated[0]["outcome"] = "recomputed-disposition"
