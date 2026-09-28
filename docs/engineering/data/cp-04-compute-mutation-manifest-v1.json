@@ -1,19 +1,38 @@
 {
-  "schema":"cp-04-compute-mutation-manifest-v1",
-  "guard_registry":{
-    "CP-COMP-COVERAGE":"coverage",
-    "CP-COMP-AUTHORITY":"authority",
-    "CP-COMP-NEGATIVE":"negative-evidence",
-    "CP-COMP-DEPENDENCY":"dependency-boundary",
-    "CP-COMP-CURRENTNESS":"currentness",
-    "CP-COMP-HISTORICAL":"historical-identity"
+  "schema": "cp-04-compute-mutation-manifest-v1",
+  "guard_registry": {
+    "CP-COMP-COVERAGE": "coverage",
+    "CP-COMP-AUTHORITY": "authority",
+    "CP-COMP-NEGATIVE": "negative-evidence",
+    "CP-COMP-DEPENDENCY": "dependency-boundary",
+    "CP-COMP-CURRENTNESS": "currentness",
+    "CP-COMP-HISTORICAL": "historical-identity",
+    "CP-COMP-INVARIANT": "invariant-integrity"
   },
-  "mutations":[
-    {"mutation_id":"drop-C06","guard_id":"CP-COMP-COVERAGE"},
-    {"mutation_id":"promote-C17","guard_id":"CP-COMP-AUTHORITY"},
-    {"mutation_id":"rewrite-C16","guard_id":"CP-COMP-NEGATIVE"},
-    {"mutation_id":"collapse-C10","guard_id":"CP-COMP-DEPENDENCY"},
-    {"mutation_id":"change-C18","guard_id":"CP-COMP-CURRENTNESS"},
-    {"mutation_id":"erase-C05","guard_id":"CP-COMP-HISTORICAL"}
+  "mutations": [
+    {
+      "mutation_id": "drop-C06",
+      "guard_id": "CP-COMP-COVERAGE"
+    },
+    {
+      "mutation_id": "promote-C17",
+      "guard_id": "CP-COMP-AUTHORITY"
+    },
+    {
+      "mutation_id": "rewrite-C16",
+      "guard_id": "CP-COMP-NEGATIVE"
+    },
+    {
+      "mutation_id": "collapse-C10",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "change-C18",
+      "guard_id": "CP-COMP-CURRENTNESS"
+    },
+    {
+      "mutation_id": "erase-C05",
+      "guard_id": "CP-COMP-HISTORICAL"
+    }
   ]
 }
