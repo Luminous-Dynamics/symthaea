@@ -1,0 +1,62 @@
+name: AI Assurance R2 Clippy Exact Qualification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ai-assurance-r2-clippy-exact-qualification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-assurance-r2-clippy-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_SOURCE_SHA: c2001727ebf98f6911ba1f6e5a6b17b4ceda68f1
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Exact-head AI-Assurance R2 qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout exact repaired source subject
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SOURCE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Prove exact checkout identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_SOURCE_SHA"
+          echo "Qualified source head: $actual"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check AI-Assurance package formatting
+        run: cargo fmt --package symthaea-ai-assurance -- --check
+
+      - name: Verify committed workspace resolution is locked
+        run: cargo metadata --locked --format-version 1 > /dev/null
+
+      - name: Test AI-Assurance kernel, integration attacks, and compile-fail docs
+        run: cargo test --locked -p symthaea-ai-assurance
+
+      - name: Clippy AI-Assurance kernel
+        run: cargo clippy --locked -p symthaea-ai-assurance --all-targets -- -D warnings
+
+      - name: Require qualification to leave tracked assurance artifacts unchanged
+        if: always()
+        run: git diff --exit-code -- Cargo.lock crates/core/symthaea-ai-assurance
