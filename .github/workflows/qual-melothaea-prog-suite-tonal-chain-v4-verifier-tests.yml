@@ -1,0 +1,33 @@
+name: QUAL Melothaea ProgSuite Tonal Chain V4 Verifier Adversarial Tests
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches:
+      - "qual/melothaea-prog-suite-tonal-chain-v4-verifier-tests"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests-\${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verifier-tests:
+    name: Fail-closed receipt verifier mutation suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout verifier test branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: \${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run adversarial verifier tests
+        shell: bash
+        run: python3 .github/qualification/test-melothaea-prog-suite-tonal-chain-receipt-v4.py
