@@ -72,6 +72,8 @@ pub enum AdvisoryInputError {
     InvalidFraction,
     /// Fractions do not form a normalized composition within tolerance.
     UnnormalizedComposition,
+    /// An acquisition feature is not finite.
+    InvalidFeatureValue,
 }
 
 
@@ -88,6 +90,13 @@ pub struct AdvisoryMiningPredictionV1 {
     pub predicted_state: Vec<f32>,
 }
 
+impl AdvisoryMiningPredictionV1 {
+    /// Wrap a mining prediction as advisory-only model output.
+    pub fn from_prediction(identity: AdvisoryIdentityV1, horizon_seconds: f32, predicted_state: Vec<f32>) -> Self {
+        Self { identity, authority: AdvisoryAuthorityV1::Advisory, horizon_seconds, predicted_state }
+    }
+}
+
 /// Typed advisory boundary for the strategic-materials predictor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryStrategicPredictionV1 {
@@ -99,6 +108,13 @@ pub struct AdvisoryStrategicPredictionV1 {
     pub horizon_seconds: f32,
     /// Model-predicted HDC state; not an observation.
     pub predicted_state: Vec<f32>,
+}
+
+impl AdvisoryStrategicPredictionV1 {
+    /// Wrap a strategic-materials prediction as advisory-only model output.
+    pub fn from_prediction(identity: AdvisoryIdentityV1, horizon_seconds: f32, predicted_state: Vec<f32>) -> Self {
+        Self { identity, authority: AdvisoryAuthorityV1::Advisory, horizon_seconds, predicted_state }
+    }
 }
 
 /// Typed advisory boundary for a mining FEP action recommendation.
@@ -240,6 +256,12 @@ impl AcquisitionFeatureV1 {
     /// Construct a search/acquisition feature.
     pub fn new(identity: AdvisoryIdentityV1, name: impl Into<String>, value: f64) -> Self {
         Self { identity, name: name.into(), value, authority: AdvisoryAuthorityV1::Advisory }
+    }
+
+    /// Validate a feature before it enters an acquisition/ranking path.
+    pub fn try_new(identity: AdvisoryIdentityV1, name: impl Into<String>, value: f64) -> Result<Self, AdvisoryInputError> {
+        if !value.is_finite() { return Err(AdvisoryInputError::InvalidFeatureValue); }
+        Ok(Self::new(identity, name, value))
     }
 }
 
