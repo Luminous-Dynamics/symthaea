@@ -293,6 +293,7 @@ def main():
     localized_projection = dependency_projection(localized, graph)
     localized_graph = json.loads(json.dumps(graph))
     localized_graph["nodes"][2]["generation"] = "G3"
+    localized_graph["nodes"][2]["ref"] = "process/G3"
     localized_projection_with_graph = dependency_projection(localized, localized_graph)
     if dependency_delta(baseline_projection, localized_projection) != ["C02"]:
         fail("historical generation mutation cascaded beyond its dependent case")
