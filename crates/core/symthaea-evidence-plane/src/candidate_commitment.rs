@@ -23,6 +23,27 @@ pub struct CandidatePredictionSource {
     pub right_lineage: String,
 }
 
+impl CandidatePredictionSource {
+    /// Validate the identity-only source boundary before any prediction payload
+    /// is attached. This keeps discovery adapters from constructing ambiguous
+    /// commitment inputs.
+    pub fn validate(&self) -> Result<(), BindingError> {
+        for (name, value) in [
+            ("candidate_id", &self.candidate_id),
+            ("source_candidate_id", &self.source_candidate_id),
+            ("test_specification_id", &self.test_specification_id),
+            ("measurement_specification_id", &self.measurement_specification_id),
+            ("left_lineage", &self.left_lineage),
+            ("right_lineage", &self.right_lineage),
+        ] {
+            if value.trim().is_empty() {
+                return Err(BindingError::MissingBindingField(name));
+            }
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CandidatePredictionBinding {
     pub candidate_id: String,
@@ -92,6 +113,26 @@ impl From<CommitmentError> for BindingError {
 }
 
 impl CandidatePredictionBinding {
+    /// Construct a binding from a validated, domain-neutral candidate source.
+    pub fn from_source(
+        source: &CandidatePredictionSource,
+        prediction_payload: &[u8],
+    ) -> Result<Self, BindingError> {
+        source.validate()?;
+        if prediction_payload.is_empty() {
+            return Err(BindingError::EmptyPredictionPayload);
+        }
+        Ok(Self {
+            candidate_id: source.candidate_id.clone(),
+            source_candidate_id: source.source_candidate_id.clone(),
+            test_specification_id: source.test_specification_id.clone(),
+            measurement_specification_id: source.measurement_specification_id.clone(),
+            left_lineage: source.left_lineage.clone(),
+            right_lineage: source.right_lineage.clone(),
+            prediction_payload: prediction_payload.to_vec(),
+        })
+    }
+
     pub fn validate(&self) -> Result<(), BindingError> {
         for (name, value) in [
             ("candidate_id", &self.candidate_id),
@@ -322,15 +363,8 @@ fn binding_for(
     candidate: &CandidatePredictionSource,
     prediction_payload: &[u8],
 ) -> CandidatePredictionBinding {
-    CandidatePredictionBinding {
-        candidate_id: candidate.candidate_id.clone(),
-        source_candidate_id: candidate.source_candidate_id.clone(),
-        test_specification_id: candidate.test_specification_id.clone(),
-        measurement_specification_id: candidate.measurement_specification_id.clone(),
-        left_lineage: candidate.left_lineage.clone(),
-        right_lineage: candidate.right_lineage.clone(),
-        prediction_payload: prediction_payload.to_vec(),
-    }
+    CandidatePredictionBinding::from_source(candidate, prediction_payload)
+        .expect("test candidate source and payload are valid")
 }
 
 fn lineage_digest(left: &str, right: &str) -> String {
