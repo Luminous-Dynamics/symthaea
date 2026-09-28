@@ -58,6 +58,15 @@ fn validate_cutoff(value:&str)->Result<(),CommitmentError>{
         || ![0,1,2,3,5,6,8,9,11,12,14,15,17,18].iter().all(|&i| b[i].is_ascii_digit()) {
         return Err(CommitmentError::InvalidCutoff);
     }
+    let month=(b[5]-b'0')*10+b[6]-b'0';
+    let day=(b[8]-b'0')*10+b[9]-b'0';
+    let hour=(b[11]-b'0')*10+b[12]-b'0';
+    let minute=(b[14]-b'0')*10+b[15]-b'0';
+    let second=(b[17]-b'0')*10+b[18]-b'0';
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day)
+        || hour>23 || minute>59 || second>59 {
+        return Err(CommitmentError::InvalidCutoff);
+    }
     Ok(())
 }
 fn hash(bytes:&[u8])->String{let mut h=Sha256::new();h.update(bytes);format!("sha256:{:x}",h.finalize())}
@@ -65,3 +74,44 @@ fn hash(bytes:&[u8])->String{let mut h=Sha256::new();h.update(bytes);format!("sh
 pub enum CommitmentError{MissingField(&'static str),EmptyPredictionPayload,ExposureBeforeKnowledgeCutoff,InvalidCutoff}
 impl fmt::Display for CommitmentError{fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result{write!(f,"{self:?}")}}
 impl std::error::Error for CommitmentError{}
+
+#[cfg(test)]
+mod cutoff_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_canonical_utc_cutoffs() {
+        let p = ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2026-09-28T08:00:00Z", "2026-09-28T09:00:00Z",
+        );
+        assert!(p.is_ok());
+    }
+
+    #[test]
+    fn rejects_noncanonical_cutoff_shape() {
+        let result = ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2026-09-28T08:00:00Z", "2026-09-28T09:00Z",
+        );
+        assert_eq!(result, Err(CommitmentError::InvalidCutoff));
+    }
+
+    #[test]
+    fn rejects_out_of_range_cutoff_components() {
+        let result = ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2026-13-28T08:00:00Z", "2026-13-28T09:00:00Z",
+        );
+        assert_eq!(result, Err(CommitmentError::InvalidCutoff));
+    }
+
+    #[test]
+    fn rejects_retrospective_cutoff() {
+        let result = ProspectiveProvenance::new(
+            "sha256:input", "sha256:artifact", "model:v1",
+            "2026-09-28T10:00:00Z", "2026-09-28T09:00:00Z",
+        );
+        assert_eq!(result, Err(CommitmentError::ExposureBeforeKnowledgeCutoff));
+    }
+}
