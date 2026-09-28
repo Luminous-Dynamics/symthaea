@@ -257,6 +257,10 @@ def main():
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
         ("delete-graph-negative-edge", lambda g: g["edges"].remove(next(e for e in g["edges"] if e["id"] == "edge/C07"))),
         ("rewrite-graph-case-binding", lambda g: g["edges"][0].__setitem__("case_id", "C16")),
+        ("rewrite-candidate-node-ref", lambda g: g["nodes"][1].__setitem__("ref", "candidate/Z")),
+        ("rewrite-process-node-generation", lambda g: g["nodes"][2].__setitem__("generation", "G9")),
+        ("rewrite-property-node-kind", lambda g: g["nodes"][3].__setitem__("kind", "measurement")),
+        ("rewrite-case-coverage-manifest", lambda g: g["case_ids"].pop()),
     ]
     for name, mutate in graph_mutations:
         mutated_graph = json.loads(json.dumps(graph))
