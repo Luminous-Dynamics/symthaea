@@ -27,7 +27,7 @@ EXPECTED = {
 }
 FIELDS = ("demand", "profile", "candidate", "process", "property", "measurement")
 GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
-GRAPH_EDGE_KEYS = {"id", "from", "to", "kind", "historical"}
+GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
 
 def fail(msg):
     raise AssertionError(msg)
@@ -52,6 +52,7 @@ def graph_identity(graph):
             {k: e[k] for k in ("id", "from", "to", "kind", "historical")}
             for e in graph["edges"]
         ],
+        "case_ids": graph["case_ids"],
         "replay_rule": graph["replay_rule"],
     }
 
@@ -70,7 +71,7 @@ def replay_digest(cases, graph):
 def check_graph(graph):
     if set(graph) != {"schema", "historical_records_immutable",
                       "derived_dispositions_recomputable", "nodes", "edges",
-                      "replay_rule"}:
+                      "case_ids", "replay_rule"}:
         fail("state graph schema drift")
     if graph["schema"] != "mat-converge-002-state-graph-v1":
         fail("state graph schema mismatch")
@@ -83,6 +84,8 @@ def check_graph(graph):
     ):
         fail("state graph replay rule mismatch")
     nodes, edges = graph["nodes"], graph["edges"]
+    if graph["case_ids"] != list(EXPECTED):
+        fail("state graph case coverage drift")
     if not nodes or not edges:
         fail("state graph is empty")
     node_ids = [n["id"] for n in nodes]
@@ -100,10 +103,14 @@ def check_graph(graph):
             fail(f"state graph edge schema drift: {edge.get('id')}")
         if edge["historical"] is not True:
             fail(f"non-historical edge: {edge['id']}")
+        if edge["case_id"] not in EXPECTED or edge["id"] != f"edge/{edge['case_id']}":
+            fail(f"graph edge is not bound to its campaign case: {edge['id']}")
         if edge["from"] not in node_set or edge["to"] not in node_set:
             fail(f"dangling state graph edge: {edge['id']}")
     if not any(n["kind"] == "negative-edge" for n in nodes):
         fail("negative evidence is absent from state graph")
+    if not set(edge["case_id"] for edge in edges).issubset(set(graph["case_ids"])):
+        fail("graph edge references uncovered case")
     required_edges = {"edge/C07", "edge/C09", "edge/C10", "edge/C16"}
     if not required_edges.issubset(edge_ids):
         fail("critical state graph edges missing")
@@ -219,6 +226,7 @@ def main():
     graph_mutations = [
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
         ("delete-graph-negative-edge", lambda g: g["edges"].remove(next(e for e in g["edges"] if e["id"] == "edge/C07"))),
+        ("rewrite-graph-case-binding", lambda g: g["edges"][0].__setitem__("case_id", "C16")),
     ]
     for name, mutate in graph_mutations:
         mutated_graph = json.loads(json.dumps(graph))
