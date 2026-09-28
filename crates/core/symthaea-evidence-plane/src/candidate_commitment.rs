@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Binds a materialized test candidate to a prospective prediction only.
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};\nuse sha2::Digest;
 use crate::prospective::{CommitmentError,ProspectivePredictionCommitment,ProspectiveProvenance};
 use crate::temporal_test_candidate::TemporalTestCandidateSpec;
 
@@ -14,7 +14,7 @@ pub struct CandidatePredictionBinding {
     pub prediction_payload:Vec<u8>,
 }
 #[derive(Debug,Clone,PartialEq,Eq)]
-pub enum BindingError{EmptyPredictionPayload,Commitment(CommitmentError)}
+pub enum BindingError{EmptyPredictionPayload,MissingBindingField(&'static str),Serialization,Commitment(CommitmentError)}
 impl From<CommitmentError> for BindingError{fn from(e:CommitmentError)->Self{Self::Commitment(e)}}
 /// Commit caller-authored prediction bytes with exact candidate and test IDs.
 /// This emits no experimental observation or criterion evidence.
@@ -35,4 +35,47 @@ mod tests {
  #[test] fn rejects_empty_prediction(){assert_eq!(commit(&candidate("c1"),b""),Err(BindingError::EmptyPredictionPayload));}
  #[test] fn supersession_is_a_new_commitment_with_parent(){let a=commit(&candidate("c1"),b"forecast-v1").unwrap();let b=a.supersede("actor-v2","2026-09-28T10:00:00Z",b"forecast-v2",provenance()).unwrap();assert_ne!(a.event_id(),b.event_id());assert_eq!(b.parent_event_ids(),&[a.event_id().to_string()]);}
  #[test] fn cutoff_order_is_enforced(){let bad=ProspectiveProvenance::new("input","artifact","lineage","2026-09-28T10:00:00Z","2026-09-28T09:00:00Z");assert!(matches!(bad,Err(CommitmentError::ExposureBeforeKnowledgeCutoff)));}
+}
+
+#[derive(Debug,Clone,PartialEq,Eq,Serialize,Deserialize)]
+pub struct CandidatePredictionCommitment {
+    pub commitment: ProspectivePredictionCommitment,
+    pub candidate_id: String,
+    pub source_candidate_id: String,
+    pub test_specification_id: String,
+    pub measurement_specification_id: String,
+    pub binding_digest: String,
+}
+impl CandidatePredictionBinding {
+    pub fn validate(&self) -> Result<(), BindingError> {
+        for (name, value) in [("candidate_id",&self.candidate_id),("source_candidate_id",&self.source_candidate_id),("test_specification_id",&self.test_specification_id),("measurement_specification_id",&self.measurement_specification_id)] {
+            if value.trim().is_empty() { return Err(BindingError::MissingBindingField(name)); }
+        }
+        if self.prediction_payload.is_empty() { return Err(BindingError::EmptyPredictionPayload); }
+        Ok(())
+    }
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, BindingError> {
+        self.validate()?;
+        serde_json::to_vec(self).map_err(|_| BindingError::Serialization)
+    }
+    pub fn digest(&self) -> Result<String, BindingError> {
+        let bytes=self.canonical_bytes()?;
+        let mut h=sha2::Sha256::new();
+        h.update(b"symthaea:candidate-prediction-binding:v1\0");
+        h.update((bytes.len() as u64).to_be_bytes());
+        h.update(bytes);
+        Ok(format!("sha256:{:x}",h.finalize()))
+    }
+}
+impl CandidatePredictionCommitment {
+    pub fn verify_binding(&self, binding:&CandidatePredictionBinding) -> Result<bool, BindingError> {
+        Ok(self.binding_digest == binding.digest()? && self.candidate_id == binding.candidate_id && self.source_candidate_id == binding.source_candidate_id && self.test_specification_id == binding.test_specification_id && self.measurement_specification_id == binding.measurement_specification_id)
+    }
+}
+pub fn commit_candidate_envelope(candidate:&TemporalTestCandidateSpec,challenge_id:&str,criteria_generation:&str,mapping_generation:&str,actor_id:&str,created_at:&str,provenance:ProspectiveProvenance,prediction_payload:&[u8])->Result<CandidatePredictionCommitment,BindingError>{
+    let binding=CandidatePredictionBinding{candidate_id:candidate.candidate_id.clone(),source_candidate_id:candidate.source_candidate_id.clone(),test_specification_id:candidate.test_specification_id.clone(),measurement_specification_id:candidate.measurement_specification_id.clone(),prediction_payload:prediction_payload.to_vec()};
+    let bytes=binding.canonical_bytes()?;
+    let digest=binding.digest()?;
+    let commitment=ProspectivePredictionCommitment::commit(challenge_id,criteria_generation,mapping_generation,actor_id,created_at,provenance,&bytes)?;
+    Ok(CandidatePredictionCommitment{commitment,candidate_id:binding.candidate_id,source_candidate_id:binding.source_candidate_id,test_specification_id:binding.test_specification_id,measurement_specification_id:binding.measurement_specification_id,binding_digest:digest})
 }
