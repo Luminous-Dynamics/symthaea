@@ -39,6 +39,14 @@
       "guard_id": "CP-COMP-DEPENDENCY"
     },
     {
+      "mutation_id": "duplicate-model-node",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "dangling-graph-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
       "mutation_id": "drop-C06",
       "guard_id": "CP-COMP-COVERAGE"
     },
