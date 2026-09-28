@@ -542,8 +542,14 @@ impl ExactDesignSearchDomainV1 {
                 .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
         }
 
-        let mut dimensions = Vec::with_capacity(self.parameters.len());
-        for parameter in &self.parameters {
+        // Enumeration order follows the same semantic-id ordering as the canonical
+        // transcript, so equivalent domains declared in different input orders
+        // produce the same candidate sequence.
+        let mut ordered_parameters = self.parameters.iter().collect::<Vec<_>>();
+        ordered_parameters.sort_by(|a, b| a.id.cmp(&b.id));
+
+        let mut dimensions = Vec::with_capacity(ordered_parameters.len());
+        for parameter in ordered_parameters {
             let values = match &parameter.domain {
                 ExactLengthDomainV1::Values(values) => values.clone(),
                 ExactLengthDomainV1::Range { lower, upper, step_um } => {
@@ -1710,7 +1716,48 @@ mod tests {
         );
     }
 
-    #[test]
+    #[te    #[test]
+    fn domain_enumeration_order_is_identity_stable() {
+        let make_domain = |first: &str, second: &str| {
+            ExactDesignSearchDomainV1::new(vec![
+                ExactDesignParameterDomainV1 {
+                    id: ParameterIdV1::new(first).unwrap(),
+                    domain: ExactLengthDomainV1::Values(vec![
+                        C0LengthUmV1::new(1).unwrap(),
+                        C0LengthUmV1::new(2).unwrap(),
+                    ]),
+                },
+                ExactDesignParameterDomainV1 {
+                    id: ParameterIdV1::new(second).unwrap(),
+                    domain: ExactLengthDomainV1::Values(vec![
+                        C0LengthUmV1::new(10).unwrap(),
+                        C0LengthUmV1::new(20).unwrap(),
+                    ]),
+                },
+            ])
+            .unwrap()
+        };
+
+        let forward = make_domain("a", "b");
+        let reversed = make_domain("b", "a");
+        let forward_ids = forward
+            .enumerate()
+            .unwrap()
+            .into_iter()
+            .map(|set| set.id().unwrap())
+            .collect::<Vec<_>>();
+        let reversed_ids = reversed
+            .enumerate()
+            .unwrap()
+            .into_iter()
+            .map(|set| set.id().unwrap())
+            .collect::<Vec<_>>();
+
+        assert_eq!(forward.id().unwrap(), reversed.id().unwrap());
+        assert_eq!(forward_ids, reversed_ids);
+    }
+
+st]
     fn domain_enumeration_is_exact_and_deterministic() {
         let id = ParameterIdV1::new("section_width").unwrap();
         let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
