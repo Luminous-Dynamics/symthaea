@@ -12,6 +12,11 @@ use serde::{Deserialize, Serialize};
 
 /// Explicit ceiling for legacy materials outputs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdvisoryAuthorityV1 {
+    /// Candidate generation, ranking, or hypothesis support only.
+    Advisory,
+}
+
 /// Stable ordered case identifiers for the independent MAT-LEGACY-001B1 qualifier.
 ///
 /// This is a deterministic software corpus manifest, not scientific evidence.
@@ -27,11 +32,6 @@ pub const LEGACY_ADVISORY_QUALIFIER_CASES_V1: &[&str] = &[
     "domain-predictions-advisory",
     "no-scientific-evidence-conversion",
 ];
-
-pub enum AdvisoryAuthorityV1 {
-    /// Candidate generation, ranking, or hypothesis support only.
-    Advisory,
-}
 
 /// Stable identity for an advisory computation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
