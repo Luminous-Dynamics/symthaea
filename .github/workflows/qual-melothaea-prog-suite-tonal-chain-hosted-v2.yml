@@ -20,7 +20,6 @@ env:
 jobs:
   qualify:
     name: Portable tonal-chain qualification
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 45
 
