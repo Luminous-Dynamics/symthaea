@@ -162,17 +162,26 @@ impl Witness {
 
     fn heal(&mut self) {
         self.link.open = true;
-        while let Some(d) = self.queue.pop_front() {
-            if d.event.time + self.link.expiry < self.clock {
+        self.drain_ready();
+    }
+
+    fn advance(&mut self, ticks: u64) {
+        self.clock += ticks;
+        self.drain_ready();
+    }
+
+    fn drain_ready(&mut self) {
+        let mut pending = VecDeque::new();
+        std::mem::swap(&mut pending, &mut self.queue);
+        while let Some(d) = pending.pop_front() {
+            if d.deliver_at > self.clock {
+                self.queue.push_back(d);
+            } else if d.event.time + self.link.expiry < self.clock {
                 self.ledger.push((d.event, Disposition::Rejected("expired")));
             } else {
                 self.apply(d.target, d.event);
             }
         }
-    }
-
-    fn advance(&mut self, ticks: u64) {
-        self.clock += ticks;
     }
 
     fn analysis_cannot_authorize(&mut self) {
@@ -203,9 +212,10 @@ fn run() -> Witness {
     w.nodes.get_mut("EARTH-A").unwrap().capability_generation += 1;
     w.share_capability("EARTH-A", "MARS", "new-capability");
 
-    // S6: heal makes queued events visible; old-generation event is rejected.
+    // S6: healing restores the route, but delivery still respects the configured delay.
     w.heal();
-
+    assert!(w.nodes["MARS"].capabilities.is_empty());
+    w.advance(15); // clock=20, queued events become eligible.
     w
 }
 
@@ -255,6 +265,20 @@ mod tests {
     fn partition_is_bounded_and_visible() {
         let w = run();
         assert!(w.ledger.iter().any(|(_, d)| *d == Disposition::Queued));
+        assert!(w.nodes["MARS"].capabilities.contains("local-analysis"));
+    }
+
+    #[test]
+    fn delay_is_first_class() {
+        let mut w = Witness::new();
+        w.partition(10);
+        w.share_capability("EARTH-A", "MARS", "local-analysis");
+        w.heal();
+        assert!(!w.nodes["MARS"].capabilities.contains("local-analysis"));
+        w.advance(9);
+        assert!(!w.nodes["MARS"].capabilities.contains("local-analysis"));
+        w.advance(1);
+        assert!(w.nodes["MARS"].capabilities.contains("local-analysis"));
     }
 
     #[test]
