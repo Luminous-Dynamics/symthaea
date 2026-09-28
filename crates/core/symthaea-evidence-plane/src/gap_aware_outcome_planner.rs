@@ -65,6 +65,15 @@ pub fn plan(
             return Err(GapAwareOutcomePlannerError::EmptyPredicate(p.clone()));
         }
     }
+    let known_outcomes: BTreeSet<&str> =
+        discrimination.candidates.iter().map(|c| c.outcome_id.as_str()).collect();
+    if let Some(unknown) = mapping_by_outcome
+        .keys()
+        .find(|id| !known_outcomes.contains(**id))
+    {
+        return Err(GapAwareOutcomePlannerError::UnknownOutcome((*unknown).to_string()));
+    }
+
     let mut assessments = Vec::new();
     for candidate in &discrimination.candidates {
         let Some(mapping) = by_outcome.get(candidate.outcome_id.as_str()) else {
