@@ -88,7 +88,7 @@ def validate(c):
 def validate_manifest(m):
     eq(m.get("schema"),"cp-04-compute-mutation-manifest-v1","manifest schema")
     eq(m.get("guard_registry"),GUARDS,"guard registry")
-    expected=["drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
+    expected=["remove-model-runtime-edge","add-graph-cycle","rename-graph-node","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
     eq([x.get("mutation_id") for x in m.get("mutations",[])],expected,"mutation manifest")
     for x in m.get("mutations",[]):
         if x.get("guard_id") not in GUARDS: fail(f"unknown guard: {x.get('guard_id')}","CP-COMP-INVARIANT")
