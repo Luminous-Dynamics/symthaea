@@ -216,7 +216,7 @@ fn lineage_digest(left: &str, right: &str) -> String {
 }
 
 fn validate_provenance_lineage(
-    candidate: &TemporalTestCandidateSpec,
+    candidate: &CandidatePredictionSource,
     provenance: &ProspectiveProvenance,
 ) -> Result<(), BindingError> {
     let expected = lineage_digest(&candidate.left_lineage, &candidate.right_lineage);
