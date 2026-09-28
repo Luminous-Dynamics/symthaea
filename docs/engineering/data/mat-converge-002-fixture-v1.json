@@ -348,65 +348,92 @@
         "from": "N01",
         "to": "N02",
         "kind": "candidate-link",
-        "historical": true
+        "historical": true,
+        "case_id": "C01"
       },
       {
         "id": "edge/C02",
         "from": "N02",
         "to": "N03",
         "kind": "process-generation",
-        "historical": true
+        "historical": true,
+        "case_id": "C02"
       },
       {
         "id": "edge/C03",
         "from": "N02",
         "to": "N06",
         "kind": "profile-binding",
-        "historical": true
+        "historical": true,
+        "case_id": "C03"
       },
       {
         "id": "edge/C04",
         "from": "N03",
         "to": "N04",
         "kind": "evaluation",
-        "historical": true
+        "historical": true,
+        "case_id": "C04"
       },
       {
         "id": "edge/C05",
         "from": "N04",
         "to": "N05",
         "kind": "measurement-generation",
-        "historical": true
+        "historical": true,
+        "case_id": "C05"
       },
       {
         "id": "edge/C07",
         "from": "N02",
         "to": "N07",
         "kind": "negative-evidence",
-        "historical": true
+        "historical": true,
+        "case_id": "C07"
       },
       {
         "id": "edge/C09",
         "from": "N04",
         "to": "N05",
         "kind": "authority-separation",
-        "historical": true
+        "historical": true,
+        "case_id": "C09"
       },
       {
         "id": "edge/C10",
         "from": "N04",
         "to": "N05",
         "kind": "cross-authority-distinctness",
-        "historical": true
+        "historical": true,
+        "case_id": "C10"
       },
       {
         "id": "edge/C16",
         "from": "N01",
         "to": "N02",
         "kind": "synthetic-disposition",
-        "historical": true
+        "historical": true,
+        "case_id": "C16"
       }
     ],
-    "replay_rule": "replay digest is over immutable node/edge identities; derived dispositions are excluded"
+    "replay_rule": "replay digest is over immutable node/edge identities; derived dispositions are excluded",
+    "case_ids": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C08",
+      "C09",
+      "C10",
+      "C11",
+      "C12",
+      "C13",
+      "C14",
+      "C15",
+      "C16"
+    ]
   }
 }
