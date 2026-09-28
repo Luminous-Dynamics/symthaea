@@ -28,6 +28,7 @@ EXPECTED = {
 FIELDS = ("demand", "profile", "candidate", "process", "property", "measurement")
 GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
 GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
+REPLAY_ORDERING = "case manifest order is significant; graph node and edge order are identity-insignificant"
 COVERAGE_REASONS = {
     "C06": "case-level adversarial ranking control",
     "C08": "case-level negative-evidence control",
@@ -53,16 +54,17 @@ def edge_hash(case):
 def graph_identity(graph):
     return {
         "schema": graph["schema"],
-        "nodes": [
-            {k: n[k] for k in ("id", "kind", "ref", "generation")}
-            for n in graph["nodes"]
-        ],
-        "edges": [
-            {k: e[k] for k in ("id", "case_id", "from", "to", "kind", "historical")}
-            for e in graph["edges"]
-        ],
+        "nodes": sorted(
+            ({k: n[k] for k in ("id", "kind", "ref", "generation")} for n in graph["nodes"]),
+            key=lambda n: n["id"],
+        ),
+        "edges": sorted(
+            ({k: e[k] for k in ("id", "case_id", "from", "to", "kind", "historical")} for e in graph["edges"]),
+            key=lambda e: e["id"],
+        ),
         "case_ids": graph["case_ids"],
         "replay_rule": graph["replay_rule"],
+        "ordering_semantics": graph["ordering_semantics"],
     }
 
 def replay_digest(cases, graph):
@@ -80,7 +82,7 @@ def replay_digest(cases, graph):
 def check_graph(graph, cases):
     if set(graph) != {"schema", "historical_records_immutable",
                       "derived_dispositions_recomputable", "nodes", "edges",
-                      "case_ids", "replay_rule", "coverage"}:
+                      "case_ids", "replay_rule", "ordering_semantics", "coverage"}:
         fail("state graph schema drift")
     if graph["schema"] != "mat-converge-002-state-graph-v1":
         fail("state graph schema mismatch")
@@ -92,6 +94,8 @@ def check_graph(graph, cases):
         "replay digest is over immutable node/edge identities; derived dispositions are excluded"
     ):
         fail("state graph replay rule mismatch")
+    if graph["ordering_semantics"] != REPLAY_ORDERING:
+        fail("state graph ordering semantics mismatch")
     nodes, edges = graph["nodes"], graph["edges"]
     if graph["case_ids"] != list(EXPECTED):
         fail("state graph case coverage drift")
@@ -182,7 +186,7 @@ def immutable_record_identity(case):
         "case_id": case["id"],
         "refs": {field: case["refs"][field] for field in FIELDS},
     }
-    return hashlib.sha256(canonical(payload).encode()).hexdigest()
+    return hashlib.sha256(canonical(payload)).hexdigest()
 
 def derived_snapshot(cases):
     """Canonical derived records used only to test recomputation stability."""
@@ -467,6 +471,17 @@ def main():
         if observed != expected:
             fail(f"node mutation fanout mismatch for {node_id}: {observed} != {expected}")
 
+    # The negative-edge node is a first-class historical tombstone: mutating
+    # its case identity must be caught rather than allowing negative evidence
+    # to become an anonymous or silently replaced record.
+    negative_node_mutated = json.loads(json.dumps(graph))
+    negative_node = next(n for n in negative_node_mutated["nodes"] if n["id"] == "N07")
+    negative_node["generation"] = "C17"
+    negative_node["ref"] = "edge/C17"
+    mutated_negative_doc = json.loads(json.dumps(doc))
+    mutated_negative_doc["state_graph"] = negative_node_mutated
+    expect_failure(mutated_negative_doc, cases, "rewrite-negative-node-tombstone")
+
     graph_mutations = [
         ("rewrite-graph-edge-kind", lambda g: g["edges"][0].__setitem__("kind", "mutated-kind")),
         ("delete-graph-negative-edge", lambda g: g["edges"].remove(next(e for e in g["edges"] if e["id"] == "edge/C07"))),
@@ -487,6 +502,42 @@ def main():
         fail("dependency projection coverage drift")
     if baseline_projection["C01"] == baseline_projection["C02"]:
         fail("distinct process generations collapsed dependency identity")
+
+    # Replay determinism: JSON object key order and graph collection order
+    # are representational only; the ordered campaign case manifest remains
+    # semantically significant and is therefore intentionally not normalized.
+    key_permuted = json.loads(json.dumps(doc))
+    key_permuted["cases"] = [
+        {key: case[key] for key in reversed(list(case))}
+        for case in key_permuted["cases"]
+    ]
+    key_permuted["state_graph"] = {
+        key: key_permuted["state_graph"][key]
+        for key in reversed(list(key_permuted["state_graph"]))
+    }
+    key_permuted["state_graph"]["nodes"] = [
+        {key: node[key] for key in reversed(list(node))}
+        for node in reversed(key_permuted["state_graph"]["nodes"])
+    ]
+    key_permuted["state_graph"]["edges"] = [
+        {key: edge[key] for key in reversed(list(edge))}
+        for edge in reversed(key_permuted["state_graph"]["edges"])
+    ]
+    if replay_digest(key_permuted["cases"], key_permuted["state_graph"]) != baseline_digest:
+        fail("representational key/graph ordering changed replay identity")
+
+    graph_node_permuted = json.loads(json.dumps(graph))
+    graph_node_permuted["nodes"].reverse()
+    if replay_digest(cases, graph_node_permuted) != baseline_digest:
+        fail("graph node ordering changed replay identity")
+    graph_edge_permuted = json.loads(json.dumps(graph))
+    graph_edge_permuted["edges"].reverse()
+    if replay_digest(cases, graph_edge_permuted) != baseline_digest:
+        fail("graph edge ordering changed replay identity")
+
+    case_order_permuted = list(reversed(cases))
+    if replay_digest(case_order_permuted, graph) == baseline_digest:
+        fail("case manifest order lost semantic significance")
 
     disposition_mutated = json.loads(json.dumps(cases))
     disposition_mutated[0]["outcome"] = "recomputed-disposition"
