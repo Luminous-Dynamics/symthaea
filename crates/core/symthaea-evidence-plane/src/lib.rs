@@ -48,7 +48,6 @@
 
 pub mod candidate_commitment;
 pub mod prospective;
-pub mod temporal_test_candidate;
 pub mod seed_plan;
 pub mod task_validator;
 
