@@ -23,6 +23,14 @@
       "guard_id": "CP-COMP-DEPENDENCY"
     },
     {
+      "mutation_id": "add-graph-field",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
+      "mutation_id": "malformed-graph-edge",
+      "guard_id": "CP-COMP-DEPENDENCY"
+    },
+    {
       "mutation_id": "drop-C06",
       "guard_id": "CP-COMP-COVERAGE"
     },
