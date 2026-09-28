@@ -1,7 +1,3 @@
-pub mod scientific_decision_frontier;
-pub mod gap_aware_outcome_planner;
-pub mod temporal_evidence_gap;
-pub mod temporal_test_candidate;
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
@@ -516,4 +512,10 @@ mod tests {
     }
 }
 
+
+pub mod scientific_decision_frontier;
+pub mod gap_aware_outcome_planner;
 pub mod temporal_evidence_gap;
+pub mod temporal_test_candidate;
+pub mod prospective;
+pub mod candidate_commitment;
