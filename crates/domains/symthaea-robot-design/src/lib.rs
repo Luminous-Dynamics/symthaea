@@ -1754,6 +1754,42 @@ mod tests {
     }
 
     #[test]
+    fn domain_enumeration_sequence_is_lexicographic_by_canonical_parameter_order() {
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(1).unwrap(),
+                    C0LengthUmV1::new(2).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        let a = ParameterIdV1::new("a").unwrap();
+        let b = ParameterIdV1::new("b").unwrap();
+        let sequence = candidates
+            .iter()
+            .map(|candidate| {
+                (
+                    candidate.parameter(&a).unwrap().value_um(),
+                    candidate.parameter(&b).unwrap().value_um(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(sequence, vec![(1, 10), (1, 20), (2, 10), (2, 20)]);
+    }
+
+    #[test]
     fn domain_enumeration_order_is_identity_stable() {
         let make_domain = |first: &str, second: &str| {
             ExactDesignSearchDomainV1::new(vec![
