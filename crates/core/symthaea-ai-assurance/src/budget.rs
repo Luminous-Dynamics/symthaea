@@ -390,6 +390,10 @@ impl BudgetAuthorityDomain {
     /// and child-expiry checks. On failure no output lease is minted, the root
     /// ledger is unchanged, and [`BudgetSplitFailure`] owns the same parent lease
     /// object supplied by the caller.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The recoverable failure retains the original authority-bearing lease so callers can prove no child lease was minted.",
+    )]
     pub fn split_recoverable(
         &self,
         parent: BudgetLease,
@@ -416,8 +420,9 @@ impl BudgetAuthorityDomain {
             };
             return Err(BudgetSplitFailure::new(parent, error));
         }
-        if let Some(child_expiry) = child_expires_at {
-            if child_expiry < now {
+        if let Some(child_expiry) = child_expires_at
+            && child_expiry < now
+        {
                 return Err(BudgetSplitFailure::new(
                     parent,
                     BudgetError::ExpiredDelegationRequest {

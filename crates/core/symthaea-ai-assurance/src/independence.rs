@@ -402,6 +402,10 @@ impl<K: CapabilityKind, H> IndependenceGuardedAction<K, RiskAssessed, H> {
 
 impl<K: CapabilityKind, H> IndependenceGuardedAction<K, Authorized, H> {
     /// Execute through the v0.8 exact-preflight/effect-attempt boundary.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The failure retains the separation-aware authorized action so exact preflight rejection remains recoverable with its lineage.",
+    )]
     pub fn execute_attempt_with<F>(
         self,
         attempt: F,
@@ -688,6 +692,10 @@ impl std::error::Error for IndependenceResolutionError {
 
 /// Effect-attempt failure preserving the separation wrapper when v0.8's exact
 /// execution preflight rejects before adapter entry.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "The preflight variant intentionally retains the full separation-aware authorized action; boxing would change this public recovery representation.",
+)]
 pub enum IndependenceEffectAttemptFailure<K: CapabilityKind, H> {
     /// Exact execution preflight failed before lower effect delegation; the
     /// original separation-aware authorized action is recoverable.

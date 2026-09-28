@@ -810,6 +810,10 @@ impl<K: CapabilityKind, H> PurposeGuardedAction<K, Authorized, H> {
     }
 
     /// Execute through the existing exact-preflight/effect-attempt boundary.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The failure preserves the authorized purpose-bearing action for exact recovery and evidence lineage.",
+    )]
     pub fn execute_attempt_with<F>(
         self,
         attempt: F,
@@ -994,6 +998,10 @@ impl std::error::Error for BudgetPurposeAuthorizeError {
 }
 
 /// Effect-attempt failure preserving purpose context on recoverable exact preflight rejection.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "The preflight variant intentionally retains the full authorized purpose action; boxing would change this public recovery representation.",
+)]
 pub enum PurposeEffectAttemptFailure<K: CapabilityKind, H> {
     /// Exact execution preflight rejected before lower effect delegation.
     Preflight {
@@ -1196,8 +1204,9 @@ fn validate_derived_expiry(
     rules: BudgetPurposeRules,
     now: SystemTime,
 ) -> Result<(), BudgetPurposeError> {
-    if let Some(expiry) = requested {
-        if expiry < now {
+    if let Some(expiry) = requested
+        && expiry < now
+    {
             return Err(BudgetPurposeError::PurposeAlreadyExpired { expiry, now });
         }
     }

@@ -168,6 +168,10 @@ impl<K: CapabilityKind, H> BudgetGuardedAction<K, RiskAssessed, H> {
     /// policy transition rejects. The quantitative lease is independent affine
     /// authority, so it is returned unchanged because no external effect has
     /// occurred at this stage.
+    #[expect(
+        clippy::result_large_err,
+        reason = "The recoverable failure intentionally returns the untouched budget lease so quantitative authority cannot be silently consumed.",
+    )]
     pub fn authorize_recoverable(
         self,
         policy_grant: PolicyGrant<K>,
