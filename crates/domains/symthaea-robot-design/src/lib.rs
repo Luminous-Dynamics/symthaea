@@ -516,8 +516,8 @@ pub struct RobotDesignSubjectV1 {
     pub control_interfaces: Vec<ControlInterfaceDesignV1>,
     /// Exact fabrication-constraint profile identity. Not fabrication authority.
     pub fabrication_constraints: ContentDigest,
-    /// Exact design-parameter-set identity. Parameter epistemics arrive in 001B.
-    pub parameter_set: ContentDigest,
+    /// Exact selected design-parameter-set identity. Search-domain identity is intentionally a different type.
+    pub parameter_set: ParameterSetId,
 }
 
 impl RobotDesignSubjectV1 {
@@ -525,7 +525,7 @@ impl RobotDesignSubjectV1 {
         requirement_snapshot: ContentDigest,
         morphology: RobotMorphologyDesignV1,
         fabrication_constraints: ContentDigest,
-        parameter_set: ContentDigest,
+        parameter_set: ParameterSetId,
     ) -> Self {
         Self {
             schema_id: ROBOT_DESIGN_SCHEMA_ID.to_string(),
@@ -773,7 +773,7 @@ impl RobotDesignSubjectV1 {
         }
 
         put_digest(&mut out, self.fabrication_constraints);
-        put_digest(&mut out, self.parameter_set);
+        put_digest(&mut out, self.parameter_set.digest());
         Ok(out)
     }
 
@@ -1084,7 +1084,12 @@ mod tests {
             }],
         };
 
-        let mut subject = RobotDesignSubjectV1::new(digest(1), morphology, digest(8), digest(9));
+        let mut subject = RobotDesignSubjectV1::new(
+            digest(1),
+            morphology,
+            digest(8),
+            ParameterSetId::from_digest(digest(9)),
+        );
         subject.geometry = vec![
             GeometryDesignRefV1 {
                 id: GeometryDesignId::new("geometry-base").unwrap(),
@@ -1328,6 +1333,42 @@ mod tests {
         assert_eq!(selected.parameter(&ParameterIdV1::new("section_width").unwrap()).unwrap().value_um(), 20_000);
         assert_ne!(narrow.id().unwrap(), broad.id().unwrap());
         assert_ne!(narrow.id().unwrap().digest(), selected.id().unwrap().digest());
+    }
+
+    #[test]
+    fn robot_design_subject_binds_selected_parameter_set_id() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let selected = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 { id, value: C0LengthUmV1::new(20_000).unwrap() },
+        ]).unwrap();
+        let parameter_set_id = selected.id().unwrap();
+        let mut subject = base_subject();
+        subject.parameter_set = parameter_set_id;
+        assert_eq!(subject.parameter_set, parameter_set_id);
+        assert_eq!(subject.parameter_set.digest(), parameter_set_id.digest());
+    }
+
+    #[test]
+    fn search_domain_identity_cannot_be_substituted_for_parameter_set_identity() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id,
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(20_000).unwrap()]),
+            },
+        ]).unwrap();
+        let search_domain_id = domain.id().unwrap();
+        let selected = ExactDesignParameterSetV1::new(vec![
+            ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                value: C0LengthUmV1::new(20_000).unwrap(),
+            },
+        ]).unwrap();
+        let parameter_set_id = selected.id().unwrap();
+        assert_ne!(search_domain_id.digest(), parameter_set_id.digest());
+        // SearchDomainId and ParameterSetId are distinct Rust types, so assignment
+        // of one to the other's field is rejected at compile time.
+        let _ = (search_domain_id, parameter_set_id);
     }
 
     #[test]
