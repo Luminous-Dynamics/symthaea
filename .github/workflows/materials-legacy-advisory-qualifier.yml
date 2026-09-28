@@ -1,0 +1,20 @@
+name: materials-legacy-advisory-qualifier
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-materials/src/legacy_advisory.rs"
+      - "scripts/qualifiers/legacy_advisory_qualifier.py"
+
+jobs:
+  independent-qualifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify source is present
+        run: test -f crates/domains/symthaea-materials/src/legacy_advisory.rs
+      - name: Run independent standard-library oracle
+        run: python3 scripts/qualifiers/legacy_advisory_qualifier.py crates/domains/symthaea-materials/src/legacy_advisory.rs
