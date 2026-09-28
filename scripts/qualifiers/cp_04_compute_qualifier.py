@@ -124,7 +124,7 @@ def validate(c):
 def validate_manifest(m):
     eq(m.get("schema"),"cp-04-compute-mutation-manifest-v1","manifest schema")
     eq(m.get("guard_registry"),GUARDS,"guard registry")
-    expected=["remove-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
+    expected=["remove-model-runtime-edge","reverse-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
     eq([x.get("mutation_id") for x in m.get("mutations",[])],expected,"mutation manifest")
     for x in m.get("mutations",[]):
         if x.get("guard_id") not in GUARDS:
@@ -132,6 +132,7 @@ def validate_manifest(m):
 def mutations(c,graph):
     graph_specs=[
         ("remove-model-runtime-edge",lambda g:g["edges"].remove(["model","runtime"]),"CP-COMP-DEPENDENCY"),
+        ("reverse-model-runtime-edge",lambda g:g["edges"].__setitem__(2,["runtime","model"]),"CP-COMP-DEPENDENCY"),
         ("add-graph-cycle",lambda g:g["edges"].append(["disposition","model"]),"CP-COMP-DEPENDENCY"),
         ("rename-graph-node",lambda g:g["nodes"].__setitem__(2,"model-v2"),"CP-COMP-DEPENDENCY"),
         ("add-graph-field",lambda g:g.__setitem__("unbound","unexpected"),"CP-COMP-DEPENDENCY"),
