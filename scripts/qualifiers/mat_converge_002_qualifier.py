@@ -231,6 +231,45 @@ def recomputation_snapshot(cases, graph, invalidation_plan):
         "digest": hashlib.sha256(canonical(payload)).hexdigest(),
     }
 
+def recomputed_result_digest(cases, invalidation_plan):
+    """Digest only the derived dispositions selected by the immutable plan."""
+    selected = set(invalidation_plan["recompute_case_ids"])
+    records = [
+        {
+            "case_id": case["id"],
+            "disposition": case["outcome"],
+        }
+        for case in cases
+        if case["id"] in selected
+    ]
+    return hashlib.sha256(canonical({
+        "schema": "mat-converge-002-recomputed-result-v1",
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "records": records,
+    })).hexdigest()
+
+
+def replay_session(cases, graph, invalidation_plan, recomputed_cases):
+    """Bind base replay, invalidation, recomputation, and derived result identities."""
+    validate_recomputation_snapshot(
+        cases, graph, invalidation_plan,
+        recomputation_snapshot(cases, graph, invalidation_plan),
+    )
+    snapshot = recomputation_snapshot(cases, graph, invalidation_plan)
+    payload = {
+        "schema": "mat-converge-002-replay-session-v1",
+        "base_replay_digest": replay_digest(cases, graph),
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "recomputation_snapshot_digest": snapshot["digest"],
+        "recomputed_result_digest": recomputed_result_digest(
+            recomputed_cases, invalidation_plan
+        ),
+    }
+    return {
+        **payload,
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
+
 def validate_recomputation_snapshot(cases, graph, invalidation_plan, snapshot):
     """Verify that a snapshot is bound to the exact canonical invalidation plan."""
     expected_plan = canonical_invalidation_plan(
@@ -514,6 +553,43 @@ def main():
     if replay_snapshot["digest"] != hashlib.sha256(canonical(snapshot_payload)).hexdigest():
         fail("recomputation snapshot digest is not self-consistent")
     validate_recomputation_snapshot(cases, graph, canonical_plan, replay_snapshot)
+
+    # Replay session binds the immutable base, the exact invalidation boundary,
+    # the recomputation snapshot, and the derived result produced by recomputation.
+    session_baseline = replay_session(cases, graph, canonical_plan, cases)
+    if session_baseline["schema"] != "mat-converge-002-replay-session-v1":
+        fail("replay session schema drift")
+    if session_baseline["base_replay_digest"] != baseline_digest:
+        fail("replay session lost base replay binding")
+    if session_baseline["invalidation_plan_digest"] != canonical_plan["digest"]:
+        fail("replay session lost invalidation-plan binding")
+    if session_baseline["recomputation_snapshot_digest"] != replay_snapshot["digest"]:
+        fail("replay session lost recomputation binding")
+    session_payload = {
+        "schema": session_baseline["schema"],
+        "base_replay_digest": session_baseline["base_replay_digest"],
+        "invalidation_plan_digest": session_baseline["invalidation_plan_digest"],
+        "recomputation_snapshot_digest": session_baseline["recomputation_snapshot_digest"],
+        "recomputed_result_digest": session_baseline["recomputed_result_digest"],
+    }
+    if session_baseline["digest"] != hashlib.sha256(canonical(session_payload)).hexdigest():
+        fail("replay session digest is not self-consistent")
+
+    # A derived-only recomputation changes the result identity, while the
+    # immutable replay inputs and recomputation boundary remain unchanged.
+    session_recomputed = replay_session(
+        cases, graph, canonical_plan, disposition_mutated
+    )
+    if session_recomputed["base_replay_digest"] != session_baseline["base_replay_digest"]:
+        fail("derived recomputation changed base replay identity")
+    if session_recomputed["invalidation_plan_digest"] != session_baseline["invalidation_plan_digest"]:
+        fail("derived recomputation changed invalidation identity")
+    if session_recomputed["recomputation_snapshot_digest"] != session_baseline["recomputation_snapshot_digest"]:
+        fail("derived recomputation changed historical recomputation identity")
+    if session_recomputed["recomputed_result_digest"] == session_baseline["recomputed_result_digest"]:
+        fail("derived recomputation failed to change result identity")
+    if session_recomputed["digest"] == session_baseline["digest"]:
+        fail("replay session failed to distinguish recomputed result")
 
     # Representation-equivalent replay must survive an independently rebuilt
     # graph object, not merely a reordered view of the original object.
