@@ -1,0 +1,36 @@
+name: CP-03 manufacturing digital thread qualification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "docs/engineering/contracts/cp-03-manufacturing-digital-thread-contract-v1.md"
+      - "docs/engineering/data/cp-03-manufacturing-corpus-v1.json"
+      - "scripts/qualifiers/cp_03_manufacturing_qualifier.py"
+      - ".github/workflows/cp-03-manufacturing.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse detached input drift
+        shell: bash
+        run: |
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          git status --short
+
+      - name: Run independent stdlib qualifier
+        run: python3 scripts/qualifiers/cp_03_manufacturing_qualifier.py
+
+      - name: Verify qualified inputs are immutable in the worktree
+        shell: bash
+        run: |
+          git diff --exit-code --             docs/engineering/contracts/cp-03-manufacturing-digital-thread-contract-v1.md             docs/engineering/data/cp-03-manufacturing-corpus-v1.json             scripts/qualifiers/cp_03_manufacturing_qualifier.py
