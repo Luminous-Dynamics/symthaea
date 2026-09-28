@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/engineering/data/mat-converge-002-fixture-v1.json"
       - "scripts/qualifiers/mat_converge_002_qualifier.py"
+      - ".github/workflows/materials-convergence-fixture.yml"
 
 jobs:
   fixture-qualifier:
@@ -16,9 +17,10 @@ jobs:
           fetch-depth: 0
       - name: Bind exact checked-out head
         run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-      - name: Capture fixture blob identity
-        run: git hash-object docs/engineering/data/mat-converge-002-fixture-v1.json
+      - name: Capture immutable fixture identity
+        run: echo "fixture_sha=$(git hash-object docs/engineering/data/mat-converge-002-fixture-v1.json)"
       - name: Run independent stdlib oracle
         run: python3 scripts/qualifiers/mat_converge_002_qualifier.py docs/engineering/data/mat-converge-002-fixture-v1.json
-      - name: Verify fixture immutability
-        run: git diff --exit-code -- docs/engineering/data/mat-converge-002-fixture-v1.json
+      - name: Verify qualified inputs stayed immutable
+        run: |
+          git diff --exit-code --             docs/engineering/data/mat-converge-002-fixture-v1.json             scripts/qualifiers/mat_converge_002_qualifier.py             .github/workflows/materials-convergence-fixture.yml
