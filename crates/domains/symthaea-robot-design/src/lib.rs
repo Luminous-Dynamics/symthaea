@@ -548,10 +548,20 @@ impl ExactDesignSearchDomainV1 {
         let mut ordered_parameters = self.parameters.iter().collect::<Vec<_>>();
         ordered_parameters.sort_by(|a, b| a.id.cmp(&b.id));
 
-        let mut dimensions = Vec::with_capacity(ordered_parameters.len());
+        let mut dimensions = Vec::new();
+        dimensions
+            .try_reserve_exact(ordered_parameters.len())
+            .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
         for parameter in ordered_parameters {
             let values = match &parameter.domain {
-                ExactLengthDomainV1::Values(values) => values.clone(),
+                ExactLengthDomainV1::Values(values) => {
+                    let mut copied = Vec::new();
+                    copied
+                        .try_reserve_exact(values.len())
+                        .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
+                    copied.extend_from_slice(values);
+                    copied
+                },
                 ExactLengthDomainV1::Range { lower, upper, step_um } => {
                     let count = Self::dimension_cardinality(&parameter.domain)?;
                     let mut values = Vec::new();
@@ -574,7 +584,7 @@ impl ExactDesignSearchDomainV1 {
 
         let mut output = Vec::<Vec<ExactDesignLengthParameterV1>>::new();
         output
-            .try_reserve_exact(total)
+            .try_reserve_exact(1)
             .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
         output.push(Vec::new());
 
@@ -588,9 +598,11 @@ impl ExactDesignSearchDomainV1 {
                 .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
             for partial in &output {
                 for value in &values {
-                    let mut candidate = partial.clone();
-                    candidate.try_reserve_exact(1)
+                    let mut candidate = Vec::new();
+                    candidate
+                        .try_reserve_exact(partial.len().checked_add(1).ok_or(RobotDesignError::DomainEnumerationOverflow)?)
                         .map_err(|_| RobotDesignError::DomainEnumerationAllocationFailure)?;
+                    candidate.extend_from_slice(partial);
                     candidate.push(ExactDesignLengthParameterV1 { id: id.clone(), value: *value });
                     next.push(candidate);
                 }
