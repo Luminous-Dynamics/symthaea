@@ -29,54 +29,436 @@ FIELDS = ("demand", "profile", "candidate", "process", "property", "measurement"
 GRAPH_NODE_KEYS = {"id", "kind", "ref", "generation"}
 GRAPH_EDGE_KEYS = {"id", "case_id", "from", "to", "kind", "historical"}
 REPLAY_ORDERING = "case manifest order is significant; graph node and edge order are identity-insignificant"
-FAILURE_DIAGNOSTICS = []
-REQUIRED_FAILURE_CATEGORIES = {
-    "authority", "negative-evidence", "coverage",
-    "historical-identity", "dependency-boundary", "schema-integrity",
+COVERAGE_REASONS = {
+    "C06": "case-level adversarial ranking control",
+    "C08": "case-level negative-evidence control",
+    "C11": "case-level population-inference control",
+    "C12": "case-level measurement-feasibility control",
+    "C13": "case-level manufacturing-feasibility control",
+    "C14": "case-level lower-tail engineering control",
+    "C15": "case-level evaluator-correlation control",
 }
 
-def record_failure(doc, cases, label, expected_category):
-    try:
-        check(doc, cases)
-    except AssertionError as exc:
-        actual_category = failure_category(str(exc))
-        if actual_category != expected_category:
-            fail(
-                f"mutation category drift: {label}: "
-                f"expected {expected_category}, got {actual_category}"
-            )
-        FAILURE_DIAGNOSTICS.append({
-            "mutation": label,
-            "category": actual_category,
+def fail(msg):
+    raise AssertionError(msg)
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+
+def edge_hash(case):
+    return hashlib.sha256(canonical({
+        "schema": "integration-edge-v1",
+        "edge": "|".join(case["refs"][field] for field in FIELDS),
+    })).hexdigest()
+
+def graph_identity(graph):
+    return {
+        "schema": graph["schema"],
+        "nodes": sorted(
+            ({k: n[k] for k in ("id", "kind", "ref", "generation")} for n in graph["nodes"]),
+            key=lambda n: n["id"],
+        ),
+        "edges": sorted(
+            ({k: e[k] for k in ("id", "case_id", "from", "to", "kind", "historical")} for e in graph["edges"]),
+            key=lambda e: e["id"],
+        ),
+        "case_ids": graph["case_ids"],
+        "replay_rule": graph["replay_rule"],
+        "ordering_semantics": graph["ordering_semantics"],
+        "dependency_closure": graph["dependency_closure"],
+    }
+
+def replay_digest(cases, graph):
+    """Hash immutable case references and graph identity, never dispositions."""
+    payload = {
+        "cases": [{
+            "id": c["id"],
+            "edge_hash": edge_hash(c),
+            "refs": {field: c["refs"][field] for field in FIELDS},
+        } for c in cases],
+        "state_graph": graph_identity(graph),
+    }
+    return hashlib.sha256(canonical(payload)).hexdigest()
+
+def check_graph(graph, cases):
+    if set(graph) != {"schema", "historical_records_immutable",
+                      "derived_dispositions_recomputable", "nodes", "edges",
+                      "case_ids", "replay_rule", "ordering_semantics",
+                      "dependency_closure", "coverage"}:
+        fail("state graph schema drift")
+    if graph["schema"] != "mat-converge-002-state-graph-v1":
+        fail("state graph schema mismatch")
+    if graph["historical_records_immutable"] is not True:
+        fail("historical graph records are not immutable")
+    if graph["derived_dispositions_recomputable"] is not True:
+        fail("derived dispositions are not declared recomputable")
+    if graph["replay_rule"] != (
+        "replay digest is over immutable node/edge identities; derived dispositions are excluded"
+    ):
+        fail("state graph replay rule mismatch")
+    if graph["ordering_semantics"] != REPLAY_ORDERING:
+        fail("state graph ordering semantics mismatch")
+    if graph["dependency_closure"] != (
+        "undirected-connected-component over immutable graph nodes; "
+        "all incident edge case IDs are invalidated"
+    ):
+        fail("state graph dependency closure semantics mismatch")
+    nodes, edges = graph["nodes"], graph["edges"]
+    if graph["case_ids"] != list(EXPECTED):
+        fail("state graph case coverage drift")
+    if not nodes or not edges:
+        fail("state graph is empty")
+    node_ids = [n["id"] for n in nodes]
+    edge_ids = [e["id"] for e in edges]
+    if len(node_ids) != len(set(node_ids)):
+        fail("duplicate state graph node identity")
+    if len(edge_ids) != len(set(edge_ids)):
+        fail("duplicate state graph edge identity")
+    node_set = set(node_ids)
+    nodes_by_id = {n["id"]: n for n in nodes}
+    for node in nodes:
+        if set(node) != GRAPH_NODE_KEYS:
+            fail(f"state graph node schema drift: {node.get('id')}")
+    for edge in edges:
+        if set(edge) != GRAPH_EDGE_KEYS:
+            fail(f"state graph edge schema drift: {edge.get('id')}")
+        if edge["historical"] is not True:
+            fail(f"non-historical edge: {edge['id']}")
+        if edge["case_id"] not in EXPECTED or edge["id"] != f"edge/{edge['case_id']}":
+            fail(f"graph edge is not bound to its campaign case: {edge['id']}")
+        if edge["from"] not in node_set or edge["to"] not in node_set:
+            fail(f"dangling state graph edge: {edge['id']}")
+    case_by_id = {c["id"]: c for c in cases}
+    prefix_fields = {
+        "demand": "demand",
+        "profile": "profile",
+        "candidate": "candidate",
+        "process": "process",
+        "property": "property",
+        "measurement": "measurement",
+    }
+    for node in nodes:
+        if node["kind"] == "negative-edge":
+            if node["ref"] != f"edge/{node['generation']}":
+                fail(f"negative node identity drift: {node['id']}")
+            if node["generation"] not in case_by_id:
+                fail(f"negative node case missing: {node['id']}")
+            continue
+        field = prefix_fields.get(node["kind"])
+        if field is None:
+            fail(f"unknown graph node kind: {node['kind']}")
+        if node["ref"] != f"{field}/{node['generation']}":
+            fail(f"node ref/generation mismatch: {node['id']}")
+        if not any(c["refs"][field] == node["ref"] for c in cases):
+            fail(f"graph node is not anchored to a campaign case: {node['id']}")
+    for edge in edges:
+        case = case_by_id[edge["case_id"]]
+        endpoint_refs = {nodes_by_id[edge["from"]]["ref"], nodes_by_id[edge["to"]]["ref"]}
+        case_refs = set(case["refs"].values())
+        if not endpoint_refs.issubset(case_refs) and edge["case_id"] != "C07":
+            fail(f"graph edge endpoints are not anchored to case {edge['case_id']}")
+    if not any(n["kind"] == "negative-edge" for n in nodes):
+        fail("negative evidence is absent from state graph")
+    if not set(edge["case_id"] for edge in edges).issubset(set(graph["case_ids"])):
+        fail("graph edge references uncovered case")
+    required_edges = {"edge/C07", "edge/C09", "edge/C10", "edge/C16"}
+    if not required_edges.issubset(edge_ids):
+        fail("critical state graph edges missing")
+
+def dependency_projection(cases, graph):
+    """Return the immutable case/graph refs that each case disposition may depend on."""
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    projection = {}
+    for case in cases:
+        refs = set(case["refs"].values())
+        for edge in graph["edges"]:
+            if edge["case_id"] != case["id"]:
+                continue
+            refs.add(node_by_id[edge["from"]]["ref"])
+            refs.add(node_by_id[edge["to"]]["ref"])
+        projection[case["id"]] = tuple(sorted(refs))
+    return projection
+
+def dependency_delta(before, after):
+    """Return case IDs whose immutable dependency projections changed."""
+    return sorted(
+        case_id for case_id in before
+        if before[case_id] != after[case_id]
+    )
+
+def immutable_record_identity(case):
+    """Digest the historical case identity without derived disposition."""
+    payload = {
+        "schema": "integration-edge-v1",
+        "case_id": case["id"],
+        "refs": {field: case["refs"][field] for field in FIELDS},
+    }
+    return hashlib.sha256(canonical(payload)).hexdigest()
+
+def derived_snapshot(cases):
+    """Canonical derived records used only to test recomputation stability."""
+    return {
+        case["id"]: canonical({
+            "case_id": case["id"],
+            "dependency_digest": immutable_record_identity(case),
+            "disposition": case["outcome"],
         })
-        return actual_category
-    fail(f"mutation escaped oracle: {label}")
+        for case in cases
+    }
 
-def failure_category(message):
-    """Normalize oracle failures into stable diagnostic classes."""
-    text = message.lower()
-    if any(token in text for token in ("authority", "physical-authority", "advisory")):
-        return "authority"
-    if any(token in text for token in ("negative", "tombstone")):
-        return "negative-evidence"
-    if any(token in text for token in ("coverage", "case coverage", "graph coverage")):
-        return "coverage"
-    if any(token in text for token in ("historical", "immutable", "generation", "ref")):
-        return "historical-identity"
-    if any(token in text for token in ("dependency", "closure", "fanout")):
-        return "dependency-boundary"
-    if any(token in text for token in ("schema", "ordering")):
-        return "schema-integrity"
-    return "invariant-integrity"
+def recomputation_snapshot(cases, graph, invalidation_plan):
+    """Create a deterministic two-phase replay artifact for selected cases."""
+    selected = set(invalidation_plan["recompute_case_ids"])
+    projections = dependency_projection(cases, graph)
+    records = []
+    for case in cases:
+        if case["id"] not in selected:
+            continue
+        records.append({
+            "case_id": case["id"],
+            "historical_identity": immutable_record_identity(case),
+            "dependency_projection": projections[case["id"]],
+        })
+    payload = {
+        "schema": "mat-converge-002-recomputation-snapshot-v1",
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "records": records,
+    }
+    return {
+        "schema": payload["schema"],
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "records": records,
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
 
-EXPECTED_CATEGORIES = {\n    "remove-process-ref": "historical-identity",\n    "change-process-generation": "historical-identity",\n    "change-profile-ref": "historical-identity",\n    "change-evaluator-generation": "historical-identity",\n    "change-measurement-generation": "historical-identity",\n    "change-ranking-only": "schema-integrity",\n    "delete-negative-case": "negative-evidence",\n    "promote-authority": "authority",\n    "change-disposition": "invariant-integrity",\n    "rewrite-historical-ref": "historical-identity",\n    "rewrite-negative-node-tombstone": "negative-evidence",\n}\n
+def canonical_invalidation_plan(cases, graph, changed_ref):
+    """Build a canonical, replayable invalidation-plan identity."""
+    plan = graph_invalidation_plan(cases, graph, changed_ref)
+    payload = {
+        "schema": "mat-converge-002-invalidation-plan-v1",
+        "graph_schema": graph["schema"],
+        "changed_ref": plan["changed_ref"],
+        "direct_case_ids": plan["direct_case_ids"],
+        "transitive_case_ids": plan["transitive_case_ids"],
+        "recompute_case_ids": plan["recompute_case_ids"],
+    }
+    return {
+        "schema": payload["schema"],
+        "changed_ref": changed_ref,
+        "direct_case_ids": plan["direct_case_ids"],
+        "transitive_case_ids": plan["transitive_case_ids"],
+        "recompute_case_ids": plan["recompute_case_ids"],
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
+
+def graph_invalidation_plan(cases, graph, changed_ref):
+    """Return deterministic direct/transitive impact for one immutable graph ref."""
+    direct = graph_direct_case_ids(cases, graph, changed_ref)
+    closure = graph_dependency_closure(cases, graph, changed_ref)
+    return {
+        "changed_ref": changed_ref,
+        "direct_case_ids": direct,
+        "transitive_case_ids": closure,
+        "recompute_case_ids": closure,
+    }
+
+def graph_direct_case_ids(cases, graph, changed_ref):
+    """Return case IDs on edges directly incident to changed_ref."""
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    return sorted(
+        edge["case_id"]
+        for edge in graph["edges"]
+        if changed_ref in {
+            node_by_id[edge["from"]]["ref"],
+            node_by_id[edge["to"]]["ref"],
+        }
+    )
+
+def graph_dependency_closure(cases, graph, changed_ref):
+    """Return case IDs in the undirected immutable graph component of changed_ref."""
+    node_by_id = {n["id"]: n for n in graph["nodes"]}
+    start_nodes = {
+        node_id for node_id, node in node_by_id.items()
+        if node["ref"] == changed_ref
+    }
+    if not start_nodes:
+        return []
+
+    adjacency = {node_id: set() for node_id in node_by_id}
+    edge_cases = {}
+    for edge in graph["edges"]:
+        adjacency[edge["from"]].add(edge["to"])
+        adjacency[edge["to"]].add(edge["from"])
+        edge_cases[edge["id"]] = edge["case_id"]
+
+    reachable = set(start_nodes)
+    frontier = list(sorted(start_nodes))
+    while frontier:
+        node_id = frontier.pop(0)
+        for neighbor in sorted(adjacency[node_id]):
+            if neighbor not in reachable:
+                reachable.add(neighbor)
+                frontier.append(neighbor)
+
+    return sorted(
+        edge_cases[edge["id"]]
+        for edge in graph["edges"]
+        if edge["from"] in reachable or edge["to"] in reachable
+    )
+
+def check(doc, cases): 
+    if doc.get("campaign_id") != "MAT-CONVERGE-002A1":
+        fail("campaign identity missing")
+    if doc.get("record_schema") != "integration-edge-v1":
+        fail("record schema mismatch")
+    if doc.get("replay_semantics") != (
+        "historical refs are immutable inputs; dispositions are derived outputs"
+    ):
+        fail("replay semantics missing")
+    if [c["id"] for c in cases] != list(EXPECTED):
+        fail("case order drift")
+    required_keys = {"id", "demand", "profile", "candidate", "process",
+                     "property", "measurement", "outcome", "refs"}
+    for c in cases:
+        if set(c) != required_keys:
+            fail(f"schema drift in {c['id']}")
+        if c["outcome"] != EXPECTED[c["id"]]:
+            fail(f"unexpected disposition for {c['id']}")
+        if set(c["refs"]) != set(FIELDS):
+            fail(f"reference set drift in {c['id']}")
+        for field in FIELDS:
+            if c["refs"][field] != f"{field}/{c[field]}":
+                fail(f"non-derived reference in {c['id']}:{field}")
+    by_id = {c["id"]: c for c in cases}
+    if by_id["C02"]["process"] != "G2" or by_id["C02"]["property"] != "E1":
+        fail("process generation rewrote historical chemistry evidence")
+    if by_id["C03"]["profile"] == "P1":
+        fail("profile change collapsed")
+    if by_id["C04"]["property"] != "E2":
+        fail("evaluator dependency collapsed")
+    if by_id["C05"]["measurement"] != "M2":
+        fail("measurement-generation dependency collapsed")
+    if by_id["C07"]["outcome"] != "negative-edge-addressable" or by_id["C08"]["outcome"] != "negative-edge-addressable":
+        fail("negative evidence lost")
+    if by_id["C09"]["outcome"] != "advisory-equal-to-measurement-stays-advisory":
+        fail("authority boundary lost")
+    if by_id["C10"]["outcome"] != "dft-equal-to-experiment-stays-distinct":
+        fail("independent evidence identity collapsed")
+    if by_id["C16"]["outcome"] != "synthetic-pass-no-physical-authority":
+        fail("synthetic PASS acquired physical authority")
+    required = {
+        "advisory-equal-to-measurement-stays-advisory",
+        "dft-equal-to-experiment-stays-distinct",
+        "negative-edge-addressable",
+        "synthetic-pass-no-physical-authority",
+    }
+    if not required.issubset({c["outcome"] for c in cases}):
+        fail("critical authority/negative-evidence controls missing")
+    check_graph(doc["state_graph"], cases)
+
+def expect_failure(doc, cases, label):
     try:
         check(doc, cases)
-    except AssertionError as exc:
-        category = failure_category(str(exc))
-        FAILURE_DIAGNOSTICS.append({"mutation": label, "category": category})
-        return category
+    except AssertionError:
+        return
     fail(f"mutation escaped oracle: {label}")
+
+
+def mutation_manifest(cases, graph):
+    return {
+        "schema": "mat-converge-002-mutation-manifest-v2",
+        "categories": sorted(REQUIRED_FAILURE_CATEGORIES),
+        "mutations": [
+            {"id": label, "category": EXPECTED_CATEGORIES[label]}
+            for label in sorted(EXPECTED_CATEGORIES)
+        ],
+        "fixture_schema": "mat-converge-002-fixture-v1",
+        "graph_schema": graph["schema"],
+        "case_ids": [case["id"] for case in cases],
+    }
+
+def validate_mutation_manifest(cases, graph, manifest):
+    expected = mutation_manifest(cases, graph)
+    if manifest != expected:
+        fail("mutation manifest does not match fixture, graph, or oracle corpus")
+
+def mutation_manifest_digest(cases, graph):
+    return hashlib.sha256(canonical(mutation_manifest(cases, graph))).hexdigest()
+
+def mutation_manifest_projection(manifest):
+    return {
+        "schema": manifest["schema"],
+        "fixture_schema": manifest["fixture_schema"],
+        "graph_schema": manifest["graph_schema"],
+        "categories": list(manifest["categories"]),
+        "mutations": [dict(item) for item in manifest["mutations"]],
+        "case_ids": list(manifest["case_ids"]),
+    }
+
+def mutation_manifest_projection_digest(manifest):
+    return hashlib.sha256(canonical(mutation_manifest_projection(manifest))).hexdigest()
+
+def recomputed_result_digest(cases, invalidation_plan):
+    selected = set(invalidation_plan["recompute_case_ids"])
+    records = [
+        {"case_id": case["id"], "outcome": case["outcome"]}
+        for case in cases if case["id"] in selected
+    ]
+    if {record["case_id"] for record in records} != selected:
+        fail("recomputed result does not cover the invalidation boundary")
+    payload = {
+        "schema": "mat-converge-002-recomputed-result-v1",
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "records": records,
+    }
+    return hashlib.sha256(canonical(payload)).hexdigest()
+
+def validate_recomputation_snapshot(cases, graph, invalidation_plan, snapshot):
+    expected_plan = canonical_invalidation_plan(cases, graph, invalidation_plan["changed_ref"])
+    if invalidation_plan != expected_plan:
+        fail("recomputation snapshot uses a non-canonical invalidation plan")
+    expected_snapshot = recomputation_snapshot(cases, graph, expected_plan)
+    if snapshot != expected_snapshot:
+        fail("recomputation snapshot does not match its immutable inputs")
+
+def replay_session(cases, graph, invalidation_plan, recomputed_cases):
+    validate_recomputation_snapshot(
+        cases, graph, invalidation_plan,
+        recomputation_snapshot(cases, graph, invalidation_plan),
+    )
+    snapshot = recomputation_snapshot(cases, graph, invalidation_plan)
+    payload = {
+        "schema": "mat-converge-002-replay-session-v1",
+        "base_replay_digest": replay_digest(cases, graph),
+        "invalidation_plan_digest": invalidation_plan["digest"],
+        "recomputation_snapshot_digest": snapshot["digest"],
+        "recomputed_result_digest": recomputed_result_digest(
+            recomputed_cases, invalidation_plan
+        ),
+    }
+    return {
+        **payload,
+        "digest": hashlib.sha256(canonical(payload)).hexdigest(),
+    }
+
+def validate_replay_session(cases, graph, invalidation_plan, recomputed_cases, session):
+    expected_plan = canonical_invalidation_plan(
+        cases, graph, invalidation_plan["changed_ref"]
+    )
+    if invalidation_plan != expected_plan:
+        fail("replay session uses a non-canonical invalidation plan")
+    snapshot = recomputation_snapshot(cases, graph, expected_plan)
+    expected_result = recomputed_result_digest(recomputed_cases, expected_plan)
+    payload = {
+        "schema": "mat-converge-002-replay-session-v1",
+        "base_replay_digest": replay_digest(cases, graph),
+        "invalidation_plan_digest": expected_plan["digest"],
+        "recomputation_snapshot_digest": snapshot["digest"],
+        "recomputed_result_digest": expected_result,
+    }
+    expected = {**payload, "digest": hashlib.sha256(canonical(payload)).hexdigest()}
+    if session != expected:
+        fail("replay session binding mismatch")
 
 def main():
     if len(sys.argv) != 2:
