@@ -291,8 +291,13 @@ def main():
     # Minimal invalidation: a localized historical generation change must
     # affect only the case that actually references that generation.
     localized_projection = dependency_projection(localized, graph)
+    localized_graph = json.loads(json.dumps(graph))
+    localized_graph["nodes"][2]["generation"] = "G3"
+    localized_projection_with_graph = dependency_projection(localized, localized_graph)
     if dependency_delta(baseline_projection, localized_projection) != ["C02"]:
         fail("historical generation mutation cascaded beyond its dependent case")
+    if dependency_delta(baseline_projection, localized_projection_with_graph) != ["C01", "C02", "C04", "C07", "C09", "C10", "C16"]:
+        fail("graph generation mutation does not expose its true dependent cases")
     for case_id in (case_id for case_id in EXPECTED if case_id != "C02"):
         if baseline_projection[case_id] != localized_projection[case_id]:
             fail(f"unrelated dependency projection changed: {case_id}")
