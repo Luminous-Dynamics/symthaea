@@ -65,10 +65,8 @@ def subject_blob_sha(path: str) -> str:
 def valid_values() -> dict[str, str]:
     qualifier_sha = git("rev-parse", "HEAD")
     qualifier_tree = git("rev-parse", "HEAD^{tree}")
-    subject_tree = git("rev-parse", f"{SUBJECT_SHA}^{tree}")
-    script_sha = hashlib.sha256(
-        (ROOT / VERIFIER.SCRIPT_PATH).read_bytes()
-    ).hexdigest()
+    subject_tree = git("rev-parse", f"{SUBJECT_SHA}^{{tree}}")
+    script_sha = hashlib.sha256((ROOT / VERIFIER.SCRIPT_PATH).read_bytes()).hexdigest()
     return {
         "schema": "melothaea-prog-suite-tonal-chain-qualification-v3",
         "qualifier_id": "melothaea-prog-suite-tonal-chain-qualification-v3",
@@ -173,7 +171,8 @@ class ReceiptVerifierAdversarialTests(unittest.TestCase):
             receipt.write_text(render(values), encoding="utf-8")
             result = self.verify(receipt)
             self.assertNotEqual(
-                result.returncode, 0,
+                result.returncode,
+                0,
                 msg=f"mutation was accepted: {reason}\nstdout={result.stdout}\nstderr={result.stderr}",
             )
 
@@ -183,33 +182,54 @@ class ReceiptVerifierAdversarialTests(unittest.TestCase):
             receipt.write_text(render(valid_values()), encoding="utf-8")
             result = self.verify(receipt)
             self.assertEqual(
-                result.returncode, 0,
+                result.returncode,
+                0,
                 msg=f"canonical fixture rejected:\nstdout={result.stdout}\nstderr={result.stderr}",
             )
 
     def test_scalar_and_binding_mutations_are_rejected(self) -> None:
         mutations = {
-            "status": "FAIL", "exit_code": "1", "terminal_stage": "test_music_theory",
+            "status": "FAIL",
+            "exit_code": "1",
+            "terminal_stage": "test_music_theory",
             "authority_scope": "scientific-and-engineering",
-            "qualification_amendment": "v2", "format_gate_policy": "authoritative",
-            "subject_sha_invariant": "changed", "scientific_lockbox_execution": "performed",
-            "human_perceptual_authority": "listener", "artistic_quality_authority": "artist",
-            "product_authority": "product", "environment_authority": "hermetic",
-            "receipt_attestation": "present", "qualifier_checkout_sha": "1" * 40,
-            "qualifier_checkout_tree": "2" * 40, "qualifier_script_sha256": "3" * 64,
-            "subject_sha": "4" * 40, "subject_tree": "5" * 40,
-            "subject_parent": "6" * 40, "base_sha": "7" * 40,
-            "source_state": "dirty", "expected_rust_release": "1.95.0",
-            "rustc_release": "1.95.0", "rustc_commit_hash": "8" * 40,
-            "cargo_version": "cargo 1.95.0 (fixture)", "cargo_lock_sha256": "9" * 64,
+            "qualification_amendment": "v2",
+            "format_gate_policy": "authoritative",
+            "subject_sha_invariant": "changed",
+            "scientific_lockbox_execution": "performed",
+            "human_perceptual_authority": "listener",
+            "artistic_quality_authority": "artist",
+            "product_authority": "product",
+            "environment_authority": "hermetic",
+            "receipt_attestation": "present",
+            "qualifier_checkout_sha": "1" * 40,
+            "qualifier_checkout_tree": "2" * 40,
+            "qualifier_script_sha256": "3" * 64,
+            "subject_sha": "4" * 40,
+            "subject_tree": "5" * 40,
+            "subject_parent": "6" * 40,
+            "base_sha": "7" * 40,
+            "source_state": "dirty",
+            "expected_rust_release": "1.95.0",
+            "rustc_release": "1.95.0",
+            "rustc_commit_hash": "8" * 40,
+            "cargo_version": "cargo 1.95.0 (fixture)",
+            "cargo_lock_sha256": "9" * 64,
             "rust_toolchain_sha256": "a" * 64,
             "music_theory_manifest_sha256": "b" * 64,
-            "muse_manifest_sha256": "c" * 64, "exact_subject_gate": "FAIL",
-            "surface_gate": "FAIL", "toolchain_gate": "FAIL", "metadata_gate": "FAIL",
-            "fmt_subject_gate": "pass", "test_music_theory_gate": "FAIL",
-            "test_muse_gate": "FAIL", "check_music_theory_gate": "FAIL",
-            "check_muse_gate": "FAIL", "clippy_music_theory_gate": "FAIL",
-            "clippy_muse_gate": "FAIL", "postflight_gate": "FAIL",
+            "muse_manifest_sha256": "c" * 64,
+            "exact_subject_gate": "FAIL",
+            "surface_gate": "FAIL",
+            "toolchain_gate": "FAIL",
+            "metadata_gate": "FAIL",
+            "fmt_subject_gate": "pass",
+            "test_music_theory_gate": "FAIL",
+            "test_muse_gate": "FAIL",
+            "check_music_theory_gate": "FAIL",
+            "check_muse_gate": "FAIL",
+            "clippy_music_theory_gate": "FAIL",
+            "clippy_muse_gate": "FAIL",
+            "postflight_gate": "FAIL",
         }
         for key, value in mutations.items():
             with self.subTest(key=key):
