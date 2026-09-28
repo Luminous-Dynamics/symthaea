@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/temporal-candidate-adapter-1.0.0.schema.json",
+  "title": "Temporal Candidate Adapter Identity",
+  "description": "Wire contract for translating temporal scientific-discovery candidate identity into the domain-neutral evidence-plane candidate source.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_id",
+    "source_candidate_id",
+    "left_model_id",
+    "right_model_id",
+    "left_lineage",
+    "right_lineage",
+    "outcome_id",
+    "horizon_seconds",
+    "test_specification_id",
+    "measurement_specification_id"
+  ],
+  "properties": {
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "source_candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Authoritative upstream identity; the adapter MUST NOT regenerate or normalize it."
+    },
+    "left_model_id": { "type": "string", "minLength": 1 },
+    "right_model_id": { "type": "string", "minLength": 1 },
+    "left_lineage": { "type": "string", "minLength": 1 },
+    "right_lineage": { "type": "string", "minLength": 1 },
+    "outcome_id": { "type": "string", "minLength": 1 },
+    "horizon_seconds": {
+      "type": "number",
+      "description": "Finite temporal horizon. Exact IEEE-754 bits remain available through the adapter's horizon_bits() accessor."
+    },
+    "test_specification_id": { "type": "string", "minLength": 1 },
+    "measurement_specification_id": { "type": "string", "minLength": 1 }
+  },
+  "x-authority": "identity_adapter_only",
+  "x-non-equivalences": [
+    "adapter input is not a prediction commitment",
+    "adapter output is not an observation",
+    "adapter output is not an experimental execution record",
+    "adapter output is not replication evidence",
+    "adapter output is not official challenge criterion evidence",
+    "adapter conversion order is not candidate ranking or selection"
+  ]
+}
