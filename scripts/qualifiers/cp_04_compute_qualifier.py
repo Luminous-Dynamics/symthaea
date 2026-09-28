@@ -178,7 +178,7 @@ def validate(c):
 def validate_manifest(m):
     eq(m.get("schema"),"cp-04-compute-mutation-manifest-v1","manifest schema")
     eq(m.get("guard_registry"),GUARDS,"guard registry")
-    expected=["remove-model-runtime-edge","reverse-model-runtime-edge","duplicate-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","duplicate-model-node","dangling-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05"]
+    expected=["remove-model-runtime-edge","reverse-model-runtime-edge","duplicate-model-runtime-edge","add-graph-cycle","rename-graph-node","add-graph-field","malformed-graph-edge","duplicate-model-node","dangling-graph-edge","drop-C06","promote-C17","rewrite-C16","collapse-C10","change-C18","erase-C05","mutate-C02-model-identity"]
     eq([x.get("mutation_id") for x in m.get("mutations",[])],expected,"mutation manifest")
     for x in m.get("mutations",[]):
         if x.get("guard_id") not in GUARDS:
