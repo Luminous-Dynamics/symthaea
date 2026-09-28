@@ -63,6 +63,17 @@ impl AdvisoryMaterialPropertyV1 {
     pub fn category(&self) -> MaterialCategory { self.material.category }
 }
 
+/// Validation failure for the safe advisory stability entry point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AdvisoryInputError {
+    /// Temperature is not finite or is negative.
+    InvalidTemperature,
+    /// An element fraction is not finite or is negative.
+    InvalidFraction,
+    /// Fractions do not form a normalized composition within tolerance.
+    UnnormalizedComposition,
+}
+
 /// A legacy heuristic stability prediction, never a thermodynamic evidence record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdvisoryStabilityPredictionV1 {
@@ -75,7 +86,25 @@ pub struct AdvisoryStabilityPredictionV1 {
 }
 
 impl AdvisoryStabilityPredictionV1 {
-    /// Run and wrap the existing heuristic stability predictor.
+    /// Safely run and wrap the existing heuristic stability predictor.
+    ///
+    /// This checked facade rejects malformed inputs before invoking the legacy
+    /// predictor. It does not make the underlying heuristic scientifically authoritative.
+    pub fn try_predict(elements: &[(u16, f64)], temperature_k: f64) -> Result<Self, AdvisoryInputError> {
+        if !temperature_k.is_finite() || temperature_k < 0.0 {
+            return Err(AdvisoryInputError::InvalidTemperature);
+        }
+        if elements.iter().any(|(_, x)| !x.is_finite() || *x < 0.0) {
+            return Err(AdvisoryInputError::InvalidFraction);
+        }
+        let total: f64 = elements.iter().map(|(_, x)| *x).sum();
+        if !elements.is_empty() && (total - 1.0).abs() > 1e-9 {
+            return Err(AdvisoryInputError::UnnormalizedComposition);
+        }
+        Ok(Self::predict(elements, temperature_k))
+    }
+
+    /// Run and wrap the existing heuristic stability predictor without changing legacy behavior.
     pub fn predict(elements: &[(u16, f64)], temperature_k: f64) -> Self {
         Self {
             identity: AdvisoryIdentityV1::new(
@@ -218,6 +247,14 @@ mod tests {
         let wrapped = AdvisoryAgingPredictionV1::from_legacy(prediction);
         assert_eq!(wrapped.horizon_seconds(), 86_400.0);
         assert!(wrapped.identity.input_generation.contains("86400"));
+    }
+
+    #[test]
+    fn malformed_stability_inputs_are_rejected_by_safe_facade() {
+        assert_eq!(AdvisoryStabilityPredictionV1::try_predict(&[(26, f64::NAN)], 300.0), Err(AdvisoryInputError::InvalidFraction));
+        assert_eq!(AdvisoryStabilityPredictionV1::try_predict(&[(26, 1.0)], f64::NAN), Err(AdvisoryInputError::InvalidTemperature));
+        assert_eq!(AdvisoryStabilityPredictionV1::try_predict(&[(26, 0.2), (28, 0.2)], 300.0), Err(AdvisoryInputError::UnnormalizedComposition));
+        assert!(AdvisoryStabilityPredictionV1::try_predict(&[(26, 0.5), (28, 0.5)], 300.0).is_ok());
     }
 
     #[test]
