@@ -28,8 +28,8 @@ def source_audit():
     tree=ast.parse(source)
     for n in ast.walk(tree):
         if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="fail":
-            if len(n.args)!=2 or not isinstance(n.args[1],ast.Name) or n.args[1].id!="guard_id":
-                fail("source audit: fail() must carry explicit validated guard_id","CP-COMP-INVARIANT")
+            if len(n.args)!=2 or not (isinstance(n.args[1],ast.Name) and n.args[1].id=="guard_id" or isinstance(n.args[1],ast.Constant) and n.args[1].value in GUARDS):
+                fail("source audit: fail() must carry explicit registered guard_id","CP-COMP-INVARIANT")
     forbidden={"symthaea","torch","numpy","pandas","onnx","tensorflow"}
     for n in ast.walk(tree):
         if isinstance(n,(ast.Import,ast.ImportFrom)) and any(a.name.split(".")[0] in forbidden for a in n.names): fail("source audit: forbidden production/runtime import","CP-COMP-INVARIANT")
