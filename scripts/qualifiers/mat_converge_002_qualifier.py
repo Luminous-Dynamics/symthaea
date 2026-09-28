@@ -211,6 +211,8 @@ def check_graph(graph, cases):
     edge_ids = [e["id"] for e in edges]
     if set(node_ids) != set(EXPECTED_GRAPH_NODE_IDENTITIES):
         fail("state graph node identity coverage drift", "MAT-MUT-SCHEMA_INTEGRITY")
+    if "edge/C07" not in set(edge_ids):
+        fail("negative evidence graph edge missing", "MAT-MUT-NEGATIVE_EVIDENCE")
     if set(edge_ids) != set(EXPECTED_GRAPH_EDGE_IDENTITIES):
         fail("state graph edge identity coverage drift", "MAT-MUT-SCHEMA_INTEGRITY")
     if len(node_ids) != len(set(node_ids)):
