@@ -461,14 +461,13 @@ impl ExactDesignSearchDomainV1 {
                 ExactLengthDomainV1::Values(values) => {
                     if values.is_empty() { return Err(RobotDesignError::EmptyCollection("domain values")); }
                     for value in values { value.validate()?; }
-                    let mut sorted = values.clone();
-                    sorted.sort_unstable();
-                    sorted.dedup();
-                    if sorted.len() != values.len() {
-                        return Err(RobotDesignError::DuplicateDomainValue(parameter.id.to_string()));
-                    }
-                    if sorted != *values {
-                        return Err(RobotDesignError::NonCanonicalDomainOrder(parameter.id.to_string()));
+                    for pair in values.windows(2) {
+                        if pair[0] == pair[1] {
+                            return Err(RobotDesignError::DuplicateDomainValue(parameter.id.to_string()));
+                        }
+                        if pair[0] > pair[1] {
+                            return Err(RobotDesignError::NonCanonicalDomainOrder(parameter.id.to_string()));
+                        }
                     }
                 }
                 ExactLengthDomainV1::Range { lower, upper, step_um } => {
@@ -514,6 +513,21 @@ impl ExactDesignSearchDomainV1 {
     pub fn id(&self) -> Result<SearchDomainId, RobotDesignError> {
         Ok(SearchDomainId(hash_transcript(&self.canonical_transcript()?)))
     }
+    fn dimension_cardinality(domain: &ExactLengthDomainV1) -> Result<usize, RobotDesignError> {
+        match domain {
+            ExactLengthDomainV1::Values(values) => Ok(values.len()),
+            ExactLengthDomainV1::Range { lower, upper, step_um } => {
+                let span = upper.value_um() - lower.value_um();
+                let count = span
+                    .checked_div(*step_um)
+                    .and_then(|n| n.checked_add(1))
+                    .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
+                usize::try_from(count)
+                    .map_err(|_| RobotDesignError::DomainEnumerationOverflow)
+            }
+        }
+    }
+
     pub fn enumerate(&self) -> Result<Vec<ExactDesignParameterSetV1>, RobotDesignError> {
         self.validate()?;
 
@@ -522,16 +536,7 @@ impl ExactDesignSearchDomainV1 {
         // first attempting a potentially enormous allocation.
         let mut total = 1usize;
         for parameter in &self.parameters {
-            let count = match &parameter.domain {
-                ExactLengthDomainV1::Values(values) => values.len(),
-                ExactLengthDomainV1::Range { lower, upper, step_um } => {
-                    let span = upper.value_um() - lower.value_um();
-                    let count = span.checked_div(*step_um).and_then(|n| n.checked_add(1))
-                        .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
-                    usize::try_from(count)
-                        .map_err(|_| RobotDesignError::DomainEnumerationOverflow)?
-                }
-            };
+            let count = Self::dimension_cardinality(&parameter.domain)?;
             total = total
                 .checked_mul(count)
                 .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
@@ -542,11 +547,7 @@ impl ExactDesignSearchDomainV1 {
             let values = match &parameter.domain {
                 ExactLengthDomainV1::Values(values) => values.clone(),
                 ExactLengthDomainV1::Range { lower, upper, step_um } => {
-                    let span = upper.value_um() - lower.value_um();
-                    let count = span.checked_div(*step_um).and_then(|n| n.checked_add(1))
-                        .ok_or(RobotDesignError::DomainEnumerationOverflow)?;
-                    let count = usize::try_from(count)
-                        .map_err(|_| RobotDesignError::DomainEnumerationOverflow)?;
+                    let count = Self::dimension_cardinality(&parameter.domain)?;
                     let mut values = Vec::new();
                     values
                         .try_reserve_exact(count)
