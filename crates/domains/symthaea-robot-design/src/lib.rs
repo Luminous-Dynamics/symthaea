@@ -1978,6 +1978,23 @@ mod tests {
         assert_eq!(ParameterSetId::from_hex(&parameter_id.to_hex()).unwrap(), parameter_id);
         let robot_id = base_subject().design_id().unwrap();
         assert_eq!(RobotDesignId::from_hex(&robot_id.to_hex()).unwrap(), robot_id);
+
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("section_width").unwrap(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(20_000).unwrap(),
+                    upper: C0LengthUmV1::new(22_000).unwrap(),
+                    step_um: 1_000,
+                },
+            },
+        ])
+        .unwrap();
+        let search_domain_id = domain.id().unwrap();
+        assert_eq!(
+            SearchDomainId::from_hex(&search_domain_id.to_hex()).unwrap(),
+            search_domain_id
+        );
     }
 
     #[test]
