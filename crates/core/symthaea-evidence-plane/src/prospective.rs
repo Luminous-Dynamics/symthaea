@@ -359,7 +359,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn tampered_event_id_fails_integrity_verification() {
         let mut value = commit(b"prediction");
         value.event_id = "sha256:tampered".into();
@@ -375,6 +374,7 @@ mod tests {
         assert_eq!(result, Err(CommitmentError::InvalidCutoff));
     }
 
+    #[test]
     fn empty_prediction_is_rejected() {
         let result = ProspectivePredictionCommitment::commit(
             "MPB-2026-09-23-01",
