@@ -10,6 +10,7 @@
       "expected_disposition": "CurrentAndApplicable",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C01:compute_subject_generation",
+        "requirement_identity": "synthetic:C01:requirement",
         "representation_identity": "synthetic:C01:representation",
         "model_identity": "synthetic:C01:model",
         "model_parameters_identity": "synthetic:C01:model_parameters",
@@ -20,6 +21,8 @@
         "execution_context_identity": "synthetic:C01:execution_context",
         "observation_identity": "synthetic:C01:observation",
         "statistics_identity": "synthetic:C01:statistics",
+        "uncertainty_identity": "synthetic:C01:uncertainty",
+        "provenance_identity": "synthetic:C01:provenance",
         "dependency_identity": "synthetic:C01:dependency",
         "currentness_identity": "synthetic:C01:currentness",
         "applicability_identity": "synthetic:C01:applicability"
@@ -31,6 +34,7 @@
       "expected_disposition": "DependencyChanged",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C02:compute_subject_generation",
+        "requirement_identity": "synthetic:C02:requirement",
         "representation_identity": "synthetic:C02:representation",
         "model_identity": "synthetic:C02:model",
         "model_parameters_identity": "synthetic:C02:model_parameters",
@@ -41,6 +45,8 @@
         "execution_context_identity": "synthetic:C02:execution_context",
         "observation_identity": "synthetic:C02:observation",
         "statistics_identity": "synthetic:C02:statistics",
+        "uncertainty_identity": "synthetic:C02:uncertainty",
+        "provenance_identity": "synthetic:C02:provenance",
         "dependency_identity": "synthetic:C02:dependency",
         "currentness_identity": "synthetic:C02:currentness",
         "applicability_identity": "synthetic:C02:applicability"
@@ -52,6 +58,7 @@
       "expected_disposition": "ConfigurationMismatch",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C03:compute_subject_generation",
+        "requirement_identity": "synthetic:C03:requirement",
         "representation_identity": "synthetic:C03:representation",
         "model_identity": "synthetic:C03:model",
         "model_parameters_identity": "synthetic:C03:model_parameters",
@@ -62,6 +69,8 @@
         "execution_context_identity": "synthetic:C03:execution_context",
         "observation_identity": "synthetic:C03:observation",
         "statistics_identity": "synthetic:C03:statistics",
+        "uncertainty_identity": "synthetic:C03:uncertainty",
+        "provenance_identity": "synthetic:C03:provenance",
         "dependency_identity": "synthetic:C03:dependency",
         "currentness_identity": "synthetic:C03:currentness",
         "applicability_identity": "synthetic:C03:applicability"
@@ -73,6 +82,7 @@
       "expected_disposition": "ConfigurationMismatch",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C04:compute_subject_generation",
+        "requirement_identity": "synthetic:C04:requirement",
         "representation_identity": "synthetic:C04:representation",
         "model_identity": "synthetic:C04:model",
         "model_parameters_identity": "synthetic:C04:model_parameters",
@@ -83,6 +93,8 @@
         "execution_context_identity": "synthetic:C04:execution_context",
         "observation_identity": "synthetic:C04:observation",
         "statistics_identity": "synthetic:C04:statistics",
+        "uncertainty_identity": "synthetic:C04:uncertainty",
+        "provenance_identity": "synthetic:C04:provenance",
         "dependency_identity": "synthetic:C04:dependency",
         "currentness_identity": "synthetic:C04:currentness",
         "applicability_identity": "synthetic:C04:applicability"
@@ -94,6 +106,7 @@
       "expected_disposition": "DeploymentMismatch",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C05:compute_subject_generation",
+        "requirement_identity": "synthetic:C05:requirement",
         "representation_identity": "synthetic:C05:representation",
         "model_identity": "synthetic:C05:model",
         "model_parameters_identity": "synthetic:C05:model_parameters",
@@ -104,6 +117,8 @@
         "execution_context_identity": "synthetic:C05:execution_context",
         "observation_identity": "synthetic:C05:observation",
         "statistics_identity": "synthetic:C05:statistics",
+        "uncertainty_identity": "synthetic:C05:uncertainty",
+        "provenance_identity": "synthetic:C05:provenance",
         "dependency_identity": "synthetic:C05:dependency",
         "currentness_identity": "synthetic:C05:currentness",
         "applicability_identity": "synthetic:C05:applicability"
@@ -115,6 +130,7 @@
       "expected_disposition": "ObservationMissing",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C06:compute_subject_generation",
+        "requirement_identity": "synthetic:C06:requirement",
         "representation_identity": "synthetic:C06:representation",
         "model_identity": "synthetic:C06:model",
         "model_parameters_identity": "synthetic:C06:model_parameters",
@@ -125,6 +141,8 @@
         "execution_context_identity": "synthetic:C06:execution_context",
         "observation_identity": "synthetic:C06:observation",
         "statistics_identity": "synthetic:C06:statistics",
+        "uncertainty_identity": "synthetic:C06:uncertainty",
+        "provenance_identity": "synthetic:C06:provenance",
         "dependency_identity": "synthetic:C06:dependency",
         "currentness_identity": "synthetic:C06:currentness",
         "applicability_identity": "synthetic:C06:applicability"
@@ -136,6 +154,7 @@
       "expected_disposition": "UncertaintyInsufficient",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C07:compute_subject_generation",
+        "requirement_identity": "synthetic:C07:requirement",
         "representation_identity": "synthetic:C07:representation",
         "model_identity": "synthetic:C07:model",
         "model_parameters_identity": "synthetic:C07:model_parameters",
@@ -146,6 +165,8 @@
         "execution_context_identity": "synthetic:C07:execution_context",
         "observation_identity": "synthetic:C07:observation",
         "statistics_identity": "synthetic:C07:statistics",
+        "uncertainty_identity": "synthetic:C07:uncertainty",
+        "provenance_identity": "synthetic:C07:provenance",
         "dependency_identity": "synthetic:C07:dependency",
         "currentness_identity": "synthetic:C07:currentness",
         "applicability_identity": "synthetic:C07:applicability"
@@ -157,6 +178,7 @@
       "expected_disposition": "PopulationInferenceBlocked",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C08:compute_subject_generation",
+        "requirement_identity": "synthetic:C08:requirement",
         "representation_identity": "synthetic:C08:representation",
         "model_identity": "synthetic:C08:model",
         "model_parameters_identity": "synthetic:C08:model_parameters",
@@ -167,6 +189,8 @@
         "execution_context_identity": "synthetic:C08:execution_context",
         "observation_identity": "synthetic:C08:observation",
         "statistics_identity": "synthetic:C08:statistics",
+        "uncertainty_identity": "synthetic:C08:uncertainty",
+        "provenance_identity": "synthetic:C08:provenance",
         "dependency_identity": "synthetic:C08:dependency",
         "currentness_identity": "synthetic:C08:currentness",
         "applicability_identity": "synthetic:C08:applicability"
@@ -178,6 +202,7 @@
       "expected_disposition": "HardEnvelopeFailure",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C09:compute_subject_generation",
+        "requirement_identity": "synthetic:C09:requirement",
         "representation_identity": "synthetic:C09:representation",
         "model_identity": "synthetic:C09:model",
         "model_parameters_identity": "synthetic:C09:model_parameters",
@@ -188,6 +213,8 @@
         "execution_context_identity": "synthetic:C09:execution_context",
         "observation_identity": "synthetic:C09:observation",
         "statistics_identity": "synthetic:C09:statistics",
+        "uncertainty_identity": "synthetic:C09:uncertainty",
+        "provenance_identity": "synthetic:C09:provenance",
         "dependency_identity": "synthetic:C09:dependency",
         "currentness_identity": "synthetic:C09:currentness",
         "applicability_identity": "synthetic:C09:applicability"
@@ -199,6 +226,7 @@
       "expected_disposition": "CommonModeNotIndependent",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C10:compute_subject_generation",
+        "requirement_identity": "synthetic:C10:requirement",
         "representation_identity": "synthetic:C10:representation",
         "model_identity": "synthetic:C10:model",
         "model_parameters_identity": "synthetic:C10:model_parameters",
@@ -209,6 +237,8 @@
         "execution_context_identity": "synthetic:C10:execution_context",
         "observation_identity": "synthetic:C10:observation",
         "statistics_identity": "synthetic:C10:statistics",
+        "uncertainty_identity": "synthetic:C10:uncertainty",
+        "provenance_identity": "synthetic:C10:provenance",
         "dependency_identity": "synthetic:C10:dependency",
         "currentness_identity": "synthetic:C10:currentness",
         "applicability_identity": "synthetic:C10:applicability"
@@ -220,6 +250,7 @@
       "expected_disposition": "AuthoritySeparated",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C11:compute_subject_generation",
+        "requirement_identity": "synthetic:C11:requirement",
         "representation_identity": "synthetic:C11:representation",
         "model_identity": "synthetic:C11:model",
         "model_parameters_identity": "synthetic:C11:model_parameters",
@@ -230,6 +261,8 @@
         "execution_context_identity": "synthetic:C11:execution_context",
         "observation_identity": "synthetic:C11:observation",
         "statistics_identity": "synthetic:C11:statistics",
+        "uncertainty_identity": "synthetic:C11:uncertainty",
+        "provenance_identity": "synthetic:C11:provenance",
         "dependency_identity": "synthetic:C11:dependency",
         "currentness_identity": "synthetic:C11:currentness",
         "applicability_identity": "synthetic:C11:applicability"
@@ -241,6 +274,7 @@
       "expected_disposition": "Stale",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C12:compute_subject_generation",
+        "requirement_identity": "synthetic:C12:requirement",
         "representation_identity": "synthetic:C12:representation",
         "model_identity": "synthetic:C12:model",
         "model_parameters_identity": "synthetic:C12:model_parameters",
@@ -251,6 +285,8 @@
         "execution_context_identity": "synthetic:C12:execution_context",
         "observation_identity": "synthetic:C12:observation",
         "statistics_identity": "synthetic:C12:statistics",
+        "uncertainty_identity": "synthetic:C12:uncertainty",
+        "provenance_identity": "synthetic:C12:provenance",
         "dependency_identity": "synthetic:C12:dependency",
         "currentness_identity": "synthetic:C12:currentness",
         "applicability_identity": "synthetic:C12:applicability"
@@ -262,6 +298,7 @@
       "expected_disposition": "StateRestorationUnresolved",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C13:compute_subject_generation",
+        "requirement_identity": "synthetic:C13:requirement",
         "representation_identity": "synthetic:C13:representation",
         "model_identity": "synthetic:C13:model",
         "model_parameters_identity": "synthetic:C13:model_parameters",
@@ -272,6 +309,8 @@
         "execution_context_identity": "synthetic:C13:execution_context",
         "observation_identity": "synthetic:C13:observation",
         "statistics_identity": "synthetic:C13:statistics",
+        "uncertainty_identity": "synthetic:C13:uncertainty",
+        "provenance_identity": "synthetic:C13:provenance",
         "dependency_identity": "synthetic:C13:dependency",
         "currentness_identity": "synthetic:C13:currentness",
         "applicability_identity": "synthetic:C13:applicability"
@@ -283,6 +322,7 @@
       "expected_disposition": "AuthoritySeparated",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C14:compute_subject_generation",
+        "requirement_identity": "synthetic:C14:requirement",
         "representation_identity": "synthetic:C14:representation",
         "model_identity": "synthetic:C14:model",
         "model_parameters_identity": "synthetic:C14:model_parameters",
@@ -293,6 +333,8 @@
         "execution_context_identity": "synthetic:C14:execution_context",
         "observation_identity": "synthetic:C14:observation",
         "statistics_identity": "synthetic:C14:statistics",
+        "uncertainty_identity": "synthetic:C14:uncertainty",
+        "provenance_identity": "synthetic:C14:provenance",
         "dependency_identity": "synthetic:C14:dependency",
         "currentness_identity": "synthetic:C14:currentness",
         "applicability_identity": "synthetic:C14:applicability"
@@ -304,6 +346,7 @@
       "expected_disposition": "AuthoritySeparated",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C15:compute_subject_generation",
+        "requirement_identity": "synthetic:C15:requirement",
         "representation_identity": "synthetic:C15:representation",
         "model_identity": "synthetic:C15:model",
         "model_parameters_identity": "synthetic:C15:model_parameters",
@@ -314,6 +357,8 @@
         "execution_context_identity": "synthetic:C15:execution_context",
         "observation_identity": "synthetic:C15:observation",
         "statistics_identity": "synthetic:C15:statistics",
+        "uncertainty_identity": "synthetic:C15:uncertainty",
+        "provenance_identity": "synthetic:C15:provenance",
         "dependency_identity": "synthetic:C15:dependency",
         "currentness_identity": "synthetic:C15:currentness",
         "applicability_identity": "synthetic:C15:applicability"
@@ -325,6 +370,7 @@
       "expected_disposition": "HistoricalNegativeRetained",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C16:compute_subject_generation",
+        "requirement_identity": "synthetic:C16:requirement",
         "representation_identity": "synthetic:C16:representation",
         "model_identity": "synthetic:C16:model",
         "model_parameters_identity": "synthetic:C16:model_parameters",
@@ -335,6 +381,8 @@
         "execution_context_identity": "synthetic:C16:execution_context",
         "observation_identity": "synthetic:C16:observation",
         "statistics_identity": "synthetic:C16:statistics",
+        "uncertainty_identity": "synthetic:C16:uncertainty",
+        "provenance_identity": "synthetic:C16:provenance",
         "dependency_identity": "synthetic:C16:dependency",
         "currentness_identity": "synthetic:C16:currentness",
         "applicability_identity": "synthetic:C16:applicability"
@@ -346,6 +394,7 @@
       "expected_disposition": "NoPhysicalExecutionAuthority",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C17:compute_subject_generation",
+        "requirement_identity": "synthetic:C17:requirement",
         "representation_identity": "synthetic:C17:representation",
         "model_identity": "synthetic:C17:model",
         "model_parameters_identity": "synthetic:C17:model_parameters",
@@ -356,6 +405,8 @@
         "execution_context_identity": "synthetic:C17:execution_context",
         "observation_identity": "synthetic:C17:observation",
         "statistics_identity": "synthetic:C17:statistics",
+        "uncertainty_identity": "synthetic:C17:uncertainty",
+        "provenance_identity": "synthetic:C17:provenance",
         "dependency_identity": "synthetic:C17:dependency",
         "currentness_identity": "synthetic:C17:currentness",
         "applicability_identity": "synthetic:C17:applicability"
@@ -367,6 +418,7 @@
       "expected_disposition": "RequalificationRequired",
       "immutable_identity": {
         "compute_subject_generation": "synthetic:C18:compute_subject_generation",
+        "requirement_identity": "synthetic:C18:requirement",
         "representation_identity": "synthetic:C18:representation",
         "model_identity": "synthetic:C18:model",
         "model_parameters_identity": "synthetic:C18:model_parameters",
@@ -377,6 +429,8 @@
         "execution_context_identity": "synthetic:C18:execution_context",
         "observation_identity": "synthetic:C18:observation",
         "statistics_identity": "synthetic:C18:statistics",
+        "uncertainty_identity": "synthetic:C18:uncertainty",
+        "provenance_identity": "synthetic:C18:provenance",
         "dependency_identity": "synthetic:C18:dependency",
         "currentness_identity": "synthetic:C18:currentness",
         "applicability_identity": "synthetic:C18:applicability"
