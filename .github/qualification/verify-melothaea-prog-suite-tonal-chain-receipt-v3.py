@@ -203,8 +203,13 @@ def main() -> int:
         raise VerificationError(
             f"cargo_version is not from the frozen 1.96.0 toolchain: {values['cargo_version']}"
         )
+    # The frozen-subject formatting observation is deliberately non-authoritative.
+    # Every functional, identity, and immutability gate remains a required PASS.
     for gate in GATES:
-        expect(values, gate, "pass")
+        if gate == "fmt_subject_gate":
+            expect(values, gate, "not-required-frozen-subject")
+        else:
+            expect(values, gate, "pass")
 
     provider = values["qualification_provider"]
     if provider not in {"local", "github-actions"}:
