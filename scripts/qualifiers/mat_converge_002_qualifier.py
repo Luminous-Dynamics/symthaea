@@ -64,7 +64,9 @@ class OracleFailure(AssertionError):
         super().__init__(message)
         self.guard_id = guard_id
 
-def fail(msg, guard_id="MAT-MUT-INVARIANT_INTEGRITY"):
+def fail(msg, guard_id):
+    if guard_id not in GUARD_CATEGORIES:
+        raise OracleFailure("MAT-ORACLE:invariant-integrity", "unknown oracle guard: " + str(guard_id))
     raise OracleFailure(guard_id, msg)
 
 FAILURE_DIAGNOSTICS = []
@@ -99,18 +101,86 @@ EXPECTED_CATEGORIES = {
     "rewrite-property-node-kind": "schema-integrity",
     "rewrite-case-coverage-manifest": "coverage",
 }
+GUARD_CATEGORIES = {
+    "MAT-MUT-AUTHORITY": "authority",
+    "MAT-MUT-COVERAGE": "coverage",
+    "MAT-MUT-DEPENDENCY_BOUNDARY": "dependency-boundary",
+    "MAT-MUT-HISTORICAL_IDENTITY": "historical-identity",
+    "MAT-MUT-INVARIANT_INTEGRITY": "invariant-integrity",
+    "MAT-MUT-NEGATIVE_EVIDENCE": "negative-evidence",
+    "MAT-MUT-SCHEMA_INTEGRITY": "schema-integrity",
+    "MAT-ORACLE:invariant-integrity": "invariant-integrity",
+}
+
 EXPECTED_GUARDS = {
-    label: f"MAT-MUT-{category.upper().replace('-', '_')}"
-    for label, category in EXPECTED_CATEGORIES.items()
+    "remove-process-ref": "MAT-MUT-HISTORICAL_IDENTITY",
+    "change-process-generation": "MAT-MUT-HISTORICAL_IDENTITY",
+    "change-profile-ref": "MAT-MUT-HISTORICAL_IDENTITY",
+    "change-evaluator-generation": "MAT-MUT-HISTORICAL_IDENTITY",
+    "change-measurement-generation": "MAT-MUT-HISTORICAL_IDENTITY",
+    "change-ranking-only": "MAT-MUT-SCHEMA_INTEGRITY",
+    "delete-negative-case": "MAT-MUT-NEGATIVE_EVIDENCE",
+    "promote-authority": "MAT-MUT-AUTHORITY",
+    "change-disposition": "MAT-MUT-INVARIANT_INTEGRITY",
+    "rewrite-historical-ref": "MAT-MUT-HISTORICAL_IDENTITY",
+    "rewrite-negative-node-tombstone": "MAT-MUT-NEGATIVE_EVIDENCE",
+    "coverage-mode": "MAT-MUT-COVERAGE",
+    "coverage-case-count": "MAT-MUT-COVERAGE",
+    "coverage-edge-count": "MAT-MUT-COVERAGE",
+    "coverage-only-count": "MAT-MUT-COVERAGE",
+    "coverage-only-identities": "MAT-MUT-COVERAGE",
+    "coverage-only-reason": "MAT-MUT-COVERAGE",
+    "rewrite-graph-edge-kind": "MAT-MUT-SCHEMA_INTEGRITY",
+    "delete-graph-negative-edge": "MAT-MUT-NEGATIVE_EVIDENCE",
+    "rewrite-graph-case-binding": "MAT-MUT-SCHEMA_INTEGRITY",
+    "rewrite-candidate-node-ref": "MAT-MUT-HISTORICAL_IDENTITY",
+    "rewrite-process-node-generation": "MAT-MUT-HISTORICAL_IDENTITY",
+    "rewrite-property-node-kind": "MAT-MUT-SCHEMA_INTEGRITY",
+    "rewrite-case-coverage-manifest": "MAT-MUT-COVERAGE",
 }
 
 def failure_category(exc):
     if not isinstance(exc, OracleFailure):
         raise AssertionError("unstructured oracle diagnostic")
-    prefix = "MAT-MUT-"
-    if not exc.guard_id.startswith(prefix):
-        raise AssertionError("oracle diagnostic guard namespace drift")
-    return exc.guard_id[len(prefix):].lower().replace("_", "-")
+    try:
+        return GUARD_CATEGORIES[exc.guard_id]
+    except KeyError as err:
+        raise AssertionError("oracle diagnostic guard registry drift") from err
+
+def guard_registry_digest():
+    return hashlib.sha256(canonical({
+        "schema": "mat-converge-002-guard-registry-v1",
+        "guards": sorted(GUARD_CATEGORIES.items()),
+        "mutation_guards": sorted(EXPECTED_GUARDS.items()),
+    })).hexdigest()
+
+def source_guard_audit():
+    """Static self-audit: every fail() call must carry an explicit guard ID."""
+    source = pathlib.Path(__file__).read_text(encoding="utf-8")
+    import ast
+    tree = ast.parse(source)
+    violations = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Name) or node.func.id != "fail":
+            continue
+        if len(node.args) < 2 and not any(keyword.arg == "guard_id" for keyword in node.keywords):
+            violations.append(node.lineno)
+    if violations:
+        raise AssertionError(
+            "unstructured fail() calls at lines: " + ",".join(map(str, sorted(violations)))
+        )
+    return {
+        "schema": "mat-converge-002-source-guard-audit-v1",
+        "fail_call_count": sum(
+            1 for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "fail"
+        ),
+        "violations": [],
+    }
 
 def record_failure(doc, cases, label, expected_category):
     try:
@@ -473,12 +543,14 @@ def expect_failure(doc, cases, label):
         check(doc, cases)
     except AssertionError:
         return
-    fail(f"mutation escaped oracle: {label}")
+    fail(f"mutation escaped oracle: {label}", "MAT-MUT-INVARIANT_INTEGRITY")
 
 
 def mutation_manifest(cases, graph):
     return {
-        "schema": "mat-converge-002-mutation-manifest-v3",
+        "schema": "mat-converge-002-mutation-manifest-v4",
+        "guard_registry_schema": "mat-converge-002-guard-registry-v1",
+        "guard_registry_digest": guard_registry_digest(),
         "categories": sorted(REQUIRED_FAILURE_CATEGORIES),
         "mutations": [
             {"id": label, "category": EXPECTED_CATEGORIES[label], "guard_id": EXPECTED_GUARDS[label]}
@@ -573,6 +645,15 @@ def validate_replay_session(cases, graph, invalidation_plan, recomputed_cases, s
         fail("replay session binding mismatch", "MAT-MUT-DEPENDENCY_BOUNDARY")
 
 def main():
+    source_guard_audit()
+    expected_guard_ids = {
+        "MAT-MUT-AUTHORITY", "MAT-MUT-COVERAGE", "MAT-MUT-DEPENDENCY_BOUNDARY",
+        "MAT-MUT-HISTORICAL_IDENTITY", "MAT-MUT-INVARIANT_INTEGRITY",
+        "MAT-MUT-NEGATIVE_EVIDENCE", "MAT-MUT-SCHEMA_INTEGRITY",
+        "MAT-ORACLE:invariant-integrity",
+    }
+    if set(GUARD_CATEGORIES) != expected_guard_ids:
+        fail("guard registry identity drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if len(sys.argv) != 2:
         print("usage: mat_converge_002_qualifier.py PATH", file=sys.stderr)
         return 2
@@ -585,7 +666,7 @@ def main():
     check(doc, cases)
     graph = doc["state_graph"]
     manifest = mutation_manifest(cases, graph)
-    if manifest["schema"] != "mat-converge-002-mutation-manifest-v3":
+    if manifest["schema"] != "mat-converge-002-mutation-manifest-v4":
         fail("mutation manifest schema drift", "MAT-MUT-COVERAGE")
     validate_mutation_manifest(cases, graph, manifest)
     if set(manifest["categories"]) != REQUIRED_FAILURE_CATEGORIES:
@@ -641,7 +722,7 @@ def main():
     except AssertionError:
         pass
     else:
-        fail("historical mutation unexpectedly accepted as qualified fixture")
+        fail("historical mutation unexpectedly accepted as qualified fixture", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Minimal invalidation: a localized historical generation change must
     # affect only the case that actually references that generation.
@@ -651,31 +732,31 @@ def main():
     localized_graph["nodes"][2]["ref"] = "process/G3"
     localized_projection_with_graph = dependency_projection(localized, localized_graph)
     if dependency_delta(baseline_projection, localized_projection) != ["C02"]:
-        fail("historical generation mutation cascaded beyond its dependent case")
+        fail("historical generation mutation cascaded beyond its dependent case", "MAT-MUT-INVARIANT_INTEGRITY")
     expected_graph_closure = graph_dependency_closure(cases, graph, "process/G1")
     if expected_graph_closure != ["C01", "C02", "C03", "C04", "C05", "C07", "C09", "C10", "C16"]:
-        fail("unexpected transitive process dependency closure in baseline graph")
+        fail("unexpected transitive process dependency closure in baseline graph", "MAT-MUT-INVARIANT_INTEGRITY")
     direct_graph_cases = graph_direct_case_ids(cases, graph, "process/G1")
     if direct_graph_cases != ["C02", "C04"]:
-        fail("unexpected direct process dependency fanout")
+        fail("unexpected direct process dependency fanout", "MAT-MUT-INVARIANT_INTEGRITY")
     if not set(direct_graph_cases).issubset(expected_graph_closure):
-        fail("transitive closure dropped a directly dependent graph case")
+        fail("transitive closure dropped a directly dependent graph case", "MAT-MUT-INVARIANT_INTEGRITY")
     plan = graph_invalidation_plan(cases, graph, "process/G1")
     if plan["direct_case_ids"] != direct_graph_cases:
-        fail("invalidation plan direct fanout drift")
+        fail("invalidation plan direct fanout drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if plan["transitive_case_ids"] != expected_graph_closure:
-        fail("invalidation plan transitive fanout drift")
+        fail("invalidation plan transitive fanout drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if plan["recompute_case_ids"] != expected_graph_closure:
-        fail("invalidation plan recomputation set drift")
+        fail("invalidation plan recomputation set drift", "MAT-MUT-INVARIANT_INTEGRITY")
     canonical_plan = canonical_invalidation_plan(cases, graph, "process/G1")
     if canonical_plan["schema"] != "mat-converge-002-invalidation-plan-v1":
-        fail("invalidation plan schema drift")
+        fail("invalidation plan schema drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if canonical_plan["direct_case_ids"] != direct_graph_cases:
-        fail("canonical invalidation plan direct fanout drift")
+        fail("canonical invalidation plan direct fanout drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if canonical_plan["transitive_case_ids"] != expected_graph_closure:
-        fail("canonical invalidation plan closure drift")
+        fail("canonical invalidation plan closure drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if canonical_plan["recompute_case_ids"] != expected_graph_closure:
-        fail("canonical invalidation plan recomputation drift")
+        fail("canonical invalidation plan recomputation drift", "MAT-MUT-INVARIANT_INTEGRITY")
     plan_payload = {
         "schema": canonical_plan["schema"],
         "graph_schema": graph["schema"],
@@ -685,7 +766,7 @@ def main():
         "recompute_case_ids": canonical_plan["recompute_case_ids"],
     }
     if canonical_plan["digest"] != hashlib.sha256(canonical(plan_payload)).hexdigest():
-        fail("invalidation plan digest is not self-consistent")
+        fail("invalidation plan digest is not self-consistent", "MAT-MUT-INVARIANT_INTEGRITY")
     key_permuted_plan = json.loads(json.dumps(canonical_plan))
     key_permuted_plan["recompute_case_ids"] = list(reversed(key_permuted_plan["recompute_case_ids"]))
     permuted_payload = {
@@ -698,38 +779,38 @@ def main():
     }
     permuted_digest = hashlib.sha256(canonical(permuted_payload)).hexdigest()
     if permuted_digest == canonical_plan["digest"]:
-        fail("recomputation ordering was incorrectly treated as representational")
+        fail("recomputation ordering was incorrectly treated as representational", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Two-phase replay artifact: the plan fixes the recomputation boundary,
     # while the snapshot binds only the immutable historical identities selected
     # by that plan.
     replay_snapshot = recomputation_snapshot(cases, graph, canonical_plan)
     if replay_snapshot["schema"] != "mat-converge-002-recomputation-snapshot-v1":
-        fail("recomputation snapshot schema drift")
+        fail("recomputation snapshot schema drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if replay_snapshot["invalidation_plan_digest"] != canonical_plan["digest"]:
-        fail("recomputation snapshot lost plan binding")
+        fail("recomputation snapshot lost plan binding", "MAT-MUT-INVARIANT_INTEGRITY")
     if [record["case_id"] for record in replay_snapshot["records"]] != expected_graph_closure:
-        fail("recomputation snapshot selected the wrong cases")
+        fail("recomputation snapshot selected the wrong cases", "MAT-MUT-INVARIANT_INTEGRITY")
     snapshot_payload = {
         "schema": replay_snapshot["schema"],
         "invalidation_plan_digest": replay_snapshot["invalidation_plan_digest"],
         "records": replay_snapshot["records"],
     }
     if replay_snapshot["digest"] != hashlib.sha256(canonical(snapshot_payload)).hexdigest():
-        fail("recomputation snapshot digest is not self-consistent")
+        fail("recomputation snapshot digest is not self-consistent", "MAT-MUT-INVARIANT_INTEGRITY")
     validate_recomputation_snapshot(cases, graph, canonical_plan, replay_snapshot)
 
     # Replay session binds the immutable base, the exact invalidation boundary,
     # the recomputation snapshot, and the derived result produced by recomputation.
     session_baseline = replay_session(cases, graph, canonical_plan, cases)
     if session_baseline["schema"] != "mat-converge-002-replay-session-v1":
-        fail("replay session schema drift")
+        fail("replay session schema drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_baseline["base_replay_digest"] != baseline_digest:
-        fail("replay session lost base replay binding")
+        fail("replay session lost base replay binding", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_baseline["invalidation_plan_digest"] != canonical_plan["digest"]:
-        fail("replay session lost invalidation-plan binding")
+        fail("replay session lost invalidation-plan binding", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_baseline["recomputation_snapshot_digest"] != replay_snapshot["digest"]:
-        fail("replay session lost recomputation binding")
+        fail("replay session lost recomputation binding", "MAT-MUT-INVARIANT_INTEGRITY")
     session_payload = {
         "schema": session_baseline["schema"],
         "base_replay_digest": session_baseline["base_replay_digest"],
@@ -738,7 +819,7 @@ def main():
         "recomputed_result_digest": session_baseline["recomputed_result_digest"],
     }
     if session_baseline["digest"] != hashlib.sha256(canonical(session_payload)).hexdigest():
-        fail("replay session digest is not self-consistent")
+        fail("replay session digest is not self-consistent", "MAT-MUT-INVARIANT_INTEGRITY")
     validate_replay_session(cases, graph, canonical_plan, cases, session_baseline)
 
     # Cross-epoch composition is forbidden: a session must not accept a result
@@ -793,21 +874,21 @@ def main():
         except AssertionError:
             pass
         else:
-            fail(f"tampered replay-session binding escaped oracle: {field}")
+            fail(f"tampered replay-session binding escaped oracle: {field}", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Session identity must also move when the immutable graph epoch changes.
     graph_epoch = json.loads(json.dumps(graph))
     graph_epoch["schema"] = "mat-converge-002-state-graph-v2"
     graph_epoch_plan = canonical_invalidation_plan(cases, graph_epoch, "process/G1")
     if graph_epoch_plan["digest"] == canonical_plan["digest"]:
-        fail("graph schema epoch change did not alter invalidation identity")
+        fail("graph schema epoch change did not alter invalidation identity", "MAT-MUT-INVARIANT_INTEGRITY")
     graph_epoch_session = replay_session(
         cases, graph_epoch, graph_epoch_plan, cases
     )
     if graph_epoch_session["base_replay_digest"] == session_baseline["base_replay_digest"]:
-        fail("graph schema epoch change did not alter replay identity")
+        fail("graph schema epoch change did not alter replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if graph_epoch_session["digest"] == session_baseline["digest"]:
-        fail("graph schema epoch change did not alter session identity")
+        fail("graph schema epoch change did not alter session identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Replay generation is observational: producing a session must not mutate
     # the historical case manifest or immutable graph.
@@ -815,7 +896,7 @@ def main():
     graph_before_session = json.loads(json.dumps(graph))
     replay_session(cases, graph, canonical_plan, cases)
     if cases != cases_before_session or graph != graph_before_session:
-        fail("replay-session generation mutated historical inputs")
+        fail("replay-session generation mutated historical inputs", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # A derived-only recomputation changes the result identity, while the
     # immutable replay inputs and recomputation boundary remain unchanged.
@@ -827,15 +908,15 @@ def main():
         cases, graph, canonical_plan, session_recomputed_cases
     )
     if session_recomputed["base_replay_digest"] != session_baseline["base_replay_digest"]:
-        fail("derived recomputation changed base replay identity")
+        fail("derived recomputation changed base replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_recomputed["invalidation_plan_digest"] != session_baseline["invalidation_plan_digest"]:
-        fail("derived recomputation changed invalidation identity")
+        fail("derived recomputation changed invalidation identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_recomputed["recomputation_snapshot_digest"] != session_baseline["recomputation_snapshot_digest"]:
-        fail("derived recomputation changed historical recomputation identity")
+        fail("derived recomputation changed historical recomputation identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_recomputed["recomputed_result_digest"] == session_baseline["recomputed_result_digest"]:
-        fail("derived recomputation failed to change result identity")
+        fail("derived recomputation failed to change result identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if session_recomputed["digest"] == session_baseline["digest"]:
-        fail("replay session failed to distinguish recomputed result")
+        fail("replay session failed to distinguish recomputed result", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Representation-equivalent replay must survive an independently rebuilt
     # graph object, not merely a reordered view of the original object.
@@ -862,13 +943,13 @@ def main():
     rebuilt_plan = canonical_invalidation_plan(cases, rebuilt_graph, "process/G1")
     rebuilt_snapshot = recomputation_snapshot(cases, rebuilt_graph, rebuilt_plan)
     if graph_identity(rebuilt_graph) != graph_identity(graph):
-        fail("independently rebuilt graph changed graph identity")
+        fail("independently rebuilt graph changed graph identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if replay_digest(cases, rebuilt_graph) != baseline_digest:
-        fail("independently rebuilt graph changed replay identity")
+        fail("independently rebuilt graph changed replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if rebuilt_plan["digest"] != canonical_plan["digest"]:
-        fail("independently rebuilt graph changed invalidation-plan identity")
+        fail("independently rebuilt graph changed invalidation-plan identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if rebuilt_snapshot["digest"] != replay_snapshot["digest"]:
-        fail("independently rebuilt graph changed recomputation identity")
+        fail("independently rebuilt graph changed recomputation identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Tampering with any plan boundary or its binding must be detected before
     # a recomputation snapshot can be treated as replayable.
@@ -880,7 +961,7 @@ def main():
         except AssertionError:
             pass
         else:
-            fail(f"tampered invalidation plan escaped binding oracle: {field}")
+            fail(f"tampered invalidation plan escaped binding oracle: {field}", "MAT-MUT-INVARIANT_INTEGRITY")
 
     tampered_digest_plan = json.loads(json.dumps(canonical_plan))
     tampered_digest_plan["digest"] = "0" * 64
@@ -889,7 +970,7 @@ def main():
     except AssertionError:
         pass
     else:
-        fail("tampered invalidation plan digest escaped binding oracle")
+        fail("tampered invalidation plan digest escaped binding oracle", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Derived dispositions are intentionally excluded from the snapshot identity.
     # The case manifest order is semantic: changing it changes the canonical
@@ -898,7 +979,7 @@ def main():
         case_order_permuted, graph, canonical_invalidation_plan(case_order_permuted, graph, "process/G1")
     )
     if manifest_reordered_snapshot["digest"] == replay_snapshot["digest"]:
-        fail("case manifest reordering lost recomputation identity")
+        fail("case manifest reordering lost recomputation identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     disposition_mutated = json.loads(json.dumps(cases))
     for case in disposition_mutated:
@@ -906,7 +987,7 @@ def main():
             case["outcome"] = "recomputed-disposition"
     mutated_snapshot = recomputation_snapshot(disposition_mutated, graph, canonical_plan)
     if mutated_snapshot["digest"] != replay_snapshot["digest"]:
-        fail("derived disposition mutated replay snapshot identity")
+        fail("derived disposition mutated replay snapshot identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Historical identity mutation must alter the replay artifact.
     historical_mutated = json.loads(json.dumps(cases))
@@ -915,23 +996,23 @@ def main():
     historical_case["refs"]["process"] = "process/G99"
     historical_snapshot = recomputation_snapshot(historical_mutated, graph, canonical_plan)
     if historical_snapshot["digest"] == replay_snapshot["digest"]:
-        fail("historical dependency mutation did not alter replay snapshot identity")
+        fail("historical dependency mutation did not alter replay snapshot identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if graph_invalidation_plan(cases, graph, "unknown/immutable-ref") != {
         "changed_ref": "unknown/immutable-ref",
         "direct_case_ids": [],
         "transitive_case_ids": [],
         "recompute_case_ids": [],
     }:
-        fail("unknown graph ref did not fail closed in invalidation plan")
+        fail("unknown graph ref did not fail closed in invalidation plan", "MAT-MUT-INVARIANT_INTEGRITY")
     unknown_plan = canonical_invalidation_plan(cases, graph, "unknown/immutable-ref")
     if unknown_plan["direct_case_ids"] != [] or unknown_plan["recompute_case_ids"] != []:
-        fail("unknown canonical invalidation plan did not fail closed")
+        fail("unknown canonical invalidation plan did not fail closed", "MAT-MUT-INVARIANT_INTEGRITY")
     actual_changed = "process/G3"
     if actual_changed in set(localized_projection["C02"]):
-        fail("case-local projection accepted an unqualified replacement generation")
+        fail("case-local projection accepted an unqualified replacement generation", "MAT-MUT-INVARIANT_INTEGRITY")
     for case_id in (case_id for case_id in EXPECTED if case_id != "C02"):
         if baseline_projection[case_id] != localized_projection[case_id]:
-            fail(f"unrelated dependency projection changed: {case_id}")
+            fail(f"unrelated dependency projection changed: {case_id}", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Recompute stability: a dependency mutation may change only the
     # derived record(s) whose immutable dependency identity changed.
@@ -942,7 +1023,7 @@ def main():
         if baseline_snapshot[case_id] != recomputed_snapshot[case_id]
     )
     if changed_records != ["C02"]:
-        fail("recomputation changed unrelated derived records")
+        fail("recomputation changed unrelated derived records", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Negative evidence is append-only in identity: adding a newer successful
     # case must not make the historical negative edge disappear or change.
@@ -955,9 +1036,9 @@ def main():
     newer["refs"]["process"] = newer["refs"]["process"]
     with_new_case.append(newer)
     if immutable_record_identity(next(c for c in with_new_case if c["id"] == "C07")) != negative_identity:
-        fail("newer result rewrote historical negative evidence identity")
+        fail("newer result rewrote historical negative evidence identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if not any(c["id"] == "C07" and c["outcome"] == "negative-edge-addressable" for c in with_new_case):
-        fail("historical negative edge became unreachable after recomputation")
+        fail("historical negative edge became unreachable after recomputation", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Bidirectional traceability: every graph endpoint must be attributable
     # to its bound case, while the campaign manifest may include cases that are
@@ -966,7 +1047,7 @@ def main():
     case_ids = {case["id"] for case in cases}
     graph_edge_cases = {edge["case_id"] for edge in graph["edges"]}
     if not graph_edge_cases.issubset(case_ids):
-        fail("graph contains edge coverage for an unknown case")
+        fail("graph contains edge coverage for an unknown case", "MAT-MUT-INVARIANT_INTEGRITY")
     case_refs = {
         case["id"]: set(case["refs"].values())
         for case in cases
@@ -975,15 +1056,15 @@ def main():
         from_ref = node_by_id[edge["from"]]["ref"]
         to_ref = node_by_id[edge["to"]]["ref"]
         if edge["case_id"] not in case_refs:
-            fail(f"graph edge is not attributable to a case: {edge['id']}")
+            fail(f"graph edge is not attributable to a case: {edge['id']}", "MAT-MUT-INVARIANT_INTEGRITY")
         allowed = case_refs[edge["case_id"]]
         if edge["id"] != "edge/C07" and not ({from_ref, to_ref} <= allowed):
-            fail(f"graph dependency is not attributable to its case: {edge['id']}")
+            fail(f"graph dependency is not attributable to its case: {edge['id']}", "MAT-MUT-INVARIANT_INTEGRITY")
     graph_only_cases = sorted(case_ids - graph_edge_cases)
     if graph_only_cases != ["C06", "C08", "C11", "C12", "C13", "C14", "C15"]:
         fail("partial structural coverage manifest drift", "MAT-MUT-COVERAGE")
     if len(graph["edges"]) != len(graph_edge_cases):
-        fail("multiple structural edges unexpectedly collapsed to one case")
+        fail("multiple structural edges unexpectedly collapsed to one case", "MAT-MUT-INVARIANT_INTEGRITY")
     declared_coverage = graph.get("coverage")
     if declared_coverage is None:
         fail("structural coverage declaration missing", "MAT-MUT-COVERAGE")
@@ -1044,29 +1125,29 @@ def main():
         expected = graph_dependency_closure(cases, graph, original_ref)
         if node_id == "N06":
             if expected != ["C03"]:
-                fail(f"profile node closure drift: {expected}")
+                fail(f"profile node closure drift: {expected}", "MAT-MUT-INVARIANT_INTEGRITY")
         elif node_id == "N07":
             if expected != ["C07"]:
-                fail(f"negative-edge node closure drift: {expected}")
+                fail(f"negative-edge node closure drift: {expected}", "MAT-MUT-INVARIANT_INTEGRITY")
         else:
             if expected != ["C01", "C02", "C03", "C04", "C05", "C07", "C09", "C10", "C16"]:
-                fail(f"core graph component closure drift for {node_id}: {expected}")
+                fail(f"core graph component closure drift for {node_id}: {expected}", "MAT-MUT-INVARIANT_INTEGRITY")
         direct_graph_expected = graph_direct_case_ids(cases, graph, original_ref)
         if direct_graph_expected and not set(direct_graph_expected).issubset(expected):
-            fail(f"transitive closure dropped direct graph fanout for {node_id}")
+            fail(f"transitive closure dropped direct graph fanout for {node_id}", "MAT-MUT-INVARIANT_INTEGRITY")
         if node_id == "N07" and direct_expected != ["C07"]:
-            fail(f"negative-edge direct fanout mismatch: {direct_expected}")
+            fail(f"negative-edge direct fanout mismatch: {direct_expected}", "MAT-MUT-INVARIANT_INTEGRITY")
         # The graph mutation is an invalidation plan, not a rewrite of history:
         # the selected cases are exactly the records eligible for recomputation.
         if set(expected) != set(graph_dependency_closure(cases, graph, original_ref)):
-            fail(f"non-deterministic recomputation closure for {node_id}")
+            fail(f"non-deterministic recomputation closure for {node_id}", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Unknown immutable refs have no graph impact; fail-closed means no accidental fanout.
     if graph_dependency_closure(cases, graph, "unknown/immutable-ref") != []:
-        fail("unknown graph ref acquired an accidental dependency closure")
+        fail("unknown graph ref acquired an accidental dependency closure", "MAT-MUT-INVARIANT_INTEGRITY")
     negative_plan = graph_invalidation_plan(cases, graph, "edge/C07")
     if negative_plan["direct_case_ids"] != ["C07"] or negative_plan["recompute_case_ids"] != ["C07"]:
-        fail("negative-edge tombstone acquired an unrelated invalidation fanout")
+        fail("negative-edge tombstone acquired an unrelated invalidation fanout", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # The negative-edge node is a first-class historical tombstone: mutating
     # its case identity must be caught rather than allowing negative evidence
@@ -1096,9 +1177,9 @@ def main():
         record_failure(mutated_doc, cases, name, EXPECTED_CATEGORIES[name])
 
     if set(baseline_projection) != set(EXPECTED):
-        fail("dependency projection coverage drift")
+        fail("dependency projection coverage drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if baseline_projection["C01"] == baseline_projection["C02"]:
-        fail("distinct process generations collapsed dependency identity")
+        fail("distinct process generations collapsed dependency identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     # Replay determinism: JSON object key order and graph collection order
     # are representational only; the ordered campaign case manifest remains
@@ -1121,36 +1202,36 @@ def main():
         for edge in reversed(key_permuted["state_graph"]["edges"])
     ]
     if replay_digest(key_permuted["cases"], key_permuted["state_graph"]) != baseline_digest:
-        fail("representational key/graph ordering changed replay identity")
+        fail("representational key/graph ordering changed replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     graph_node_permuted = json.loads(json.dumps(graph))
     graph_node_permuted["nodes"].reverse()
     if replay_digest(cases, graph_node_permuted) != baseline_digest:
-        fail("graph node ordering changed replay identity")
+        fail("graph node ordering changed replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
     graph_edge_permuted = json.loads(json.dumps(graph))
     graph_edge_permuted["edges"].reverse()
     if replay_digest(cases, graph_edge_permuted) != baseline_digest:
-        fail("graph edge ordering changed replay identity")
+        fail("graph edge ordering changed replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     case_order_permuted = list(reversed(cases))
     if replay_digest(case_order_permuted, graph) == baseline_digest:
-        fail("case manifest order lost semantic significance")
+        fail("case manifest order lost semantic significance", "MAT-MUT-INVARIANT_INTEGRITY")
 
     disposition_mutated = json.loads(json.dumps(cases))
     disposition_mutated[0]["outcome"] = "recomputed-disposition"
     if replay_digest(disposition_mutated, graph) != baseline_digest:
-        fail("derived disposition mutated replay identity")
+        fail("derived disposition mutated replay identity", "MAT-MUT-INVARIANT_INTEGRITY")
 
     expected_mutations = set(EXPECTED_CATEGORIES)
     observed_mutations = [item["mutation"] for item in FAILURE_DIAGNOSTICS]
     if len(observed_mutations) != len(expected_mutations):
-        fail("adversarial mutation count drift")
+        fail("adversarial mutation count drift", "MAT-MUT-INVARIANT_INTEGRITY")
     if set(observed_mutations) != expected_mutations:
         missing = sorted(expected_mutations - set(observed_mutations))
         extra = sorted(set(observed_mutations) - expected_mutations)
-        fail("adversarial mutation identity drift: missing=" + ",".join(missing) + ";extra=" + ",".join(extra))
+        fail("adversarial mutation identity drift: missing=" + ",".join(missing) + ";extra=" + ",".join(extra), "MAT-MUT-INVARIANT_INTEGRITY")
     if len(observed_mutations) != len(set(observed_mutations)):
-        fail("adversarial mutation diagnostics contain duplicate identities")
+        fail("adversarial mutation diagnostics contain duplicate identities", "MAT-MUT-INVARIANT_INTEGRITY")
     if any("guard_id" not in item for item in FAILURE_DIAGNOSTICS):
         fail("adversarial diagnostics missing stable guard identity", "MAT-MUT-INVARIANT_INTEGRITY")
     if {item["guard_id"] for item in FAILURE_DIAGNOSTICS} != set(EXPECTED_GUARDS.values()):
@@ -1162,7 +1243,7 @@ def main():
     observed_categories = {item["category"] for item in FAILURE_DIAGNOSTICS}
     missing_categories = sorted(REQUIRED_FAILURE_CATEGORIES - observed_categories)
     if missing_categories:
-        fail("adversarial coverage contract missing categories: " + ",".join(missing_categories))
+        fail("adversarial coverage contract missing categories: " + ",".join(missing_categories), "MAT-MUT-INVARIANT_INTEGRITY")
 
     print(json.dumps({
         "qualifier": "MAT-CONVERGE-002A2",
@@ -1172,7 +1253,10 @@ def main():
         "case_count": len(cases),
         "mutation_count": len(FAILURE_DIAGNOSTICS),
         "diagnostic_schema": "mat-converge-002-diagnostic-v2",
-        "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v3",
+        "mutation_manifest_schema": "mat-converge-002-mutation-manifest-v4",
+        "guard_registry_schema": "mat-converge-002-guard-registry-v1",
+        "guard_registry_digest": guard_registry_digest(),
+        "source_guard_audit": source_guard_audit(),
         "mutation_manifest_digest": mutation_manifest_digest(cases, graph),
         "mutation_manifest_projection_digest": mutation_manifest_projection_digest(manifest),
         "failure_categories": {
