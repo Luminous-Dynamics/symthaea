@@ -375,6 +375,7 @@ def main():
     # Bidirectional traceability: every graph endpoint must be attributable
     # to its bound case, while the campaign manifest may include cases that are
     # intentionally covered only by the case-level oracle.
+    node_by_id = {node["id"]: node for node in graph["nodes"]}
     case_ids = {case["id"] for case in cases}
     graph_edge_cases = {edge["case_id"] for edge in graph["edges"]}
     if not graph_edge_cases.issubset(case_ids):
