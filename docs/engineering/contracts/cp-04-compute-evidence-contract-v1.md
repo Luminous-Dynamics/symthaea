@@ -41,7 +41,7 @@ Model output is not physical observation. A benchmark score is not a population 
 
 ## Compute evidence subject
 A claim-bearing subject should bind exact immutable identities for:
-- compute subject and generation
+- requirement and compute subject generation
 - representation
 - model and model parameters/checkpoint
 - runtime and runtime configuration
@@ -50,7 +50,8 @@ A claim-bearing subject should bind exact immutable identities for:
 - deployment artifact
 - execution context
 - observations
-- uncertainty/statistics
+- uncertainty and statistics
+- provenance reference
 - dependencies
 - currentness and applicability
 - authority disposition
@@ -113,7 +114,7 @@ CIV-Service can project separately qualified compute capability into availabilit
 Engineering qualification cannot grant production execution authority. Physical execution remains behind hardware, OS/runtime, HAL, operator, commissioning, and safety boundaries.
 
 ## Replay semantics
-The production contract requires replay to bind exact immutable representation/model/runtime/toolchain/accelerator/deployment/execution/observation/statistical/dependency/currentness/applicability identities; mutable aliases and derived dispositions are not replay identities. The v1 synthetic oracle now carries explicit immutable identity fixtures for compute subject generation, representation, model, model parameters, runtime, toolchain, accelerator, deployment artifact, execution context, observation, statistics, dependency, currentness, and applicability. Its replay input binds those identities together with the corpus schema, authority, claim ceiling, replay semantics, dependency-graph identity, and ordered case manifest. These are synthetic identity fixtures, not physical artifacts, and the qualifier does **not** pretend that fixture identifiers demonstrate production execution or performance. Equivalent immutable inputs must yield equivalent dispositions. The qualifier adversarially verifies that every synthetic replay-input field and every explicit immutable identity field affects replay identity, while changing only a derived disposition does not. The mutation suite also changes a model identity and requires dependency-bound rejection. It also verifies the replay schema, case count, case order, and scenario binding explicitly.
+The production contract requires replay to bind exact immutable representation/model/runtime/toolchain/accelerator/deployment/execution/observation/statistical/dependency/currentness/applicability identities; mutable aliases and derived dispositions are not replay identities. The v1 synthetic oracle now carries explicit immutable identity fixtures for requirement, compute subject generation, representation, model, model parameters, runtime, toolchain, accelerator, deployment artifact, execution context, observation, uncertainty, statistics, provenance reference, dependency, currentness, and applicability. Its replay input binds those identities together with the corpus schema, authority, claim ceiling, replay semantics, dependency-graph identity, and ordered case manifest. These are synthetic identity fixtures, not physical artifacts, and the qualifier does **not** pretend that fixture identifiers demonstrate production execution or performance. Equivalent immutable inputs must yield equivalent dispositions. The qualifier adversarially verifies that every synthetic replay-input field and every explicit immutable identity field affects replay identity, while changing only a derived disposition does not. The mutation suite also changes a model identity and requires dependency-bound rejection. It also verifies the replay schema, case count, case order, and scenario binding explicitly.
 
 ## Adversarial requirements
 The qualifier must reject/narrow:
