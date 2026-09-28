@@ -1575,6 +1575,42 @@ mod tests {
     }
 
     #[test]
+    fn domain_enumeration_preflights_cartesian_cardinality() {
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("a").unwrap(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(1).unwrap(),
+                    upper: C0LengthUmV1::new(u64::MAX).unwrap(),
+                    step_um: 1,
+                },
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("b").unwrap(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(1).unwrap(),
+                    upper: C0LengthUmV1::new(u64::MAX).unwrap(),
+                    step_um: 1,
+                },
+            },
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new("c").unwrap(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(1).unwrap(),
+                    upper: C0LengthUmV1::new(u64::MAX).unwrap(),
+                    step_um: 1,
+                },
+            },
+        ])
+        .unwrap();
+
+        assert_eq!(
+            domain.enumerate(),
+            Err(RobotDesignError::DomainEnumerationOverflow)
+        );
+    }
+
+    #[test]
     fn domain_enumeration_is_exact_and_deterministic() {
         let id = ParameterIdV1::new("section_width").unwrap();
         let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
