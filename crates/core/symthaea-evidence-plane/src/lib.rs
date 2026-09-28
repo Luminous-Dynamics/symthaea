@@ -46,7 +46,9 @@
 //! and `SYMTHAEA_COGNITIVE_ARCHITECTURE_AUDIT_ADDENDUM_2026-07-28.md` (§0.1)
 //! at the monorepo root for the audit trail behind this crate.
 
+pub mod candidate_commitment;
 pub mod prospective;
+pub mod temporal_test_candidate;
 pub mod seed_plan;
 pub mod task_validator;
 
