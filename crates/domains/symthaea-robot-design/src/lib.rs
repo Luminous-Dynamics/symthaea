@@ -1554,6 +1554,16 @@ mod tests {
     }
 
     #[test]
+    fn semantic_ids_reject_invalid_values_at_the_serde_boundary() {
+        assert!(serde_json::from_str::<DesignComponentId>(r#""bad id""#).is_err());
+        assert!(serde_json::from_str::<DesignJointId>(r#""bad id""#).is_err());
+        assert!(serde_json::from_str::<GeometryDesignId>(r#""bad id""#).is_err());
+        assert!(serde_json::from_str::<ActuatorSlotId>(r#""bad id""#).is_err());
+        assert!(serde_json::from_str::<SensorSlotId>(r#""bad id""#).is_err());
+        assert!(serde_json::from_str::<ControlInterfaceId>(r#""bad id""#).is_err());
+    }
+
+    #[test]
     fn invalid_semantic_id_is_rejected_at_construction() {
         assert!(matches!(
             DesignComponentId::new("contains spaces"),
