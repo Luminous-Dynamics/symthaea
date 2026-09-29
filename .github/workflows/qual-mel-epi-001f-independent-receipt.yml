@@ -40,6 +40,14 @@ jobs:
             const expectedParent = process.env.EXPECTED_PARENT;
             const expectedWorkflowName = process.env.EXPECTED_WORKFLOW_NAME;
             const expectedWorkflowBlobSha = process.env.EXPECTED_WORKFLOW_BLOB_SHA;
+            const expectedSourceBlobShas = {
+              'crates/domains/symthaea-epistemic-types/src/claim_derivation.rs':
+                '79ced4b67ac1b248e19f685036101b66fcc6162a',
+              'crates/domains/symthaea-epistemic-types/src/lib.rs':
+                'b077b51b190ba14e09718ae2147c11f85016445b',
+              'docs/research/MEL_EPI_001F_CLAIM_DERIVATION_V1.md':
+                '476c980d3d4d2e3254255f7259910fffebea7150',
+            };
             const workflowPath = process.env.WORKFLOW_PATH;
             const observerWorkflowSha = process.env.OBSERVER_WORKFLOW_SHA;
             const observerWorkflowRef = process.env.OBSERVER_WORKFLOW_REF;
@@ -196,6 +204,12 @@ jobs:
               };
             }
 
+            const sourceBlobHashesVerified =
+              expectedFiles.every(
+                (path) =>
+                  sourceHashes[path]?.blob_sha === expectedSourceBlobShas[path]
+              );
+
             const expectedSteps = [
               'Verify workflow host is main',
               'Checkout exact 001F product subject',
@@ -232,6 +246,7 @@ jobs:
               workflowContractVerified &&
               ancestryVerified &&
               sourceSurfaceVerified &&
+              sourceBlobHashesVerified &&
               requiredStepsSucceeded
                 ? 'PASS'
                 : 'NOT_PASS';
@@ -287,6 +302,8 @@ jobs:
                 expected_files: expectedFiles,
                 observed_files: changedFiles,
                 verified: sourceSurfaceVerified,
+                blob_hashes_verified: sourceBlobHashesVerified,
+                expected_blob_shas: expectedSourceBlobShas,
                 files: sourceHashes,
               },
               gate_outcomes: stepOutcomes,
