@@ -52,6 +52,24 @@ EXPECTED_TYPES = (
     "traces_to", "currentness_for", "applicable_to", "derives",
 )
 
+EDGE_ENDPOINT_ORACLE = {
+    "requires": (("requirement", "representation"),),
+    "implements": (("representation", "model"),),
+    "parameterizes": (("model", "model_parameters"),),
+    "executes_with": (("model", "runtime"),),
+    "compiled_by": (("runtime", "toolchain"),),
+    "runs_on": (("runtime", "accelerator"),),
+    "deploys": (("accelerator", "deployment_artifact"),),
+    "executes": (("deployment_artifact", "execution_context"),),
+    "observes": (("execution_context", "observation"),),
+    "quantifies": (("observation", "uncertainty"),),
+    "summarizes": (("observation", "statistics"),),
+    "traces_to": (("observation", "provenance_reference"),),
+    "currentness_for": (("currentness", "runtime"),),
+    "applicable_to": (("applicability", "execution_context"),),
+    "derives": (("statistics", "disposition"),),
+}
+
 EXPECTED_CLOSURE_ORACLE = {
     "requirement": ("requirement", "representation", "model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
     "representation": ("representation", "model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
@@ -110,6 +128,16 @@ def load():
     except Exception as exc:
         fail(f"cannot load graph: {exc}", "CP-COMP-DAG-SCHEMA")
 
+def validate_edge_semantics(edges):
+    """Validate edge-type endpoint semantics independently of the full graph oracle."""
+    for edge in edges:
+        if len(edge) != 3:
+            fail("edge must contain source, type and target", "CP-COMP-DAG-TYPING")
+        src, edge_type, dst = edge
+        allowed = EDGE_ENDPOINT_ORACLE.get(edge_type)
+        if allowed is None or (src, dst) not in allowed:
+            fail(f"invalid endpoint pair for edge type {edge_type!r}: {src!r}->{dst!r}", "CP-COMP-DAG-TYPING")
+
 def validate_shape(g):
     if set(g) != {"schema", "node_types", "edge_types", "edges", "claim_ceiling"}:
         fail("unexpected top-level graph fields", "CP-COMP-DAG-SCHEMA")
@@ -120,6 +148,9 @@ def validate_shape(g):
     if tuple(g["edge_types"]) != EXPECTED_TYPES:
         fail("edge-type vocabulary/order mismatch", "CP-COMP-DAG-TYPING")
     edges = tuple(tuple(e) for e in g["edges"])
+    if set(EDGE_ENDPOINT_ORACLE) != set(g["edge_types"]):
+        fail("endpoint oracle does not cover every edge type", "CP-COMP-DAG-TYPING")
+    validate_edge_semantics(edges)
     if edges != EXPECTED_EDGES:
         fail("typed edge oracle mismatch", "CP-COMP-DAG-TYPING")
     if len(g["node_types"]) != len(set(g["node_types"])):
@@ -189,6 +220,8 @@ MUTATIONS = (
     ("dangling-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with", "missing"])),
     ("duplicate-node", "CP-COMP-DAG-SCHEMA", lambda g: g["node_types"].append("model")),
     ("add-cycle", "CP-COMP-DAG-ACYCLIC", lambda g: g["edges"].append(["disposition", "derives", "model"])),
+    ("invalid-source-for-edge-type", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["runtime", "executes_with", "runtime"])),
+    ("invalid-target-for-edge-type", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with", "toolchain"])),
 )
 
 def validate_mutation_manifest():
