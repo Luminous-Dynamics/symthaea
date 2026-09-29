@@ -146,17 +146,10 @@ impl EnhancedKnowledgeGraph {
         // Check for contradictions before inserting
         let contradictions = self.detect_contradictions(&encoding, current_cycle);
 
-        // Check for corroboration (highly similar existing fact)
-        if let Some(existing_id) = self.find_corroboration(&encoding) {
-            if let Some(fact) = self.facts.get_mut(&existing_id) {
-                fact.corroboration_count += 1;
-                // Boost confidence on corroboration (capped at initial)
-                fact.confidence = (fact.confidence + 0.1).min(1.0);
-                fact.last_accessed_cycle = current_cycle;
-                return (existing_id, contradictions);
-            }
-        }
-
+        // Never collapse a new observation into an existing fact based on HDC similarity.
+        // Similarity is retrieval metadata, not provenance or independent evidence.
+        // Explicit corroboration is represented by ProvenanceRelationKind::Corroborates
+        // and must therefore be recorded at the provenance boundary.
         // Evict if at capacity
         if self.facts.len() >= self.capacity {
             self.evict_lowest_confidence();
@@ -800,17 +793,6 @@ impl EnhancedKnowledgeGraph {
         alerts
     }
 
-    fn find_corroboration(&self, encoding: &FactEncoding) -> Option<FactId> {
-        // A fact with >0.85 similarity is likely the same information
-        for existing in self.facts.values() {
-            let sim = encoding.vector.similarity(&existing.encoding.vector);
-            if sim > 0.85 {
-                return Some(existing.id);
-            }
-        }
-        None
-    }
-
     fn evict_lowest_confidence(&mut self) {
         if let Some((&id, _)) = self.facts.iter().min_by(|(_, a), (_, b)| {
             a.confidence
@@ -906,20 +888,36 @@ mod tests {
     }
 
     #[test]
-    fn test_corroboration() {
+    fn test_similar_insertions_preserve_distinct_memory_identity() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
         let enc1 = make_encoding("oil prices rose", 0.7);
         let (id1, _) = graph.insert(enc1, 1, None, false);
 
-        // Insert same fact again — should corroborate, not duplicate
+        // A second observation is a distinct memory until an explicit provenance
+        // relation says otherwise. HDC similarity must not silently collapse it.
         let enc2 = make_encoding("oil prices rose", 0.8);
         let (id2, _) = graph.insert(enc2, 2, None, false);
 
-        assert_eq!(id1, id2); // Same ID = corroborated
-        assert_eq!(graph.len(), 1); // Still one fact
-        let fact = graph.get_fact(id1).unwrap();
-        assert_eq!(fact.corroboration_count, 1);
+        assert_ne!(id1, id2);
+        assert_eq!(graph.len(), 2);
+        assert_eq!(graph.get_fact(id1).unwrap().corroboration_count, 0);
+        assert_eq!(graph.get_fact(id2).unwrap().corroboration_count, 0);
+
+        let memory_1 = graph.provenance(id1).unwrap().memory_id;
+        let memory_2 = graph.provenance(id2).unwrap().memory_id;
+        assert_ne!(memory_1, memory_2);
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: memory_2,
+            target_memory_id: memory_1,
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:2".into(),
+        }).unwrap();
+
+        // The relation is structural provenance, not an implicit confidence boost.
+        assert_eq!(graph.get_fact(id1).unwrap().confidence, 0.7);
+        assert_eq!(graph.get_fact(id2).unwrap().confidence, 0.8);
     }
 
     #[test]
