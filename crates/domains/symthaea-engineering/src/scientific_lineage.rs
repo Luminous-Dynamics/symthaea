@@ -61,7 +61,10 @@ impl ScientificLineageGraph {
             qualification_policy: QUALIFICATION_POLICY.to_owned(),
             relations,
             authority_ceiling: AuthorityCeiling::SyntheticQualification,
-        })
+            projection_digest: String::new(),
+        };
+        projection.projection_digest = projection.compute_projection_digest();
+        Ok(projection)
     }
 
     /// Project the graph to qualification-admissible relations.
@@ -189,6 +192,7 @@ pub struct QualificationProjection {
     qualification_policy: String,
     relations: Vec<EngineeringRelation>,
     authority_ceiling: AuthorityCeiling,
+    projection_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -198,6 +202,7 @@ struct QualificationProjectionWire {
     qualification_policy: String,
     relations: Vec<EngineeringRelation>,
     authority_ceiling: AuthorityCeiling,
+    projection_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -231,6 +236,7 @@ impl TryFrom<QualificationProjectionWire> for QualificationProjection {
             qualification_policy: wire.qualification_policy,
             relations: wire.relations,
             authority_ceiling: wire.authority_ceiling,
+            projection_digest: wire.projection_digest,
         };
         projection.validate()?;
         Ok(projection)
@@ -245,6 +251,7 @@ impl From<QualificationProjection> for QualificationProjectionWire {
             qualification_policy: value.qualification_policy,
             relations: value.relations,
             authority_ceiling: value.authority_ceiling,
+            projection_digest: value.projection_digest,
         }
     }
 }
@@ -306,13 +313,22 @@ impl QualificationProjection {
         if !projection_is_acyclic(&self.relations) {
             return Err(QualificationProjectionError::CyclicProjection);
         }
+        if !is_sha256_hex(&self.projection_digest)
+            || self.projection_digest != self.compute_projection_digest()
+        {
+            return Err(QualificationProjectionError::InvalidProjectionDigest);
+        }
         Ok(())
     }
 
     /// Stable identity of the bounded projection. The source graph snapshot is
     /// deliberately recorded separately: epistemic-only DKG mutations change
     /// the source snapshot without changing qualification projection identity.
-    pub fn projection_digest(&self) -> String {
+    pub fn projection_digest(&self) -> &str {
+        &self.projection_digest
+    }
+
+    fn compute_projection_digest(&self) -> String {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(QUALIFICATION_PROJECTION_SCHEMA.as_bytes());
         bytes.push(0);
@@ -572,6 +588,21 @@ mod tests {
         let projection = graph.qualification_projection().unwrap();
         let mut json = serde_json::to_value(&projection).unwrap();
         json["qualification_policy"] = serde_json::json!("tampered-policy");
+        let result: Result<QualificationProjection, _> = serde_json::from_value(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn tampered_relation_is_rejected_by_replay_digest() {
+        let graph = fixture();
+        let projection = graph.qualification_projection().unwrap();
+        let mut json = serde_json::to_value(&projection).unwrap();
+        let relation = json["relations"][0]["source"]["canonical_identifier"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        json["relations"][0]["source"]["canonical_identifier"] =
+            serde_json::json!(format!("{relation}-tampered"));
         let result: Result<QualificationProjection, _> = serde_json::from_value(json);
         assert!(result.is_err());
     }
