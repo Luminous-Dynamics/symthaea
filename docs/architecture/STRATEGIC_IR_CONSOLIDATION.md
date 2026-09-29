@@ -576,3 +576,37 @@ code cannot accidentally obtain hidden opponent actions merely because the under
 extensive-form state is omniscient. Current MCCFR work similarly treats replay/history
 stability as an explicit property rather than assuming that a state identifier is itself
 a sufficient information representation. citeturn0search0turn0search1
+### 2026-09-29 information-safe local history and semantic recall consistency
+
+A further boundary audit found a subtle but important information leak in the first
+player-local history representation: local events still carried `DecisionStateId`.
+Even when hidden actions were filtered correctly, an omniscient state identifier could
+encode world identity that the observing player is not entitled to distinguish.
+
+The local history contract is therefore now state-free:
+
+- own actions carry only `ActionId`;
+- observed actions carry only the observing player's visible actor/action pair;
+- visible chance events carry only `ChanceOutcomeId`;
+- observations carry only `ObservationId`.
+
+Concrete `DecisionStateId` values remain available to the encoder through the separate
+`state` argument only for validating the current model boundary; they are not embedded
+in the player's recalled information sequence. Two world histories with different
+internal state IDs but identical player-visible events therefore produce identical
+local histories.
+
+The extensive-form verifier also now checks semantic information-history consistency
+separately. For every declared information set, all member states must induce the same
+canonical player-local action-observation history. This catches a stronger class of
+recall defects than the legacy own-action/infoset check: a visible opponent action,
+visible chance outcome, or semantic observation cannot differ across members of one
+information set and then be silently collapsed.
+
+This remains an explicit verification step rather than a claim that all future
+information models are solved. Public/private observation feature decoding,
+history-dependent state representations, and repeated-state/transposition semantics
+still require their own contracts. The boundary is now substantially closer to the
+OpenSpiel model in which action-observation history is sufficient to reconstruct the
+information state, while retaining Symthaea's explicit distinction between world
+identity and player-visible information. citeturn0search0turn0search1turn0search4
