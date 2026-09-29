@@ -880,6 +880,97 @@ mod tests {
 
 
     #[test]
+    fn semantic_history_preserves_chance_identity_and_observation() {
+        struct Encoder;
+
+        impl InformationEncoder for Encoder {
+            fn encode(
+                &self,
+                _player: PlayerId,
+                _state: DecisionStateId,
+                history: &[HistoryEvent],
+            ) -> Result<InformationSetId, InformationEncodingError> {
+                assert!(history.iter().any(|event| matches!(
+                    event,
+                    HistoryEvent::Chance {
+                        outcome: ChanceOutcomeId(42),
+                        ..
+                    }
+                )));
+                assert!(history.iter().any(|event| matches!(
+                    event,
+                    HistoryEvent::Observation {
+                        observer: PlayerId(0),
+                        observation: ObservationId(7),
+                        ..
+                    }
+                )));
+                Ok(InformationSetId(0))
+            }
+        }
+
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Chance {
+                    state: DecisionStateId(0),
+                    outcomes: vec![
+                        ChanceTransition {
+                            outcome: ChanceOutcomeId(42),
+                            probability: 1.0,
+                            next: DecisionStateId(1),
+                        },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(2),
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(3),
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(3),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: InformationStructure {
+                decision_states: vec![DecisionState {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    information_set: InformationSetId(0),
+                    legal_actions: vec![ActionId(0), ActionId(1)],
+                }],
+                information_sets: vec![InformationSet {
+                    id: InformationSetId(0),
+                    player: PlayerId(0),
+                    members: vec![DecisionStateId(1)],
+                }],
+            },
+            observations: HashMap::from([(
+                DecisionStateId(1),
+                vec![Observation {
+                    observer: PlayerId(0),
+                    observation: ObservationId(7),
+                }],
+            )]),
+        };
+
+        assert_eq!(game.verify_information_encoder(&Encoder), Ok(()));
+    }
+
+    #[test]
     fn rejects_semantic_information_encoder_mismatch() {
         struct Encoder;
 
