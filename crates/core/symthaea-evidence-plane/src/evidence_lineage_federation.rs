@@ -169,16 +169,14 @@ impl EvidenceLineageDkgFederationManifest {
             .collect::<Vec<_>>();
         canonical_sort(&mut expected);
 
-        if self.source_records != expected {
-            let duplicate = has_duplicate_ids(&self.source_records);
-            return Err(if duplicate {
-                FederationManifestError::DuplicateSourceRecord
-            } else {
-                FederationManifestError::SourceSetMismatch
-            });
+        if has_duplicate_ids(&self.source_records) {
+            return Err(FederationManifestError::DuplicateSourceRecord);
         }
         if !is_canonical(&self.source_records) {
             return Err(FederationManifestError::NonCanonicalSourceOrder);
+        }
+        if self.source_records != expected {
+            return Err(FederationManifestError::SourceSetMismatch);
         }
         if self.manifest_digest != self.compute_digest() {
             return Err(FederationManifestError::ManifestDigestMismatch);
