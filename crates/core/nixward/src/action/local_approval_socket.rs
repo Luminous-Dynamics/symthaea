@@ -836,8 +836,8 @@ mod tests {
 
     fn projection_for(
         request: &PendingNixApprovalRequestV1,
-    ) -> super::super::local_approval_projection::PendingNixApprovalProjectionV1 {
-        super::super::local_approval_projection::PendingNixApprovalProjectionV1::from_request(
+    ) -> crate::action::local_approval_projection::PendingNixApprovalProjectionV1 {
+        crate::action::local_approval_projection::PendingNixApprovalProjectionV1::from_request(
             request,
             "nixos-rebuild switch --flake .#workstation",
         )
@@ -1025,7 +1025,7 @@ mod tests {
         let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
         let request = request_for(&daemon);
         let request_id = request.request_id().unwrap();
-        store.install_pending(request.clone()).unwrap();
+        install_request(&store, &request);
         let submission = submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
         let (_parent, runtime) = private_runtime_path();
         let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
@@ -1072,6 +1072,50 @@ mod tests {
         assert!(matches!(
             err,
             LocalApprovalSocketErrorV1::FrameTooLarge { .. }
+        ));
+        assert!(store.is_pending(&request_id).unwrap());
+    }
+
+    #[test]
+    fn projection_digest_mismatch_does_not_consume_live_request() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
+        let request = request_for(&daemon);
+        let request_id = request.request_id().unwrap();
+        install_request(&store, &request);
+
+        let mut submission =
+            submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
+        submission.projection_digest = "22".repeat(32);
+
+        let (_parent, runtime) = private_runtime_path();
+        let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
+        let socket_path = server.socket_path().to_path_buf();
+        let client_submission = submission.clone();
+        let client = thread::spawn(move || {
+            let mut stream = UnixStream::connect(&socket_path).unwrap();
+            write_json_frame_v1(
+                &mut stream,
+                &LocalApprovalWireRequestV2::new(client_submission),
+            )
+            .unwrap();
+            let _ = stream.shutdown(Shutdown::Both);
+        });
+
+        let err = server
+            .accept_and_consume_at_v1(
+                &store,
+                ms(1_100),
+                AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            )
+            .unwrap_err();
+        client.join().unwrap();
+
+        assert!(matches!(
+            err,
+            LocalApprovalSocketErrorV1::RequestStore(
+                LocalApprovalRequestStoreErrorV1::ProjectionDigestMismatch
+            )
         ));
         assert!(store.is_pending(&request_id).unwrap());
     }
