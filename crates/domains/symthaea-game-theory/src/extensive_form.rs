@@ -890,6 +890,54 @@ mod tests {
     }
 
     #[test]
+    fn player_history_projection_does_not_leak_private_actions() {
+        let history = vec![
+            HistoryEvent::Decision {
+                state: DecisionStateId(0),
+                player: PlayerId(1),
+                information_set: InformationSetId(1),
+                action: ActionId(9),
+                visibility: EventVisibility::ActorOnly,
+            },
+            HistoryEvent::Observation {
+                state: DecisionStateId(1),
+                observer: PlayerId(0),
+                observation: ObservationId(7),
+            },
+            HistoryEvent::Chance {
+                state: DecisionStateId(2),
+                outcome: ChanceOutcomeId(42),
+                next: DecisionStateId(3),
+                visibility: EventVisibility::Public,
+            },
+        ];
+
+        let player_zero = project_player_history(PlayerId(0), &history);
+        assert!(!player_zero.iter().any(|event| matches!(
+            event,
+            PlayerHistoryEvent::ObservedAction { player: PlayerId(1), action: ActionId(9), .. }
+        )));
+        assert!(player_zero.iter().any(|event| matches!(
+            event,
+            PlayerHistoryEvent::Observation { observation: ObservationId(7), .. }
+        )));
+        assert!(player_zero.iter().any(|event| matches!(
+            event,
+            PlayerHistoryEvent::ChanceOutcome { outcome: ChanceOutcomeId(42), .. }
+        )));
+
+        let player_one = project_player_history(PlayerId(1), &history);
+        assert!(player_one.iter().any(|event| matches!(
+            event,
+            PlayerHistoryEvent::OwnAction { action: ActionId(9), .. }
+        )));
+        assert!(!player_one.iter().any(|event| matches!(
+            event,
+            PlayerHistoryEvent::Observation { observation: ObservationId(7), .. }
+        )));
+    }
+
+    #[test]
     fn verifies_semantic_information_encoder() {
         struct Encoder;
 
