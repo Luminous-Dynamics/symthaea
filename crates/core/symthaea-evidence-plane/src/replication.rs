@@ -412,7 +412,7 @@ mod tests {
         a.observation_record_digest = "sha256:changed".into();
         a.record_digest = "sha256:stale".into();
         assert_eq!(
-            ReplicationRecord::record(&o, &a, input(ReplicationOutcome::Supports)),
+            ReplicationRecord::record(&o, &a, input(ReplicationOutcome::ReplicatedSupportive)),
             Err(ReplicationError::InvalidAssessment)
         );
 
