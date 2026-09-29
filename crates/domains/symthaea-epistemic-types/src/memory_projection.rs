@@ -60,8 +60,62 @@ pub struct MemoryProvenance {
     pub retrieval_index_ref: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ProvenanceRelationKind {
+    DerivedFrom,
+    RevisedFrom,
+    Supersedes,
+    Contradicts,
+    Corroborates,
+    RepresentationOf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ProvenanceRelation {
+    pub source_memory_id: String,
+    pub target_memory_id: String,
+    pub kind: ProvenanceRelationKind,
+    pub created_at: String,
+}
+
+impl ProvenanceRelation {
+    pub fn validate(&self) -> Result<(), &'static str> {
+        if self.source_memory_id.trim().is_empty() || self.target_memory_id.trim().is_empty() {
+            return Err("provenance relation memory identities must be non-empty");
+        }
+        if self.source_memory_id == self.target_memory_id {
+            return Err("provenance relation cannot self-reference");
+        }
+        if self.created_at.trim().is_empty() {
+            return Err("provenance relation created_at must be non-empty");
+        }
+        Ok(())
+    }
+}
+
 impl MemoryProvenance {
     pub fn provenance_identity(&self) -> Option<&str> { self.provenance_family.as_deref() }
+
+    /// Structural validity only. This does not assert truth, reliability, or admission.
+    pub fn validate_structure(&self) -> Result<(), &'static str> {
+        if self.memory_id.trim().is_empty() {
+            return Err("memory_id must be non-empty");
+        }
+        if self.created_at.trim().is_empty() {
+            return Err("created_at must be non-empty");
+        }
+        if let Some(family) = &self.provenance_family {
+            if family.trim().is_empty() {
+                return Err("provenance_family must be non-empty when present");
+            }
+        }
+        if let Some(canonical) = &self.canonical_identity {
+            if canonical.trim().is_empty() {
+                return Err("canonical_identity must be non-empty when present");
+            }
+        }
+        Ok(())
+    }
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
