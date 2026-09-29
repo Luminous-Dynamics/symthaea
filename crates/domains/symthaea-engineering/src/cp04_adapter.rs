@@ -417,6 +417,20 @@ mod tests {
     }
 
     #[test]
+    fn checked_in_fixture_round_trips_through_rust_adapter() {
+        let fixture = include_str!("../../../../docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json");
+        let artifact: Cp04QualificationArtifact =
+            serde_json::from_str(fixture).expect("checked-in CP-04 fixture must deserialize");
+        artifact.validate().expect("checked-in CP-04 fixture must validate");
+
+        let generated = Cp04QualificationArtifact::try_from_projection(
+            &projection(),
+        ).expect("fixture projection must remain adaptable");
+        assert_eq!(artifact, generated);
+        assert_eq!(artifact.canonical_bytes().unwrap(), generated.canonical_bytes().unwrap());
+    }
+
+    #[test]
     fn adapter_preserves_identity_and_authority_ceiling() {
         let artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
         assert_eq!(artifact.authority_ceiling, AuthorityCeiling::SyntheticQualification);
