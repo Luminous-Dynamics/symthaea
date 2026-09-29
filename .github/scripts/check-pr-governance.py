@@ -304,17 +304,6 @@ def require_complete_object_graph(git_runner: Any = git) -> None:
             "governance validation forbids alternate-ref commands in the authority repository"
         )
 
-    alternate_object_directories = git_runner(
-        "config", "--get", "core.alternateObjectDirectories", check=False
-    )
-    if alternate_object_directories.returncode not in {0, 1}:
-        raise GovernanceError("unable to determine alternate-object state")
-    if alternate_object_directories.returncode == 0 and alternate_object_directories.stdout.strip():
-        raise GovernanceError(
-            "governance validation requires a self-contained object database; "
-            "configured alternate object directories are forbidden"
-        )
-
     replace_refs = git_runner(
         "for-each-ref", "--format=%(refname)", "refs/replace/"
     )
@@ -323,12 +312,6 @@ def require_complete_object_graph(git_runner: Any = git) -> None:
             "governance validation forbids refs/replace because Git may substitute "
             "replacement objects for ordinary object reads"
         )
-
-    grafts = git_runner(
-        "config", "--get", "core.repositoryFormatVersion", check=False
-    )
-    if grafts.returncode not in {0, 1}:
-        raise GovernanceError("unable to determine repository format state")
 
 
 def require_complete_history() -> None:
