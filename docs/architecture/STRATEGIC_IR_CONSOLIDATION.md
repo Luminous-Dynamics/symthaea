@@ -458,3 +458,24 @@ External CFR work reinforces this direction: current Rust CFR tooling validates 
 trees and perfect-recall violations during game construction, while MCCFR separates
 `EmbeddedHistory` and `PerfectRecall` as explicit attestations rather than treating
 recall as an incidental solver detail.
+
+### 2026-09-29 action availability and recall boundary refinement
+
+Action ordering is not semantic: extensive-form validation compares decision-node
+transitions and information-set legal actions as sets, while still rejecting
+duplicates. This prevents serialization order from changing the strategic model.
+
+The current finite-tree recall verifier proves consistency of a player's prior
+information-set/action sequence. It intentionally does not yet claim that every
+piece of information previously observed is represented in the information-set
+identity. That stronger property requires an explicit observation/history encoder.
+
+This matches current MCCFR practice: modern implementations separate the game state,
+public/private information, and an encoder that maps states into information-set
+identifiers. Perfect recall is then an attestation about replay consistency rather
+than merely a property inferred from an integer information-set ID.
+
+Accordingly, the next IR boundary should introduce a typed history/observation
+encoder before adding CFR/MCCFR adapters. Until then, `verify_perfect_recall`
+should be understood as a strong finite-tree structural check, not a complete
+semantic observation proof.
