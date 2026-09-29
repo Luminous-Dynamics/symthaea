@@ -413,6 +413,7 @@ mod tests {
     #[test]
     fn test_summary_generation() {
         let facts = vec![GroundedFact {
+            provenance: None,
             text: "Iran sanctioned.".into(),
             confidence: 0.9,
             similarity: 0.7,
