@@ -166,6 +166,10 @@ impl ExtensiveGame {
         // A finite extensive-form game is represented as an acyclic reachable
         // state graph here. Repeated-state/transposition semantics need an
         // explicit history model before they can safely share state IDs.
+        if let Some((child, parent)) = self.find_multiple_parent() {
+            return Err(ExtensiveGameError::MultipleParents { child, parent });
+        }
+
         if let Some(cycle) = self.find_cycle() {
             return Err(ExtensiveGameError::CycleDetected(cycle));
         }
@@ -293,6 +297,28 @@ impl ExtensiveGame {
         Ok(())
     }
 
+    fn find_multiple_parent(&self) -> Option<(DecisionStateId, DecisionStateId)> {
+        let mut parents = HashMap::<DecisionStateId, DecisionStateId>::new();
+        let mut stack = vec![self.root];
+        while let Some(state) = stack.pop() {
+            let node = self.node(state)?;
+            let children = match node {
+                ExtensiveNode::Decision { actions, .. } => actions.iter().map(|a| a.next).collect::<Vec<_>>(),
+                ExtensiveNode::Chance { outcomes, .. } => outcomes.iter().map(|o| o.next).collect::<Vec<_>>(),
+                ExtensiveNode::Terminal { .. } => Vec::new(),
+            };
+            for child in children {
+                if child == self.root { continue; }
+                if let Some(previous) = parents.insert(child, state) {
+                    if previous != state { return Some((child, previous)); }
+                } else {
+                    stack.push(child);
+                }
+            }
+        }
+        None
+    }
+
     fn find_cycle(&self) -> Option<DecisionStateId> {
         #[derive(Clone, Copy, PartialEq, Eq)]
         enum Mark {
@@ -372,6 +398,7 @@ pub enum ExtensiveGameError {
     UnreachableNode(DecisionStateId),
     InformationMemberNotReachable(DecisionStateId),
     CycleDetected(DecisionStateId),
+    MultipleParents { child: DecisionStateId, parent: DecisionStateId },
     PerfectRecallViolation {
         information_set: crate::strategic_context::InformationSetId,
         state: DecisionStateId,
