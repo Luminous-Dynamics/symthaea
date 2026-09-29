@@ -265,6 +265,24 @@ mod tests {
         assert!(profiled.is_self_consistent());
         assert_ne!(profiled.receipt_digest, receipt.receipt_digest);
     }
+    #[test] fn verification_digest_is_not_producer_authentication() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        // A party able to rewrite the receipt can recompute an unkeyed digest.
+        // Verification therefore means internal consistency, not origin authentication.
+        let mut rewritten=receipt;
+        rewritten.query="different query".into();
+        rewritten.receipt_digest=rewritten.canonical_digest();
+        assert!(rewritten.verify().is_ok());
+    }
+
+    #[test] fn duplicate_selected_identity_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut duplicated=receipt;
+        duplicated.selected.push("x".into());
+        duplicated.receipt_digest=duplicated.canonical_digest();
+        assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateSelectedIdentity));
+    }
+
     #[test] fn live_mode_needs_no_frontier() {
         let (g,r)=retrieve(&MemoryRetrievalRequest::live("x",10),vec![candidate("live",MemoryKind::Vector,"f",0.8,FrontierEligibility::Unknown)]);
         assert_eq!(g.len(),1); assert!(r.excluded.is_empty());
