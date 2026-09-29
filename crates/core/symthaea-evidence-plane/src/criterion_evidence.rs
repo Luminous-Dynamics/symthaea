@@ -58,6 +58,8 @@ pub struct CriterionEvidenceEligibility {
     pub binding_digest: String,
     pub authority_payload_digest: String,
     pub record_digest: String,
+    /// If present, this record supersedes the referenced immutable disposition.
+    pub supersedes_evidence_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -129,6 +131,9 @@ impl CriterionEvidenceEligibility {
         }
         if !valid_utc(&input.adjudicated_at) { return Err(CriterionEvidenceError::InvalidTimestamp); }
         if input.authority_payload.is_empty() { return Err(CriterionEvidenceError::EmptyPayload); }
+        if input.challenge_id != observation.challenge_id { return Err(CriterionEvidenceError::LinkMismatch("challenge_id")); }
+        if input.criterion_id != observation.criterion_id { return Err(CriterionEvidenceError::LinkMismatch("criterion_id")); }
+        if input.criterion_generation != observation.criterion_generation { return Err(CriterionEvidenceError::LinkMismatch("criterion_generation")); }
 
         let authority_payload_digest = hash(
             b"symthaea:criterion-evidence-authority-payload:v1\0",
@@ -144,6 +149,7 @@ impl CriterionEvidenceEligibility {
             authority_basis: input.authority_basis,
             adjudicated_at: input.adjudicated_at,
             disposition: input.disposition,
+            supersedes_evidence_id: None,
             observation_id: observation.observation_id.clone(),
             observation_record_digest: observation.record_digest.clone(),
             assessment_id: assessment.assessment_id.clone(),
@@ -160,6 +166,17 @@ impl CriterionEvidenceEligibility {
         Ok(r)
     }
 
+    /// Create a new immutable disposition; the parent record is never mutated.
+    pub fn supersede(&self, input: CriterionEvidenceInput, observation: &ExternalExperimentalObservation, assessment: &IndependentAssessment, replication: &ReplicationRecord) -> Result<Self, CriterionEvidenceError> {
+        if !self.verify_integrity() { return Err(CriterionEvidenceError::LinkMismatch("superseded record integrity")); }
+        if input.evidence_id.trim().is_empty() { return Err(CriterionEvidenceError::MissingField("evidence_id")); }
+        if input.evidence_id == self.evidence_id { return Err(CriterionEvidenceError::LinkMismatch("supersession evidence_id")); }
+        let mut next = Self::adjudicate(observation, assessment, replication, input)?;
+        next.supersedes_evidence_id = Some(self.evidence_id.clone());
+        next.record_digest = next.digest();
+        Ok(next)
+    }
+
     /// Envelope integrity only. Eligible != completed, and this method does not authenticate authority.
     pub fn verify_integrity(&self) -> bool {
         [
@@ -170,7 +187,7 @@ impl CriterionEvidenceEligibility {
             self.assessment_id.as_str(), self.assessment_record_digest.as_str(),
             self.replication_id.as_str(), self.replication_record_digest.as_str(),
             self.commitment_event_id.as_str(), self.candidate_id.as_str(),
-            self.binding_digest.as_str(), self.authority_payload_digest.as_str(),
+            self.binding_digest.as_str(), self.authority_payload_digest.as_str(), self.supersedes_evidence_id.as_deref().unwrap_or(""),
         ].iter().all(|s| !s.trim().is_empty())
             && valid_utc(&self.adjudicated_at)
             && self.record_digest == self.digest()
@@ -240,9 +257,10 @@ mod tests {
         (o,a,r)
     }
     fn input(d:CriterionEvidenceDisposition)->CriterionEvidenceInput{CriterionEvidenceInput{evidence_id:"evidence:1".into(),challenge_id:"challenge-1".into(),criterion_id:"generation-1".into(),criterion_generation:"criterion-1".into(),authority_id:"authority:1".into(),authority_institution_id:"institution:authority".into(),authority_basis:"official scorer designation".into(),adjudicated_at:"2026-09-29T13:00:00Z".into(),disposition:d,authority_payload:b"authority record".to_vec()}}
-    #[test]fn binds_complete_chain(){let(o,a,r)=chain();let e=CriterionEvidenceEligibility::adjudicate(&o,&a,&r,input(CriterionEvidenceDisposition::Eligible)).unwrap();assert!(e.verify_integrity());assert_eq!(e.challenge_id,"challenge-1");assert_eq!(e.observation_record_digest,o.record_digest);assert_eq!(e.assessment_record_digest,a.record_digest);assert_eq!(e.replication_record_digest,r.record_digest);}
+    #[test]fn binds_complete_chain(){let(o,a,r)=chain();let e=CriterionEvidenceEligibility::adjudicate(&o,&a,&r,input(CriterionEvidenceDisposition::Eligible)).unwrap();assert!(e.verify_integrity());assert_eq!(e.challenge_id,"challenge-1");assert_eq!(e.criterion_id,"generation-1");assert_eq!(e.criterion_generation,"criterion-1");assert_eq!(e.observation_record_digest,o.record_digest);assert_eq!(e.assessment_record_digest,a.record_digest);assert_eq!(e.replication_record_digest,r.record_digest);}
     #[test]fn preserves_explicit_dispositions(){let(o,a,r)=chain();for d in[CriterionEvidenceDisposition::Eligible,CriterionEvidenceDisposition::Ineligible,CriterionEvidenceDisposition::Deferred]{let e=CriterionEvidenceEligibility::adjudicate(&o,&a,&r,input(d)).unwrap();assert_eq!(e.disposition,d);}}
     #[test]fn rejects_wrong_chain(){let(o,mut a,r)=chain();a.candidate_id="changed".into();a.record_digest="stale".into();assert_eq!(CriterionEvidenceEligibility::adjudicate(&o,&a,&r,input(CriterionEvidenceDisposition::Deferred)),Err(CriterionEvidenceError::InvalidAssessment));}
-    #[test]fn rejects_wrong_criterion_generation_and_bad_input(){let(o,a,r)=chain();let mut i=input(CriterionEvidenceDisposition::Deferred);i.criterion_generation="".into();assert_eq!(CriterionEvidenceEligibility::adjudicate(&o,&a,&r,i),Err(CriterionEvidenceError::MissingField("criterion_generation")));let mut i=input(CriterionEvidenceDisposition::Deferred);i.adjudicated_at="2026-02-29T13:00:00Z".into();assert_eq!(CriterionEvidenceEligibility::adjudicate(&o,&a,&r,i),Err(CriterionEvidenceError::InvalidTimestamp));}
+    #[test]fn rejects_wrong_lineage_and_bad_input(){let(o,a,r)=chain();let mut i=input(CriterionEvidenceDisposition::Deferred);i.criterion_generation="other-generation".into();assert_eq!(CriterionEvidenceEligibility::adjudicate(&o,&a,&r,i),Err(CriterionEvidenceError::LinkMismatch("criterion_generation")));let mut i=input(CriterionEvidenceDisposition::Deferred);i.criterion_generation="".into();assert_eq!(CriterionEvidenceEligibility::adjudicate(&o,&a,&r,i),Err(CriterionEvidenceError::MissingField("criterion_generation")));let mut i=input(CriterionEvidenceDisposition::Deferred);i.adjudicated_at="2026-02-29T13:00:00Z".into();assert_eq!(CriterionEvidenceEligibility::adjudicate(&o,&a,&r,i),Err(CriterionEvidenceError::InvalidTimestamp));}
+    #[test]fn supersession_is_new_immutable_record(){let(o,a,r)=chain();let original=CriterionEvidenceEligibility::adjudicate(&o,&a,&r,input(CriterionEvidenceDisposition::Deferred)).unwrap();let mut next=input(CriterionEvidenceDisposition::Eligible);next.evidence_id="evidence:2".into();let replacement=original.supersede(next,&o,&a,&r).unwrap();assert_eq!(replacement.supersedes_evidence_id.as_deref(),Some("evidence:1"));assert_ne!(replacement.record_digest,original.record_digest);assert!(original.verify_integrity());assert!(replacement.verify_integrity());}
     #[test]fn roundtrip_and_tamper_detection(){let(o,a,r)=chain();let e=CriterionEvidenceEligibility::adjudicate(&o,&a,&r,input(CriterionEvidenceDisposition::Deferred)).unwrap();let j=serde_json::to_vec(&e).unwrap();assert_eq!(serde_json::from_slice::<CriterionEvidenceEligibility>(&j).unwrap(),e);let mut t=e;t.disposition=CriterionEvidenceDisposition::Ineligible;assert!(!t.verify_integrity());}
 }
