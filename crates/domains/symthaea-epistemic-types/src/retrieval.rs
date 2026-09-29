@@ -52,7 +52,7 @@ pub struct RetrievedMemory {
 pub struct ExcludedMemory { pub canonical_identity: String, pub reason: RetrievalExclusion }
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemoryRetrievalReceipt {
-    pub mode: RetrievalMode, pub frontier_ref: Option<String>, pub query: String,
+    pub mode: RetrievalMode, pub frontier_ref: Option<String>, pub query: String, pub max_results: usize,
     pub selected: Vec<String>, pub selected_representation_digests: Vec<String>,
     pub excluded: Vec<ExcludedMemory>, pub provenance_families: Vec<String>,
     pub retrieval_profile_versions: Vec<String>,
@@ -67,6 +67,7 @@ impl MemoryRetrievalReceipt {
         out.push(match self.mode { RetrievalMode::Historical => 0, RetrievalMode::Live => 1 });
         put_optional(&mut out, self.frontier_ref.as_deref());
         put_string(&mut out, &self.query);
+        put_u32(&mut out, self.max_results);
         put_strings(&mut out, &self.selected);
         put_strings(&mut out, &self.selected_representation_digests);
         let mut excluded = self.excluded.clone();
@@ -161,6 +162,7 @@ fn retrieve_validated(
         mode: request.mode,
         frontier_ref: request.frontier_ref.clone(),
         query: request.query.clone(),
+        max_results: request.max_results,
         selected,
         selected_representation_digests,
         excluded,
