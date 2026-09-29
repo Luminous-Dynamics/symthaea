@@ -192,6 +192,29 @@ impl LocalApprovalRuntimeV1 {
             .observe_currentness(&projection.request_id, now)?)
     }
 
+    /// Observe whether a runtime-owned installed request is current at one instant.
+    ///
+    /// This is a non-authoritative snapshot for UI/currentness purposes. It validates
+    /// the projection against the exact request retained by the installed handle and
+    /// the live daemon incarnation before consulting pending state. The result can
+    /// become stale immediately after return and never reserves or authorizes an effect.
+    pub fn observe_installed_projection_currentness(
+        &self,
+        installed: &InstalledLocalApprovalRequestV1,
+        projection: &super::local_approval_projection::PendingNixApprovalProjectionV1,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRuntimeErrorV1> {
+        projection.validate()?;
+        if installed.request.daemon_incarnation_id != self.daemon_incarnation.reference()
+            || projection.daemon_incarnation_ref != self.daemon_incarnation.reference()
+            || projection.request_id != installed.request_id()
+            || !projection.matches_request(&installed.request, &installed.operator_visible_action)?
+        {
+            return Ok(PendingRequestCurrentnessV1::NotPending);
+        }
+        Ok(self.request_store.observe_currentness(installed.request_id(), now)?)
+    }
+
     /// Accept one LOCAL-007 socket submission and atomically consume its request.
     ///
     /// The returned affine-ish local token is still not execution authority.
