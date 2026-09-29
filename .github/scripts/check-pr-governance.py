@@ -250,13 +250,42 @@ def parse_name_status(text: str) -> list[str]:
     return sorted(set(paths))
 
 
-def require_complete_history() -> None:
-    """Reject repositories whose commit graph is explicitly shallow."""
-    proc = git("rev-parse", "--is-shallow-repository", check=False)
-    if proc.returncode != 0:
+def require_complete_object_graph(git_runner: Any = git) -> None:
+    """Reject shallow or partial repositories before topology-sensitive validation."""
+    shallow = git_runner("rev-parse", "--is-shallow-repository", check=False)
+    if shallow.returncode != 0:
         raise GovernanceError("unable to determine repository shallow state")
-    if proc.stdout.strip().lower() != "false":
-        raise GovernanceError("governance validation requires a complete commit history; repository is shallow")
+    if shallow.stdout.strip().lower() != "false":
+        raise GovernanceError(
+            "governance validation requires a complete commit history; repository is shallow"
+        )
+
+    partial = git_runner("config", "--get", "extensions.partialClone", check=False)
+    if partial.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine Git partial-clone state")
+    if partial.returncode == 0 and partial.stdout.strip():
+        raise GovernanceError(
+            "governance validation requires a complete object graph; repository is a partial clone"
+        )
+
+    promisors = git_runner(
+        "config", "--get-regexp", r"^remote\\..*\\.promisor$", check=False
+    )
+    if promisors.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine Git promisor-remote state")
+    if promisors.returncode == 0:
+        for line in promisors.stdout.splitlines():
+            _key, _sep, value = line.partition(" ")
+            if value.strip().lower() == "true":
+                raise GovernanceError(
+                    "governance validation requires a complete object graph; "
+                    "repository has a promisor remote"
+                )
+
+
+def require_complete_history() -> None:
+    """Backward-compatible alias for the complete-object-graph guard."""
+    require_complete_object_graph()
 
 
 def validate_exact_base_head_ancestry(base: str, head: str) -> None:
@@ -371,6 +400,36 @@ def history_topology_self_test() -> None:
         proc = shallow_cmd("merge-base", "--is-ancestor", base, merge)
         assert proc.returncode != 0
         assert (shallow / ".git" / "shallow").exists()
+
+        def local_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+            proc = subprocess.run(
+                ["git", *args], cwd=worktree, check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            if check and proc.returncode != 0:
+                detail = proc.stderr.strip() or proc.stdout.strip()
+                raise AssertionError(f"fixture git command failed: {args}: {detail}")
+            return proc
+
+        assert require_complete_object_graph(local_git) is None
+        run_local("config", "extensions.partialClone", "origin")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("partial-clone extension must fail closed")
+        run_local("config", "--unset", "extensions.partialClone")
+
+        run_local("remote", "add", "origin", "https://example.invalid/symthaea.git")
+        run_local("config", "remote.origin.promisor", "true")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("promisor remote must fail closed")
+        run_local("config", "--unset", "remote.origin.promisor")
 
 
 def read_at_commit(commit: str, path: str) -> str:
@@ -505,7 +564,7 @@ def self_test() -> None:
     assert classify("src/cognitive_loop/thresholds/moral.rs", policy) == "safety"
     assert classify("ordinary.rs", policy) is None
     assert approved_subject("safety(core): tighten", {"safety"})
-    assert require_complete_history() is None
+    assert require_complete_object_graph() is None
     assert not approved_subject("governance(ci): wrong", {"safety"})
     assert approved_subject("governance(ci): tighten", {"governance"})
     assert approved_subject("emergency-safety(ci): coordinated", {"safety", "governance"})
