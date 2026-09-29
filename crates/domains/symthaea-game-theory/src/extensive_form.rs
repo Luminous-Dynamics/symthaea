@@ -107,7 +107,7 @@ pub struct ExtensiveGame {
     pub observations: HashMap<DecisionStateId, Vec<Observation>>,
 }
 
-fn project_player_history(player: PlayerId, history: &[PlayerHistoryEvent]) -> Vec<PlayerHistoryEvent> {
+fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<PlayerHistoryEvent> {
     history.iter().filter_map(|event| match event {
         HistoryEvent::Decision { state, player: actor, action, visibility, .. } => {
             if *actor == player {
