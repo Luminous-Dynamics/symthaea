@@ -273,6 +273,11 @@ impl QualificationProjection {
         &self.qualification_policy
     }
 
+    /// Require an exact source knowledge snapshot before replay.
+    pub fn source_graph_matches(&self, graph: &ScientificLineageGraph) -> bool {
+        self.source_graph_digest == graph.graph_digest()
+    }
+
     pub const fn schema(&self) -> &'static str {
         QUALIFICATION_PROJECTION_SCHEMA
     }
@@ -583,6 +588,20 @@ mod tests {
         let before = graph.graph_digest();
         graph.add_node(object("definition", "isolated", A));
         assert_ne!(before, graph.graph_digest());
+    }
+
+    #[test]
+    fn replay_requires_exact_source_graph_snapshot() {
+        let mut graph = fixture();
+        let projection = graph.qualification_projection().unwrap();
+        assert!(projection.source_graph_matches(&graph));
+
+        graph.add_relation(rel(
+            &object("prediction", "extra", A),
+            &object("scientific_claim", "extra-claim", B),
+            EngineeringRelationKind::Supports,
+        ));
+        assert!(!projection.source_graph_matches(&graph));
     }
 
     #[test]
