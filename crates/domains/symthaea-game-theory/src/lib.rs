@@ -26,6 +26,7 @@
 //! ```
 
 pub mod strategic;
+pub mod strategic_context;
 
 /// A two-player normal-form game.
 #[derive(Debug, Clone)]
