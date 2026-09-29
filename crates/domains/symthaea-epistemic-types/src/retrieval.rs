@@ -53,7 +53,7 @@ pub struct ExcludedMemory { pub canonical_identity: String, pub reason: Retrieva
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemoryRetrievalReceipt {
     pub mode: RetrievalMode, pub frontier_ref: Option<String>, pub query: String, pub max_results: usize,
-    pub selected: Vec<String>, pub selected_representation_digests: Vec<String>,
+    pub selected: Vec<String>, pub selected_representation_digests: Vec<(String, String)>,
     pub excluded: Vec<ExcludedMemory>, pub provenance_families: Vec<String>,
     pub retrieval_profile_versions: Vec<String>,
     pub receipt_digest: String,
@@ -69,7 +69,13 @@ impl MemoryRetrievalReceipt {
         put_string(&mut out, &self.query);
         put_u32(&mut out, self.max_results);
         put_strings(&mut out, &self.selected);
-        put_strings(&mut out, &self.selected_representation_digests);
+        let mut bindings = self.selected_representation_digests.clone();
+        bindings.sort();
+        put_u32(&mut out, bindings.len());
+        for (identity, digest) in bindings {
+            put_string(&mut out, &identity);
+            put_string(&mut out, &digest);
+        }
         let mut excluded = self.excluded.clone();
         excluded.sort_by(|a,b| a.canonical_identity.cmp(&b.canonical_identity).then_with(|| (a.reason as u8).cmp(&(b.reason as u8))));
         put_u32(&mut out, excluded.len());
@@ -155,7 +161,9 @@ fn retrieve_validated(
     let mut families = groups.iter().flat_map(|g| g.provenance_families.iter().cloned()).collect::<Vec<_>>(); families.sort(); families.dedup();
     excluded.sort_by(|a,b| a.canonical_identity.cmp(&b.canonical_identity).then_with(|| (a.reason as u8).cmp(&(b.reason as u8))));
     let mut selected_representation_digests = groups.iter()
-        .flat_map(|g| g.representations.iter().map(|candidate| candidate.projection.representation_digest.clone()))
+        .flat_map(|g| g.representations.iter().map(|candidate| {
+            (g.canonical_identity.clone(), candidate.projection.representation_digest.clone())
+        }))
         .collect::<Vec<_>>();
     selected_representation_digests.sort();
     let mut receipt = MemoryRetrievalReceipt {
