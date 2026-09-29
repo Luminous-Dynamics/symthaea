@@ -147,6 +147,32 @@ impl LocalApprovalRequestStoreV1 {
             .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?
             .contains_key(request_id))
     }
+
+    /// Observe whether a request is pending and unexpired at one instant.
+    ///
+    /// This is a non-authoritative snapshot. It does not reserve or consume the
+    /// request and must not be used as execution admission.
+    pub fn observe_currentness(
+        &self,
+        request_id: &str,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRequestStoreErrorV1> {
+        let pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+        let request = match pending.get(request_id) {
+            Some(request) => request,
+            None => return Ok(PendingRequestCurrentnessV1::NotPending),
+        };
+
+        if now.as_u64() >= request.expires_at_unix_ms {
+            Ok(PendingRequestCurrentnessV1::Expired)
+        } else {
+            Ok(PendingRequestCurrentnessV1::Current)
+        }
+    }
+
 }
 
 impl std::fmt::Debug for LocalApprovalRequestStoreV1 {
@@ -163,6 +189,14 @@ impl std::fmt::Debug for LocalApprovalRequestStoreV1 {
 pub struct PendingRequestInstallV1 {
     pub request_id: String,
     pub superseded_request_ids: Vec<String>,
+}
+
+/// Non-authoritative snapshot of live pending-request currentness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingRequestCurrentnessV1 {
+    Current,
+    Expired,
+    NotPending,
 }
 
 /// Live proof that one exact pending request was admitted and atomically removed.
@@ -342,6 +376,100 @@ mod tests {
             .consume_verified_submission(&new_submission, &peer(1000, 1), ms(1_300))
             .unwrap();
         assert_eq!(consumed.request_id(), new_id);
+    }
+
+    #[test]
+    fn currentness_observation_distinguishes_current_expired_and_not_pending() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        store.install_pending(request).unwrap();
+
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_999)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(2_000)).unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+
+        let second = request_for(&store, 2);
+        let second_id = second.request_id().unwrap();
+        store.install_pending(second).unwrap();
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_500)).unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(
+            store.observe_currentness(&second_id, ms(1_500)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+    }
+
+    #[test]
+    fn stale_currentness_observation_cannot_resurrect_consumed_request() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        let observation = store.observe_currentness(&request_id, ms(1_300)).unwrap();
+        assert_eq!(observation, PendingRequestCurrentnessV1::Current);
+
+        store
+            .consume_verified_submission(&submission, &peer(1000, 1), ms(1_400))
+            .unwrap();
+
+        // The earlier Current result is intentionally only a historical observation.
+        // Re-observing the live store after consumption is the only meaningful
+        // currentness check and must report that the request is no longer pending.
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_500)).unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(store.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn stale_currentness_does_not_bypass_expiry_at_atomic_consume_boundary() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_900),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        // A caller may observe Current immediately before the deadline.
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_999)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+
+        // The atomic consume boundary re-evaluates time itself. The stale
+        // observation cannot authorize a consume at the exact expiry instant.
+        assert!(matches!(
+            store.consume_verified_submission(&submission, &peer(1000, 1), ms(2_000)),
+            Err(LocalApprovalRequestStoreErrorV1::Admission(_))
+        ));
+        assert!(store.is_pending(&request_id).unwrap());
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(2_000)).unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
     }
 
     #[test]

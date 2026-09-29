@@ -27,7 +27,7 @@ use super::local_approval_socket::{
 };
 use super::local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
-    LocalApprovalRequestStoreV1, PendingRequestInstallV1,
+    LocalApprovalRequestStoreV1, PendingRequestCurrentnessV1, PendingRequestInstallV1,
 };
 use super::temporal::UnixMillisV1;
 use std::path::{Path, PathBuf};
@@ -170,6 +170,51 @@ impl LocalApprovalRuntimeV1 {
         })
     }
 
+    /// Observe projection currentness against this live runtime.
+    ///
+    /// This validates the projection commitment, binds it to this daemon incarnation,
+    /// and then checks the live pending store at one instant. The result is deliberately
+    /// non-authoritative: it is a UI/currentness observation and may become stale
+    /// immediately after return. It never reserves, consumes, or authorizes an effect.
+    pub fn observe_projection_currentness(
+        &self,
+        projection: &super::local_approval_projection::PendingNixApprovalProjectionV1,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRuntimeErrorV1> {
+        projection.validate()?;
+        if projection.daemon_incarnation_ref != self.daemon_incarnation.reference()
+            || projection.request_id.is_empty()
+        {
+            return Ok(PendingRequestCurrentnessV1::NotPending);
+        }
+        Ok(self
+            .request_store
+            .observe_currentness(&projection.request_id, now)?)
+    }
+
+    /// Observe whether a runtime-owned installed request is current at one instant.
+    ///
+    /// This is a non-authoritative snapshot for UI/currentness purposes. It validates
+    /// the projection against the exact request retained by the installed handle and
+    /// the live daemon incarnation before consulting pending state. The result can
+    /// become stale immediately after return and never reserves or authorizes an effect.
+    pub fn observe_installed_projection_currentness(
+        &self,
+        installed: &InstalledLocalApprovalRequestV1,
+        projection: &super::local_approval_projection::PendingNixApprovalProjectionV1,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRuntimeErrorV1> {
+        projection.validate()?;
+        if installed.request.daemon_incarnation_id != self.daemon_incarnation.reference()
+            || projection.daemon_incarnation_ref != self.daemon_incarnation.reference()
+            || projection.request_id != installed.request_id()
+            || !projection.matches_request(&installed.request, &installed.operator_visible_action)?
+        {
+            return Ok(PendingRequestCurrentnessV1::NotPending);
+        }
+        Ok(self.request_store.observe_currentness(installed.request_id(), now)?)
+    }
+
     /// Accept one LOCAL-007 socket submission and atomically consume its request.
     ///
     /// The returned affine-ish local token is still not execution authority.
@@ -208,6 +253,8 @@ pub enum LocalApprovalRuntimeErrorV1 {
     Socket(#[from] LocalApprovalSocketErrorV1),
     #[error(transparent)]
     RequestStore(#[from] LocalApprovalRequestStoreErrorV1),
+    #[error(transparent)]
+    Projection(#[from] super::local_approval_projection::LocalApprovalProjectionErrorV1),
 }
 
 #[cfg(test)]
@@ -242,6 +289,207 @@ mod tests {
                 .as_millis(),
         )
         .unwrap()
+    }
+
+    #[test]
+    fn projection_currentness_is_live_observation_not_authority() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let installed = runtime
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let projection = installed.operator_projection().unwrap();
+
+        assert_eq!(
+            runtime
+                .observe_projection_currentness(&projection, UnixMillisV1::new(now))
+                .unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn projection_currentness_rejects_superseded_and_expired_snapshots() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let action = intent("nginx.service");
+        let first = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let first_projection = first.operator_projection().unwrap();
+        let second = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(500)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let second_projection = second.operator_projection().unwrap();
+
+        assert_eq!(
+            runtime
+                .observe_projection_currentness(&first_projection, UnixMillisV1::new(now))
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(
+            runtime
+                .observe_projection_currentness(&second_projection, UnixMillisV1::new(now + 60_000))
+                .unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn projection_currentness_rejects_projection_from_another_daemon_incarnation() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime_path = parent.path().join("runtime");
+        let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        let now = wall_ms();
+        let installed = first
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let projection = installed.operator_projection().unwrap();
+        drop(first);
+
+        let second = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        assert_eq!(
+            second
+                .observe_projection_currentness(&projection, UnixMillisV1::new(now))
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(second.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn projection_currentness_requires_exact_runtime_owned_projection() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let installed = runtime
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let projection = installed.operator_projection().unwrap();
+
+        assert_eq!(
+            runtime
+                .observe_installed_projection_currentness(
+                    &installed,
+                    &projection,
+                    UnixMillisV1::new(now),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+
+        let mut tampered = projection.clone();
+        tampered.machine_target_ref = "machine:other".to_string();
+        assert!(tampered.validate().is_err());
+        assert!(matches!(
+            runtime.observe_installed_projection_currentness(
+                &installed,
+                &tampered,
+                UnixMillisV1::new(now),
+            ),
+            Err(LocalApprovalRuntimeErrorV1::Projection(_))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn projection_currentness_rejects_superseded_expired_and_restarted_requests() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime_path = parent.path().join("runtime");
+        let runtime = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        let now = wall_ms();
+        let action = intent("nginx.service");
+
+        let first = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let first_projection = first.operator_projection().unwrap();
+
+        let second = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(500)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let second_projection = second.operator_projection().unwrap();
+
+        assert_eq!(
+            runtime
+                .observe_installed_projection_currentness(
+                    &first,
+                    &first_projection,
+                    UnixMillisV1::new(now),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(
+            runtime
+                .observe_installed_projection_currentness(
+                    &second,
+                    &second_projection,
+                    UnixMillisV1::new(now + 60_000),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+
+        drop(runtime);
+        let restarted = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        assert_eq!(
+            restarted
+                .observe_installed_projection_currentness(
+                    &second,
+                    &second_projection,
+                    UnixMillisV1::new(now),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
     }
 
     #[test]

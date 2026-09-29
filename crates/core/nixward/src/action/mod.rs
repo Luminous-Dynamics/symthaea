@@ -73,7 +73,7 @@ pub use local_approval_socket::{
 };
 pub use local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
-    LocalApprovalRequestStoreV1, PendingRequestInstallV1,
+    LocalApprovalRequestStoreV1, PendingRequestCurrentnessV1, PendingRequestInstallV1,
 };
 pub use local_approval_submission::{
     LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1,
