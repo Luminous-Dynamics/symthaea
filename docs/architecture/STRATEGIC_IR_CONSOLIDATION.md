@@ -430,3 +430,31 @@ CI verification                   not yet observed
 ```
 
 This is still a migration-stage contract. It does not yet prove perfect recall, construct extensive-form transitions, or provide a CFR solver; those remain separate model/solver responsibilities.
+
+### 2026-09-29 derived perfect-recall evidence
+
+The extensive-form boundary now derives `PerfectRecallEvidence::Verified` from the
+reachable state graph rather than accepting a caller-supplied boolean as proof.
+
+Validation first requires:
+- every information-structure decision state to have a corresponding decision node;
+- every decision node to have a corresponding information-structure entry;
+- every information-set member to be reachable and to be a decision node;
+- the reachable graph to be acyclic for this migration-stage finite-tree model.
+
+The verifier then replays every reachable history and compares, for each information
+set, the acting player's prior `(information_set, action)` sequence across all member
+states. Opponent and chance transitions are intentionally omitted from that recalled
+sequence. A solver that requires perfect recall can therefore consume evidence derived
+from the game model instead of trusting an unattested flag.
+
+This is deliberately stronger than a solver capability declaration but narrower than a
+universal Strategic IR invariant: games with repeated states, transpositions, or
+history-dependent information encoders need an explicit history model before they can
+be admitted without this finite-tree restriction. This keeps the current boundary
+sound while leaving room for a later `StateId`/history abstraction.
+
+External CFR work reinforces this direction: current Rust CFR tooling validates malformed
+trees and perfect-recall violations during game construction, while MCCFR separates
+`EmbeddedHistory` and `PerfectRecall` as explicit attestations rather than treating
+recall as an incidental solver detail.
