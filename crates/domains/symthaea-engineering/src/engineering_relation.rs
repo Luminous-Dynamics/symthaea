@@ -53,6 +53,48 @@ pub enum EngineeringRelationKind {
 }
 
 impl EngineeringRelationKind {
+    /// Stable wire name used for canonical relation identity.
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::PartOf => "part_of", Self::Contains => "contains",
+            Self::Requires => "requires", Self::Implements => "implements",
+            Self::Parameterizes => "parameterizes", Self::ExecutesWith => "executes_with",
+            Self::CompiledBy => "compiled_by", Self::RunsOn => "runs_on",
+            Self::Deploys => "deploys", Self::Executes => "executes",
+            Self::Observes => "observes", Self::DependsOn => "depends_on",
+            Self::Constrains => "constrains", Self::Formalizes => "formalizes",
+            Self::Instantiates => "instantiates", Self::Produces => "produces",
+            Self::Quantifies => "quantifies", Self::HasProperty => "has_property",
+            Self::Supports => "supports", Self::Contradicts => "contradicts",
+            Self::DerivedFrom => "derived_from", Self::Equivalent => "equivalent",
+            Self::Generalizes => "generalizes", Self::Specializes => "specializes",
+        }
+    }
+
+    /// Explicit endpoint ontology. None means validation is deferred to a
+    /// higher-level adapter because the relation is intentionally polymorphic.
+    pub const fn endpoint_pairs(self) -> Option<&'static [(&'static str, &'static str)]> {
+        match self {
+            Self::Requires => Some(&[("requirement", "representation")]),
+            Self::Implements => Some(&[("representation", "model")]),
+            Self::Parameterizes => Some(&[("model", "model_parameters")]),
+            Self::ExecutesWith => Some(&[("model", "runtime")]),
+            Self::CompiledBy => Some(&[("runtime", "toolchain")]),
+            Self::RunsOn => Some(&[("runtime", "accelerator")]),
+            Self::Deploys => Some(&[("accelerator", "deployment_artifact")]),
+            Self::Executes => Some(&[("deployment_artifact", "execution_context")]),
+            Self::Observes => Some(&[("execution_context", "observation"), ("experiment", "observation")]),
+            Self::Constrains => Some(&[("equation", "model"), ("theorem", "physical_model"), ("definition", "model")]),
+            Self::Formalizes => Some(&[("model", "physical_system"), ("equation", "model")]),
+            Self::Instantiates => Some(&[("simulation", "model"), ("experiment", "physical_system")]),
+            Self::Produces => Some(&[("simulation", "prediction"), ("process", "material"), ("experiment", "observation")]),
+            Self::Quantifies => Some(&[("observation", "uncertainty"), ("observation", "statistics")]),
+            Self::HasProperty => Some(&[("material", "property"), ("material", "measured_property"), ("material", "predicted_property")]),
+            Self::PartOf | Self::Contains | Self::DependsOn | Self::Supports | Self::Contradicts |
+            Self::DerivedFrom | Self::Equivalent | Self::Generalizes | Self::Specializes => None,
+        }
+    }
+
     pub const fn family(self) -> RelationFamily {
         match self {
             Self::PartOf | Self::Contains => RelationFamily::Composition,
@@ -114,6 +156,16 @@ impl EngineeringRelation {
             return Err(RelationError::SelfRelation);
         }
 
+        if let Some(pairs) = kind.endpoint_pairs() {
+            if !pairs.iter().any(|(s, t)| *s == source.object_kind && *t == target.object_kind) {
+                return Err(RelationError::InvalidEndpoints {
+                    kind: kind.wire_name(),
+                    source_kind: source.object_kind.clone(),
+                    target_kind: target.object_kind.clone(),
+                });
+            }
+        }
+
         Ok(Self { source, target, kind })
     }
 
@@ -137,7 +189,7 @@ impl EngineeringRelation {
         push_field(&mut out, ENGINEERING_RELATION_SCHEMA.as_bytes());
         push_field(&mut out, self.source.identity_digest().as_bytes());
         push_field(&mut out, self.target.identity_digest().as_bytes());
-        push_field(&mut out, format!("{:?}", self.kind).as_bytes());
+        push_field(&mut out, self.kind.wire_name().as_bytes());
         out
     }
 
@@ -152,6 +204,7 @@ pub enum RelationError {
     InvalidSource(crate::engineering_identity::IdentityError),
     InvalidTarget(crate::engineering_identity::IdentityError),
     SelfRelation,
+    InvalidEndpoints { kind: &'static str, source_kind: String, target_kind: String },
 }
 
 impl fmt::Display for RelationError {
@@ -160,6 +213,8 @@ impl fmt::Display for RelationError {
             Self::InvalidSource(err) => write!(f, "invalid relation source: {err}"),
             Self::InvalidTarget(err) => write!(f, "invalid relation target: {err}"),
             Self::SelfRelation => write!(f, "relation source and target must differ"),
+            Self::InvalidEndpoints { kind, source_kind, target_kind } =>
+                write!(f, "invalid endpoints for {kind}: {source_kind} -> {target_kind}"),
         }
     }
 }
