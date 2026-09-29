@@ -593,13 +593,32 @@ mod tests {
 
     #[test]
     fn rejects_128_ppd_queries_in_polar_coverage() {
+        let text = label()
+            .replace("LINES = 4", "LINES = 5632")
+            .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 11520")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 90.0")
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = 44.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 88.0");
         let metadata = MolaMegdrMetadata::from_label(
-            &parse_label(&label()),
+            &parse_label(&text),
             "MEGT00N000HB",
         )
         .unwrap();
-        assert_eq!(metadata.cell_for(88.0, 0.0), Err(MolaError::OutOfBounds));
-        assert_eq!(metadata.cell_for(88.001, 0.0), Err(MolaError::OutOfBounds));
+        assert_eq!(metadata.cell_for(89.0, 0.0), Err(MolaError::OutOfBounds));
+    }
+
+    #[test]
+    fn rejects_128_ppd_global_latitude_claim() {
+        let text = label()
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -89.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 89.0")
+            .replace("LINES = 4", "LINES = 22784");
+        let error = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap_err();
+        assert!(matches!(error, MolaError::Unsupported(_)));
     }
 
     #[test]
