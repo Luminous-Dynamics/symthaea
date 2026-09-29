@@ -98,6 +98,23 @@ impl InformationStructure {
     pub fn validate(&self) -> Result<(), InformationStructureError> {
         let mut membership = vec![None; self.decision_states.len()];
 
+        for (i, state) in self.decision_states.iter().enumerate() {
+            if self.decision_states[..i]
+                .iter()
+                .any(|prior| prior.state == state.state)
+            {
+                return Err(InformationStructureError::DuplicateDecisionStateId(state.state));
+            }
+        }
+        for (i, info_set) in self.information_sets.iter().enumerate() {
+            if self.information_sets[..i]
+                .iter()
+                .any(|prior| prior.id == info_set.id)
+            {
+                return Err(InformationStructureError::DuplicateInformationSetId(info_set.id));
+            }
+        }
+
         for info_set in &self.information_sets {
             if info_set.members.is_empty() {
                 return Err(InformationStructureError::EmptyInformationSet(info_set.id));
@@ -140,6 +157,13 @@ impl InformationStructure {
                         state: *state_id,
                     });
                 };
+                if state.information_set != info_set.id {
+                    return Err(InformationStructureError::StateInformationSetMismatch {
+                        state: state.state,
+                        expected: info_set.id,
+                        actual: state.information_set,
+                    });
+                }
                 if state.player != info_set.player {
                     return Err(InformationStructureError::PlayerMismatch {
                         information_set: info_set.id,
@@ -163,9 +187,12 @@ impl InformationStructure {
                     });
                 }
 
-                let slot = membership
-                    .get_mut(state.state.0)
-                    .expect("state id was checked against decision_states");
+                let state_index = self
+                    .decision_states
+                    .iter()
+                    .position(|candidate| candidate.state == state.state)
+                    .expect("validated decision-state id must exist");
+                let slot = &mut membership[state_index];
                 if let Some(previous) = *slot {
                     return Err(InformationStructureError::StateInMultipleInformationSets {
                         state: state.state,
@@ -187,8 +214,8 @@ impl InformationStructure {
 
     pub fn state(&self, id: DecisionStateId) -> Option<&DecisionState> {
         self.decision_states
-            .get(id.0)
-            .filter(|state| state.state == id)
+            .iter()
+            .find(|state| state.state == id)
     }
 
     /// Gate solver use on declared information-structure capabilities.
@@ -233,6 +260,8 @@ pub enum PerfectRecallEvidence {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InformationStructureError {
     EmptyInformationSet(InformationSetId),
+    DuplicateDecisionStateId(DecisionStateId),
+    DuplicateInformationSetId(InformationSetId),
     DuplicateMember {
         information_set: InformationSetId,
         state: DecisionStateId,
@@ -240,6 +269,11 @@ pub enum InformationStructureError {
     UnknownDecisionState {
         information_set: InformationSetId,
         state: DecisionStateId,
+    },
+    StateInformationSetMismatch {
+        state: DecisionStateId,
+        expected: InformationSetId,
+        actual: InformationSetId,
     },
     PlayerMismatch {
         information_set: InformationSetId,
@@ -467,6 +501,38 @@ mod tests {
         assert!(matches!(
             structure.validate(),
             Err(InformationStructureError::UnassignedDecisionState(DecisionStateId(2)))
+        ));
+    }
+
+
+    #[test]
+    fn decision_state_and_information_set_ids_must_be_unique() {
+        let mut structure = valid_information_structure();
+        structure.decision_states[1].state = DecisionStateId(0);
+        assert_eq!(
+            structure.validate(),
+            Err(InformationStructureError::DuplicateDecisionStateId(DecisionStateId(0)))
+        );
+
+        structure.decision_states[1].state = DecisionStateId(1);
+        structure.information_sets.push(InformationSet {
+            id: InformationSetId(7),
+            player: PlayerId(0),
+            members: vec![DecisionStateId(0)],
+        });
+        assert_eq!(
+            structure.validate(),
+            Err(InformationStructureError::DuplicateInformationSetId(InformationSetId(7)))
+        );
+    }
+
+    #[test]
+    fn decision_state_must_name_its_containing_information_set() {
+        let mut structure = valid_information_structure();
+        structure.decision_states[1].information_set = InformationSetId(99);
+        assert!(matches!(
+            structure.validate(),
+            Err(InformationStructureError::StateInformationSetMismatch { .. })
         ));
     }
 
