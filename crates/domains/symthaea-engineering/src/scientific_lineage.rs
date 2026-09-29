@@ -7,7 +7,12 @@
 //! but are excluded from qualification invalidation closure.
 
 use crate::{EngineeringObjectId, EngineeringRelation, EngineeringRelationKind};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+pub const QUALIFICATION_PROJECTION_SCHEMA: &str = "symthaea.qualification-projection.v1";
+pub const QUALIFICATION_POLICY: &str = "symthaea.qualification-policy.v1";
 
 /// A recursive scientific graph. It permits cycles because the DKG/knowledge
 /// layer is not itself a qualification DAG.
@@ -50,7 +55,13 @@ impl ScientificLineageGraph {
         self.validate_qualification_acyclic()?;
         let mut relations: Vec<EngineeringRelation> = self.qualification_relations().cloned().collect();
         relations.sort_by(|a, b| a.relation_digest().cmp(&b.relation_digest()));
-        Ok(QualificationProjection { relations, authority_ceiling: AuthorityCeiling::SyntheticQualification })
+        Ok(QualificationProjection {
+            schema: QUALIFICATION_PROJECTION_SCHEMA.to_owned(),
+            source_graph_digest: self.graph_digest(),
+            qualification_policy: QUALIFICATION_POLICY.to_owned(),
+            relations,
+            authority_ceiling: AuthorityCeiling::SyntheticQualification,
+        })
     }
 
     /// Project the graph to qualification-admissible relations.
@@ -128,20 +139,30 @@ impl ScientificLineageGraph {
         closure
     }
 
-    /// Deterministic graph fingerprint for replay fixtures.
+    /// Deterministic fingerprint of the complete scientific graph.
+    ///
+    /// Nodes are included even when isolated, so replay identity cannot silently
+    /// collapse two knowledge snapshots merely because they have the same edges.
     pub fn graph_digest(&self) -> String {
+        let mut node_digests: Vec<_> = self.nodes.keys().map(EngineeringObjectId::identity_digest).collect();
         let mut relation_digests: Vec<_> =
             self.relations.iter().map(EngineeringRelation::relation_digest).collect();
+        node_digests.sort_unstable();
         relation_digests.sort_unstable();
 
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea.scientific-lineage.v1");
+        bytes.extend_from_slice(b"symthaea.scientific-lineage.v2");
+        bytes.extend_from_slice(b"nodes\0");
+        for digest in node_digests {
+            bytes.extend_from_slice(digest.as_bytes());
+            bytes.push(0);
+        }
+        bytes.extend_from_slice(b"relations\0");
         for digest in relation_digests {
             bytes.extend_from_slice(digest.as_bytes());
             bytes.push(0);
         }
 
-        use sha2::{Digest, Sha256};
         Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
     }
 }
@@ -150,16 +171,82 @@ impl ScientificLineageGraph {
 ///
 /// This prevents a projection artifact from being interpreted as operational
 /// authority or physical-performance evidence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuthorityCeiling {
     SyntheticQualification,
 }
 
 /// Immutable deterministic projection consumed by downstream qualification.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// The serialized form is a replay artifact: it records the exact source graph
+/// snapshot, qualification policy, authority ceiling, and ordered relation set.
+/// Deserialization validates the artifact before constructing the trusted type.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "QualificationProjectionWire", into = "QualificationProjectionWire")]
 pub struct QualificationProjection {
+    schema: String,
+    source_graph_digest: String,
+    qualification_policy: String,
     relations: Vec<EngineeringRelation>,
     authority_ceiling: AuthorityCeiling,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct QualificationProjectionWire {
+    schema: String,
+    source_graph_digest: String,
+    qualification_policy: String,
+    relations: Vec<EngineeringRelation>,
+    authority_ceiling: AuthorityCeiling,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QualificationProjectionError {
+    InvalidSchema,
+    InvalidSourceGraphDigest,
+    InvalidPolicy,
+    InvalidAuthorityCeiling,
+    InvalidRelation,
+    UnorderedRelations,
+    DuplicateRelation,
+    InvalidProjectionDigest,
+    CyclicProjection,
+}
+
+impl std::fmt::Display for QualificationProjectionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "invalid qualification projection: {:?}", self)
+    }
+}
+
+impl std::error::Error for QualificationProjectionError {}
+
+impl TryFrom<QualificationProjectionWire> for QualificationProjection {
+    type Error = QualificationProjectionError;
+
+    fn try_from(wire: QualificationProjectionWire) -> Result<Self, Self::Error> {
+        let projection = Self {
+            schema: wire.schema,
+            source_graph_digest: wire.source_graph_digest,
+            qualification_policy: wire.qualification_policy,
+            relations: wire.relations,
+            authority_ceiling: wire.authority_ceiling,
+        };
+        projection.validate()?;
+        Ok(projection)
+    }
+}
+
+impl From<QualificationProjection> for QualificationProjectionWire {
+    fn from(value: QualificationProjection) -> Self {
+        Self {
+            schema: value.schema,
+            source_graph_digest: value.source_graph_digest,
+            qualification_policy: value.qualification_policy,
+            relations: value.relations,
+            authority_ceiling: value.authority_ceiling,
+        }
+    }
 }
 
 impl QualificationProjection {
@@ -171,12 +258,68 @@ impl QualificationProjection {
         self.authority_ceiling
     }
 
-    /// Stable replay identity for the bounded qualification projection.
+    pub fn source_graph_digest(&self) -> &str {
+        &self.source_graph_digest
+    }
+
+    pub fn qualification_policy(&self) -> &str {
+        &self.qualification_policy
+    }
+
+    pub const fn schema(&self) -> &'static str {
+        QUALIFICATION_PROJECTION_SCHEMA
+    }
+
+    /// Validate the replay artifact's semantic and cryptographic invariants.
+    pub fn validate(&self) -> Result<(), QualificationProjectionError> {
+        if self.schema != QUALIFICATION_PROJECTION_SCHEMA {
+            return Err(QualificationProjectionError::InvalidSchema);
+        }
+        if !is_sha256_hex(&self.source_graph_digest) {
+            return Err(QualificationProjectionError::InvalidSourceGraphDigest);
+        }
+        if self.qualification_policy != QUALIFICATION_POLICY {
+            return Err(QualificationProjectionError::InvalidPolicy);
+        }
+        if self.authority_ceiling != AuthorityCeiling::SyntheticQualification {
+            return Err(QualificationProjectionError::InvalidAuthorityCeiling);
+        }
+
+        let mut previous: Option<String> = None;
+        let mut seen = BTreeSet::new();
+        for relation in &self.relations {
+            if !relation.admissible_for_qualification() {
+                return Err(QualificationProjectionError::InvalidRelation);
+            }
+            relation.source.validate().map_err(|_| QualificationProjectionError::InvalidRelation)?;
+            relation.target.validate().map_err(|_| QualificationProjectionError::InvalidRelation)?;
+            let digest = relation.relation_digest();
+            if !seen.insert(digest.clone()) {
+                return Err(QualificationProjectionError::DuplicateRelation);
+            }
+            if previous.as_ref().is_some_and(|p| p >= &digest) {
+                return Err(QualificationProjectionError::UnorderedRelations);
+            }
+            previous = Some(digest);
+        }
+
+        if !projection_is_acyclic(&self.relations) {
+            return Err(QualificationProjectionError::CyclicProjection);
+        }
+        Ok(())
+    }
+
+    /// Stable identity of the bounded projection. The source graph snapshot is
+    /// deliberately recorded separately: epistemic-only DKG mutations change
+    /// the source snapshot without changing qualification projection identity.
     pub fn projection_digest(&self) -> String {
-        use sha2::{Digest, Sha256};
         let mut bytes = Vec::new();
-        bytes.extend_from_slice(b"symthaea.qualification-projection.v1");
+        bytes.extend_from_slice(QUALIFICATION_PROJECTION_SCHEMA.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(self.qualification_policy.as_bytes());
+        bytes.push(0);
         bytes.extend_from_slice(b"synthetic-qualification");
+        bytes.push(0);
         for relation in &self.relations {
             bytes.extend_from_slice(relation.relation_digest().as_bytes());
             bytes.push(0);
@@ -197,6 +340,37 @@ impl QualificationProjection {
         }
         closure
     }
+}
+
+fn projection_is_acyclic(relations: &[EngineeringRelation]) -> bool {
+    let mut indegree: BTreeMap<EngineeringObjectId, usize> = BTreeMap::new();
+    let mut outgoing: BTreeMap<EngineeringObjectId, Vec<EngineeringObjectId>> = BTreeMap::new();
+
+    for relation in relations {
+        indegree.entry(relation.source.clone()).or_default();
+        *indegree.entry(relation.target.clone()).or_default() += 1;
+        outgoing.entry(relation.source.clone()).or_default().push(relation.target.clone());
+    }
+
+    let mut queue: VecDeque<_> = indegree.iter()
+        .filter_map(|(node, degree)| (*degree == 0).then_some(node.clone()))
+        .collect();
+    let mut visited = 0usize;
+    while let Some(node) = queue.pop_front() {
+        visited += 1;
+        if let Some(targets) = outgoing.get(&node) {
+            for target in targets {
+                let degree = indegree.get_mut(target).expect("target exists");
+                *degree -= 1;
+                if *degree == 0 { queue.push_back(target.clone()); }
+            }
+        }
+    }
+    visited == indegree.len()
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -358,6 +532,48 @@ mod tests {
         let before = graph.qualification_projection().unwrap().projection_digest();
         graph.add_relation(rel(&claim, &prediction, EngineeringRelationKind::Contradicts));
         assert_eq!(before, graph.qualification_projection().unwrap().projection_digest());
+    }
+
+
+    #[test]
+    fn projection_is_serializable_and_validated_on_deserialization() {
+        let graph = fixture();
+        let projection = graph.qualification_projection().unwrap();
+        let json = serde_json::to_string(&projection).unwrap();
+        let restored: QualificationProjection = serde_json::from_str(&json).unwrap();
+        assert_eq!(projection, restored);
+        assert!(restored.validate().is_ok());
+    }
+
+    #[test]
+    fn projection_records_source_snapshot_separately_from_projection_identity() {
+        let prediction = object("prediction", "p", A);
+        let claim = object("scientific_claim", "c", B);
+        let mut graph = ScientificLineageGraph::new();
+        graph.add_relation(rel(&prediction, &claim, EngineeringRelationKind::Supports));
+        let before = graph.qualification_projection().unwrap();
+        graph.add_relation(rel(&claim, &prediction, EngineeringRelationKind::Contradicts));
+        let after = graph.qualification_projection().unwrap();
+        assert_ne!(before.source_graph_digest(), after.source_graph_digest());
+        assert_eq!(before.projection_digest(), after.projection_digest());
+    }
+
+    #[test]
+    fn isolated_node_changes_source_graph_identity() {
+        let mut graph = fixture();
+        let before = graph.graph_digest();
+        graph.add_node(object("definition", "isolated", A));
+        assert_ne!(before, graph.graph_digest());
+    }
+
+    #[test]
+    fn tampered_projection_is_rejected() {
+        let graph = fixture();
+        let projection = graph.qualification_projection().unwrap();
+        let mut json = serde_json::to_value(&projection).unwrap();
+        json["qualification_policy"] = serde_json::json!("tampered-policy");
+        let result: Result<QualificationProjection, _> = serde_json::from_value(json);
+        assert!(result.is_err());
     }
 
     #[test]
