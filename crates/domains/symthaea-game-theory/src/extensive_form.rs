@@ -211,6 +211,60 @@ mod tests {
         assert!(game.validate().is_ok());
     }
 
+
+    #[test]
+    fn rejects_decision_actions_that_disagree_with_information_set() {
+        let mut game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(2), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information: info(),
+        };
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::DecisionActionsMismatch(DecisionStateId(0)))
+        );
+
+        game.nodes[0] = ExtensiveNode::Decision {
+            state: DecisionStateId(0),
+            player: PlayerId(1),
+            actions: vec![
+                Transition { action: ActionId(0), next: DecisionStateId(1) },
+                Transition { action: ActionId(1), next: DecisionStateId(2) },
+            ],
+        };
+        assert!(matches!(
+            game.validate(),
+            Err(ExtensiveGameError::DecisionPlayerMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_node_ids() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Terminal { state: DecisionStateId(0), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(0), payoffs: vec![0.0] },
+            ],
+            information: info(),
+        };
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::DuplicateNodeId(DecisionStateId(0)))
+        );
+    }
+
     #[test]
     fn rejects_non_normalized_chance() {
         let game = ExtensiveGame {
