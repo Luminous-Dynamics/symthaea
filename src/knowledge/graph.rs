@@ -15,6 +15,7 @@
 use super::encoding::FactEncoding;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
+use symthaea_epistemic_types::{MemoryKind, MemoryProvenance};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,13 @@ pub type FactId = u64;
 /// A fact stored in the knowledge graph with temporal metadata
 #[derive(Debug, Clone)]
 pub struct TemporalFact {
-    /// Unique identifier
+    /// Stable semantic-memory identity, independent of the in-process FactId.
+    pub memory_id: String,
+    /// Optional canonical identity assigned by the epistemic admission boundary.
+    pub canonical_identity: Option<String>,
+    /// Provenance family shared by representations of the same source lineage.
+    pub provenance_family: Option<String>,
+    /// Unique in-process retrieval identifier
     pub id: FactId,
     /// HDC encoding of this fact
     pub encoding: FactEncoding,
@@ -153,9 +160,13 @@ impl EnhancedKnowledgeGraph {
 
         let id = self.next_id;
         self.next_id += 1;
+        let memory_id = uuid::Uuid::new_v4().to_string();
 
         let confidence = encoding.confidence;
         let fact = TemporalFact {
+            memory_id,
+            canonical_identity: None,
+            provenance_family: None,
             id,
             encoding,
             inserted_at_cycle: current_cycle,
@@ -530,6 +541,9 @@ impl EnhancedKnowledgeGraph {
         let id: FactId = self.next_id;
         self.next_id += 1;
         let fact = TemporalFact {
+            memory_id: record.memory_id.clone(),
+            canonical_identity: record.canonical_identity.clone(),
+            provenance_family: record.provenance_family.clone(),
             id,
             encoding,
             inserted_at_cycle: record.cycle,
@@ -555,6 +569,9 @@ impl EnhancedKnowledgeGraph {
         self.facts
             .values()
             .map(|f| super::persistence::FactRecord {
+                memory_id: f.memory_id.clone(),
+                canonical_identity: f.canonical_identity.clone(),
+                provenance_family: f.provenance_family.clone(),
                 vector_bytes: f.encoding.vector.0.to_vec(),
                 source_text: f.encoding.source_text.clone(),
                 confidence: f.confidence,
