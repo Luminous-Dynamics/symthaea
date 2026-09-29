@@ -237,6 +237,18 @@ pub enum TerrainQuality {
     Invalid,
 }
 
+/// Vertical reference used by a terrain sample. Values must never be
+/// interpreted as interchangeable heights without an explicit conversion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerrainVerticalDatum {
+    /// Height above a named areoid/equipotential surface.
+    AreoidRelative,
+    /// Height above the spherical reference radius in MarsTetherReference.
+    ReferenceSphereRelative,
+    /// Absolute distance from Mars' center of mass.
+    PlanetocentricRadius,
+}
+
 /// Terrain observation in the same areocentric, east-positive convention
 /// used by the MOLA MEGDR products. Elevation is relative to the supplied
 /// terrain product's vertical datum (typically its areoid), not automatically
@@ -247,6 +259,7 @@ pub struct TerrainSample {
     pub longitude_rad: f64,
     pub elevation_m: Option<f64>,
     pub elevation_uncertainty_m: Option<f64>,
+    pub vertical_datum: TerrainVerticalDatum,
     pub slope_rad: Option<f64>,
     pub roughness_m: Option<f64>,
     pub quality: TerrainQuality,
@@ -282,10 +295,51 @@ pub enum FeasibilityState {
     HigherFidelityRequired,
 }
 
+/// Converted terrain height above the kernel reference sphere, with a
+/// conservative absolute uncertainty bound in metres.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RadialTerrainElevation {
+    pub elevation_above_reference_m: f64,
+    pub uncertainty_bound_m: f64,
+}
+
+/// Convert a terrain sample to height above the kernel reference sphere.
+/// For areoid-relative samples, both the areoid radius and its uncertainty
+/// must be supplied from a compatible, versioned body-fixed product. Bounds
+/// are combined by addition (worst-case), not root-sum-square, because their
+/// statistical independence is not established here.
+pub fn radial_terrain_elevation(
+    reference: MarsTetherReference,
+    sample: &TerrainSample,
+    areoid_radius_m: Option<f64>,
+    areoid_uncertainty_m: Option<f64>,
+) -> Option<RadialTerrainElevation> {
+    if !sample.is_usable() {
+        return None;
+    }
+    let height = sample.elevation_m?;
+    let sample_uncertainty = sample.elevation_uncertainty_m?;
+    let (radial_elevation, uncertainty) = match sample.vertical_datum {
+        TerrainVerticalDatum::AreoidRelative => {
+            let areoid = areoid_radius_m?;
+            let areoid_uncertainty = areoid_uncertainty_m?;
+            if !areoid.is_finite() || !areoid_uncertainty.is_finite() || areoid_uncertainty < 0.0 {
+                return None;
+            }
+            (areoid + height - reference.radius_m, areoid_uncertainty + sample_uncertainty)
+        }
+        TerrainVerticalDatum::ReferenceSphereRelative => (height, sample_uncertainty),
+        TerrainVerticalDatum::PlanetocentricRadius => (height - reference.radius_m, sample_uncertainty),
+    };
+    if !radial_elevation.is_finite() || radial_elevation <= -reference.radius_m || !uncertainty.is_finite() {
+        return None;
+    }
+    Some(RadialTerrainElevation { elevation_above_reference_m: radial_elevation, uncertainty_bound_m: uncertainty })
+}
+
 /// Convert areoid-relative MOLA topography into radial elevation above the
-/// kernel's spherical reference radius. The caller must supply an areoid
-/// radius from a compatible body-fixed frame and epoch/product convention.
-/// This function does not infer an areoid from topography.
+/// kernel's spherical reference radius. Retained as a scalar helper for
+/// callers that already validate uncertainty and provenance separately.
 pub fn radial_elevation_from_areoid(
     reference: MarsTetherReference,
     areoid_radius_m: f64,
@@ -587,6 +641,7 @@ mod tests {
             longitude_rad: 0.0,
             elevation_m: Some(1200.0),
             elevation_uncertainty_m: Some(5.0),
+            vertical_datum: TerrainVerticalDatum::AreoidRelative,
             slope_rad: Some(0.02),
             roughness_m: Some(3.0),
             quality,
@@ -613,6 +668,25 @@ mod tests {
         let m = MarsTetherReference::MARS;
         assert_eq!(radial_elevation_from_areoid(m, m.radius_m + 120.0, 80.0), Some(200.0));
         assert!(radial_elevation_from_areoid(m, f64::NAN, 1.0).is_none());
+    }
+
+    #[test]
+    fn terrain_datum_conversion_preserves_conservative_uncertainty() {
+        let m = MarsTetherReference::MARS;
+        let sample = fixture_terrain(TerrainQuality::Measured);
+        let converted = radial_terrain_elevation(m, &sample, Some(m.radius_m + 120.0), Some(2.0)).unwrap();
+        assert_eq!(converted.elevation_above_reference_m, 1320.0);
+        assert_eq!(converted.uncertainty_bound_m, 7.0);
+        let mut direct = sample.clone();
+        direct.vertical_datum = TerrainVerticalDatum::ReferenceSphereRelative;
+        let converted = radial_terrain_elevation(m, &direct, None, None).unwrap();
+        assert_eq!(converted.elevation_above_reference_m, 1200.0);
+        assert_eq!(converted.uncertainty_bound_m, 5.0);
+        direct.vertical_datum = TerrainVerticalDatum::PlanetocentricRadius;
+        direct.elevation_m = Some(m.radius_m + 1200.0);
+        let converted = radial_terrain_elevation(m, &direct, None, None).unwrap();
+        assert_eq!(converted.elevation_above_reference_m, 1200.0);
+        assert!(radial_terrain_elevation(m, &sample, None, None).is_none());
     }
 
     #[test]
