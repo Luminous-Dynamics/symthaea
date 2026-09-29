@@ -556,6 +556,41 @@ mod tests {
     }
 
     #[test]
+    fn zero_observation_count_cannot_become_terrain() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("mola_adapter_zero_{}_label.lbl", std::process::id()));
+        let mut img = path.clone();
+        img.set_extension("img");
+        std::fs::write(&path, label()).unwrap();
+        std::fs::write(&img, vec![0u8; 64]).unwrap();
+
+        let product = MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").unwrap();
+
+        let mut count_path = path.clone();
+        count_path.set_file_name(format!("mola_adapter_zero_count_{}_label.lbl", std::process::id()));
+        let mut count_img = count_path.clone();
+        count_img.set_extension("img");
+        let count_label = label()
+            .replace("MEGT00N000HB", "MEGC00N000HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
+        std::fs::write(&count_path, count_label).unwrap();
+        std::fs::write(&count_img, vec![0u8; 64]).unwrap();
+
+        let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
+        let sample = product.sample_nearest_with_count(&counts, 0.0, 0.007, 3.0).unwrap();
+
+        assert_eq!(sample.quality, TerrainQuality::Missing);
+        assert!(sample.elevation_m.is_none());
+        assert!(!sample.is_usable());
+
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(img);
+        let _ = std::fs::remove_file(count_path);
+        let _ = std::fs::remove_file(count_img);
+    }
+
+    #[test]
     fn decodes_big_endian_sample_without_interpolation() {
         let mut path = std::env::temp_dir();
         path.push(format!("mola_adapter_sample_{}_label.lbl", std::process::id()));
