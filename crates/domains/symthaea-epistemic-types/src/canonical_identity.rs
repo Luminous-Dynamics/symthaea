@@ -6,8 +6,8 @@
 
 use crate::{sha256_hex, MemoryKind};
 
-pub const MEMORY_CANONICAL_ENCODING_DOMAIN: &[u8] = b"memory-canonical:v1\\0";
-pub const MEMORY_PROJECTION_ENCODING_DOMAIN: &[u8] = b"memory-projection:v1\\0";
+pub const MEMORY_CANONICAL_ENCODING_DOMAIN: &[u8] = b"memory-canonical:v1\0";
+pub const MEMORY_PROJECTION_ENCODING_DOMAIN: &[u8] = b"memory-projection:v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CanonicalEncodingError {
