@@ -219,6 +219,46 @@ impl Observation {
     }
 }
 
+/// Directed relationship between two observations in the evidence graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ObservationRelationKind {
+    /// The source observation provides positive evidence for the target.
+    Supports,
+    /// The source observation provides evidence against the target.
+    Contradicts,
+    /// The source independently agrees with the target observation.
+    Corroborates,
+    /// The source was computationally derived from the target.
+    DerivedFrom,
+    /// The observations support an identity match.
+    SameEntity,
+    /// The observations may refer to the same entity, but the match is unresolved.
+    PossibleSameEntity,
+}
+
+/// Auditable edge between observations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ObservationRelation {
+    pub source_observation_id: String,
+    pub target_observation_id: String,
+    pub kind: ObservationRelationKind,
+}
+
+impl ObservationRelation {
+    /// Validate graph-edge invariants before insertion.
+    pub fn validate(&self) -> Result<(), ObservationValidationError> {
+        if self.source_observation_id.trim().is_empty()
+            || self.target_observation_id.trim().is_empty()
+        {
+            return Err(ObservationValidationError::EmptyRelationId);
+        }
+        if self.source_observation_id == self.target_observation_id {
+            return Err(ObservationValidationError::SelfRelation);
+        }
+        Ok(())
+    }
+}
+
 /// Fail-closed validation errors for malformed sensor metadata.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ObservationValidationError {
@@ -236,6 +276,10 @@ pub enum ObservationValidationError {
     InvalidContentHash,
     #[error("secret observations cannot permit raw-asset export")]
     SecretRawAssetExport,
+    #[error("relation observation ids must not be empty")]
+    EmptyRelationId,
+    #[error("an observation relation cannot point to itself")]
+    SelfRelation,
 }
 
 #[cfg(test)]
@@ -324,6 +368,32 @@ mod tests {
         assert_eq!(a, b);
         assert_ne!(a, c);
         assert!(a.validate().is_ok());
+    }
+
+    #[test]
+    fn relation_rejects_empty_ids() {
+        let relation = ObservationRelation {
+            source_observation_id: String::new(),
+            target_observation_id: "obs-2".into(),
+            kind: ObservationRelationKind::Supports,
+        };
+        assert_eq!(
+            relation.validate(),
+            Err(ObservationValidationError::EmptyRelationId)
+        );
+    }
+
+    #[test]
+    fn relation_rejects_self_edge() {
+        let relation = ObservationRelation {
+            source_observation_id: "obs-1".into(),
+            target_observation_id: "obs-1".into(),
+            kind: ObservationRelationKind::Corroborates,
+        };
+        assert_eq!(
+            relation.validate(),
+            Err(ObservationValidationError::SelfRelation)
+        );
     }
 
     #[test]
