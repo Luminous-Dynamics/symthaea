@@ -398,14 +398,13 @@ impl KnowledgePersistence {
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
             CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_memory_id_unique
-                ON knowledge_facts(memory_id)
-                WHERE memory_id IS NOT NULL;",
+                ON knowledge_facts(memory_id);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
 
         // Backward-compatible migration for databases created before EPF-011.
-        // The partial unique index above is safe for legacy NULL memory IDs and makes
-        // stable memory_id the idempotency key for all newly persisted records.
+        // SQLite UNIQUE indexes permit multiple NULLs, so legacy rows without a memory_id
+        // remain compatible while stable memory_id becomes the idempotency key for new rows.
         let columns: Vec<String> = conn
             .prepare("PRAGMA table_info(knowledge_facts)")
             .map_err(|e| format!("Schema inspect: {e}"))?
