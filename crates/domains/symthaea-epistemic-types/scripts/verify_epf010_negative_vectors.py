@@ -68,7 +68,12 @@ def canonical_bytes(receipt):
     for family in families:
         put_string(out, family)
 
-    profiles = sorted(set(receipt["retrieval_profile_versions"]))
+    raw_profiles = receipt["retrieval_profile_versions"]
+    if any(not profile for profile in raw_profiles):
+        raise ValueError("EmptyRetrievalProfileVersion")
+    profiles = sorted(raw_profiles)
+    if len(profiles) != len(set(profiles)):
+        raise ValueError("DuplicateRetrievalProfileVersion")
     out.extend(struct.pack(">I", len(profiles)))
     for profile in profiles:
         put_string(out, profile)
