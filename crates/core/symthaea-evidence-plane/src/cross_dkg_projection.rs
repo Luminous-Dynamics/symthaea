@@ -352,7 +352,7 @@ mod tests {
         ).unwrap();
         let c = CrossDkgLinkCollection::new(vec![l2]).unwrap();
         assert_eq!(
-            FederatedProjectionReceipt::new("projection:1", "1", &c, &[r]),
+            FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]),
             Err(ProjectionReceiptError::ReceiptNotInCollection)
         );
     }
