@@ -139,6 +139,35 @@ impl EvidenceTemporalEvaluationV1 {
         self.status
     }
 
+    /// Evaluate an observed window using strict expiry semantics for
+    /// authoritative admission: equality with the validity endpoint is expired.
+    ///
+    /// This deliberately does not change the inclusive replayable evidence
+    /// semantics of evaluate().
+    pub fn evaluate_strict_expiry(
+        currentness: EvidenceCurrentnessV1,
+        evaluated_at: UnixMillisV1,
+    ) -> Self {
+        let status = match currentness {
+            EvidenceCurrentnessV1::Static => EvidenceTemporalStatusV1::Current,
+            EvidenceCurrentnessV1::Unknown => EvidenceTemporalStatusV1::Unknown,
+            EvidenceCurrentnessV1::Observed(window) => {
+                if evaluated_at < window.observed_at() {
+                    EvidenceTemporalStatusV1::NotYetValid
+                } else if evaluated_at >= window.valid_until() {
+                    EvidenceTemporalStatusV1::Expired
+                } else {
+                    EvidenceTemporalStatusV1::Current
+                }
+            }
+        };
+        Self {
+            currentness,
+            evaluated_at,
+            status,
+        }
+    }
+
     pub const fn is_current(self) -> bool {
         matches!(self.status, EvidenceTemporalStatusV1::Current)
     }
