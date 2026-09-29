@@ -187,6 +187,7 @@ FORBIDDEN_ROOT_WORKFLOW_SNIPPETS = (
     "git checkout \\${PR_HEAD_SHA}",
     "git checkout refs/pull/",
     "actions/download-artifact",
+    "filter:",
 )
 
 def validate_root_workflow_text(text: str) -> None:
