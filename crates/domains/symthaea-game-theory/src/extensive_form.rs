@@ -423,7 +423,7 @@ impl ExtensiveGame {
             ExtensiveNode::Chance { state, outcomes } => {
                 for outcome in outcomes {
                     let mut next = history.clone();
-                    next.push(HistoryEvent::Chance { state: *state, outcome: outcome.outcome, next: outcome.next });
+                    next.push(HistoryEvent::Chance { state: *state, outcome: outcome.outcome, next: outcome.next, visibility: outcome.visibility.clone() });
                     self.collect_information_histories(outcome.next, next, histories)?;
                 }
             }
@@ -963,6 +963,7 @@ mod tests {
                             outcome: ChanceOutcomeId(42),
                             probability: 1.0,
                             next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
                         },
                     ],
                 },
@@ -973,10 +974,12 @@ mod tests {
                         Transition {
                             action: ActionId(0),
                             next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
                         },
                         Transition {
                             action: ActionId(1),
                             next: DecisionStateId(3),
+                            visibility: EventVisibility::Public,
                         },
                     ],
                 },
