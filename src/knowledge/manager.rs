@@ -25,7 +25,7 @@ use super::causal_bridge::CausalKnowledgeBridge;
 use super::encoding::KnowledgeEncoder;
 use super::extraction::{EntityType, KnowledgeExtractor};
 use super::graph::{ContradictionAlert, EnhancedKnowledgeGraph, FactSearchResult};
-use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord};
+use super::persistence::{CausalEdgeRecord, KnowledgePersistence, OntologyRecord, ProvenanceRelationRecord};
 use super::reasoning_context::{KnowledgeQueryResult, ReasoningContext};
 use std::collections::VecDeque;
 use symthaea_core::hdc::unified_hv::BinaryHV;
@@ -289,6 +289,18 @@ impl KnowledgeManager {
                 }
                 if !facts.is_empty() {
                     tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
+                }
+            }
+            // Load append-only provenance relations after facts so endpoint identities exist.
+            if let Ok(relations) = p.load_provenance_relations() {
+                let mut loaded_relations = 0usize;
+                for record in relations {
+                    if graph.import_provenance_relation(record.into()).unwrap_or(false) {
+                        loaded_relations += 1;
+                    }
+                }
+                if loaded_relations > 0 {
+                    tracing::info!(count = loaded_relations, "Knowledge: loaded provenance relations from SQLite");
                 }
             }
             // Load existing causal edges
@@ -761,6 +773,16 @@ impl KnowledgeManager {
             if let Err(e) = p.save_facts(&facts) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save facts");
             }
+            let provenance_relations: Vec<ProvenanceRelationRecord> = self
+                .graph
+                .provenance_relations()
+                .iter()
+                .cloned()
+                .map(Into::into)
+                .collect();
+            if let Err(e) = p.save_provenance_relations(&provenance_relations) {
+                tracing::warn!(error = %e, "Knowledge persistence: failed to save provenance relations");
+            }
             if let Err(e) = p.save_causal_edges(&edges) {
                 tracing::warn!(error = %e, "Knowledge persistence: failed to save edges");
             }
@@ -1151,7 +1173,7 @@ impl KnowledgeManager {
         results
             .iter()
             .take(top_k)
-            .map(|r| (format!("fact:{}", r.fact_id), r.similarity))
+            .filter_map(|r| self.graph.get_fact(r.fact_id).map(|f| (f.encoding.source_text.clone(), r.similarity)))
             .collect()
     }
 
