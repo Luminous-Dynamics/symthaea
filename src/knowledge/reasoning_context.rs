@@ -154,13 +154,18 @@ impl ReasoningContext {
         // 1. Convert search results to grounded facts
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
-            .map(|r| GroundedFact {
-                provenance: manager.graph().provenance(r.fact_id),
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|r| {
+                let fact = manager.graph().get_fact(r.fact_id)?;
+                Some(GroundedFact {
+                    provenance: manager.graph().provenance(r.fact_id),
+                    // Grounded context must expose the persisted claim itself rather than
+                    // a process-local FactId label; the FactId remains retrieval metadata.
+                    text: fact.encoding.source_text.clone(),
+                    confidence: r.confidence,
+                    similarity: r.similarity,
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
+                })
             })
             .collect();
 
