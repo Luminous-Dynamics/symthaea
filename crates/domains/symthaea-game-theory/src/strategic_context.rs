@@ -114,7 +114,7 @@ impl Strategy {
 
 /// A profile of complete contingent plans, one per player.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StrategyProfilePlan(pub Vec<Strategy>);
+pub struct StrategyProfilePlan(pub Vec<Strategy>);\n\nimpl StrategyProfilePlan {\n    /// Validate every player plan against its own decision points.\n    pub fn validate(&self, points: &[(PlayerId, Vec<DecisionPoint>)]) -> Result<(), ContextError> {\n        if self.0.len() != points.len() {\n            return Err(ContextError::ProfilePlayerCount { expected: points.len(), actual: self.0.len() });\n        }\n        for (strategy, (player, decision_points)) in self.0.iter().zip(points) {\n            if strategy.player != *player {\n                return Err(ContextError::PlayerMismatch { information_set: InformationSetId(usize::MAX), expected: *player, actual: strategy.player });\n            }\n            strategy.validate(decision_points)?;\n        }\n        Ok(())\n    }\n}
 
 /// Validation failures for information-aware decision contracts.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,7 +122,7 @@ pub enum ContextError {
     NoLegalActions,
     DuplicateLegalAction(ActionId),
     DuplicateInformationSet(InformationSetId),
-    PlayerMismatch { information_set: InformationSetId, expected: PlayerId, actual: PlayerId },
+    PlayerMismatch { information_set: InformationSetId, expected: PlayerId, actual: PlayerId },\n    ProfilePlayerCount { expected: usize, actual: usize },
     MissingDecision(InformationSetId),
     UnknownInformationSet(InformationSetId),
     IllegalAction { information_set: InformationSetId, action: ActionId },
