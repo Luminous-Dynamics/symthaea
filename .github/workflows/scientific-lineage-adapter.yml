@@ -13,6 +13,7 @@ on:
       - "crates/domains/symthaea-engineering/src/scientific_lineage.rs"
       - "crates/domains/symthaea-engineering/Cargo.toml"
       - "crates/domains/symthaea-engineering/tests/cp04_digest_boundaries.rs"
+      - "crates/domains/symthaea-engineering/tests/cp04_negative_contract_vectors.rs"
   workflow_dispatch:
 
 permissions:
@@ -37,5 +38,7 @@ jobs:
         run: cargo test -p symthaea-engineering checked_in_fixture_round_trips_through_rust_adapter --lib
       - name: Verify digest boundary mutations
         run: cargo test -p symthaea-engineering --test cp04_digest_boundaries
+      - name: Verify negative contract vectors
+        run: cargo test -p symthaea-engineering --test cp04_negative_contract_vectors
       - name: Verify fixture remains unchanged
         run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py
