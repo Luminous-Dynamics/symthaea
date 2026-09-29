@@ -118,7 +118,9 @@ impl RetrievalEngine {
         candidates: impl IntoIterator<Item = MemoryRetrievalCandidate>,
     ) -> Result<VerifiedRetrievalExecution, RetrievalExecutionError> {
         let (groups, receipt) = try_retrieve(request, candidates)?;
-        let receipt = receipt.with_retrieval_profile_versions(self.profile.receipt_versions());
+        let receipt = receipt
+            .seal_with_retrieval_profile_versions(self.profile.receipt_versions())
+            .map_err(|error| RetrievalExecutionError::ReceiptIntegrity(ReceiptVerificationError::Canonicalization(error)))?;
         let receipt = receipt.verify().map_err(RetrievalExecutionError::ReceiptIntegrity)?;
         Ok(VerifiedRetrievalExecution {
             groups,
