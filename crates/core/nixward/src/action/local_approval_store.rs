@@ -25,7 +25,7 @@ use super::local_approval_submission::{
     admit_verified_local_submission_v1,
 };
 use super::approver_evidence::VerifiedLocalUnixPeerCredentialV1;
-use super::temporal::UnixMillisV1;
+use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use thiserror::Error;
@@ -99,11 +99,11 @@ impl LocalApprovalRequestStoreV1 {
     /// The mutex remains held from lookup through admission and removal. Two
     /// concurrent consumers of the same request cannot both observe and remove
     /// the same pending request successfully.
-    pub fn consume_verified_submission(
+    pub(crate) fn consume_verified_submission(
         &self,
         submission: &LocalApprovalSubmissionV1,
         verified_peer: &VerifiedLocalUnixPeerCredentialV1,
-        now: UnixMillisV1,
+        evaluation: AuthoritativeEvaluationV1,
     ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1> {
         let mut pending = self
             .pending
@@ -114,7 +114,7 @@ impl LocalApprovalRequestStoreV1 {
             let request = pending
                 .get(&submission.request_id)
                 .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
-            admit_verified_local_submission_v1(submission, request, verified_peer, now)?
+            admit_verified_local_submission_v1(submission, request, verified_peer, evaluation)?
         };
 
         let removed = pending
@@ -125,7 +125,7 @@ impl LocalApprovalRequestStoreV1 {
         Ok(ConsumedLocalApprovalDecisionV1 {
             request_id: submission.request_id.clone(),
             decision_evidence: decision,
-            consumed_at_unix_ms: now.as_u64(),
+            consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
         })
     }
 
@@ -361,8 +361,8 @@ mod tests {
 
         assert_eq!(
             store
-                .consume_verified_submission(&old_submission, &peer(1000, 1), ms(1_300))
-                .unwrap_err(),
+                .consume_verified_submission(&old_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+            .unwrap_err(),
             LocalApprovalRequestStoreErrorV1::RequestNotPending
         );
 
@@ -373,7 +373,7 @@ mod tests {
         )
         .unwrap();
         let consumed = store
-            .consume_verified_submission(&new_submission, &peer(1000, 1), ms(1_300))
+            .consume_verified_submission(&new_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert_eq!(consumed.request_id(), new_id);
     }
@@ -426,7 +426,7 @@ mod tests {
         assert_eq!(observation, PendingRequestCurrentnessV1::Current);
 
         store
-            .consume_verified_submission(&submission, &peer(1000, 1), ms(1_400))
+            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
             .unwrap();
 
         // The earlier Current result is intentionally only a historical observation.
@@ -487,7 +487,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         let consumed = store
-            .consume_verified_submission(&submission, &peer(1000, 1), ms(1_300))
+            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
 
         assert_eq!(consumed.request_id(), request_id);
@@ -522,7 +522,7 @@ mod tests {
         assert!(store.is_pending(&request_id).unwrap());
 
         store
-            .consume_verified_submission(&valid_submission, &peer(1000, 1), ms(1_300))
+            .consume_verified_submission(&valid_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert!(!store.is_pending(&request_id).unwrap());
     }
@@ -541,7 +541,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         let consumed = store
-            .consume_verified_submission(&submission, &peer(1000, 1), ms(1_300))
+            .consume_verified_submission(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         assert_eq!(consumed.decision_kind(), LocalApprovalDecisionKindV1::Denied);
         assert_eq!(store.pending_count().unwrap(), 0);
@@ -569,7 +569,7 @@ mod tests {
             handles.push(thread::spawn(move || {
                 let peer = peer(uid, pid);
                 barrier.wait();
-                store.consume_verified_submission(&submission, &peer, ms(1_300))
+                store.consume_verified_submission(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             }));
         }
         barrier.wait();

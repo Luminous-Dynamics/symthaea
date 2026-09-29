@@ -7,7 +7,42 @@
 //! units from crossing realization/authorization boundaries, and to preserve the
 //! difference between current, future-dated, expired, static, and unknown evidence.
 
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
+
+/// Runtime-owned wall-clock observation used for authoritative admission.
+///
+/// The constructor is crate-private so external callers cannot manufacture an
+/// authoritative evaluation timestamp. Deterministic construction remains an
+/// internal qualification seam, while production code samples the OS wall clock
+/// at the admission boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct AuthoritativeEvaluationV1 {
+    evaluated_at: UnixMillisV1,
+}
+
+impl AuthoritativeEvaluationV1 {
+    pub(crate) fn sample_from_system_clock() -> Result<Self, NixTimeErrorV1> {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| NixTimeErrorV1::SystemClockBeforeUnixEpoch)?;
+        let millis = duration
+            .as_millis()
+            .try_into()
+            .map_err(|_| NixTimeErrorV1::ConversionOverflow)?;
+        Ok(Self {
+            evaluated_at: UnixMillisV1::new(millis),
+        })
+    }
+
+    pub(crate) const fn from_unix_millis_for_test(evaluated_at: UnixMillisV1) -> Self {
+        Self { evaluated_at }
+    }
+
+    pub(crate) const fn evaluated_at(self) -> UnixMillisV1 {
+        self.evaluated_at
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnixMillisV1(u64);
@@ -139,6 +174,35 @@ impl EvidenceTemporalEvaluationV1 {
         self.status
     }
 
+    /// Evaluate an observed window using strict expiry semantics for
+    /// authoritative admission: equality with the validity endpoint is expired.
+    ///
+    /// This deliberately does not change the inclusive replayable evidence
+    /// semantics of evaluate().
+    pub fn evaluate_strict_expiry(
+        currentness: EvidenceCurrentnessV1,
+        evaluated_at: UnixMillisV1,
+    ) -> Self {
+        let status = match currentness {
+            EvidenceCurrentnessV1::Static => EvidenceTemporalStatusV1::Current,
+            EvidenceCurrentnessV1::Unknown => EvidenceTemporalStatusV1::Unknown,
+            EvidenceCurrentnessV1::Observed(window) => {
+                if evaluated_at < window.observed_at() {
+                    EvidenceTemporalStatusV1::NotYetValid
+                } else if evaluated_at >= window.valid_until() {
+                    EvidenceTemporalStatusV1::Expired
+                } else {
+                    EvidenceTemporalStatusV1::Current
+                }
+            }
+        };
+        Self {
+            currentness,
+            evaluated_at,
+            status,
+        }
+    }
+
     pub const fn is_current(self) -> bool {
         matches!(self.status, EvidenceTemporalStatusV1::Current)
     }
@@ -152,6 +216,8 @@ pub enum NixTimeErrorV1 {
     ConversionOverflow,
     #[error("millisecond timestamp is not an exact whole-second value")]
     NotExactSeconds,
+    #[error("system clock is before the Unix epoch")]
+    SystemClockBeforeUnixEpoch,
 }
 
 #[cfg(test)]
@@ -173,6 +239,26 @@ mod tests {
             assert!(result.is_current());
             assert_eq!(result.evaluated_at(), UnixMillisV1::new(now));
         }
+    }
+
+    #[test]
+    fn strict_expiry_differs_from_inclusive_observation_only_at_endpoint() {
+        let before =
+            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(199_999));
+        assert_eq!(before.status(), EvidenceTemporalStatusV1::Current);
+
+        let exact =
+            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(200_000));
+        assert_eq!(exact.status(), EvidenceTemporalStatusV1::Expired);
+
+        let after =
+            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(200_001));
+        assert_eq!(after.status(), EvidenceTemporalStatusV1::Expired);
+
+        // The generic observational evaluator remains intentionally inclusive.
+        let observed_exact =
+            EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(200_000));
+        assert_eq!(observed_exact.status(), EvidenceTemporalStatusV1::Current);
     }
 
     #[test]

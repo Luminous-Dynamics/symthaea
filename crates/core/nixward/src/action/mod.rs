@@ -77,7 +77,6 @@ pub use local_approval_store::{
 };
 pub use local_approval_submission::{
     LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1,
-    admit_verified_local_submission_v1,
 };
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
