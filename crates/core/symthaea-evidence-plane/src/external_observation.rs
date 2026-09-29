@@ -63,7 +63,7 @@ impl ExternalExperimentalObservation {
  fn digest(&self)->String{
   let mut h=Sha256::new(); h.update(b"symthaea:external-experimental-observation:v2\0");
   for s in [self.observation_id.as_str(),self.execution_id.as_str(),self.observer_id.as_str(),self.institution_id.as_str(),
-   self.observed_at.as_str(),code(self.disposition),self.commitment_event_id.as_str(),self.candidate_id.as_str(),
+   self.observed_at.as_str(),code(self.disposition),self.commitment_event_id.as_str(),self.challenge_id.as_str(),self.criterion_id.as_str(),self.criterion_generation.as_str(),self.candidate_id.as_str(),
    self.source_candidate_id.as_str(),self.test_specification_id.as_str(),self.measurement_specification_id.as_str(),
    self.binding_digest.as_str(),self.observation_digest.as_str()] { h.update((s.len() as u64).to_be_bytes()); h.update(s.as_bytes()); }
   format!("sha256:{:x}",h.finalize())
