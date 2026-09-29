@@ -65,24 +65,80 @@ jobs:
           components: rustfmt,clippy
 
       - name: Focused formatting
+        id: format
         run: rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs
 
       - name: Focused package check
+        id: check
         run: cargo check -p symthaea-se-model --locked --all-targets
 
       - name: Focused package tests
+        id: test
         run: cargo test -p symthaea-se-model --locked
 
       - name: Focused strict Clippy
+        id: clippy
         run: cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
 
       - name: Record lock identity
+        id: lock
         shell: bash
         run: |
           set -euo pipefail
           sha256sum Cargo.lock | tee cargo-lock-sha256.txt
           git status --short
           test -z "$(git status --porcelain)"
+
+      - name: Emit primary evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          cat > se001q-repair-primary-manifest.json <<EOF
+          {
+            "schema": "se-repair-evidence-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "job": "${{ github.job }}",
+            "event": "${{ github.event_name }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "toolchain": "$EXPECTED_TOOLCHAIN",
+            "lock_sha256": "$lock_sha",
+            "commands": {
+              "format": "rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs",
+              "check": "cargo check -p symthaea-se-model --locked --all-targets",
+              "test": "cargo test -p symthaea-se-model --locked",
+              "clippy": "cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings"
+            },
+            "outcomes": {
+              "format": "${{ steps.format.outcome }}",
+              "check": "${{ steps.check.outcome }}",
+              "test": "${{ steps.test.outcome }}",
+              "clippy": "${{ steps.clippy.outcome }}",
+              "lock": "${{ steps.lock.outcome }}"
+            },
+            "observation_class": "reproduced",
+            "authority_class": "execution_evidence_only",
+            "qualification_state": "not_granted",
+            "positive_invariants": [
+              "repair checkout must equal expected repair SHA",
+              "pull request base must equal frozen v1.4 subject",
+              "working tree must remain clean",
+              "Cargo.lock identity is captured"
+            ],
+            "negative_invariants": [
+              "historical 47de7f2a306cffb66b5505786220590aa5f42e90 is not the experiment subject",
+              "execution evidence does not itself grant qualification authority"
+            ]
+          }
+          EOF
 
       - name: Upload primary execution capsule
         if: always()
@@ -96,6 +152,7 @@ jobs:
             base-ref.txt
             toolchain.txt
             cargo-lock-sha256.txt
+            se001q-repair-primary-manifest.json
           if-no-files-found: error
           retention-days: 90
 
@@ -131,13 +188,48 @@ jobs:
           components: clippy
 
       - name: Independent focused test replay
+        id: replay-test
         run: cargo test -p symthaea-se-model --locked
 
       - name: Independent focused check replay
+        id: replay-check
         run: cargo check -p symthaea-se-model --locked --all-targets
 
       - name: Independent strict Clippy replay
+        id: replay-clippy
         run: cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
+
+      - name: Emit replay evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          lock_sha="$(sha256sum Cargo.lock | awk '{print $1}')"
+          cat > se001q-repair-replay-manifest.json <<EOF
+          {
+            "schema": "se-repair-evidence-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "job": "${{ github.job }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "toolchain": "$EXPECTED_TOOLCHAIN",
+            "lock_sha256": "$lock_sha",
+            "outcomes": {
+              "test": "${{ steps.replay-test.outcome }}",
+              "check": "${{ steps.replay-check.outcome }}",
+              "clippy": "${{ steps.replay-clippy.outcome }}"
+            },
+            "observation_class": "reproduced",
+            "authority_class": "independent_execution_evidence",
+            "qualification_state": "not_granted"
+          }
+          EOF
 
       - name: Upload replay capsule
         if: always()
@@ -147,6 +239,7 @@ jobs:
           name: se001q-repair-replay-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             Cargo.lock
+            se001q-repair-replay-manifest.json
           if-no-files-found: error
           retention-days: 90
 
