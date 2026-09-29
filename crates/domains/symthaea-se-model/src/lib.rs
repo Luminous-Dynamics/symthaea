@@ -37,11 +37,11 @@ pub enum ModelError {
     DuplicateSymmetricRelation,
     #[error("self relation is not allowed for {0:?}")]
     SelfRelation(RelationKind),
-    #[error("invalid role pairing for {kind:?}: {source:?} -> {target:?}")]
+    #[error("invalid role pairing for {kind:?}: {source_kind:?} -> {target_kind:?}")]
     InvalidRelationRoles {
         kind: RelationKind,
-        source: NodeKind,
-        target: NodeKind,
+        source_kind: NodeKind,
+        target_kind: NodeKind,
     },
     #[error("relation {0:?} would introduce a forbidden cycle")]
     CyclicRelation(RelationKind),
@@ -710,8 +710,8 @@ impl EngineeringGraph {
         } else {
             Err(ModelError::InvalidRelationRoles {
                 kind: relation.kind,
-                source,
-                target,
+                source_kind: source,
+                target_kind: target,
             })
         }
     }
@@ -1215,4 +1215,27 @@ mod tests {
         assert_eq!(paths[0].affected, battery);
         assert_eq!(paths[0].steps[0].from, change);
     }
+    #[test]
+    fn invalid_relation_roles_are_context_not_error_source() {
+        let error = ModelError::InvalidRelationRoles {
+            kind: RelationKind::AllocatedTo,
+            source_kind: NodeKind::Requirement,
+            target_kind: NodeKind::Component,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "invalid role pairing for AllocatedTo: Requirement -> Component"
+        );
+        assert!(std::error::Error::source(&error).is_none());
+        assert!(matches!(
+            error,
+            ModelError::InvalidRelationRoles {
+                kind: RelationKind::AllocatedTo,
+                source_kind: NodeKind::Requirement,
+                target_kind: NodeKind::Component,
+            }
+        ));
+    }
+
 }
