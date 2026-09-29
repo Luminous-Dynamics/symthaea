@@ -496,6 +496,37 @@ mod tests {
     }
 
     #[test]
+    fn graph_digest_changes_when_epistemic_evidence_changes_but_projection_digest_does_not() {
+        let graph = fixture();
+        let base_projection = graph.qualification_projection().unwrap();
+        let mut changed = graph.clone();
+        let prediction = object("prediction", "strength-prediction", B);
+        let claim = object("scientific_claim", "claim-1", A);
+        changed.add_relation(rel(&prediction, &claim, EngineeringRelationKind::Supports));
+        let changed_projection = changed.qualification_projection().unwrap();
+
+        assert_ne!(graph.graph_digest(), changed.graph_digest());
+        assert_eq!(base_projection.projection_digest(), changed_projection.projection_digest());
+        assert_ne!(base_projection.source_graph_digest(), changed_projection.source_graph_digest());
+    }
+
+    #[test]
+    fn graph_and_projection_digests_are_invariant_to_relation_insertion_order() {
+        let original = fixture();
+        let relations: Vec<_> = original.relations().cloned().collect();
+        let mut reversed = ScientificLineageGraph::new();
+        for relation in relations.into_iter().rev() {
+            reversed.add_relation(relation);
+        }
+
+        assert_eq!(original.graph_digest(), reversed.graph_digest());
+        assert_eq!(
+            original.qualification_projection().unwrap().projection_digest(),
+            reversed.qualification_projection().unwrap().projection_digest(),
+        );
+    }
+
+    #[test]
     fn epistemic_support_is_in_graph_but_never_in_qualification_closure() {
         let graph = fixture();
         let prediction = object("prediction", "strength-prediction", B);
