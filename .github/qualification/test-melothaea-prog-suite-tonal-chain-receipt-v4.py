@@ -275,6 +275,16 @@ class ReceiptVerifierAdversarialTests(unittest.TestCase):
             result = self.verify(receipt)
             self.assertNotEqual(result.returncode, 0)
 
+    def test_well_formed_compiler_hash_is_not_execution_authentication(self) -> None:
+        # Syntax validation of this field is not proof of the compiler executed.
+        values = valid_values()
+        values["rustc_commit_hash"] = "a" * 40
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = Path(tmp) / "receipt.tsv"
+            receipt.write_text(render(values), encoding="utf-8")
+            result = self.verify(receipt)
+            self.assertEqual(result.returncode, 0, msg=result.stderr)
+
     def test_github_provider_requires_positive_run_identity(self) -> None:
         values = valid_values()
         values["qualification_provider"] = "github-actions"
