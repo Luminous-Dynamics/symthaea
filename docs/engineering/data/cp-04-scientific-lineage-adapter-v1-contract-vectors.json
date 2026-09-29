@@ -1,7 +1,6 @@
 {
   "schema": "symthaea.cp-04-qualification-adapter-contract-v1",
   "fixture": "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json",
-  "fixture_sha256": "6798d5086b4224557807ed060331fc000d9caacd8fbc868d4b7d18f8e925b4a2",
   "source_graph_digest": "1bdcb0a0dc9cc82a501ccbc3ded3241d4fa736d9592f93d91ef4386e06653ec2",
   "projection_digest": "024cb4f186e332085f6cd4c6089f41bfbbd640e62bf3e946155ce4c3bc79473a",
   "artifact_digest": "6798d5086b4224557807ed060331fc000d9caacd8fbc868d4b7d18f8e925b4a2",
