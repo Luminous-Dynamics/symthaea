@@ -72,7 +72,10 @@
       "binding_equivariance_error",
       "bundle_equivariance_error",
       "permutation_equivariance_error",
-      "round_trip_hysteresis"
+      "round_trip_hysteresis",
+      "hadamard_binding_equivariance_error",
+      "hadamard_bundle_equivariance_error",
+      "hadamard_permutation_equivariance_error"
     ],
     "threshold_policy": "characterization_only_no_quality_gate",
     "deterministic": true
@@ -86,5 +89,24 @@
     "evolve_high_then_project",
     "project_then_evolve",
     "native_low_direct"
+  ],
+  "projection_candidates": [
+    {
+      "family": "legacy_dilate",
+      "version": "existing",
+      "directions": [
+        "expand",
+        "contract"
+      ],
+      "status": "characterization_negative_control"
+    },
+    {
+      "family": "hadamard_truncate",
+      "version": "v1",
+      "directions": [
+        "contract"
+      ],
+      "status": "research_candidate"
+    }
   ]
 }
