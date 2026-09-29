@@ -109,7 +109,7 @@ impl EvidenceView {
         if item_ids != receipt_ids {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
-        if receipt.canonical_digest() != receipt.canonical_digest() {
+        if !receipt.is_self_consistent() {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
         let mut view = Self {
