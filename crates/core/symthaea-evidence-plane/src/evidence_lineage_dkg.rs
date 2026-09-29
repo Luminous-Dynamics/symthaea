@@ -354,6 +354,103 @@ fn edge_type(t: DkgEdgeType) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::candidate_commitment::{
+        commit_candidate_envelope, CandidatePredictionBinding, CandidatePredictionSource,
+    };
+    use crate::criterion_evidence::{
+        CriterionEvidenceDisposition, CriterionEvidenceEligibility, CriterionEvidenceInput,
+    };
+    use crate::external_observation::{ExternalExperimentalObservation, ExternalObservationInput, ObservationDisposition};
+    use crate::independent_assessment::{AssessmentInput, AssessmentOutcome, IndependentAssessment};
+    use crate::prospective::ProspectiveProvenance;
+    use crate::replication::{ReplicationInput, ReplicationOutcome, ReplicationRecord};
+
+    fn evidence_chain() -> (
+        crate::candidate_commitment::CandidatePredictionCommitment,
+        ExternalExperimentalObservation,
+        IndependentAssessment,
+        ReplicationRecord,
+        CriterionEvidenceEligibility,
+        CriterionEvidenceEligibility,
+    ) {
+        let source = CandidatePredictionSource {
+            candidate_id: "candidate:1".into(),
+            source_candidate_id: "source:1".into(),
+            test_specification_id: "test:1".into(),
+            measurement_specification_id: "measure:1".into(),
+            left_lineage: "left".into(),
+            right_lineage: "right".into(),
+        };
+        let binding = CandidatePredictionBinding::from_source(&source, b"prediction").unwrap();
+        let provenance = ProspectiveProvenance::new(
+            "input", "artifact", binding.lineage_digest().unwrap(),
+            "2026-09-28T08:00:00Z", "2026-09-28T09:00:00Z",
+        ).unwrap();
+        let commitment = commit_candidate_envelope(
+            &source, "challenge-1", "criterion-1", "generation-1",
+            "predictor", "2026-09-28T09:00:00Z", provenance, b"prediction",
+        ).unwrap();
+        let observation = ExternalExperimentalObservation::ingest(
+            &commitment, &binding,
+            ExternalObservationInput {
+                observation_id: "obs:1".into(),
+                execution_id: "exec:original".into(),
+                observer_id: "observer:original".into(),
+                institution_id: "institution:original".into(),
+                observed_at: "2026-09-29T10:00:00Z".into(),
+                disposition: ObservationDisposition::Reported,
+                observation_payload: b"observation".to_vec(),
+            },
+        ).unwrap();
+        let assessment = IndependentAssessment::assess(
+            &observation,
+            AssessmentInput {
+                assessment_id: "assessment:1".into(),
+                assessor_id: "assessor:1".into(),
+                assessor_institution_id: "review".into(),
+                independent_from_observer: true,
+                independence_basis: "separate".into(),
+                assessed_at: "2026-09-29T11:00:00Z".into(),
+                outcome: AssessmentOutcome::Supports,
+                assessment_payload: b"assessment".to_vec(),
+            },
+        ).unwrap();
+        let replication = ReplicationRecord::record(
+            &observation, &assessment,
+            ReplicationInput {
+                replication_id: "replication:1".into(),
+                execution_id: "exec:replica".into(),
+                observer_id: "observer:replica".into(),
+                institution_id: "institution:replica".into(),
+                independent_from_original_observer: true,
+                independence_basis: "distinct execution".into(),
+                replicated_at: "2026-09-29T12:00:00Z".into(),
+                outcome: ReplicationOutcome::ReplicatedSupportive,
+                replication_payload: b"replication".to_vec(),
+            },
+        ).unwrap();
+        let input = |evidence_id: &str, disposition| CriterionEvidenceInput {
+            evidence_id: evidence_id.into(),
+            challenge_id: "challenge-1".into(),
+            criterion_id: "criterion-1".into(),
+            criterion_generation: "generation-1".into(),
+            authority_id: "authority:1".into(),
+            authority_institution_id: "institution:authority".into(),
+            authority_basis: "official scorer designation".into(),
+            adjudicated_at: "2026-09-29T13:00:00Z".into(),
+            disposition,
+            authority_payload: evidence_id.as_bytes().to_vec(),
+        };
+        let original = CriterionEvidenceEligibility::adjudicate(
+            &observation, &assessment, &replication,
+            input("evidence:1", CriterionEvidenceDisposition::Deferred),
+        ).unwrap();
+        let replacement = original.supersede(
+            input("evidence:2", CriterionEvidenceDisposition::Eligible),
+            &observation, &assessment, &replication,
+        ).unwrap();
+        (commitment, observation, assessment, replication, original, replacement)
+    }
 
     fn node(id: &str, t: DkgNodeType) -> DkgNode {
         DkgNode { node_id: id.into(), node_type: t, record_digest: format!("sha256:{id}"), supersedes_node_id: None }
@@ -398,6 +495,42 @@ mod tests {
         let decoded: EvidenceLineageDkgProjection = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(p, decoded);
         assert!(decoded.verify_integrity());
+    }
+
+    #[test]
+    fn closed_history_projects_all_dispositions_and_supersession() {
+        let (c, o, a, r, original, replacement) = evidence_chain();
+        let p = EvidenceLineageDkgProjection::from_chain_history(
+            &c, &o, &a, &r, &[original.clone(), replacement.clone()],
+        ).unwrap();
+        assert!(p.verify_integrity());
+        assert_eq!(p.nodes.len(), 6);
+        assert_eq!(p.edges.len(), 7);
+        assert!(p.edges.iter().any(|e|
+            e.source_node_id == replacement.evidence_id
+                && e.edge_type == DkgEdgeType::Supersedes
+                && e.target_node_id == original.evidence_id
+        ));
+        let replacement_node = p.nodes.iter().find(|n| n.node_id == replacement.evidence_id).unwrap();
+        assert_eq!(replacement_node.supersedes_node_id.as_deref(), Some(original.evidence_id.as_str()));
+    }
+
+    #[test]
+    fn single_superseded_record_requires_closed_history() {
+        let (c, o, a, r, _original, replacement) = evidence_chain();
+        assert_eq!(
+            EvidenceLineageDkgProjection::from_chain(&c, &o, &a, &r, &replacement),
+            Err(DkgProjectionError::MissingSupersessionParent)
+        );
+    }
+
+    #[test]
+    fn history_order_does_not_change_projection_digest() {
+        let (c, o, a, r, original, replacement) = evidence_chain();
+        let a = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &a, &r, &[original.clone(), replacement.clone()]).unwrap();
+        let b = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &a, &r, &[replacement, original]).unwrap();
+        assert_eq!(a, b);
+        assert!(b.verify_integrity());
     }
 
     #[test]
