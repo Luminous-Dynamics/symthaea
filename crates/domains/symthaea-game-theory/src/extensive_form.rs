@@ -8,6 +8,19 @@ use crate::strategic::{ActionId, PlayerId};
 use crate::strategic_context::{DecisionStateId, InformationStructure, PerfectRecallEvidence};
 use std::collections::{HashMap, HashSet};
 
+/// Lossless transition history for semantic information encoding.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HistoryEvent {
+    Decision { state: DecisionStateId, player: PlayerId, information_set: crate::strategic_context::InformationSetId, action: ActionId },
+    Chance { state: DecisionStateId, next: DecisionStateId },
+}
+
+/// Semantic mapping from a concrete history to a player's information set.
+pub trait InformationEncoder {
+    fn encode(&self, player: PlayerId, state: DecisionStateId, history: &[HistoryEvent]) -> Result<crate::strategic_context::InformationSetId, String>;
+}
+
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExtensiveNode {
     Decision { state: DecisionStateId, player: PlayerId, actions: Vec<Transition> },
