@@ -6,6 +6,11 @@ on:
       - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
       - "scripts/qualifiers/scientific_lineage_adapter_qualifier.py"
       - ".github/workflows/scientific-lineage-adapter.yml"
+      - "crates/domains/symthaea-engineering/src/cp04_adapter.rs"
+      - "crates/domains/symthaea-engineering/src/engineering_identity.rs"
+      - "crates/domains/symthaea-engineering/src/engineering_relation.rs"
+      - "crates/domains/symthaea-engineering/src/scientific_lineage.rs"
+      - "crates/domains/symthaea-engineering/Cargo.toml"
   workflow_dispatch:
 
 permissions:
@@ -26,5 +31,8 @@ jobs:
           git status --short
       - name: Verify CP-04 adapter vector
         run: python3 scripts/qualifiers/scientific_lineage_adapter_qualifier.py
+      - name: Verify Rust fixture round-trip
+        run: cargo test -p symthaea-engineering checked_in_fixture_round_trips_through_rust_adapter --lib
+
       - name: Verify fixture remains unchanged
         run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py
