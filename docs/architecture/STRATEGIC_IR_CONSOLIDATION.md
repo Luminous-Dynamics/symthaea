@@ -484,3 +484,18 @@ semantic observation proof.
 ### 2026-09-29 semantic information encoder boundary
 
 The extensive-form layer now treats the declared information-set partition and the semantic mechanism that produces that partition as distinct contracts. A typed `HistoryEvent` stream and `InformationEncoder` boundary are the intended seam for public/private observation and recalled-history semantics. Structural `PerfectRecallEvidence` remains valid as finite-tree action/infoset evidence, while semantic observation consistency is verified separately against an encoder. The migration-stage state graph remains a true tree; shared children/transpositions are not admitted until history is first-class.
+
+
+### 2026-09-29 semantic information encoder implemented
+
+The proposed history/observation seam is now executable in the extensive-form boundary.
+
+The model exposes a typed HistoryEvent stream and an InformationEncoder contract. ExtensiveGame::verify_information_encoder replays every reachable decision history and requires the semantic encoder to agree with the declared InformationSetId. This makes the declared partition auditable against an actual encoder instead of treating an opaque integer ID as proof of observation semantics.
+
+The encoder boundary is intentionally separate from verify_perfect_recall:
+
+- structural recall evidence checks prior own information-set/action history;
+- semantic encoding checks the information partition produced from concrete history;
+- neither check is promoted to solver authority by itself.
+
+The migration-stage extensive-form representation also now rejects shared child states (MultipleParents). That prevents transposition-style state reuse from silently conflating distinct histories. If transpositions or repeated states are needed later, history must become a first-class IR object rather than weakening this tree invariant.
