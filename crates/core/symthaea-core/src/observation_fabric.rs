@@ -86,6 +86,7 @@ impl SensorIdentity {
 pub struct AssetRef {
     pub hash_algorithm: String,
     pub content_hash: String,
+    pub integrity: AssetIntegrity,
     pub media_type: Option<String>,
     pub catalog_id: Option<String>,
 }
@@ -96,6 +97,7 @@ impl AssetRef {
         Self {
             hash_algorithm: "blake3".to_string(),
             content_hash: blake3::hash(bytes).to_hex().to_string(),
+            integrity: AssetIntegrity::HashVerified,
             media_type: None,
             catalog_id: None,
         }
@@ -173,6 +175,7 @@ impl ObservationQuality {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationProvenance {
     pub source: SensorIdentity,
+    pub verification: ProvenanceVerification,
     pub acquired_by: Option<String>,
     pub parent_observation_ids: Vec<String>,
     pub processing_fingerprint: Option<String>,
@@ -327,6 +330,7 @@ mod tests {
             },
             provenance: ObservationProvenance {
                 source: SensorIdentity::new("camera-1"),
+                verification: ProvenanceVerification::Unverified,
                 acquired_by: None,
                 parent_observation_ids: Vec::new(),
                 processing_fingerprint: Some("proc-v1".into()),
@@ -386,6 +390,7 @@ mod tests {
         let a = AssetRef::blake3(b"same");
         let b = AssetRef::blake3(b"same");
         let c = AssetRef::blake3(b"different");
+        assert_eq!(a.integrity, AssetIntegrity::HashVerified);
         assert_eq!(a, b);
         assert_ne!(a, c);
         assert!(a.validate().is_ok());
@@ -431,6 +436,14 @@ mod tests {
             relation.validate(),
             Err(ObservationValidationError::DerivedRelationIndependenceMismatch)
         );
+    }
+
+    #[test]
+    fn verification_axes_remain_separate() {
+        let mut observation = fixture();
+        observation.provenance.verification = ProvenanceVerification::CredentialVerified;
+        assert_eq!(observation.asset.as_ref().map(|asset| asset.integrity), Some(AssetIntegrity::HashVerified));
+        assert_eq!(observation.provenance.verification, ProvenanceVerification::CredentialVerified);
     }
 
     #[test]
