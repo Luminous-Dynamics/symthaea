@@ -20,10 +20,12 @@ Add deterministic self-test coverage using a temporary Git repository. The topol
 - a rewritten/non-descendant history is rejected;
 - a shallow repository cannot establish the required ancestry relation;
 - a partial clone or promisor-remote repository is rejected before topology-sensitive validation;
+- configured alternate object sources and alternate-ref commands are rejected;
+- replacement refs under refs/replace/ are rejected;
 - the trusted Governance Root workflow contract rejects a checkout filter that could introduce a partial object graph;
 - the direct endpoint diff remains the changeset authority even when the head is a merge commit.
 
-Production validation first rejects an explicitly shallow or partial/promisor repository, while the trusted workflow contract separately rejects a checkout filter; it then requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
+Production validation first rejects an explicitly shallow or partial/promisor repository, configured alternate object sources, alternate-ref commands, or replacement refs, while the trusted workflow contract separately rejects a checkout filter; it then requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
 
 ## Scientific Basis
 
@@ -39,7 +41,7 @@ The change addresses governance-integrity risk from merge topology, rewritten he
 
 ## Test Evidence
 
-The self-test now creates a temporary Git repository and exercises descendant, identical, merge, reverse, rewritten-history, shallow-history, partial-clone-extension, and promisor-remote cases. It also checks that a merge head's exact endpoint diff contains changes introduced on both sides of the merge. GitHub Actions execution remains a separate evidence layer until an eligible hosted runner executes the workflow.
+The self-test now creates a temporary Git repository and exercises descendant, identical, merge, reverse, rewritten-history, shallow-history, partial-clone-extension, promisor-remote, alternate-object, alternate-ref-command, and replacement-ref cases. It also checks that a merge head's exact endpoint diff contains changes introduced on both sides of the merge. GitHub Actions execution remains a separate evidence layer until an eligible hosted runner executes the workflow.
 
 ## Rollback Plan
 
