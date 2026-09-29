@@ -59,7 +59,7 @@ impl ExternalExperimentalObservation {
    && valid_utc(&self.observed_at) && self.record_digest==self.digest()
  }
  fn digest(&self)->String{
-  let mut h=Sha256::new(); h.update(b"symthaea:external-experimental-observation:v1\0");
+  let mut h=Sha256::new(); h.update(b"symthaea:external-experimental-observation:v2\0");
   for s in [self.observation_id.as_str(),self.execution_id.as_str(),self.observer_id.as_str(),self.institution_id.as_str(),
    self.observed_at.as_str(),code(self.disposition),self.commitment_event_id.as_str(),self.candidate_id.as_str(),
    self.source_candidate_id.as_str(),self.test_specification_id.as_str(),self.measurement_specification_id.as_str(),
