@@ -86,7 +86,7 @@ Currentness and applicability are dependency boundaries; they are not evidence o
 
 The qualifier MUST also preserve three closure-algebra properties over representative edge removals:
 
-- **Locality:** removing a dependency cannot unexpectedly alter an unrelated node's closure.
+- **Locality:** removing a dependency can only alter closures of nodes that can reach the dependency source; unrelated closures remain unchanged.
 - **Monotonicity:** removing dependencies cannot introduce new reachable downstream nodes.
 - **Compositionality:** applying two dependency removals sequentially MUST produce the same closure as applying the two removals together, independent of removal order.
 
