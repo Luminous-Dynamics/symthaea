@@ -180,6 +180,33 @@ mod tests {
     }
 
     #[test]
+    fn invalid_request_is_rejected_without_panicking() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
+        let request = MemoryRetrievalRequest {
+            mode: crate::RetrievalMode::Historical,
+            frontier_ref: None,
+            query: "claim:x".into(),
+            max_results: 5,
+        };
+        let result = RetrievalEngine::new(profile).execute(&request, Vec::<MemoryRetrievalCandidate>::new());
+        assert_eq!(result, Err(RetrievalExecutionError::Request(RetrievalRequestError::MissingHistoricalFrontier)));
+    }
+
+    #[test]
+    fn verified_execution_feeds_reasoning_boundary() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
+        let execution = RetrievalEngine::new(profile)
+            .execute(
+                &MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5),
+                vec![candidate("claim:x")],
+            )
+            .unwrap();
+        let view = crate::EvidenceView::from_verified_retrieval(&execution.groups, &execution.receipt).unwrap();
+        assert_eq!(view.items.len(), 1);
+        assert_eq!(view.items[0].canonical_identity, "claim:x");
+    }
+
+    #[test]
     fn empty_profile_component_is_rejected() {
         assert_eq!(
             RetrievalExecutionProfile::new("", "ranking:v1", "frontier:v1", "normalization:v1"),
