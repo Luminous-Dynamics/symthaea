@@ -60,6 +60,232 @@ pub trait Policy {
     fn decide(&self, context: &AgentContext) -> Result<Vec<MixedAction>, ContextError>;
 }
 
+
+/// Stable identifier for a concrete decision state in an extensive-form model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct DecisionStateId(pub usize);
+
+/// One concrete decision state belonging to an information set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DecisionState {
+    pub state: DecisionStateId,
+    pub player: PlayerId,
+    pub information_set: InformationSetId,
+    pub legal_actions: Vec<ActionId>,
+}
+
+/// A collection of decision states that are indistinguishable to a player.
+///
+/// Standard extensive-form solvers require member states to expose the same
+/// action vocabulary. State-dependent availability should be modeled later as
+/// an explicit action-availability semantics, rather than silently weakening
+/// this invariant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InformationSet {
+    pub id: InformationSetId,
+    pub player: PlayerId,
+    pub members: Vec<DecisionStateId>,
+}
+
+/// A finite information structure for extensive-form strategic models.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InformationStructure {
+    pub decision_states: Vec<DecisionState>,
+    pub information_sets: Vec<InformationSet>,
+}
+
+impl InformationStructure {
+    pub fn validate(&self) -> Result<(), InformationStructureError> {
+        let mut membership = vec![None; self.decision_states.len()];
+
+        for info_set in &self.information_sets {
+            if info_set.members.is_empty() {
+                return Err(InformationStructureError::EmptyInformationSet(info_set.id));
+            }
+            for (i, state) in info_set.members.iter().enumerate() {
+                if info_set.members[..i].contains(state) {
+                    return Err(InformationStructureError::DuplicateMember {
+                        information_set: info_set.id,
+                        state: *state,
+                    });
+                }
+            }
+
+            let Some(first) = self.state(info_set.members[0]) else {
+                return Err(InformationStructureError::UnknownDecisionState {
+                    information_set: info_set.id,
+                    state: info_set.members[0],
+                });
+            };
+
+            if first.player != info_set.player {
+                return Err(InformationStructureError::PlayerMismatch {
+                    information_set: info_set.id,
+                    expected: info_set.player,
+                    actual: first.player,
+                    state: first.state,
+                });
+            }
+            validate_legal_actions(&first.legal_actions).map_err(|error| {
+                InformationStructureError::InvalidLegalActions {
+                    state: first.state,
+                    error,
+                }
+            })?;
+
+            for state_id in &info_set.members {
+                let Some(state) = self.state(*state_id) else {
+                    return Err(InformationStructureError::UnknownDecisionState {
+                        information_set: info_set.id,
+                        state: *state_id,
+                    });
+                };
+                if state.player != info_set.player {
+                    return Err(InformationStructureError::PlayerMismatch {
+                        information_set: info_set.id,
+                        expected: info_set.player,
+                        actual: state.player,
+                        state: state.state,
+                    });
+                }
+                validate_legal_actions(&state.legal_actions).map_err(|error| {
+                    InformationStructureError::InvalidLegalActions {
+                        state: state.state,
+                        error,
+                    }
+                })?;
+                if state.legal_actions != first.legal_actions {
+                    return Err(InformationStructureError::InconsistentActionSet {
+                        information_set: info_set.id,
+                        expected: first.legal_actions.clone(),
+                        actual: state.legal_actions.clone(),
+                        state: state.state,
+                    });
+                }
+
+                let slot = membership
+                    .get_mut(state.state.0)
+                    .expect("state id was checked against decision_states");
+                if let Some(previous) = *slot {
+                    return Err(InformationStructureError::StateInMultipleInformationSets {
+                        state: state.state,
+                        first: previous,
+                        second: info_set.id,
+                    });
+                }
+                *slot = Some(info_set.id);
+            }
+        }
+
+        for state in &self.decision_states {
+            if membership[state.state.0].is_none() {
+                return Err(InformationStructureError::UnassignedDecisionState(state.state));
+            }
+        }
+        Ok(())
+    }
+
+    pub fn state(&self, id: DecisionStateId) -> Option<&DecisionState> {
+        self.decision_states
+            .get(id.0)
+            .filter(|state| state.state == id)
+    }
+
+    /// Gate solver use on declared information-structure capabilities.
+    ///
+    /// Perfect recall is deliberately not a universal IR invariant. Solvers
+    /// that require it must receive explicit evidence from the model layer.
+    pub fn validate_for_solver(
+        &self,
+        capabilities: SolverCapabilities,
+        perfect_recall: Option<PerfectRecallEvidence>,
+    ) -> Result<(), SolverCompatibilityError> {
+        self.validate()
+            .map_err(SolverCompatibilityError::InvalidInformationStructure)?;
+
+        if !capabilities.supports_imperfect_information
+            && self.information_sets.iter().any(|set| set.members.len() > 1)
+        {
+            return Err(SolverCompatibilityError::ImperfectInformationUnsupported);
+        }
+
+        if capabilities.requires_perfect_recall {
+            match perfect_recall {
+                Some(PerfectRecallEvidence::Verified) => {}
+                Some(PerfectRecallEvidence::Violated) => {
+                    return Err(SolverCompatibilityError::PerfectRecallRequired)
+                }
+                None => return Err(SolverCompatibilityError::PerfectRecallUnverified),
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Evidence supplied by a model validator for a solver requiring perfect recall.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PerfectRecallEvidence {
+    Verified,
+    Violated,
+}
+
+/// Validation failures for extensive-form information structures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InformationStructureError {
+    EmptyInformationSet(InformationSetId),
+    DuplicateMember {
+        information_set: InformationSetId,
+        state: DecisionStateId,
+    },
+    UnknownDecisionState {
+        information_set: InformationSetId,
+        state: DecisionStateId,
+    },
+    PlayerMismatch {
+        information_set: InformationSetId,
+        expected: PlayerId,
+        actual: PlayerId,
+        state: DecisionStateId,
+    },
+    InvalidLegalActions {
+        state: DecisionStateId,
+        error: ContextError,
+    },
+    InconsistentActionSet {
+        information_set: InformationSetId,
+        expected: Vec<ActionId>,
+        actual: Vec<ActionId>,
+        state: DecisionStateId,
+    },
+    StateInMultipleInformationSets {
+        state: DecisionStateId,
+        first: InformationSetId,
+        second: InformationSetId,
+    },
+    UnassignedDecisionState(DecisionStateId),
+}
+
+/// Solver/game information compatibility failures.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SolverCompatibilityError {
+    InvalidInformationStructure(InformationStructureError),
+    ImperfectInformationUnsupported,
+    PerfectRecallRequired,
+    PerfectRecallUnverified,
+}
+
+fn validate_legal_actions(actions: &[ActionId]) -> Result<(), ContextError> {
+    if actions.is_empty() {
+        return Err(ContextError::NoLegalActions);
+    }
+    for (i, action) in actions.iter().enumerate() {
+        if actions[..i].contains(action) {
+            return Err(ContextError::DuplicateLegalAction(*action));
+        }
+    }
+    Ok(())
+}
+
 /// A complete contingent plan for a finite set of information sets.
 /// Each information set may occur at most once in the plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -174,6 +400,103 @@ mod tests {
             observation: "public signal: red".into(),
             legal_actions: vec![ActionId(0), ActionId(1)],
         }
+    }
+
+
+    fn valid_information_structure() -> InformationStructure {
+        InformationStructure {
+            decision_states: vec![
+                DecisionState {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    information_set: InformationSetId(7),
+                    legal_actions: vec![ActionId(0), ActionId(1)],
+                },
+                DecisionState {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    information_set: InformationSetId(7),
+                    legal_actions: vec![ActionId(0), ActionId(1)],
+                },
+            ],
+            information_sets: vec![InformationSet {
+                id: InformationSetId(7),
+                player: PlayerId(0),
+                members: vec![DecisionStateId(0), DecisionStateId(1)],
+            }],
+        }
+    }
+
+    #[test]
+    fn information_sets_require_same_player_and_action_vocabulary() {
+        let mut structure = valid_information_structure();
+        structure.decision_states[1].legal_actions = vec![ActionId(0)];
+        assert!(matches!(
+            structure.validate(),
+            Err(InformationStructureError::InconsistentActionSet { .. })
+        ));
+
+        structure.decision_states[1].legal_actions = vec![ActionId(0), ActionId(1)];
+        structure.decision_states[1].player = PlayerId(1);
+        assert!(matches!(
+            structure.validate(),
+            Err(InformationStructureError::PlayerMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn decision_states_cannot_be_shared_or_left_unassigned() {
+        let mut structure = valid_information_structure();
+        structure.information_sets.push(InformationSet {
+            id: InformationSetId(8),
+            player: PlayerId(0),
+            members: vec![DecisionStateId(0)],
+        });
+        assert!(matches!(
+            structure.validate(),
+            Err(InformationStructureError::StateInMultipleInformationSets { .. })
+        ));
+
+        structure.information_sets[1].members = vec![DecisionStateId(1)];
+        structure.decision_states.push(DecisionState {
+            state: DecisionStateId(2),
+            player: PlayerId(0),
+            information_set: InformationSetId(8),
+            legal_actions: vec![ActionId(0), ActionId(1)],
+        });
+        assert!(matches!(
+            structure.validate(),
+            Err(InformationStructureError::UnassignedDecisionState(DecisionStateId(2)))
+        ));
+    }
+
+    #[test]
+    fn solver_capabilities_gate_imperfect_information_and_recall() {
+        let structure = valid_information_structure();
+        let no_imperfect = SolverCapabilities {
+            supports_imperfect_information: false,
+            requires_perfect_recall: false,
+            supports_chance: false,
+            supports_general_sum: true,
+        };
+        assert_eq!(
+            structure.validate_for_solver(no_imperfect, None),
+            Err(SolverCompatibilityError::ImperfectInformationUnsupported)
+        );
+
+        let cfr_like = SolverCapabilities {
+            supports_imperfect_information: true,
+            requires_perfect_recall: true,
+            supports_chance: true,
+            supports_general_sum: false,
+        };
+        assert_eq!(
+            structure.validate_for_solver(cfr_like, None),
+            Err(SolverCompatibilityError::PerfectRecallUnverified)
+        );
+        assert!(structure
+            .validate_for_solver(cfr_like, Some(PerfectRecallEvidence::Verified))
+            .is_ok());
     }
 
     #[test]
