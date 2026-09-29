@@ -178,6 +178,8 @@ REQUIRED_ROOT_WORKFLOW_SNIPPETS = (
     'refs/pull/${PR_NUMBER}/head:refs/remotes/pr-governance/${PR_NUMBER}/head',
     'test "${fetched_head}" = "${PR_HEAD_SHA}"',
     "python3 .github/scripts/check-pr-governance.py",
+    "actions_event_policy_requirement=pull_request_target_must_be_explicitly_allowed",
+    "actions_event_policy_attestation=not_established_by_repository_code",
 )
 FORBIDDEN_ROOT_WORKFLOW_SNIPPETS = (
     "ref: ${{ github.event.pull_request.head.sha }}",
