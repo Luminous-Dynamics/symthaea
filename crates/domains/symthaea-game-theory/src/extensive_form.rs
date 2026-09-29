@@ -762,6 +762,45 @@ mod tests {
     }
 
     #[test]
+    fn verifies_semantic_information_encoder() {
+        struct Encoder;
+
+        impl InformationEncoder for Encoder {
+            fn encode(
+                &self,
+                _player: PlayerId,
+                state: DecisionStateId,
+                _history: &[HistoryEvent],
+            ) -> Result<InformationSetId, String> {
+                if state == DecisionStateId(0) {
+                    Ok(InformationSetId(0))
+                } else {
+                    Err("unexpected state".into())
+                }
+            }
+        }
+
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information: info(),
+        };
+
+        assert_eq!(game.verify_information_encoder(&Encoder), Ok(()));
+    }
+
+    #[test]
     fn rejects_duplicate_node_ids() {
         let game = ExtensiveGame {
             root: DecisionStateId(0),
