@@ -108,49 +108,68 @@ impl MemoryRetrievalReceipt {
     }
 
     /// Canonical, deterministic encoding of the receipt's retrieval contract and selection.
-    pub fn canonical_bytes(&self) -> Vec<u8> {
+    pub fn canonical_bytes(&self) -> Result<Vec<u8>, ReceiptCanonicalizationError> {
         let mut out = RETRIEVAL_RECEIPT_DOMAIN.to_vec();
         out.push(match self.mode { RetrievalMode::Historical => 0, RetrievalMode::Live => 1 });
-        put_optional(&mut out, self.frontier_ref.as_deref());
-        put_string(&mut out, &self.query);
-        put_u32(&mut out, self.max_results);
+        put_optional(&mut out, self.frontier_ref.as_deref())?;
+        put_string(&mut out, &self.query)?;
+        put_u32(&mut out, self.max_results)?;
         let mut selected = self.selected.clone();
         selected.sort();
         selected.dedup();
-        put_strings(&mut out, &selected);
+        put_strings(&mut out, &selected)?;
         let mut bindings = self.selected_representation_digests.clone();
         bindings.sort();
-        put_u32(&mut out, bindings.len());
+        put_u32(&mut out, bindings.len())?;
         for (identity, digest) in bindings {
-            put_string(&mut out, &identity);
-            put_string(&mut out, &digest);
+            put_string(&mut out, &identity)?;
+            put_string(&mut out, &digest)?;
         }
         let mut excluded = self.excluded.clone();
         excluded.sort_by(|a,b| a.canonical_identity.cmp(&b.canonical_identity).then_with(|| (a.reason as u8).cmp(&(b.reason as u8))));
-        put_u32(&mut out, excluded.len());
+        put_u32(&mut out, excluded.len())?;
         for item in excluded {
-            put_string(&mut out, &item.canonical_identity);
+            put_string(&mut out, &item.canonical_identity)?;
             out.push(match item.reason { RetrievalExclusion::PostFrontier=>0, RetrievalExclusion::FrontierUnknown=>1, RetrievalExclusion::MissingHistoricalFrontier=>2 });
         }
-        let mut families=self.provenance_families.clone(); families.sort(); families.dedup(); put_strings(&mut out,&families);
-        let mut profiles=self.retrieval_profile_versions.clone(); profiles.sort(); profiles.dedup(); put_strings(&mut out,&profiles);
-        out
+        let mut families=self.provenance_families.clone(); families.sort(); families.dedup(); put_strings(&mut out,&families)?;
+        let mut profiles=self.retrieval_profile_versions.clone(); profiles.sort(); profiles.dedup(); put_strings(&mut out,&profiles)?;
+        Ok(out)
     }
-    pub fn canonical_digest(&self) -> String { sha256_hex(&self.canonical_bytes()) }
+    pub fn canonical_digest(&self) -> Result<String, ReceiptCanonicalizationError> { Ok(sha256_hex(&self.canonical_bytes()?)) }
     pub fn with_retrieval_profile_versions(mut self, versions: impl IntoIterator<Item = String>) -> Self {
         self.retrieval_profile_versions = versions.into_iter().collect();
         self.retrieval_profile_versions.sort();
         self.retrieval_profile_versions.dedup();
-        self.receipt_digest = self.canonical_digest();
+        self.receipt_digest = self.canonical_digest().expect("receipt canonicalization overflow");
         self
     }
-    pub fn is_self_consistent(&self) -> bool { !self.receipt_digest.is_empty() && self.receipt_digest == self.canonical_digest() }
+    pub fn is_self_consistent(&self) -> bool { !self.receipt_digest.is_empty() && self.canonical_digest().map(|d| self.receipt_digest == d).unwrap_or(false) }
 }
 
-fn put_u32(out: &mut Vec<u8>, n: usize) { out.extend_from_slice(&(n as u32).to_be_bytes()); }
-fn put_string(out: &mut Vec<u8>, value: &str) { put_u32(out, value.len()); out.extend_from_slice(value.as_bytes()); }
-fn put_optional(out: &mut Vec<u8>, value: Option<&str>) { match value { Some(v)=>{out.push(1);put_string(out,v)},None=>out.push(0)} }
-fn put_strings(out: &mut Vec<u8>, values: &[String]) { put_u32(out, values.len()); for value in values { put_string(out,value); } }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReceiptCanonicalizationError {
+    LengthOverflow,
+}
+
+fn put_u32(out: &mut Vec<u8>, n: usize) -> Result<(), ReceiptCanonicalizationError> {
+    let value = u32::try_from(n).map_err(|_| ReceiptCanonicalizationError::LengthOverflow)?;
+    out.extend_from_slice(&value.to_be_bytes());
+    Ok(())
+}
+fn put_string(out: &mut Vec<u8>, value: &str) -> Result<(), ReceiptCanonicalizationError> {
+    put_u32(out, value.len())?;
+    out.extend_from_slice(value.as_bytes());
+    Ok(())
+}
+fn put_optional(out: &mut Vec<u8>, value: Option<&str>) -> Result<(), ReceiptCanonicalizationError> {
+    match value { Some(v)=>{out.push(1);put_string(out,v)},None=>{out.push(0);Ok(())} }
+}
+fn put_strings(out: &mut Vec<u8>, values: &[String]) -> Result<(), ReceiptCanonicalizationError> {
+    put_u32(out, values.len())?;
+    for value in values { put_string(out, value)?; }
+    Ok(())
+}
 
 /// Fallible entry point for untrusted or externally constructed requests.
 pub fn try_retrieve(
@@ -227,7 +246,7 @@ fn retrieve_validated(
         retrieval_profile_versions: Vec::new(),
         receipt_digest: String::new(),
     };
-    receipt.receipt_digest = receipt.canonical_digest();
+    receipt.receipt_digest = receipt.canonical_digest().expect("receipt canonicalization overflow");
     (groups, receipt)
 }
 
@@ -291,7 +310,7 @@ mod tests {
         let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
         let mut duplicated=receipt;
         duplicated.selected.push("x".into());
-        duplicated.receipt_digest=duplicated.canonical_digest();
+        duplicated.receipt_digest=duplicated.canonical_digest().unwrap();
         assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateSelectedIdentity));
     }
 
@@ -307,7 +326,7 @@ mod tests {
         let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
         let mut empty=receipt;
         empty.selected_representation_digests[0].1.clear();
-        empty.receipt_digest=empty.canonical_digest();
+        empty.receipt_digest=empty.canonical_digest().unwrap();
         assert_eq!(empty.verify(), Err(ReceiptVerificationError::EmptyRepresentationDigest));
     }
 
