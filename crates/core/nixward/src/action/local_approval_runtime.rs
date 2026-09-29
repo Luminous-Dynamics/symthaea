@@ -361,7 +361,8 @@ mod tests {
 
         let second = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
         assert_ne!(second.daemon_incarnation_ref(), installed.request().daemon_incarnation_id);
-        assert_ne!(second.socket_path(), old_socket.as_path());
+        assert_eq!(second.socket_path(), old_socket.as_path());
+        assert_ne!(second.transport_instance_ref(), installed.request().daemon_incarnation_id);
 
         let new_socket = second.socket_path().to_path_buf();
         let client = thread::spawn(move || submit_local_approval_v1(&new_socket, &submission));
