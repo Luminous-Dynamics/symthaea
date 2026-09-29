@@ -640,6 +640,107 @@ mod tests {
     }
 
     #[test]
+    fn standalone_validation_rejects_duplicate_node_identity() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.nodes.push(artifact.nodes[0].clone());
+        artifact.nodes.sort_by(|a, b| a.identity_digest.cmp(&b.identity_digest));
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(matches!(
+            artifact.validate(),
+            Err(Cp04AdapterError::DuplicateNode(_))
+        ));
+    }
+
+    #[test]
+    fn source_binding_rejects_missing_or_extra_nodes() {
+        let projection = projection();
+        let artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+
+        let mut missing = artifact.clone();
+        missing.nodes.pop();
+        missing.artifact_digest = missing.compute_digest().unwrap();
+        assert!(matches!(
+            missing.validate(),
+            Err(Cp04AdapterError::MissingEndpoint(_))
+        ));
+        assert!(matches!(
+            missing.validate_against_projection(&projection),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+
+        let extra = object("observation", "extra", "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
+        let mut extra_artifact = artifact.clone();
+        let digest = extra.identity_digest();
+        extra_artifact.nodes.push(Cp04Node {
+            object_kind: extra.object_kind.clone(),
+            identity: extra,
+            identity_digest: digest,
+        });
+        extra_artifact.nodes.sort_by(|a, b| a.identity_digest.cmp(&b.identity_digest));
+        extra_artifact.artifact_digest = extra_artifact.compute_digest().unwrap();
+        assert!(extra_artifact.validate().is_ok());
+        assert!(matches!(
+            extra_artifact.validate_against_projection(&projection),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+    }
+
+    #[test]
+    fn standalone_envelope_integrity_is_distinct_from_source_lineage_binding() {
+        let projection = projection();
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+        artifact.source_graph_digest = "f".repeat(64);
+        artifact.projection_digest = "e".repeat(64);
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+
+        assert!(artifact.validate().is_ok());
+        assert!(matches!(
+            artifact.validate_against_projection(&projection),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+    }
+
+    #[test]
+    fn epistemic_source_snapshot_change_invalidates_artifact_replay() {
+        let mut graph = crate::ScientificLineageGraph::new();
+        let simulation = object("simulation", "sim", A);
+        let model = object("model", "model", B);
+        graph.add_relation(EngineeringRelation::new(
+            simulation.clone(),
+            model.clone(),
+            EngineeringRelationKind::Instantiates,
+        ).unwrap());
+
+        let original = graph.qualification_projection().unwrap();
+        let artifact = Cp04QualificationArtifact::try_from_projection(&original).unwrap();
+
+        graph.add_relation(EngineeringRelation::new(
+            object("prediction", "prediction", A),
+            object("scientific_claim", "claim", B),
+            EngineeringRelationKind::Supports,
+        ).unwrap());
+        let changed = graph.qualification_projection().unwrap();
+
+        assert_eq!(original.projection_digest(), changed.projection_digest());
+        assert_ne!(original.source_graph_digest(), changed.source_graph_digest());
+        assert!(matches!(
+            artifact.validate_against_projection(&changed),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+    }
+
+    #[test]
+    fn unicode_normalization_variants_are_not_silently_collapsed() {
+        let composed = object("model", "é", A);
+        let decomposed = object("model", "e\u{301}", A);
+
+        assert_ne!(composed.identity_digest(), decomposed.identity_digest());
+        assert_ne!(composed.canonical_identifier, decomposed.canonical_identifier);
+        assert_eq!(composed.content_digest, decomposed.content_digest);
+    }
+
+
+    #[test]
     fn adapter_preserves_identity_and_authority_ceiling() {
         let artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
         assert_eq!(artifact.authority_ceiling, AuthorityCeiling::SyntheticQualification);
