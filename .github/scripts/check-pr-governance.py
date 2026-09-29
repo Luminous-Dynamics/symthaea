@@ -269,7 +269,7 @@ def require_complete_object_graph(git_runner: Any = git) -> None:
         )
 
     promisors = git_runner(
-        "config", "--get-regexp", r"^remote\\..*\\.promisor$", check=False
+        "config", "--get-regexp", r"^remote\..*\.promisor$", check=False
     )
     if promisors.returncode not in {0, 1}:
         raise GovernanceError("unable to determine Git promisor-remote state")
