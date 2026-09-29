@@ -768,6 +768,7 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information,
+            observations: HashMap::new(),
         };
 
         assert_eq!(
