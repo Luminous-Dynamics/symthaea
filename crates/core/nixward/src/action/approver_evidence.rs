@@ -79,7 +79,7 @@ pub enum VerifiedApproverEvidenceProfileV1 {
 }
 
 impl VerifiedApproverEvidenceProfileV1 {
-    fn from_reference(
+    pub(crate) fn from_reference(
         reference: &ApproverEvidenceRefV1,
     ) -> Result<Self, ApproverEvidenceErrorV1> {
         match reference.profile {
