@@ -15,6 +15,7 @@ on:
       - "crates/domains/symthaea-engineering/Cargo.toml"
       - "crates/domains/symthaea-engineering/tests/cp04_digest_boundaries.rs"
       - "crates/domains/symthaea-engineering/tests/cp04_negative_contract_vectors.rs"
+      - "crates/domains/symthaea-engineering/tests/cp04_dependency_contract.rs"
   workflow_dispatch:
 
 permissions:
