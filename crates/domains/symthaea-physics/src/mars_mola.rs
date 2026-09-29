@@ -100,26 +100,35 @@ impl MolaMegdrProduct {
         })
     }
 
-    /// Sample the nearest MEGDR cell. No interpolation is performed.
-    pub fn sample_nearest(
+    /// Sample the nearest topography cell only when its companion counts map
+    /// proves that the cell has at least one observation. No interpolation is
+    /// performed and uncertainty must be supplied explicitly by the caller.
+    pub fn sample_nearest_with_count(
         &self,
+        counts: &Self,
         latitude_deg: f64,
         longitude_deg: f64,
+        elevation_uncertainty_m: f64,
     ) -> Result<TerrainSample, MolaError> {
+        self.validate_companion(counts)?;
+        if !elevation_uncertainty_m.is_finite() || elevation_uncertainty_m < 0.0 {
+            return Err(MolaError::InvalidMetadata(
+                "elevation uncertainty must be finite and non-negative".into(),
+            ));
+        }
+        if self.metadata.map_kind != 'T' {
+            return Err(MolaError::InvalidMetadata(
+                "sample source must be a topography map".into(),
+            ));
+        }
         let (line, sample) = self.metadata.cell_for(latitude_deg, longitude_deg)?;
+        let count = counts.read_count(line, sample)?;
+        if count == 0 {
+            return Ok(self.missing_sample(latitude_deg, longitude_deg));
+        }
         let value = self.read_i16(line, sample)? as f64;
         if self.metadata.missing_value.is_some_and(|m| value == m) {
-            return Ok(TerrainSample {
-                latitude_rad: latitude_deg.to_radians(),
-                longitude_rad: normalize_lon(longitude_deg).to_radians(),
-                elevation_m: None,
-                elevation_uncertainty_m: None,
-                vertical_datum: TerrainVerticalDatum::AreoidRelative,
-                slope_rad: None,
-                roughness_m: None,
-                quality: TerrainQuality::Missing,
-                provenance: self.provenance.clone(),
-            });
+            return Ok(self.missing_sample(latitude_deg, longitude_deg));
         }
         let elevation = value * self.metadata.pixel_scale + self.metadata.pixel_offset;
         if !elevation.is_finite() {
@@ -129,9 +138,7 @@ impl MolaMegdrProduct {
             latitude_rad: latitude_deg.to_radians(),
             longitude_rad: normalize_lon(longitude_deg).to_radians(),
             elevation_m: Some(elevation),
-            // Product-level uncertainty must be supplied by the caller from
-            // the pinned product documentation; do not invent per-cell error.
-            elevation_uncertainty_m: None,
+            elevation_uncertainty_m: Some(elevation_uncertainty_m),
             vertical_datum: TerrainVerticalDatum::AreoidRelative,
             slope_rad: None,
             roughness_m: None,
@@ -140,12 +147,77 @@ impl MolaMegdrProduct {
         })
     }
 
+    fn missing_sample(&self, latitude_deg: f64, longitude_deg: f64) -> TerrainSample {
+        TerrainSample {
+            latitude_rad: latitude_deg.to_radians(),
+            longitude_rad: normalize_lon(longitude_deg).to_radians(),
+            elevation_m: None,
+            elevation_uncertainty_m: None,
+            vertical_datum: TerrainVerticalDatum::AreoidRelative,
+            slope_rad: None,
+            roughness_m: None,
+            quality: TerrainQuality::Missing,
+            provenance: self.provenance.clone(),
+        }
+    }
+
+    fn validate_companion(&self, counts: &Self) -> Result<(), MolaError> {
+        let a = &self.metadata;
+        let b = &counts.metadata;
+        if b.map_kind != 'C' {
+            return Err(MolaError::InvalidMetadata(
+                "companion product must be a counts map".into(),
+            ));
+        }
+        if a.product_version != b.product_version
+            || a.resolution_pixels_per_degree != b.resolution_pixels_per_degree
+            || a.lines != b.lines
+            || a.samples != b.samples
+            || a.latitude_min_deg != b.latitude_min_deg
+            || a.latitude_max_deg != b.latitude_max_deg
+            || a.longitude_min_deg != b.longitude_min_deg
+            || a.longitude_max_deg != b.longitude_max_deg
+            || a.tile_origin_lat_deg != b.tile_origin_lat_deg
+            || a.tile_origin_lon_deg != b.tile_origin_lon_deg
+        {
+            return Err(MolaError::InvalidMetadata(
+                "topography/counts grids are not registration-identical".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn read_count(&self, line: u32, sample: u32) -> Result<u32, MolaError> {
+        if line >= self.metadata.lines || sample >= self.metadata.samples {
+            return Err(MolaError::OutOfBounds);
+        }
+        let byte_offset = u64::from(self.metadata.record_bytes)
+            * (u64::from(line) + u64::from(self.metadata.line_offset))
+            + u64::from(sample) * u64::from(self.metadata.sample_bits / 8)
+            + u64::from(self.metadata.sample_offset);
+        let mut file = File::open(&self.img_path)?;
+        file.seek(SeekFrom::Start(byte_offset))?;
+        match self.metadata.sample_bits {
+            8 => {
+                let mut b = [0u8; 1];
+                file.read_exact(&mut b)?;
+                Ok(u32::from(b[0]))
+            }
+            16 => {
+                let mut b = [0u8; 2];
+                file.read_exact(&mut b)?;
+                Ok(u32::from(u16::from_be_bytes(b)))
+            }
+            _ => Err(MolaError::Unsupported(
+                "counts must be an 8-bit or 16-bit integer".into(),
+            )),
+        }
+    }
+
     fn read_i16(&self, line: u32, sample: u32) -> Result<i16, MolaError> {
         if line >= self.metadata.lines || sample >= self.metadata.samples {
             return Err(MolaError::OutOfBounds);
         }
-        let index = u64::from(line) * u64::from(self.metadata.samples)
-            + u64::from(sample);
         let byte_offset = u64::from(self.metadata.record_bytes)
             * (u64::from(line) + u64::from(self.metadata.line_offset))
             + u64::from(sample) * 2
@@ -192,6 +264,9 @@ impl MolaMegdrMetadata {
         let map_kind = required(kv, "MAP_TYPE")?.chars().next().ok_or_else(|| {
             MolaError::InvalidMetadata("MAP_TYPE is empty".into())
         })?;
+        if !matches!(map_kind, 'T' | 'C' | 'R' | 'A') {
+            return Err(MolaError::InvalidMetadata("unsupported MEGDR map type".into()));
+        }
         let tile_origin_lat_deg = parse_f64_default(kv, "TILE_ORIGIN_LATITUDE", latitude_max_deg)?;
         let tile_origin_lon_deg = parse_f64_default(kv, "TILE_ORIGIN_LONGITUDE", longitude_min_deg)?;
 
@@ -213,9 +288,18 @@ impl MolaMegdrMetadata {
         if lines == 0 || samples == 0 || record_bytes < 2 {
             return Err(MolaError::InvalidMetadata("invalid raster dimensions".into()));
         }
-        if sample_bits != 16 || !matches!(sample_type.as_str(), "MSB_INTEGER" | "LSB_INTEGER") {
+        if !matches!(sample_type.as_str(), "MSB_INTEGER" | "LSB_INTEGER") {
+            return Err(MolaError::Unsupported("unsupported MEGDR integer sample type".into()));
+        }
+        if map_kind == 'C' && resolution >= 64 {
+            if sample_bits != 8 {
+                return Err(MolaError::Unsupported(
+                    "64/128 ppd MEGDR counts must be 8-bit unsigned integers".into(),
+                ));
+            }
+        } else if sample_bits != 16 {
             return Err(MolaError::Unsupported(
-                "MEGDR adapter requires 16-bit signed integer samples".into(),
+                "topography/radius and low-resolution counts must be 16-bit integers".into(),
             ));
         }
         if !map_projection.eq_ignore_ascii_case("SIMPLE CYLINDRICAL") {
@@ -483,8 +567,21 @@ mod tests {
         bytes[2 * 1 + 1] = 0xE8;
         std::fs::write(&img, bytes).unwrap();
         let product = MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").unwrap();
-        let sample = product.sample_nearest(0.0, 0.007).unwrap();
+        let mut count_path = path.clone();
+        count_path.set_file_name(format!("mola_adapter_count_{}_label.lbl", std::process::id()));
+        let mut count_img = count_path.clone();
+        count_img.set_extension("img");
+        let count_label = label().replace("MEGT00N000HB", "MEGC00N000HB").replace("MAP_TYPE = T", "MAP_TYPE = C");
+        std::fs::write(&count_path, count_label).unwrap();
+        let mut count_bytes = vec![0u8; 64];
+        count_bytes[1] = 1;
+        std::fs::write(&count_img, count_bytes).unwrap();
+        let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
+        let sample = product.sample_nearest_with_count(&counts, 0.0, 0.007, 3.0).unwrap();
         assert_eq!(sample.elevation_m, Some(1000.0));
+        assert!(sample.is_usable());
+        let _ = std::fs::remove_file(count_path);
+        let _ = std::fs::remove_file(count_img);
         assert_eq!(sample.quality, TerrainQuality::Measured);
         assert_eq!(sample.vertical_datum, TerrainVerticalDatum::AreoidRelative);
         let _ = std::fs::remove_file(path);
