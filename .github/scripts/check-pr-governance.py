@@ -349,6 +349,20 @@ def history_topology_self_test() -> None:
         assert "side.txt" in changed
         assert "tracked.txt" in changed
 
+        # Shallow history must not be accepted as a substitute for complete
+        # ancestry. Git explicitly treats shallow commits as roots, so a
+        # topology-sensitive validator must detect that boundary and fail
+        # closed rather than silently reasoning over truncated history.
+        shallow = worktree / "shallow"
+        run_local("clone", "--quiet", "--depth", "1", f"file://{worktree}", str(shallow))
+        shallow_cmd = lambda *args: subprocess.run(
+            ["git", *args], cwd=shallow, check=False,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        proc = shallow_cmd("merge-base", "--is-ancestor", base, merge)
+        assert proc.returncode != 0
+        assert (shallow / ".git" / "shallow").exists()
+
 
 def read_at_commit(commit: str, path: str) -> str:
     return run_git("show", f"{commit}:{path}")
