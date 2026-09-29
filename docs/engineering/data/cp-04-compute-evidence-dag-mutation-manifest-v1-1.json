@@ -1,0 +1,45 @@
+{
+  "schema": "cp-04-compute-evidence-dag-mutation-manifest-v1-1",
+  "mutations": [
+    {
+      "mutation_id": "remove-model-runtime-edge",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "reverse-model-runtime-edge",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "duplicate-model-runtime-edge",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "change-edge-type",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "rename-node",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "add-graph-field",
+      "expected_guard_id": "CP-COMP-DAG-SCHEMA"
+    },
+    {
+      "mutation_id": "malformed-edge",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "dangling-edge",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "duplicate-node",
+      "expected_guard_id": "CP-COMP-DAG-SCHEMA"
+    },
+    {
+      "mutation_id": "add-cycle",
+      "expected_guard_id": "CP-COMP-DAG-ACYCLIC"
+    }
+  ]
+}
