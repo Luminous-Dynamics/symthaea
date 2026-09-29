@@ -49,6 +49,7 @@ An edge type is part of graph identity. Replacing an edge type with another type
 If an evidence-relevant node changes, its direct and transitive downstream dependants become candidates for requalification.
 
 The oracle MUST compute downstream closure from the typed graph rather than trusting a hand-maintained list.
+The qualifier MUST compare the computed closure for every declared node against an explicit semantic closure oracle. Coverage of all node classes is required; checking only selected critical paths is insufficient. A graph mutation that preserves schema shape but changes any node's invalidation closure MUST be detected.
 
 Changing a node does not rewrite historical nodes. Requalification produces a new derived disposition for the affected context.
 
