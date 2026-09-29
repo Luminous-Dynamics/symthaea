@@ -903,15 +903,26 @@ mod tests {
             .insert_node(node(component.clone(), "controller", "Control computer"))
             .unwrap();
 
+        let error = graph
+            .add_relation(Relation::new(
+                req,
+                RelationKind::AllocatedTo,
+                component
+            ))
+            .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "invalid role pairing for AllocatedTo: Requirement -> Component"
+        );
+        assert!(std::error::Error::source(&error).is_none());
         assert!(matches!(
-            graph
-                .add_relation(Relation::new(
-                    req,
-                    RelationKind::AllocatedTo,
-                    component
-                ))
-                .unwrap_err(),
-            ModelError::InvalidRelationRoles { .. }
+            error,
+            ModelError::InvalidRelationRoles {
+                kind: RelationKind::AllocatedTo,
+                source_kind: NodeKind::Requirement,
+                target_kind: NodeKind::Component,
+            }
         ));
     }
 
@@ -1215,6 +1226,7 @@ mod tests {
         assert_eq!(paths[0].affected, battery);
         assert_eq!(paths[0].steps[0].from, change);
     }
+
     #[test]
     fn invalid_relation_roles_are_context_not_error_source() {
         let error = ModelError::InvalidRelationRoles {
