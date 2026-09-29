@@ -848,6 +848,7 @@ impl KnowledgeManager {
             .last_search_results
             .iter()
             .map(|r| super::reasoning_context::GroundedFact {
+                provenance: self.graph.provenance(r.fact_id),
                 text: format!("fact:{}", r.fact_id),
                 confidence: r.confidence,
                 similarity: r.similarity,
