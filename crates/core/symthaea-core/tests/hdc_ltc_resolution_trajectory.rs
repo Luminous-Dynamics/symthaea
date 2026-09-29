@@ -154,14 +154,19 @@ fn legacy_dilate_can_be_characterized_against_liquid_trajectory() {
             let projected_reference = reference_state.dilate(lo);
 
             let error = normalized_l2_error(low.state(), &projected_reference);
+            let reference_tau = reference.effective_tau(&high_input);
+            let low_tau = low.effective_tau(&low_input);
+            let tau_error = (reference_tau - low_tau).abs();
+
             assert!(error.is_finite());
+            assert!(tau_error.is_finite());
         }
     }
 }
 
 #[test]
 fn round_trip_hysteresis_is_explicitly_nonzero_or_zero_but_never_unknown() {
-    for &(hi, lo) in &[(16_384, 4_096), (64_536, 1_024)] {
+    for &(hi, lo) in &[(16_384, 4_096), (65_536, 1_024)] {
         let source = ContinuousHV::random(hi, SEED.wrapping_add(hi as u64));
         let round_trip = source.dilate(lo).dilate(hi);
         let error = normalized_l2_error(&source, &round_trip);
