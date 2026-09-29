@@ -2405,6 +2405,60 @@ mod tests {
     }
 
     #[test]
+    fn maximum_boundary_values_and_range_converge_to_same_candidates() {
+        let id = ParameterIdV1::new("length").unwrap();
+        let max = u64::MAX;
+        let values_domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(max - 1).unwrap(),
+                    C0LengthUmV1::new(max).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+        let range_domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(max - 1).unwrap(),
+                    upper: C0LengthUmV1::new(max).unwrap(),
+                    step_um: 1,
+                },
+            },
+        ])
+        .unwrap();
+
+        assert_ne!(values_domain.id().unwrap(), range_domain.id().unwrap());
+        assert_ne!(
+            values_domain.canonical_transcript().unwrap(),
+            range_domain.canonical_transcript().unwrap()
+        );
+
+        let values_candidates = values_domain.enumerate().unwrap();
+        let range_candidates = range_domain.enumerate().unwrap();
+
+        assert_eq!(values_candidates, range_candidates);
+        assert_eq!(
+            values_candidates
+                .iter()
+                .map(|candidate| candidate.parameter(&id).unwrap().value_um())
+                .collect::<Vec<_>>(),
+            vec![max - 1, max]
+        );
+        assert_eq!(values_candidates.len(), 2);
+        assert_eq!(
+            values_candidates
+                .iter()
+                .map(|candidate| candidate.id().unwrap())
+                .collect::<BTreeSet<_>>()
+                .len(),
+            values_candidates.len()
+        );
+    }
+
+    #[test]
     fn range_enumeration_reaches_u64_max_without_wraparound() {
         let id = ParameterIdV1::new("length").unwrap();
         let max = u64::MAX;
