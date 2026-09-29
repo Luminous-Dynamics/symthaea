@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/scientific-discovery/criterion-evidence-eligibility-1.0.0.schema.json",
+  "title": "Symthaea Criterion Evidence Eligibility",
+  "description": "External authority disposition over a complete observation-assessment-replication lineage. Eligibility is not criterion completion or scientific truth.",
+  "type": "object",
+  "required": [
+    "evidence_id",
+    "challenge_id",
+    "criterion_id",
+    "criterion_generation",
+    "authority_id",
+    "authority_institution_id",
+    "authority_basis",
+    "adjudicated_at",
+    "disposition",
+    "observation_id",
+    "observation_record_digest",
+    "assessment_id",
+    "assessment_record_digest",
+    "replication_id",
+    "replication_record_digest",
+    "commitment_event_id",
+    "candidate_id",
+    "binding_digest",
+    "authority_payload_digest",
+    "record_digest"
+  ],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "criterion_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "criterion_generation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_institution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudicated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "disposition": {
+      "enum": [
+        "eligible",
+        "ineligible",
+        "deferred"
+      ]
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_record_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessment_record_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replication_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replication_record_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commitment_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "binding_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_payload_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "x-authority": "external_authority_eligibility_disposition_only",
+  "x-non-equivalences": [
+    "eligible != criterion_completed",
+    "eligible != scientific_truth",
+    "authority_attestation != authenticated_authority",
+    "record_digest != digital_signature"
+  ],
+  "x-integrity": "Symthaea verifies envelope integrity and exact ancestry links; it does not authenticate authority, institution, scientific correctness, or official challenge completion."
+}
