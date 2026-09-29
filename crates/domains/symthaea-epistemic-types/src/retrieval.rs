@@ -7,6 +7,12 @@
 use crate::{MemoryKind, MemoryProjectionRef, MemoryProvenance};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetrievalRequestError {
+    MissingHistoricalFrontier,
+    EmptyHistoricalFrontier,
+}
+
 pub enum RetrievalMode {
     Historical,
     Live,
@@ -32,6 +38,17 @@ impl MemoryRetrievalRequest {
 
     pub fn live(query: impl Into<String>, max_results: usize) -> Self {
         Self { mode: RetrievalMode::Live, frontier_ref: None, query: query.into(), max_results }
+    }
+
+    pub fn validate(&self) -> Result<(), RetrievalRequestError> {
+        if self.mode == RetrievalMode::Historical {
+            match self.frontier_ref.as_deref() {
+                None => return Err(RetrievalRequestError::MissingHistoricalFrontier),
+                Some("") => return Err(RetrievalRequestError::EmptyHistoricalFrontier),
+                Some(_) => {}
+            }
+        }
+        Ok(())
     }
 }
 
@@ -86,6 +103,7 @@ pub fn retrieve(
     request: &MemoryRetrievalRequest,
     candidates: impl IntoIterator<Item = MemoryRetrievalCandidate>,
 ) -> (Vec<RetrievedMemory>, MemoryRetrievalReceipt) {
+    debug_assert!(request.validate().is_ok(), "invalid retrieval request");
     let mut eligible = Vec::new();
     let mut excluded = Vec::new();
 
@@ -233,6 +251,21 @@ mod tests {
         let (groups, _) = retrieve(&MemoryRetrievalRequest::historical("frontier:1", "x", 10), vec![low, high]);
         assert_eq!(groups[0].canonical_identity, "claim:b");
         assert_eq!(groups[1].canonical_identity, "claim:a");
+    }
+
+    #[test]
+    #[test]
+    fn historical_requests_require_a_frontier() {
+        let missing = MemoryRetrievalRequest {
+            mode: RetrievalMode::Historical,
+            frontier_ref: None,
+            query: "x".into(),
+            max_results: 1,
+        };
+        assert_eq!(missing.validate(), Err(RetrievalRequestError::MissingHistoricalFrontier));
+
+        let empty = MemoryRetrievalRequest::historical("", "x", 1);
+        assert_eq!(empty.validate(), Err(RetrievalRequestError::EmptyHistoricalFrontier));
     }
 
     #[test]
