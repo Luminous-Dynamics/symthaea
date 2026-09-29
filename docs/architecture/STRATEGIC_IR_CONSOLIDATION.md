@@ -368,3 +368,25 @@ This pass does not:
 - remove existing APIs before adapter coverage exists.
 
 The purpose is to establish the reasoning boundary first, then increase mathematical and computational sophistication without creating another parallel architecture.
+
+
+## 2026-09-29 ecosystem review: information sets and solver evidence
+
+A current Rust ecosystem review reinforces two additional design constraints.
+
+First, modern CFR implementations expose the game as a state machine with explicit player/chance/terminal nodes and information sets, while keeping the solving algorithm behind that interface. The current `cfr` crate reports regret information and regret bounds, and validates structural properties such as consistent information-set action sets and perfect recall before solving. citeturn0search0turn0search8
+
+Second, the current `mccfr` ecosystem explicitly separates public information, private information, turns, sampling, regret updates, and averaged strategy queries. This is a strong signal that Symthaea should not model imperfect-information strategy as a function of omniscient world state. citeturn0search1turn0search4
+
+Accordingly, the next IR hardening tranche should make these invariants explicit:
+
+- an agent receives an `AgentContext`, not arbitrary `WorldState`;
+- every information set has a well-defined legal-action set;
+- strategies are complete contingent plans over information sets, while policies are decision procedures;
+- solver validation rejects malformed information structures before mathematical analysis;
+- perfect-recall requirements belong to the capability contract of solvers that require them, rather than becoming a universal assumption of the IR;
+- regret, exploitability, convergence, and approximation bounds remain separate evidence fields.
+
+A further ecosystem pattern is worth preserving: safe/depth-limited subgame solving composes belief/world partitioning and local re-solving as orthogonal layers rather than conflating them. That supports treating belief updates, model restriction, and solver choice as composable stages in Strategic IR rather than embedding them into one solver-specific type. citeturn0search3turn0search7
+
+These observations strengthen the existing architectural decision not to make an external CFR crate the canonical ontology. External solvers can be adapters once the IR can faithfully express their required game-state, action, information-set, and evidence contracts.
