@@ -15,7 +15,7 @@
 use super::encoding::FactEncoding;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
-use symthaea_epistemic_types::{MemoryKind, MemoryProvenance};
+use symthaea_epistemic_types::{MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +100,9 @@ pub struct EnhancedKnowledgeGraph {
     domain_index: HashMap<String, Vec<FactId>>,
     /// Pending contradiction alerts (drained by the knowledge manager each cycle)
     pending_contradictions: Vec<ContradictionAlert>,
+    /// Append-only provenance relations between stable memory identities.
+    /// These relations are structural lineage, not evidence-weighting signals.
+    provenance_relations: Vec<ProvenanceRelation>,
     /// Statistics
     total_insertions: u64,
     total_evictions: u64,
@@ -123,6 +126,7 @@ impl EnhancedKnowledgeGraph {
             contradiction_threshold: 0.7,
             domain_index: HashMap::new(),
             pending_contradictions: Vec::new(),
+            provenance_relations: Vec::new(),
             total_insertions: 0,
             total_evictions: 0,
             total_contradictions: 0,
@@ -365,6 +369,51 @@ impl EnhancedKnowledgeGraph {
         } else {
             false
         }
+    }
+
+    /// Record a typed provenance relation without changing either endpoint's confidence.
+    pub fn record_provenance_relation(&mut self, relation: ProvenanceRelation) -> Result<bool, &'static str> {
+        relation.validate()?;
+        let source_exists = self.facts.values().any(|f| f.memory_id == relation.source_memory_id);
+        let target_exists = self.facts.values().any(|f| f.memory_id == relation.target_memory_id);
+        if !source_exists || !target_exists {
+            return Err("provenance relation endpoints must exist");
+        }
+        if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom)
+            && self.lineage_would_cycle(&relation.source_memory_id, &relation.target_memory_id)
+        {
+            return Err("derivation lineage relation would create a cycle");
+        }
+        if self.provenance_relations.iter().any(|existing| existing == &relation) {
+            return Ok(false);
+        }
+        self.provenance_relations.push(relation);
+        Ok(true)
+    }
+
+    pub fn provenance_relations(&self) -> &[ProvenanceRelation] {
+        &self.provenance_relations
+    }
+
+    pub fn import_provenance_relation(&mut self, relation: ProvenanceRelation) -> Result<bool, &'static str> {
+        self.record_provenance_relation(relation)
+    }
+
+    fn lineage_would_cycle(&self, source: &str, target: &str) -> bool {
+        let mut frontier = vec![target.to_owned()];
+        let mut visited = std::collections::HashSet::new();
+        while let Some(current) = frontier.pop() {
+            if current == source { return true; }
+            if !visited.insert(current.clone()) { continue; }
+            for relation in &self.provenance_relations {
+                if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom)
+                    && relation.source_memory_id == current
+                {
+                    frontier.push(relation.target_memory_id.clone());
+                }
+            }
+        }
+        false
     }
 
     /// Number of facts currently stored
@@ -988,6 +1037,33 @@ mod tests {
         graph.insert(make_encoding("claim c", 0.7), 3, None, false);
 
         assert_eq!(graph.provenance(id_a).unwrap().memory_id, memory_a);
+    }
+
+    #[test]
+    fn test_provenance_relation_is_append_only_and_non_evidence_weighting() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("derived", 0.6), 2, None, false);
+        let source_id = graph.provenance(a).unwrap().memory_id;
+        let derived_id = graph.provenance(b).unwrap().memory_id;
+        let before = graph.get_fact(b).unwrap().confidence;
+        let relation = ProvenanceRelation { source_memory_id: derived_id, target_memory_id: source_id, kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into() };
+        assert_eq!(graph.record_provenance_relation(relation.clone()).unwrap(), true);
+        assert_eq!(graph.record_provenance_relation(relation).unwrap(), false);
+        assert_eq!(graph.provenance_relations().len(), 1);
+        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
+    }
+
+    #[test]
+    fn test_provenance_lineage_rejects_cycles() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("b", 0.8), 2, None, false);
+        let a_id = graph.provenance(a).unwrap().memory_id;
+        let b_id = graph.provenance(b).unwrap().memory_id;
+        graph.record_provenance_relation(ProvenanceRelation { source_memory_id: b_id.clone(), target_memory_id: a_id.clone(), kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into() }).unwrap();
+        let err = graph.record_provenance_relation(ProvenanceRelation { source_memory_id: a_id, target_memory_id: b_id, kind: ProvenanceRelationKind::RevisedFrom, created_at: "cycle:3".into() }).unwrap_err();
+        assert_eq!(err, "derivation lineage relation would create a cycle");
     }
 
     #[test]
