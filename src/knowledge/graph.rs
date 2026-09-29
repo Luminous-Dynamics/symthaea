@@ -317,6 +317,26 @@ impl EnhancedKnowledgeGraph {
         self.facts.get(&id)
     }
 
+    /// Return provenance metadata without treating retrieval metrics as evidence.
+    pub fn provenance(&self, id: FactId) -> Option<MemoryProvenance> {
+        self.facts.get(&id).map(|fact| MemoryProvenance {
+            canonical_identity: fact.canonical_identity.clone(),
+            memory_id: fact.memory_id.clone(),
+            memory_kind: MemoryKind::KnowledgeGraph,
+            created_at: format!("cycle:{}", fact.inserted_at_cycle),
+            source_event: None,
+            canonical_artifact_ref: None,
+            statement_ref: None,
+            provenance_family: fact.provenance_family.clone(),
+            epistemic_state: None,
+            claim_ceiling: None,
+            frontier_ref: None,
+            derivation_ref: None,
+            model_ref: None,
+            retrieval_index_ref: Some(format!("fact-id:{}", fact.id)),
+        })
+    }
+
     /// Get all facts with causal relations (for DAG construction)
     pub fn causal_facts(&self) -> Vec<&TemporalFact> {
         self.facts
