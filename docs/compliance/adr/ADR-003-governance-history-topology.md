@@ -20,13 +20,13 @@ Add deterministic self-test coverage using a temporary Git repository. The topol
 - a rewritten/non-descendant history is rejected;
 - a shallow repository cannot establish the required ancestry relation;
 - a partial clone or promisor-remote repository is rejected before topology-sensitive validation;
-- configured alternate object sources and alternate-ref commands are rejected;
+- configured alternate-ref commands and external object-database environment overrides are rejected;
 - Git object-database environment overrides are rejected;
 - replacement refs under refs/replace/ are rejected;
 - the trusted Governance Root workflow contract rejects a checkout filter that could introduce a partial object graph;
 - the direct endpoint diff remains the changeset authority even when the head is a merge commit.
 
-Production validation first rejects an explicitly shallow or partial/promisor repository, configured alternate object sources, alternate-ref commands, replacement refs, or Git object-database environment overrides, while the trusted workflow contract separately rejects a checkout filter; it then requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
+Production validation first rejects an explicitly shallow or partial/promisor repository, alternate-ref commands, replacement refs, or Git object-database environment overrides, while the trusted workflow contract separately rejects a checkout filter; it then requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
 
 ## Scientific Basis
 
