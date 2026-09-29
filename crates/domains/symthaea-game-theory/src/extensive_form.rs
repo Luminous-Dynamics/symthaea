@@ -23,12 +23,39 @@ pub struct Observation {
     pub observation: ObservationId,
 }
 
+/// Visibility of an event to players observing the game.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EventVisibility {
+    Public,
+    ActorOnly,
+    Players(Vec<PlayerId>),
+}
+
+impl EventVisibility {
+    fn visible_to(&self, observer: PlayerId, actor: Option<PlayerId>) -> bool {
+        match self {
+            Self::Public => true,
+            Self::ActorOnly => actor == Some(observer),
+            Self::Players(players) => players.contains(&observer),
+        }
+    }
+}
+
 /// Lossless transition/observation history for semantic information encoding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HistoryEvent {
-    Decision { state: DecisionStateId, player: PlayerId, information_set: crate::strategic_context::InformationSetId, action: ActionId },
-    Chance { state: DecisionStateId, outcome: ChanceOutcomeId, next: DecisionStateId },
+    Decision { state: DecisionStateId, player: PlayerId, information_set: crate::strategic_context::InformationSetId, action: ActionId, visibility: EventVisibility },
+    Chance { state: DecisionStateId, outcome: ChanceOutcomeId, next: DecisionStateId, visibility: EventVisibility },
     Observation { state: DecisionStateId, observer: PlayerId, observation: ObservationId },
+}
+
+/// Player-local action-observation history. Private world events are not exposed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PlayerHistoryEvent {
+    OwnAction { state: DecisionStateId, action: ActionId },
+    ObservedAction { state: DecisionStateId, player: PlayerId, action: ActionId },
+    ChanceOutcome { state: DecisionStateId, outcome: ChanceOutcomeId },
+    Observation { state: DecisionStateId, observation: ObservationId },
 }
 
 /// Semantic mapping from a concrete history to a player's information set.
@@ -37,7 +64,7 @@ pub trait InformationEncoder {
         &self,
         player: PlayerId,
         state: DecisionStateId,
-        history: &[HistoryEvent],
+        history: &[PlayerHistoryEvent],
     ) -> Result<crate::strategic_context::InformationSetId, InformationEncodingError>;
 }
 
@@ -59,6 +86,7 @@ pub enum ExtensiveNode {
 pub struct Transition {
     pub action: ActionId,
     pub next: DecisionStateId,
+    pub visibility: EventVisibility,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,6 +94,7 @@ pub struct ChanceTransition {
     pub outcome: ChanceOutcomeId,
     pub probability: f64,
     pub next: DecisionStateId,
+    pub visibility: EventVisibility,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -76,6 +105,26 @@ pub struct ExtensiveGame {
     /// Observations emitted when a state is entered. Multiple observers may
     /// receive different observations of the same world state.
     pub observations: HashMap<DecisionStateId, Vec<Observation>>,
+}
+
+fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<PlayerHistoryEvent> {
+    history.iter().filter_map(|event| match event {
+        HistoryEvent::Decision { state, player: actor, action, visibility, .. } => {
+            if *actor == player {
+                Some(PlayerHistoryEvent::OwnAction { state: *state, action: *action })
+            } else if visibility.visible_to(player, Some(*actor)) {
+                Some(PlayerHistoryEvent::ObservedAction { state: *state, player: *actor, action: *action })
+            } else {
+                None
+            }
+        }
+        HistoryEvent::Chance { state, outcome, visibility, .. } => visibility.visible_to(player, None).then_some(
+            PlayerHistoryEvent::ChanceOutcome { state: *state, outcome: *outcome }
+        ),
+        HistoryEvent::Observation { state, observer, observation } => (*observer == player).then_some(
+            PlayerHistoryEvent::Observation { state: *state, observation: *observation }
+        ),
+    }).collect()
 }
 
 impl ExtensiveGame {
@@ -286,7 +335,8 @@ impl ExtensiveGame {
         for state in &self.information.decision_states {
             let paths = histories.get(&state.state).ok_or(ExtensiveGameError::InformationMemberNotReachable(state.state))?;
             for history in paths {
-                let encoded = encoder.encode(state.player, state.state, history).map_err(|error| ExtensiveGameError::InformationEncodingFailed {
+                let local_history = project_player_history(state.player, history);
+                let encoded = encoder.encode(state.player, state.state, &local_history).map_err(|error| ExtensiveGameError::InformationEncodingFailed {
                         state: state.state,
                         message: error.message,
                     })?;
@@ -561,8 +611,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -584,8 +634,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(2), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(2), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -603,8 +653,8 @@ mod tests {
             state: DecisionStateId(0),
             player: PlayerId(1),
             actions: vec![
-                Transition { action: ActionId(0), next: DecisionStateId(1) },
-                Transition { action: ActionId(1), next: DecisionStateId(2) },
+                Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
             ],
         };
         assert!(matches!(
@@ -625,8 +675,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -649,8 +699,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -675,22 +725,22 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Decision {
                     state: DecisionStateId(1),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(2), next: DecisionStateId(3) },
+                        Transition { action: ActionId(2), next: DecisionStateId(3), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Decision {
                     state: DecisionStateId(2),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(2), next: DecisionStateId(4) },
+                        Transition { action: ActionId(2), next: DecisionStateId(4), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(3), payoffs: vec![1.0] },
@@ -760,8 +810,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -788,16 +838,16 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Decision {
                     state: DecisionStateId(1),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(0) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(0), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
@@ -865,8 +915,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -993,8 +1043,8 @@ mod tests {
                     state: DecisionStateId(0),
                     player: PlayerId(0),
                     actions: vec![
-                        Transition { action: ActionId(0), next: DecisionStateId(1) },
-                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                        Transition { action: ActionId(0), next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        Transition { action: ActionId(1), next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
@@ -1035,8 +1085,8 @@ mod tests {
                 ExtensiveNode::Chance {
                     state: DecisionStateId(0),
                     outcomes: vec![
-                        ChanceTransition { outcome: ChanceOutcomeId(0), probability: 0.4, next: DecisionStateId(1) },
-                        ChanceTransition { outcome: ChanceOutcomeId(1), probability: 0.4, next: DecisionStateId(2) },
+                        ChanceTransition { outcome: ChanceOutcomeId(0), probability: 0.4, next: DecisionStateId(1), visibility: EventVisibility::Public },
+                        ChanceTransition { outcome: ChanceOutcomeId(1), probability: 0.4, next: DecisionStateId(2), visibility: EventVisibility::Public },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
