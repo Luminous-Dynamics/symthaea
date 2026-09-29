@@ -319,23 +319,62 @@ def require_complete_history() -> None:
     require_complete_object_graph()
 
 
-def validate_exact_base_head_ancestry(base: str, head: str) -> None:
+def validate_exact_base_head_ancestry(
+    base: str,
+    head: str,
+    git_runner: Any = git,
+) -> None:
     if base == head:
         raise GovernanceError("base_sha and head_sha must identify distinct commits")
-    if not git_ok("merge-base", "--is-ancestor", base, head):
-        merge_base = run_git("merge-base", base, head).strip() or "<none>"
+    ancestry = git_runner("merge-base", "--is-ancestor", base, head, check=False)
+    if ancestry.returncode != 0:
+        merge_base_proc = git_runner("merge-base", base, head, check=False)
+        merge_base = merge_base_proc.stdout.strip() or "<none>"
         raise GovernanceError(
             "head_sha must descend from base_sha for exact base-to-head governance; "
             f"merge_base={merge_base}"
         )
 
 
-def changed_paths(base: str, head: str) -> list[str]:
-    validate_exact_base_head_ancestry(base, head)
-    out = run_git(
+def changed_paths(
+    base: str,
+    head: str,
+    git_runner: Any = git,
+) -> list[str]:
+    validate_exact_base_head_ancestry(base, head, git_runner)
+    proc = git_runner(
         "diff", "--name-status", "-M", "--diff-filter=ACDMRT", base, head
     )
-    return parse_name_status(out)
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip()
+        raise GovernanceError(f"git diff: {detail or 'git exited nonzero'}")
+    return parse_name_status(proc.stdout)
+
+
+def require_exact_object_connectivity(
+    base: str,
+    head: str,
+    git_runner: Any = git,
+) -> None:
+    """Verify the exact authority endpoints have a self-contained object graph."""
+    proc = git_runner(
+        "--no-replace-objects",
+        "fsck",
+        "--full",
+        "--connectivity-only",
+        "--no-reflogs",
+        "--no-dangling",
+        "--no-progress",
+        base,
+        head,
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip() or "git fsck exited nonzero"
+        raise GovernanceError(
+            "exact base/head object connectivity is invalid: "
+            f"{detail}"
+        )
 
 
 def unique_non_merge_commits(base: str, head: str) -> list[str]:
@@ -376,10 +415,22 @@ def history_topology_self_test() -> None:
         (worktree / "tracked.txt").write_text("feature\\n", encoding="utf-8")
         run_local("commit", "--quiet", "-am", "feature")
         feature = run_local("rev-parse", "HEAD")
-        validate_exact_base_head_ancestry(base, feature)
+
+        def local_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+            proc = subprocess.run(
+                ["git", *args], cwd=worktree, check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            if check and proc.returncode != 0:
+                detail = proc.stderr.strip() or proc.stdout.strip()
+                raise AssertionError(f"fixture git command failed: {args}: {detail}")
+            return proc
+
+        validate_exact_base_head_ancestry(base, feature, local_git)
+        assert require_exact_object_connectivity(base, feature, local_git) is None
 
         try:
-            validate_exact_base_head_ancestry(base, base)
+            validate_exact_base_head_ancestry(base, base, local_git)
         except GovernanceError:
             pass
         else:
@@ -393,12 +444,12 @@ def history_topology_self_test() -> None:
         run_local("checkout", "--quiet", feature)
         run_local("merge", "--quiet", "--no-ff", side, "-m", "merge")
         merge = run_local("rev-parse", "HEAD")
-        validate_exact_base_head_ancestry(base, merge)
+        validate_exact_base_head_ancestry(base, merge, local_git)
         assert run_local("rev-parse", f"{merge}^1") == feature
         assert run_local("rev-parse", f"{merge}^2") == side
 
         try:
-            validate_exact_base_head_ancestry(feature, base)
+            validate_exact_base_head_ancestry(feature, base, local_git)
         except GovernanceError:
             pass
         else:
@@ -408,7 +459,7 @@ def history_topology_self_test() -> None:
         run_local("commit", "--quiet", "-am", "rebased")
         rebased = run_local("rev-parse", "HEAD")
         try:
-            validate_exact_base_head_ancestry(side, rebased)
+            validate_exact_base_head_ancestry(side, rebased, local_git)
         except GovernanceError:
             pass
         else:
@@ -431,16 +482,6 @@ def history_topology_self_test() -> None:
         proc = shallow_cmd("merge-base", "--is-ancestor", base, merge)
         assert proc.returncode != 0
         assert (shallow / ".git" / "shallow").exists()
-
-        def local_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-            proc = subprocess.run(
-                ["git", *args], cwd=worktree, check=False,
-                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-            )
-            if check and proc.returncode != 0:
-                detail = proc.stderr.strip() or proc.stdout.strip()
-                raise AssertionError(f"fixture git command failed: {args}: {detail}")
-            return proc
 
         assert require_complete_object_graph(local_git) is None
         saved_env = {key: os.environ.get(key) for key in (
@@ -500,6 +541,20 @@ def history_topology_self_test() -> None:
             raise AssertionError("replace refs must fail closed")
         run_local("replace", "-d", base)
 
+        # Delete a reachable tree object. The endpoint SHAs remain unchanged,
+        # but the authority object graph is no longer self-contained.
+        feature_tree = run_local("rev-parse", f"{feature}^{{tree}}")
+        tree_object = worktree / ".git" / "objects" / feature_tree[:2] / feature_tree[2:]
+        if not tree_object.exists():
+            raise AssertionError("fixture expected a loose tree object for missing-object test")
+        tree_object.unlink()
+        try:
+            require_exact_object_connectivity(base, feature, local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("missing reachable tree object must fail closed")
+
 
 def read_at_commit(commit: str, path: str) -> str:
     return run_git("show", f"{commit}:{path}")
@@ -555,6 +610,7 @@ def approved_subject(subject: str, authorities: set[str]) -> bool:
 
 def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[str, Any]:
     require_complete_history()
+    require_exact_object_connectivity(base, head)
     validate_declared_roots(base, head)
     validate_root_workflow_contract(base)
     validate_exact_base_head_ancestry(base, head)
