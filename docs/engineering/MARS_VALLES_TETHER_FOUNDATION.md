@@ -343,3 +343,7 @@ For a coarse Valles-region grid:
 Only the surviving uncertainty classes should trigger higher-fidelity simulation.
 
 This keeps the architecture honest while letting Symthaea's engineering, digital-twin, simulation, and formal-safety infrastructure participate from the beginning.
+
+### Vertical datum is part of terrain identity
+
+Every terrain sample must declare whether its value is areoid-relative height, reference-sphere-relative height, or planetocentric radius. Conversions to the spherical kernel radius must preserve a conservative uncertainty bound and require a compatible areoid model when converting areoid-relative values. The PDS4 MEGDR bundle includes product labels and ENVI headers; some higher-resolution products omit the areoid layer, so adapters must explicitly document any independently sourced areoid model and its revision. No implicit datum assumption is permitted.
