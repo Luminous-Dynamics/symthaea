@@ -41,6 +41,9 @@ use thiserror::Error;
 pub struct InstalledLocalApprovalRequestV1 {
     request: PendingNixApprovalRequestV1,
     install: PendingRequestInstallV1,
+    /// The exact disclosure text supplied at composition time. It is retained
+    /// privately so projection cannot be reconstructed from an unrelated string.
+    operator_visible_action: String,
 }
 
 impl InstalledLocalApprovalRequestV1 {
@@ -55,6 +58,23 @@ impl InstalledLocalApprovalRequestV1 {
     pub fn superseded_request_ids(&self) -> &[String] {
         &self.install.superseded_request_ids
     }
+
+    /// Project exactly what this runtime-owned request was created to display.
+    ///
+    /// Callers cannot substitute another display string: the original text is
+    /// retained privately and the projection constructor re-checks its digest
+    /// against the request's canonical display commitment.
+    pub fn operator_projection(
+        &self,
+    ) -> Result<
+        super::local_approval_projection::PendingNixApprovalProjectionV1,
+        super::local_approval_projection::LocalApprovalProjectionErrorV1,
+    > {
+        super::local_approval_projection::PendingNixApprovalProjectionV1::from_request(
+            &self.request,
+            &self.operator_visible_action,
+        )
+    }
 }
 
 impl std::fmt::Debug for InstalledLocalApprovalRequestV1 {
@@ -66,6 +86,7 @@ impl std::fmt::Debug for InstalledLocalApprovalRequestV1 {
                 "superseded_request_ids",
                 &self.install.superseded_request_ids,
             )
+            .field("operator_visible_action", &"<redacted>")
             .finish_non_exhaustive()
     }
 }
@@ -142,7 +163,11 @@ impl LocalApprovalRuntimeV1 {
         debug_assert_eq!(request.daemon_incarnation_id, self.daemon_incarnation.reference());
         debug_assert_eq!(request.request_id().ok().as_deref(), Some(install.request_id.as_str()));
 
-        Ok(InstalledLocalApprovalRequestV1 { request, install })
+        Ok(InstalledLocalApprovalRequestV1 {
+            request,
+            install,
+            operator_visible_action: displayed_action.to_owned(),
+        })
     }
 
     /// Accept one LOCAL-007 socket submission and atomically consume its request.
@@ -247,6 +272,58 @@ mod tests {
         assert!(runtime
             .transport_instance_ref()
             .starts_with("nixward-local-approval-socket-instance-v1:"));
+    }
+
+    #[test]
+    fn installed_request_projection_is_derived_from_runtime_owned_display() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let installed = runtime
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+
+        let projection = installed.operator_projection().unwrap();
+        assert_eq!(projection.request_id, installed.request_id());
+        assert_eq!(projection.operator_visible_action, "restart nginx.service");
+        assert_eq!(
+            projection.operator_visible_action_digest,
+            installed.request().displayed_action_digest
+        );
+        assert_eq!(projection.projection_digest, projection.compute_digest().unwrap());
+        projection.validate().unwrap();
+    }
+
+    #[test]
+    fn installed_request_projection_cannot_be_rebound_to_external_display_text() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let installed = runtime
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+
+        let projection = installed.operator_projection().unwrap();
+        assert!(matches!(
+            super::super::local_approval_projection::PendingNixApprovalProjectionV1::from_request(
+                installed.request(),
+                "restart sshd.service",
+            ),
+            Err(super::super::local_approval_projection::LocalApprovalProjectionErrorV1::DisplayedActionDigestMismatch)
+        ));
+        assert_eq!(projection.operator_visible_action, "restart nginx.service");
     }
 
     #[test]
