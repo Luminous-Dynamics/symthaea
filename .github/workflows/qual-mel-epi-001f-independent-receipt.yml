@@ -21,7 +21,11 @@ jobs:
         env:
           EXPECTED_SUBJECT: 9308736b927d85c19d882ba0db7ada1aaf5dc1d2
           EXPECTED_PARENT: a4f5351882b08f044319d5e61a01c792341f3726
+          EXPECTED_WORKFLOW_NAME: QUAL MEL-EPI-001F exact subject dispatcher
+          EXPECTED_WORKFLOW_BLOB_SHA: db2f1a9fcd612a1a462763bf763614c3f8612bdf
           WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-dispatch.yml
+          OBSERVER_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          OBSERVER_WORKFLOW_REF: ${{ github.workflow_ref }}
         with:
           script: |
             const fs = require('fs');
@@ -32,7 +36,11 @@ jobs:
             const repo = context.repo.repo;
             const subject = process.env.EXPECTED_SUBJECT;
             const expectedParent = process.env.EXPECTED_PARENT;
+            const expectedWorkflowName = process.env.EXPECTED_WORKFLOW_NAME;
+            const expectedWorkflowBlobSha = process.env.EXPECTED_WORKFLOW_BLOB_SHA;
             const workflowPath = process.env.WORKFLOW_PATH;
+            const observerWorkflowSha = process.env.OBSERVER_WORKFLOW_SHA;
+            const observerWorkflowRef = process.env.OBSERVER_WORKFLOW_REF;
 
             const jobs = await github.paginate(
               github.rest.actions.listJobsForWorkflowRun,
@@ -50,10 +58,31 @@ jobs:
               throw new Error('dispatcher workflow path resolved to a directory');
             }
 
-            const workflowText = Buffer.from(
+            const workflowBytes = Buffer.from(
               workflowFile.data.content,
               workflowFile.data.encoding
-            ).toString('utf8');
+            );
+            const workflowText = workflowBytes.toString('utf8');
+            const workflowSha256 = crypto.createHash('sha256').update(workflowBytes).digest('hex');
+
+            const dispatcherWorkflow = await github.rest.actions.getWorkflow({
+              owner,
+              repo,
+              workflow_id: workflowPath,
+            });
+
+            const workflowIdentityVerified =
+              String(run.workflow_id) === String(dispatcherWorkflow.data.id) &&
+              run.name === expectedWorkflowName &&
+              dispatcherWorkflow.data.name === expectedWorkflowName &&
+              dispatcherWorkflow.data.path === workflowPath &&
+              run.path === workflowPath + '@main' &&
+              run.event === 'workflow_dispatch' &&
+              run.head_branch === 'main' &&
+              run.repository?.full_name === owner + '/' + repo &&
+              run.head_repository?.full_name === owner + '/' + repo;
+
+            const workflowBlobVerified = workflowFile.data.sha === expectedWorkflowBlobSha;
 
             const requiredWorkflowFragments = [
               subject,
@@ -67,6 +96,8 @@ jobs:
               'cargo test --locked -p symthaea-epistemic-types',
               'cargo check --locked -p symthaea-epistemic-types --all-targets',
               'cargo clippy --locked -p symthaea-epistemic-types --all-targets --no-deps -- -D warnings',
+              'on:\n  workflow_dispatch',
+              'permissions:\n  contents: read',
             ];
 
             const missingWorkflowFragments = requiredWorkflowFragments.filter(
@@ -177,10 +208,14 @@ jobs:
                 stepOutcomes[name][0] === 'success'
             );
 
+            const workflowContractVerified =
+              workflowIdentityVerified &&
+              workflowBlobVerified &&
+              missingWorkflowFragments.length === 0;
+
             const qualificationResult =
               run.conclusion === 'success' &&
-              run.head_branch === 'main' &&
-              missingWorkflowFragments.length === 0 &&
+              workflowContractVerified &&
               ancestryVerified &&
               sourceSurfaceVerified &&
               requiredStepsSucceeded
@@ -196,15 +231,32 @@ jobs:
                 attempt: run.run_attempt,
                 conclusion: run.conclusion,
                 event: run.event,
+                name: run.name,
+                path: run.path,
+                workflow_id: run.workflow_id,
                 head_branch: run.head_branch,
                 head_sha: run.head_sha,
+                repository_full_name: run.repository?.full_name ?? null,
+                head_repository_full_name: run.head_repository?.full_name ?? null,
                 workflow_file_path: workflowPath,
                 workflow_file_blob_sha: workflowFile.data.sha,
+                workflow_file_sha256: workflowSha256,
                 html_url: run.html_url,
               },
               workflow_contract: {
+                expected_workflow_name: expectedWorkflowName,
+                expected_workflow_path: workflowPath,
+                expected_workflow_blob_sha: expectedWorkflowBlobSha,
+                observed_workflow_id: run.workflow_id,
+                resolved_workflow_id: dispatcherWorkflow.data.id,
                 missing_fragments: missingWorkflowFragments,
-                verified: missingWorkflowFragments.length === 0,
+                identity_verified: workflowIdentityVerified,
+                blob_verified: workflowBlobVerified,
+                verified: workflowContractVerified,
+              },
+              observer_context: {
+                workflow_sha: observerWorkflowSha,
+                workflow_ref: observerWorkflowRef,
               },
               ancestry: {
                 expected: expectedAncestry,
