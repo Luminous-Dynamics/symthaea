@@ -1480,6 +1480,32 @@ mod tests {
     }
 
     #[test]
+    fn parameter_set_identity_commits_to_parameter_id_and_membership() {
+        let make = |id: &str, include_height: bool| {
+            let mut parameters = vec![ExactDesignLengthParameterV1 {
+                id: ParameterIdV1::new(id).unwrap(),
+                value: C0LengthUmV1::new(20_000).unwrap(),
+            }];
+            if include_height {
+                parameters.push(ExactDesignLengthParameterV1 {
+                    id: ParameterIdV1::new("section_height").unwrap(),
+                    value: C0LengthUmV1::new(30_000).unwrap(),
+                });
+            }
+            ExactDesignParameterSetV1::new(parameters).unwrap()
+        };
+
+        let baseline = make("section_width", false);
+        let renamed = make("width", false);
+        let extended = make("section_width", true);
+
+        assert_ne!(baseline.id().unwrap(), renamed.id().unwrap());
+        assert_ne!(baseline.canonical_transcript().unwrap(), renamed.canonical_transcript().unwrap());
+        assert_ne!(baseline.id().unwrap(), extended.id().unwrap());
+        assert_ne!(baseline.canonical_transcript().unwrap(), extended.canonical_transcript().unwrap());
+    }
+
+    #[test]
     fn parameter_identity_changes_for_one_micrometre() {
         let id = ParameterIdV1::new("section_width").unwrap();
         let a = ExactDesignParameterSetV1::new(vec![ExactDesignLengthParameterV1 { id: id.clone(), value: C0LengthUmV1::new(20_000).unwrap() }]).unwrap();
@@ -1769,6 +1795,28 @@ mod tests {
         assert_eq!(
             domain.enumerate(),
             Err(RobotDesignError::DomainEnumerationOverflow)
+        );
+    }
+
+    #[test]
+    fn search_domain_identity_commits_to_parameter_id() {
+        let make = |name: &str| ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: ParameterIdV1::new(name).unwrap(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(20_000).unwrap(),
+                    C0LengthUmV1::new(21_000).unwrap(),
+                ]),
+            },
+        ]).unwrap();
+
+        let original = make("section_width");
+        let renamed = make("width");
+        assert_ne!(original.id().unwrap(), renamed.id().unwrap());
+        assert_ne!(original.canonical_transcript().unwrap(), renamed.canonical_transcript().unwrap());
+        assert_eq!(
+            original.enumerate().unwrap().iter().map(|set| set.parameters[0].value.value_um()).collect::<Vec<_>>(),
+            renamed.enumerate().unwrap().iter().map(|set| set.parameters[0].value.value_um()).collect::<Vec<_>>()
         );
     }
 
