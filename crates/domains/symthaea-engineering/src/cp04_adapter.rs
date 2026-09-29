@@ -210,7 +210,7 @@ impl Cp04QualificationArtifact {
         }
 
         let mut node_digests = BTreeMap::new();
-        let mut previous_node_digest: Option<&str> = None;
+        let mut previous_node_digest: Option<String> = None;
         for node in &self.nodes {
             node.identity.validate().map_err(|_| {
                 Cp04AdapterError::MissingEndpoint(node.identity_digest.clone())
@@ -223,10 +223,10 @@ impl Cp04QualificationArtifact {
             if node_digests.insert(digest.clone(), ()).is_some() {
                 return Err(Cp04AdapterError::DuplicateNode(digest));
             }
-            if previous_node_digest.is_some_and(|previous| previous >= digest.as_str()) {
+            if previous_node_digest.as_deref().is_some_and(|previous| previous >= digest.as_str()) {
                 return Err(Cp04AdapterError::UnorderedNodes);
             }
-            previous_node_digest = Some(Box::leak(digest.into_boxed_str()));
+            previous_node_digest = Some(digest);
         }
 
         let mut previous_edge_key: Option<(String, String, String, String)> = None;
