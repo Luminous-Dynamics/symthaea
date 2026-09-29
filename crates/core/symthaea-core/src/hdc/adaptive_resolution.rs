@@ -15,7 +15,7 @@ impl HdcResolution {
 }
 
 /// A packed binary HV with an explicit resolution tag.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PackedBinaryHv { resolution: HdcResolution, bytes: Vec<u8> }
 
 impl PackedBinaryHv {
