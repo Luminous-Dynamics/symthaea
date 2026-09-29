@@ -125,19 +125,10 @@ impl PendingNixApprovalRequestV1 {
         evaluated_at: UnixMillisV1,
     ) -> Result<EvidenceTemporalEvaluationV1, LocalApprovalErrorV1> {
         self.validate_shape()?;
-        if evaluated_at.as_u64() >= self.expires_at_unix_ms {
-            return Ok(EvidenceTemporalEvaluationV1::evaluate(
-                EvidenceCurrentnessV1::Observed(
-                    EvidenceWindowMillisV1::new(
-                        UnixMillisV1::new(self.created_at_unix_ms),
-                        UnixMillisV1::new(self.expires_at_unix_ms.saturating_sub(1)),
-                    )
-                    .map_err(|_| LocalApprovalErrorV1::InvalidRequestWindow)?,
-                ),
-                evaluated_at,
-            ));
-        }
-        self.temporal_evaluation(evaluated_at)
+        Ok(EvidenceTemporalEvaluationV1::evaluate_strict_expiry(
+            self.currentness()?,
+            evaluated_at,
+        ))
     }
 
     pub fn is_current_at(&self, now: UnixMillisV1) -> Result<bool, LocalApprovalErrorV1> {
