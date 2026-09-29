@@ -459,7 +459,7 @@ impl EvidenceLineageDkgProjection {
 
     fn digest(&self) -> String {
         let mut h = Sha256::new();
-        h.update(b"symthaea:evidence-lineage-dkg-projection:v2 ");
+        h.update(b"symthaea:evidence-lineage-dkg-projection:v3\0");
         put(&mut h, &self.projection_version);
         h.update((self.nodes.len() as u64).to_be_bytes());
         for n in &self.nodes {
