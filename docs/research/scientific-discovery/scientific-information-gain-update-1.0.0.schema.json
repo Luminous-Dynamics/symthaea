@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Scientific Information-Gain Update Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "investigation_id",
+    "trace_digest",
+    "frozen_comparison_receipt_digest",
+    "prediction_stage_id",
+    "prospective_commitment_digest",
+    "execution_stage_id",
+    "observation_stage_id",
+    "observation_artifact_digest",
+    "disposition",
+    "pre_update_state_digest",
+    "information_gain_artifact_digest",
+    "post_update_state_digest",
+    "next_planning_input_digest",
+    "update_digest"
+  ],
+  "properties": {
+    "receipt_version": { "const": "1.0.0" },
+    "investigation_id": { "type": "string", "minLength": 1 },
+    "trace_digest": { "$ref": "#/$defs/digest" },
+    "frozen_comparison_receipt_digest": { "$ref": "#/$defs/digest" },
+    "prediction_stage_id": { "type": "string", "minLength": 1 },
+    "prospective_commitment_digest": { "$ref": "#/$defs/digest" },
+    "execution_stage_id": { "type": "string", "minLength": 1 },
+    "observation_stage_id": { "type": "string", "minLength": 1 },
+    "observation_artifact_digest": { "$ref": "#/$defs/digest" },
+    "disposition": {
+      "enum": ["supports", "contradicts", "null", "inconclusive", "partial"]
+    },
+    "pre_update_state_digest": { "$ref": "#/$defs/digest" },
+    "information_gain_artifact_digest": { "$ref": "#/$defs/digest" },
+    "post_update_state_digest": { "$ref": "#/$defs/digest" },
+    "next_planning_input_digest": { "$ref": "#/$defs/digest" },
+    "update_digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-fA-F]{64}$"
+    }
+  }
+}
