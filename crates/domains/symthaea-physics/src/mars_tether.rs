@@ -212,7 +212,7 @@ impl RotatingTetherGeometry {
             .into_iter()
             .filter(|v| *v >= 0.0)
             .fold(f64::INFINITY, f64::min);
-        if t.is_finite() {
+        if t.is_finite() && t <= self.length_m {
             Some((t, self.anchor_position_m.add(self.direction.scale(t))))
         } else {
             None
@@ -536,7 +536,11 @@ mod tests {
             PI / 2.0,
             1.0e6,
         );
-        let hit = g.sphere_intersection(m.synchronous_radius_m()).expect("sync sphere");
+        assert!(g.sphere_intersection(m.synchronous_radius_m()).is_none());
+        let long_geometry = RotatingTetherGeometry::from_anchor(
+            m, anchor, 0.0, PI / 2.0, m.synchronous_altitude_m(),
+        );
+        let hit = long_geometry.sphere_intersection(m.synchronous_radius_m()).expect("sync sphere");
         assert!(hit.0 > 0.0);
         assert!((hit.1.norm_m() - m.synchronous_radius_m()).abs() < 1e-6);
     }
