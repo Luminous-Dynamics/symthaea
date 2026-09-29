@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.ai/schema/cross-dkg-projection-receipt-1.0.0.schema.json",
+  "title": "Federated Cross-DKG Projection Receipt",
+  "description": "Deterministic provenance/reproducibility envelope for a federated projection. It does not establish truth, consensus, semantic authority, authenticated execution, or evidence qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "projection_id",
+    "projection_version",
+    "collection_digest",
+    "adapter_receipt_digests",
+    "outputs",
+    "projection_digest"
+  ],
+  "properties": {
+    "receipt_version": { "const": "1.0.0" },
+    "projection_id": { "type": "string", "minLength": 1 },
+    "projection_version": { "type": "string", "minLength": 1 },
+    "collection_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "adapter_receipt_digests": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+      "uniqueItems": true
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["record_id", "record_digest"],
+        "properties": {
+          "record_id": { "type": "string", "minLength": 1 },
+          "record_digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "projection_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}
