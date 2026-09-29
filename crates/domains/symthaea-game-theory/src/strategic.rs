@@ -231,6 +231,9 @@ pub struct SolverCapabilities {
 
 /// Solver interface for validated strategic models.
 pub trait StrategicSolver {
+    /// Declares information-structure and payoff assumptions before solving.
+    fn capabilities(&self) -> SolverCapabilities;
+
     fn method(&self) -> AnalysisMethod;
     fn supported_tasks(&self) -> &'static [AnalysisTask];
 
@@ -265,6 +268,15 @@ impl PureNashSolver {
 }
 
 impl StrategicSolver for PureNashSolver {
+    fn capabilities(&self) -> SolverCapabilities {
+        SolverCapabilities {
+            supports_imperfect_information: false,
+            requires_perfect_recall: false,
+            supports_chance: false,
+            supports_general_sum: true,
+        }
+    }
+
     fn method(&self) -> AnalysisMethod {
         AnalysisMethod::ExhaustiveEnumeration
     }
@@ -347,6 +359,15 @@ mod tests {
         let result = PureNashSolver.solve(&game, AnalysisTask::FindEquilibrium).unwrap();
 
         assert_eq!(result.completeness, Completeness::Exhaustive);
+        assert_eq!(
+            PureNashSolver.capabilities(),
+            SolverCapabilities {
+                supports_imperfect_information: false,
+                requires_perfect_recall: false,
+                supports_chance: false,
+                supports_general_sum: true,
+            }
+        );
         assert_eq!(
             result.equilibria,
             vec![PureNashEquilibrium {
