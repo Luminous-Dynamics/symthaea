@@ -847,13 +847,18 @@ impl KnowledgeManager {
         let facts: Vec<super::reasoning_context::GroundedFact> = self
             .last_search_results
             .iter()
-            .map(|r| super::reasoning_context::GroundedFact {
-                provenance: self.graph.provenance(r.fact_id),
-                text: format!("fact:{}", r.fact_id),
-                confidence: r.confidence,
-                similarity: r.similarity,
-                domain: None,
-                is_causal: false,
+            .filter_map(|r| {
+                let fact = self.graph.get_fact(r.fact_id)?;
+                Some(super::reasoning_context::GroundedFact {
+                    provenance: self.graph.provenance(r.fact_id),
+                    // Query results must carry the persisted claim itself; FactId is only
+                    // a process-local retrieval handle and must never become claim text.
+                    text: fact.encoding.source_text.clone(),
+                    confidence: r.confidence,
+                    similarity: r.similarity,
+                    domain: fact.domain.clone(),
+                    is_causal: fact.has_causal_relations,
+                })
             })
             .collect();
 
