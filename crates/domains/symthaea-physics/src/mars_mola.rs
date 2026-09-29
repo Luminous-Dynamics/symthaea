@@ -172,6 +172,7 @@ impl MolaMegdrProduct {
             ));
         }
         if a.product_version != b.product_version
+            || a.product_creation_time != b.product_creation_time
             || a.resolution_pixels_per_degree != b.resolution_pixels_per_degree
             || a.lines != b.lines
             || a.samples != b.samples
@@ -179,6 +180,8 @@ impl MolaMegdrProduct {
             || a.latitude_max_deg != b.latitude_max_deg
             || a.longitude_min_deg != b.longitude_min_deg
             || a.longitude_max_deg != b.longitude_max_deg
+            || a.line_projection_offset != b.line_projection_offset
+            || a.sample_projection_offset != b.sample_projection_offset
             || a.tile_origin_lat_deg != b.tile_origin_lat_deg
             || a.tile_origin_lon_deg != b.tile_origin_lon_deg
         {
@@ -273,6 +276,12 @@ impl MolaMegdrMetadata {
         if !matches!(map_kind, 'T' | 'C' | 'R' | 'A') {
             return Err(MolaError::InvalidMetadata("unsupported MEGDR map type".into()));
         }
+        let product_kind = product_id.chars().nth(3);
+        if product_kind != Some(map_kind) {
+            return Err(MolaError::InvalidMetadata(
+                "PRODUCT_ID map-kind prefix does not match MAP_TYPE".into(),
+            ));
+        }
         let tile_origin_lat_deg = parse_f64_default(kv, "TILE_ORIGIN_LATITUDE", latitude_max_deg)?;
         let tile_origin_lon_deg = parse_f64_default(kv, "TILE_ORIGIN_LONGITUDE", longitude_min_deg)?;
 
@@ -284,6 +293,11 @@ impl MolaMegdrMetadata {
         if product_version != "2.0" {
             return Err(MolaError::InvalidMetadata(
                 "only final MEGDR PRODUCT_VERSION_ID=2.0 is accepted".into(),
+            ));
+        }
+        if product_creation_time < "2003-03-21T00:00:00" {
+            return Err(MolaError::InvalidMetadata(
+                "MEGDR product creation time predates the final 2.0 release".into(),
             ));
         }
         if !matches!(resolution, 4 | 16 | 32 | 64 | 128) {
@@ -365,6 +379,7 @@ impl MolaMegdrMetadata {
         Ok(Self {
             product_id,
             product_version,
+            product_creation_time,
             resolution_pixels_per_degree: resolution,
             lines,
             samples,
@@ -589,6 +604,16 @@ mod tests {
     }
 
     #[test]
+    fn rejects_pre_final_creation_time() {
+        let text = label().replace(
+            "PRODUCT_CREATION_TIME = 2003-03-21T00:00:00",
+            "PRODUCT_CREATION_TIME = 2003-03-20T23:59:59",
+        );
+        let error = MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+        assert!(matches!(error, MolaError::InvalidMetadata(_)));
+    }
+
+    #[test]
     fn rejects_wrong_product_version_and_grid_registration() {
         let mut text = label().replace("PRODUCT_VERSION_ID = 2.0", "PRODUCT_VERSION_ID = 1.0");
         let mut path = std::env::temp_dir();
@@ -603,6 +628,33 @@ mod tests {
         assert!(MolaMegdrProduct::open(&path, &img, "MEGT00N000HB", "pds4-v1").is_err());
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_file(img);
+    }
+
+    #[test]
+    fn rejects_mismatched_projection_registration() {
+        let topography = MolaMegdrMetadata::from_label(&parse_label(&label()), "MEGT00N000HB").unwrap();
+        let count_label = label()
+            .replace("MEGT00N000HB", "MEGC00N000HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
+            .replace("PRODUCT_CREATION_TIME = 2003-03-21T00:00:00", "PRODUCT_CREATION_TIME = 2003-03-21T00:00:01")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.015626");
+        let counts = MolaMegdrMetadata::from_label(&parse_label(&count_label), "MEGC00N000HB").unwrap();
+        let product = MolaMegdrProduct {
+            metadata: topography,
+            provenance: TerrainProvenance {
+                source_id: "MEGT00N000HB".into(),
+                source_revision: "pds4-v1".into(),
+                coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+            },
+            img_path: std::path::PathBuf::from("unused"),
+        };
+        let count_product = MolaMegdrProduct {
+            metadata: counts,
+            provenance: product.provenance.clone(),
+            img_path: std::path::PathBuf::from("unused"),
+        };
+        assert!(product.validate_companion(&count_product).is_err());
     }
 
     #[test]
