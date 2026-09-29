@@ -55,7 +55,7 @@ impl ScientificLineageGraph {
         self.validate_qualification_acyclic()?;
         let mut relations: Vec<EngineeringRelation> = self.qualification_relations().cloned().collect();
         relations.sort_by(|a, b| a.relation_digest().cmp(&b.relation_digest()));
-        Ok(QualificationProjection {
+        let mut projection = QualificationProjection {
             schema: QUALIFICATION_PROJECTION_SCHEMA.to_owned(),
             source_graph_digest: self.graph_digest(),
             qualification_policy: QUALIFICATION_POLICY.to_owned(),
