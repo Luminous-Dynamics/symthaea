@@ -116,6 +116,21 @@ impl PendingNixApprovalRequestV1 {
         ))
     }
 
+    /// Authoritative admission check for this live request.
+    ///
+    /// Observational evidence windows are inclusive, but pending approval
+    /// admission is strict: evaluated_at == expires_at is already expired.
+    pub fn authoritative_temporal_evaluation(
+        &self,
+        evaluated_at: UnixMillisV1,
+    ) -> Result<EvidenceTemporalEvaluationV1, LocalApprovalErrorV1> {
+        self.validate_shape()?;
+        Ok(EvidenceTemporalEvaluationV1::evaluate_strict_expiry(
+            self.currentness()?,
+            evaluated_at,
+        ))
+    }
+
     pub fn is_current_at(&self, now: UnixMillisV1) -> Result<bool, LocalApprovalErrorV1> {
         Ok(self.temporal_evaluation(now)?.is_current())
     }
@@ -161,7 +176,7 @@ impl LocalNixApprovalDecisionV1 {
         approver_ref: impl Into<String>,
     ) -> Result<Self, LocalApprovalErrorV1> {
         request.validate_shape()?;
-        match request.temporal_evaluation(decided_at)?.status() {
+        match request.authoritative_temporal_evaluation(decided_at)?.status() {
             EvidenceTemporalStatusV1::Current => {}
             EvidenceTemporalStatusV1::NotYetValid => {
                 return Err(LocalApprovalErrorV1::DecisionBeforeRequest);
@@ -237,7 +252,7 @@ impl LocalNixApprovalDecisionV1 {
         }
 
         let decided_at = UnixMillisV1::new(self.decided_at_unix_ms);
-        match request.temporal_evaluation(decided_at)?.status() {
+        match request.authoritative_temporal_evaluation(decided_at)?.status() {
             EvidenceTemporalStatusV1::Current => {}
             EvidenceTemporalStatusV1::NotYetValid => {
                 return Err(LocalApprovalErrorV1::DecisionBeforeRequest);
@@ -254,7 +269,7 @@ impl LocalNixApprovalDecisionV1 {
             return Err(LocalApprovalErrorV1::DecisionFromFuture);
         }
 
-        match request.temporal_evaluation(now)?.status() {
+        match request.authoritative_temporal_evaluation(now)?.status() {
             EvidenceTemporalStatusV1::Current => Ok(self.decision),
             EvidenceTemporalStatusV1::NotYetValid => {
                 Err(LocalApprovalErrorV1::RequestNotYetValid)
@@ -448,8 +463,46 @@ mod tests {
             EvidenceTemporalStatusV1::Current
         );
         assert_eq!(
-            request.temporal_evaluation(ms(2_001)).unwrap().status(),
+            request.authoritative_temporal_evaluation(ms(1_999)).unwrap().status(),
+            EvidenceTemporalStatusV1::Current
+        );
+        assert_eq!(
+            request.authoritative_temporal_evaluation(ms(2_000)).unwrap().status(),
             EvidenceTemporalStatusV1::Expired
+        );
+        assert_eq!(
+            request.authoritative_temporal_evaluation(ms(2_001)).unwrap().status(),
+            EvidenceTemporalStatusV1::Expired
+        );
+    }
+
+    #[test]
+    fn approval_at_exact_expiry_is_rejected_by_authoritative_admission() {
+        let intent = intent("machine:workstation", "generation:42");
+        let request = request(&intent, 1);
+
+        assert_eq!(
+            LocalNixApprovalDecisionV1::for_request(
+                &request,
+                LocalApprovalDecisionKindV1::Approved,
+                ms(2_000),
+                "local-user:test",
+            )
+            .unwrap_err(),
+            LocalApprovalErrorV1::DecisionAfterExpiry
+        );
+
+        let decision = LocalNixApprovalDecisionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_999),
+            "local-user:test",
+        )
+        .unwrap();
+
+        assert_eq!(
+            decision.evaluate_against(&request, ms(2_000)).unwrap_err(),
+            LocalApprovalErrorV1::RequestExpired
         );
     }
 

@@ -139,6 +139,35 @@ impl EvidenceTemporalEvaluationV1 {
         self.status
     }
 
+    /// Evaluate an observed window using strict expiry semantics for
+    /// authoritative admission: equality with the validity endpoint is expired.
+    ///
+    /// This deliberately does not change the inclusive replayable evidence
+    /// semantics of evaluate().
+    pub fn evaluate_strict_expiry(
+        currentness: EvidenceCurrentnessV1,
+        evaluated_at: UnixMillisV1,
+    ) -> Self {
+        let status = match currentness {
+            EvidenceCurrentnessV1::Static => EvidenceTemporalStatusV1::Current,
+            EvidenceCurrentnessV1::Unknown => EvidenceTemporalStatusV1::Unknown,
+            EvidenceCurrentnessV1::Observed(window) => {
+                if evaluated_at < window.observed_at() {
+                    EvidenceTemporalStatusV1::NotYetValid
+                } else if evaluated_at >= window.valid_until() {
+                    EvidenceTemporalStatusV1::Expired
+                } else {
+                    EvidenceTemporalStatusV1::Current
+                }
+            }
+        };
+        Self {
+            currentness,
+            evaluated_at,
+            status,
+        }
+    }
+
     pub const fn is_current(self) -> bool {
         matches!(self.status, EvidenceTemporalStatusV1::Current)
     }
@@ -173,6 +202,26 @@ mod tests {
             assert!(result.is_current());
             assert_eq!(result.evaluated_at(), UnixMillisV1::new(now));
         }
+    }
+
+    #[test]
+    fn strict_expiry_differs_from_inclusive_observation_only_at_endpoint() {
+        let before =
+            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(199_999));
+        assert_eq!(before.status(), EvidenceTemporalStatusV1::Current);
+
+        let exact =
+            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(200_000));
+        assert_eq!(exact.status(), EvidenceTemporalStatusV1::Expired);
+
+        let after =
+            EvidenceTemporalEvaluationV1::evaluate_strict_expiry(observed(), UnixMillisV1::new(200_001));
+        assert_eq!(after.status(), EvidenceTemporalStatusV1::Expired);
+
+        // The generic observational evaluator remains intentionally inclusive.
+        let observed_exact =
+            EvidenceTemporalEvaluationV1::evaluate(observed(), UnixMillisV1::new(200_000));
+        assert_eq!(observed_exact.status(), EvidenceTemporalStatusV1::Current);
     }
 
     #[test]
