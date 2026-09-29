@@ -827,7 +827,7 @@ mod tests {
             .create_approval_request(
                 &intent,
                 "nixos-rebuild switch --flake .#workstation",
-                "local-human-v1",
+                "same-uid-process-v1",
                 ms(1_000),
                 ms(2_000),
             )
