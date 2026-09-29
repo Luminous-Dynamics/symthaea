@@ -242,3 +242,8 @@ The anchor assessment now rejects a non-finite or non-positive minimum anchor ra
 The terrain contract now carries a `TerrainVerticalDatum` for each sample: areoid-relative height, height above the kernel reference sphere, or planetocentric radius. The new `radial_terrain_elevation` conversion returns reference-sphere-relative height and an uncertainty bound. For areoid-relative samples, both the compatible areoid radius and its uncertainty are mandatory; the converter combines the areoid and sample uncertainty bounds by addition (worst case), not root-sum-square, because independence is not established. Missing or invalid datum inputs return no conversion rather than a guessed height.
 
 This makes the PDS MEGDR product distinction actionable in code: adapters must declare the exact vertical quantity represented by the raster and provide a compatible areoid model when required. Conversion does not itself establish geodetic compatibility, terrain accuracy, or anchor suitability. A geographic sweep remains gated on a real, versioned raster adapter and product-level validation.
+
+
+### Terrain sample admissibility
+
+The core sample validator also checks that areocentric latitude lies within [-90°, +90°], optional slope lies within [0°, 90°], and provenance identifiers (source, revision, coordinate reference) are non-empty. These are syntactic admissibility checks only; they do not prove that a product label is truthful, that the grid registration is correct, or that a coordinate transform is valid. Dataset adapters remain responsible for validating those claims against source metadata.
