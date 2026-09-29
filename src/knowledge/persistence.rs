@@ -126,7 +126,16 @@ impl KnowledgePersistence {
         for fact in facts {
             conn.execute(
                 "INSERT INTO knowledge_facts (memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                 ON CONFLICT(memory_id) DO UPDATE SET
+                    canonical_identity = excluded.canonical_identity,
+                    provenance_family = excluded.provenance_family,
+                    vector_blob = excluded.vector_blob,
+                    source_text = excluded.source_text,
+                    confidence = excluded.confidence,
+                    domain = excluded.domain,
+                    cycle = excluded.cycle,
+                    is_causal = excluded.is_causal",
                 rusqlite::params![
                     fact.memory_id,
                     fact.canonical_identity,
@@ -387,11 +396,16 @@ impl KnowledgePersistence {
                 is_a_parent TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
-            CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
+            CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_memory_id_unique
+                ON knowledge_facts(memory_id)
+                WHERE memory_id IS NOT NULL;",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
 
         // Backward-compatible migration for databases created before EPF-011.
+        // The partial unique index above is safe for legacy NULL memory IDs and makes
+        // stable memory_id the idempotency key for all newly persisted records.
         let columns: Vec<String> = conn
             .prepare("PRAGMA table_info(knowledge_facts)")
             .map_err(|e| format!("Schema inspect: {e}"))?
@@ -474,7 +488,51 @@ mod tests {
     }
 
     #[test]
-    fn test_save_and_load_causal_edges() {
+    fn test_save_facts_is_idempotent_by_memory_id() {
+        let dir = std::env::temp_dir().join(format!("symthaea_fact_upsert_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let first = FactRecord {
+            memory_id: "memory-stable".into(),
+            canonical_identity: Some("claim-1".into()),
+            provenance_family: Some("family-1".into()),
+            vector_bytes: vec![0u8; 2048],
+            source_text: "original".into(),
+            confidence: 0.8,
+            domain: Some("test".into()),
+            cycle: 1,
+            is_causal: false,
+        };
+        assert_eq!(p.save_facts(&[first]).unwrap(), 1);
+
+        let updated = FactRecord {
+            memory_id: "memory-stable".into(),
+            canonical_identity: Some("claim-1".into()),
+            provenance_family: Some("family-1".into()),
+            vector_bytes: vec![1u8; 2048],
+            source_text: "updated".into(),
+            confidence: 0.9,
+            domain: Some("test".into()),
+            cycle: 2,
+            is_causal: true,
+        };
+        assert_eq!(p.save_facts(&[updated]).unwrap(), 1);
+
+        let loaded = p.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].memory_id, "memory-stable");
+        assert_eq!(loaded[0].source_text, "updated");
+        assert!((loaded[0].confidence - 0.9).abs() < 0.001);
+        assert_eq!(loaded[0].cycle, 2);
+        assert!(loaded[0].is_causal);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_and_load_causal_edges {
         let dir = std::env::temp_dir().join(format!("symthaea_causal_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
         let _ = std::fs::create_dir_all(&dir);
