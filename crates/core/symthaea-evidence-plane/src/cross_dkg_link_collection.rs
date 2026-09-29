@@ -197,7 +197,7 @@ mod tests {
         b.link_digest = "sha256:tampered".into();
         assert_eq!(
             CrossDkgLinkCollection::new(vec![a, b]),
-            Err(CrossDkgCollectionError::InvalidLink(CrossDkgLinkError::DigestMismatch))
+            Err(CrossDkgCollectionError::InvalidLink(CrossDkgLinkError::LinkDigestMismatch))
         );
     }
 
