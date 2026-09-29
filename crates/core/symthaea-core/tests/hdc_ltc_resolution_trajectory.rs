@@ -5,7 +5,7 @@
 //! trajectory-level oracle before any adaptive conversion is allowed to affect
 //! production state.
 
-use symthaea_core::hdc::{ContinuousHV, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig};
+use symthaea_core::hdc::{\n    continuous_resolution_projection::{project, ContinuousProjectionFamily},\n    ContinuousHV, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,\n};
 
 const DIMS: [usize; 7] = [1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536];
 const SEED: u64 = 0x4844_432d_4c54_4301;
@@ -283,4 +283,82 @@ fn legacy_dilate_operator_matrix_is_deterministic() {
         assert_eq!(a.permutation_error.to_bits(), b.permutation_error.to_bits());
         assert_eq!(a.round_trip_error.to_bits(), b.round_trip_error.to_bits());
     }
+}
+
+
+#[test]
+fn hadamard_candidate_matrix_covers_all_contractions() {
+    // 21 strict contractions. Expansion is intentionally unsupported by the
+    // candidate so that no pseudo-inverse semantics are silently invented.
+    let mut observed = 0usize;
+
+    for (source_index, &source_dim) in DIMS.iter().enumerate().skip(1) {
+        for (target_index, &target_dim) in DIMS.iter().enumerate().take(source_index) {
+            let seed = SEED
+                .wrapping_add((source_index as u64) << 32)
+                .wrapping_add(target_index as u64);
+            let a = ContinuousHV::random(source_dim, seed);
+            let b = ContinuousHV::random(source_dim, seed.wrapping_add(1));
+            let c = ContinuousHV::random(source_dim, seed.wrapping_add(2));
+
+            let pa = project(&a, target_dim, ContinuousProjectionFamily::HadamardTruncateV1)
+                .expect("valid contraction");
+            let pb = project(&b, target_dim, ContinuousProjectionFamily::HadamardTruncateV1)
+                .expect("valid contraction");
+            let pc = project(&c, target_dim, ContinuousProjectionFamily::HadamardTruncateV1)
+                .expect("valid contraction");
+
+            let binding_error = normalized_l2_error(
+                &project(
+                    &a.bind(&b),
+                    target_dim,
+                    ContinuousProjectionFamily::HadamardTruncateV1,
+                )
+                .expect("valid contraction"),
+                &pa.bind(&pb),
+            );
+            let bundle_error = normalized_l2_error(
+                &project(
+                    &ContinuousHV::bundle(&[&a, &b, &c]),
+                    target_dim,
+                    ContinuousProjectionFamily::HadamardTruncateV1,
+                )
+                .expect("valid contraction"),
+                &ContinuousHV::bundle(&[&pa, &pb, &pc]),
+            );
+            let permutation_error = normalized_l2_error(
+                &project(
+                    &a.permute(1),
+                    target_dim,
+                    ContinuousProjectionFamily::HadamardTruncateV1,
+                )
+                .expect("valid contraction"),
+                &pa.permute(1),
+            );
+
+            assert!(binding_error.is_finite());
+            assert!(bundle_error.is_finite());
+            assert!(permutation_error.is_finite());
+            observed += 1;
+        }
+    }
+
+    assert_eq!(observed, 21);
+}
+
+#[test]
+fn hadamard_candidate_is_deterministic_and_rejects_expansion() {
+    let source = ContinuousHV::random(16_384, SEED);
+    let a = project(&source, 4_096, ContinuousProjectionFamily::HadamardTruncateV1)
+        .expect("valid contraction");
+    let b = project(&source, 4_096, ContinuousProjectionFamily::HadamardTruncateV1)
+        .expect("valid contraction");
+    assert_eq!(a.values, b.values);
+
+    assert!(project(
+        &a,
+        16_384,
+        ContinuousProjectionFamily::HadamardTruncateV1
+    )
+    .is_err());
 }
