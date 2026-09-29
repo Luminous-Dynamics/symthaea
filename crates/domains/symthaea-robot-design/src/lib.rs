@@ -2332,6 +2332,30 @@ mod tests {
     }
 
     #[test]
+    fn range_enumeration_reaches_u64_max_without_wraparound() {
+        let id = ParameterIdV1::new("length").unwrap();
+        let max = u64::MAX;
+        let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id: id.clone(),
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(max - 4).unwrap(),
+                upper: C0LengthUmV1::new(max).unwrap(),
+                step_um: 2,
+            },
+        }])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        let values = candidates
+            .iter()
+            .map(|candidate| candidate.parameter(&id).unwrap().value_um())
+            .collect::<Vec<_>>();
+
+        assert_eq!(values, vec![max - 4, max - 2, max]);
+        assert_eq!(candidates.len(), 3);
+    }
+
+    #[test]
     fn mixed_range_and_values_enumeration_is_deterministic_and_cartesian() {
         let width = ParameterIdV1::new("width").unwrap();
         let height = ParameterIdV1::new("height").unwrap();
