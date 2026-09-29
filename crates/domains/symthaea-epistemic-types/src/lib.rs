@@ -1,3 +1,4 @@
+pub mod claim_derivation;
 pub mod claim_scope;
 pub mod epistemic_watchdog;
 pub mod formal_watchdog;
@@ -7,6 +8,7 @@ pub mod provenance;
 pub mod semantic_evidence;
 pub mod source_reference;
 pub mod validated_projection;
+pub use claim_derivation::*;
 pub use claim_scope::*;
 pub use epistemic_watchdog::*;
 pub use formal_watchdog::*;
