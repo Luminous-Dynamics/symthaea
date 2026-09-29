@@ -1073,13 +1073,19 @@ mod tests {
     fn test_provenance_relation_survives_local_eviction_boundary() {
         let mut graph = EnhancedKnowledgeGraph::new(1);
         let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
+        let a_id = graph.provenance(a).unwrap().memory_id;
         let (b, _) = graph.insert(make_encoding("replacement", 0.7), 2, None, false);
-        let a_id = graph.provenance(a).map(|p| p.memory_id);
         let b_id = graph.provenance(b).unwrap().memory_id;
-        let historical_id = a_id.unwrap_or_else(|| "evicted-memory".into());
-        let relation = ProvenanceRelation { source_memory_id: b_id, target_memory_id: historical_id, kind: ProvenanceRelationKind::RevisedFrom, created_at: "cycle:2".into() };
+
+        assert!(graph.provenance(a).is_none());
+        let relation = ProvenanceRelation {
+            source_memory_id: b_id,
+            target_memory_id: a_id.clone(),
+            kind: ProvenanceRelationKind::RevisedFrom,
+            created_at: "cycle:2".into(),
+        };
         assert!(graph.record_provenance_relation(relation).is_ok());
-        assert_eq!(graph.provenance_relations().len(), 1);
+        assert_eq!(graph.provenance_relations()[0].target_memory_id, a_id);
     }
 
     #[test]
