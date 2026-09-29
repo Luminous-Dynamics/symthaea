@@ -317,7 +317,7 @@ mod tests {
         let mut receipt = FederatedEvidenceBoundaryLineageReceipt::new(
             &boundary, &observation, &projection, &collection, &[projection.clone()],
         ).unwrap();
-        receipt.observation_record_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
+        receipt.lineage_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into();
         assert_eq!(
             receipt.verify(
                 &boundary, &observation, &projection, &collection, &[projection],
