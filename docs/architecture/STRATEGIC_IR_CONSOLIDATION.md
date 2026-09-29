@@ -610,3 +610,19 @@ still require their own contracts. The boundary is now substantially closer to t
 OpenSpiel model in which action-observation history is sufficient to reconstruct the
 information state, while retaining Symthaea's explicit distinction between world
 identity and player-visible information. citeturn0search0turn0search1turn0search4
+
+
+### 2026-09-29 event-visibility validation
+
+The visibility contract is now validated at the event boundary rather than relying on projection behavior alone. `ActorOnly` is valid for decision actions, where an actor exists, but is rejected for chance events because chance has no actor. Explicit `Players` visibility lists are also canonicalized by rejecting duplicate player IDs. This prevents a structurally accepted event from having ambiguous or accidentally empty observer semantics before it reaches the player-local history projection.
+
+The resulting separation is now explicit:
+
+```text
+world transition
+  -> event visibility validation
+  -> player-local projection
+  -> information encoder
+```
+
+Visibility remains a transport/observation rule, not an information-set identity by itself; the encoder still determines the canonical `InformationSetId` from the observable history.
