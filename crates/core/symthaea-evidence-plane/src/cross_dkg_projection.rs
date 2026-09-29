@@ -18,9 +18,16 @@ const VERSION: &str = "1.0.0";
 const DOMAIN: &[u8] = b"symthaea:cross-dkg-projection-receipt:v1\0";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FederatedProjectionOutputOrigin {
+    SourceReference,
+    DerivedFromProjection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FederatedProjectionOutput {
     pub record_id: String,
     pub record_digest: String,
+    pub origin: FederatedProjectionOutputOrigin,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +36,7 @@ pub struct FederatedProjectionReceipt {
     pub projection_id: String,
     pub projection_version: String,
     pub collection_digest: String,
+    pub parent_projection_digests: Vec<String>,
     pub adapter_receipt_digests: Vec<String>,
     pub outputs: Vec<FederatedProjectionOutput>,
     pub projection_digest: String,
@@ -40,6 +48,7 @@ impl FederatedProjectionReceipt {
         projection_version: impl Into<String>,
         collection: &CrossDkgLinkCollection,
         receipts: &[CrossDkgAdapterReceipt],
+        parent_projection_digests: &[String],
     ) -> Result<Self, ProjectionReceiptError> {
         collection.verify_integrity()?;
         let projection_id = projection_id.into();
@@ -49,6 +58,11 @@ impl FederatedProjectionReceipt {
         }
         if receipts.is_empty() {
             return Err(ProjectionReceiptError::EmptyReceipts);
+        }
+        let mut parents = parent_projection_digests.to_vec();
+        parents.sort();
+        if parents.windows(2).any(|w| w[0] == w[1]) {
+            return Err(ProjectionReceiptError::DuplicateParentProjection);
         }
 
         let mut receipt_digests = Vec::with_capacity(receipts.len());
@@ -67,6 +81,11 @@ impl FederatedProjectionReceipt {
             outputs.push(FederatedProjectionOutput {
                 record_id: receipt.output_record_id.clone(),
                 record_digest: receipt.output_record_digest.clone(),
+                origin: if parent_projection_digests.is_empty() {
+                    FederatedProjectionOutputOrigin::SourceReference
+                } else {
+                    FederatedProjectionOutputOrigin::DerivedFromProjection
+                },
             });
         }
 
@@ -88,6 +107,7 @@ impl FederatedProjectionReceipt {
             projection_id,
             projection_version,
             collection_digest: collection.collection_digest.clone(),
+            parent_projection_digests: parents,
             adapter_receipt_digests: receipt_digests,
             outputs,
             projection_digest: String::new(),
@@ -110,6 +130,15 @@ impl FederatedProjectionReceipt {
         if self.collection_digest != collection.collection_digest {
             return Err(ProjectionReceiptError::CollectionMismatch);
         }
+        if self.parent_projection_digests.windows(2).any(|w| w[0] >= w[1]) {
+            return Err(ProjectionReceiptError::NonCanonicalParentOrder);
+        }
+        if self.parent_projection_digests.iter().any(|d| d.trim().is_empty()) {
+            return Err(ProjectionReceiptError::InvalidParentProjection);
+        }
+        if self.parent_projection_digests.iter().any(|d| d == &self.projection_digest) {
+            return Err(ProjectionReceiptError::SelfParentProjection);
+        }
         if self.adapter_receipt_digests.is_empty() {
             return Err(ProjectionReceiptError::EmptyReceipts);
         }
@@ -129,6 +158,47 @@ impl FederatedProjectionReceipt {
             return Err(ProjectionReceiptError::ProjectionDigestMismatch);
         }
         Ok(())
+    }
+
+    /// Verifies a supplied closed set of projection receipts is acyclic and
+    /// that every declared parent is present in the same provenance closure.
+    pub fn verify_ancestry(receipts: &[FederatedProjectionReceipt]) -> Result<(), ProjectionReceiptError> {
+        let mut by_digest = std::collections::BTreeMap::new();
+        for receipt in receipts {
+            if by_digest.insert(receipt.projection_digest.clone(), receipt).is_some() {
+                return Err(ProjectionReceiptError::DuplicateProjectionDigest);
+            }
+        }
+        for receipt in receipts {
+            for parent in &receipt.parent_projection_digests {
+                if !by_digest.contains_key(parent) {
+                    return Err(ProjectionReceiptError::MissingParentProjection);
+                }
+            }
+        }
+        fn visit(
+            digest: &str,
+            by_digest: &std::collections::BTreeMap<String, &FederatedProjectionReceipt>,
+            visiting: &mut std::collections::BTreeSet<String>,
+            visited: &mut std::collections::BTreeSet<String>,
+        ) -> bool {
+            if visited.contains(digest) { return true; }
+            if !visiting.insert(digest.to_owned()) { return false; }
+            let ok = by_digest[digest].parent_projection_digests.iter()
+                .all(|p| visit(p, by_digest, visiting, visited));
+            visiting.remove(digest);
+            if ok { visited.insert(digest.to_owned()); }
+            ok
+        }
+        let mut visiting = std::collections::BTreeSet::new();
+        let mut visited = std::collections::BTreeSet::new();
+        for digest in by_digest.keys() {
+            if !visit(digest, &by_digest, &mut visiting, &mut visited) {
+                return Err(ProjectionReceiptError::CyclicParentProjection);
+            }
+        }
+        Ok(())
+    }
     }
 
     /// Verifies each receipt against its exact declaration/link pair, then
@@ -162,6 +232,7 @@ impl FederatedProjectionReceipt {
         put(&mut h, &self.projection_id);
         put(&mut h, &self.projection_version);
         put(&mut h, &self.collection_digest);
+        for digest in &self.parent_projection_digests { put(&mut h, digest); }
         for digest in &self.adapter_receipt_digests { put(&mut h, digest); }
         for output in &self.outputs {
             put(&mut h, &output.record_id);
@@ -193,6 +264,13 @@ pub enum ProjectionReceiptError {
     ProjectionDigestMismatch,
     ReceiptSetMismatch,
     AdapterReceipt(AdapterReceiptError),
+    DuplicateParentProjection,
+    InvalidParentProjection,
+    SelfParentProjection,
+    NonCanonicalParentOrder,
+    DuplicateProjectionDigest,
+    MissingParentProjection,
+    CyclicParentProjection,
 }
 
 impl From<CrossDkgCollectionError> for ProjectionReceiptError {
@@ -239,8 +317,8 @@ mod tests {
             &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
         ).unwrap();
         let c = CrossDkgLinkCollection::new(vec![l.clone()]).unwrap();
-        let a = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r.clone()]).unwrap();
-        let b = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r]).unwrap();
+        let a = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r.clone()], &[]).unwrap();
+        let b = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]).unwrap();
         assert_eq!(a, b);
         assert!(a.verify_receipts(&c, &[(&d, &l)], &[CrossDkgAdapterReceipt::derive_reference(
             &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
@@ -255,7 +333,7 @@ mod tests {
             &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
         ).unwrap();
         let c = CrossDkgLinkCollection::new(vec![l]).unwrap();
-        let mut p = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r]).unwrap();
+        let mut p = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]).unwrap();
         p.outputs[0].record_id = "tampered".into();
         assert_eq!(p.verify_integrity(&c), Err(ProjectionReceiptError::ProjectionDigestMismatch));
     }
@@ -274,7 +352,7 @@ mod tests {
         ).unwrap();
         let c = CrossDkgLinkCollection::new(vec![l2]).unwrap();
         assert_eq!(
-            FederatedProjectionReceipt::new("projection:1", "1", &c, &[r]),
+            FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]),
             Err(ProjectionReceiptError::ReceiptNotInCollection)
         );
     }
@@ -287,7 +365,7 @@ mod tests {
             &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
         ).unwrap();
         let c = CrossDkgLinkCollection::new(vec![l]).unwrap();
-        let p = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r]).unwrap();
+        let p = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]).unwrap();
         let bytes = serde_json::to_vec(&p).unwrap();
         let decoded: FederatedProjectionReceipt = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(p, decoded);
