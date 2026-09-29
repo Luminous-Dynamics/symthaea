@@ -10,6 +10,7 @@
     "projection_id",
     "projection_version",
     "collection_digest",
+    "parent_projection_digests",
     "adapter_receipt_digests",
     "outputs",
     "projection_digest"
@@ -21,6 +22,11 @@
     "collection_digest": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "parent_projection_digests": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+      "uniqueItems": true
     },
     "adapter_receipt_digests": {
       "type": "array",
@@ -40,6 +46,9 @@
           "record_digest": {
             "type": "string",
             "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "origin": {
+            "enum": ["SourceReference", "DerivedFromProjection"]
           }
         }
       }
