@@ -306,7 +306,7 @@ mod tests {
             FederatedEvidenceBoundaryLineageReceipt::new(
                 &boundary, &substituted, &projection, &collection, &[projection],
             ),
-            Err(EvidenceBoundaryLineageError::InvalidObservation)
+            Err(EvidenceBoundaryLineageError::InvalidBoundary)
         );
     }
 
