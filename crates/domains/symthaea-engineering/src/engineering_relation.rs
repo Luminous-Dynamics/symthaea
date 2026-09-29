@@ -292,6 +292,26 @@ mod tests {
     }
 
     #[test]
+    fn invalid_endpoints_are_rejected() {
+        let err = EngineeringRelation::new(
+            object("material", "m", A),
+            object("runtime", "r", B),
+            EngineeringRelationKind::Formalizes,
+        ).unwrap_err();
+        assert!(matches!(err, RelationError::InvalidEndpoints { .. }));
+    }
+
+    #[test]
+    fn wire_names_are_stable_and_distinct() {
+        assert_eq!(EngineeringRelationKind::Produces.wire_name(), "produces");
+        assert_eq!(EngineeringRelationKind::Supports.wire_name(), "supports");
+        assert_ne!(
+            EngineeringRelationKind::Produces.wire_name(),
+            EngineeringRelationKind::Supports.wire_name()
+        );
+    }
+
+    #[test]
     fn serde_round_trip_preserves_relation() {
         let relation = relation(EngineeringRelationKind::Constrains);
         let json = serde_json::to_string(&relation).unwrap();
