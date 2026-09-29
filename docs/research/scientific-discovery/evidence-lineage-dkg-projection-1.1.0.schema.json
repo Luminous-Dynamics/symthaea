@@ -1,0 +1,50 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.org/schemas/scientific-discovery/evidence-lineage-dkg-projection-1.1.0.schema.json",
+  "title":"Evidence Lineage DKG Projection 1.1.0",
+  "description":"Canonical, deterministic provenance projection for immutable scientific evidence records, including closed criterion-evidence supersession histories. The graph represents lineage and relationships; it does not establish scientific truth.",
+  "type":"object",
+  "required":["projection_version","nodes","edges","projection_digest"],
+  "properties":{
+    "projection_version":{"const":"1.1.0"},
+    "nodes":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["node_id","node_type","record_digest"],
+        "properties":{
+          "node_id":{"type":"string","minLength":1},
+          "node_type":{"enum":["candidate_commitment","external_observation","independent_assessment","replication","criterion_evidence","evidence_chain_audit"]},
+          "record_digest":{"type":"string","minLength":1},
+          "supersedes_node_id":{"type":["string","null"]}
+        },
+        "additionalProperties":false
+      }
+    },
+    "edges":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["source_node_id","edge_type","target_node_id"],
+        "properties":{
+          "source_node_id":{"type":"string","minLength":1},
+          "edge_type":{"enum":["commits_to","observed_from","assesses","replicates","eligible_for","audited_by","supersedes"]},
+          "target_node_id":{"type":"string","minLength":1}
+        },
+        "additionalProperties":false
+      }
+    },
+    "projection_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties":false,
+  "x-authority":"provenance_projection_only",
+  "x-non-equivalences":[
+    "graph_presence != scientific_truth",
+    "graph_connectivity != criterion_completion",
+    "node_agreement != consensus",
+    "supersession_order != truth_promotion",
+    "audit_complete != scientific_validity"
+  ],
+  "x-source-of-truth":"immutable evidence records and append-only events",
+  "x-federation":"Independent indexers should derive byte-equivalent canonical nodes and edges from the same canonical records and closed histories."
+}
