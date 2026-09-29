@@ -523,6 +523,7 @@ fn edge_type(t: DkgEdgeType) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::evidence_chain_audit::EvidenceChainAudit;
     use crate::candidate_commitment::{
         commit_candidate_envelope, CandidatePredictionBinding, CandidatePredictionSource,
     };
@@ -756,6 +757,62 @@ mod tests {
         node.supersedes_node_id = None;
         p.projection_digest = p.digest();
         assert_eq!(p.verify_semantic_invariants(), Err(DkgSemanticError::SupersessionMetadataMismatch("evidence:2".into())));
+    }
+
+    #[test]
+    fn audited_projection_accepts_content_addressed_audit() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let audit = EvidenceChainAudit::audit(&o, &a, &r, &evidence);
+        assert!(audit.verify_integrity());
+        let p = EvidenceLineageDkgProjection::from_chain_history_with_audit(
+            &c, &o, &a, &r, &[evidence], &audit,
+        ).unwrap();
+        assert!(p.verify_semantic_invariants().is_ok());
+        assert_eq!(p.nodes.iter().filter(|n| n.node_type == DkgNodeType::EvidenceChainAudit).count(), 1);
+        assert_eq!(p.edges.iter().filter(|e| e.edge_type == DkgEdgeType::AuditedBy).count(), 1);
+    }
+
+    #[test]
+    fn audited_projection_rejects_tampered_audit_digest() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let mut audit = EvidenceChainAudit::audit(&o, &a, &r, &evidence);
+        audit.audit_digest = "sha256:tampered".into();
+        assert_eq!(
+            EvidenceLineageDkgProjection::from_chain_history_with_audit(&c, &o, &a, &r, &[evidence], &audit),
+            Err(DkgProjectionError::InvalidAudit)
+        );
+    }
+
+    #[test]
+    fn audited_projection_rejects_wrong_audit_lineage() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let mut audit = EvidenceChainAudit::audit(&o, &a, &r, &evidence);
+        audit.evidence_id = "evidence:other".into();
+        audit.audit_digest = audit.audit_digest();
+        assert_eq!(
+            EvidenceLineageDkgProjection::from_chain_history_with_audit(&c, &o, &a, &r, &[evidence], &audit),
+            Err(DkgProjectionError::InvalidAuditLineage)
+        );
+    }
+
+    #[test]
+    fn semantic_invariants_reject_missing_audit_edge() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let audit = EvidenceChainAudit::audit(&o, &a, &r, &evidence);
+        let mut p = EvidenceLineageDkgProjection::from_chain_history_with_audit(&c, &o, &a, &r, &[evidence], &audit).unwrap();
+        p.edges.retain(|e| e.edge_type != DkgEdgeType::AuditedBy);
+        p.projection_digest = p.digest();
+        assert_eq!(p.verify_semantic_invariants(), Err(DkgSemanticError::WrongEdgeCardinality { source: "evidence:1".into(), edge: "audited_by".into(), target: format!("audit:{}", audit.audit_digest) }));
+    }
+
+    #[test]
+    fn semantic_invariants_reject_multiple_audit_nodes() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let audit = EvidenceChainAudit::audit(&o, &a, &r, &evidence);
+        let mut p = EvidenceLineageDkgProjection::from_chain_history_with_audit(&c, &o, &a, &r, &[evidence], &audit).unwrap();
+        p.nodes.push(DkgNode { node_id: "audit:duplicate".into(), node_type: DkgNodeType::EvidenceChainAudit, record_digest: audit.audit_digest.clone(), supersedes_node_id: None });
+        p.projection_digest = p.digest();
+        assert_eq!(p.verify_semantic_invariants(), Err(DkgSemanticError::WrongNodeCardinality("evidence_chain_audit")));
     }
 
     #[test]
