@@ -65,6 +65,7 @@ pub mod federated_evidence_boundary;
 pub mod federated_evidence_boundary_lineage;
 pub mod federated_projection_output_lineage;
 pub mod federated_qualified_derivation;
+pub mod federated_provenance_proof;
 pub mod prospective;
 pub mod prospective_audit;
 pub mod seed_plan;
