@@ -384,12 +384,69 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Verify receipt artifact server identity
+        id: verify_receipt_artifact
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          EXPECTED_ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
+          EXPECTED_ARTIFACT_NAME: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          EXPECTED_ARTIFACT_DIGEST: ${{ steps.upload_receipt.outputs.artifact-digest }}
+        with:
+          script: |
+            const artifactId = Number(process.env.EXPECTED_ARTIFACT_ID);
+            const expectedName = process.env.EXPECTED_ARTIFACT_NAME;
+            const expectedDigest = 'sha256:' + process.env.EXPECTED_ARTIFACT_DIGEST;
+
+            if (!Number.isSafeInteger(artifactId) || artifactId <= 0) {
+              throw new Error('receipt artifact ID is not a positive safe integer');
+            }
+
+            const artifactResponse = await github.rest.actions.getArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: artifactId,
+            });
+            const artifact = artifactResponse.data;
+
+            if (artifact.id !== artifactId) {
+              throw new Error('artifact API returned a different artifact ID');
+            }
+            if (artifact.name !== expectedName) {
+              throw new Error('artifact API name does not match the uploaded receipt artifact name');
+            }
+            if (artifact.digest !== expectedDigest) {
+              throw new Error('artifact API digest does not match the upload-artifact digest');
+            }
+            if (artifact.expired) {
+              throw new Error('receipt artifact is already expired');
+            }
+            if (artifact.workflow_run?.id !== Number(process.env.GITHUB_RUN_ID)) {
+              throw new Error('artifact API workflow run ID is not the current observer run');
+            }
+            if (artifact.workflow_run?.head_branch !== 'main') {
+              throw new Error('artifact API workflow run is not on main');
+            }
+            if (artifact.workflow_run?.head_sha !== process.env.GITHUB_SHA) {
+              throw new Error('artifact API workflow run head SHA is not the observer workflow host SHA');
+            }
+
+            core.setOutput('api_url', artifact.url);
+            core.setOutput('name', artifact.name);
+            core.setOutput('digest', artifact.digest);
+            core.setOutput('workflow_run_id', String(artifact.workflow_run.id));
+            core.setOutput('workflow_head_sha', artifact.workflow_run.head_sha);
+
       - name: Bind receipt artifact digest
         env:
           RECEIPT_ARTIFACT_ID: ${{ steps.upload_receipt.outputs.artifact-id }}
           RECEIPT_ARTIFACT_URL: ${{ steps.upload_receipt.outputs.artifact-url }}
           RECEIPT_ARTIFACT_DIGEST: ${{ steps.upload_receipt.outputs.artifact-digest }}
           RECEIPT_ARTIFACT_NAME: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
+          RECEIPT_ARTIFACT_SERVER_API_URL: ${{ steps.verify_receipt_artifact.outputs.api_url }}
+          RECEIPT_ARTIFACT_SERVER_NAME: ${{ steps.verify_receipt_artifact.outputs.name }}
+          RECEIPT_ARTIFACT_SERVER_DIGEST: ${{ steps.verify_receipt_artifact.outputs.digest }}
+          RECEIPT_ARTIFACT_SERVER_WORKFLOW_RUN_ID: ${{ steps.verify_receipt_artifact.outputs.workflow_run_id }}
+          RECEIPT_ARTIFACT_SERVER_WORKFLOW_HEAD_SHA: ${{ steps.verify_receipt_artifact.outputs.workflow_head_sha }}
           OBSERVER_RUN_ID: ${{ github.run_id }}
           OBSERVER_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
@@ -448,6 +505,14 @@ jobs:
               id: artifactIdNumber,
               url: artifactUrl,
               digest: 'sha256:' + artifactDigest,
+            },
+            server_observation: {
+              verified: true,
+              api_url: process.env.RECEIPT_ARTIFACT_SERVER_API_URL,
+              name: process.env.RECEIPT_ARTIFACT_SERVER_NAME,
+              digest: process.env.RECEIPT_ARTIFACT_SERVER_DIGEST,
+              workflow_run_id: Number(process.env.RECEIPT_ARTIFACT_SERVER_WORKFLOW_RUN_ID),
+              workflow_head_sha: process.env.RECEIPT_ARTIFACT_SERVER_WORKFLOW_HEAD_SHA,
             },
           };
 
