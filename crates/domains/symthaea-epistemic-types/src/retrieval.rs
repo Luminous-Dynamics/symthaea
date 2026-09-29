@@ -65,6 +65,8 @@ pub struct MemoryRetrievalReceipt {
 pub enum ReceiptVerificationError {
     DigestMismatch,
     DuplicateSelectedIdentity,
+    DuplicateRepresentationBinding,
+    EmptyRepresentationDigest,
     UnselectedRepresentationIdentity,
 }
 
@@ -89,7 +91,17 @@ impl MemoryRetrievalReceipt {
         if selected.len() != self.selected.len() {
             return Err(ReceiptVerificationError::DuplicateSelectedIdentity);
         }
-        if self.selected_representation_digests.iter().any(|(identity, _)| !selected.contains(identity)) {
+        let mut bindings = self.selected_representation_digests.clone();
+        bindings.sort();
+        for pair in &bindings {
+            if pair.1.is_empty() {
+                return Err(ReceiptVerificationError::EmptyRepresentationDigest);
+            }
+        }
+        if bindings.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ReceiptVerificationError::DuplicateRepresentationBinding);
+        }
+        if bindings.iter().any(|(identity, _)| !selected.contains(identity)) {
             return Err(ReceiptVerificationError::UnselectedRepresentationIdentity);
         }
         Ok(VerifiedRetrievalReceipt(self.clone()))
@@ -283,7 +295,23 @@ mod tests {
         assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateSelectedIdentity));
     }
 
-    #[test] fn live_mode_needs_no_frontier() {
+    #[test] fn duplicate_representation_binding_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut duplicated=receipt;
+        duplicated.selected_representation_digests.push(duplicated.selected_representation_digests[0].clone());
+        duplicated.receipt_digest=duplicated.canonical_digest();
+        assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateRepresentationBinding));
+    }
+
+    #[test] fn empty_representation_digest_is_rejected() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut empty=receipt;
+        empty.selected_representation_digests[0].1.clear();
+        empty.receipt_digest=empty.canonical_digest();
+        assert_eq!(empty.verify(), Err(ReceiptVerificationError::EmptyRepresentationDigest));
+    }
+
+    #[test] fn live_mode_needs_no_frontier {
         let (g,r)=retrieve(&MemoryRetrievalRequest::live("x",10),vec![candidate("live",MemoryKind::Vector,"f",0.8,FrontierEligibility::Unknown)]);
         assert_eq!(g.len(),1); assert!(r.excluded.is_empty());
     }
