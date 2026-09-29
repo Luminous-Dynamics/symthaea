@@ -613,20 +613,12 @@ mod tests {
 
     #[test]
     fn unknown_required_profile_fails_closed() {
-        let request = request_with_profile("unknown-profile-v99");
-        let projection = projection(&request);
-        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
-            &request, &projection, LocalApprovalDecisionKindV1::Approved, ms(1_200),
-        ).unwrap();
-        assert!(matches!(
-            admit_verified_local_submission_v2(
-                &submission, &request, &projection.projection_digest, &peer(1000, 1),
-                AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
-            ),
-            Err(LocalApprovalAdmissionErrorV1::ApproverEvidence(
-                ApproverEvidenceErrorV1::UnknownRequiredApprovalProfile
-            ))
-        ));
+        let mut request = request();
+        request.authority_profile_ref = "unknown-profile-v99".to_string();
+        assert_eq!(
+            request.validate_shape().unwrap_err(),
+            LocalApprovalErrorV1::UnknownAuthorityProfile
+        );
     }
 
     fn request_with_profile(profile: &str) -> PendingNixApprovalRequestV1 {
