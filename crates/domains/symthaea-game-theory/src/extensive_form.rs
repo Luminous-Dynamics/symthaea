@@ -291,6 +291,29 @@ impl ExtensiveGame {
         Ok(PerfectRecallEvidence::Verified)
     }
 
+    fn collect_information_histories(&self, state: DecisionStateId, history: Vec<HistoryEvent>, histories: &mut HashMap<DecisionStateId, Vec<Vec<HistoryEvent>>>) -> Result<(), ExtensiveGameError> {
+        histories.entry(state).or_default().push(history.clone());
+        match self.node(state).ok_or(ExtensiveGameError::UnknownNode(state))? {
+            ExtensiveNode::Decision { player, state, actions } => {
+                let info_set = self.information.state(*state).expect("validated decision state").information_set;
+                for action in actions {
+                    let mut next = history.clone();
+                    next.push(HistoryEvent::Decision { state: *state, player: *player, information_set: info_set, action: action.action });
+                    self.collect_information_histories(action.next, next, histories)?;
+                }
+            }
+            ExtensiveNode::Chance { state, outcomes } => {
+                for outcome in outcomes {
+                    let mut next = history.clone();
+                    next.push(HistoryEvent::Chance { state: *state, next: outcome.next });
+                    self.collect_information_histories(outcome.next, next, histories)?;
+                }
+            }
+            ExtensiveNode::Terminal { .. } => {}
+        }
+        Ok(())
+    }
+
     fn collect_histories(
         &self,
         state: DecisionStateId,
@@ -429,6 +452,8 @@ pub enum ExtensiveGameError {
     InformationMemberNotReachable(DecisionStateId),
     CycleDetected(DecisionStateId),
     MultipleParents { child: DecisionStateId, parent: DecisionStateId },
+    InformationEncodingFailed { state: DecisionStateId, message: String },
+    InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
     PerfectRecallViolation {
         information_set: crate::strategic_context::InformationSetId,
         state: DecisionStateId,
