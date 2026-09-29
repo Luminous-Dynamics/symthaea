@@ -1,7 +1,7 @@
 {
   "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://symthaea.org/schemas/scientific-discovery/evidence-lineage-dkg-projection-1.1.0.schema.json",
-  "title":"Evidence Lineage DKG Projection 1.1.0",
+  "$id":"https://symthaea.org/schemas/scientific-discovery/evidence-lineage-dkg-projection-1.2.0.schema.json",
+  "title":"Evidence Lineage DKG Projection 1.2.0",
   "description":"Canonical, deterministic provenance projection for immutable scientific evidence records, including closed criterion-evidence supersession histories. The graph represents lineage and relationships; it does not establish scientific truth.",
   "type":"object",
   "required":["projection_version","nodes","edges","projection_digest"],
@@ -56,8 +56,12 @@
     "replication_replicates_assessment",
     "criterion_evidence_eligible_for_replication",
     "supersession_metadata_matches_supersedes_edge",
-    "no_unexpected_edges"
+    "no_unexpected_edges",
+    "zero_or_one_evidence_chain_audit",
+    "audit_node_record_digest_matches_audit_digest",
+    "terminal_evidence_audited_by_audit_node",
+    "no_audited_by_edge_without_audit_node"
   ],
   "x-source-of-truth":"immutable evidence records and append-only events",
-  "x-federation":"Independent indexers should derive byte-equivalent canonical nodes and edges from the same canonical records and closed histories."
+  "x-federation":"Independent indexers should derive byte-equivalent canonical nodes and edges from the same canonical records and closed histories, including content-addressed audit nodes."
 }
