@@ -394,6 +394,11 @@ impl EvidenceLineageDkgProjection {
                 e.edge_type == DkgEdgeType::Supersedes && e.target_node_id == **evidence_id
             })).ok_or(DkgSemanticError::InvalidAuditLinkage)?;
             require_exact(terminal_evidence, DkgEdgeType::AuditedBy, audit_id)?;
+            let audit_node = self.nodes.iter().find(|n| n.node_id == *audit_id).ok_or(DkgSemanticError::InvalidAuditLinkage)?;
+            let expected_digest = audit_node.node_id.strip_prefix("audit:").ok_or(DkgSemanticError::InvalidAuditNodeDigest)?;
+            if audit_node.record_digest != expected_digest {
+                return Err(DkgSemanticError::InvalidAuditNodeDigest);
+            }
             expected_edge_count += 1;
         }
         for node in self.nodes.iter().filter(|n| n.node_type == DkgNodeType::CriterionEvidence) {
@@ -492,6 +497,7 @@ pub enum DkgSemanticError {
     SupersessionMetadataMismatch(String),
     UnexpectedEdge,
     InvalidAuditLinkage,
+    InvalidAuditNodeDigest,
 }
 
 fn put(h: &mut Sha256, s: &str) {
