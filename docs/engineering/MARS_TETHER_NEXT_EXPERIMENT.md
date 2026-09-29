@@ -85,3 +85,36 @@ The experiment is ready to advance to flexible dynamics only when:
 6. uncertainty is preserved in machine-readable output;
 7. no site ranking is produced;
 8. every numerical result is provenance-bearing.
+## First-order numerical sanity check
+
+Using Mars GM = 4.2828372e13 m^3/s^2, equatorial radius = 3,396.2 km, and sidereal period = 88,642.44 s gives:
+
+- rotation rate ≈ 7.088236e-5 rad/s;
+- areosynchronous radius ≈ 20,427.65 km from Mars center;
+- areosynchronous altitude above the equatorial radius ≈ 17,031.45 km;
+- effective radial acceleration at the surface ≈ -3.696 m/s^2 in the rotating frame;
+- effective radial acceleration at Phobos' mean radius ≈ -0.440 m/s^2;
+- effective radial acceleration at areosynchronous radius ≈ 0;
+- effective radial acceleration at Deimos' mean radius ≈ +0.040 m/s^2.
+
+For a constant-density, constant-allowable-stress idealized tether segment, the first-order self-supporting area-ratio exponent from radius r0 to r1 is:
+
+    I(r0,r1) = GM(1/r0 - 1/r1) - 0.5*omega^2*(r1^2-r0^2)
+
+and A(r1)/A(r0) = exp(I / specific_strength), where specific_strength = allowable_stress / density.
+
+For the surface-to-areosynchronous interval, I ≈ 9.495e6 m^2/s^2. The corresponding idealized area ratios are approximately:
+
+- 5 MYuri: 6.68x;
+- 10 MYuri: 2.58x;
+- 15 MYuri: 1.88x;
+- 30 MYuri: 1.37x;
+- 50 MYuri: 1.21x.
+
+These are sanity-check numbers only. They do not establish a feasible elevator because they omit the full counterweight/apex boundary condition, climber loads, local topography, bending, defects, fatigue, thermal state, dynamic stability, deployment architecture, and perturbations. Their value is that they give the T1 implementation an independently checkable analytical limiting case.
+
+## Architectural consequence
+
+The first model should therefore report specific-strength requirement curves, not merely a yes/no material result. This lets material manufacturing evidence enter later as an uncertainty distribution and allows the same tether architecture to be evaluated against future improvements in graphene, CNT, hBN, or other candidate materials.
+
+Recent literature still identifies ultra-high specific strength, long-length manufacturing, and climber/tether interface properties as central unresolved engineering constraints.
