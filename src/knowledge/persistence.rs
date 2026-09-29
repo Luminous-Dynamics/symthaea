@@ -396,9 +396,7 @@ impl KnowledgePersistence {
                 is_a_parent TEXT
             );
             CREATE INDEX IF NOT EXISTS idx_facts_domain ON knowledge_facts(domain);
-            CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_memory_id_unique
-                ON knowledge_facts(memory_id);",
+            CREATE INDEX IF NOT EXISTS idx_facts_cycle ON knowledge_facts(cycle);",
         )
         .map_err(|e| format!("Schema init: {e}"))?;
 
@@ -418,6 +416,13 @@ impl KnowledgePersistence {
                     .map_err(|e| format!("Schema migration {name}: {e}"))?;
             }
         }
+
+        // Create the identity index only after the additive columns exist on legacy databases.
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_facts_memory_id_unique ON knowledge_facts(memory_id)",
+            [],
+        )
+        .map_err(|e| format!("Schema identity index: {e}"))?;
 
         self.initialized = true;
         Ok(())
