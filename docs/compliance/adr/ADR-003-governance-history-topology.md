@@ -18,9 +18,10 @@ Add deterministic self-test coverage using a temporary Git repository. The topol
 - a merge commit descending from the exact base is accepted;
 - reverse ancestry is rejected;
 - a rewritten/non-descendant history is rejected;
+- a shallow repository cannot establish the required ancestry relation;
 - the direct endpoint diff remains the changeset authority even when the head is a merge commit.
 
-Production validation continues to require the exact 40-hex event SHAs, require the base to be an ancestor of the head, and compute the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
+Production validation first rejects an explicitly shallow repository, then requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
 
 ## Scientific Basis
 
@@ -36,7 +37,7 @@ The change addresses governance-integrity risk from merge topology, rewritten he
 
 ## Test Evidence
 
-The self-test now creates a temporary Git repository and exercises descendant, identical, merge, reverse, and rewritten-history cases. It also checks that a merge head's exact endpoint diff contains changes introduced on both sides of the merge. GitHub Actions execution remains a separate evidence layer until an eligible hosted runner executes the workflow.
+The self-test now creates a temporary Git repository and exercises descendant, identical, merge, reverse, rewritten-history, and shallow-history cases. It also checks that a merge head's exact endpoint diff contains changes introduced on both sides of the merge. GitHub Actions execution remains a separate evidence layer until an eligible hosted runner executes the workflow.
 
 ## Rollback Plan
 
