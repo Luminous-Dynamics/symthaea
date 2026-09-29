@@ -1,6 +1,9 @@
 name: Systems Engineering SE-001Q Repair Execution v1
 
 on:
+  push:
+    branches:
+      - systems-engineering/se-001q-repair-execution-v1
   pull_request:
     branches:
       - systems-engineering/se-001q-v1.4-frozen-base
