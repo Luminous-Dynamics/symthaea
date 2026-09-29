@@ -302,7 +302,7 @@ mod tests {
         // Verification therefore means internal consistency, not origin authentication.
         let mut rewritten=receipt;
         rewritten.query="different query".into();
-        rewritten.receipt_digest=rewritten.canonical_digest();
+        rewritten.receipt_digest=rewritten.canonical_digest().unwrap();
         assert!(rewritten.verify().is_ok());
     }
 
@@ -318,7 +318,7 @@ mod tests {
         let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
         let mut duplicated=receipt;
         duplicated.selected_representation_digests.push(duplicated.selected_representation_digests[0].clone());
-        duplicated.receipt_digest=duplicated.canonical_digest();
+        duplicated.receipt_digest=duplicated.canonical_digest().unwrap();
         assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateRepresentationBinding));
     }
 
