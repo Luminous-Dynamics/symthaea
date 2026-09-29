@@ -254,7 +254,7 @@ fn admit_verified_local_submission_v1_test_adapter(
     submission: &LocalApprovalSubmissionV1,
     request: &PendingNixApprovalRequestV1,
     verified_peer: &VerifiedLocalUnixPeerCredentialV1,
-    evaluation: AuthoritativeEvaluationV1,
+    evaluation: UnixMillisV1,
 ) -> Result<LocalNixApprovalDecisionV1, LocalApprovalAdmissionErrorV1> {
     // Legacy unit coverage remains isolated from production admission. CROSS-002
     // production callers must use V2 and a runtime-owned projection digest.
@@ -267,7 +267,13 @@ fn admit_verified_local_submission_v1_test_adapter(
         decision: submission.decision,
         decided_at_unix_ms: submission.decided_at_unix_ms,
     };
-    admit_verified_local_submission_v2(&v2, request, &projection_digest, verified_peer, evaluation)
+    admit_verified_local_submission_v2(
+        &v2,
+        request,
+        &projection_digest,
+        verified_peer,
+        AuthoritativeEvaluationV1::from_unix_millis_for_test(evaluation),
+    )
 }
 
 #[cfg(test)]
@@ -358,7 +364,7 @@ mod tests {
         .unwrap();
         submission.request_id = "00".repeat(32);
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -380,7 +386,7 @@ mod tests {
         .unwrap();
         submission.daemon_incarnation_id = "another-daemon-incarnation".to_string();
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -404,7 +410,7 @@ mod tests {
         .unwrap();
         submission.action_intent_digest = "11".repeat(32);
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -425,7 +431,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
@@ -446,7 +452,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_001)))
@@ -500,14 +506,14 @@ mod tests {
         )
         .unwrap();
 
-        let first = admit_verified_local_submission_v1(
+        let first = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 10),
             ms(1_300),
         )
         .unwrap();
-        let second = admit_verified_local_submission_v1(
+        let second = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1001, 11),
@@ -530,7 +536,7 @@ mod tests {
             ms(1_200),
         )
         .unwrap();
-        let admitted = admit_verified_local_submission_v1(
+        let admitted = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 10),
@@ -557,14 +563,110 @@ mod tests {
         let peer = peer(1000, 10);
 
         let first =
-            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
+            admit_verified_local_submission_v1_test_adapter(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
         let second =
-            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
+            admit_verified_local_submission_v1_test_adapter(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
 
         assert_eq!(first, second);
         assert_eq!(first.digest().unwrap(), second.digest().unwrap());
         // Atomic request consumption belongs to the owning request store / live
         // authority runtime. This pure evidence-admission layer intentionally has
         // no mutable nonce/request-consumption state and makes no single-use claim.
+    }    
+    fn projection(request: &PendingNixApprovalRequestV1) -> PendingNixApprovalProjectionV1 {
+        PendingNixApprovalProjectionV1::from_request(
+            request,
+            "nixos-rebuild switch --flake .#workstation",
+        )
+        .unwrap()
     }
+
+    #[test]
+    fn v2_submission_binds_exact_projection_digest() {
+        let request = request();
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request,
+            &projection,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        let admitted = admit_verified_local_submission_v2(
+            &submission,
+            &request,
+            &projection.projection_digest,
+            &peer(1000, 1),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap();
+        assert_eq!(admitted.decision, LocalApprovalDecisionKindV1::Approved);
+    }
+
+    #[test]
+    fn v2_wrong_projection_digest_is_rejected_before_admission() {
+        let request = request();
+        let projection = projection(&request);
+        let mut submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request,
+            &projection,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        submission.projection_digest = "11".repeat(32);
+        let err = admit_verified_local_submission_v2(
+            &submission,
+            &request,
+            &projection.projection_digest,
+            &peer(1000, 1),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(err, LocalApprovalAdmissionErrorV1::ProjectionDigestMismatch);
+    }
+
+    #[test]
+    fn v2_projection_from_different_semantic_request_is_rejected() {
+        let request_a = request();
+        let mut request_b = request();
+        request_b.machine_target_ref = "machine:other".to_string();
+        let projection_b = PendingNixApprovalProjectionV1::from_request(
+            &request_b,
+            "nixos-rebuild switch --flake .#workstation",
+        )
+        .unwrap();
+        let err = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request_a,
+            &projection_b,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap_err();
+        assert_eq!(err, LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch);
+    }
+
+    #[test]
+    fn v2_wire_shape_rejects_unknown_identity_and_authority_fields() {
+        let request = request();
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request,
+            &projection,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        let mut object = serde_json::to_value(&submission)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone();
+        object.insert("uid".to_string(), serde_json::json!(0));
+        assert!(serde_json::from_value::<LocalApprovalSubmissionV2>(
+            serde_json::Value::Object(object)
+        )
+        .is_err());
+    }
+
 }
