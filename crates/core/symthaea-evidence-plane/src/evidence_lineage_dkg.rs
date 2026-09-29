@@ -181,7 +181,7 @@ impl EvidenceLineageDkgProjection {
 
         // A closed linear history has exactly one root and one terminal record.
         // Following parents from every node catches cycles deterministically.
-        let roots: Vec<_> = ids.iter().filter(|id| !child_to_parent.contains_key(*id)).cloned().collect();
+        let roots: Vec<String> = ids.iter().filter(|id| !child_to_parent.contains_key(id.as_str())).cloned().collect();
         if roots.len() != 1 {
             return Err(DkgProjectionError::SupersessionCycleOrDisconnected);
         }
