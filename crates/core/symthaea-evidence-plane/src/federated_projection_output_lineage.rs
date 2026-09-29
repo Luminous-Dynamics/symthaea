@@ -103,6 +103,9 @@ impl FederatedProjectionOutputLineageReceipt {
             {
                 return Err(ProjectionOutputLineageError::InvalidDigest);
             }
+            if !projection.parent_projection_digests.iter().any(|d| d == &parent.projection_digest) {
+                return Err(ProjectionOutputLineageError::ParentProjectionNotFound);
+            }
             let parent_projection = ancestry
                 .iter()
                 .find(|p| p.projection_digest == parent.projection_digest)
