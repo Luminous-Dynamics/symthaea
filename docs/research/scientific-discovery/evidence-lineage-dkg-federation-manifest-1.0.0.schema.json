@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/scientific-discovery/evidence-lineage-dkg-federation-manifest-1.0.0.schema.json",
+  "title": "Evidence Lineage DKG Federation Manifest 1.0.0",
+  "description": "Deterministic federation metadata describing the canonical DKG projection inputs and resulting projection digest. It does not establish scientific truth.",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "projection_schema_version",
+    "canonicalization_id",
+    "digest_algorithm",
+    "projection_digest_domain",
+    "audit_digest_domain",
+    "audit_inclusion",
+    "source_records",
+    "projection_digest",
+    "manifest_digest"
+  ],
+  "properties": {
+    "manifest_version": { "const": "1.0.0" },
+    "projection_schema_version": { "const": "1.2.0" },
+    "canonicalization_id": { "const": "symthaea:dkg-node-edge-order:v1" },
+    "digest_algorithm": { "const": "sha256" },
+    "projection_digest_domain": { "const": "symthaea:evidence-lineage-dkg-projection:v3" },
+    "audit_digest_domain": { "const": "symthaea:evidence-chain-audit:v1" },
+    "audit_inclusion": { "enum": ["excluded", "included"] },
+    "source_records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["node_id", "node_type", "record_digest"],
+        "properties": {
+          "node_id": { "type": "string", "minLength": 1 },
+          "node_type": {
+            "enum": [
+              "candidate_commitment",
+              "external_observation",
+              "independent_assessment",
+              "replication",
+              "criterion_evidence",
+              "evidence_chain_audit"
+            ]
+          },
+          "record_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "projection_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "indexer_metadata": { "type": ["string", "null"] },
+    "manifest_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false,
+  "x-authority": "federation_reproducibility_metadata_only",
+  "x-non-equivalences": [
+    "matching_manifest != scientific_truth",
+    "matching_graph != consensus",
+    "matching_source_set != criterion_completion",
+    "manifest_digest != digital_signature"
+  ],
+  "x-canonicalization": "source_records are sorted by node_type, node_id, record_digest using the same canonical node ordering as the DKG projection.",
+  "x-content-addressing": "manifest_digest is SHA-256 over the complete manifest payload excluding manifest_digest itself.",
+  "x-source-of-truth": "immutable evidence records and append-only events",
+  "x-federation": "Independent indexers can compare manifests before comparing full graph payloads; equal source and projection digests indicate byte-equivalent canonical inputs and projection under this contract."
+}
