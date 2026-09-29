@@ -51,6 +51,7 @@ pub mod external_observation;
 pub mod independent_assessment;
 pub mod replication;
 pub mod criterion_evidence;
+pub mod evidence_chain_audit;
 pub mod prospective;
 pub mod prospective_audit;
 pub mod seed_plan;
