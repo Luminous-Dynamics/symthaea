@@ -34,7 +34,9 @@ pub mod engineering_identity;
 pub mod engineering_relation;
 pub use engineering_identity::EngineeringObjectId;
 pub use engineering_relation::{EngineeringRelation, EngineeringRelationKind, RelationFamily};
+pub mod cp04_adapter;
 pub mod scientific_lineage;
+pub use cp04_adapter::{Cp04AdapterError, Cp04Edge, Cp04Node, Cp04QualificationArtifact};
 pub use scientific_lineage::{
     AuthorityCeiling, QualificationProjection, QualificationProjectionError,
     ScientificLineageGraph, QUALIFICATION_POLICY, QUALIFICATION_PROJECTION_SCHEMA, QUALIFICATION_PROJECTION_ARTIFACT_SCHEMA,
