@@ -333,6 +333,59 @@ mod tests {
     }
 
     #[test]
+    fn required_profile_parser_is_closed_world() {
+        assert_eq!(
+            RequiredApprovalProfileV1::parse_ref("same-uid-process-v1").unwrap(),
+            RequiredApprovalProfileV1::SameUidProcessV1
+        );
+        assert!(matches!(
+            RequiredApprovalProfileV1::parse_ref("unknown-profile-v99"),
+            Err(ApproverEvidenceErrorV1::UnknownRequiredApprovalProfile)
+        ));
+    }
+
+    #[test]
+    fn profile_compatibility_never_upgrades_local_peer_evidence() {
+        let local = VerifiedApproverEvidenceProfileV1::SameUidProcessV1;
+        assert!(required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            local
+        ));
+        assert!(!required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::LocalOperatorGroupV1,
+            local
+        ));
+        assert!(!required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::PolkitAuthorizedOperatorV1,
+            local
+        ));
+        assert!(!required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::XeniaAuthenticatedOperatorV1,
+            local
+        ));
+        assert!(!required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::XeniaStateBoundPermitV1,
+            local
+        ));
+    }
+
+    #[test]
+    fn xenia_profiles_only_accept_matching_xenia_evidence() {
+        assert!(required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::XeniaAuthenticatedOperatorV1,
+            VerifiedApproverEvidenceProfileV1::XeniaAuthenticatedOperatorV1
+        ));
+        assert!(!required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::XeniaStateBoundPermitV1,
+            VerifiedApproverEvidenceProfileV1::XeniaAuthenticatedOperatorV1
+        ));
+        assert!(required_profile_accepts_evidence_v1(
+            RequiredApprovalProfileV1::XeniaStateBoundPermitV1,
+            VerifiedApproverEvidenceProfileV1::XeniaStateBoundPermitV1
+        ));
+    }
+
+    #[test]
     fn local_peer_evidence_digest_is_deterministic_and_semantic() {
         let a = observed();
         let b = observed();
