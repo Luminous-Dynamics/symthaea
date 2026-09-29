@@ -68,7 +68,10 @@ impl MemoryRetrievalReceipt {
         put_optional(&mut out, self.frontier_ref.as_deref());
         put_string(&mut out, &self.query);
         put_u32(&mut out, self.max_results);
-        put_strings(&mut out, &self.selected);
+        let mut selected = self.selected.clone();
+        selected.sort();
+        selected.dedup();
+        put_strings(&mut out, &selected);
         let mut bindings = self.selected_representation_digests.clone();
         bindings.sort();
         put_u32(&mut out, bindings.len());
