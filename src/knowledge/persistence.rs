@@ -15,6 +15,7 @@
 //! Science: Ebbinghaus (1885) memory consolidation across sessions
 
 use std::path::Path;
+use symthaea_epistemic_types::{ProvenanceRelation, ProvenanceRelationKind};
 
 
 /// Knowledge persistence layer backed by SQLite.
@@ -52,6 +53,37 @@ pub struct FactRecord {
     pub cycle: u64,
     /// Whether the fact contains causal relations
     pub is_causal: bool,
+}
+
+/// A serializable provenance relation record.
+#[derive(Debug, Clone)]
+pub struct ProvenanceRelationRecord {
+    pub source_memory_id: String,
+    pub target_memory_id: String,
+    pub kind: ProvenanceRelationKind,
+    pub created_at: String,
+}
+
+impl From<ProvenanceRelationRecord> for ProvenanceRelation {
+    fn from(record: ProvenanceRelationRecord) -> Self {
+        Self {
+            source_memory_id: record.source_memory_id,
+            target_memory_id: record.target_memory_id,
+            kind: record.kind,
+            created_at: record.created_at,
+        }
+    }
+}
+
+impl From<ProvenanceRelation> for ProvenanceRelationRecord {
+    fn from(relation: ProvenanceRelation) -> Self {
+        Self {
+            source_memory_id: relation.source_memory_id,
+            target_memory_id: relation.target_memory_id,
+            kind: relation.kind,
+            created_at: relation.created_at,
+        }
+    }
 }
 
 /// A serializable causal edge record
@@ -208,6 +240,48 @@ impl KnowledgePersistence {
 
         self.total_loaded += facts.len() as u64;
         Ok(facts)
+    }
+
+    /// Save typed provenance relations append-only. Replaying an existing relation is idempotent.
+    pub fn save_provenance_relations(&mut self, relations: &[ProvenanceRelationRecord]) -> Result<usize, String> {
+        if !self.is_configured() { return Err("No database path configured".into()); }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        conn.execute_batch("BEGIN TRANSACTION").map_err(|e| e.to_string())?;
+        let mut count = 0;
+        for relation in relations {
+            let inserted = conn.execute(
+                "INSERT OR IGNORE INTO knowledge_provenance_relations (source_memory_id, target_memory_id, kind, created_at) VALUES (?1, ?2, ?3, ?4)",
+                rusqlite::params![relation.source_memory_id, relation.target_memory_id, format!("{:?}", relation.kind), relation.created_at],
+            ).map_err(|e| e.to_string())?;
+            count += inserted;
+        }
+        conn.execute_batch("COMMIT").map_err(|e| e.to_string())?;
+        self.total_saved += count as u64;
+        Ok(count)
+    }
+
+    /// Load typed provenance relations from SQLite.
+    pub fn load_provenance_relations(&mut self) -> Result<Vec<ProvenanceRelationRecord>, String> {
+        if !self.is_configured() { return Err("No database path configured".into()); }
+        let conn = self.open_connection()?;
+        self.ensure_schema(&conn)?;
+        let mut stmt = conn.prepare("SELECT source_memory_id, target_memory_id, kind, created_at FROM knowledge_provenance_relations ORDER BY created_at, source_memory_id, target_memory_id").map_err(|e| e.to_string())?;
+        let relations = stmt.query_map([], |row| {
+            let kind: String = row.get(2)?;
+            let kind = match kind.as_str() {
+                "DerivedFrom" => ProvenanceRelationKind::DerivedFrom,
+                "RevisedFrom" => ProvenanceRelationKind::RevisedFrom,
+                "Supersedes" => ProvenanceRelationKind::Supersedes,
+                "Contradicts" => ProvenanceRelationKind::Contradicts,
+                "Corroborates" => ProvenanceRelationKind::Corroborates,
+                "RepresentationOf" => ProvenanceRelationKind::RepresentationOf,
+                _ => return Err(rusqlite::Error::InvalidColumnType(2, "kind".into(), rusqlite::types::Type::Text)),
+            };
+            Ok(ProvenanceRelationRecord { source_memory_id: row.get(0)?, target_memory_id: row.get(1)?, kind, created_at: row.get(3)? })
+        }).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect::<Vec<_>>();
+        self.total_loaded += relations.len() as u64;
+        Ok(relations)
     }
 
     /// Save causal edge records.
@@ -392,6 +466,13 @@ impl KnowledgePersistence {
                 cycle INTEGER NOT NULL,
                 is_causal INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS knowledge_provenance_relations (
+                source_memory_id TEXT NOT NULL,
+                target_memory_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (source_memory_id, target_memory_id, kind, created_at)
+            );
             CREATE TABLE IF NOT EXISTS knowledge_causal_edges (
                 cause TEXT NOT NULL,
                 effect TEXT NOT NULL,
@@ -452,6 +533,21 @@ mod tests {
         let mut p = KnowledgePersistence::default();
         assert!(!p.is_configured());
         assert!(p.save_facts(&[]).is_err());
+    }
+
+    #[test]
+    fn test_save_and_load_provenance_relations_append_only() {
+        let dir = std::env::temp_dir().join(format!("symthaea_provenance_relation_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+        let mut p = KnowledgePersistence::new(&db_path);
+        let relation = ProvenanceRelationRecord { source_memory_id: "derived".into(), target_memory_id: "source".into(), kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into() };
+        assert_eq!(p.save_provenance_relations(std::slice::from_ref(&relation)).unwrap(), 1);
+        assert_eq!(p.save_provenance_relations(std::slice::from_ref(&relation)).unwrap(), 0);
+        let loaded = p.load_provenance_relations().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].kind, ProvenanceRelationKind::DerivedFrom);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
