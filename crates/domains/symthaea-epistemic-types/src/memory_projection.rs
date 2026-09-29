@@ -164,6 +164,57 @@ mod tests {
     }
 
     #[test]
+    fn structural_validation_rejects_missing_identity() {
+        let mut p = MemoryProvenance {
+            canonical_identity: None,
+            memory_id: "mem-1".into(),
+            memory_kind: MemoryKind::KnowledgeGraph,
+            created_at: "cycle:1".into(),
+            source_event: None,
+            canonical_artifact_ref: None,
+            statement_ref: None,
+            provenance_family: Some("family-1".into()),
+            epistemic_state: None,
+            claim_ceiling: None,
+            frontier_ref: None,
+            derivation_ref: None,
+            model_ref: None,
+            retrieval_index_ref: None,
+        };
+        assert!(p.validate_structure().is_ok());
+
+        p.memory_id.clear();
+        assert_eq!(p.validate_structure(), Err("memory_id must be non-empty"));
+    }
+
+    #[test]
+    fn provenance_relations_are_typed_and_non_self_referential() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "derived".into(),
+            target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        };
+        assert!(relation.validate().is_ok());
+
+        let mut self_relation = relation.clone();
+        self_relation.target_memory_id = self_relation.source_memory_id.clone();
+        assert_eq!(self_relation.validate(), Err("provenance relation cannot self-reference"));
+    }
+
+    #[test]
+    fn revision_is_a_distinct_typed_relation() {
+        let relation = ProvenanceRelation {
+            source_memory_id: "revision".into(),
+            target_memory_id: "original".into(),
+            kind: ProvenanceRelationKind::RevisedFrom,
+            created_at: "cycle:3".into(),
+        };
+        assert_eq!(relation.kind, ProvenanceRelationKind::RevisedFrom);
+        assert!(relation.validate().is_ok());
+    }
+
+    #[test]
     fn sha256_is_deterministic() {
         assert_eq!(sha256_hex(b"symthaea-memory"), sha256_hex(b"symthaea-memory"));
     }
