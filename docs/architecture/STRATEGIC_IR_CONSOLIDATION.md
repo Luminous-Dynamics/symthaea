@@ -543,3 +543,36 @@ claiming that every observation history is a complete perfect-recall representat
 The distinction also matches current Rust MCCFR work, where `EmbeddedHistory` and
 `PerfectRecall` are separate attestations and replay consistency is made explicit rather
 than inferred from an opaque state identifier. citeturn0search0turn0search1
+### 2026-09-29 player-local action-observation history
+
+The semantic encoder boundary is now explicitly player-local rather than receiving the
+omniscient world history. `HistoryEvent` remains the lossless model history, while
+`PlayerHistoryEvent` is the information-bearing projection supplied to an
+`InformationEncoder`.
+
+Decision and chance transitions carry `EventVisibility` (`Public`, `ActorOnly`, or an
+explicit player set). The projection always retains the observing player's own actions,
+retains actions visible to that player, retains only that player's observations, and
+retains chance outcomes only when their visibility permits it. A regression fixture proves
+that an actor-only opponent action does not leak into another player's encoder input.
+
+This is an important correctness boundary for imperfect-information solving: OpenSpiel
+models observations as player-specific and distinguishes public/private information,
+while its information-state contract requires the action-observation history to be the
+basis from which the information state can be reconstructed. citeturn1search0turn1search2
+
+The Strategic IR therefore now has three deliberately separate layers:
+
+```text
+world history
+    -> visibility projection
+    -> player-local action-observation history
+    -> information encoder
+    -> canonical InformationSetId
+```
+
+This also makes the eventual CFR/MCCFR adapter boundary substantially safer: solver
+code cannot accidentally obtain hidden opponent actions merely because the underlying
+extensive-form state is omniscient. Current MCCFR work similarly treats replay/history
+stability as an explicit property rather than assuming that a state identifier is itself
+a sufficient information representation. citeturn0search0turn0search1
