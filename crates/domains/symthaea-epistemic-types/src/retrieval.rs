@@ -81,6 +81,13 @@ impl MemoryRetrievalReceipt {
         out
     }
     pub fn canonical_digest(&self) -> String { sha256_hex(&self.canonical_bytes()) }
+    pub fn with_retrieval_profile_versions(mut self, versions: impl IntoIterator<Item = String>) -> Self {
+        self.retrieval_profile_versions = versions.into_iter().collect();
+        self.retrieval_profile_versions.sort();
+        self.retrieval_profile_versions.dedup();
+        self.receipt_digest = self.canonical_digest();
+        self
+    }
     pub fn is_self_consistent(&self) -> bool { !self.receipt_digest.is_empty() && self.receipt_digest == self.canonical_digest() }
 }
 
@@ -146,7 +153,21 @@ fn retrieve_validated(
     let mut selected = groups.iter().map(|g| g.canonical_identity.clone()).collect::<Vec<_>>(); selected.sort();
     let mut families = groups.iter().flat_map(|g| g.provenance_families.iter().cloned()).collect::<Vec<_>>(); families.sort(); families.dedup();
     excluded.sort_by(|a,b| a.canonical_identity.cmp(&b.canonical_identity).then_with(|| (a.reason as u8).cmp(&(b.reason as u8))));
-    let receipt = MemoryRetrievalReceipt { mode: request.mode, frontier_ref: request.frontier_ref.clone(), query: request.query.clone(), selected, excluded, provenance_families: families };
+    let selected_representation_digests = groups.iter()
+        .flat_map(|g| g.representations.iter().map(|candidate| candidate.projection.representation_digest.clone()))
+        .collect::<Vec<_>>();
+    let mut receipt = MemoryRetrievalReceipt {
+        mode: request.mode,
+        frontier_ref: request.frontier_ref.clone(),
+        query: request.query.clone(),
+        selected,
+        selected_representation_digests,
+        excluded,
+        provenance_families: families,
+        retrieval_profile_versions: Vec::new(),
+        receipt_digest: String::new(),
+    };
+    receipt.receipt_digest = receipt.canonical_digest();
     (groups, receipt)
 }
 
