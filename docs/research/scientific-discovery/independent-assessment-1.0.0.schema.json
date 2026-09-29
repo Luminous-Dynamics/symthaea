@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Independent Observation Assessment 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "assessment_id",
+    "assessor_id",
+    "assessor_institution_id",
+    "independent_from_observer",
+    "independence_basis",
+    "assessed_at",
+    "outcome",
+    "observation_id",
+    "observation_record_digest",
+    "commitment_event_id",
+    "candidate_id",
+    "binding_digest",
+    "assessment_digest",
+    "record_digest"
+  ],
+  "properties": {
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessor_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessor_institution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_from_observer": {
+      "const": true
+    },
+    "independence_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessed_at": {
+      "type": "string",
+      "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}Z$"
+    },
+    "outcome": {
+      "enum": [
+        "supports",
+        "contradicts",
+        "inconclusive",
+        "procedural_invalid"
+      ]
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_record_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "commitment_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "binding_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "assessment_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "record_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "x-authority": "independent_assessment_claim_only",
+  "x-non-equivalences": [
+    "assessment is not experimental observation",
+    "assessment is not replication",
+    "assessment does not establish scientific truth",
+    "independence is a caller attestation, not authenticated fact",
+    "assessment does not complete an official criterion",
+    "outcomes are descriptive and not a confidence score"
+  ]
+}
