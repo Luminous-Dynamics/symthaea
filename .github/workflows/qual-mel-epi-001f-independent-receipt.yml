@@ -347,8 +347,6 @@ jobs:
                 workflow_sha: observerWorkflowSha,
                 workflow_ref: observerWorkflowRef,
                 workflow_file_path: expectedObserverWorkflowPath,
-                workflow_sha: observerWorkflowSha,
-                workflow_ref: observerWorkflowRef,
                 workflow_blob_sha: observerWorkflowFile.data.sha,
                 workflow_sha256: observerWorkflowSha256,
                 identity_verified: observerWorkflowIdentityVerified,
@@ -397,6 +395,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$RECEIPT_ARTIFACT_ID"
+          test -n "$RECEIPT_ARTIFACT_URL"
           test -n "$RECEIPT_ARTIFACT_DIGEST"
           node <<'NODE'
           const fs = require('fs');
@@ -407,12 +406,29 @@ jobs:
           const receipt = JSON.parse(receiptBytes.toString('utf8'));
           const artifactDigest = process.env.RECEIPT_ARTIFACT_DIGEST;
           const artifactId = process.env.RECEIPT_ARTIFACT_ID;
+          const artifactUrl = process.env.RECEIPT_ARTIFACT_URL;
+          const artifactIdNumber = Number(artifactId);
 
           if (!/^[0-9a-f]{64}$/.test(artifactDigest)) {
             throw new Error('receipt artifact digest is not a lowercase SHA-256 hex digest');
           }
           if (!/^[0-9]+$/.test(artifactId)) {
             throw new Error('receipt artifact ID is not a decimal integer');
+          }
+          if (!Number.isSafeInteger(artifactIdNumber) || artifactIdNumber <= 0) {
+            throw new Error('receipt artifact ID is not a positive safe integer');
+          }
+
+          const expectedArtifactUrl =
+            process.env.GITHUB_SERVER_URL +
+            '/' +
+            process.env.GITHUB_REPOSITORY +
+            '/actions/runs/' +
+            process.env.GITHUB_RUN_ID +
+            '/artifacts/' +
+            artifactId;
+          if (artifactUrl !== expectedArtifactUrl) {
+            throw new Error('receipt artifact URL is not bound to this observer run and artifact ID');
           }
 
           const manifest = {
@@ -429,8 +445,8 @@ jobs:
             },
             artifact: {
               name: process.env.RECEIPT_ARTIFACT_NAME,
-              id: Number(artifactId),
-              url: process.env.RECEIPT_ARTIFACT_URL,
+              id: artifactIdNumber,
+              url: artifactUrl,
               digest: 'sha256:' + artifactDigest,
             },
           };
@@ -444,7 +460,7 @@ jobs:
       - name: Upload receipt artifact manifest
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: mel-epi-001f-independent-run-receipt-manifest-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          name: mel-epi-001f-independent-run-receipt-manifest-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}-observer-${{ github.run_id }}-${{ github.run_attempt }}
           path: MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_ARTIFACT_MANIFEST_V1.json
           if-no-files-found: error
           retention-days: 90
