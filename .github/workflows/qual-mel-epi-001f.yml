@@ -1,0 +1,99 @@
+name: QUAL MEL-EPI-001F exact subject
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/qual-mel-epi-001f.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository history
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Checkout exact 001F product subject
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          subject='9308736b927d85c19d882ba0db7ada1aaf5dc1d2'
+          provenance_parent='a4f5351882b08f044319d5e61a01c792341f3726'
+          typestate_parent='62d021bfc055fafcdd067c697df7d39a05c50bd5'
+          claim_scope_parent='3f3a6b3bf4728879688eb53961236b0756180c47'
+          source_ref_parent='2507b588c679bc4a4f3f790f97c0475bf42d8126'
+          semantic_subject='647f0aefa5801b57c5b10f17937998918918028d'
+          semantic_repair='377d26d3207e715665713f37b52c7b097ad01313'
+          semantic_source='035422d7a8b701fe75f4f79e6ba777df47472394'
+          main_parent='5fd5259af776c0a7f1b9608f040bfae9009871a1'
+
+          git checkout --detach "$subject"
+
+          test "$(git rev-parse HEAD)" = "$subject"
+          test "$(git rev-parse HEAD^)" = "$provenance_parent"
+          test "$(git rev-parse HEAD^^)" = "$typestate_parent"
+          test "$(git rev-parse HEAD^^^)" = "$claim_scope_parent"
+          test "$(git rev-parse HEAD^^^^)" = "$source_ref_parent"
+          test "$(git rev-parse HEAD^^^^^)" = "$semantic_subject"
+          test "$(git rev-parse HEAD^^^^^^)" = "$semantic_repair"
+          test "$(git rev-parse HEAD^^^^^^^)" = "$semantic_source"
+          test "$(git rev-parse HEAD^^^^^^^^)" = "$main_parent"
+
+          mapfile -t source_changed < <(
+            git diff --name-only "$provenance_parent" "$subject" | sort
+          )
+          source_expected=(
+            "crates/domains/symthaea-epistemic-types/src/claim_derivation.rs"
+            "crates/domains/symthaea-epistemic-types/src/lib.rs"
+            "docs/research/MEL_EPI_001F_CLAIM_DERIVATION_V1.md"
+          )
+          mapfile -t source_expected_sorted < <(
+            printf '%s\n' "${source_expected[@]}" | sort
+          )
+          test "${#source_changed[@]}" -eq "${#source_expected_sorted[@]}"
+          diff -u             <(printf '%s\n' "${source_expected_sorted[@]}")             <(printf '%s\n' "${source_changed[@]}")
+
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.96.0
+          rustc --version
+          cargo --version
+          rustc --version | grep -F 'rustc 1.96.0 '
+          cargo --version | grep -F 'cargo 1.96.0 '
+
+      - name: Locked metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Rustfmt
+        run: cargo fmt -p symthaea-epistemic-types -- --check
+
+      - name: Tests
+        run: cargo test --locked -p symthaea-epistemic-types
+
+      - name: Check all targets
+        run: cargo check --locked -p symthaea-epistemic-types --all-targets
+
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-epistemic-types --all-targets --no-deps -- -D warnings
+
+      - name: Exact-source postflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "9308736b927d85c19d882ba0db7ada1aaf5dc1d2"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
