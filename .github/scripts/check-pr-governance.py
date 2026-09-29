@@ -345,6 +345,9 @@ def self_test() -> None:
     assert approved_subject("safety(core): tighten", {"safety"})
     assert not approved_subject("governance(ci): wrong", {"safety"})
     assert approved_subject("governance(ci): tighten", {"governance"})
+    assert approved_subject("emergency-safety(ci): coordinated", {"safety", "governance"})
+    assert not approved_subject("safety(core): mixed", {"safety", "governance"})
+    assert not approved_subject("governance(ci): mixed", {"safety", "governance"})
     assert parse_name_status("M\ta.rs\nD\tb.rs\nR100\told.rs\tnew.rs\n") == [
         "a.rs", "b.rs", "new.rs", "old.rs"
     ]
