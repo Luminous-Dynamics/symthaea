@@ -14,7 +14,9 @@
 //! consumption before minting or exercising any live effect capability.
 
 use super::approver_evidence::{
-    ApproverEvidenceErrorV1, ApproverEvidenceProfileV1, VerifiedLocalUnixPeerCredentialV1,
+    required_profile_accepts_evidence_v1, ApproverEvidenceErrorV1,
+    ApproverEvidenceProfileV1, RequiredApprovalProfileV1,
+    VerifiedApproverEvidenceProfileV1, VerifiedLocalUnixPeerCredentialV1,
 };
 use super::local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
@@ -195,6 +197,11 @@ pub(crate) fn admit_verified_local_submission_v2(
     submission.validate_against(request, expected_projection_digest)?;
 
     let approver_ref = local_verified_peer_approver_ref_v1(verified_peer)?;
+    let required_profile = RequiredApprovalProfileV1::parse_ref(&request.authority_profile_ref)?;
+    let evidence_profile = VerifiedApproverEvidenceProfileV1::SameUidProcessV1;
+    if !required_profile_accepts_evidence_v1(required_profile, evidence_profile) {
+        return Err(LocalApprovalAdmissionErrorV1::RequiredProfileNotSatisfied);
+    }
     let decision = LocalNixApprovalDecisionV1::for_request(
         request,
         submission.decision,
@@ -247,6 +254,8 @@ pub enum LocalApprovalAdmissionErrorV1 {
     ProjectionDigestMismatch,
     #[error("projection validation failed: {0}")]
     Projection(#[from] LocalApprovalProjectionErrorV1),
+    #[error("verified approver evidence does not satisfy the exact required approval profile")]
+    RequiredProfileNotSatisfied,
 }
 
 #[cfg(test)]
@@ -573,6 +582,53 @@ mod tests {
         // authority runtime. This pure evidence-admission layer intentionally has
         // no mutable nonce/request-consumption state and makes no single-use claim.
     }    
+    #[test]
+    fn required_same_uid_profile_accepts_verified_local_peer() {
+        let request = request_with_profile("same-uid-process-v1");
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request, &projection, LocalApprovalDecisionKindV1::Approved, ms(1_200),
+        ).unwrap();
+        admit_verified_local_submission_v2(
+            &submission, &request, &projection.projection_digest, &peer(1000, 1),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        ).unwrap();
+    }
+
+    #[test]
+    fn xenia_required_profile_rejects_verified_local_peer() {
+        let request = request_with_profile("xenia-authenticated-operator-v1");
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request, &projection, LocalApprovalDecisionKindV1::Approved, ms(1_200),
+        ).unwrap();
+        assert_eq!(
+            admit_verified_local_submission_v2(
+                &submission, &request, &projection.projection_digest, &peer(1000, 1),
+                AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            ).unwrap_err(),
+            LocalApprovalAdmissionErrorV1::RequiredProfileNotSatisfied
+        );
+    }
+
+    #[test]
+    fn unknown_required_profile_fails_closed() {
+        let request = request_with_profile("unknown-profile-v99");
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request, &projection, LocalApprovalDecisionKindV1::Approved, ms(1_200),
+        ).unwrap();
+        assert!(matches!(
+            admit_verified_local_submission_v2(
+                &submission, &request, &projection.projection_digest, &peer(1000, 1),
+                AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+            ),
+            Err(LocalApprovalAdmissionErrorV1::ApproverEvidence(
+                ApproverEvidenceErrorV1::UnknownRequiredApprovalProfile
+            ))
+        ));
+    }
+
     fn projection(request: &PendingNixApprovalRequestV1) -> PendingNixApprovalProjectionV1 {
         PendingNixApprovalProjectionV1::from_request(
             request,
