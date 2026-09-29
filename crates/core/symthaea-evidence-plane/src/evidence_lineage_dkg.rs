@@ -72,23 +72,55 @@ impl EvidenceLineageDkgProjection {
         replication: &ReplicationRecord,
         evidence: &CriterionEvidenceEligibility,
     ) -> Result<Self, DkgProjectionError> {
-        if !commitment.commitment.verify_integrity() { return Err(DkgProjectionError::InvalidCommitment); }
-        if !observation.verify_integrity() { return Err(DkgProjectionError::InvalidObservation); }
-        if !assessment.verify_integrity() { return Err(DkgProjectionError::InvalidAssessment); }
-        if !replication.verify_integrity() { return Err(DkgProjectionError::InvalidReplication); }
-        if !evidence.verify_integrity() { return Err(DkgProjectionError::InvalidCriterionEvidence); }
+        Self::from_chain_history(
+            commitment,
+            observation,
+            assessment,
+            replication,
+            std::slice::from_ref(evidence),
+        )
+    }
+
+    /// Derive a canonical graph from a closed criterion-evidence supersession
+    /// history. Every historical record remains a first-class node; the graph
+    /// records replacement ancestry without selecting a scientifically "true"
+    /// disposition.
+    pub fn from_chain_history(
+        commitment: &CandidatePredictionCommitment,
+        observation: &ExternalExperimentalObservation,
+        assessment: &IndependentAssessment,
+        replication: &ReplicationRecord,
+        evidence_history: &[CriterionEvidenceEligibility],
+    ) -> Result<Self, DkgProjectionError> {
+        if !commitment.commitment.verify_integrity() {
+            return Err(DkgProjectionError::InvalidCommitment);
+        }
+        if !observation.verify_integrity() {
+            return Err(DkgProjectionError::InvalidObservation);
+        }
+        if !assessment.verify_integrity() {
+            return Err(DkgProjectionError::InvalidAssessment);
+        }
+        if !replication.verify_integrity() {
+            return Err(DkgProjectionError::InvalidReplication);
+        }
+        if evidence_history.is_empty() {
+            return Err(DkgProjectionError::EmptySupersessionHistory);
+        }
 
         let commitment_id = commitment.commitment.event_id().to_string();
         if observation.commitment_event_id != commitment_id
             || observation.candidate_id != commitment.candidate_id
-            || observation.binding_digest != commitment.binding_digest {
+            || observation.binding_digest != commitment.binding_digest
+        {
             return Err(DkgProjectionError::CommitmentObservationMismatch);
         }
         if assessment.observation_id != observation.observation_id
             || assessment.observation_record_digest != observation.record_digest
             || assessment.commitment_event_id != observation.commitment_event_id
             || assessment.candidate_id != observation.candidate_id
-            || assessment.binding_digest != observation.binding_digest {
+            || assessment.binding_digest != observation.binding_digest
+        {
             return Err(DkgProjectionError::AssessmentMismatch);
         }
         if replication.observation_id != observation.observation_id
@@ -97,46 +129,142 @@ impl EvidenceLineageDkgProjection {
             || replication.assessment_record_digest != assessment.record_digest
             || replication.commitment_event_id != observation.commitment_event_id
             || replication.candidate_id != observation.candidate_id
-            || replication.binding_digest != observation.binding_digest {
+            || replication.binding_digest != observation.binding_digest
+        {
             return Err(DkgProjectionError::ReplicationMismatch);
         }
-        if evidence.challenge_id != observation.challenge_id
-            || evidence.criterion_id != observation.criterion_id
-            || evidence.criterion_generation != observation.criterion_generation
-            || evidence.observation_id != observation.observation_id
-            || evidence.observation_record_digest != observation.record_digest
-            || evidence.assessment_id != assessment.assessment_id
-            || evidence.assessment_record_digest != assessment.record_digest
-            || evidence.replication_id != replication.replication_id
-            || evidence.replication_record_digest != replication.record_digest
-            || evidence.commitment_event_id != observation.commitment_event_id
-            || evidence.candidate_id != observation.candidate_id
-            || evidence.binding_digest != observation.binding_digest {
-            return Err(DkgProjectionError::CriterionEvidenceMismatch);
+
+        for evidence in evidence_history {
+            if !evidence.verify_integrity() {
+                return Err(DkgProjectionError::InvalidCriterionEvidence);
+            }
+            if evidence.challenge_id != observation.challenge_id
+                || evidence.criterion_id != observation.criterion_id
+                || evidence.criterion_generation != observation.criterion_generation
+                || evidence.observation_id != observation.observation_id
+                || evidence.observation_record_digest != observation.record_digest
+                || evidence.assessment_id != assessment.assessment_id
+                || evidence.assessment_record_digest != assessment.record_digest
+                || evidence.replication_id != replication.replication_id
+                || evidence.replication_record_digest != replication.record_digest
+                || evidence.commitment_event_id != observation.commitment_event_id
+                || evidence.candidate_id != observation.candidate_id
+                || evidence.binding_digest != observation.binding_digest
+            {
+                return Err(DkgProjectionError::CriterionEvidenceMismatch);
+            }
         }
 
-        if evidence.supersedes_evidence_id.is_some() {
-            return Err(DkgProjectionError::SupersessionParentNotIncluded);
+        let mut ids = std::collections::BTreeSet::new();
+        for evidence in evidence_history {
+            if !ids.insert(evidence.evidence_id.clone()) {
+                return Err(DkgProjectionError::DuplicateEvidenceId);
+            }
+            if evidence.supersedes_evidence_id.as_deref() == Some(evidence.evidence_id.as_str()) {
+                return Err(DkgProjectionError::SelfSupersession);
+            }
         }
 
-        let nodes = vec![
-            DkgNode { node_id: commitment_id.clone(), node_type: DkgNodeType::CandidateCommitment,
-                record_digest: commitment.commitment.payload_digest(), supersedes_node_id: None },
-            DkgNode { node_id: observation.observation_id.clone(), node_type: DkgNodeType::ExternalObservation,
-                record_digest: observation.record_digest.clone(), supersedes_node_id: None },
-            DkgNode { node_id: assessment.assessment_id.clone(), node_type: DkgNodeType::IndependentAssessment,
-                record_digest: assessment.record_digest.clone(), supersedes_node_id: None },
-            DkgNode { node_id: replication.replication_id.clone(), node_type: DkgNodeType::Replication,
-                record_digest: replication.record_digest.clone(), supersedes_node_id: None },
-            DkgNode { node_id: evidence.evidence_id.clone(), node_type: DkgNodeType::CriterionEvidence,
-                record_digest: evidence.record_digest.clone(), supersedes_node_id: evidence.supersedes_evidence_id.clone() },
+        let mut parent_to_child = std::collections::BTreeMap::<String, String>::new();
+        let mut child_to_parent = std::collections::BTreeMap::<String, String>::new();
+        for evidence in evidence_history {
+            if let Some(parent) = &evidence.supersedes_evidence_id {
+                if !ids.contains(parent) {
+                    return Err(DkgProjectionError::MissingSupersessionParent);
+                }
+                if parent_to_child.insert(parent.clone(), evidence.evidence_id.clone()).is_some() {
+                    return Err(DkgProjectionError::BranchingSupersession);
+                }
+                child_to_parent.insert(evidence.evidence_id.clone(), parent.clone());
+            }
+        }
+
+        // A closed linear history has exactly one root and one terminal record.
+        // Following parents from every node catches cycles deterministically.
+        let roots: Vec<_> = ids.iter().filter(|id| !child_to_parent.contains_key(*id)).cloned().collect();
+        if roots.len() != 1 {
+            return Err(DkgProjectionError::SupersessionCycleOrDisconnected);
+        }
+        let mut visited = std::collections::BTreeSet::new();
+        let mut cursor = roots[0].clone();
+        loop {
+            if !visited.insert(cursor.clone()) {
+                return Err(DkgProjectionError::SupersessionCycleOrDisconnected);
+            }
+            match parent_to_child.get(&cursor) {
+                Some(next) => cursor = next.clone(),
+                None => break,
+            }
+        }
+        if visited.len() != ids.len() {
+            return Err(DkgProjectionError::SupersessionCycleOrDisconnected);
+        }
+
+        let mut nodes = vec![
+            DkgNode {
+                node_id: commitment_id.clone(),
+                node_type: DkgNodeType::CandidateCommitment,
+                record_digest: commitment.commitment.payload_digest(),
+                supersedes_node_id: None,
+            },
+            DkgNode {
+                node_id: observation.observation_id.clone(),
+                node_type: DkgNodeType::ExternalObservation,
+                record_digest: observation.record_digest.clone(),
+                supersedes_node_id: None,
+            },
+            DkgNode {
+                node_id: assessment.assessment_id.clone(),
+                node_type: DkgNodeType::IndependentAssessment,
+                record_digest: assessment.record_digest.clone(),
+                supersedes_node_id: None,
+            },
+            DkgNode {
+                node_id: replication.replication_id.clone(),
+                node_type: DkgNodeType::Replication,
+                record_digest: replication.record_digest.clone(),
+                supersedes_node_id: None,
+            },
         ];
         let mut edges = vec![
-            DkgEdge { source_node_id: observation.observation_id.clone(), edge_type: DkgEdgeType::ObservedFrom, target_node_id: commitment_id },
-            DkgEdge { source_node_id: assessment.assessment_id.clone(), edge_type: DkgEdgeType::Assesses, target_node_id: observation.observation_id.clone() },
-            DkgEdge { source_node_id: replication.replication_id.clone(), edge_type: DkgEdgeType::Replicates, target_node_id: assessment.assessment_id.clone() },
-            DkgEdge { source_node_id: evidence.evidence_id.clone(), edge_type: DkgEdgeType::EligibleFor, target_node_id: replication.replication_id.clone() },
+            DkgEdge {
+                source_node_id: observation.observation_id.clone(),
+                edge_type: DkgEdgeType::ObservedFrom,
+                target_node_id: commitment_id,
+            },
+            DkgEdge {
+                source_node_id: assessment.assessment_id.clone(),
+                edge_type: DkgEdgeType::Assesses,
+                target_node_id: observation.observation_id.clone(),
+            },
+            DkgEdge {
+                source_node_id: replication.replication_id.clone(),
+                edge_type: DkgEdgeType::Replicates,
+                target_node_id: assessment.assessment_id.clone(),
+            },
         ];
+
+        for evidence in evidence_history {
+            nodes.push(DkgNode {
+                node_id: evidence.evidence_id.clone(),
+                node_type: DkgNodeType::CriterionEvidence,
+                record_digest: evidence.record_digest.clone(),
+                supersedes_node_id: evidence.supersedes_evidence_id.clone(),
+            });
+            edges.push(DkgEdge {
+                source_node_id: evidence.evidence_id.clone(),
+                edge_type: DkgEdgeType::EligibleFor,
+                target_node_id: replication.replication_id.clone(),
+            });
+            if let Some(parent) = &evidence.supersedes_evidence_id {
+                edges.push(DkgEdge {
+                    source_node_id: evidence.evidence_id.clone(),
+                    edge_type: DkgEdgeType::Supersedes,
+                    target_node_id: parent.clone(),
+                });
+            }
+        }
+
         Ok(Self::new(nodes, edges))
     }
 
@@ -154,8 +282,12 @@ impl EvidenceLineageDkgProjection {
     }
 
     pub fn verify_integrity(&self) -> bool {
+        let unique_nodes = self.nodes.iter().map(|n| n.node_id.as_str()).collect::<std::collections::BTreeSet<_>>().len() == self.nodes.len();
+        let unique_edges = self.edges.iter().map(|e| (&e.source_node_id, e.edge_type, &e.target_node_id)).collect::<std::collections::BTreeSet<_>>().len() == self.edges.len();
         self.projection_version == "1.0.0"
             && self.projection_digest == self.digest()
+            && unique_nodes
+            && unique_edges
             && self.nodes.iter().all(|n| !n.node_id.trim().is_empty() && !n.record_digest.trim().is_empty())
             && self.edges.iter().all(|e| !e.source_node_id.trim().is_empty() && !e.target_node_id.trim().is_empty())
             && self.edges.iter().all(|e| {
@@ -189,7 +321,8 @@ impl EvidenceLineageDkgProjection {
 pub enum DkgProjectionError {
     InvalidCommitment, InvalidObservation, InvalidAssessment, InvalidReplication, InvalidCriterionEvidence,
     CommitmentObservationMismatch, AssessmentMismatch, ReplicationMismatch, CriterionEvidenceMismatch,
-    SupersessionParentNotIncluded,
+    EmptySupersessionHistory, DuplicateEvidenceId, SelfSupersession, MissingSupersessionParent,
+    BranchingSupersession, SupersessionCycleOrDisconnected, SupersessionParentNotIncluded,
 }
 
 fn put(h: &mut Sha256, s: &str) {
@@ -265,5 +398,22 @@ mod tests {
         let decoded: EvidenceLineageDkgProjection = serde_json::from_slice(&encoded).unwrap();
         assert_eq!(p, decoded);
         assert!(decoded.verify_integrity());
+    }
+
+    #[test]
+    fn duplicate_node_ids_are_not_integrity_valid() {
+        let n1 = node("same", DkgNodeType::ExternalObservation);
+        let n2 = node("same", DkgNodeType::CriterionEvidence);
+        let p = EvidenceLineageDkgProjection::new(vec![n1, n2], vec![]);
+        assert!(!p.verify_integrity());
+    }
+
+    #[test]
+    fn duplicate_edges_are_not_integrity_valid() {
+        let n1 = node("a", DkgNodeType::ExternalObservation);
+        let n2 = node("b", DkgNodeType::IndependentAssessment);
+        let edge = DkgEdge { source_node_id: "b".into(), edge_type: DkgEdgeType::Assesses, target_node_id: "a".into() };
+        let p = EvidenceLineageDkgProjection::new(vec![n1, n2], vec![edge.clone(), edge]);
+        assert!(!p.verify_integrity());
     }
 }
