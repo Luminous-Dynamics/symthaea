@@ -1049,6 +1049,24 @@ mod tests {
         assert_eq!(graph.record_provenance_relation(relation).unwrap(), false);
         assert_eq!(graph.provenance_relations().len(), 1);
         assert_eq!(graph.get_fact(b).unwrap().confidence, before);
+
+        let corroborates = ProvenanceRelation {
+            source_memory_id: graph.provenance(a).unwrap().memory_id,
+            target_memory_id: graph.provenance(b).unwrap().memory_id,
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:2".into(),
+        };
+        assert!(graph.record_provenance_relation(corroborates).unwrap());
+        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
+
+        let representation = ProvenanceRelation {
+            source_memory_id: graph.provenance(b).unwrap().memory_id,
+            target_memory_id: graph.provenance(a).unwrap().memory_id,
+            kind: ProvenanceRelationKind::RepresentationOf,
+            created_at: "cycle:2".into(),
+        };
+        assert!(graph.record_provenance_relation(representation).unwrap());
+        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
     }
 
     #[test]
