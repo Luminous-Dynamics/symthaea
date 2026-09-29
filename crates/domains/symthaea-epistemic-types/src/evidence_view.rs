@@ -224,4 +224,18 @@ mod tests {
             Err(EvidenceViewError::ReceiptMismatch)
         );
     }
+
+    #[test]
+    fn mismatched_representation_digest_is_rejected() {
+        let (groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![candidate("claim:x", 0.7, "family:a")],
+        );
+        receipt.selected_representation_digests[0] = "tampered".into();
+        receipt.receipt_digest = receipt.canonical_digest();
+        assert_eq!(
+            EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
 }
