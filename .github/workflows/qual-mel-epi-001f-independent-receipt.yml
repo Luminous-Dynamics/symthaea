@@ -1,0 +1,237 @@
+name: QUAL MEL-EPI-001F independent run receipt
+
+on:
+  workflow_run:
+    workflows:
+      - QUAL MEL-EPI-001F exact subject dispatcher
+    types:
+      - completed
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  receipt:
+    if: github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build independent qualification receipt
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
+        env:
+          EXPECTED_SUBJECT: 9308736b927d85c19d882ba0db7ada1aaf5dc1d2
+          EXPECTED_PARENT: a4f5351882b08f044319d5e61a01c792341f3726
+          WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-dispatch.yml
+        with:
+          script: |
+            const fs = require('fs');
+            const crypto = require('crypto');
+
+            const run = context.payload.workflow_run;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const subject = process.env.EXPECTED_SUBJECT;
+            const expectedParent = process.env.EXPECTED_PARENT;
+            const workflowPath = process.env.WORKFLOW_PATH;
+
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              { owner, repo, run_id: run.id, per_page: 100 }
+            );
+
+            const workflowFile = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: workflowPath,
+              ref: run.head_sha,
+            });
+
+            if (Array.isArray(workflowFile.data)) {
+              throw new Error('dispatcher workflow path resolved to a directory');
+            }
+
+            const workflowText = Buffer.from(
+              workflowFile.data.content,
+              workflowFile.data.encoding
+            ).toString('utf8');
+
+            const requiredWorkflowFragments = [
+              subject,
+              expectedParent,
+              'refs/heads/main',
+              'crates/domains/symthaea-epistemic-types/src/claim_derivation.rs',
+              'crates/domains/symthaea-epistemic-types/src/lib.rs',
+              'docs/research/MEL_EPI_001F_CLAIM_DERIVATION_V1.md',
+              'cargo metadata --locked --no-deps --format-version 1',
+              'cargo fmt -p symthaea-epistemic-types -- --check',
+              'cargo test --locked -p symthaea-epistemic-types',
+              'cargo check --locked -p symthaea-epistemic-types --all-targets',
+              'cargo clippy --locked -p symthaea-epistemic-types --all-targets --no-deps -- -D warnings',
+            ];
+
+            const missingWorkflowFragments = requiredWorkflowFragments.filter(
+              (fragment) => !workflowText.includes(fragment)
+            );
+
+            const expectedAncestry = [
+              subject,
+              'a4f5351882b08f044319d5e61a01c792341f3726',
+              '62d021bfc055fafcdd067c697df7d39a05c50bd5',
+              '3f3a6b3bf4728879688eb53961236b0756180c47',
+              '2507b588c679bc4a4f3f790f97c0475bf42d8126',
+              '647f0aefa5801b57c5b10f17937998918918028d',
+              '377d26d3207e715665713f37b52c7b097ad01313',
+              '035422d7a8b701fe75f4f79e6ba777df47472394',
+              '5fd5259af776c0a7f1b9608f040bfae9009871a1',
+            ];
+
+            const observedAncestry = [];
+            let cursor = subject;
+            for (let index = 0; index < expectedAncestry.length; index += 1) {
+              const commit = await github.rest.repos.getCommit({
+                owner,
+                repo,
+                ref: cursor,
+              });
+              const actualSha = commit.data.sha;
+              const actualParent = commit.data.parents[0]?.sha ?? null;
+              observedAncestry.push({
+                depth: index,
+                commit_sha: actualSha,
+                expected_sha: expectedAncestry[index],
+                first_parent: actualParent,
+              });
+              if (actualSha !== expectedAncestry[index]) {
+                break;
+              }
+              cursor = actualParent;
+              if (!cursor) {
+                break;
+              }
+            }
+
+            const ancestryVerified =
+              observedAncestry.length === expectedAncestry.length &&
+              observedAncestry.every((entry) => entry.commit_sha === entry.expected_sha);
+
+            const compare = await github.rest.repos.compareCommits({
+              owner,
+              repo,
+              basehead: expectedParent + '...' + subject,
+            });
+
+            const changedFiles = (compare.data.files ?? [])
+              .map((file) => file.filename)
+              .sort();
+
+            const expectedFiles = [
+              'crates/domains/symthaea-epistemic-types/src/claim_derivation.rs',
+              'crates/domains/symthaea-epistemic-types/src/lib.rs',
+              'docs/research/MEL_EPI_001F_CLAIM_DERIVATION_V1.md',
+            ].sort();
+
+            const sourceSurfaceVerified =
+              JSON.stringify(changedFiles) === JSON.stringify(expectedFiles);
+
+            const sourceHashes = {};
+            for (const path of expectedFiles) {
+              const file = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path,
+                ref: subject,
+              });
+              if (Array.isArray(file.data)) {
+                throw new Error('expected source path resolved to a directory: ' + path);
+              }
+              const bytes = Buffer.from(file.data.content, file.data.encoding);
+              sourceHashes[path] = {
+                blob_sha: file.data.sha,
+                sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+              };
+            }
+
+            const expectedSteps = [
+              'Verify workflow host is main',
+              'Checkout exact 001F product subject',
+              'Install pinned Rust toolchain',
+              'Locked metadata',
+              'Rustfmt',
+              'Tests',
+              'Check all targets',
+              'Strict Clippy',
+              'Exact-source postflight',
+            ];
+
+            const stepOutcomes = {};
+            for (const name of expectedSteps) {
+              const matches = jobs
+                .flatMap((job) => job.steps ?? [])
+                .filter((step) => step.name === name);
+              stepOutcomes[name] = matches.map((step) => step.conclusion);
+            }
+
+            const requiredStepsSucceeded = expectedSteps.every(
+              (name) =>
+                stepOutcomes[name].length === 1 &&
+                stepOutcomes[name][0] === 'success'
+            );
+
+            const qualificationResult =
+              run.conclusion === 'success' &&
+              run.head_branch === 'main' &&
+              missingWorkflowFragments.length === 0 &&
+              ancestryVerified &&
+              sourceSurfaceVerified &&
+              requiredStepsSucceeded
+                ? 'PASS'
+                : 'NOT_PASS';
+
+            const receipt = {
+              schema_version: 'mel-epi-001f-independent-run-receipt-v1',
+              qualification_result: qualificationResult,
+              product_subject: subject,
+              workflow_run: {
+                id: run.id,
+                attempt: run.run_attempt,
+                conclusion: run.conclusion,
+                event: run.event,
+                head_branch: run.head_branch,
+                head_sha: run.head_sha,
+                workflow_file_path: workflowPath,
+                workflow_file_blob_sha: workflowFile.data.sha,
+                html_url: run.html_url,
+              },
+              workflow_contract: {
+                missing_fragments: missingWorkflowFragments,
+                verified: missingWorkflowFragments.length === 0,
+              },
+              ancestry: {
+                expected: expectedAncestry,
+                observed: observedAncestry,
+                verified: ancestryVerified,
+              },
+              source_surface: {
+                expected_files: expectedFiles,
+                observed_files: changedFiles,
+                verified: sourceSurfaceVerified,
+                files: sourceHashes,
+              },
+              gate_outcomes: stepOutcomes,
+              gates_verified: requiredStepsSucceeded,
+            };
+
+            fs.writeFileSync(
+              'MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_V1.json',
+              JSON.stringify(receipt, null, 2) + '\n'
+            );
+
+            core.info('Qualification result: ' + qualificationResult);
+
+      - name: Upload independent qualification receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mel-epi-001f-independent-run-receipt-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: MEL_EPI_001F_INDEPENDENT_RUN_RECEIPT_V1.json
+          if-no-files-found: error
+          retention-days: 90
