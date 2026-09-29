@@ -9,7 +9,7 @@
 //! - bundle_simd vs scalar
 //! - similarity_simd vs scalar
 //!
-//! Target: 4x+ speedup for 16,384-dim vectors
+//! Historical target only; benchmark results are hardware- and workload-dependent.
 //!
 //! Run with:
 //!   CARGO_TARGET_DIR=/tmp/symthaea-target cargo bench --bench simd_continuous --features simd
