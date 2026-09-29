@@ -1,0 +1,188 @@
+name: Systems Engineering SE-001Q Repair Execution v1
+
+on:
+  pull_request:
+    branches:
+      - systems-engineering/se-001q-v1.4-frozen-base
+    paths:
+      - 'crates/domains/symthaea-se-model/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/systems-engineering-se001q-repair-execution-v1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: se001q-repair-execution-v1-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  FROZEN_SUBJECT_SHA: b7a26c24fc729d59932a635e284376c3941bc05d
+  EXPECTED_REPAIR_SHA: e79f8ff5d5ddd5b4ad8e134a585f7b61f742264b
+  EXPECTED_BASE_REF: systems-engineering/se-001q-v1.4-frozen-base
+  EXPECTED_TOOLCHAIN: 1.96.0
+
+jobs:
+  identity-and-gates:
+    name: Repair generation identity + gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repair generation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Bind experiment identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$EXPECTED_REPAIR_SHA"
+          test -z "$(git status --porcelain)"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            test "${{ github.event.pull_request.base.ref }}" = "$EXPECTED_BASE_REF"
+            test "${{ github.event.pull_request.base.sha }}" = "$FROZEN_SUBJECT_SHA"
+          fi
+          printf '%s\n' "$actual" > repair-sha.txt
+          printf '%s\n' "$FROZEN_SUBJECT_SHA" > frozen-subject-sha.txt
+          printf '%s\n' "$EXPECTED_BASE_REF" > base-ref.txt
+          printf '%s\n' "$EXPECTED_TOOLCHAIN" > toolchain.txt
+
+      - name: Install pinned Rust, rustfmt, and Clippy
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Focused formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs
+
+      - name: Focused package check
+        run: cargo check -p symthaea-se-model --locked --all-targets
+
+      - name: Focused package tests
+        run: cargo test -p symthaea-se-model --locked
+
+      - name: Focused strict Clippy
+        run: cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
+
+      - name: Record lock identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum Cargo.lock | tee cargo-lock-sha256.txt
+          git status --short
+          test -z "$(git status --porcelain)"
+
+      - name: Upload primary execution capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload
+        with:
+          name: se001q-repair-primary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            repair-sha.txt
+            frozen-subject-sha.txt
+            base-ref.txt
+            toolchain.txt
+            cargo-lock-sha256.txt
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record artifact identity
+        if: always()
+        run: |
+          echo "artifact-id: ${{ steps.upload.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "artifact-digest: ${{ steps.upload.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  independent-replay:
+    name: Independent repair-generation replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: identity-and-gates
+    steps:
+      - name: Checkout repair generation independently
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Re-bind exact repair identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_REPAIR_SHA"
+          test -z "$(git status --porcelain)"
+
+      - name: Install pinned Rust + Clippy
+        uses: dtolnay/rust-toolchain@ebb3d1676050bfd0971c36c1e215b5751473994d # 1.96.0
+        with:
+          components: clippy
+
+      - name: Independent focused test replay
+        run: cargo test -p symthaea-se-model --locked
+
+      - name: Independent focused check replay
+        run: cargo check -p symthaea-se-model --locked --all-targets
+
+      - name: Independent strict Clippy replay
+        run: cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
+
+      - name: Upload replay capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload-replay
+        with:
+          name: se001q-repair-replay-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            Cargo.lock
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record replay artifact identity
+        if: always()
+        run: |
+          echo "artifact-id: ${{ steps.upload-replay.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "artifact-digest: ${{ steps.upload-replay.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  delta-audit:
+    name: Verify repair remains minimal
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repair generation
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify frozen-base delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_REPAIR_SHA"
+          test "$(git rev-parse "$EXPECTED_BASE_REF")" = "$FROZEN_SUBJECT_SHA"
+          mapfile -t files < <(git diff --name-only "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA")
+          test "${#files[@]}" -eq 1
+          test "${files[0]}" = 'crates/domains/symthaea-se-model/src/lib.rs'
+          test -z "$(git diff --name-only "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- Cargo.lock)"
+          {
+            echo '### Repair identity'
+            echo
+            echo "frozen_subject_sha=$FROZEN_SUBJECT_SHA"
+            echo "repair_sha=$EXPECTED_REPAIR_SHA"
+            echo "changed_file=${files[0]}"
+            echo
+            echo 'Observation class: reproduced'
+            echo
+            echo 'This workflow produces execution evidence only; it grants no qualification authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
