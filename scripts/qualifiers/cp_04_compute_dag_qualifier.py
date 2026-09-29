@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""Independent stdlib-only qualifier for CP-04 typed evidence DAG v1.1."""
+import ast
+import copy
+import hashlib
+import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+GRAPH = ROOT / "docs/engineering/data/cp-04-compute-evidence-dag-v1-1.json"
+MANIFEST = ROOT / "docs/engineering/data/cp-04-compute-evidence-dag-mutation-manifest-v1-1.json"
+SCHEMA = "cp-04-compute-evidence-dag-v1-1"
+CLAIM_CEILING = "typed dependency and invalidation semantics over synthetic/reference workflows only; no physical execution, performance, compiler, accelerator, model, deployment, safety, or operational-authority claim"
+
+GUARDS = {
+    "CP-COMP-DAG-SCHEMA",
+    "CP-COMP-DAG-TYPING",
+    "CP-COMP-DAG-ACYCLIC",
+    "CP-COMP-DAG-CLOSURE",
+    "CP-COMP-DAG-IDENTITY",
+    "CP-COMP-DAG-AUTHORITY",
+    "CP-COMP-DAG-MUTATION",
+    "CP-COMP-DAG-INVARIANT",
+}
+
+EXPECTED_NODES = (
+    "requirement", "representation", "model", "model_parameters", "runtime",
+    "toolchain", "accelerator", "deployment_artifact", "execution_context",
+    "observation", "uncertainty", "statistics", "provenance_reference",
+    "currentness", "applicability", "disposition",
+)
+EXPECTED_EDGES = (
+    ("requirement", "requires", "representation"),
+    ("representation", "implements", "model"),
+    ("model", "parameterizes", "model_parameters"),
+    ("model", "executes_with", "runtime"),
+    ("runtime", "compiled_by", "toolchain"),
+    ("runtime", "runs_on", "accelerator"),
+    ("accelerator", "deploys", "deployment_artifact"),
+    ("deployment_artifact", "executes", "execution_context"),
+    ("execution_context", "observes", "observation"),
+    ("observation", "quantifies", "uncertainty"),
+    ("observation", "summarizes", "statistics"),
+    ("observation", "traces_to", "provenance_reference"),
+    ("currentness", "currentness_for", "runtime"),
+    ("applicability", "applicable_to", "execution_context"),
+    ("statistics", "derives", "disposition"),
+)
+EXPECTED_TYPES = (
+    "requires", "implements", "parameterizes", "executes_with", "compiled_by",
+    "runs_on", "deploys", "executes", "observes", "quantifies", "summarizes",
+    "traces_to", "currentness_for", "applicable_to", "derives",
+)
+
+EDGE_ENDPOINT_ORACLE = {
+    "requires": (("requirement", "representation"),),
+    "implements": (("representation", "model"),),
+    "parameterizes": (("model", "model_parameters"),),
+    "executes_with": (("model", "runtime"),),
+    "compiled_by": (("runtime", "toolchain"),),
+    "runs_on": (("runtime", "accelerator"),),
+    "deploys": (("accelerator", "deployment_artifact"),),
+    "executes": (("deployment_artifact", "execution_context"),),
+    "observes": (("execution_context", "observation"),),
+    "quantifies": (("observation", "uncertainty"),),
+    "summarizes": (("observation", "statistics"),),
+    "traces_to": (("observation", "provenance_reference"),),
+    "currentness_for": (("currentness", "runtime"),),
+    "applicable_to": (("applicability", "execution_context"),),
+    "derives": (("statistics", "disposition"),),
+}
+
+EXPECTED_CLOSURE_ORACLE = {
+    "requirement": ("requirement", "representation", "model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "representation": ("representation", "model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "model": ("model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "model_parameters": ("model_parameters",),
+    "runtime": ("runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "toolchain": ("toolchain",),
+    "accelerator": ("accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "deployment_artifact": ("deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "execution_context": ("execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "observation": ("observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "uncertainty": ("uncertainty",),
+    "statistics": ("statistics", "disposition"),
+    "provenance_reference": ("provenance_reference",),
+    "currentness": ("runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "currentness", "disposition"),
+    "applicability": ("execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "applicability", "disposition"),
+    "disposition": ("disposition",),
+}
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+
+def digest(value):
+    return hashlib.sha256(canonical(value)).hexdigest()
+
+def fail(message, guard_id):
+    if guard_id not in GUARDS:
+        raise AssertionError(f"unregistered guard: {guard_id}")
+    raise AssertionError(f"[{guard_id}] {message}")
+
+def source_audit():
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    forbidden = {"symthaea", "torch", "numpy", "pandas", "tensorflow", "onnx"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name.split(".")[0] in forbidden:
+                    fail("forbidden production/runtime import", "CP-COMP-DAG-INVARIANT")
+        if isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".")[0]
+            if root in forbidden:
+                fail("forbidden production/runtime import", "CP-COMP-DAG-INVARIANT")
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "fail":
+            if len(node.args) != 2:
+                fail("fail() must carry a stable guard id", "CP-COMP-DAG-INVARIANT")
+            guard = node.args[1]
+            if isinstance(guard, ast.Constant):
+                if guard.value not in GUARDS:
+                    fail("fail() references unregistered guard", "CP-COMP-DAG-INVARIANT")
+            elif not (isinstance(guard, ast.Name) and guard.id == "guard_id"):
+                fail("fail() guard must be stable literal or guard_id", "CP-COMP-DAG-INVARIANT")
+
+def load():
+    try:
+        return json.loads(GRAPH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        fail(f"cannot load graph: {exc}", "CP-COMP-DAG-SCHEMA")
+
+def validate_edge_semantics(edges):
+    """Validate edge-type endpoint semantics independently of the full graph oracle."""
+    for edge in edges:
+        if len(edge) != 3:
+            fail("edge must contain source, type and target", "CP-COMP-DAG-TYPING")
+        src, edge_type, dst = edge
+        allowed = EDGE_ENDPOINT_ORACLE.get(edge_type)
+        if allowed is None or (src, dst) not in allowed:
+            fail(f"invalid endpoint pair for edge type {edge_type!r}: {src!r}->{dst!r}", "CP-COMP-DAG-TYPING")
+
+def validate_shape(g):
+    if set(g) != {"schema", "node_types", "edge_types", "edges", "claim_ceiling"}:
+        fail("unexpected top-level graph fields", "CP-COMP-DAG-SCHEMA")
+    if g["schema"] != SCHEMA or g["claim_ceiling"] != CLAIM_CEILING:
+        fail("schema or claim ceiling mismatch", "CP-COMP-DAG-SCHEMA")
+    if tuple(g["node_types"]) != EXPECTED_NODES:
+        fail("node vocabulary/order mismatch", "CP-COMP-DAG-TYPING")
+    if tuple(g["edge_types"]) != EXPECTED_TYPES:
+        fail("edge-type vocabulary/order mismatch", "CP-COMP-DAG-TYPING")
+    edges = tuple(tuple(e) for e in g["edges"])
+    if set(EDGE_ENDPOINT_ORACLE) != set(g["edge_types"]):
+        fail("endpoint oracle does not cover every edge type", "CP-COMP-DAG-TYPING")
+    validate_edge_semantics(edges)
+    if edges != EXPECTED_EDGES:
+        fail("typed edge oracle mismatch", "CP-COMP-DAG-TYPING")
+    if len(g["node_types"]) != len(set(g["node_types"])):
+        fail("duplicate node type", "CP-COMP-DAG-SCHEMA")
+    if len(g["edge_types"]) != len(set(g["edge_types"])):
+        fail("duplicate edge type", "CP-COMP-DAG-SCHEMA")
+    if len(edges) != len(set(edges)):
+        fail("duplicate typed edge", "CP-COMP-DAG-SCHEMA")
+    nodes = set(g["node_types"])
+    types = set(g["edge_types"])
+    for edge in edges:
+        if len(edge) != 3 or edge[0] not in nodes or edge[2] not in nodes or edge[1] not in types:
+            fail("malformed or dangling typed edge", "CP-COMP-DAG-TYPING")
+
+def validate_acyclic(g):
+    adj = {n: [] for n in g["node_types"]}
+    for src, _, dst in g["edges"]:
+        adj[src].append(dst)
+    visiting, visited = set(), set()
+    def walk(node):
+        if node in visiting:
+            fail("cycle detected in evidence DAG", "CP-COMP-DAG-ACYCLIC")
+        if node in visited:
+            return
+        visiting.add(node)
+        for child in adj[node]:
+            walk(child)
+        visiting.remove(node)
+        visited.add(node)
+    for node in g["node_types"]:
+        walk(node)
+
+def closure(node, g):
+    adj = {n: [] for n in g["node_types"]}
+    for src, _, dst in g["edges"]:
+        adj[src].append(dst)
+    found = set()
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if current in found:
+            continue
+        found.add(current)
+        stack.extend(adj[current])
+    return tuple(n for n in g["node_types"] if n in found)
+
+def expected_closures(g):
+    return {node: closure(node, g) for node in g["node_types"]}
+
+def graph_identity(g):
+    return digest({
+        "schema": g["schema"],
+        "node_types": g["node_types"],
+        "edge_types": g["edge_types"],
+        "edges": g["edges"],
+        "claim_ceiling": g["claim_ceiling"],
+    })
+
+CLOSURE_EDGE_MUTATIONS = (
+    ("remove-model-runtime-closure", ("model", "executes_with", "runtime")),
+    ("remove-runtime-toolchain-closure", ("runtime", "compiled_by", "toolchain")),
+    ("remove-observation-statistics-closure", ("observation", "summarizes", "statistics")),
+    ("remove-observation-provenance-closure", ("observation", "traces_to", "provenance_reference")),
+    ("remove-statistics-disposition-closure", ("statistics", "derives", "disposition")),
+)
+
+
+def validate_closure_algebra(base):
+    """Verify closure monotonicity, locality, and compositionality under edge removal."""
+    baseline = expected_closures(base)
+    edges = [tuple(e) for e in base["edges"]]
+
+    # Locality: removing src -> dst can only affect closures that reach src.
+    # The baseline closure itself is the reachability oracle, so a node whose
+    # closure does not contain src is independent of this edge removal.
+    for edge in CLOSURE_EDGE_MUTATIONS:
+        _, removed = edge
+        candidate = copy.deepcopy(base)
+        candidate["edges"].remove(list(removed))
+        observed = expected_closures(candidate)
+        src, _, _ = removed
+        for node in base["node_types"]:
+            if src not in baseline[node] and observed[node] != baseline[node]:
+                fail("edge removal escaped its affected ancestor closure", "CP-COMP-DAG-CLOSURE")
+
+    # Monotonicity: removing dependencies cannot introduce new reachable nodes.
+    for edge in edges:
+        candidate = copy.deepcopy(base)
+        candidate["edges"].remove(list(edge))
+        observed = expected_closures(candidate)
+        for node in base["node_types"]:
+            if not set(observed[node]).issubset(set(baseline[node])):
+                fail("edge removal increased closure", "CP-COMP-DAG-CLOSURE")
+
+    # Compositionality: sequential removal of two edges must equal batch removal
+    # in either order.
+    pairs = [(CLOSURE_EDGE_MUTATIONS[0], CLOSURE_EDGE_MUTATIONS[1]),
+             (CLOSURE_EDGE_MUTATIONS[2], CLOSURE_EDGE_MUTATIONS[4])]
+    for left, right in pairs:
+        candidate_a = copy.deepcopy(base)
+        candidate_a["edges"].remove(list(left[1]))
+        candidate_a["edges"].remove(list(right[1]))
+        batch = expected_closures(candidate_a)
+
+        for first, second in ((left, right), (right, left)):
+            candidate_b = copy.deepcopy(base)
+            candidate_b["edges"].remove(list(first[1]))
+            candidate_b["edges"].remove(list(second[1]))
+            sequential = expected_closures(candidate_b)
+            if sequential != batch:
+                fail("closure composition is order-dependent", "CP-COMP-DAG-CLOSURE")
+
+def validate_edge_closure_sensitivity(base):
+    """Representative dependency edges contribute their reachable target closures."""
+    baseline = expected_closures(base)
+    for mutation_id, edge in CLOSURE_EDGE_MUTATIONS:
+        candidate = copy.deepcopy(base)
+        candidate["edges"].remove(list(edge))
+        observed = expected_closures(candidate)
+        src, _, dst = edge
+        affected = tuple(n for n in base["node_types"] if n in baseline[src] and n not in observed[src])
+        expected_removed = tuple(n for n in baseline[src] if n in baseline[dst])
+        if affected != expected_removed:
+            fail(f"{mutation_id} changed unexpected closure", "CP-COMP-DAG-CLOSURE")
+
+MUTATIONS = (
+    ("remove-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].remove(["model", "executes_with", "runtime"])),
+    ("reverse-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["runtime", "executes_with", "model"])),
+    ("duplicate-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].append(["model", "executes_with", "runtime"])),
+    ("change-edge-type", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "requires", "runtime"])),
+    ("rename-node", "CP-COMP-DAG-TYPING", lambda g: g["node_types"].__setitem__(2, "model_v2")),
+    ("add-graph-field", "CP-COMP-DAG-SCHEMA", lambda g: g.__setitem__("unexpected", True)),
+    ("malformed-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with"])),
+    ("dangling-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with", "missing"])),
+    ("duplicate-node", "CP-COMP-DAG-SCHEMA", lambda g: g["node_types"].append("model")),
+    ("add-cycle", "CP-COMP-DAG-ACYCLIC", lambda g: g["edges"].append(["disposition", "derives", "model"])),
+    ("invalid-source-for-edge-type", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["runtime", "executes_with", "runtime"])),
+    ("invalid-target-for-edge-type", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["model", "executes_with", "toolchain"])),
+)
+
+def validate_mutation_manifest():
+    try:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    except Exception as exc:
+        fail(f"cannot load mutation manifest: {exc}", "CP-COMP-DAG-MUTATION")
+    if set(manifest) != {"schema", "mutations"} or manifest["schema"] != "cp-04-compute-evidence-dag-mutation-manifest-v1-1":
+        fail("mutation manifest schema mismatch", "CP-COMP-DAG-MUTATION")
+    expected = [{"mutation_id": label, "expected_guard_id": guard} for label, guard, _ in MUTATIONS]
+    if manifest["mutations"] != expected:
+        fail("mutation manifest does not exactly bind executable mutation suite", "CP-COMP-DAG-MUTATION")
+    return digest(manifest)
+
+def validate(g):
+    validate_shape(g)
+    validate_acyclic(g)
+    closures = expected_closures(g)
+    if set(closures) != set(EXPECTED_CLOSURE_ORACLE):
+        fail("closure oracle does not cover every declared node", "CP-COMP-DAG-CLOSURE")
+    for node in EXPECTED_NODES:
+        if closures[node] != EXPECTED_CLOSURE_ORACLE[node]:
+            fail(f"downstream invalidation closure mismatch for {node}", "CP-COMP-DAG-CLOSURE")
+
+def replay_identity(g):
+    return digest(g)
+
+def run_mutations(base):
+    results = []
+    for label, guard, mutate in MUTATIONS:
+        candidate = copy.deepcopy(base)
+        mutate(candidate)
+        rejected = False
+        try:
+            validate(candidate)
+        except AssertionError as exc:
+            rejected = guard in str(exc)
+        if not rejected:
+            fail(f"mutation {label} escaped expected guard {guard}", "CP-COMP-DAG-MUTATION")
+        results.append({"mutation_id": label, "guard_id": guard, "rejected": True})
+    return results
+
+def main():
+    source_audit()
+    manifest_identity = validate_mutation_manifest()
+    graph = load()
+    validate(graph)
+
+    identity = graph_identity(graph)
+    equivalent = copy.deepcopy(graph)
+    if graph_identity(equivalent) != identity:
+        fail("equivalent graph changed identity", "CP-COMP-DAG-IDENTITY")
+
+    changed_type = copy.deepcopy(graph)
+    changed_type["edges"][3][1] = "requires"
+    if graph_identity(changed_type) == identity:
+        fail("edge-type mutation did not change graph identity", "CP-COMP-DAG-IDENTITY")
+
+    disposition_only = copy.deepcopy(graph)
+    # Derived disposition is not an input node value in this fixture; an external
+    # disposition annotation therefore cannot alter the dependency graph identity.
+    disposition_only["derived_disposition"] = "CurrentAndApplicable"
+    if graph_identity(disposition_only) == identity:
+        # This check documents the intentional boundary: graph identity ignores
+        # derived output annotations.
+        pass
+    else:
+        fail("derived disposition altered immutable graph identity", "CP-COMP-DAG-INVARIANT")
+
+    validate_closure_algebra(graph)
+    validate_edge_closure_sensitivity(graph)
+    results = run_mutations(graph)
+    receipt = {
+        "schema": "cp-04-compute-evidence-dag-qualification-receipt-v1-1",
+        "graph_identity": identity,
+        "mutation_manifest_identity": manifest_identity,
+        "mutation_results": results,
+        "claim_ceiling": CLAIM_CEILING,
+        "physical_execution_authority": False,
+    }
+    receipt["receipt_sha256"] = digest({k: v for k, v in receipt.items() if k != "receipt_sha256"})
+    print("PASS"
+          f" schema={SCHEMA}"
+          f" graph_identity={identity}"
+          f" mutations={len(results)}"
+          f" receipt_sha256={receipt['receipt_sha256']}")
+
+if __name__ == "__main__":
+    main()
