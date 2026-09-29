@@ -7,7 +7,42 @@
 //! units from crossing realization/authorization boundaries, and to preserve the
 //! difference between current, future-dated, expired, static, and unknown evidence.
 
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
+
+/// Runtime-owned wall-clock observation used for authoritative admission.
+///
+/// The constructor is crate-private so external callers cannot manufacture an
+/// authoritative evaluation timestamp. Deterministic construction remains an
+/// internal qualification seam, while production code samples the OS wall clock
+/// at the admission boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct AuthoritativeEvaluationV1 {
+    evaluated_at: UnixMillisV1,
+}
+
+impl AuthoritativeEvaluationV1 {
+    pub(crate) fn sample_from_system_clock() -> Result<Self, NixTimeErrorV1> {
+        let duration = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| NixTimeErrorV1::SystemClockBeforeUnixEpoch)?;
+        let millis = duration
+            .as_millis()
+            .try_into()
+            .map_err(|_| NixTimeErrorV1::ConversionOverflow)?;
+        Ok(Self {
+            evaluated_at: UnixMillisV1::new(millis),
+        })
+    }
+
+    pub(crate) const fn from_unix_millis_for_test(evaluated_at: UnixMillisV1) -> Self {
+        Self { evaluated_at }
+    }
+
+    pub(crate) const fn evaluated_at(self) -> UnixMillisV1 {
+        self.evaluated_at
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UnixMillisV1(u64);
@@ -181,6 +216,8 @@ pub enum NixTimeErrorV1 {
     ConversionOverflow,
     #[error("millisecond timestamp is not an exact whole-second value")]
     NotExactSeconds,
+    #[error("system clock is before the Unix epoch")]
+    SystemClockBeforeUnixEpoch,
 }
 
 #[cfg(test)]
