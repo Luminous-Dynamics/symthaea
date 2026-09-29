@@ -374,11 +374,8 @@ impl EnhancedKnowledgeGraph {
     /// Record a typed provenance relation without changing either endpoint's confidence.
     pub fn record_provenance_relation(&mut self, relation: ProvenanceRelation) -> Result<bool, &'static str> {
         relation.validate()?;
-        let source_exists = self.facts.values().any(|f| f.memory_id == relation.source_memory_id);
-        let target_exists = self.facts.values().any(|f| f.memory_id == relation.target_memory_id);
-        if !source_exists || !target_exists {
-            return Err("provenance relation endpoints must exist");
-        }
+        // Endpoint memories may have been evicted from the local cognitive projection;
+        // provenance history must remain referentially stable rather than being erased by eviction.
         if matches!(relation.kind, ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom)
             && self.lineage_would_cycle(&relation.source_memory_id, &relation.target_memory_id)
         {
@@ -1052,6 +1049,19 @@ mod tests {
         assert_eq!(graph.record_provenance_relation(relation).unwrap(), false);
         assert_eq!(graph.provenance_relations().len(), 1);
         assert_eq!(graph.get_fact(b).unwrap().confidence, before);
+    }
+
+    #[test]
+    fn test_provenance_relation_survives_local_eviction_boundary() {
+        let mut graph = EnhancedKnowledgeGraph::new(1);
+        let (a, _) = graph.insert(make_encoding("source", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("replacement", 0.7), 2, None, false);
+        let a_id = graph.provenance(a).map(|p| p.memory_id);
+        let b_id = graph.provenance(b).unwrap().memory_id;
+        let historical_id = a_id.unwrap_or_else(|| "evicted-memory".into());
+        let relation = ProvenanceRelation { source_memory_id: b_id, target_memory_id: historical_id, kind: ProvenanceRelationKind::RevisedFrom, created_at: "cycle:2".into() };
+        assert!(graph.record_provenance_relation(relation).is_ok());
+        assert_eq!(graph.provenance_relations().len(), 1);
     }
 
     #[test]
