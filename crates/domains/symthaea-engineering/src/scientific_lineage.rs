@@ -45,6 +45,14 @@ impl ScientificLineageGraph {
         self.relations.iter().filter(move |r| r.kind == kind)
     }
 
+    /// Build an immutable, validated qualification projection.
+    pub fn qualification_projection(&self) -> Result<QualificationProjection, QualificationCycle> {
+        self.validate_qualification_acyclic()?;
+        let mut relations: Vec<EngineeringRelation> = self.qualification_relations().cloned().collect();
+        relations.sort_by(|a, b| a.relation_digest().cmp(&b.relation_digest()));
+        Ok(QualificationProjection { relations, authority_ceiling: AuthorityCeiling::SyntheticQualification })
+    }
+
     /// Project the graph to qualification-admissible relations.
     ///
     /// This is a semantic boundary, not a copy of the full DKG: epistemic
@@ -135,6 +143,59 @@ impl ScientificLineageGraph {
 
         use sha2::{Digest, Sha256};
         Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    }
+}
+
+/// Explicit ceiling carried by every qualification projection.
+///
+/// This prevents a projection artifact from being interpreted as operational
+/// authority or physical-performance evidence.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthorityCeiling {
+    SyntheticQualification,
+}
+
+/// Immutable deterministic projection consumed by downstream qualification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QualificationProjection {
+    relations: Vec<EngineeringRelation>,
+    authority_ceiling: AuthorityCeiling,
+}
+
+impl QualificationProjection {
+    pub fn relations(&self) -> impl Iterator<Item = &EngineeringRelation> {
+        self.relations.iter()
+    }
+
+    pub const fn authority_ceiling(&self) -> AuthorityCeiling {
+        self.authority_ceiling
+    }
+
+    /// Stable replay identity for the bounded qualification projection.
+    pub fn projection_digest(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"symthaea.qualification-projection.v1");
+        bytes.extend_from_slice(b"synthetic-qualification");
+        for relation in &self.relations {
+            bytes.extend_from_slice(relation.relation_digest().as_bytes());
+            bytes.push(0);
+        }
+        Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    pub fn closure(&self, source: &EngineeringObjectId) -> BTreeSet<EngineeringObjectId> {
+        let mut closure = BTreeSet::new();
+        let mut queue = VecDeque::from([source.clone()]);
+        while let Some(current) = queue.pop_front() {
+            if !closure.insert(current.clone()) { continue; }
+            for relation in &self.relations {
+                if relation.source == current && !closure.contains(&relation.target) {
+                    queue.push_back(relation.target.clone());
+                }
+            }
+        }
+        closure
     }
 }
 
@@ -238,6 +299,9 @@ mod tests {
     #[test]
     fn qualification_projection_is_acyclic_for_scientific_fixture() {
         assert!(fixture().validate_qualification_acyclic().is_ok());
+        let projection = fixture().qualification_projection().unwrap();
+        assert_eq!(projection.authority_ceiling(), AuthorityCeiling::SyntheticQualification);
+        assert_eq!(projection.relations().count(), 7);
     }
 
     #[test]
@@ -267,6 +331,33 @@ mod tests {
 
         let err = graph.validate_qualification_acyclic().unwrap_err();
         assert!(err.visited_count < err.node_count);
+    }
+
+    #[test]
+    fn projection_digest_is_deterministic_and_excludes_epistemic_edges() {
+        let graph = fixture();
+        let projection = graph.qualification_projection().unwrap();
+        assert_eq!(projection.projection_digest(), graph.qualification_projection().unwrap().projection_digest());
+        assert!(projection.relations().all(|r| r.kind != EngineeringRelationKind::Supports && r.kind != EngineeringRelationKind::Contradicts));
+    }
+
+    #[test]
+    fn projection_closure_matches_graph_qualification_closure() {
+        let graph = fixture();
+        let simulation = object("simulation", "thermal-run", A);
+        let projection = graph.qualification_projection().unwrap();
+        assert_eq!(projection.closure(&simulation), graph.qualification_closure(&simulation));
+    }
+
+    #[test]
+    fn adding_epistemic_evidence_does_not_change_projection_identity() {
+        let prediction = object("prediction", "p", A);
+        let claim = object("scientific_claim", "c", B);
+        let mut graph = ScientificLineageGraph::new();
+        graph.add_relation(rel(&prediction, &claim, EngineeringRelationKind::Supports));
+        let before = graph.qualification_projection().unwrap().projection_digest();
+        graph.add_relation(rel(&claim, &prediction, EngineeringRelationKind::Contradicts));
+        assert_eq!(before, graph.qualification_projection().unwrap().projection_digest());
     }
 
     #[test]
