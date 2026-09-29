@@ -342,7 +342,7 @@ pub fn assess_anchor_geometry(
     }
     let latitude_delta = (terrain.latitude_rad - anchor.latitude_rad).abs();
     let raw_longitude_delta = (terrain.longitude_rad - anchor.longitude_rad).abs();
-    let longitude_delta = raw_longitude_delta.min(2.0 * PI - raw_longitude_delta);
+    let longitude_delta = ((raw_longitude_delta + PI).rem_euclid(2.0 * PI) - PI).abs();
     if latitude_delta > 1.0e-8 || longitude_delta > 1.0e-8 {
         return AnchorGeometryAssessment {
             state: FeasibilityState::InsufficientEvidence,
