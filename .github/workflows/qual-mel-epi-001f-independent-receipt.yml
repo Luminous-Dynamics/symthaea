@@ -342,8 +342,8 @@ jobs:
                 verified: workflowContractVerified,
               },
               observer_context: {
-                run_id: context.runId,
-                run_attempt: context.runAttempt,
+                run_id: Number(process.env.GITHUB_RUN_ID),
+                run_attempt: Number(process.env.GITHUB_RUN_ATTEMPT),
                 workflow_sha: observerWorkflowSha,
                 workflow_ref: observerWorkflowRef,
                 workflow_file_path: expectedObserverWorkflowPath,
