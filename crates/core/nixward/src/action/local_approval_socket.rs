@@ -236,7 +236,7 @@ impl LocalApprovalSocketServerV1 {
         )?;
         let request: LocalApprovalWireRequestV1 = read_json_frame_v1(&mut stream)?;
         request.validate_protocol()?;
-        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(evaluated_at))
+        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, evaluation)
     }
 
     fn consume_and_ack_v1(
