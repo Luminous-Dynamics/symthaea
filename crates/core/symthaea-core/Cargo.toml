@@ -113,6 +113,10 @@ path = "examples/cross_domain_query.rs"
 name = "hdc_ltc_resolution_matrix"
 path = "examples/hdc_ltc_resolution_matrix.rs"
 
+[[example]]
+name = "hdc_ltc_resolution_trajectory_matrix"
+path = "examples/hdc_ltc_resolution_trajectory_matrix.rs"
+
 # scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
 [[example]]
 name = "scaling_study_demo"
