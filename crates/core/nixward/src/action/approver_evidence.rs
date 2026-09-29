@@ -45,6 +45,78 @@ pub struct ApproverEvidenceRefV1 {
     pub evidence_digest: String,
 }
 
+/// Typed policy profile required by a pending approval request.
+///
+/// This is a requirement, not proof that the requirement has been satisfied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequiredApprovalProfileV1 {
+    SameUidProcessV1,
+    LocalOperatorGroupV1,
+    PolkitAuthorizedOperatorV1,
+    XeniaAuthenticatedOperatorV1,
+    XeniaStateBoundPermitV1,
+}
+
+impl RequiredApprovalProfileV1 {
+    pub(crate) fn parse_ref(value: &str) -> Result<Self, ApproverEvidenceErrorV1> {
+        match value {
+            "same-uid-process-v1" => Ok(Self::SameUidProcessV1),
+            "local-operator-group-v1" => Ok(Self::LocalOperatorGroupV1),
+            "polkit-authorized-operator-v1" => Ok(Self::PolkitAuthorizedOperatorV1),
+            "xenia-authenticated-operator-v1" => Ok(Self::XeniaAuthenticatedOperatorV1),
+            "xenia-state-bound-permit-v1" => Ok(Self::XeniaStateBoundPermitV1),
+            _ => Err(ApproverEvidenceErrorV1::UnknownRequiredApprovalProfile),
+        }
+    }
+}
+
+/// The profile actually established by a verified evidence boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerifiedApproverEvidenceProfileV1 {
+    SameUidProcessV1,
+    XeniaAuthenticatedOperatorV1,
+    XeniaStateBoundPermitV1,
+}
+
+impl VerifiedApproverEvidenceProfileV1 {
+    fn from_reference(
+        reference: &ApproverEvidenceRefV1,
+    ) -> Result<Self, ApproverEvidenceErrorV1> {
+        match reference.profile {
+            ApproverEvidenceProfileV1::LocalUnixPeerCredentialV1 => {
+                Ok(Self::SameUidProcessV1)
+            }
+            ApproverEvidenceProfileV1::XeniaAuthenticatedPrincipalV1 => {
+                Ok(Self::XeniaAuthenticatedOperatorV1)
+            }
+            ApproverEvidenceProfileV1::XeniaStateBoundPermitV1 => {
+                Ok(Self::XeniaStateBoundPermitV1)
+            }
+        }
+    }
+}
+
+/// Explicit policy compatibility. A proof is never upgraded merely because a
+/// weaker evidence profile is available.
+pub(crate) fn required_profile_accepts_evidence_v1(
+    required: RequiredApprovalProfileV1,
+    evidence: VerifiedApproverEvidenceProfileV1,
+) -> bool {
+    matches!(
+        (required, evidence),
+        (
+            RequiredApprovalProfileV1::SameUidProcessV1,
+            VerifiedApproverEvidenceProfileV1::SameUidProcessV1
+        ) | (
+            RequiredApprovalProfileV1::XeniaAuthenticatedOperatorV1,
+            VerifiedApproverEvidenceProfileV1::XeniaAuthenticatedOperatorV1
+        ) | (
+            RequiredApprovalProfileV1::XeniaStateBoundPermitV1,
+            VerifiedApproverEvidenceProfileV1::XeniaStateBoundPermitV1
+        )
+    )
+}
+
 impl ApproverEvidenceRefV1 {
     pub fn validate_shape(&self) -> Result<(), ApproverEvidenceErrorV1> {
         validate_digest(&self.evidence_digest, "approver evidence digest")
@@ -209,6 +281,8 @@ pub enum ApproverEvidenceErrorV1 {
     InvalidProcessId,
     #[error("external evidence helper requires a Xenia evidence profile")]
     WrongExternalProfile,
+    #[error("unknown required approval profile")]
+    UnknownRequiredApprovalProfile,
 }
 
 fn validate_ref(value: &str, field: &'static str) -> Result<(), ApproverEvidenceErrorV1> {
