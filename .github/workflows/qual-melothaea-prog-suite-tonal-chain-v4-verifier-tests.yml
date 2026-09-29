@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests-${{ github.event.pull_request.number || github.ref }}
@@ -28,6 +29,68 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Run GitHub execution evidence validator self-test
+        shell: bash
+        run: python3 .github/qualification/verify-melothaea-github-execution-v1.py --self-test
+
       - name: Run adversarial verifier tests
         shell: bash
         run: python3 .github/qualification/test-melothaea-prog-suite-tonal-chain-receipt-v4.py
+
+      - name: Capture GitHub execution evidence from Actions API
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}" \
+            > /tmp/mel-run.json
+          gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs" \
+            > /tmp/mel-jobs.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          run = json.loads(Path("/tmp/mel-run.json").read_text())
+          jobs = json.loads(Path("/tmp/mel-jobs.json").read_text())["jobs"]
+          matches = [j for j in jobs if j["name"] == "Fail-closed receipt verifier mutation suite"]
+          if len(matches) != 1:
+              raise SystemExit(f"expected exactly one verifier job, found {len(matches)}")
+          job = matches[0]
+          steps = [s for s in job.get("steps", []) if s["name"] == "Run adversarial verifier tests"]
+          if len(steps) != 1:
+              raise SystemExit(f"expected exactly one adversarial test step, found {len(steps)}")
+          step = steps[0]
+          evidence = {
+              "repository": run["repository"]["full_name"],
+              "workflow_id": run["workflow_id"],
+              "workflow_path": ".github/workflows/qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests.yml",
+              "run_id": run["id"],
+              "run_attempt": run["run_attempt"],
+              "run_status": run["status"],
+              "run_conclusion": run.get("conclusion"),
+              "run_head_sha": run["head_sha"],
+              "job_run_id": job["run_id"],
+              "job_name": job["name"],
+              "job_status": job["status"],
+              "job_conclusion": job.get("conclusion"),
+              "job_head_sha": job["head_sha"],
+              "required_step": step["name"],
+              "required_step_status": step["status"],
+              "required_step_conclusion": step.get("conclusion"),
+          }
+          Path("/tmp/mel-execution-evidence.json").write_text(
+              json.dumps(evidence, sort_keys=True, indent=2) + "\n"
+          )
+          PY
+          cat /tmp/mel-execution-evidence.json
+
+      - name: Verify captured GitHub execution identity
+        shell: bash
+        run: |
+          python3 .github/qualification/verify-melothaea-github-execution-v1.py \
+            --evidence /tmp/mel-execution-evidence.json \
+            --head-sha "${GITHUB_SHA}" \
+            --allow-running
+          echo "NOTE: in-job execution identity is not a completed qualification PASS."
