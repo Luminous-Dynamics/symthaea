@@ -6,7 +6,7 @@
 //! returning a `VerifiedRetrievalReceipt`.
 
 use crate::{
-    retrieve, MemoryRetrievalCandidate, MemoryRetrievalRequest, MemoryRetrievalReceipt,
+    try_retrieve, MemoryRetrievalCandidate, MemoryRetrievalRequest, MemoryRetrievalReceipt,
     ReceiptVerificationError, RetrievalRequestError, RetrievedMemory, VerifiedRetrievalReceipt,
 };
 
@@ -117,7 +117,7 @@ impl RetrievalEngine {
         request: &MemoryRetrievalRequest,
         candidates: impl IntoIterator<Item = MemoryRetrievalCandidate>,
     ) -> Result<VerifiedRetrievalExecution, RetrievalExecutionError> {
-        let (groups, receipt) = retrieve(request, candidates);
+        let (groups, receipt) = try_retrieve(request, candidates)?;
         let receipt = receipt.with_retrieval_profile_versions(self.profile.receipt_versions());
         let receipt = receipt.verify().map_err(RetrievalExecutionError::ReceiptIntegrity)?;
         Ok(VerifiedRetrievalExecution {
