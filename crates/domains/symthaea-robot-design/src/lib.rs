@@ -2459,6 +2459,47 @@ mod tests {
     }
 
     #[test]
+    fn maximum_boundary_candidate_transcripts_match_across_representations() {
+        let id = ParameterIdV1::new("length").unwrap();
+        let max = u64::MAX;
+        let values_domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(max - 1).unwrap(),
+                    C0LengthUmV1::new(max).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+        let range_domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: id.clone(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(max - 1).unwrap(),
+                    upper: C0LengthUmV1::new(max).unwrap(),
+                    step_um: 1,
+                },
+            },
+        ])
+        .unwrap();
+
+        let values_candidates = values_domain.enumerate().unwrap();
+        let range_candidates = range_domain.enumerate().unwrap();
+
+        assert_eq!(values_candidates.len(), range_candidates.len());
+        for (values_candidate, range_candidate) in
+            values_candidates.iter().zip(range_candidates.iter())
+        {
+            assert_eq!(
+                values_candidate.canonical_transcript().unwrap(),
+                range_candidate.canonical_transcript().unwrap()
+            );
+            assert_eq!(values_candidate.id().unwrap(), range_candidate.id().unwrap());
+        }
+    }
+
+    #[test]
     fn range_enumeration_reaches_u64_max_without_wraparound() {
         let id = ParameterIdV1::new("length").unwrap();
         let max = u64::MAX;
