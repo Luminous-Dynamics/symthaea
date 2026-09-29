@@ -12,6 +12,7 @@ on:
       - "crates/domains/symthaea-engineering/src/engineering_relation.rs"
       - "crates/domains/symthaea-engineering/src/scientific_lineage.rs"
       - "crates/domains/symthaea-engineering/Cargo.toml"
+      - "crates/domains/symthaea-engineering/tests/cp04_digest_boundaries.rs"
   workflow_dispatch:
 
 permissions:
