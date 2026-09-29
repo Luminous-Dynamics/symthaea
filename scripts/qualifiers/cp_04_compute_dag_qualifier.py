@@ -52,6 +52,25 @@ EXPECTED_TYPES = (
     "traces_to", "currentness_for", "applicable_to", "derives",
 )
 
+EXPECTED_CLOSURE_ORACLE = {
+    "requirement": ("requirement", "representation", "model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "representation": ("representation", "model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "model": ("model", "model_parameters", "runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "model_parameters": ("model_parameters",),
+    "runtime": ("runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "toolchain": ("toolchain",),
+    "accelerator": ("accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "deployment_artifact": ("deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "execution_context": ("execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "observation": ("observation", "uncertainty", "statistics", "provenance_reference", "disposition"),
+    "uncertainty": ("uncertainty",),
+    "statistics": ("statistics", "disposition"),
+    "provenance_reference": ("provenance_reference",),
+    "currentness": ("runtime", "toolchain", "accelerator", "deployment_artifact", "execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "currentness", "disposition"),
+    "applicability": ("execution_context", "observation", "uncertainty", "statistics", "provenance_reference", "applicability", "disposition"),
+    "disposition": ("disposition",),
+}
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
 
@@ -188,20 +207,11 @@ def validate(g):
     validate_shape(g)
     validate_acyclic(g)
     closures = expected_closures(g)
-    if "deployment_artifact" not in closures["accelerator"] or "model" in closures["deployment_artifact"]:
-        fail("deployment closure escaped its dependency boundary", "CP-COMP-DAG-CLOSURE")
-    if closures["runtime"] != (
-        "runtime", "toolchain", "accelerator", "deployment_artifact",
-        "execution_context", "observation", "uncertainty", "statistics",
-        "provenance_reference", "disposition",
-    ):
-        fail("runtime closure does not match typed dependency semantics", "CP-COMP-DAG-CLOSURE")
-    if "provenance_reference" not in closures["observation"]:
-        fail("observation lost provenance dependency", "CP-COMP-DAG-CLOSURE")
-    if "disposition" not in closures["statistics"]:
-        fail("statistics lost disposition dependency", "CP-COMP-DAG-CLOSURE")
-    if "execution_context" not in closures["applicability"]:
-        fail("applicability boundary missing", "CP-COMP-DAG-CLOSURE")
+    if set(closures) != set(EXPECTED_CLOSURE_ORACLE):
+        fail("closure oracle does not cover every declared node", "CP-COMP-DAG-CLOSURE")
+    for node in EXPECTED_NODES:
+        if closures[node] != EXPECTED_CLOSURE_ORACLE[node]:
+            fail(f"downstream invalidation closure mismatch for {node}", "CP-COMP-DAG-CLOSURE")
 
 def replay_identity(g):
     return digest(g)
