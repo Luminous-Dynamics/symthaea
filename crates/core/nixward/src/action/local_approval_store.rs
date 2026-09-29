@@ -148,6 +148,31 @@ impl LocalApprovalRequestStoreV1 {
             .contains_key(request_id))
     }
 
+    /// Observe whether a request is pending and unexpired at one instant.
+    ///
+    /// This is a non-authoritative snapshot. It does not reserve or consume the
+    /// request and must not be used as execution admission.
+    pub fn observe_currentness(
+        &self,
+        request_id: &str,
+        now: UnixMillisV1,
+    ) -> Result<PendingRequestCurrentnessV1, LocalApprovalRequestStoreErrorV1> {
+        let pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+        let request = match pending.get(request_id) {
+            Some(request) => request,
+            None => return Ok(PendingRequestCurrentnessV1::NotPending),
+        };
+
+        if now.as_u64() >= request.expires_at_unix_ms {
+            Ok(PendingRequestCurrentnessV1::Expired)
+        } else {
+            Ok(PendingRequestCurrentnessV1::Current)
+        }
+    }
+
     /// Observe whether a request is current at one caller-supplied wall-clock instant.
     ///
     /// This is deliberately an observation, not a reservation or execution grant.
@@ -189,6 +214,14 @@ impl std::fmt::Debug for LocalApprovalRequestStoreV1 {
 pub struct PendingRequestInstallV1 {
     pub request_id: String,
     pub superseded_request_ids: Vec<String>,
+}
+
+/// Non-authoritative snapshot of live pending-request currentness.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PendingRequestCurrentnessV1 {
+    Current,
+    Expired,
+    NotPending,
 }
 
 /// Non-authoritative snapshot of a request's live-store currentness.
