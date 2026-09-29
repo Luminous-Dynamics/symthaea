@@ -361,7 +361,7 @@ mod tests {
             &intent(),
             store.daemon_incarnation_ref().to_string(),
             "nixos-rebuild switch --flake .#workstation",
-            "local-human-v1",
+            "same-uid-process-v1",
             ms(1_000),
             ms(2_000),
             [nonce_byte; 32],
