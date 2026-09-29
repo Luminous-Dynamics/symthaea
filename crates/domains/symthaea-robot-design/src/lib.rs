@@ -1856,6 +1856,38 @@ mod tests {
     }
 
     #[test]
+    fn search_domain_identity_commits_to_domain_representation() {
+        let id = ParameterIdV1::new("section_width").unwrap();
+        let values = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id: id.clone(),
+            domain: ExactLengthDomainV1::Values(vec![
+                C0LengthUmV1::new(20_000).unwrap(),
+                C0LengthUmV1::new(21_000).unwrap(),
+                C0LengthUmV1::new(22_000).unwrap(),
+            ]),
+        }])
+        .unwrap();
+        let range = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id,
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(20_000).unwrap(),
+                upper: C0LengthUmV1::new(22_000).unwrap(),
+                step_um: 1_000,
+            },
+        }])
+        .unwrap();
+
+        let values_candidates = values.enumerate().unwrap();
+        let range_candidates = range.enumerate().unwrap();
+        assert_eq!(
+            values_candidates.iter().map(|set| set.id().unwrap()).collect::<Vec<_>>(),
+            range_candidates.iter().map(|set| set.id().unwrap()).collect::<Vec<_>>()
+        );
+        assert_ne!(values.id().unwrap(), range.id().unwrap());
+        assert_ne!(values.canonical_transcript().unwrap(), range.canonical_transcript().unwrap());
+    }
+
+    #[test]
     fn mixed_values_and_range_enumeration_is_lexicographic_by_canonical_parameter_order() {
         let domain = ExactDesignSearchDomainV1::new(vec![
             ExactDesignParameterDomainV1 {
@@ -2351,6 +2383,29 @@ mod tests {
             r#"{"schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Range":{"lower":20000,"upper":22001,"step_um":1000}}}]}"#,
         );
         assert!(non_terminating.is_err());
+    }
+
+    #[test]
+    fn exact_search_domain_serde_rejects_invalid_boundary_fields() {
+        let invalid_id: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{ "schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"bad id","domain":{"Values":[20000]}}]}"#,
+        );
+        assert!(invalid_id.is_err());
+
+        let empty_values: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{ "schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Values":[]}}]}"#,
+        );
+        assert!(empty_values.is_err());
+
+        let reversed_range: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{ "schema_id":"symthaea.robot-design.search-domain.v1","schema_version":1,"parameters":[{"id":"section_width","domain":{"Range":{"lower":22000,"upper":20000,"step_um":1000}}}]}"#,
+        );
+        assert!(reversed_range.is_err());
+
+        let wrong_schema: Result<ExactDesignSearchDomainV1, _> = serde_json::from_str(
+            r#"{ "schema_id":"other","schema_version":1,"parameters":[{"id":"section_width","domain":{"Values":[20000]}}]}"#,
+        );
+        assert!(wrong_schema.is_err());
     }
 
     #[test]
