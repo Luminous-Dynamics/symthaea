@@ -37,7 +37,7 @@ pub use engineering_relation::{EngineeringRelation, EngineeringRelationKind, Rel
 pub mod scientific_lineage;
 pub use scientific_lineage::{
     AuthorityCeiling, QualificationProjection, QualificationProjectionError,
-    ScientificLineageGraph, QUALIFICATION_POLICY, QUALIFICATION_PROJECTION_SCHEMA,
+    ScientificLineageGraph, QUALIFICATION_POLICY, QUALIFICATION_PROJECTION_SCHEMA, QUALIFICATION_PROJECTION_ARTIFACT_SCHEMA,
 };
 
 /// Debug-friendly wrapper for the fabrication autonomy loop.
