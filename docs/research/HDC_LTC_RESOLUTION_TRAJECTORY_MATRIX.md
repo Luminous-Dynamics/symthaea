@@ -12,7 +12,7 @@ This matrix is the empirical companion to #6531, #6536, #6541, #6560, and #6561.
 
 1K, 2K, 4K, 8K, 16K, 32K, 64K.
 
-Every strict source -> target transition is evaluated, plus same-dimension identity controls.
+Every strict source -> target transition is evaluated: 7 × 6 = 42 directed transitions, plus same-dimension identity controls.
 
 ## Experimental arms
 
@@ -32,6 +32,16 @@ Every strict source -> target transition is evaluated, plus same-dimension ident
 - binding equivariance error
 - permutation equivariance error
 - bundle distortion
+
+### Operator preservation
+
+For every directed transition, the legacy `ContinuousHV::dilate` baseline is characterized for:
+- binding equivariance: `P(a⊗b)` vs `P(a)⊗P(b)`
+- bundle equivariance: `P(bundle(a,b,c))` vs `bundle(P(a),P(b),P(c))`
+- permutation equivariance: `P(ρ(a))` vs `ρ(P(a))`
+- round-trip hysteresis: `a` vs `P⁻¹(P(a))` where the existing dilation expansion is used as the return path
+
+These are characterization metrics, not acceptance thresholds. A small static representation error does not imply operator preservation.
 
 ### Liquid dynamics
 At each step:
@@ -110,7 +120,19 @@ If any component cannot be converted safely, the transition must fail closed or 
 5. Nested orthogonal bases.
 6. Learned/task-specific maps only after representation-neutral evidence.
 
-No candidate is production-safe merely because it minimizes static vector error.
+No candidate is production-safe merely because it minimizes static vector error. The candidate must survive the operator matrix and coupled trajectory tests.
+
+## Reference separation and ablations
+
+The matrix must distinguish:
+- evolve high-resolution then project
+- project then evolve
+- direct native low-resolution evolution
+- state-only conversion
+- state + learned-parameter conversion
+- full coupled conversion including dynamic/momentum state
+
+This prevents representation loss from being confused with low-dimensional model capacity or incomplete state conversion.
 
 ## Acceptance
 
