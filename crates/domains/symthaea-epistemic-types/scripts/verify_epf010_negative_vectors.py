@@ -71,6 +71,8 @@ def canonical_bytes(receipt):
     raw_profiles = receipt["retrieval_profile_versions"]
     if any(not profile for profile in raw_profiles):
         raise ValueError("EmptyRetrievalProfileVersion")
+    if any(not profile.strip() for profile in raw_profiles):
+        raise ValueError("WhitespaceOnlyRetrievalProfileVersion")
     profiles = sorted(raw_profiles)
     if len(profiles) != len(set(profiles)):
         raise ValueError("DuplicateRetrievalProfileVersion")
