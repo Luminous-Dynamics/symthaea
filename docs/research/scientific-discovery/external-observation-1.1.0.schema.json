@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "External Experimental Observation 1.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observation_id",
+    "execution_id",
+    "observer_id",
+    "institution_id",
+    "observed_at",
+    "disposition",
+    "commitment_event_id",
+    "criterion_generation",
+    "criterion_id",
+    "challenge_id",
+    "candidate_id",
+    "source_candidate_id",
+    "test_specification_id",
+    "measurement_specification_id",
+    "binding_digest",
+    "observation_digest",
+    "record_digest"
+  ],
+  "properties": {
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "institution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observed_at": {
+      "type": "string",
+      "pattern": "^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}Z$"
+    },
+    "disposition": {
+      "enum": [
+        "reported",
+        "failed",
+        "null_result",
+        "contradictory",
+        "inconclusive"
+      ]
+    },
+    "commitment_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "test_specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "measurement_specification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "binding_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "observation_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "record_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "challenge_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "criterion_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "criterion_generation": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "x-authority": "external_observation_ingress_only",
+  "x-non-equivalences": [
+    "observation is not independent assessment",
+    "observation is not replication",
+    "observation does not establish scientific truth",
+    "institution identity is asserted, not authenticated",
+    "ingress does not prove execution",
+    "negative, null, contradictory, and inconclusive outcomes are retained"
+  ],
+  "$id": "https://symthaea.org/schemas/scientific-discovery/external-observation-1.1.0.schema.json",
+  "x-lineage-binding": "challenge_id is copied from the verified prospective commitment challenge_id; criterion_generation is copied from criteria_generation; criterion_id is copied from mapping_generation. These fields are immutable members of the observation envelope.",
+  "x-digest-domain": "symthaea:external-experimental-observation:v2"
+}
