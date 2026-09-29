@@ -6,7 +6,7 @@
 
 use crate::{
     sha256_hex, ExcludedMemory, MemoryRetrievalReceipt, RetrievedMemory,
-    RetrievalMode,
+    RetrievalMode, VerifiedRetrievalReceipt,
 };
 
 const EVIDENCE_VIEW_DOMAIN: &[u8] = b"epistemic-evidence-view:v1\0";
@@ -73,6 +73,15 @@ fn put_float(out: &mut Vec<u8>, value: f64) -> Result<(), EvidenceViewError> {
 }
 
 impl EvidenceView {
+    /// Construct a reasoning-facing view only after explicit receipt verification.
+    pub fn from_verified_retrieval(
+        groups: &[RetrievedMemory],
+        receipt: &VerifiedRetrievalReceipt,
+    ) -> Result<Self, EvidenceViewError> {
+        Self::from_retrieval(groups, receipt.receipt())
+    }
+
+    /// Compatibility entry point; still validates receipt digest and content bindings.
     pub fn from_retrieval(
         groups: &[RetrievedMemory],
         receipt: &MemoryRetrievalReceipt,
@@ -193,7 +202,8 @@ mod tests {
     fn view_preserves_independent_families_without_assessing_them() {
         let (groups, receipt) = retrieve(&MemoryRetrievalRequest::historical("f:1", "q", 5),
             vec![candidate("claim:x", 0.7, "family:a"), candidate("claim:x", 0.6, "family:b")]);
-        let view = EvidenceView::from_retrieval(&groups, &receipt).unwrap();
+        let verified = receipt.verify().unwrap();
+        let view = EvidenceView::from_verified_retrieval(&groups, &verified).unwrap();
         assert_eq!(view.items.len(), 1);
         assert_eq!(view.items[0].representations.len(), 2);
         assert_eq!(view.items[0].representations.iter().filter_map(|r| r.provenance_family.as_deref()).collect::<Vec<_>>(), vec!["family:a", "family:b"]);
