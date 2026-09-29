@@ -155,3 +155,56 @@ This separation prevents a convenient local propagator from silently becoming an
 The recent Mars-Phobos elevator literature also reinforces the need to keep the architectures separate. A 2025 Acta Astronautica study models a Phobos-to-Mars tether around the Mars-Phobos L1 region using a planar elliptic restricted three-body problem. That is a different boundary-value problem from a surface-to-areosynchronous elevator and should be represented as a sibling architecture, not folded into the T0 surface solver.
 
 Material work likewise remains parameter-driven: reviews identify ultra-high specific strength and scalable production as central requirements, while climber-interface work highlights unresolved friction, shear, thermal, and anisotropy measurements. Those unknowns should remain explicit uncertainty fields rather than being replaced by a nominal graphene/GSL value.
+
+
+## T0.5 geometry kernel now implemented
+
+The analytic layer now includes a spherical Mars anchor and straight-line rotating tether geometry:
+
+`MarsAnchor -> ENU basis -> tether direction -> endpoint -> corotation velocity`.
+
+The coordinate contract is explicit:
+
+- latitude is areocentric;
+- longitude is positive east;
+- anchor elevation is above the reference spherical Mars radius;
+- azimuth is measured east of north;
+- elevation is measured above the local horizontal plane.
+
+A quadratic sphere-intersection diagnostic determines where a straight tether first reaches a specified Mars-centered radius. This gives us a clean bridge to the areosynchronous sphere without pretending that the tether is already a solved flexible structure.
+
+This is important for non-equatorial designs. Published non-equatorial elevator analysis explicitly models latitude-dependent taper/payload effects rather than treating an off-equator anchor as a simple translation of the equatorial solution. In particular, the literature reports reduced payload capacity with increasing anchorage latitude and increased deployment latitude range with higher tensile strength. citeturn0search5
+
+## Topography boundary is now clearer
+
+The surface geometry should not query a generic "Valles altitude" value. It should consume a terrain provider returning elevation plus uncertainty and provenance at the requested latitude/longitude.
+
+MOLA-derived Mars topography provides a suitable initial reference source. USGS describes a MOLA-based global DEM and reports approximately 100 m horizontal-position accuracy and about 1 m radial accuracy for the underlying points, while also documenting interpolation gaps and areoid uncertainty. citeturn0search2 NASA's current open-data catalog continues to expose the MOLA mission gridded records. citeturn0search4
+
+For Valles specifically, the USGS geologic map distinguishes the Noctis Labyrinthus plateau, the Valles Marineris province, and the eastern canyon province, reinforcing the architectural rule that "Valles Marineris" is a region containing materially different terrain and geology rather than one anchor site. citeturn0search1
+
+The next terrain interface should therefore return something like:
+
+`TerrainSample { elevation_m, elevation_uncertainty_m, slope_rad, roughness, geology_class, source_id, source_revision }`.
+
+No site-ranking function should consume this directly. It should feed constraint predicates and uncertainty bounds.
+
+## Ephemeris boundary confirmed
+
+JPL's planetary-satellite ephemeris service publishes SPK files intended for use with the NAIF SPICE toolkit, including Martian satellite ephemerides. citeturn0search6 NAIF explicitly states that SPICE is also used for engineering tasks. citeturn0search0
+
+This makes the intended T2/T3 interface:
+
+`EphemerisProvider(time, frame) -> BodyState(position, velocity, provenance)`.
+
+The tether kernel should remain agnostic about the particular SPICE kernel revision. Kernel identity and coverage interval become evidence fields.
+
+## Architectural consequence
+
+We now have three clean fidelity boundaries:
+
+1. **T0:** analytic Mars reference mechanics;
+2. **T0.5:** anchor/local-frame/straight-tether geometry;
+3. **T1+:** distributed mass, phase-aware ephemerides, flexible dynamics, environmental loads and operations.
+
+That ordering lets us test each layer independently instead of allowing a sophisticated simulator to conceal a coordinate or reference-frame error.
