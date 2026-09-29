@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn snapshot_ref_is_bound_when_present() {
         let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap()
-            .with_snapshot_ref("snapshot:2026-09-29T00:00:00Z").unwrap();
+            .with_snapshot_ref("2026-09-29T00:00:00Z").unwrap();
         let execution = RetrievalEngine::new(profile)
             .execute(&MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5), vec![candidate("claim:x")])
             .unwrap();
