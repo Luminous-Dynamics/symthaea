@@ -58,6 +58,46 @@ pub struct MemoryProvenance {
 
 impl MemoryProvenance {
     pub fn provenance_identity(&self) -> Option<&str> { self.provenance_family.as_deref() }
+
+    pub fn canonical_artifact(&self) -> Option<Result<CanonicalArtifactRef, RefValidationError>> {
+        self.canonical_artifact_ref.as_deref().map(CanonicalArtifactRef::try_from)
+    }
+
+    pub fn statement(&self) -> Option<Result<StatementRef, RefValidationError>> {
+        self.statement_ref.as_deref().map(StatementRef::try_from)
+    }
+
+    pub fn provenance_family_ref(&self) -> Option<Result<ProvenanceFamilyRef, RefValidationError>> {
+        self.provenance_family.as_deref().map(ProvenanceFamilyRef::try_from)
+    }
+
+    pub fn frontier(&self) -> Option<Result<FrontierRef, RefValidationError>> {
+        self.frontier_ref.as_deref().map(FrontierRef::try_from)
+    }
+
+    pub fn derivation(&self) -> Option<Result<DerivationRef, RefValidationError>> {
+        self.derivation_ref.as_deref().map(DerivationRef::try_from)
+    }
+
+    pub fn model(&self) -> Option<Result<ModelRef, RefValidationError>> {
+        self.model_ref.as_deref().map(ModelRef::try_from)
+    }
+
+    pub fn retrieval_index(&self) -> Option<Result<RetrievalIndexRef, RefValidationError>> {
+        self.retrieval_index_ref.as_deref().map(RetrievalIndexRef::try_from)
+    }
+
+    pub fn source_event_ref(&self) -> Option<Result<SourceEventRef, RefValidationError>> {
+        self.source_event.as_deref().map(SourceEventRef::try_from)
+    }
+
+    pub fn epistemic_state_ref(&self) -> Option<Result<EpistemicStateRef, RefValidationError>> {
+        self.epistemic_state.as_deref().map(EpistemicStateRef::try_from)
+    }
+
+    pub fn claim_ceiling_ref(&self) -> Option<Result<ClaimCeilingRef, RefValidationError>> {
+        self.claim_ceiling.as_deref().map(ClaimCeilingRef::try_from)
+    }
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
