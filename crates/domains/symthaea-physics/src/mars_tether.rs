@@ -186,7 +186,8 @@ impl RotatingTetherGeometry {
         Self {
             anchor_position_m: anchor_position,
             direction,
-            endpoint_position_m: endpoint,            length_m,
+            endpoint_position_m: endpoint,
+            length_m,
             endpoint_rotating_velocity_m_s: velocity,
         }
     }
@@ -323,18 +324,30 @@ pub fn radial_terrain_elevation(
         TerrainVerticalDatum::AreoidRelative => {
             let areoid = areoid_radius_m?;
             let areoid_uncertainty = areoid_uncertainty_m?;
-            if !areoid.is_finite() || !areoid_uncertainty.is_finite() || areoid_uncertainty < 0.0 {
+            if !areoid.is_finite()
+                || !areoid_uncertainty.is_finite()
+                || areoid_uncertainty < 0.0
+            {
                 return None;
             }
-            (areoid + height - reference.radius_m, areoid_uncertainty + sample_uncertainty)
+            (
+                areoid + height - reference.radius_m,
+                areoid_uncertainty + sample_uncertainty,
+            )
         }
         TerrainVerticalDatum::ReferenceSphereRelative => (height, sample_uncertainty),
         TerrainVerticalDatum::PlanetocentricRadius => (height - reference.radius_m, sample_uncertainty),
     };
-    if !radial_elevation.is_finite() || radial_elevation <= -reference.radius_m || !uncertainty.is_finite() {
+    if !radial_elevation.is_finite()
+        || radial_elevation <= -reference.radius_m
+        || !uncertainty.is_finite()
+    {
         return None;
     }
-    Some(RadialTerrainElevation { elevation_above_reference_m: radial_elevation, uncertainty_bound_m: uncertainty })
+    Some(RadialTerrainElevation {
+        elevation_above_reference_m: radial_elevation,
+        uncertainty_bound_m: uncertainty,
+    })
 }
 
 /// Convert areoid-relative MOLA topography into radial elevation above the
@@ -439,7 +452,8 @@ pub fn assess_anchor_geometry(
 pub struct TetherMaterial {
     /// Bulk density, kg/m^3.
     pub density_kg_m3: f64,
-    /// Allowable axial stress after all design knock-down factors, Pa.    pub allowable_stress_pa: f64,
+    /// Allowable axial stress after all design knock-down factors, Pa.
+    pub allowable_stress_pa: f64,
 }
 
 impl TetherMaterial {
