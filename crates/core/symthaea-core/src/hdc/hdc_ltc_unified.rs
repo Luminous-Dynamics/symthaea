@@ -2955,4 +2955,22 @@ mod adaptive_resolution_tests {
         assert!(weight_error.is_finite());
         assert!(tau_error.is_finite());
     }
+
+    #[test]
+    fn legacy_dilate_is_not_assumed_to_commute_with_binding() {
+        let w = ContinuousHV::random(HI, SEED.wrapping_add(1));
+        let x = ContinuousHV::random(HI, SEED.wrapping_add(2));
+
+        let projected_bind = w.bind(&x).dilate(LO);
+        let bound_projected = w.dilate(LO).bind(&x.dilate(LO));
+
+        let error = relative_error(&projected_bind, &bound_projected);
+
+        assert!(error.is_finite());
+        // Element-wise multiplication is nonlinear with respect to the
+        // averaging/folding performed by dilate(). A production transition
+        // therefore cannot assume algebra preservation from static similarity.
+        assert!(error > 1e-7);
+    }
+
 }
