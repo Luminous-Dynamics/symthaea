@@ -115,6 +115,10 @@ impl EvidenceLineageDkgProjection {
             return Err(DkgProjectionError::CriterionEvidenceMismatch);
         }
 
+        if evidence.supersedes_evidence_id.is_some() {
+            return Err(DkgProjectionError::SupersessionParentNotIncluded);
+        }
+
         let nodes = vec![
             DkgNode { node_id: commitment_id.clone(), node_type: DkgNodeType::CandidateCommitment,
                 record_digest: commitment.commitment.payload_digest(), supersedes_node_id: None },
@@ -133,9 +137,6 @@ impl EvidenceLineageDkgProjection {
             DkgEdge { source_node_id: replication.replication_id.clone(), edge_type: DkgEdgeType::Replicates, target_node_id: assessment.assessment_id.clone() },
             DkgEdge { source_node_id: evidence.evidence_id.clone(), edge_type: DkgEdgeType::EligibleFor, target_node_id: replication.replication_id.clone() },
         ];
-        if let Some(parent) = &evidence.supersedes_evidence_id {
-            edges.push(DkgEdge { source_node_id: evidence.evidence_id.clone(), edge_type: DkgEdgeType::Supersedes, target_node_id: parent.clone() });
-        }
         Ok(Self::new(nodes, edges))
     }
 
@@ -188,6 +189,7 @@ impl EvidenceLineageDkgProjection {
 pub enum DkgProjectionError {
     InvalidCommitment, InvalidObservation, InvalidAssessment, InvalidReplication, InvalidCriterionEvidence,
     CommitmentObservationMismatch, AssessmentMismatch, ReplicationMismatch, CriterionEvidenceMismatch,
+    SupersessionParentNotIncluded,
 }
 
 fn put(h: &mut Sha256, s: &str) {
