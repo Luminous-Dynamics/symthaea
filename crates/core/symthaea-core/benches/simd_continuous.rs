@@ -14,7 +14,7 @@
 //! Run with:
 //!   CARGO_TARGET_DIR=/tmp/symthaea-target cargo bench --bench simd_continuous --features simd
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 const HDC_DIM: usize = 16_384;
 const RESOLUTION_DIMS: &[usize] = &[1_024, 2_048, 4_096, 8_192, 16_384, 32_768, 65_536];
