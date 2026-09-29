@@ -230,3 +230,8 @@ The kernel now includes an explicit `radial_elevation_from_areoid` conversion. I
 The PDS MEGDR archive distinguishes planetary radius, areoid, topography, and observation counts, and defines the current MEGDR coordinate system as areocentric latitude with east-increasing longitude. Its maintained PDS4 bundle includes labels and ENVI headers alongside image files. This supports a future adapter that can preserve product identity and datum metadata instead of treating a bare raster value as self-describing. The adapter must still select a compatible areoid/radius field and coordinate convention; this contract alone does not establish a geodetic transformation or geophysical validity.
 
 A MOLA-backed geographic sweep remains blocked on implementing and validating the raster adapter and acquiring a specific, versioned product. No candidate site should be labelled feasible from the present spherical kernel.
+
+
+## Input validation hardening
+
+The anchor assessment now rejects a non-finite or non-positive minimum anchor radius as `InsufficientEvidence` before using the configuration to classify a candidate. This is a configuration-quality failure, not evidence that a geographic site is physically infeasible. A regression test covers a NaN threshold. The assessment remains intentionally non-certifying: a usable terrain sample is not yet datum-converted and compared against the structural anchor elevation.
