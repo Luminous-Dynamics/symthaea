@@ -92,12 +92,14 @@ Solvers implement a common capability contract:
 ```rust
 pub trait StrategicSolver {
     fn capabilities(&self) -> SolverCapabilities;
+    fn method(&self) -> AnalysisMethod;
+    fn supported_tasks(&self) -> &'static [AnalysisTask];
 
     fn solve(
         &self,
         game: &ValidatedGame,
-        task: &AnalysisTask,
-    ) -> StrategicResult;
+        task: AnalysisTask,
+    ) -> Result<StrategicResult, AnalysisError>;
 }
 ```
 
@@ -390,3 +392,41 @@ Accordingly, the next IR hardening tranche should make these invariants explicit
 A further ecosystem pattern is worth preserving: safe/depth-limited subgame solving composes belief/world partitioning and local re-solving as orthogonal layers rather than conflating them. That supports treating belief updates, model restriction, and solver choice as composable stages in Strategic IR rather than embedding them into one solver-specific type. citeturn0search3turn0search7
 
 These observations strengthen the existing architectural decision not to make an external CFR crate the canonical ontology. External solvers can be adapters once the IR can faithfully express their required game-state, action, information-set, and evidence contracts.
+
+
+## 2026-09-29 information-structure hardening
+
+The next implementation tranche now makes the information-set boundary executable rather than documentary.
+
+The canonical domain module adds:
+
+- DecisionState with explicit player, information-set identity, and legal actions;
+- InformationSet with explicit member decision states;
+- InformationStructure::validate() for structural integrity;
+- rejection of duplicate state IDs and information-set IDs;
+- rejection of empty or duplicate information-set membership;
+- rejection of unknown or multiply assigned decision states;
+- rejection when a decision state's declared information set disagrees with its containing set;
+- rejection when members of one information set belong to different players;
+- rejection when members expose different legal-action vocabularies;
+- solver compatibility checks for imperfect-information support;
+- explicit PerfectRecallEvidence gating for solvers that require perfect recall.
+
+This mirrors the current CFR ecosystem: game builders validate inconsistent information-set action sets and perfect-recall requirements before solving, while newer MCCFR abstractions treat public/private information and perfect-recall properties as explicit solver-facing contracts. citeturn0search0turn0search3turn0search4
+
+Importantly, the Strategic IR does not declare perfect recall globally. A model may be representable without satisfying a particular solver's recall requirements; the solver adapter must state its own requirements and the model must provide corresponding evidence.
+
+The implementation also avoids assuming that a numeric state ID is a vector index. State identity is validated explicitly, and references are resolved by identifier. This prevents sparse or reordered identifiers from becoming accidental memory-layout contracts.
+
+Current branch implementation status:
+
+```text
+agent-local policy contract       present
+contingent strategy validation    present
+information-set validation        present
+solver capability declaration     present
+perfect-recall gating             present
+CI verification                   not yet observed
+```
+
+This is still a migration-stage contract. It does not yet prove perfect recall, construct extensive-form transitions, or provide a CFR solver; those remain separate model/solver responsibilities.
