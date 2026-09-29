@@ -72,6 +72,10 @@ CP-04 references canonical owners for:
 
 CP-04 MUST NOT create duplicate canonical identity stores for these concerns.
 
+## Mutation manifest
+
+The executable mutation suite is bound to `docs/engineering/data/cp-04-compute-evidence-dag-mutation-manifest-v1-1.json`. The qualifier MUST reject any difference in mutation order, mutation identifier, or expected stable guard between the persisted manifest and executable suite. The qualification receipt records the canonical manifest digest.
+
 ## Qualification target
 
 The independent qualifier MUST verify:
