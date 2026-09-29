@@ -209,6 +209,27 @@ def graph_identity(g):
         "claim_ceiling": g["claim_ceiling"],
     })
 
+CLOSURE_EDGE_MUTATIONS = (
+    ("remove-model-runtime-closure", ("model", "executes_with", "runtime")),
+    ("remove-runtime-toolchain-closure", ("runtime", "compiled_by", "toolchain")),
+    ("remove-observation-statistics-closure", ("observation", "summarizes", "statistics")),
+    ("remove-observation-provenance-closure", ("observation", "traces_to", "provenance_reference")),
+    ("remove-statistics-disposition-closure", ("statistics", "derives", "disposition")),
+)
+
+def validate_edge_closure_sensitivity(base):
+    """Every dependency edge must contribute exactly its target closure."""
+    baseline = expected_closures(base)
+    for mutation_id, edge in CLOSURE_EDGE_MUTATIONS:
+        candidate = copy.deepcopy(base)
+        candidate["edges"].remove(list(edge))
+        observed = expected_closures(candidate)
+        src, _, dst = edge
+        affected = tuple(n for n in base["node_types"] if n in baseline[src] and n not in observed[src])
+        expected_removed = tuple(n for n in baseline[src] if n in baseline[dst])
+        if affected != expected_removed:
+            fail(f"{mutation_id} changed unexpected closure", "CP-COMP-DAG-CLOSURE")
+
 MUTATIONS = (
     ("remove-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].remove(["model", "executes_with", "runtime"])),
     ("reverse-model-runtime-edge", "CP-COMP-DAG-TYPING", lambda g: g["edges"].__setitem__(3, ["runtime", "executes_with", "model"])),
@@ -291,6 +312,7 @@ def main():
     else:
         fail("derived disposition altered immutable graph identity", "CP-COMP-DAG-INVARIANT")
 
+    validate_edge_closure_sensitivity(graph)
     results = run_mutations(graph)
     receipt = {
         "schema": "cp-04-compute-evidence-dag-qualification-receipt-v1-1",
