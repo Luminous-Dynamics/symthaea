@@ -216,8 +216,23 @@ impl Cp04QualificationArtifact {
                     edge.target_identity_digest.clone(),
                 ));
             }
-            if !CP04_EDGE_TYPES.contains(&edge.edge_type.as_str()) {
-                return Err(Cp04AdapterError::UnsupportedRelationKind(edge.edge_type.clone()));
+            let kind = cp04_relation_kind(&edge.edge_type)?;
+            let source = node_digests
+                .get(&edge.source_identity_digest)
+                .and_then(|_| self.nodes.iter().find(|n| n.identity_digest == edge.source_identity_digest))
+                .ok_or_else(|| Cp04AdapterError::MissingEndpoint(edge.source_identity_digest.clone()))?;
+            let target = self.nodes
+                .iter()
+                .find(|n| n.identity_digest == edge.target_identity_digest)
+                .ok_or_else(|| Cp04AdapterError::MissingEndpoint(edge.target_identity_digest.clone()))?;
+            let relation = EngineeringRelation::new(
+                source.identity.clone(),
+                target.identity.clone(),
+                kind,
+            )
+            .map_err(|_| Cp04AdapterError::UnsupportedRelationKind(edge.edge_type.clone()))?;
+            if relation.relation_digest() != edge.relation_digest {
+                return Err(Cp04AdapterError::InvalidArtifactDigest);
             }
         }
 
@@ -286,6 +301,28 @@ const CP04_EDGE_TYPES: &[&str] = &[
     "applicable_to",
     "derives",
 ];
+
+fn cp04_relation_kind(wire_name: &str) -> Result<EngineeringRelationKind, Cp04AdapterError> {
+    let kind = match wire_name {
+        "requires" => EngineeringRelationKind::Requires,
+        "implements" => EngineeringRelationKind::Implements,
+        "parameterizes" => EngineeringRelationKind::Parameterizes,
+        "executes_with" => EngineeringRelationKind::ExecutesWith,
+        "compiled_by" => EngineeringRelationKind::CompiledBy,
+        "runs_on" => EngineeringRelationKind::RunsOn,
+        "deploys" => EngineeringRelationKind::Deploys,
+        "executes" => EngineeringRelationKind::Executes,
+        "observes" => EngineeringRelationKind::Observes,
+        "quantifies" => EngineeringRelationKind::Quantifies,
+        "summarizes" => EngineeringRelationKind::Summarizes,
+        "traces_to" => EngineeringRelationKind::TracesTo,
+        "currentness_for" => EngineeringRelationKind::CurrentnessFor,
+        "applicable_to" => EngineeringRelationKind::ApplicableTo,
+        "derives" => EngineeringRelationKind::Derives,
+        _ => return Err(Cp04AdapterError::UnsupportedRelationKind(wire_name.to_owned())),
+    };
+    Ok(kind)
+}
 
 fn validate_cp04_node(node: &EngineeringObjectId) -> Result<(), Cp04AdapterError> {
     if CP04_NODE_TYPES.contains(&node.object_kind.as_str()) {
@@ -396,6 +433,14 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.artifact_digest, b.artifact_digest);
         assert_eq!(a.canonical_bytes().unwrap(), b.canonical_bytes().unwrap());
+    }
+
+    #[test]
+    fn standalone_validation_checks_edge_semantics_not_only_artifact_hash() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.edges[0].edge_type = "implements".into();
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(artifact.validate().is_err());
     }
 
     #[test]
