@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
 CONTRACT_VECTORS = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json"
+NEGATIVE_CONTRACT_VECTORS = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json"
 IDENTITY_SCHEMA = "symthaea.engineering-object-id.v1"
 RELATION_SCHEMA = "symthaea.engineering-relation.v1"
 PROJECTION_SCHEMA = "symthaea.qualification-projection.v1"
@@ -159,6 +160,87 @@ def self_test_wire_contracts():
     require(encoded == b'{"schema":"s","artifact_digest":""}', "JSON compact serialization drift")
 
 
+def verify_machine_readable_contracts(contract, artifact, by_digest, relation_digests):
+    dependency = contract.get("dependency_matrix")
+    require(isinstance(dependency, dict), "dependency matrix missing")
+    require(dependency.get("schema") == "symthaea.cp-04-dependency-matrix-v1",
+            "dependency matrix schema mismatch")
+    expected_rules = {
+        "identity": {"relation": "changed", "projection": "changed", "source_graph": "changed", "artifact": "changed"},
+        "qualification_relation": {"relation": "changed", "projection": "changed", "source_graph": "changed", "artifact": "changed"},
+        "epistemic_relation": {"relation": "changed", "projection": "unchanged", "source_graph": "changed", "artifact": "changed"},
+    }
+    rules = dependency.get("rules")
+    require(isinstance(rules, list), "dependency matrix rules must be a list")
+    actual_rules = {rule.get("mutation"): rule for rule in rules}
+    require(set(actual_rules) == set(expected_rules), "dependency matrix mutation set diverged")
+    for mutation, expected in expected_rules.items():
+        rule = actual_rules[mutation]
+        require(set(rule) == {"mutation", "relation", "projection", "source_graph", "artifact"},
+                "dependency matrix rule fields diverged")
+        for field, value in expected.items():
+            require(rule[field] == value,
+                    f"dependency matrix {mutation}.{field} must be {value}")
+
+    negative = json.loads(NEGATIVE_CONTRACT_VECTORS.read_text(encoding="utf-8"))
+    require(negative.get("schema") == "symthaea.cp-04-qualification-adapter-negative-contract-v1",
+            "negative contract schema mismatch")
+    vectors = negative.get("vectors")
+    require(isinstance(vectors, list) and vectors, "negative contract vectors missing")
+    allowed_boundaries = {"artifact-integrity", "source-binding"}
+    allowed_validate = {"accept", "reject"}
+    allowed_strategies = {"unchanged_artifact_digest", "recompute_artifact_digest"}
+    for vector in vectors:
+        require(set(vector) == {"id", "mutation_path", "mutation_value", "digest_strategy",
+                                 "expected_validate", "expected_source_binding", "first_boundary"},
+                f"negative vector {vector.get('id')} fields diverged")
+        require(vector["expected_validate"] in allowed_validate, "invalid expected_validate")
+        require(vector["expected_source_binding"] in allowed_validate, "invalid expected_source_binding")
+        require(vector["first_boundary"] in allowed_boundaries, "invalid first boundary")
+        require(vector["digest_strategy"] in allowed_strategies, "invalid digest strategy")
+
+    baseline_graph = graph_digest(by_digest.keys(), relation_digests)
+    baseline_projection = projection_digest(relation_digests)
+    for vector in vectors:
+        path = vector["mutation_path"]
+        mutated = json.loads(json.dumps(artifact, ensure_ascii=False))
+        if path == "source_graph_digest":
+            mutated["source_graph_digest"] = vector["mutation_value"] * 64
+        elif path == "projection_digest":
+            mutated["projection_digest"] = vector["mutation_value"] * 64
+        elif path == "claim_ceiling":
+            mutated["claim_ceiling"] = vector["mutation_value"]
+        elif path == "edges[0].relation_digest":
+            mutated["edges"][0]["relation_digest"] = vector["mutation_value"] * 64
+        elif path == "nodes[0].identity.canonical_identifier":
+            mutated["nodes"][0]["identity"]["canonical_identifier"] = vector["mutation_value"]
+        else:
+            raise AssertionError("[SCI-LINEAGE-ADAPTER] unsupported negative mutation path: " + path)
+
+        if vector["digest_strategy"] == "unchanged_artifact_digest":
+            require(mutated["artifact_digest"] != artifact_digest(mutated),
+                    f"negative vector {vector['id']} must fail artifact-integrity")
+        else:
+            mutated["artifact_digest"] = artifact_digest(mutated)
+            require(mutated["artifact_digest"] == artifact_digest(mutated),
+                    f"negative vector {vector['id']} recomputed envelope is not self-consistent")
+            if path == "source_graph_digest":
+                require(mutated["source_graph_digest"] != baseline_graph,
+                        f"negative vector {vector['id']} must fail source-binding")
+            elif path == "projection_digest":
+                require(mutated["projection_digest"] != baseline_projection,
+                        f"negative vector {vector['id']} must fail source-binding")
+        require(vector["first_boundary"] == (
+            "artifact-integrity" if vector["digest_strategy"] == "unchanged_artifact_digest"
+            else "source-binding"
+        ), f"negative vector {vector['id']} boundary declaration diverged")
+        require(vector["expected_validate"] == (
+            "reject" if vector["digest_strategy"] == "unchanged_artifact_digest" else "accept"
+        ), f"negative vector {vector['id']} validation declaration diverged")
+        require(vector["expected_source_binding"] == "reject",
+                f"negative vector {vector['id']} source-binding declaration diverged")
+
+
 def main():
     self_test_wire_contracts()
     contract = json.loads(CONTRACT_VECTORS.read_text(encoding="utf-8"))
@@ -257,6 +339,8 @@ def main():
             "contract vector projection digest diverged")
     require(artifact["artifact_digest"] == contract["artifact_digest"],
             "contract vector artifact digest diverged")
+
+    verify_machine_readable_contracts(contract, artifact, by_digest, relation_digests)
 
     unicode_vector = contract["utf8_identity_vector"]
     require(identity_digest(unicode_vector) == unicode_vector["identity_digest"],
