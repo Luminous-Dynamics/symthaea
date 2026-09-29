@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Federated Projection Output Lineage Receipt",
+  "description": "Content-addressed provenance receipt binding one projection output to exact parent projection outputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "projection_digest",
+    "output_record_id",
+    "output_record_digest",
+    "parent_outputs",
+    "lineage_digest"
+  ],
+  "properties": {
+    "receipt_version": { "const": "1.0.0" },
+    "projection_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "output_record_id": { "type": "string", "minLength": 1 },
+    "output_record_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "parent_outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["projection_digest", "output_record_id", "output_record_digest"],
+        "properties": {
+          "projection_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "output_record_id": { "type": "string", "minLength": 1 },
+          "output_record_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+        }
+      },
+      "uniqueItems": true
+    },
+    "lineage_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "x-symthaea-boundary": {
+    "semantic_role": "provenance_only",
+    "evidence_qualification": false,
+    "truth_establishment": false,
+    "external_observation_promotion": false
+  }
+}
