@@ -440,6 +440,39 @@ mod tests {
     }
 
     #[test]
+    fn stale_currentness_does_not_bypass_expiry_at_atomic_consume_boundary() {
+        let daemon = LiveDaemonIncarnationV1::generate().unwrap();
+        let store = LocalApprovalRequestStoreV1::new(&daemon);
+        let request = request_for(&store, 1);
+        let request_id = request.request_id().unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            &request,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_900),
+        )
+        .unwrap();
+        store.install_pending(request).unwrap();
+
+        // A caller may observe Current immediately before the deadline.
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(1_999)).unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+
+        // The atomic consume boundary re-evaluates time itself. The stale
+        // observation cannot authorize a consume at the exact expiry instant.
+        assert!(matches!(
+            store.consume_verified_submission(&submission, &peer(1000, 1), ms(2_000)),
+            Err(LocalApprovalRequestStoreErrorV1::Admission(_))
+        ));
+        assert!(store.is_pending(&request_id).unwrap());
+        assert_eq!(
+            store.observe_currentness(&request_id, ms(2_000)).unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+    }
+
+    #[test]
     fn successful_consume_removes_request_and_returns_live_token() {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
         let store = LocalApprovalRequestStoreV1::new(&daemon);
