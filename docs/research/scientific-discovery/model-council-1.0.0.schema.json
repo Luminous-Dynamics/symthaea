@@ -1,0 +1,14 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.luminousdynamics.io/schemas/model-council-1.0.0.json",
+  "title":"Lineage-Aware Scientific Model Council",
+  "type":"object",
+  "required":["schema","schema_version","authority","independence_rule","non_equivalences"],
+  "properties":{
+    "schema":{"const":"symthaea.scientific_discovery.model_council"},
+    "schema_version":{"const":"1.0.0"},
+    "authority":{"const":"model_organization_only"},
+    "independence_rule":{"const":"distinct_model_lineage_required"},
+    "non_equivalences":{"type":"array","items":{"type":"string"},"minItems":4}
+  }
+}
