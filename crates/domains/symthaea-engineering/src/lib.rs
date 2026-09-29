@@ -31,6 +31,7 @@ pub use symthaea_formal_safety as formal_safety;
 pub use symthaea_memory as memory;
 pub use symthaea_sim_bridge as sim_bridge;
 pub mod scientific_lineage;
+pub use scientific_lineage::{AuthorityCeiling, QualificationProjection, ScientificLineageGraph};
 
 /// Debug-friendly wrapper for the fabrication autonomy loop.
 pub struct DebugFabricationLoop(pub AutonomyLoop);
