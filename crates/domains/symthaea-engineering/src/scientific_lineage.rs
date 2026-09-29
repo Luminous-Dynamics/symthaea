@@ -298,8 +298,11 @@ impl QualificationProjection {
             if !relation.admissible_for_qualification() {
                 return Err(QualificationProjectionError::InvalidRelation);
             }
-            relation.source.validate().map_err(|_| QualificationProjectionError::InvalidRelation)?;
-            relation.target.validate().map_err(|_| QualificationProjectionError::InvalidRelation)?;
+            EngineeringRelation::new(
+                relation.source.clone(),
+                relation.target.clone(),
+                relation.kind,
+            ).map_err(|_| QualificationProjectionError::InvalidRelation)?;
             let digest = relation.relation_digest();
             if !seen.insert(digest.clone()) {
                 return Err(QualificationProjectionError::DuplicateRelation);
