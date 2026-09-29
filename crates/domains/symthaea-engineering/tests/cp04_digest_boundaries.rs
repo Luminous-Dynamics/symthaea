@@ -208,3 +208,45 @@ fn artifact_envelope_mutation_cannot_be_hidden_by_an_unchanged_artifact_digest()
     assert_eq!(tampered.artifact_digest, original.artifact_digest);
     assert!(tampered.validate().is_err());
 }
+
+
+#[test]
+fn graph_insertion_order_does_not_change_qualification_or_artifact_identity() {
+    let requirement = object("requirement", "r", "1", A);
+    let representation = object("representation", "rep", "1", B);
+    let model = object("model", "m", "1", A);
+    let first = relation(requirement.clone(), representation.clone(), EngineeringRelationKind::Requires);
+    let second = relation(representation.clone(), model.clone(), EngineeringRelationKind::Implements);
+
+    let mut forward = ScientificLineageGraph::new();
+    forward.add_node(requirement.clone());
+    forward.add_node(representation.clone());
+    forward.add_node(model.clone());
+    forward.add_relation(first.clone());
+    forward.add_relation(second.clone());
+
+    let mut reverse = ScientificLineageGraph::new();
+    reverse.add_node(model);
+    reverse.add_node(representation);
+    reverse.add_node(requirement);
+    reverse.add_relation(second);
+    reverse.add_relation(first);
+
+    let forward_projection = forward.qualification_projection().unwrap();
+    let reverse_projection = reverse.qualification_projection().unwrap();
+    assert_eq!(forward_projection.projection_digest(), reverse_projection.projection_digest());
+    assert_eq!(forward_projection.source_graph_digest(), reverse_projection.source_graph_digest());
+    assert_eq!(artifact_for_graph(&forward), artifact_for_graph(&reverse));
+}
+
+#[test]
+fn artifact_rejects_noncanonical_node_and_edge_order() {
+    let graph = three_node_graph(EngineeringRelationKind::Requires);
+    let original = artifact_for_graph(&graph);
+    let mut nodes_reordered = original.clone();
+    nodes_reordered.nodes.reverse();
+    assert!(nodes_reordered.validate().is_err());
+    let mut edges_reordered = original.clone();
+    edges_reordered.edges.reverse();
+    assert!(edges_reordered.validate().is_err());
+}
