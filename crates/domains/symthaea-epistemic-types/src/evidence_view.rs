@@ -112,6 +112,15 @@ impl EvidenceView {
         if !receipt.is_self_consistent() {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
+        let mut representation_digests = groups.iter()
+            .flat_map(|group| group.representations.iter().map(|candidate| candidate.projection.representation_digest.clone()))
+            .collect::<Vec<_>>();
+        representation_digests.sort();
+        let mut receipt_representation_digests = receipt.selected_representation_digests.clone();
+        receipt_representation_digests.sort();
+        if representation_digests != receipt_representation_digests {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
         let mut view = Self {
             mode: receipt.mode,
             frontier_ref: receipt.frontier_ref.clone(),
