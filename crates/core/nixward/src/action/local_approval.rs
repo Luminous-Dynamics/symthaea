@@ -14,6 +14,7 @@
 
 use super::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
 use super::temporal::{
+    AuthoritativeEvaluationV1,
     EvidenceCurrentnessV1, EvidenceTemporalEvaluationV1, EvidenceTemporalStatusV1,
     EvidenceWindowMillisV1, UnixMillisV1,
 };
@@ -234,7 +235,7 @@ impl LocalNixApprovalDecisionV1 {
     pub fn evaluate_against(
         &self,
         request: &PendingNixApprovalRequestV1,
-        now: UnixMillisV1,
+        evaluation: AuthoritativeEvaluationV1,
     ) -> Result<LocalApprovalDecisionKindV1, LocalApprovalErrorV1> {
         self.validate_shape()?;
         request.validate_shape()?;
@@ -265,6 +266,7 @@ impl LocalNixApprovalDecisionV1 {
             }
         }
 
+        let now = evaluation.evaluated_at();
         if decided_at > now {
             return Err(LocalApprovalErrorV1::DecisionFromFuture);
         }
@@ -501,7 +503,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request, ms(2_000)).unwrap_err(),
+            decision.evaluate_against(&request, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_000))).unwrap_err(),
             LocalApprovalErrorV1::RequestExpired
         );
     }
@@ -519,7 +521,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request, ms(1_200)).unwrap(),
+            decision.evaluate_against(&request, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_200))).unwrap(),
             LocalApprovalDecisionKindV1::Approved
         );
     }
@@ -596,7 +598,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request, ms(2_001)).unwrap_err(),
+            decision.evaluate_against(&request, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_001))).unwrap_err(),
             LocalApprovalErrorV1::RequestExpired
         );
     }
@@ -614,7 +616,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request, ms(1_400)).unwrap_err(),
+            decision.evaluate_against(&request, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400))).unwrap_err(),
             LocalApprovalErrorV1::DecisionFromFuture
         );
     }
@@ -631,7 +633,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            decision.evaluate_against(&request, ms(1_200)).unwrap(),
+            decision.evaluate_against(&request, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_200))).unwrap(),
             LocalApprovalDecisionKindV1::Denied
         );
     }
