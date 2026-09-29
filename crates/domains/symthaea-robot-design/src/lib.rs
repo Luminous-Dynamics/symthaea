@@ -2241,6 +2241,42 @@ mod tests {
     }
 
     #[test]
+    fn singleton_range_enumerates_exactly_one_candidate() {
+        let parameter = ParameterIdV1::new("edge_length").unwrap();
+        let range = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id: parameter.clone(),
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(42).unwrap(),
+                upper: C0LengthUmV1::new(42).unwrap(),
+                step_um: u64::MAX,
+            },
+        }])
+        .unwrap();
+        let values = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id: parameter.clone(),
+            domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(42).unwrap()]),
+        }])
+        .unwrap();
+
+        let range_candidates = range.enumerate().unwrap();
+        let values_candidates = values.enumerate().unwrap();
+        assert_eq!(range_candidates, values_candidates);
+        assert_eq!(range_candidates.len(), 1);
+        assert_eq!(
+            range_candidates[0]
+                .parameter(&parameter)
+                .unwrap()
+                .value_um(),
+            42
+        );
+        assert_ne!(range.id().unwrap(), values.id().unwrap());
+        assert_ne!(
+            range.canonical_transcript().unwrap(),
+            values.canonical_transcript().unwrap()
+        );
+    }
+
+    #[test]
     fn range_enumeration_handles_u64_boundary_without_wraparound() {
         let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
             id: ParameterIdV1::new("edge_length").unwrap(),
