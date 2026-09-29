@@ -40,3 +40,46 @@ It validates the relation endpoint oracle and provides a bounded qualification
 projection whose invalidation closure excludes epistemic relations. The graph
 also deliberately permits epistemic cycles, demonstrating that recursive DKG
 knowledge and deterministic qualification topology are separate concerns.
+
+
+## Replay artifact contract
+
+`QualificationProjection` is also the replay artifact for the bounded
+qualification plane. Its serialized representation records:
+
+- `schema`: `symthaea.qualification-projection.v1`
+- `source_graph_digest`: SHA-256 identity of the complete scientific graph snapshot,
+  including isolated nodes and relations
+- `qualification_policy`: `symthaea.qualification-policy.v1`
+- ordered, unique typed relations admitted to qualification
+- `authority_ceiling`: `synthetic-qualification`
+
+The projection digest is computed only from the projection schema, policy,
+authority ceiling, and ordered relation identities. The source graph digest is
+recorded separately. Therefore an epistemic-only DKG mutation can change the
+knowledge snapshot without changing the deterministic qualification projection,
+while replay can still require the exact source snapshot.
+
+Deserialization is not trusted blindly: the projection uses a validated wire
+representation and rejects unknown schema/policy, malformed identities,
+non-qualification relations, duplicate or unordered relations, and cyclic
+projection topology.
+
+This establishes the replay boundary:
+
+```text
+scientific DKG snapshot
+        │
+        ├── source_graph_digest
+        ▼
+validated QualificationProjection
+        │
+        ├── projection_digest
+        ├── qualification_policy
+        └── authority_ceiling
+        ▼
+CP-04 qualification / replay
+```
+
+A projection digest is not physical-performance evidence and never grants
+operational authority.
