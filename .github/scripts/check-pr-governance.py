@@ -283,6 +283,42 @@ def require_complete_object_graph(git_runner: Any = git) -> None:
                     "repository has a promisor remote"
                 )
 
+    alternates = git_runner(
+        "config", "--get", "core.alternateRefsCommand", check=False
+    )
+    if alternates.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine alternate-ref command state")
+    if alternates.returncode == 0 and alternates.stdout.strip():
+        raise GovernanceError(
+            "governance validation forbids alternate-ref commands in the authority repository"
+        )
+
+    alternate_object_directories = git_runner(
+        "config", "--get", "core.alternateObjectDirectories", check=False
+    )
+    if alternate_object_directories.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine alternate-object state")
+    if alternate_object_directories.returncode == 0 and alternate_object_directories.stdout.strip():
+        raise GovernanceError(
+            "governance validation requires a self-contained object database; "
+            "configured alternate object directories are forbidden"
+        )
+
+    replace_refs = git_runner(
+        "for-each-ref", "--format=%(refname)", "refs/replace/"
+    )
+    if replace_refs.strip():
+        raise GovernanceError(
+            "governance validation forbids refs/replace because Git may substitute "
+            "replacement objects for ordinary object reads"
+        )
+
+    grafts = git_runner(
+        "config", "--get", "core.repositoryFormatVersion", check=False
+    )
+    if grafts.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine repository format state")
+
 
 def require_complete_history() -> None:
     """Backward-compatible alias for the complete-object-graph guard."""
@@ -431,6 +467,33 @@ def history_topology_self_test() -> None:
         else:
             raise AssertionError("promisor remote must fail closed")
         run_local("config", "--unset", "remote.origin.promisor")
+
+        run_local("config", "core.alternateRefsCommand", "echo refs/heads/main")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("alternate-ref command must fail closed")
+        run_local("config", "--unset", "core.alternateRefsCommand")
+
+        run_local("config", "core.alternateObjectDirectories", str(worktree / "objects"))
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("alternate object directories must fail closed")
+        run_local("config", "--unset", "core.alternateObjectDirectories")
+
+        run_local("replace", base, feature)
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("replace refs must fail closed")
+        run_local("replace", "-d", base)
 
 
 def read_at_commit(commit: str, path: str) -> str:
