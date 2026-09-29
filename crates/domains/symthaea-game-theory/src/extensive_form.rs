@@ -196,9 +196,21 @@ impl ExtensiveGame {
     /// Chance and opponent actions are intentionally omitted from the recalled
     /// sequence: they may differ while remaining indistinguishable to the
     /// acting player.
+    /// Verify that every decision state has the same legal-action *set* as
+    /// its information-set peers. The current IR represents availability as
+    /// a common finite action vocabulary; ordering is not semantic.
+    pub fn validate_action_availability(&self) -> Result<(), ExtensiveGameError> {
+        self.information
+            .validate()
+            .map_err(ExtensiveGameError::InformationStructure)
+    }
+
     pub fn verify_perfect_recall(&self) -> Result<PerfectRecallEvidence, ExtensiveGameError> {
         self.validate()?;
 
+        // A caller cannot manufacture a Verified marker by constructing a
+        // compatible-looking information structure: verification always runs
+        // against the actual reachable game graph.
         let mut histories: HashMap<DecisionStateId, Vec<Vec<RecallStep>>> = HashMap::new();
         self.collect_histories(self.root, Vec::new(), &mut histories)?;
 
@@ -444,6 +456,32 @@ mod tests {
             game.validate(),
             Err(ExtensiveGameError::DecisionPlayerMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn action_order_is_not_semantic() {
+        let mut information = info();
+        information.decision_states[0].legal_actions.reverse();
+
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information,
+        };
+
+        assert!(game.validate().is_ok());
+        assert!(game.validate_action_availability().is_ok());
     }
 
     #[test]
