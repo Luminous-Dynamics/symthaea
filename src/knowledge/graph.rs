@@ -892,6 +892,65 @@ mod tests {
     }
 
     #[test]
+    fn test_memory_identity_survives_export_import() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let enc = make_encoding("stable claim", 0.8);
+        let (id, _) = graph.insert(enc, 1, Some("test".into()), false);
+
+        let original = graph.provenance(id).unwrap();
+        let records = graph.export_fact_records();
+
+        let mut restored = EnhancedKnowledgeGraph::new(100);
+        restored.import_fact_record(&records[0]);
+        let restored_id = restored
+            .search(&restored.get_fact(restored.facts.keys().next().unwrap()).unwrap().encoding.vector, 1, 2)
+            [0]
+            .fact_id;
+        let round_trip = restored.provenance(restored_id).unwrap();
+
+        assert_eq!(round_trip.memory_id, original.memory_id);
+        assert_eq!(round_trip.provenance_family, original.provenance_family);
+        assert_eq!(round_trip.retrieval_index_ref, Some(format!("fact-id:{restored_id}")));
+        assert_ne!(restored_id, id);
+    }
+
+    #[test]
+    fn test_canonical_identity_requires_explicit_admission() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let enc = make_encoding("admission boundary claim", 0.8);
+        let (id, _) = graph.insert(enc, 1, None, false);
+
+        let before = graph.provenance(id).unwrap();
+        assert!(before.canonical_identity.is_none());
+
+        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
+        let _ = graph.search(&query, 1, 2);
+        assert!(graph.provenance(id).unwrap().canonical_identity.is_none());
+
+        assert!(graph.attach_provenance(
+            id,
+            Some("canonical:claim-1".into()),
+            Some("source-family-1".into()),
+        ));
+        let after = graph.provenance(id).unwrap();
+        assert_eq!(after.canonical_identity.as_deref(), Some("canonical:claim-1"));
+        assert_eq!(after.provenance_family.as_deref(), Some("source-family-1"));
+    }
+
+    #[test]
+    fn test_eviction_does_not_reassign_surviving_identity() {
+        let mut graph = EnhancedKnowledgeGraph::new(2);
+        let (id_a, _) = graph.insert(make_encoding("claim a", 0.9), 1, None, false);
+        let (id_b, _) = graph.insert(make_encoding("claim b", 0.8), 2, None, false);
+        let memory_a = graph.provenance(id_a).unwrap().memory_id;
+
+        graph.insert(make_encoding("claim c", 0.7), 3, None, false);
+
+        assert_eq!(graph.provenance(id_a).unwrap().memory_id, memory_a);
+        assert_eq!(graph.provenance(id_b).unwrap().memory_id, graph.provenance(id_b).unwrap().memory_id);
+    }
+
+    #[test]
     fn test_empty_graph() {
         let graph = EnhancedKnowledgeGraph::new(100);
         assert!(graph.is_empty());
