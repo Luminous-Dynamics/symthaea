@@ -179,7 +179,7 @@ pub enum SimdLevel {
     Avx512,
 }
 
-/// Best available SIMD level for integer operations (XOR, popcount, etc.)
+/// Best available SIMD level for generic integer/bitwise operations (e.g. XOR).\n///\n/// This intentionally does not imply hardware popcount support; use\n/// `best_popcount_level()` for that capability.
 pub fn best_integer_level() -> SimdLevel {
     if has_avx512f() {
         SimdLevel::Avx512
@@ -195,7 +195,7 @@ pub fn best_integer_level() -> SimdLevel {
 }
 
 /// Best available SIMD level for float operations (dot product, FMA, etc.)
-pub fn best_float_level() -> SimdLevel {
+/// Best available SIMD level for hardware popcount operations.\n///\n/// AVX-512 popcount is a distinct capability from AVX-512F/BW and must not\n/// be inferred from generic AVX-512 support.\npub fn best_popcount_level() -> SimdLevel {\n    if has_avx512_vpopcntdq() {\n        SimdLevel::Avx512\n    } else if has_avx2() && has_popcnt() {\n        SimdLevel::Avx2\n    } else if has_popcnt() {\n        SimdLevel::Sse41\n    } else if has_neon() {\n        SimdLevel::Neon\n    } else {\n        SimdLevel::Scalar\n    }\n}\n\npub fn best_float_level() -> SimdLevel {
     if has_avx2() && has_fma() {
         SimdLevel::Avx2Fma
     } else if has_avx2() {
@@ -277,7 +277,7 @@ impl std::fmt::Display for SimdCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "SIMD: AVX-512F={} BW={} VPOPCNTDQ={} | AVX2={} FMA={} | SSE4.1={} POPCNT={} | NEON={} | best_int={:?} best_float={:?}",
+            "SIMD: AVX-512F={} BW={} VPOPCNTDQ={} | AVX2={} FMA={} | SSE4.1={} POPCNT={} | NEON={} | best_int={:?} best_popcount={:?} best_float={:?}",
             self.avx512f,
             self.avx512bw,
             self.avx512_vpopcntdq,
@@ -322,7 +322,7 @@ mod tests {
         let int_level = best_integer_level();
         let float_level = best_float_level();
         assert!(int_level >= SimdLevel::Scalar);
-        assert!(float_level >= SimdLevel::Scalar);
+        assert!(popcount_level >= SimdLevel::Scalar);\n        assert!(float_level >= SimdLevel::Scalar);
     }
 
     #[test]
@@ -330,7 +330,7 @@ mod tests {
         let caps = SimdCapabilities::detect();
         let report = format!("{}", caps);
         assert!(report.contains("SIMD:"));
-        assert!(report.contains("AVX2="));
+        assert!(report.contains("AVX2="));\n        assert!(report.contains("best_popcount="));
 
         #[cfg(target_arch = "x86_64")]
         {
