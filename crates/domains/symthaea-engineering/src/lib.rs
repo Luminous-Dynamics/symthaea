@@ -32,7 +32,12 @@ pub use symthaea_memory as memory;
 pub use symthaea_sim_bridge as sim_bridge;
 
 pub mod engineering_identity;
+pub mod engineering_relation;
 pub use engineering_identity::{EngineeringObjectId, IdentityError, ENGINEERING_OBJECT_ID_SCHEMA};
+pub use engineering_relation::{
+    EngineeringRelation, EngineeringRelationKind, RelationError, RelationFamily,
+    ENGINEERING_RELATION_SCHEMA,
+};
 
 /// Debug-friendly wrapper for the fabrication autonomy loop.
 pub struct DebugFabricationLoop(pub AutonomyLoop);
