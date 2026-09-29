@@ -472,6 +472,81 @@ mod tests {
     }
 
     #[test]
+    fn rejects_forgetting_own_prior_action() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(2), next: DecisionStateId(3) },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(2),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(2), next: DecisionStateId(4) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(3), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(4), payoffs: vec![0.0] },
+            ],
+            information: InformationStructure {
+                decision_states: vec![
+                    DecisionState {
+                        state: DecisionStateId(0),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(0),
+                        legal_actions: vec![ActionId(0), ActionId(1)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(1),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(1),
+                        legal_actions: vec![ActionId(2)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(2),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(1),
+                        legal_actions: vec![ActionId(2)],
+                    },
+                ],
+                information_sets: vec![
+                    InformationSet {
+                        id: InformationSetId(0),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(0)],
+                    },
+                    InformationSet {
+                        id: InformationSetId(1),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(1), DecisionStateId(2)],
+                    },
+                ],
+            },
+        };
+
+        assert!(matches!(
+            game.verify_perfect_recall(),
+            Err(ExtensiveGameError::PerfectRecallViolation {
+                information_set: InformationSetId(1),
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn rejects_information_member_without_decision_node() {
         let mut information = info();
         information.decision_states.push(DecisionState {
