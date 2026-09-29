@@ -198,7 +198,8 @@ pub(crate) fn admit_verified_local_submission_v2(
 
     let approver_ref = local_verified_peer_approver_ref_v1(verified_peer)?;
     let required_profile = RequiredApprovalProfileV1::parse_ref(&request.authority_profile_ref)?;
-    let evidence_profile = VerifiedApproverEvidenceProfileV1::SameUidProcessV1;
+    let evidence_profile =
+        VerifiedApproverEvidenceProfileV1::from_reference(verified_peer.evidence_ref())?;
     if !required_profile_accepts_evidence_v1(required_profile, evidence_profile) {
         return Err(LocalApprovalAdmissionErrorV1::RequiredProfileNotSatisfied);
     }
