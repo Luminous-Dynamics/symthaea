@@ -38,6 +38,7 @@ impl From<io::Error> for MolaError {
 pub struct MolaMegdrMetadata {
     pub product_id: String,
     pub product_version: String,
+    pub product_creation_time: String,
     pub resolution_pixels_per_degree: u32,
     pub lines: u32,
     pub samples: u32,
@@ -248,6 +249,7 @@ impl MolaMegdrMetadata {
     ) -> Result<Self, MolaError> {
         let product_id = required(kv, "PRODUCT_ID")?;
         let product_version = required(kv, "PRODUCT_VERSION_ID")?;
+        let product_creation_time = required(kv, "PRODUCT_CREATION_TIME")?;
         let resolution = parse_u32(kv, "MAP_RESOLUTION")?;
         let lines = parse_u32(kv, "LINES")?;
         let samples = parse_u32(kv, "LINE_SAMPLES")?;
@@ -568,6 +570,7 @@ mod tests {
         [
             "PRODUCT_ID = MEGT00N000HB",
             "PRODUCT_VERSION_ID = 2.0",
+            "PRODUCT_CREATION_TIME = 2003-03-21T00:00:00",
             "MAP_RESOLUTION = 128",
             "LINES = 4",
             "LINE_SAMPLES = 8",
