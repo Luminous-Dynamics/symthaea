@@ -125,13 +125,14 @@ fn legacy_dilate_round_trip_is_measured_at_multiple_scales() {
 }
 
 #[test]
-fn legacy_dilate_can_be_characterized_against_liquid_trajectory() {
+fn legacy_dilate_with_fresh_low_parameters_is_a_negative_control() {
     for &(hi, lo) in &[(16_384, 4_096), (16_384, 8_192), (32_768, 8_192)] {
         let high = trajectory(hi, 8);
         let low_start = high[0].dilate(lo);
 
-        let mut low = neuron(lo);
-        low.set_state(low_start);
+        // Deliberately keep the low-resolution neuron parameters freshly generated.
+        // This is a negative control, not a valid resolution transition: the
+        // current runtime has no public parameter-conversion contract yet.
 
         let mut converted_high = Vec::with_capacity(9);
         converted_high.push(high[0].clone());
