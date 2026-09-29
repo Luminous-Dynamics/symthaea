@@ -72,6 +72,10 @@ jobs:
         id: check
         run: cargo check -p symthaea-se-model --locked --all-targets
 
+      - name: Semantic repair regression
+        id: semantic-test
+        run: cargo test -p symthaea-se-model --locked invalid_relation_roles_is_context_not_error_source
+
       - name: Focused package tests
         id: test
         run: cargo test -p symthaea-se-model --locked
@@ -114,12 +118,14 @@ jobs:
             "commands": {
               "format": "rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs",
               "check": "cargo check -p symthaea-se-model --locked --all-targets",
+              "semantic_test": "cargo test -p symthaea-se-model --locked invalid_relation_roles_is_context_not_error_source",
               "test": "cargo test -p symthaea-se-model --locked",
               "clippy": "cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings"
             },
             "outcomes": {
               "format": "${{ steps.format.outcome }}",
               "check": "${{ steps.check.outcome }}",
+              "semantic_test": "${{ steps.semantic-test.outcome }}",
               "test": "${{ steps.test.outcome }}",
               "clippy": "${{ steps.clippy.outcome }}",
               "lock": "${{ steps.lock.outcome }}"
@@ -187,6 +193,10 @@ jobs:
         with:
           components: clippy
 
+      - name: Independent semantic repair regression replay
+        id: replay-semantic-test
+        run: cargo test -p symthaea-se-model --locked invalid_relation_roles_is_context_not_error_source
+
       - name: Independent focused test replay
         id: replay-test
         run: cargo test -p symthaea-se-model --locked
@@ -221,6 +231,7 @@ jobs:
             "toolchain": "$EXPECTED_TOOLCHAIN",
             "lock_sha256": "$lock_sha",
             "outcomes": {
+              "semantic_test": "${{ steps.replay-semantic-test.outcome }}",
               "test": "${{ steps.replay-test.outcome }}",
               "check": "${{ steps.replay-check.outcome }}",
               "clippy": "${{ steps.replay-clippy.outcome }}"
