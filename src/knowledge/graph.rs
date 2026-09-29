@@ -350,6 +350,23 @@ impl EnhancedKnowledgeGraph {
         std::mem::take(&mut self.pending_contradictions)
     }
 
+    /// Attach canonical/provenance identity to an existing local fact without changing its retrieval ID.
+    /// This is an explicit admission-boundary operation; retrieval itself never creates identity.
+    pub fn attach_provenance(
+        &mut self,
+        id: FactId,
+        canonical_identity: Option<String>,
+        provenance_family: Option<String>,
+    ) -> bool {
+        if let Some(fact) = self.facts.get_mut(&id) {
+            fact.canonical_identity = canonical_identity;
+            fact.provenance_family = provenance_family;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Number of facts currently stored
     pub fn len(&self) -> usize {
         self.facts.len()
