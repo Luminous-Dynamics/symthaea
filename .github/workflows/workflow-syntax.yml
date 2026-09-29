@@ -6,11 +6,13 @@ on:
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
+      - ".github/*.json"
   push:
     branches: [main]
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
+      - ".github/*.json"
   workflow_dispatch:
 
 permissions:
@@ -196,6 +198,11 @@ jobs:
           else
             echo "json=false" >> "$GITHUB_OUTPUT"
           fi
+          if grep -Fxq '.github/scripts/check-pr-governance.py' /tmp/github-python-files.txt; then
+            echo "governance_validator=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "governance_validator=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Lint changed workflows
         if: steps.changed.outputs.workflows == 'true'
@@ -243,7 +250,7 @@ jobs:
           done < /tmp/github-json-files.txt
 
       - name: Self-test changed PR governance validator
-        if: steps.changed.outputs.python == 'true' && grep -Fxq '.github/scripts/check-pr-governance.py' /tmp/github-python-files.txt
+        if: steps.changed.outputs.governance_validator == 'true'
         shell: bash
         run: |
           set -euo pipefail
