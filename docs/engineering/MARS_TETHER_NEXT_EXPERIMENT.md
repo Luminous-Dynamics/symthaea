@@ -173,15 +173,15 @@ The coordinate contract is explicit:
 
 A quadratic sphere-intersection diagnostic determines where a straight tether first reaches a specified Mars-centered radius. This gives us a clean bridge to the areosynchronous sphere without pretending that the tether is already a solved flexible structure.
 
-This is important for non-equatorial designs. Published non-equatorial elevator analysis explicitly models latitude-dependent taper/payload effects rather than treating an off-equator anchor as a simple translation of the equatorial solution. In particular, the literature reports reduced payload capacity with increasing anchorage latitude and increased deployment latitude range with higher tensile strength. citeturn0search5
+This is important for non-equatorial designs. Published non-equatorial elevator analysis explicitly models latitude-dependent taper/payload effects rather than treating an off-equator anchor as a simple translation of the equatorial solution. In particular, the literature reports reduced payload capacity with increasing anchorage latitude and increased deployment latitude range with higher tensile strength.
 
 ## Topography boundary is now clearer
 
 The surface geometry should not query a generic "Valles altitude" value. It should consume a terrain provider returning elevation plus uncertainty and provenance at the requested latitude/longitude.
 
-MOLA-derived Mars topography provides a suitable initial reference source. USGS describes a MOLA-based global DEM and reports approximately 100 m horizontal-position accuracy and about 1 m radial accuracy for the underlying points, while also documenting interpolation gaps and areoid uncertainty. citeturn0search2 NASA's current open-data catalog continues to expose the MOLA mission gridded records. citeturn0search4
+MOLA-derived Mars topography provides a suitable initial reference source. USGS describes a MOLA-based global DEM and reports approximately 100 m horizontal-position accuracy and about 1 m radial accuracy for the underlying points, while also documenting interpolation gaps and areoid uncertainty. NASA's current open-data catalog continues to expose the MOLA mission gridded records.
 
-For Valles specifically, the USGS geologic map distinguishes the Noctis Labyrinthus plateau, the Valles Marineris province, and the eastern canyon province, reinforcing the architectural rule that "Valles Marineris" is a region containing materially different terrain and geology rather than one anchor site. citeturn0search1
+For Valles specifically, the USGS geologic map distinguishes the Noctis Labyrinthus plateau, the Valles Marineris province, and the eastern canyon province, reinforcing the architectural rule that "Valles Marineris" is a region containing materially different terrain and geology rather than one anchor site.
 
 The next terrain interface should therefore return something like:
 
@@ -191,7 +191,7 @@ No site-ranking function should consume this directly. It should feed constraint
 
 ## Ephemeris boundary confirmed
 
-JPL's planetary-satellite ephemeris service publishes SPK files intended for use with the NAIF SPICE toolkit, including Martian satellite ephemerides. citeturn0search6 NAIF explicitly states that SPICE is also used for engineering tasks. citeturn0search0
+JPL's planetary-satellite ephemeris service publishes SPK files intended for use with the NAIF SPICE toolkit, including Martian satellite ephemerides. NAIF explicitly states that SPICE is also used for engineering tasks.
 
 This makes the intended T2/T3 interface:
 
