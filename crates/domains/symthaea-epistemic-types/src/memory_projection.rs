@@ -41,6 +41,10 @@ impl MemoryProjectionRef {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MemoryProvenance {
+    /// Stable identity of the canonical semantic object when one is known.
+    /// This is deliberately optional: local cognitive memory may exist before admission to the canonical fabric.
+    pub canonical_identity: Option<String>,
+    /// Stable identity of this memory record across persistence/retrieval projections.
     pub memory_id: String,
     pub memory_kind: MemoryKind,
     pub created_at: String,
@@ -90,6 +94,7 @@ mod tests {
     #[test]
     fn provenance_family_is_stable_across_retrieval_indexes() {
         let a = MemoryProvenance {
+            canonical_identity: Some("claim:abc".into()),
             memory_id: "mem-a".into(), memory_kind: MemoryKind::Vector,
             created_at: "2026-09-29T00:00:00Z".into(),
             source_event: Some("event-1".into()), canonical_artifact_ref: Some("artifact-1".into()),
