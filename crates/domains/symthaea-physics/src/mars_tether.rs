@@ -186,8 +186,7 @@ impl RotatingTetherGeometry {
         Self {
             anchor_position_m: anchor_position,
             direction,
-            endpoint_position_m: endpoint,
-            length_m,
+            endpoint_position_m: endpoint,            length_m,
             endpoint_rotating_velocity_m_s: velocity,
         }
     }
@@ -318,6 +317,15 @@ pub fn assess_anchor_geometry(
     terrain: &TerrainSample,
     minimum_anchor_radius_m: f64,
 ) -> AnchorGeometryAssessment {
+    if !minimum_anchor_radius_m.is_finite() || minimum_anchor_radius_m <= 0.0 {
+        return AnchorGeometryAssessment {
+            state: FeasibilityState::InsufficientEvidence,
+            terrain_usable: false,
+            anchor_position_m: None,
+            radial_distance_to_sync_m: None,
+            reason: "minimum anchor radius is invalid or unspecified",
+        };
+    }
     if !terrain.is_usable() {
         return AnchorGeometryAssessment {
             state: FeasibilityState::InsufficientEvidence,
@@ -377,8 +385,7 @@ pub fn assess_anchor_geometry(
 pub struct TetherMaterial {
     /// Bulk density, kg/m^3.
     pub density_kg_m3: f64,
-    /// Allowable axial stress after all design knock-down factors, Pa.
-    pub allowable_stress_pa: f64,
+    /// Allowable axial stress after all design knock-down factors, Pa.    pub allowable_stress_pa: f64,
 }
 
 impl TetherMaterial {
@@ -627,6 +634,15 @@ mod tests {
         assert_eq!(assessed.state, FeasibilityState::HigherFidelityRequired);
         assert!(assessed.terrain_usable);
         assert!(assessed.radial_distance_to_sync_m.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn invalid_minimum_anchor_radius_produces_insufficient_evidence() {
+        let m = MarsTetherReference::MARS;
+        let anchor = MarsAnchor { latitude_rad: 0.0, longitude_rad: 0.0, elevation_m: 0.0 };
+        let assessed = assess_anchor_geometry(m, anchor, &fixture_terrain(TerrainQuality::Measured), f64::NAN);
+        assert_eq!(assessed.state, FeasibilityState::InsufficientEvidence);
+        assert!(assessed.anchor_position_m.is_none());
     }
 
     #[test]
