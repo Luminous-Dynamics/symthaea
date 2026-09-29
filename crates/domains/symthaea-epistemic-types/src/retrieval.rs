@@ -68,7 +68,9 @@ pub enum ReceiptVerificationError {
     DuplicateSelectedIdentity,
     DuplicateRepresentationBinding,
     DuplicateExclusion,
+    DuplicateRetrievalProfileVersion,
     EmptyRepresentationDigest,
+    EmptyRetrievalProfileVersion,
     UnselectedRepresentationIdentity,
 }
 
@@ -117,6 +119,14 @@ impl MemoryRetrievalReceipt {
         });
         if exclusions.windows(2).any(|pair| pair[0] == pair[1]) {
             return Err(ReceiptVerificationError::DuplicateExclusion);
+        }
+        let mut profiles = self.retrieval_profile_versions.clone();
+        if profiles.iter().any(|profile| profile.is_empty()) {
+            return Err(ReceiptVerificationError::EmptyRetrievalProfileVersion);
+        }
+        profiles.sort();
+        if profiles.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ReceiptVerificationError::DuplicateRetrievalProfileVersion);
         }
         Ok(VerifiedRetrievalReceipt(self.clone()))
     }
@@ -332,6 +342,24 @@ mod tests {
         assert!(profiled.is_self_consistent());
         assert_ne!(profiled.receipt_digest, receipt.receipt_digest);
     }
+    #[test]
+    fn duplicate_profile_versions_are_rejected_even_if_digest_is_recomputed() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut duplicated=receipt;
+        duplicated.retrieval_profile_versions = vec!["algorithm:v1".into(), "algorithm:v1".into()];
+        duplicated.receipt_digest=duplicated.canonical_digest().unwrap();
+        assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateRetrievalProfileVersion));
+    }
+
+    #[test]
+    fn empty_profile_version_is_rejected() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut malformed=receipt;
+        malformed.retrieval_profile_versions = vec!["".into()];
+        malformed.receipt_digest=malformed.canonical_digest().unwrap();
+        assert_eq!(malformed.verify(), Err(ReceiptVerificationError::EmptyRetrievalProfileVersion));
+    }
+
     #[test] fn verification_digest_is_not_producer_authentication() {
         let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
         // A party able to rewrite the receipt can recompute an unkeyed digest.
