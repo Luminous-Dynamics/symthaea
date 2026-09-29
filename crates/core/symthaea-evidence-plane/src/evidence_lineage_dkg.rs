@@ -428,7 +428,7 @@ impl EvidenceLineageDkgProjection {
         nodes.sort_by_key(|n| (node_type(n.node_type), n.node_id.clone(), n.record_digest.clone()));
         edges.sort_by_key(|e| (e.source_node_id.clone(), edge_type(e.edge_type), e.target_node_id.clone()));
         let mut p = Self {
-            projection_version: "1.1.0".into(),
+            projection_version: "1.2.0".into(),
             nodes,
             edges,
             projection_digest: String::new(),
@@ -440,7 +440,7 @@ impl EvidenceLineageDkgProjection {
     pub fn verify_integrity(&self) -> bool {
         let unique_nodes = self.nodes.iter().map(|n| n.node_id.as_str()).collect::<std::collections::BTreeSet<_>>().len() == self.nodes.len();
         let unique_edges = self.edges.iter().map(|e| (&e.source_node_id, e.edge_type, &e.target_node_id)).collect::<std::collections::BTreeSet<_>>().len() == self.edges.len();
-        self.projection_version == "1.1.0"
+        self.projection_version == "1.2.0"
             && self.projection_digest == self.digest()
             && unique_nodes
             && unique_edges
