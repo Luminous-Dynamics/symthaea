@@ -201,10 +201,6 @@ pub fn best_integer_level() -> SimdLevel {
 pub fn best_popcount_level() -> SimdLevel {
     if has_avx512_vpopcntdq() {
         SimdLevel::Avx512
-    } else if has_avx2() && has_popcnt() {
-        SimdLevel::Avx2
-    } else if has_popcnt() {
-        SimdLevel::Sse41
     } else if has_neon() {
         SimdLevel::Neon
     } else {
