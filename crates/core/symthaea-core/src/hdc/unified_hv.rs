@@ -1180,6 +1180,30 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "ContinuousHV::bundle requires all vectors to have the same dimension")]
+    fn test_continuous_bundle_rejects_mixed_dimensions() {
+        let a = ContinuousHV::zero(128);
+        let b = ContinuousHV::zero(64);
+        let _ = ContinuousHV::bundle(&[&a, &b]);
+    }
+
+    #[test]
+    #[should_panic(expected = "ContinuousHV::weighted_bundle requires all vectors to have the same dimension")]
+    fn test_continuous_weighted_bundle_rejects_mixed_dimensions() {
+        let a = ContinuousHV::zero(128);
+        let b = ContinuousHV::zero(64);
+        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0, 1.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "ContinuousHV::weighted_bundle requires one weight per vector")]
+    fn test_continuous_weighted_bundle_rejects_weight_count_mismatch() {
+        let a = ContinuousHV::zero(128);
+        let b = ContinuousHV::zero(128);
+        let _ = ContinuousHV::weighted_bundle(&[&a, &b], &[1.0]);
+    }
+
+    #[test]
     fn test_continuous_bundling_similar() {
         let a = ContinuousHV::random(HDC_DIMENSION, 42);
         let b = ContinuousHV::random(HDC_DIMENSION, 43);
