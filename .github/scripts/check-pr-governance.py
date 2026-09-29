@@ -181,20 +181,37 @@ REQUIRED_ROOT_WORKFLOW_SNIPPETS = (
 FORBIDDEN_ROOT_WORKFLOW_SNIPPETS = (
     "ref: ${{ github.event.pull_request.head.sha }}",
     "ref: refs/pull/${{ github.event.pull_request.number }}/merge",
+    "repository: ${{ github.event.pull_request.head.repo.full_name }}",
+    "allow-unsafe-pr-checkout: true",
     "gh pr checkout",
+    "git checkout \\${PR_HEAD_SHA}",
+    "git checkout refs/pull/",
+    "actions/download-artifact",
 )
 
-def validate_root_workflow_contract(base: str) -> None:
-    text = read_at_commit(base, ROOT_WORKFLOW_PATH)
+def validate_root_workflow_text(text: str) -> None:
     missing = [snippet for snippet in REQUIRED_ROOT_WORKFLOW_SNIPPETS if snippet not in text]
     if missing:
-        raise GovernanceError(f"{ROOT_WORKFLOW_PATH}: trusted-base workflow contract missing: {missing}")
+        raise GovernanceError(
+            f"{ROOT_WORKFLOW_PATH}: trusted-base workflow contract missing: {missing}"
+        )
     forbidden = [snippet for snippet in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS if snippet in text]
-    checkout_lines = [line.strip() for line in text.splitlines() if line.strip().startswith("uses: actions/checkout@")]
-    if any(not re.fullmatch(r"uses: actions/checkout@[0-9a-f]{40}", line) for line in checkout_lines):
+    checkout_lines = [
+        line.strip() for line in text.splitlines()
+        if line.strip().startswith("uses: actions/checkout@")
+    ]
+    if any(
+        not re.fullmatch(r"uses: actions/checkout@[0-9a-f]{40}", line)
+        for line in checkout_lines
+    ):
         raise GovernanceError(f"{ROOT_WORKFLOW_PATH}: actions/checkout must use a full commit SHA")
     if forbidden:
-        raise GovernanceError(f"{ROOT_WORKFLOW_PATH}: forbidden untrusted-checkout/execution pattern: {forbidden}")
+        raise GovernanceError(
+            f"{ROOT_WORKFLOW_PATH}: forbidden untrusted-code pattern: {forbidden}"
+        )
+
+def validate_root_workflow_contract(base: str) -> None:
+    validate_root_workflow_text(read_at_commit(base, ROOT_WORKFLOW_PATH))
 def validate_declared_roots(base: str, head: str) -> None:
     for match, path, _authority in REQUIRED_CLASS_A_ROOTS:
         if not (root_exists(base, match, path) or root_exists(head, match, path)):
@@ -403,6 +420,47 @@ def self_test() -> None:
         pass
     else:
         raise AssertionError("malformed rename records must be rejected")
+
+    # Adversarial state-transition matrix: protected-root deletion, rename,
+    # copy, and mixed-authority transitions all fail closed.
+    assert parse_name_status("D\tsrc/safety/agent.rs\n") == [
+        "src/safety/agent.rs"
+    ]
+    assert parse_name_status(
+        "R100\tsrc/safety/agent.rs\tsrc/safety/renamed.rs\n"
+    ) == [
+        "src/safety/agent.rs",
+        "src/safety/renamed.rs",
+    ]
+    assert parse_name_status(
+        "C100\tsrc/safety/agent.rs\tsrc/safety/copied.rs\n"
+    ) == [
+        "src/safety/agent.rs",
+        "src/safety/copied.rs",
+    ]
+    assert approved_subject("emergency-safety(root): coordinated", {"safety", "governance"})
+    assert not approved_subject("safety(root): coordinated", {"safety", "governance"})
+    assert not approved_subject("governance(root): coordinated", {"safety", "governance"})
+
+    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS)
+    validate_root_workflow_text(trusted_workflow)
+    for forbidden in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS:
+        try:
+            validate_root_workflow_text(f"{trusted_workflow}\n{forbidden}")
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError(
+                f"root workflow forbidden pattern must fail closed: {forbidden!r}"
+            )
+    try:
+        validate_root_workflow_text(
+            trusted_workflow.replace("actions/checkout@", "actions/checkout@v6")
+        )
+    except GovernanceError:
+        pass
+    else:
+        raise AssertionError("unpinned checkout must fail closed")
 
     with tempfile.TemporaryDirectory() as td:
         policy_path = Path(td) / "policy.json"
