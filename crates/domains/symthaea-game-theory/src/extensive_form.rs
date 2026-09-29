@@ -52,10 +52,15 @@ pub enum HistoryEvent {
 /// Player-local action-observation history. Private world events are not exposed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlayerHistoryEvent {
-    OwnAction { state: DecisionStateId, action: ActionId },
-    ObservedAction { state: DecisionStateId, player: PlayerId, action: ActionId },
-    ChanceOutcome { state: DecisionStateId, outcome: ChanceOutcomeId },
-    Observation { state: DecisionStateId, observation: ObservationId },
+    /// The player remembers their own action, but not an omniscient world-state identifier.
+    OwnAction { action: ActionId },
+    /// A visible opponent action. The event carries only semantically observable identity.
+    ObservedAction { player: PlayerId, action: ActionId },
+    /// A visible chance outcome. The outcome identity is semantic; the source/destination
+    /// world-state identities are intentionally absent.
+    ChanceOutcome { outcome: ChanceOutcomeId },
+    /// A player-specific semantic observation. Concrete state identity is not observable.
+    Observation { observation: ObservationId },
 }
 
 /// Semantic mapping from a concrete history to a player's information set.
@@ -111,18 +116,18 @@ fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<Pla
     history.iter().filter_map(|event| match event {
         HistoryEvent::Decision { state, player: actor, action, visibility, .. } => {
             if *actor == player {
-                Some(PlayerHistoryEvent::OwnAction { state: *state, action: *action })
+                Some(PlayerHistoryEvent::OwnAction { action: *action })
             } else if visibility.visible_to(player, Some(*actor)) {
-                Some(PlayerHistoryEvent::ObservedAction { state: *state, player: *actor, action: *action })
+                Some(PlayerHistoryEvent::ObservedAction { player: *actor, action: *action })
             } else {
                 None
             }
         }
         HistoryEvent::Chance { state, outcome, visibility, .. } => visibility.visible_to(player, None).then_some(
-            PlayerHistoryEvent::ChanceOutcome { state: *state, outcome: *outcome }
+            PlayerHistoryEvent::ChanceOutcome { outcome: *outcome }
         ),
         HistoryEvent::Observation { state, observer, observation } => (*observer == player).then_some(
-            PlayerHistoryEvent::Observation { state: *state, observation: *observation }
+            PlayerHistoryEvent::Observation { observation: *observation }
         ),
     }).collect()
 }
