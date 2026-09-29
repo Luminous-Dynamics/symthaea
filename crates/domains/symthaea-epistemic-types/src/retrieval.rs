@@ -335,6 +335,7 @@ mod tests {
         let r=MemoryRetrievalRequest{mode:RetrievalMode::Historical,frontier_ref:None,query:"x".into(),max_results:1};
         assert_eq!(try_retrieve(&r,Vec::new()),Err(RetrievalRequestError::MissingHistoricalFrontier));
         assert_eq!(MemoryRetrievalRequest::historical("","x",1).validate(),Err(RetrievalRequestError::EmptyHistoricalFrontier));
+        assert_eq!(MemoryRetrievalRequest::historical(" \t\n","x",1).validate(),Err(RetrievalRequestError::WhitespaceOnlyHistoricalFrontier));
     }
     #[test] fn receipt_is_self_consistent_and_binds_selection_metadata() {
         let (_g, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
@@ -365,6 +366,15 @@ mod tests {
         malformed.retrieval_profile_versions = vec!["".into()];
         malformed.receipt_digest=malformed.canonical_digest().unwrap();
         assert_eq!(malformed.verify(), Err(ReceiptVerificationError::EmptyRetrievalProfileVersion));
+    }
+
+    #[test]
+    fn whitespace_only_profile_version_is_rejected() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut malformed=receipt;
+        malformed.retrieval_profile_versions = vec![" \t\n".into()];
+        malformed.receipt_digest=malformed.canonical_digest().unwrap();
+        assert_eq!(malformed.verify(), Err(ReceiptVerificationError::WhitespaceOnlyRetrievalProfileVersion));
     }
 
     #[test] fn verification_digest_is_not_producer_authentication() {
