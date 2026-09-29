@@ -365,6 +365,60 @@ mod tests {
     }
 
     #[test]
+    fn equatorial_vertical_geometry_reaches_sync_at_expected_length() {
+        let m = MarsTetherReference::MARS;
+        let anchor = MarsAnchor {
+            latitude_rad: 0.0,
+            longitude_rad: 0.0,
+            elevation_m: 0.0,
+        };
+        let g = RotatingTetherGeometry::from_anchor(
+            m,
+            anchor,
+            0.0,
+            PI / 2.0,
+            m.synchronous_altitude_m(),
+        );
+        assert!((g.endpoint_position_m.norm_m() - m.synchronous_radius_m()).abs() < 5.0);
+        assert!(g.endpoint_rotating_velocity_m_s.y_m > 1400.0);
+        assert!(g.endpoint_rotating_velocity_m_s.x_m.abs() < 1e-9);
+    }
+
+    #[test]
+    fn off_equator_local_vertical_has_expected_components() {
+        let anchor = MarsAnchor {
+            latitude_rad: 30.0_f64.to_radians(),
+            longitude_rad: 45.0_f64.to_radians(),
+            elevation_m: 0.0,
+        };
+        let up = anchor.enu_basis().2;
+        let direction = anchor.tether_direction(0.0, PI / 2.0);
+        assert!((direction.x_m - up.x_m).abs() < 1e-12);
+        assert!((direction.y_m - up.y_m).abs() < 1e-12);
+        assert!((direction.z_m - up.z_m).abs() < 1e-12);
+    }
+
+    #[test]
+    fn outward_tether_intersects_sync_sphere_when_geometry_allows_it() {
+        let m = MarsTetherReference::MARS;
+        let anchor = MarsAnchor {
+            latitude_rad: 0.0,
+            longitude_rad: 0.0,
+            elevation_m: 0.0,
+        };
+        let g = RotatingTetherGeometry::from_anchor(
+            m,
+            anchor,
+            0.0,
+            PI / 2.0,
+            1.0e6,
+        );
+        let hit = g.sphere_intersection(m.synchronous_radius_m()).expect("sync sphere");
+        assert!(hit.0 > 0.0);
+        assert!((hit.1.norm_m() - m.synchronous_radius_m()).abs() < 1e-6);
+    }
+
+    #[test]
     fn effective_acceleration_changes_sign_at_sync() {
         let m = MarsTetherReference::MARS;
         assert!(m.effective_radial_acceleration_m_s2(m.radius_m) < -3.69);
