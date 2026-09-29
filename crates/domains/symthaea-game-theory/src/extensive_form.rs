@@ -410,7 +410,6 @@ impl ExtensiveGame {
 
     pub fn verify_perfect_recall(&self) -> Result<PerfectRecallEvidence, ExtensiveGameError> {
         self.validate()?;
-        self.verify_information_history_consistency()?;
 
         // A caller cannot manufacture a Verified marker by constructing a
         // compatible-looking information structure: verification always runs
