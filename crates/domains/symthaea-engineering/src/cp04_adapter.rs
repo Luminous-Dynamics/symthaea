@@ -527,6 +527,44 @@ mod tests {
     }
 
     #[test]
+    fn contract_vectors_pin_every_digest_boundary() {
+        let fixture = include_str!("../../../../docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json");
+        let vectors = include_str!("../../../../docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json");
+        let artifact: Cp04QualificationArtifact = serde_json::from_str(fixture).unwrap();
+        let vectors: serde_json::Value = serde_json::from_str(vectors).unwrap();
+
+        assert_eq!(artifact.source_graph_digest, vectors["source_graph_digest"]);
+        assert_eq!(artifact.projection_digest, vectors["projection_digest"]);
+        assert_eq!(artifact.artifact_digest, vectors["artifact_digest"]);
+
+        let actual_identities: Vec<_> = artifact.nodes.iter().map(|n| n.identity_digest.clone()).collect();
+        let mut expected_identities: Vec<String> = vectors["identity_digests"]
+            .as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_owned()).collect();
+        let mut actual_identities = actual_identities;
+        actual_identities.sort();
+        expected_identities.sort();
+        assert_eq!(actual_identities, expected_identities);
+
+        let actual_relations: Vec<_> = artifact.edges.iter().map(|e| e.relation_digest.clone()).collect();
+        let mut expected_relations: Vec<String> = vectors["relation_digests"]
+            .as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_owned()).collect();
+        let mut actual_relations = actual_relations;
+        actual_relations.sort();
+        expected_relations.sort();
+        assert_eq!(actual_relations, expected_relations);
+
+        let unicode = &vectors["utf8_identity_vector"];
+        let identity = EngineeringObjectId::new(
+            unicode["namespace"].as_str().unwrap(),
+            unicode["object_kind"].as_str().unwrap(),
+            unicode["canonical_identifier"].as_str().unwrap(),
+            unicode["version"].as_str().unwrap(),
+            unicode["content_digest"].as_str().unwrap(),
+        ).unwrap();
+        assert_eq!(identity.identity_digest(), unicode["identity_digest"]);
+    }
+
+    #[test]
     fn adapter_preserves_identity_and_authority_ceiling() {
         let artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
         assert_eq!(artifact.authority_ceiling, AuthorityCeiling::SyntheticQualification);
