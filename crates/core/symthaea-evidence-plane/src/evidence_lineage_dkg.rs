@@ -418,6 +418,18 @@ pub enum DkgProjectionError {
     CommitmentObservationMismatch, AssessmentMismatch, ReplicationMismatch, CriterionEvidenceMismatch,
     EmptySupersessionHistory, DuplicateEvidenceId, SelfSupersession, MissingSupersessionParent,
     BranchingSupersession, SupersessionCycleOrDisconnected,
+    InvalidCanonicalTopology,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DkgSemanticError {
+    InvalidIntegrity,
+    WrongNodeCardinality(&'static str),
+    UnexpectedAuditNode,
+    WrongEdgeCardinality { source: String, edge: String, target: String },
+    InvalidSupersessionTarget(String),
+    SupersessionMetadataMismatch(String),
+    UnexpectedEdge,
 }
 
 fn put(h: &mut Sha256, s: &str) {
