@@ -67,16 +67,15 @@ pub fn project(
     if source_dim == target_dim {
         return Err(ContinuousProjectionError::SameDimension);
     }
-    if target_dim == 0 || target_dim > source_dim {
+    if target_dim == 0 {
+        return Err(ContinuousProjectionError::InvalidTarget);
+    }
+    if target_dim > source_dim {
         return Err(ContinuousProjectionError::ExpansionUnsupported);
     }
     if !is_power_of_two(source_dim) || !is_power_of_two(target_dim) {
         return Err(ContinuousProjectionError::NonPowerOfTwo);
     }
-    if target_dim > source_dim {
-        return Err(ContinuousProjectionError::InvalidTarget);
-    }
-
     match family {
         ContinuousProjectionFamily::HadamardTruncateV1 => {
             let mut transformed = source.as_slice().to_vec();
