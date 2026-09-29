@@ -13,25 +13,25 @@
 //!
 //! | Type | Representation | Use Case |
 //! |------|---------------|----------|
-//! | BinaryHV | [u8; 2048] (16,384 bits), Copy, SIMD-accelerated | Fast binding, memory, STT encoding |
-//! | ContinuousHV | Vec<f32>, configurable dimension | Gradients, phi computation, learning |
-//! | HV | Enum wrapping both | Unified API across representations |
+//! | [`BinaryHV`](hdc::BinaryHV) | `[u8; 2048]` (16,384 bits), `Copy`, SIMD-accelerated | Fast binding, memory, STT encoding |
+//! | [`ContinuousHV`](hdc::ContinuousHV) | `Vec<f32>`, configurable dimension | Gradients, phi computation, learning |
+//! | [`HV`](hdc::HV) | Enum wrapping both | Unified API across representations |
 //!
-//! Backward-compatible alias RealHV is available but new code should
-//! use BinaryHV and ContinuousHV directly.
+//! Backward-compatible alias `RealHV` is available but new code should
+//! use `BinaryHV` and `ContinuousHV` directly.
 //!
 //! ## Modules
 //!
-//! - hdc — Hyperdimensional computing: vector types, encoding, binding, bundling,
+//! - **[`hdc`]** — Hyperdimensional computing: vector types, encoding, binding, bundling,
 //!   similarity search, attention, memory, and consciousness topology
-//! - consciousness_metrics — True IIT consciousness metrics: entropy estimation,
+//! - **[`consciousness_metrics`]** — True IIT consciousness metrics: entropy estimation,
 //!   MIP search, Phi* computation, temporal/causal analysis
-//! - physics — Physics-grounded modeling: periodic table, emergence chains,
+//! - **[`physics`]** — Physics-grounded modeling: periodic table, emergence chains,
 //!   chemical kinetics, and thermodynamic consciousness
-//! - phi_engine — Integrated Information (Φ) calculation engine
-//! - core — Core consciousness state types and configuration
-//! - genesis — System bootstrap and initialization
-//! - observability — Metrics, tracing, and introspection
+//! - **[`phi_engine`]** — Integrated Information (Φ) calculation engine
+//! - **[`core`]** — Core consciousness state types and configuration
+//! - **[`genesis`]** — System bootstrap and initialization
+//! - **[`observability`]** — Metrics, tracing, and introspection
 
 #![warn(missing_docs)]
 #![allow(clippy::needless_range_loop)]
@@ -50,13 +50,13 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::should_implement_trait)]
 #![allow(clippy::manual_memcpy)]
-#![allow(clippy::only_used_on_recursion)]
+#![allow(clippy::only_used_in_recursion)]
 #![allow(clippy::redundant_guards)]
 #![allow(clippy::unwrap_or_default)]
 #![allow(clippy::duplicated_attributes)]
 #![allow(clippy::manual_is_multiple_of)]
 // Suppress test-harness-generated deprecated warnings for phi_real module tests.
-// phi_real is deprecated (renamed to spectral_connectivity), but the linter
+// phi_real is #![deprecated] (renamed to spectral_connectivity), but the linter
 // hook restores its tests; the test harness references deprecated test constants
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
