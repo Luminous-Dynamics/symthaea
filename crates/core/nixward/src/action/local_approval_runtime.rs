@@ -335,6 +335,52 @@ mod tests {
     }
 
     #[test]
+    fn restart_rejects_old_submission_after_new_runtime_takes_over() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime_path = parent.path().join("runtime");
+        let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        let now = wall_ms();
+        let installed = first
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            installed.request(),
+            LocalApprovalDecisionKindV1::Approved,
+            UnixMillisV1::new(wall_ms()),
+        )
+        .unwrap();
+        let old_socket = first.socket_path().to_path_buf();
+        let old_request_id = installed.request_id().to_string();
+        drop(first);
+
+        let second = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        assert_ne!(second.daemon_incarnation_ref(), installed.request().daemon_incarnation_id);
+        assert_ne!(second.socket_path(), old_socket.as_path());
+
+        let new_socket = second.socket_path().to_path_buf();
+        let client = thread::spawn(move || submit_local_approval_v1(&new_socket, &submission));
+        let result = second.accept_and_consume();
+        let client_result = client.join().unwrap();
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Socket(_))
+                | Err(LocalApprovalRuntimeErrorV1::RequestStore(
+                    LocalApprovalRequestStoreErrorV1::RequestNotPending
+                ))
+        ));
+        assert!(client_result.is_err());
+        assert_eq!(second.pending_count().unwrap(), 0);
+        assert!(!old_request_id.is_empty());
+    }
+
+    #[test]
     fn two_independent_runtimes_do_not_share_incarnation_or_transport_identity() {
         let first_parent = tempfile::tempdir().unwrap();
         let second_parent = tempfile::tempdir().unwrap();
