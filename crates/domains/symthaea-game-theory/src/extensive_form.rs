@@ -107,7 +107,7 @@ pub struct ExtensiveGame {
     pub observations: HashMap<DecisionStateId, Vec<Observation>>,
 }
 
-fn project_player_history(player: PlayerId, history: &[HistoryEvent]) -> Vec<PlayerHistoryEvent> {
+fn project_player_history(player: PlayerId, history: &[PlayerHistoryEvent]) -> Vec<PlayerHistoryEvent> {
     history.iter().filter_map(|event| match event {
         HistoryEvent::Decision { state, player: actor, action, visibility, .. } => {
             if *actor == player {
@@ -898,7 +898,7 @@ mod tests {
                 &self,
                 _player: PlayerId,
                 state: DecisionStateId,
-                _history: &[HistoryEvent],
+                _history: &[PlayerHistoryEvent],
             ) -> Result<InformationSetId, InformationEncodingError> {
                 if state == DecisionStateId(0) {
                     Ok(InformationSetId(0))
@@ -939,22 +939,15 @@ mod tests {
                 &self,
                 _player: PlayerId,
                 _state: DecisionStateId,
-                history: &[HistoryEvent],
+                history: &[PlayerHistoryEvent],
             ) -> Result<InformationSetId, InformationEncodingError> {
                 assert!(history.iter().any(|event| matches!(
                     event,
-                    HistoryEvent::Chance {
-                        outcome: ChanceOutcomeId(42),
-                        ..
-                    }
+                    PlayerHistoryEvent::ChanceOutcome { outcome: ChanceOutcomeId(42), .. }
                 )));
                 assert!(history.iter().any(|event| matches!(
                     event,
-                    HistoryEvent::Observation {
-                        observer: PlayerId(0),
-                        observation: ObservationId(7),
-                        ..
-                    }
+                    PlayerHistoryEvent::Observation { observation: ObservationId(7), .. }
                 )));
                 Ok(InformationSetId(0))
             }
@@ -1030,7 +1023,7 @@ mod tests {
                 &self,
                 _player: PlayerId,
                 _state: DecisionStateId,
-                _history: &[HistoryEvent],
+                _history: &[PlayerHistoryEvent],
             ) -> Result<InformationSetId, InformationEncodingError> {
                 Ok(InformationSetId(99))
             }
