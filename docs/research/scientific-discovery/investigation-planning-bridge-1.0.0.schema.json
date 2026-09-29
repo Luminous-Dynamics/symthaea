@@ -1,0 +1,32 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"Scientific Investigation Planning Bridge Receipt",
+  "type":"object",
+  "additionalProperties":false,
+  "required":[
+    "receipt_version","investigation_id","planning_trace_digest",
+    "model_council_artifact_digest","compiled_prediction_artifact_digest",
+    "prospective_commitment_digest","experiment_selection_artifact_digest",
+    "prediction_stage_id","experiment_selection_stage_id","receipt_digest"
+  ],
+  "properties":{
+    "receipt_version":{"const":"1.0.0"},
+    "investigation_id":{"type":"string","minLength":1},
+    "planning_trace_digest":{"$ref":"#/$defs/digest"},
+    "model_council_artifact_digest":{"$ref":"#/$defs/digest"},
+    "compiled_prediction_artifact_digest":{"$ref":"#/$defs/digest"},
+    "prospective_commitment_digest":{"$ref":"#/$defs/digest"},
+    "experiment_selection_artifact_digest":{"$ref":"#/$defs/digest"},
+    "prediction_stage_id":{"type":"string","minLength":1},
+    "experiment_selection_stage_id":{"type":"string","minLength":1},
+    "execution_stage_id":{"type":["string","null"]},
+    "observation_stage_id":{"type":["string","null"]},
+    "receipt_digest":{"$ref":"#/$defs/digest"}
+  },
+  "$defs":{
+    "digest":{
+      "type":"string",
+      "pattern":"^sha256:[0-9a-fA-F]{64}$"
+    }
+  }
+}

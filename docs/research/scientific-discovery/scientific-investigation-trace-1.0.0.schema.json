@@ -1,0 +1,38 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.ai/schemas/scientific-investigation-trace-1.0.0.schema.json",
+  "title":"Symthaea Scientific Investigation Trace 1.0.0",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["trace_version","investigation_id","stages","trace_digest"],
+  "properties":{
+    "trace_version":{"const":"1.0.0"},
+    "investigation_id":{"type":"string","minLength":1},
+    "challenge_id":{"type":["string","null"]},
+    "stages":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "additionalProperties":false,
+        "required":["stage_id","kind","artifact","outcome","parent_stage_ids"],
+        "properties":{
+          "stage_id":{"type":"string","minLength":1},
+          "kind":{"enum":["hypothesis","model_council_selection","prospective_prediction","experiment_selection","external_execution","observation","independent_assessment","replication","criterion_evidence","provenance_proof"]},
+          "artifact":{
+            "type":"object",
+            "additionalProperties":false,
+            "required":["artifact_id","artifact_digest"],
+            "properties":{
+              "artifact_id":{"type":"string","minLength":1},
+              "artifact_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+            }
+          },
+          "outcome":{"enum":["pending","supports","contradicts","null","inconclusive","procedural_invalid","partial"]},
+          "parent_stage_ids":{"type":"array","items":{"type":"string","minLength":1},"uniqueItems":true}
+        }
+      }
+    },
+    "trace_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "description":"Provenance/orchestration trace only. It preserves the distinction between computational reasoning, experiment selection, external execution, observation, independent assessment, replication, and official criterion evidence. It does not establish scientific truth or allow computational artifacts to satisfy external criteria."
+}

@@ -533,3 +533,6 @@ mod tests {
         assert_eq!(counters.get("never_touched"), 0.0);
     }
 }
+
+pub mod scientific_investigation_trace;
+pub mod investigation_planning_bridge;
