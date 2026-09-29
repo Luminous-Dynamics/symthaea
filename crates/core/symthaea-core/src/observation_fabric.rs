@@ -25,6 +25,30 @@ pub enum DisclosureClass {
     Public, Restricted, Private, Secret,
 }
 
+/// Verification state of the exact asset bytes referenced by an observation.
+///
+/// This is deliberately independent from provenance verification: proving that
+/// bytes match a hash does not prove who produced them or that their contents
+/// are truthful.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AssetIntegrity {
+    Unverified,
+    HashVerified,
+    VerificationFailed,
+}
+
+/// Verification state of the producer/credential/lineage associated with an observation.
+///
+/// This does not assert that the observation's substantive content is true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ProvenanceVerification {
+    Unverified,
+    SignatureVerified,
+    CredentialVerified,
+    ChainVerified,
+    VerificationFailed,
+}
+
 /// What an observation is allowed to disclose.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DisclosurePolicy {
@@ -100,6 +124,22 @@ impl AssetRef {
             integrity: AssetIntegrity::HashVerified,
             media_type: None,
             catalog_id: None,
+        }
+    }
+
+    /// Recompute the digest over exact bytes and update the integrity state.
+    ///
+    /// A mismatch is recorded explicitly so callers cannot accidentally retain
+    /// a stale "verified" state after inspecting different bytes.
+    pub fn verify_bytes(&mut self, bytes: &[u8]) -> Result<(), ObservationValidationError> {
+        self.validate()?;
+        let expected = blake3::hash(bytes).to_hex().to_string();
+        if expected == self.content_hash {
+            self.integrity = AssetIntegrity::HashVerified;
+            Ok(())
+        } else {
+            self.integrity = AssetIntegrity::VerificationFailed;
+            Err(ObservationValidationError::AssetHashMismatch)
         }
     }
 
@@ -193,6 +233,11 @@ pub struct Observation {
     pub modality: ObservationModality,
     pub time: ObservationTime,
     pub location: Option<ObservationLocation>,
+    /// Stable identifier for the real-world or conceptual feature being observed.
+    ///
+    /// Keeping this distinct from sensor/platform identity follows the OGC
+    /// observation model, where an observation targets a feature of interest.
+    pub feature_of_interest_id: Option<String>,
     pub quality: ObservationQuality,
     pub provenance: ObservationProvenance,
     pub asset: Option<AssetRef>,
@@ -210,6 +255,9 @@ impl Observation {
         }
         if let Some(location) = self.location {
             location.validate()?;
+        }
+        if self.feature_of_interest_id.as_deref().is_some_and(|id| id.trim().is_empty()) {
+            return Err(ObservationValidationError::EmptyFeatureOfInterestId);
         }
         self.quality.validate()?;
         if self.provenance.verification != ProvenanceVerification::Unverified
@@ -302,6 +350,10 @@ pub enum ObservationValidationError {
     InvalidLocation,
     #[error("quality/confidence is outside valid bounds")]
     InvalidQuality,
+    #[error("feature-of-interest id must not be empty when provided")]
+    EmptyFeatureOfInterestId,
+    #[error("asset bytes do not match the declared content hash")]
+    AssetHashMismatch,
     #[error("unsupported content hash algorithm: {0}")]
     UnsupportedHashAlgorithm(String),
     #[error("content hash must be 64 hexadecimal characters")]
@@ -337,6 +389,7 @@ mod tests {
                 longitude_deg: 20.0,
                 uncertainty_m: 4.0,
             }),
+            feature_of_interest_id: Some("scene-001".into()),
             quality: ObservationQuality {
                 confidence: 0.92,
                 measurement_uncertainty: Some(0.3),
@@ -397,6 +450,28 @@ mod tests {
         assert_eq!(
             observation.validate(),
             Err(ObservationValidationError::SecretRawAssetExport)
+        );
+    }
+
+    #[test]
+    fn asset_hash_verification_rejects_changed_bytes() {
+        let mut asset = AssetRef::blake3(b"original");
+        assert_eq!(
+            asset.verify_bytes(b"changed"),
+            Err(ObservationValidationError::AssetHashMismatch)
+        );
+        assert_eq!(asset.integrity, AssetIntegrity::VerificationFailed);
+        assert_eq!(asset.verify_bytes(b"original"), Ok(()));
+        assert_eq!(asset.integrity, AssetIntegrity::HashVerified);
+    }
+
+    #[test]
+    fn empty_feature_of_interest_fails_closed() {
+        let mut observation = fixture();
+        observation.feature_of_interest_id = Some("  ".into());
+        assert_eq!(
+            observation.validate(),
+            Err(ObservationValidationError::EmptyFeatureOfInterestId)
         );
     }
 
