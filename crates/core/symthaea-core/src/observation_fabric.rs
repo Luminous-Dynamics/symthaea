@@ -176,6 +176,8 @@ impl ObservationQuality {
 pub struct ObservationProvenance {
     pub source: SensorIdentity,
     pub verification: ProvenanceVerification,
+    /// Stable reference to the attestation/evidence used for verification.
+    pub attestation_id: Option<String>,
     pub acquired_by: Option<String>,
     pub parent_observation_ids: Vec<String>,
     pub processing_fingerprint: Option<String>,
@@ -210,6 +212,14 @@ impl Observation {
             location.validate()?;
         }
         self.quality.validate()?;
+        if self.provenance.verification != ProvenanceVerification::Unverified
+            && self.provenance.attestation_id.as_deref().is_none_or(str::is_empty)
+        {
+            return Err(ObservationValidationError::MissingVerificationAttestation);
+        }
+        if self.provenance.parent_observation_ids.iter().any(|parent| parent.trim().is_empty() || parent == &self.id) {
+            return Err(ObservationValidationError::InvalidParentObservation);
+        }
         if let Some(asset) = &self.asset {
             asset.validate()?;
         }
@@ -304,6 +314,10 @@ pub enum ObservationValidationError {
     SelfRelation,
     #[error("derived-from relations require derived or shared-upstream independence")]
     DerivedRelationIndependenceMismatch,
+    #[error("verified provenance requires an attestation reference")]
+    MissingVerificationAttestation,
+    #[error("parent observation ids must be non-empty and cannot reference the observation itself")]
+    InvalidParentObservation,
 }
 
 #[cfg(test)]
@@ -331,6 +345,7 @@ mod tests {
             provenance: ObservationProvenance {
                 source: SensorIdentity::new("camera-1"),
                 verification: ProvenanceVerification::Unverified,
+                attestation_id: None,
                 acquired_by: None,
                 parent_observation_ids: Vec::new(),
                 processing_fingerprint: Some("proc-v1".into()),
@@ -442,8 +457,24 @@ mod tests {
     fn verification_axes_remain_separate() {
         let mut observation = fixture();
         observation.provenance.verification = ProvenanceVerification::CredentialVerified;
+        observation.provenance.attestation_id = Some("att-001".into());
         assert_eq!(observation.asset.as_ref().map(|asset| asset.integrity), Some(AssetIntegrity::HashVerified));
         assert_eq!(observation.provenance.verification, ProvenanceVerification::CredentialVerified);
+        assert_eq!(observation.provenance.attestation_id.as_deref(), Some("att-001"));
+    }
+
+    #[test]
+    fn verified_provenance_requires_attestation() {
+        let mut observation = fixture();
+        observation.provenance.verification = ProvenanceVerification::CredentialVerified;
+        assert_eq!(observation.validate(), Err(ObservationValidationError::MissingVerificationAttestation));
+    }
+
+    #[test]
+    fn parent_cannot_self_reference() {
+        let mut observation = fixture();
+        observation.provenance.parent_observation_ids = vec!["obs-001".into()];
+        assert_eq!(observation.validate(), Err(ObservationValidationError::InvalidParentObservation));
     }
 
     #[test]
