@@ -47,7 +47,7 @@ struct Row {
     state_error_mean: f32,
     tau_error_terminal: f32,
     tau_error_mean: f32,
-    hysteresis_error: f32,
+    hysteresis_error: Option<f32>,
     clock_preserved: bool,
     update_count_preserved: bool,
 }
@@ -167,17 +167,19 @@ fn row(source_dim: usize, target_dim: usize, seed: u64, family: Family) -> Row {
         tau_errors.push((high_tau - low_tau).abs());
     }
 
-    let round_trip = convert_hv(
-        &convert_hv(
-            &ContinuousHV::random(source_dim, seed ^ 0x48595354),
-            target_dim,
-            family,
-        ),
-        source_dim,
-        family,
-    );
-    let source_round_trip = ContinuousHV::random(source_dim, seed ^ 0x48595354);
-    let hysteresis_error = normalized_l2(&source_round_trip, &round_trip);
+    let hysteresis_error = match family {
+        Family::LegacyDilate => {
+            let source_round_trip = ContinuousHV::random(source_dim, seed ^ 0x48595354);
+            let round_trip = convert_hv(
+                &convert_hv(&source_round_trip, target_dim, family),
+                source_dim,
+                family,
+            );
+            Some(normalized_l2(&source_round_trip, &round_trip))
+        }
+        // HadamardTruncateV1 deliberately has no invented expansion/pseudo-inverse.
+        Family::HadamardTruncateV1 => None,
+    };
 
     Row {
         schema_version: "hdc-ltc-resolution-trajectory-matrix.v1",
