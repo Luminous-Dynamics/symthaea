@@ -85,6 +85,7 @@ pub enum Cp04AdapterError {
     MissingEndpoint(String),
     DuplicateNode(String),
     InvalidArtifactDigest,
+    SourceMismatch,
 }
 
 impl fmt::Display for Cp04AdapterError {
@@ -98,6 +99,7 @@ impl fmt::Display for Cp04AdapterError {
             Self::MissingEndpoint(digest) => write!(f, "relation endpoint missing from node set: {digest}"),
             Self::DuplicateNode(digest) => write!(f, "duplicate CP-04 node identity: {digest}"),
             Self::InvalidArtifactDigest => write!(f, "CP-04 adapter artifact digest mismatch"),
+            Self::SourceMismatch => write!(f, "CP-04 adapter artifact does not match source projection"),
         }
     }
 }
@@ -223,6 +225,34 @@ impl Cp04QualificationArtifact {
             return Err(Cp04AdapterError::InvalidArtifactDigest);
         }
         Ok(())
+    }
+
+    /// Require the artifact to match the exact validated projection that produced it.
+    ///
+    /// Internal artifact validation proves envelope integrity; this method additionally
+    /// proves lineage preservation against the source projection and therefore prevents
+    /// a caller from changing an edge or identity while merely recomputing the envelope
+    /// digest.
+    pub fn validate_against_projection(
+        &self,
+        projection: &QualificationProjection,
+    ) -> Result<(), Cp04AdapterError> {
+        projection.validate()?;
+        let expected = Self::try_from_projection(projection)?;
+        if self.schema != expected.schema
+            || self.cp04_schema != expected.cp04_schema
+            || self.source_graph_digest != expected.source_graph_digest
+            || self.projection_digest != expected.projection_digest
+            || self.qualification_policy != expected.qualification_policy
+            || self.authority_ceiling != expected.authority_ceiling
+            || self.claim_ceiling != expected.claim_ceiling
+            || self.nodes != expected.nodes
+            || self.edges != expected.edges
+            || self.artifact_digest != expected.artifact_digest
+        {
+            return Err(Cp04AdapterError::SourceMismatch);
+        }
+        self.validate()
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, Cp04AdapterError> {
@@ -366,6 +396,18 @@ mod tests {
         assert_eq!(a, b);
         assert_eq!(a.artifact_digest, b.artifact_digest);
         assert_eq!(a.canonical_bytes().unwrap(), b.canonical_bytes().unwrap());
+    }
+
+    #[test]
+    fn adapter_rejects_tampered_edge_even_if_envelope_digest_is_recomputed() {
+        let projection = projection();
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+        artifact.edges[0].edge_type = "implements".into();
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(matches!(
+            artifact.validate_against_projection(&projection),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
     }
 
     #[test]
