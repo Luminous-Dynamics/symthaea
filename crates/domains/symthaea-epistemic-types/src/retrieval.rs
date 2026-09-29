@@ -151,6 +151,11 @@ impl MemoryRetrievalReceipt {
         Ok(out)
     }
     pub fn canonical_digest(&self) -> Result<String, ReceiptCanonicalizationError> { Ok(sha256_hex(&self.canonical_bytes()?)) }
+    /// Compatibility-only receipt enrichment. Prefer `RetrievalEngine::execute`, which owns
+    /// the execution profile and returns a verified receipt. This method remains public
+    /// temporarily for migration of lower-level callers and must not be used as a
+    /// reasoning authorization step.
+    #[deprecated(note = "prefer RetrievalEngine::execute so retrieval provenance is owned by the execution boundary")]
     pub fn with_retrieval_profile_versions(mut self, versions: impl IntoIterator<Item = String>) -> Self {
         self.retrieval_profile_versions = versions.into_iter().collect();
         self.retrieval_profile_versions.sort();
