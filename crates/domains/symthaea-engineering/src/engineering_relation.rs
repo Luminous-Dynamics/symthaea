@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn serde_round_trip_preserves_relation() {
-        let relation = relation(EngineeringRelationKind::Constrains);
+        let relation = relation(EngineeringRelationKind::Produces);
         let json = serde_json::to_string(&relation).unwrap();
         let restored: EngineeringRelation = serde_json::from_str(&json).unwrap();
         assert_eq!(relation, restored);
