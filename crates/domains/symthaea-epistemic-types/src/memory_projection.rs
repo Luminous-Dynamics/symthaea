@@ -93,6 +93,52 @@ impl ProvenanceRelation {
     }
 }
 
+/// Version of the local structural provenance validator. Bump when validation
+/// semantics change; this is intentionally independent of epistemic truth assessment.
+pub const PROVENANCE_VALIDATOR_VERSION: &str = "melothaea-provenance-structural-v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProvenanceValidationViolation {
+    pub code: String,
+    pub source_memory_id: Option<String>,
+    pub target_memory_id: Option<String>,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProvenanceValidationReport {
+    pub validator_version: String,
+    pub snapshot_digest: String,
+    pub relation_count: usize,
+    pub conforms: bool,
+    pub violations: Vec<ProvenanceValidationViolation>,
+}
+
+impl ProvenanceValidationReport {
+    pub fn from_relations(relations: &[ProvenanceRelation]) -> Self {
+        let mut canonical = relations.to_vec();
+        canonical.sort_by(|a, b| {
+            (&a.source_memory_id, &a.target_memory_id, a.kind as u8, &a.created_at)
+                .cmp(&(&b.source_memory_id, &b.target_memory_id, b.kind as u8, &b.created_at))
+        });
+
+        let bytes = serde_json::to_vec(&canonical).expect("provenance relations are serializable");
+        Self {
+            validator_version: PROVENANCE_VALIDATOR_VERSION.to_owned(),
+            snapshot_digest: sha256_hex(&bytes),
+            relation_count: relations.len(),
+            conforms: true,
+            violations: Vec::new(),
+        }
+    }
+
+    pub fn with_violations(mut self, violations: Vec<ProvenanceValidationViolation>) -> Self {
+        self.conforms = violations.is_empty();
+        self.violations = violations;
+        self
+    }
+}
+
 impl MemoryProvenance {
     pub fn provenance_identity(&self) -> Option<&str> { self.provenance_family.as_deref() }
 
@@ -200,6 +246,25 @@ mod tests {
         let mut self_relation = relation.clone();
         self_relation.target_memory_id = self_relation.source_memory_id.clone();
         assert_eq!(self_relation.validate(), Err("provenance relation cannot self-reference"));
+    }
+
+    #[test]
+    fn validation_report_binds_to_order_independent_snapshot() {
+        let a = ProvenanceRelation {
+            source_memory_id: "derived".into(), target_memory_id: "source".into(),
+            kind: ProvenanceRelationKind::DerivedFrom, created_at: "cycle:2".into(),
+        };
+        let b = ProvenanceRelation {
+            source_memory_id: "revision".into(), target_memory_id: "derived".into(),
+            kind: ProvenanceRelationKind::RevisedFrom, created_at: "cycle:3".into(),
+        };
+        let first = ProvenanceValidationReport::from_relations(&[a.clone(), b.clone()]);
+        let second = ProvenanceValidationReport::from_relations(&[b, a]);
+        assert_eq!(first.snapshot_digest, second.snapshot_digest);
+        assert_eq!(first.relation_count, 2);
+        assert!(first.conforms);
+        assert!(first.violations.is_empty());
+        assert_eq!(first.validator_version, PROVENANCE_VALIDATOR_VERSION);
     }
 
     #[test]
