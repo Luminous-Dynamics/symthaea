@@ -1,0 +1,37 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"Federated Qualified Derivation Receipt",
+  "description":"Provenance-only qualified derivation context for an exact federated output lineage. Activity, plan, and agent fields are assertions and are not authenticated execution evidence.",
+  "type":"object",
+  "additionalProperties":false,
+  "required":["receipt_version","output_lineage_digest","activity_id","activity_record_digest","plan_ref","responsible_agent_id","parent_roles","context_digest"],
+  "properties":{
+    "receipt_version":{"const":"1.0.0"},
+    "output_lineage_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "activity_id":{"type":"string","minLength":1},
+    "activity_record_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "plan_ref":{"type":["string","null"]},
+    "responsible_agent_id":{"type":["string","null"]},
+    "parent_roles":{
+      "type":"array",
+      "items":{
+        "type":"object","additionalProperties":false,
+        "required":["parent_projection_digest","parent_output_record_id","role"],
+        "properties":{
+          "parent_projection_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+          "parent_output_record_id":{"type":"string","minLength":1},
+          "role":{"type":"string","minLength":1}
+        }
+      },
+      "uniqueItems":true
+    },
+    "context_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "x-symthaea-boundary":{
+    "semantic_role":"provenance_only",
+    "execution_authentication":false,
+    "evidence_qualification":false,
+    "truth_establishment":false,
+    "authority_transfer":false
+  }
+}
