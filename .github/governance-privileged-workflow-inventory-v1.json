@@ -1,0 +1,104 @@
+{
+  "schema": "symthaea-privileged-workflow-inventory-v1",
+  "purpose": "Repository-side inventory of GitHub Actions workflows whose trigger or execution context crosses a privileged trust boundary.",
+  "authority_boundary": {
+    "source": "trusted_repository_base_tree",
+    "external_actions_policy": "not_established_by_repository_code",
+    "merge_authorization": "not_established_by_this_inventory"
+  },
+  "workflows": [
+    {
+      "path": ".github/workflows/draft-ci-governor.yml",
+      "trigger": {
+        "event": "pull_request_target",
+        "types": [
+          "converted_to_draft",
+          "ready_for_review"
+        ]
+      },
+      "trust_class": "privileged_pull_request_event",
+      "permissions": {
+        "top_level": {},
+        "jobs": {
+          "cancel-current-draft-full-ci": {
+            "actions": "write",
+            "pull-requests": "read"
+          },
+          "dispatch-ready-full-ci": {
+            "actions": "write",
+            "pull-requests": "read"
+          }
+        }
+      },
+      "secrets_consumed": false,
+      "untrusted_pr_code_checked_out": false,
+      "untrusted_pr_code_executed": false,
+      "third_party_actions": [
+        {
+          "uses": "actions/github-script",
+          "sha": "f28e40c7f34bde8b3046d885e986cb6290c5673b"
+        }
+      ],
+      "purpose": "Transitional lifecycle bridge for dispatching/cancelling full CI on same-repository draft state transitions.",
+      "migration_target": "#4606 native pull_request lifecycle ownership",
+      "external_event_policy": {
+        "event": "pull_request_target",
+        "repository_can_self_attest": false,
+        "required_attestation": "effective enterprise/org/repository Actions policy explicitly permits this event for this workflow"
+      }
+    },
+    {
+      "path": ".github/workflows/qual-mel-epi-001f-independent-receipt.yml",
+      "trigger": {
+        "event": "workflow_run",
+        "types": [
+          "completed"
+        ],
+        "workflows": [
+          "QUAL MEL-EPI-001F exact subject dispatcher"
+        ]
+      },
+      "trust_class": "privileged_workflow_completion_event",
+      "permissions": {
+        "top_level": {
+          "actions": "read",
+          "contents": "read"
+        }
+      },
+      "secrets_consumed": false,
+      "untrusted_pr_code_checked_out": false,
+      "untrusted_pr_code_executed": false,
+      "third_party_actions": [
+        {
+          "uses": "actions/github-script",
+          "sha": "3a2844b7e9c422d3c10d287c895573f7108da1b3"
+        },
+        {
+          "uses": "actions/upload-artifact",
+          "sha": "ea165f8d65b6e75b540449e92b4886f43607fa02"
+        }
+      ],
+      "guards": [
+        "github.event.workflow_run.head_branch == 'main'",
+        "dispatcher workflow content is inspected at workflow_run.head_sha",
+        "expected ancestry is checked",
+        "expected source surface is checked",
+        "required qualification steps are checked"
+      ],
+      "purpose": "Independent receipt generation for a fixed main-branch qualification run.",
+      "external_event_policy": {
+        "event": "workflow_run",
+        "repository_can_self_attest": false,
+        "required_attestation": "record any applicable enterprise/org/repository Actions event restriction affecting workflow_run"
+      }
+    }
+  ],
+  "nonclaims": [
+    "This inventory does not prove the effective GitHub Actions control-plane policy.",
+    "This inventory does not prove workflow execution.",
+    "This inventory does not establish runner qualification.",
+    "This inventory does not establish scientific adequacy.",
+    "This inventory does not establish merge authorization.",
+    "Absence from this inventory must not be treated as proof that a workflow is non-privileged; an independent detector is required."
+  ]
+}
