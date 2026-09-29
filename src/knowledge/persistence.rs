@@ -16,7 +16,6 @@
 
 use std::path::Path;
 
-use symthaea_epistemic_types::{MemoryKind, MemoryProvenance};
 
 /// Knowledge persistence layer backed by SQLite.
 ///
