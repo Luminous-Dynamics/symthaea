@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/scientific-planning-trace-1.0.0.schema.json",
+  "title": "Scientific Planning Trace",
+  "description": "Deterministic planning-only trace across evidence-gap planning, Pareto frontier construction, and explicit FEP admissibility. It does not constitute scientific evidence, replication, criterion satisfaction, or truth.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "gap_plan",
+    "metrics",
+    "gap_candidate_ids",
+    "frontier",
+    "admissibility",
+    "policy",
+    "artifact_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mycelix.symthaea.scientific-planning-trace.1.0.0"
+    },
+    "gap_plan": {
+      "type": "object",
+      "description": "Canonical 002H evidence-gap plan consumed by this trace."
+    },
+    "metrics": {
+      "type": "array",
+      "description": "Exact planner-supplied metric bridge for each gap candidate.",
+      "items": { "type": "object" }
+    },
+    "gap_candidate_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "frontier": {
+      "type": "object",
+      "description": "The complete non-dominated decision frontier, including domination provenance."
+    },
+    "admissibility": {
+      "type": "object",
+      "description": "Explicit policy filtering over frontier members only."
+    },
+    "policy": {
+      "type": "object",
+      "description": "Planner-supplied admissibility thresholds."
+    },
+    "artifact_digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false,
+  "x-authority": "decision_support_only",
+  "x-non-equivalences": [
+    "planning_trace_is_not_scientific_truth",
+    "model_implied_likelihood_is_not_experimental_probability",
+    "computational_discrimination_is_not_observation",
+    "pareto_frontier_is_not_a_truth_ranking",
+    "fep_admissibility_is_not_scientific_validation",
+    "no_trace_stage_emits_replication_or_official_criterion_evidence"
+  ]
+}
