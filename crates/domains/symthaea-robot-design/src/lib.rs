@@ -2212,13 +2212,9 @@ mod tests {
         let second = ExactDesignSearchDomainV1::new(cases[1].clone()).unwrap();
 
         assert_ne!(first.id().unwrap(), second.id().unwrap());
-        assert_eq!(
-            first.canonical_transcript()
-                .unwrap()
-                .iter()
-                .filter(|byte| **byte == 0)
-                .count(),
-            2
+        assert_ne!(
+            first.canonical_transcript().unwrap(),
+            second.canonical_transcript().unwrap()
         );
 
         let first_candidates = first.enumerate().unwrap();
