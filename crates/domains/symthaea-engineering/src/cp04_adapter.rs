@@ -84,6 +84,10 @@ pub enum Cp04AdapterError {
     UnsupportedRelationKind(String),
     MissingEndpoint(String),
     DuplicateNode(String),
+    InvalidSchema(String),
+    InvalidCp04Schema(String),
+    InvalidAuthorityCeiling,
+    InvalidClaimCeiling,
     InvalidArtifactDigest,
     SourceMismatch,
 }
@@ -98,6 +102,10 @@ impl fmt::Display for Cp04AdapterError {
             }
             Self::MissingEndpoint(digest) => write!(f, "relation endpoint missing from node set: {digest}"),
             Self::DuplicateNode(digest) => write!(f, "duplicate CP-04 node identity: {digest}"),
+            Self::InvalidSchema(schema) => write!(f, "invalid CP-04 adapter schema: {schema}"),
+            Self::InvalidCp04Schema(schema) => write!(f, "invalid CP-04 schema: {schema}"),
+            Self::InvalidAuthorityCeiling => write!(f, "CP-04 authority ceiling is not SyntheticQualification"),
+            Self::InvalidClaimCeiling => write!(f, "CP-04 claim ceiling does not match the adapter contract"),
             Self::InvalidArtifactDigest => write!(f, "CP-04 adapter artifact digest mismatch"),
             Self::SourceMismatch => write!(f, "CP-04 adapter artifact does not match source projection"),
         }
@@ -182,12 +190,17 @@ impl Cp04QualificationArtifact {
 
     /// Validate the complete adapter envelope before a downstream hand-off.
     pub fn validate(&self) -> Result<(), Cp04AdapterError> {
-        if self.schema != CP04_ADAPTER_SCHEMA
-            || self.cp04_schema != CP04_SCHEMA
-            || self.claim_ceiling != CP04_CLAIM_CEILING
-            || self.authority_ceiling != AuthorityCeiling::SyntheticQualification
-        {
-            return Err(Cp04AdapterError::InvalidArtifactDigest);
+        if self.schema != CP04_ADAPTER_SCHEMA {
+            return Err(Cp04AdapterError::InvalidSchema(self.schema.clone()));
+        }
+        if self.cp04_schema != CP04_SCHEMA {
+            return Err(Cp04AdapterError::InvalidCp04Schema(self.cp04_schema.clone()));
+        }
+        if self.claim_ceiling != CP04_CLAIM_CEILING {
+            return Err(Cp04AdapterError::InvalidClaimCeiling);
+        }
+        if self.authority_ceiling != AuthorityCeiling::SyntheticQualification {
+            return Err(Cp04AdapterError::InvalidAuthorityCeiling);
         }
 
         let mut node_digests = BTreeMap::new();
@@ -428,6 +441,89 @@ mod tests {
         ).expect("fixture projection must remain adaptable");
         assert_eq!(artifact, generated);
         assert_eq!(artifact.canonical_bytes().unwrap(), generated.canonical_bytes().unwrap());
+    }
+
+    #[test]
+    fn mutation_of_identity_field_is_rejected_even_before_envelope_hash_check() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.nodes[0].identity.canonical_identifier.push_str("-tampered");
+        assert!(artifact.validate().is_err());
+    }
+
+    #[test]
+    fn mutation_of_content_digest_is_rejected_by_identity_validation() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.nodes[0].identity.content_digest = "c".repeat(64);
+        assert!(artifact.validate().is_err());
+    }
+
+    #[test]
+    fn source_graph_mutation_cannot_preserve_artifact_identity() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        let original = artifact.artifact_digest.clone();
+        artifact.source_graph_digest = "f".repeat(64);
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert_ne!(original, artifact.artifact_digest);
+    }
+
+    #[test]
+    fn endpoint_mutation_cannot_be_hidden_by_recomputing_envelope_digest() {
+        let projection = projection();
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+        artifact.edges[0].target_identity_digest = artifact.nodes
+            .iter()
+            .find(|n| n.object_kind == "requirement")
+            .unwrap()
+            .identity_digest
+            .clone();
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(artifact.validate().is_err());
+        assert!(matches!(
+            artifact.validate_against_projection(&projection),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+    }
+
+    #[test]
+    fn relation_kind_mutation_cannot_be_hidden_by_recomputing_envelope_digest() {
+        let projection = projection();
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+        artifact.edges[0].edge_type = "requires".into();
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(artifact.validate().is_err());
+        assert!(matches!(
+            artifact.validate_against_projection(&projection),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+    }
+
+    #[test]
+    fn projection_relation_mutation_is_detected_at_source_boundary() {
+        let projection = projection();
+        let artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+        let mut changed = projection.clone();
+        changed.relations.pop();
+        changed.projection_digest = changed.compute_projection_digest();
+        assert!(changed.validate().is_ok());
+        assert!(matches!(
+            artifact.validate_against_projection(&changed),
+            Err(Cp04AdapterError::SourceMismatch)
+        ));
+    }
+
+    #[test]
+    fn envelope_policy_failures_have_distinct_typed_errors() {
+        let mut schema = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        schema.schema = "tampered.schema".into();
+        assert!(matches!(schema.validate(), Err(Cp04AdapterError::InvalidSchema(_))));
+
+        let mut cp04_schema = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        cp04_schema.cp04_schema = "tampered.cp04.schema".into();
+        assert!(matches!(cp04_schema.validate(), Err(Cp04AdapterError::InvalidCp04Schema(_))));
+
+        let mut claim = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        claim.claim_ceiling = "tampered claim ceiling".into();
+        assert!(matches!(claim.validate(), Err(Cp04AdapterError::InvalidClaimCeiling)));
     }
 
     #[test]
