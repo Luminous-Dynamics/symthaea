@@ -118,3 +118,40 @@ These are sanity-check numbers only. They do not establish a feasible elevator b
 The first model should therefore report specific-strength requirement curves, not merely a yes/no material result. This lets material manufacturing evidence enter later as an uncertainty distribution and allows the same tether architecture to be evaluated against future improvements in graphene, CNT, hBN, or other candidate materials.
 
 Recent literature still identifies ultra-high specific strength, long-length manufacturing, and climber/tether interface properties as central unresolved engineering constraints.
+
+## T0 reference kernel now implemented
+
+The first auditable mechanics kernel now lives in `crates/domains/symthaea-physics/src/mars_tether.rs`. It intentionally contains no ephemeris or flexible-tether assumptions.
+
+It provides:
+
+- Mars GM, radius, rotation period, and Phobos/Deimos reference radii;
+- synchronous radius and altitude;
+- rotating-frame radial effective acceleration;
+- the analytic taper integral;
+- constant-stress area-ratio calculation;
+- Simpson quadrature for tether mass per unit anchor area;
+- an explicit diagnostic for whether a radial tether interval crosses a satellite's mean orbit;
+- regression tests for the analytical limiting cases.
+
+The mass model is deliberately expressed as **mass per unit anchor area** rather than total tether mass. That keeps the first experiment honest: without a specified anchor cross-section, counterweight, termination condition, payload schedule, and structural architecture, a total mass claim would imply more certainty than the model contains.
+
+## Ephemeris boundary
+
+The next orbital-coupling step should consume authoritative SPICE-derived ephemerides rather than embedding a hand-built Phobos/Deimos propagator in this module. NASA NAIF describes SPICE as an engineering-grade geometry system and its Martian archives include SPK ephemerides for Mars, Phobos, Deimos, and the Sun.
+
+Therefore:
+
+1. `mars_tether` remains the deterministic analytic reference layer;
+2. an orbital/ephemeris adapter supplies time-tagged body states;
+3. the tether solver consumes those states through an explicit provenance-bearing interface;
+4. phase-aware clearance becomes a downstream T2/T3 computation;
+5. external structural/dynamic solvers can later feed validated loads back into the same evidence boundary.
+
+This separation prevents a convenient local propagator from silently becoming an authoritative celestial-mechanics source.
+
+## Literature-derived refinement
+
+The recent Mars-Phobos elevator literature also reinforces the need to keep the architectures separate. A 2025 Acta Astronautica study models a Phobos-to-Mars tether around the Mars-Phobos L1 region using a planar elliptic restricted three-body problem. That is a different boundary-value problem from a surface-to-areosynchronous elevator and should be represented as a sibling architecture, not folded into the T0 surface solver.
+
+Material work likewise remains parameter-driven: reviews identify ultra-high specific strength and scalable production as central requirements, while climber-interface work highlights unresolved friction, shear, thermal, and anisotropy measurements. Those unknowns should remain explicit uncertainty fields rather than being replaced by a nominal graphene/GSL value.
