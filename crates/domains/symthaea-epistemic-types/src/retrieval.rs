@@ -1,6 +1,8 @@
 //! Frontier-aware retrieval primitives. Retrieval ranks representations; it never
 //! upgrades epistemic state or creates canonical evidence.
-use crate::{MemoryKind, MemoryProjectionRef, MemoryProvenance};
+use crate::{sha256_hex, MemoryKind, MemoryProjectionRef, MemoryProvenance};
+
+const RETRIEVAL_RECEIPT_DOMAIN: &[u8] = b"epistemic-retrieval-receipt:v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetrievalRequestError { MissingHistoricalFrontier, EmptyHistoricalFrontier }
@@ -51,7 +53,10 @@ pub struct ExcludedMemory { pub canonical_identity: String, pub reason: Retrieva
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemoryRetrievalReceipt {
     pub mode: RetrievalMode, pub frontier_ref: Option<String>, pub query: String,
-    pub selected: Vec<String>, pub excluded: Vec<ExcludedMemory>, pub provenance_families: Vec<String>,
+    pub selected: Vec<String>, pub selected_representation_digests: Vec<String>,
+    pub excluded: Vec<ExcludedMemory>, pub provenance_families: Vec<String>,
+    pub retrieval_profile_versions: Vec<String>,
+    pub receipt_digest: String,
 }
 
 
