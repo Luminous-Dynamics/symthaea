@@ -237,8 +237,8 @@ mod tests {
 
     fn relation(kind: EngineeringRelationKind) -> EngineeringRelation {
         EngineeringRelation::new(
-            object("physical-model", "model", A),
-            object("material", "candidate", B),
+            object("simulation", "model", A),
+            object("prediction", "candidate", B),
             kind,
         )
         .unwrap()
