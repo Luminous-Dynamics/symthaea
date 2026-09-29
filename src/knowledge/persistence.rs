@@ -167,6 +167,16 @@ impl KnowledgePersistence {
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
+        // Materialize deterministic identities for pre-EPF-011 rows so a subsequent
+        // save updates the same row rather than creating a second representation.
+        conn.execute(
+            "UPDATE knowledge_facts
+             SET memory_id = 'legacy-fact:' || id
+             WHERE memory_id IS NULL",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+
         let mut stmt = conn
             .prepare(
                 "SELECT id, memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal
@@ -177,7 +187,7 @@ impl KnowledgePersistence {
         let facts: Vec<FactRecord> = stmt
             .query_map([], |row| {
                 Ok(FactRecord {
-                    memory_id: row.get::<_, Option<String>>(1)?.unwrap_or_else(|| format!("legacy-fact:{}", row.get::<_, i64>(0).unwrap_or_default())),
+                    memory_id: row.get(1)?,
                     canonical_identity: row.get(2)?,
                     provenance_family: row.get(3)?,
                     vector_bytes: row.get(4)?,
@@ -536,7 +546,49 @@ mod tests {
     }
 
     #[test]
-    fn test_save_and_load_causal_edges {
+    fn test_legacy_rows_receive_stable_memory_identity() {
+        let dir = std::env::temp_dir().join(format!("symthaea_legacy_fact_test_{}", std::process::id()));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        {
+            let conn = rusqlite::Connection::open(&db_path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE knowledge_facts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    vector_blob BLOB NOT NULL,
+                    source_text TEXT NOT NULL,
+                    confidence REAL NOT NULL,
+                    domain TEXT,
+                    cycle INTEGER NOT NULL,
+                    is_causal INTEGER NOT NULL DEFAULT 0
+                );",
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![vec![7u8; 2048], "legacy", 0.7f32, "test", 3i64, false],
+            )
+            .unwrap();
+        }
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let loaded = p.load_facts().unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].memory_id, "legacy-fact:1");
+
+        // Saving the loaded record must update, not duplicate, the migrated row.
+        p.save_facts(&loaded).unwrap();
+        let loaded_again = p.load_facts().unwrap();
+        assert_eq!(loaded_again.len(), 1);
+        assert_eq!(loaded_again[0].memory_id, "legacy-fact:1");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_and_load_causal_edges() {
         let dir = std::env::temp_dir().join(format!("symthaea_causal_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
         let _ = std::fs::create_dir_all(&dir);
