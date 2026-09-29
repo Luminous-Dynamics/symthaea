@@ -265,7 +265,102 @@ impl EvidenceLineageDkgProjection {
             }
         }
 
-        Ok(Self::new(nodes, edges))
+        let projection = Self::new(nodes, edges);
+        projection
+            .verify_semantic_invariants()
+            .map_err(|_| DkgProjectionError::InvalidCanonicalTopology)?;
+        Ok(projection)
+    }
+
+    /// Validate the canonical semantic topology of an evidence-lineage graph.
+    ///
+    /// \`verify_integrity\` checks the envelope and digest. This stronger check
+    /// additionally constrains node cardinality and edge meaning so that a
+    /// structurally valid but semantically nonsensical graph cannot masquerade
+    /// as a canonical evidence chain. It still makes no scientific-truth or
+    /// authority determination.
+    pub fn verify_semantic_invariants(&self) -> Result<(), DkgSemanticError> {
+        if !self.verify_integrity() {
+            return Err(DkgSemanticError::InvalidIntegrity);
+        }
+
+        let count = |t: DkgNodeType| self.nodes.iter().filter(|n| n.node_type == t).count();
+        if count(DkgNodeType::CandidateCommitment) != 1 {
+            return Err(DkgSemanticError::WrongNodeCardinality("candidate_commitment"));
+        }
+        if count(DkgNodeType::ExternalObservation) != 1 {
+            return Err(DkgSemanticError::WrongNodeCardinality("external_observation"));
+        }
+        if count(DkgNodeType::IndependentAssessment) != 1 {
+            return Err(DkgSemanticError::WrongNodeCardinality("independent_assessment"));
+        }
+        if count(DkgNodeType::Replication) != 1 {
+            return Err(DkgSemanticError::WrongNodeCardinality("replication"));
+        }
+        if count(DkgNodeType::CriterionEvidence) == 0 {
+            return Err(DkgSemanticError::WrongNodeCardinality("criterion_evidence"));
+        }
+        if count(DkgNodeType::EvidenceChainAudit) != 0 {
+            return Err(DkgSemanticError::UnexpectedAuditNode);
+        }
+
+        let node_ids = |t: DkgNodeType| -> Vec<&str> {
+            self.nodes.iter().filter(|n| n.node_type == t).map(|n| n.node_id.as_str()).collect()
+        };
+        let commitment = node_ids(DkgNodeType::CandidateCommitment)[0];
+        let observation = node_ids(DkgNodeType::ExternalObservation)[0];
+        let assessment = node_ids(DkgNodeType::IndependentAssessment)[0];
+        let replication = node_ids(DkgNodeType::Replication)[0];
+        let evidence_ids = node_ids(DkgNodeType::CriterionEvidence);
+
+        let exact_edge_count = |source: &str, kind: DkgEdgeType, target: &str| {
+            self.edges.iter().filter(|e| {
+                e.source_node_id == source && e.edge_type == kind && e.target_node_id == target
+            }).count()
+        };
+        let require_exact = |source: &str, kind: DkgEdgeType, target: &str| {
+            if exact_edge_count(source, kind, target) != 1 {
+                Err(DkgSemanticError::WrongEdgeCardinality {
+                    source: source.to_owned(),
+                    edge: edge_type(kind).to_owned(),
+                    target: target.to_owned(),
+                })
+            } else {
+                Ok(())
+            }
+        };
+
+        require_exact(observation, DkgEdgeType::ObservedFrom, commitment)?;
+        require_exact(assessment, DkgEdgeType::Assesses, observation)?;
+        require_exact(replication, DkgEdgeType::Replicates, assessment)?;
+        for evidence_id in &evidence_ids {
+            require_exact(evidence_id, DkgEdgeType::EligibleFor, replication)?;
+        }
+
+        let mut expected_edge_count = 3 + evidence_ids.len();
+        for node in self.nodes.iter().filter(|n| n.node_type == DkgNodeType::CriterionEvidence) {
+            match node.supersedes_node_id.as_deref() {
+                Some(parent) => {
+                    if !evidence_ids.contains(&parent) {
+                        return Err(DkgSemanticError::InvalidSupersessionTarget(parent.to_owned()));
+                    }
+                    require_exact(&node.node_id, DkgEdgeType::Supersedes, parent)?;
+                    expected_edge_count += 1;
+                }
+                None => {
+                    if self.edges.iter().any(|e| {
+                        e.source_node_id == node.node_id && e.edge_type == DkgEdgeType::Supersedes
+                    }) {
+                        return Err(DkgSemanticError::SupersessionMetadataMismatch(node.node_id.clone()));
+                    }
+                }
+            }
+        }
+
+        if self.edges.len() != expected_edge_count {
+            return Err(DkgSemanticError::UnexpectedEdge);
+        }
+        Ok(())
     }
 
     pub fn new(mut nodes: Vec<DkgNode>, mut edges: Vec<DkgEdge>) -> Self {
@@ -323,6 +418,18 @@ pub enum DkgProjectionError {
     CommitmentObservationMismatch, AssessmentMismatch, ReplicationMismatch, CriterionEvidenceMismatch,
     EmptySupersessionHistory, DuplicateEvidenceId, SelfSupersession, MissingSupersessionParent,
     BranchingSupersession, SupersessionCycleOrDisconnected,
+    InvalidCanonicalTopology,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DkgSemanticError {
+    InvalidIntegrity,
+    WrongNodeCardinality(&'static str),
+    UnexpectedAuditNode,
+    WrongEdgeCardinality { source: String, edge: String, target: String },
+    InvalidSupersessionTarget(String),
+    SupersessionMetadataMismatch(String),
+    UnexpectedEdge,
 }
 
 fn put(h: &mut Sha256, s: &str) {
@@ -539,6 +646,54 @@ mod tests {
         let n2 = node("same", DkgNodeType::CriterionEvidence);
         let p = EvidenceLineageDkgProjection::new(vec![n1, n2], vec![]);
         assert!(!p.verify_integrity());
+    }
+
+
+    #[test]
+    fn semantic_invariants_accept_closed_history() {
+        let (c, o, a, r, original, replacement) = evidence_chain();
+        let p = EvidenceLineageDkgProjection::from_chain_history(
+            &c, &o, &a, &r, &[original, replacement],
+        ).unwrap();
+        assert!(p.verify_semantic_invariants().is_ok());
+    }
+
+    #[test]
+    fn semantic_invariants_reject_wrong_edge_type() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let mut p = EvidenceLineageDkgProjection::from_chain(&c, &o, &a, &r, &evidence).unwrap();
+        let edge = p.edges.iter_mut().find(|e| e.source_node_id == o.observation_id).unwrap();
+        edge.edge_type = DkgEdgeType::Assesses;
+        p.projection_digest = p.digest();
+        assert!(matches!(p.verify_semantic_invariants(), Err(DkgSemanticError::WrongEdgeCardinality { .. })));
+    }
+
+    #[test]
+    fn semantic_invariants_reject_missing_ancestry_edge() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let mut p = EvidenceLineageDkgProjection::from_chain(&c, &o, &a, &r, &evidence).unwrap();
+        p.edges.retain(|e| !(e.source_node_id == a.assessment_id && e.edge_type == DkgEdgeType::Assesses));
+        p.projection_digest = p.digest();
+        assert!(matches!(p.verify_semantic_invariants(), Err(DkgSemanticError::WrongEdgeCardinality { .. })));
+    }
+
+    #[test]
+    fn semantic_invariants_reject_extra_edge() {
+        let (c, o, a, r, evidence, _) = evidence_chain();
+        let mut p = EvidenceLineageDkgProjection::from_chain(&c, &o, &a, &r, &evidence).unwrap();
+        p.edges.push(DkgEdge { source_node_id: o.observation_id.clone(), edge_type: DkgEdgeType::Supersedes, target_node_id: a.assessment_id.clone() });
+        p.projection_digest = p.digest();
+        assert_eq!(p.verify_semantic_invariants(), Err(DkgSemanticError::UnexpectedEdge));
+    }
+
+    #[test]
+    fn semantic_invariants_reject_supersession_metadata_mismatch() {
+        let (c, o, a, r, original, replacement) = evidence_chain();
+        let mut p = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &a, &r, &[original, replacement]).unwrap();
+        let node = p.nodes.iter_mut().find(|n| n.node_id == "evidence:2").unwrap();
+        node.supersedes_node_id = None;
+        p.projection_digest = p.digest();
+        assert_eq!(p.verify_semantic_invariants(), Err(DkgSemanticError::SupersessionMetadataMismatch("evidence:2".into())));
     }
 
     #[test]

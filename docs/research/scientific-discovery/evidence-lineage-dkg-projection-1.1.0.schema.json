@@ -45,6 +45,19 @@
     "supersession_order != truth_promotion",
     "audit_complete != scientific_validity"
   ],
+  "x-semantic-invariants":[
+    "exactly_one_candidate_commitment",
+    "exactly_one_external_observation",
+    "exactly_one_independent_assessment",
+    "exactly_one_replication",
+    "one_or_more_criterion_evidence_records",
+    "observation_observed_from_commitment",
+    "assessment_assesses_observation",
+    "replication_replicates_assessment",
+    "criterion_evidence_eligible_for_replication",
+    "supersession_metadata_matches_supersedes_edge",
+    "no_unexpected_edges"
+  ],
   "x-source-of-truth":"immutable evidence records and append-only events",
   "x-federation":"Independent indexers should derive byte-equivalent canonical nodes and edges from the same canonical records and closed histories."
 }
