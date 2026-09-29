@@ -2332,6 +2332,69 @@ mod tests {
     }
 
     #[test]
+    fn multi_dimension_enumeration_is_deterministic_and_cartesian() {
+        let z = ParameterIdV1::new("z").unwrap();
+        let a = ParameterIdV1::new("a").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: z.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(30).unwrap(),
+                    C0LengthUmV1::new(40).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: a.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        let observed = candidates
+            .iter()
+            .map(|candidate| {
+                (
+                    candidate.parameter(&a).unwrap().value_um(),
+                    candidate.parameter(&z).unwrap().value_um(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(observed, vec![(10, 30), (10, 40), (20, 30), (20, 40)]);
+        assert_eq!(candidates.len(), 4);
+
+        let unique_ids = candidates
+            .iter()
+            .map(|candidate| candidate.id().unwrap())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(unique_ids.len(), candidates.len());
+
+        let reversed = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: a.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: z.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(30).unwrap(),
+                    C0LengthUmV1::new(40).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        assert_eq!(reversed.enumerate().unwrap(), candidates);
+    }
+
+    #[test]
     fn parameter_set_serde_permutation_preserves_identity() {
         let first = ExactDesignParameterSetV1::new(vec![
             ExactDesignLengthParameterV1 {
