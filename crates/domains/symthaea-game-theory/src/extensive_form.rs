@@ -8,11 +8,27 @@ use crate::strategic::{ActionId, PlayerId};
 use crate::strategic_context::{DecisionStateId, InformationStructure, PerfectRecallEvidence};
 use std::collections::{HashMap, HashSet};
 
-/// Lossless transition history for semantic information encoding.
+/// Stable identity for a chance outcome.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ChanceOutcomeId(pub usize);
+
+/// Stable identity for a semantic observation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ObservationId(pub usize);
+
+/// A semantic observation emitted at a concrete state for one player.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Observation {
+    pub observer: PlayerId,
+    pub observation: ObservationId,
+}
+
+/// Lossless transition/observation history for semantic information encoding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HistoryEvent {
     Decision { state: DecisionStateId, player: PlayerId, information_set: crate::strategic_context::InformationSetId, action: ActionId },
-    Chance { state: DecisionStateId, next: DecisionStateId },
+    Chance { state: DecisionStateId, outcome: ChanceOutcomeId, next: DecisionStateId },
+    Observation { state: DecisionStateId, observer: PlayerId, observation: ObservationId },
 }
 
 /// Semantic mapping from a concrete history to a player's information set.
@@ -47,6 +63,7 @@ pub struct Transition {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChanceTransition {
+    pub outcome: ChanceOutcomeId,
     pub probability: f64,
     pub next: DecisionStateId,
 }
@@ -56,6 +73,9 @@ pub struct ExtensiveGame {
     pub root: DecisionStateId,
     pub nodes: Vec<ExtensiveNode>,
     pub information: InformationStructure,
+    /// Observations emitted when a state is entered. Multiple observers may
+    /// receive different observations of the same world state.
+    pub observations: HashMap<DecisionStateId, Vec<Observation>>,
 }
 
 impl ExtensiveGame {
@@ -80,6 +100,25 @@ impl ExtensiveGame {
         for (i, node) in self.nodes.iter().enumerate() {
             if self.nodes[..i].iter().any(|prior| prior.state() == node.state()) {
                 return Err(ExtensiveGameError::DuplicateNodeId(node.state()));
+            }
+        }
+
+        // Observation streams are semantic inputs to information encoding.
+        // They must be unambiguous for each observer at a concrete state.
+        for (state, observations) in &self.observations {
+            if self.node(*state).is_none() {
+                return Err(ExtensiveGameError::ObservationStateMissing(*state));
+            }
+            for (i, observation) in observations.iter().enumerate() {
+                if observations[..i]
+                    .iter()
+                    .any(|prior| prior.observer == observation.observer)
+                {
+                    return Err(ExtensiveGameError::DuplicateObservationObserver {
+                        state: *state,
+                        observer: observation.observer,
+                    });
+                }
             }
         }
 
@@ -305,7 +344,16 @@ impl ExtensiveGame {
         Ok(PerfectRecallEvidence::Verified)
     }
 
-    fn collect_information_histories(&self, state: DecisionStateId, history: Vec<HistoryEvent>, histories: &mut HashMap<DecisionStateId, Vec<Vec<HistoryEvent>>>) -> Result<(), ExtensiveGameError> {
+    fn collect_information_histories(&self, state: DecisionStateId, mut history: Vec<HistoryEvent>, histories: &mut HashMap<DecisionStateId, Vec<Vec<HistoryEvent>>>) -> Result<(), ExtensiveGameError> {
+        if let Some(observations) = self.observations.get(&state) {
+            for observation in observations {
+                history.push(HistoryEvent::Observation {
+                    state,
+                    observer: observation.observer,
+                    observation: observation.observation,
+                });
+            }
+        }
         histories.entry(state).or_default().push(history.clone());
         match self.node(state).ok_or(ExtensiveGameError::UnknownNode(state))? {
             ExtensiveNode::Decision { player, state, actions } => {
@@ -319,7 +367,7 @@ impl ExtensiveGame {
             ExtensiveNode::Chance { state, outcomes } => {
                 for outcome in outcomes {
                     let mut next = history.clone();
-                    next.push(HistoryEvent::Chance { state: *state, next: outcome.next });
+                    next.push(HistoryEvent::Chance { state: *state, outcome: outcome.outcome, next: outcome.next });
                     self.collect_information_histories(outcome.next, next, histories)?;
                 }
             }
@@ -467,6 +515,8 @@ pub enum ExtensiveGameError {
     CycleDetected(DecisionStateId),
     MultipleParents { child: DecisionStateId, parent: DecisionStateId },
     InformationEncodingFailed { state: DecisionStateId, message: String },
+    ObservationStateMissing(DecisionStateId),
+    DuplicateObservationObserver { state: DecisionStateId, observer: PlayerId },
     InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
     PerfectRecallViolation {
         information_set: crate::strategic_context::InformationSetId,
@@ -512,6 +562,7 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information: info(),
+            observations: HashMap::new(),
         };
         assert!(game.validate().is_ok());
     }
@@ -574,6 +625,7 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information,
+            observations: HashMap::new(),
         };
 
         assert!(game.validate().is_ok());
@@ -669,6 +721,7 @@ mod tests {
                     },
                 ],
             },
+            observations: HashMap::new(),
         };
 
         assert!(matches!(
@@ -877,8 +930,8 @@ mod tests {
                 ExtensiveNode::Chance {
                     state: DecisionStateId(0),
                     outcomes: vec![
-                        ChanceTransition { probability: 0.4, next: DecisionStateId(1) },
-                        ChanceTransition { probability: 0.4, next: DecisionStateId(2) },
+                        ChanceTransition { outcome: ChanceOutcomeId(0), probability: 0.4, next: DecisionStateId(1) },
+                        ChanceTransition { outcome: ChanceOutcomeId(1), probability: 0.4, next: DecisionStateId(2) },
                     ],
                 },
                 ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
