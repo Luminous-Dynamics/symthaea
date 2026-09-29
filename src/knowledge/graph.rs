@@ -15,7 +15,10 @@
 use super::encoding::FactEncoding;
 use std::collections::HashMap;
 use symthaea_core::hdc::unified_hv::BinaryHV;
-use symthaea_epistemic_types::{MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind};
+use symthaea_epistemic_types::{
+    MemoryKind, MemoryProvenance, ProvenanceRelation, ProvenanceRelationKind,
+    ProvenanceValidationReport, ProvenanceValidationViolation,
+};
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -383,6 +386,76 @@ impl EnhancedKnowledgeGraph {
 
     pub fn provenance_relations(&self) -> &[ProvenanceRelation] {
         &self.provenance_relations
+    }
+
+    /// Validate the current provenance snapshot without mutating graph state.
+    ///
+    /// The report is structural only: it binds to an order-independent snapshot
+    /// digest and checks relation well-formedness plus derivation/revision acyclicity.
+    /// It does not assign truth, reliability, or evidential weight.
+    pub fn validate_provenance(&self) -> ProvenanceValidationReport {
+        let mut violations = Vec::new();
+
+        for relation in &self.provenance_relations {
+            if let Err(message) = relation.validate() {
+                violations.push(ProvenanceValidationViolation {
+                    code: "invalid_relation".into(),
+                    source_memory_id: Some(relation.source_memory_id.clone()),
+                    target_memory_id: Some(relation.target_memory_id.clone()),
+                    message: message.into(),
+                });
+            }
+        }
+
+        let mut seen = std::collections::HashSet::new();
+        for relation in &self.provenance_relations {
+            if !seen.insert(relation) {
+                violations.push(ProvenanceValidationViolation {
+                    code: "duplicate_relation".into(),
+                    source_memory_id: Some(relation.source_memory_id.clone()),
+                    target_memory_id: Some(relation.target_memory_id.clone()),
+                    message: "duplicate provenance relation".into(),
+                });
+            }
+        }
+
+        let lineage: Vec<&ProvenanceRelation> = self
+            .provenance_relations
+            .iter()
+            .filter(|relation| {
+                matches!(
+                    relation.kind,
+                    ProvenanceRelationKind::DerivedFrom | ProvenanceRelationKind::RevisedFrom
+                )
+            })
+            .collect();
+
+        for relation in &lineage {
+            let mut frontier = vec![relation.target_memory_id.clone()];
+            let mut visited = std::collections::HashSet::new();
+            while let Some(current) = frontier.pop() {
+                if current == relation.source_memory_id {
+                    violations.push(ProvenanceValidationViolation {
+                        code: "lineage_cycle".into(),
+                        source_memory_id: Some(relation.source_memory_id.clone()),
+                        target_memory_id: Some(relation.target_memory_id.clone()),
+                        message: "derivation/revision lineage contains a cycle".into(),
+                    });
+                    break;
+                }
+                if !visited.insert(current.clone()) {
+                    continue;
+                }
+                for edge in &lineage {
+                    if edge.source_memory_id == current {
+                        frontier.push(edge.target_memory_id.clone());
+                    }
+                }
+            }
+        }
+
+        ProvenanceValidationReport::from_relations(&self.provenance_relations)
+            .with_violations(violations)
     }
 
     /// Query provenance without assigning evidential weight.
@@ -1146,6 +1219,29 @@ mod tests {
         assert_eq!(graph.provenance_relations_to(&a_id).len(), 1);
         assert_eq!(graph.provenance_relations_of_kind(ProvenanceRelationKind::Corroborates).len(), 1);
         assert_eq!(graph.get_fact(b).unwrap().confidence, before);
+    }
+
+    #[test]
+    fn test_provenance_validation_report_is_non_mutating_and_snapshot_bound() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("b", 0.8), 2, None, false);
+        let a_id = graph.provenance(a).unwrap().memory_id;
+        let b_id = graph.provenance(b).unwrap().memory_id;
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: b_id,
+            target_memory_id: a_id,
+            kind: ProvenanceRelationKind::DerivedFrom,
+            created_at: "cycle:2".into(),
+        }).unwrap();
+
+        let before = graph.provenance_relations().to_vec();
+        let report = graph.validate_provenance();
+        assert!(report.conforms);
+        assert_eq!(report.relation_count, 1);
+        assert!(!report.snapshot_digest.is_empty());
+        assert_eq!(graph.provenance_relations(), before.as_slice());
     }
 
     #[test]
