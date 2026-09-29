@@ -78,11 +78,23 @@ impl EvidenceView {
         groups: &[RetrievedMemory],
         receipt: &VerifiedRetrievalReceipt,
     ) -> Result<Self, EvidenceViewError> {
-        Self::from_retrieval(groups, receipt.receipt())
+        Self::from_verified_inner(groups, receipt.receipt())
     }
 
-    /// Compatibility entry point; still validates receipt digest and content bindings.
+    /// Compatibility entry point for callers that still hold an unverified receipt.
+    ///
+    /// This MUST verify the receipt before exposing any reasoning-facing view.
+    /// In particular, a caller must not be able to recompute an unkeyed digest over
+    /// a structurally invalid receipt and bypass the VerifiedRetrievalReceipt gate.
     pub fn from_retrieval(
+        groups: &[RetrievedMemory],
+        receipt: &MemoryRetrievalReceipt,
+    ) -> Result<Self, EvidenceViewError> {
+        let verified = receipt.verify().map_err(|_| EvidenceViewError::ReceiptMismatch)?;
+        Self::from_verified_inner(groups, verified.receipt())
+    }
+
+    fn from_verified_inner(
         groups: &[RetrievedMemory],
         receipt: &MemoryRetrievalReceipt,
     ) -> Result<Self, EvidenceViewError> {
