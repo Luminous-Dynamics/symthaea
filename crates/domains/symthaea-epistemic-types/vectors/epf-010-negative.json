@@ -207,6 +207,31 @@
         ],
         "receipt_digest": "bc32520d3de7496bf62394bb217739dc755ce842d2739a6185576ef470cbd03f"
       }
+    },
+    {
+      "name": "whitespace-only-profile-version",
+      "expected_failure": "WhitespaceOnlyRetrievalProfileVersion",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [
+          " \t\n"
+        ],
+        "receipt_digest": ""
+      }
     }
   ]
 }
