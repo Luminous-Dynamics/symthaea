@@ -1,0 +1,24 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.dev/schema/cross-dkg-adapter-receipt-1.0.0.schema.json",
+  "title":"Cross-DKG Adapter Receipt",
+  "description":"Content-addressed declaration and output binding for an authority-bounded DKG projection adapter.",
+  "type":"object","additionalProperties":false,
+  "required":["receipt_version","adapter_id","adapter_version","policy_ref","source_dkg_id","target_dkg_id","link_digest","source_record_id","source_record_digest","target_record_id","target_record_digest","relation","capability","disposition","output_record_id","output_record_digest","receipt_digest"],
+  "properties":{
+    "receipt_version":{"const":"1.0.0"},
+    "adapter_id":{"type":"string","minLength":1},"adapter_version":{"type":"string","minLength":1},
+    "policy_ref":{"type":"string","minLength":1},"source_dkg_id":{"type":"string","minLength":1},
+    "target_dkg_id":{"type":"string","minLength":1},"link_digest":{"type":"string","minLength":1},
+    "source_record_id":{"type":"string","minLength":1},"source_record_digest":{"type":"string","minLength":1},
+    "target_record_id":{"type":"string","minLength":1},"target_record_digest":{"type":"string","minLength":1},
+    "relation":{"enum":["references","derived_from","context_for","same_as","contradicts","supersedes"]},
+    "capability":{"enum":["reference_only","context_attachment","derived_metadata"]},
+    "disposition":{"enum":["reference_only","context_only","derived_metadata"]},
+    "output_record_id":{"type":"string","minLength":1},"output_record_digest":{"type":"string","minLength":1},
+    "receipt_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "x-authority":"declared-adapter-output-provenance-only",
+  "x-non-equivalences":["adapter execution is not authenticated by this receipt","derived metadata is not source truth","cross-DKG reference is not evidence qualification","receipt digest is not a digital signature","adapter capability does not grant authority over the source DKG"],
+  "x-semantic-promotion":"requires a separate domain-specific, auditable qualification process"
+}
