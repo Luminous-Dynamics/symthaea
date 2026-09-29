@@ -291,17 +291,24 @@ impl KnowledgeManager {
                     tracing::info!(count = facts.len(), "Knowledge: loaded facts from SQLite");
                 }
             }
-            // Load append-only provenance relations after facts so endpoint identities exist.
-            if let Ok(relations) = p.load_provenance_relations() {
-                let mut loaded_relations = 0usize;
-                for record in relations {
-                    if graph.import_provenance_relation(record.into()).unwrap_or(false) {
-                        loaded_relations += 1;
+            // Load append-only provenance relations after facts. Relations are historical
+            // provenance and may intentionally reference memories no longer resident in the
+            // local cognitive projection.
+            match p.load_provenance_relations() {
+                Ok(relations) => {
+                    let mut loaded_relations = 0usize;
+                    for record in relations {
+                        match graph.import_provenance_relation(record.into()) {
+                            Ok(true) => loaded_relations += 1,
+                            Ok(false) => {},
+                            Err(error) => tracing::warn!(%error, "Knowledge: rejected persisted provenance relation"),
+                        }
+                    }
+                    if loaded_relations > 0 {
+                        tracing::info!(count = loaded_relations, "Knowledge: loaded provenance relations from SQLite");
                     }
                 }
-                if loaded_relations > 0 {
-                    tracing::info!(count = loaded_relations, "Knowledge: loaded provenance relations from SQLite");
-                }
+                Err(error) => tracing::warn!(%error, "Knowledge: failed to load provenance relations from SQLite"),
             }
             // Load existing causal edges
             if let Ok(edges) = p.load_causal_edges() {
