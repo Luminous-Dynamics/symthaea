@@ -1125,7 +1125,7 @@ mod tests {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
         let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
         let request = request_for(&daemon);
-        store.install_pending(request.clone()).unwrap();
+        install_request(&store, &request);
         let submission = submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
         let (_parent, runtime) = private_runtime_path();
         let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
