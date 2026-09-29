@@ -235,3 +235,10 @@ A MOLA-backed geographic sweep remains blocked on implementing and validating th
 ## Input validation hardening
 
 The anchor assessment now rejects a non-finite or non-positive minimum anchor radius as `InsufficientEvidence` before using the configuration to classify a candidate. This is a configuration-quality failure, not evidence that a geographic site is physically infeasible. A regression test covers a NaN threshold. The assessment remains intentionally non-certifying: a usable terrain sample is not yet datum-converted and compared against the structural anchor elevation.
+
+
+## Explicit terrain vertical datum and uncertainty propagation
+
+The terrain contract now carries a `TerrainVerticalDatum` for each sample: areoid-relative height, height above the kernel reference sphere, or planetocentric radius. The new `radial_terrain_elevation` conversion returns reference-sphere-relative height and an uncertainty bound. For areoid-relative samples, both the compatible areoid radius and its uncertainty are mandatory; the converter combines the areoid and sample uncertainty bounds by addition (worst case), not root-sum-square, because independence is not established. Missing or invalid datum inputs return no conversion rather than a guessed height.
+
+This makes the PDS MEGDR product distinction actionable in code: adapters must declare the exact vertical quantity represented by the raster and provide a compatible areoid model when required. Conversion does not itself establish geodetic compatibility, terrain accuracy, or anchor suitability. A geographic sweep remains gated on a real, versioned raster adapter and product-level validation.
