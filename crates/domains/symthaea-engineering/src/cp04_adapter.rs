@@ -84,6 +84,9 @@ pub enum Cp04AdapterError {
     UnsupportedRelationKind(String),
     MissingEndpoint(String),
     DuplicateNode(String),
+    DuplicateEdge(String),
+    UnorderedNodes,
+    UnorderedEdges,
     InvalidSchema(String),
     InvalidCp04Schema(String),
     InvalidAuthorityCeiling,
@@ -102,6 +105,9 @@ impl fmt::Display for Cp04AdapterError {
             }
             Self::MissingEndpoint(digest) => write!(f, "relation endpoint missing from node set: {digest}"),
             Self::DuplicateNode(digest) => write!(f, "duplicate CP-04 node identity: {digest}"),
+            Self::DuplicateEdge(digest) => write!(f, "duplicate CP-04 relation identity: {digest}"),
+            Self::UnorderedNodes => write!(f, "CP-04 nodes are not canonically ordered"),
+            Self::UnorderedEdges => write!(f, "CP-04 edges are not canonically ordered"),
             Self::InvalidSchema(schema) => write!(f, "invalid CP-04 adapter schema: {schema}"),
             Self::InvalidCp04Schema(schema) => write!(f, "invalid CP-04 schema: {schema}"),
             Self::InvalidAuthorityCeiling => write!(f, "CP-04 authority ceiling is not SyntheticQualification"),
@@ -204,6 +210,7 @@ impl Cp04QualificationArtifact {
         }
 
         let mut node_digests = BTreeMap::new();
+        let mut previous_node_digest: Option<&str> = None;
         for node in &self.nodes {
             node.identity.validate().map_err(|_| {
                 Cp04AdapterError::MissingEndpoint(node.identity_digest.clone())
@@ -216,8 +223,14 @@ impl Cp04QualificationArtifact {
             if node_digests.insert(digest.clone(), ()).is_some() {
                 return Err(Cp04AdapterError::DuplicateNode(digest));
             }
+            if previous_node_digest.is_some_and(|previous| previous >= digest.as_str()) {
+                return Err(Cp04AdapterError::UnorderedNodes);
+            }
+            previous_node_digest = Some(Box::leak(digest.into_boxed_str()));
         }
 
+        let mut previous_edge_key: Option<(String, String, String, String)> = None;
+        let mut seen_edge_digests = std::collections::BTreeSet::new();
         for edge in &self.edges {
             if !node_digests.contains_key(&edge.source_identity_digest) {
                 return Err(Cp04AdapterError::MissingEndpoint(
@@ -244,9 +257,21 @@ impl Cp04QualificationArtifact {
                 kind,
             )
             .map_err(|_| Cp04AdapterError::UnsupportedRelationKind(edge.edge_type.clone()))?;
-            if relation.relation_digest() != edge.relation_digest {
+            let computed_relation_digest = relation.relation_digest();
+            if computed_relation_digest != edge.relation_digest {
                 return Err(Cp04AdapterError::InvalidArtifactDigest);
             }
+            if !seen_edge_digests.insert(computed_relation_digest.clone()) {
+                return Err(Cp04AdapterError::DuplicateEdge(computed_relation_digest));
+            }
+            let key = (
+                edge.source_identity_digest.clone(), edge.edge_type.clone(),
+                edge.target_identity_digest.clone(), edge.relation_digest.clone(),
+            );
+            if previous_edge_key.as_ref().is_some_and(|previous| previous >= &key) {
+                return Err(Cp04AdapterError::UnorderedEdges);
+            }
+            previous_edge_key = Some(key);
         }
 
         if self.artifact_digest != self.compute_digest()? {
@@ -553,6 +578,27 @@ mod tests {
         let mut claim = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
         claim.claim_ceiling = "tampered claim ceiling".into();
         assert!(matches!(claim.validate(), Err(Cp04AdapterError::InvalidClaimCeiling)));
+    }
+
+    #[test]
+    fn standalone_validation_rejects_noncanonical_node_and_edge_order() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.nodes.reverse();
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(matches!(artifact.validate(), Err(Cp04AdapterError::UnorderedNodes)));
+
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.edges.reverse();
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(matches!(artifact.validate(), Err(Cp04AdapterError::UnorderedEdges)));
+    }
+
+    #[test]
+    fn standalone_validation_rejects_duplicate_relation_identity() {
+        let mut artifact = Cp04QualificationArtifact::try_from_projection(&projection()).unwrap();
+        artifact.edges.push(artifact.edges[0].clone());
+        artifact.artifact_digest = artifact.compute_digest().unwrap();
+        assert!(matches!(artifact.validate(), Err(Cp04AdapterError::DuplicateEdge(_))));
     }
 
     #[test]
