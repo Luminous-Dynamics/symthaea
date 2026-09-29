@@ -3,12 +3,11 @@
 //! The compatibility-level `retrieve` API remains available for lower-level
 //! callers, but reasoning-facing integrations should use `RetrievalEngine`.
 //! The engine owns the execution profile and seals it into the receipt before
-//! returning a `VerifiedRetrievalReceipt`. Callers therefore cannot construct
-//! an engine receipt and then separately decorate it with provenance.
+//! returning a `VerifiedRetrievalReceipt`.
 
 use crate::{
     retrieve, MemoryRetrievalCandidate, MemoryRetrievalRequest, MemoryRetrievalReceipt,
-    RetrievalRequestError, RetrievedMemory, VerifiedRetrievalReceipt,
+    ReceiptVerificationError, RetrievalRequestError, RetrievedMemory, VerifiedRetrievalReceipt,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,6 +64,18 @@ impl RetrievalExecutionProfile {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetrievalExecutionError {
+    Request(RetrievalRequestError),
+    ReceiptIntegrity(ReceiptVerificationError),
+}
+
+impl From<RetrievalRequestError> for RetrievalExecutionError {
+    fn from(value: RetrievalRequestError) -> Self {
+        Self::Request(value)
+    }
+}
+
 /// The complete output of one retrieval execution.
 ///
 /// The receipt is already verified when returned. The execution profile is
@@ -105,13 +116,10 @@ impl RetrievalEngine {
         &self,
         request: &MemoryRetrievalRequest,
         candidates: impl IntoIterator<Item = MemoryRetrievalCandidate>,
-    ) -> Result<VerifiedRetrievalExecution, RetrievalRequestError> {
+    ) -> Result<VerifiedRetrievalExecution, RetrievalExecutionError> {
         let (groups, receipt) = retrieve(request, candidates);
-        let receipt = receipt
-            .with_retrieval_profile_versions(self.profile.receipt_versions());
-        let receipt = receipt
-            .verify()
-            .map_err(|_| RetrievalRequestError::InvalidReceiptIntegrity)?;
+        let receipt = receipt.with_retrieval_profile_versions(self.profile.receipt_versions());
+        let receipt = receipt.verify().map_err(RetrievalExecutionError::ReceiptIntegrity)?;
         Ok(VerifiedRetrievalExecution {
             groups,
             receipt,
@@ -128,11 +136,7 @@ mod tests {
     fn candidate(id: &str) -> MemoryRetrievalCandidate {
         MemoryRetrievalCandidate {
             projection: MemoryProjectionRef::new(
-                id,
-                MemoryKind::Semantic,
-                "semantic-v1",
-                id.as_bytes(),
-                Some("frontier:1".into()),
+                id, MemoryKind::Semantic, "semantic-v1", id.as_bytes(), Some("frontier:1".into()),
             ),
             provenance: MemoryProvenance {
                 memory_id: format!("memory:{id}"),
@@ -145,38 +149,23 @@ mod tests {
                 epistemic_state: Some("Observed".into()),
                 claim_ceiling: Some("source-scoped".into()),
                 frontier_ref: Some("frontier:1".into()),
-                derivation_ref: None,
-                model_ref: None,
-                retrieval_index_ref: None,
+                derivation_ref: None, model_ref: None, retrieval_index_ref: None,
             },
-            retrieval_score: 0.8,
-            freshness: 0.8,
-            frontier_eligibility: FrontierEligibility::Eligible,
+            retrieval_score: 0.8, freshness: 0.8, frontier_eligibility: FrontierEligibility::Eligible,
         }
     }
 
     #[test]
     fn engine_owns_all_four_provenance_dimensions() {
-        let profile = RetrievalExecutionProfile::new(
-            "retrieval:v3",
-            "ranking:cosine-v2",
-            "frontier:v2",
-            "normalization:utf8-v1",
-        )
-        .unwrap();
-        let engine = RetrievalEngine::new(profile.clone());
-        let execution = engine
-            .execute(
-                &MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5),
-                vec![candidate("claim:x")],
-            )
+        let profile = RetrievalExecutionProfile::new("retrieval:v3", "cosine-v2", "frontier:v2", "utf8-v1").unwrap();
+        let execution = RetrievalEngine::new(profile.clone())
+            .execute(&MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5), vec![candidate("claim:x")])
             .unwrap();
-
         assert_eq!(execution.profile, profile);
         assert!(execution.receipt().retrieval_profile_versions.contains(&"algorithm:retrieval:v3".to_string()));
-        assert!(execution.receipt().retrieval_profile_versions.contains(&"ranking:ranking:cosine-v2".to_string()));
+        assert!(execution.receipt().retrieval_profile_versions.contains(&"ranking:cosine-v2".to_string()));
         assert!(execution.receipt().retrieval_profile_versions.contains(&"frontier-semantics:frontier:v2".to_string()));
-        assert!(execution.receipt().retrieval_profile_versions.contains(&"normalization:normalization:utf8-v1".to_string()));
+        assert!(execution.receipt().retrieval_profile_versions.contains(&"normalization:utf8-v1".to_string()));
         assert!(execution.receipt.verify().is_ok());
     }
 
@@ -185,10 +174,8 @@ mod tests {
         let base = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
         let changed = RetrievalExecutionProfile::new("a", "b2", "c", "d").unwrap();
         let request = MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5);
-
         let first = RetrievalEngine::new(base).execute(&request, vec![candidate("claim:x")]).unwrap();
         let second = RetrievalEngine::new(changed).execute(&request, vec![candidate("claim:x")]).unwrap();
-
         assert_ne!(first.receipt().receipt_digest, second.receipt().receipt_digest);
     }
 
