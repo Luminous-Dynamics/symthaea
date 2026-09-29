@@ -2241,6 +2241,37 @@ mod tests {
     }
 
     #[test]
+    fn range_enumeration_handles_u64_boundary_without_wraparound() {
+        let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id: ParameterIdV1::new("edge_length").unwrap(),
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(u64::MAX - 1).unwrap(),
+                upper: C0LengthUmV1::new(u64::MAX).unwrap(),
+                step_um: 1,
+            },
+        }])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(
+            candidates[0]
+                .parameter(&ParameterIdV1::new("edge_length").unwrap())
+                .unwrap()
+                .value_um(),
+            u64::MAX - 1
+        );
+        assert_eq!(
+            candidates[1]
+                .parameter(&ParameterIdV1::new("edge_length").unwrap())
+                .unwrap()
+                .value_um(),
+            u64::MAX
+        );
+        assert_ne!(candidates[0].id().unwrap(), candidates[1].id().unwrap());
+    }
+
+    #[test]
     fn parameter_set_serde_permutation_preserves_identity() {
         let first = ExactDesignParameterSetV1::new(vec![
             ExactDesignLengthParameterV1 {
