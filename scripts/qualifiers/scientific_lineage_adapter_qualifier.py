@@ -90,11 +90,11 @@ def projection_digest(relation_digests):
 
 def graph_digest(node_digests, relation_digests):
     out = bytearray(LINEAGE_SCHEMA.encode("utf-8"))
-    out.extend(b"nodes\\0")
+    out.extend(b"nodes\x00")
     for digest in sorted(node_digests):
         out.extend(digest.encode("ascii"))
         out.append(0)
-    out.extend(b"relations\\0")
+    out.extend(b"relations\x00")
     for digest in sorted(relation_digests):
         out.extend(digest.encode("ascii"))
         out.append(0)
