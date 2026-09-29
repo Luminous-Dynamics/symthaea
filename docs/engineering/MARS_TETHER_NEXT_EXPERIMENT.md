@@ -221,3 +221,12 @@ Consequently, the present kernel does **not** silently turn MOLA areoid-relative
 ## Scope and verification status
 
 The repository change contains unit tests authored for geometry and evidence-state behavior, but this workflow has not run the Rust workspace test suite or compiler. Treat the implementation as committed source awaiting CI/compiler verification; do not describe the tests as passing until CI confirms them. No MOLA raster was ingested and no Valles latitude/longitude sweep has been executed in this iteration.
+
+
+## Datum conversion and sample-to-anchor identity
+
+The kernel now includes an explicit `radial_elevation_from_areoid` conversion. It requires an areoid radius already expressed in a compatible body-fixed frame and returns radial elevation relative to the kernel's spherical reference radius; it does not infer an areoid from topography. Terrain assessments also reject samples whose latitude/longitude do not match the requested anchor within the declared numerical tolerance.
+
+The PDS MEGDR archive distinguishes planetary radius, areoid, topography, and observation counts, and defines the current MEGDR coordinate system as areocentric latitude with east-increasing longitude. Its maintained PDS4 bundle includes labels and ENVI headers alongside image files. This supports a future adapter that can preserve product identity and datum metadata instead of treating a bare raster value as self-describing. The adapter must still select a compatible areoid/radius field and coordinate convention; this contract alone does not establish a geodetic transformation or geophysical validity.
+
+A MOLA-backed geographic sweep remains blocked on implementing and validating the raster adapter and acquiring a specific, versioned product. No candidate site should be labelled feasible from the present spherical kernel.
