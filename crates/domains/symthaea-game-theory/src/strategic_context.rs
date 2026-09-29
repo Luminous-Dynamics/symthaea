@@ -71,6 +71,7 @@ pub struct Strategy {
 /// One information set and its legal actions, used to validate a plan.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DecisionPoint {
+    pub player: PlayerId,
     pub information_set: InformationSetId,
     pub legal_actions: Vec<ActionId>,
 }
@@ -86,6 +87,9 @@ impl Strategy {
             }
         }
         for (i, point) in points.iter().enumerate() {
+            if point.player != self.player {
+                return Err(ContextError::PlayerMismatch { information_set: point.information_set, expected: self.player, actual: point.player });
+            }
             if points[..i].iter().any(|prior| prior.information_set == point.information_set) {
                 return Err(ContextError::DuplicateInformationSet(point.information_set));
             }
@@ -118,6 +122,7 @@ pub enum ContextError {
     NoLegalActions,
     DuplicateLegalAction(ActionId),
     DuplicateInformationSet(InformationSetId),
+    PlayerMismatch { information_set: InformationSetId, expected: PlayerId, actual: PlayerId },
     MissingDecision(InformationSetId),
     UnknownInformationSet(InformationSetId),
     IllegalAction { information_set: InformationSetId, action: ActionId },
@@ -197,8 +202,8 @@ mod tests {
     #[test]
     fn contingent_strategy_requires_exact_legal_coverage() {
         let points = vec![
-            DecisionPoint { information_set: InformationSetId(7), legal_actions: vec![ActionId(0), ActionId(1)] },
-            DecisionPoint { information_set: InformationSetId(8), legal_actions: vec![ActionId(2)] },
+            DecisionPoint { player: PlayerId(0), information_set: InformationSetId(7), legal_actions: vec![ActionId(0), ActionId(1)] },
+            DecisionPoint { player: PlayerId(0), information_set: InformationSetId(8), legal_actions: vec![ActionId(2)] },
         ];
         let complete = Strategy {
             player: PlayerId(0),
@@ -213,6 +218,7 @@ mod tests {
     #[test]
     fn rejects_illegal_contingent_action() {
         let points = vec![DecisionPoint {
+            player: PlayerId(0),
             information_set: InformationSetId(7),
             legal_actions: vec![ActionId(0)],
         }];
