@@ -1,0 +1,48 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://symthaea.ai/schemas/federated-provenance-proof-1.0.0.schema.json",
+  "title":"Symthaea Federated Provenance Proof 1.0.0",
+  "type":"object",
+  "additionalProperties":false,
+  "required":[
+    "proof_version","query","target_output_lineage_digest",
+    "target_projection_ancestry","completeness","proof_digest"
+  ],
+  "properties":{
+    "proof_version":{"const":"1.0.0"},
+    "query":{
+      "type":"object",
+      "additionalProperties":false,
+      "required":[
+        "query_version","target_projection_digest","target_output_record_id",
+        "target_output_record_digest","scope",
+        "include_derivation_context","include_external_observation_boundary"
+      ],
+      "properties":{
+        "query_version":{"const":"1.0.0"},
+        "target_projection_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "target_output_record_id":{"type":"string","minLength":1},
+        "target_output_record_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+        "scope":{
+          "oneOf":[
+            {"type":"string","const":"closed_projection_set"},
+            {"type":"object","additionalProperties":false,"required":["depth_limited"],"properties":{"depth_limited":{"type":"integer","minimum":1}}}
+          ]
+        },
+        "include_derivation_context":{"type":"boolean"},
+        "include_external_observation_boundary":{"type":"boolean"}
+      }
+    },
+    "target_output_lineage_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "target_projection_ancestry":{
+      "type":"array","items":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+      "uniqueItems":true
+    },
+    "completeness":{"const":"complete_within_scope"},
+    "derivation_context_digest":{"type":["string","null"],"pattern":"^sha256:[0-9a-f]{64}$"},
+    "boundary_lineage_digest":{"type":["string","null"],"pattern":"^sha256:[0-9a-f]{64}$"},
+    "observation_record_digest":{"type":["string","null"],"pattern":"^sha256:[0-9a-f]{64}$"},
+    "proof_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"}
+  },
+  "description":"Provenance-only bounded query/proof receipt. Complete means complete within the declared closed/bounded scope, not globally complete. Absence outside the supplied scope is not disproof; the receipt does not establish scientific truth, qualify evidence, authenticate actors, or transfer authority."
+}
