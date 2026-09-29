@@ -266,7 +266,7 @@ mod tests {
     use super::*;
     use crate::action::executor::NixOSCommand;
     use crate::action::{
-        LocalApprovalDecisionKindV1, LocalApprovalSubmissionV1, submit_local_approval_v1,
+        LocalApprovalDecisionKindV1, LocalApprovalSubmissionV2, submit_local_approval_v2,
     };
     use std::sync::Arc;
     use std::thread;
@@ -281,6 +281,20 @@ mod tests {
                 args: vec!["restart".to_string(), service.to_string()],
                 safety_level: crate::action::SafetyLevel::SystemModify,
             },
+        )
+        .unwrap()
+    }
+
+    fn submission_for(
+        installed: &InstalledLocalApprovalRequestV1,
+        decision: LocalApprovalDecisionKindV1,
+    ) -> LocalApprovalSubmissionV2 {
+        let projection = installed.operator_projection().unwrap();
+        LocalApprovalSubmissionV2::for_request_and_projection(
+            installed.request(),
+            &projection,
+            decision,
+            UnixMillisV1::new(wall_ms()),
         )
         .unwrap()
     }
@@ -641,15 +655,10 @@ mod tests {
                 UnixMillisV1::new(now + 60_000),
             )
             .unwrap();
-        let submission = LocalApprovalSubmissionV1::for_request(
-            installed.request(),
-            LocalApprovalDecisionKindV1::Approved,
-            UnixMillisV1::new(wall_ms()),
-        )
-        .unwrap();
+        let submission = submission_for(&installed, LocalApprovalDecisionKindV1::Approved);
         let socket_path = runtime.socket_path().to_path_buf();
         let client = thread::spawn(move || {
-            submit_local_approval_v1(&socket_path, &submission).unwrap()
+            submit_local_approval_v2(&socket_path, &submission).unwrap()
         });
 
         let consumed = runtime.accept_and_consume().unwrap();
@@ -678,12 +687,7 @@ mod tests {
                 UnixMillisV1::new(now + 60_000),
             )
             .unwrap();
-        let submission = LocalApprovalSubmissionV1::for_request(
-            installed.request(),
-            LocalApprovalDecisionKindV1::Approved,
-            UnixMillisV1::new(wall_ms()),
-        )
-        .unwrap();
+        let submission = submission_for(&installed, LocalApprovalDecisionKindV1::Approved);
         let old_socket = first.socket_path().to_path_buf();
         let first_transport = first.transport_instance_ref().to_string();
         drop(first);
@@ -694,7 +698,7 @@ mod tests {
         assert_ne!(second.transport_instance_ref(), first_transport);
 
         let new_socket = second.socket_path().to_path_buf();
-        let client = thread::spawn(move || submit_local_approval_v1(&new_socket, &submission));
+        let client = thread::spawn(move || submit_local_approval_v2(&new_socket, &submission));
         let result = second.accept_and_consume();
         let client_result = client.join().unwrap();
 
@@ -728,12 +732,7 @@ mod tests {
                 UnixMillisV1::new(now + 60_000),
             )
             .unwrap();
-        let first_submission = LocalApprovalSubmissionV1::for_request(
-            first.request(),
-            LocalApprovalDecisionKindV1::Approved,
-            UnixMillisV1::new(wall_ms()),
-        )
-        .unwrap();
+        let first_submission = submission_for(&first, LocalApprovalDecisionKindV1::Approved);
 
         let second = runtime
             .create_pending_request(
@@ -744,19 +743,14 @@ mod tests {
                 UnixMillisV1::new(now + 60_000),
             )
             .unwrap();
-        let second_submission = LocalApprovalSubmissionV1::for_request(
-            second.request(),
-            LocalApprovalDecisionKindV1::Approved,
-            UnixMillisV1::new(wall_ms()),
-        )
-        .unwrap();
+        let second_submission = submission_for(&second, LocalApprovalDecisionKindV1::Approved);
 
         assert_eq!(second.superseded_request_ids(), &[first.request_id().to_string()]);
         assert_eq!(runtime.pending_count().unwrap(), 1);
 
         let stale_socket = runtime.socket_path().to_path_buf();
         let stale_client =
-            thread::spawn(move || submit_local_approval_v1(&stale_socket, &first_submission));
+            thread::spawn(move || submit_local_approval_v2(&stale_socket, &first_submission));
         let stale_result = runtime.accept_and_consume();
         let stale_client_result = stale_client.join().unwrap();
 
@@ -773,7 +767,7 @@ mod tests {
 
         let current_socket = runtime.socket_path().to_path_buf();
         let current_client =
-            thread::spawn(move || submit_local_approval_v1(&current_socket, &second_submission));
+            thread::spawn(move || submit_local_approval_v2(&current_socket, &second_submission));
         let current_result = runtime.accept_and_consume().unwrap();
         let current_ack = current_client.join().unwrap();
 
