@@ -52,6 +52,12 @@ impl ExtensiveGame {
             })
             .ok_or(ExtensiveGameError::NoTerminalNode)?;
 
+        for (i, node) in self.nodes.iter().enumerate() {
+            if self.nodes[..i].iter().any(|prior| prior.state() == node.state()) {
+                return Err(ExtensiveGameError::DuplicateNodeId(node.state()));
+            }
+        }
+
         let mut reachable = Vec::new();
         let mut stack = vec![self.root];
         while let Some(id) = stack.pop() {
@@ -64,7 +70,21 @@ impl ExtensiveGame {
             reachable.push(id);
 
             match node {
-                ExtensiveNode::Decision { actions, .. } => {
+                ExtensiveNode::Decision { state, player, actions } => {
+                    let Some(decision_state) = self.information.state(*state) else {
+                        return Err(ExtensiveGameError::DecisionStateMissingFromInformation(*state));
+                    };
+                    if decision_state.player != *player {
+                        return Err(ExtensiveGameError::DecisionPlayerMismatch {
+                            state: *state,
+                            expected: decision_state.player,
+                            actual: *player,
+                        });
+                    }
+                    let action_ids: Vec<_> = actions.iter().map(|action| action.action).collect();
+                    if action_ids != decision_state.legal_actions {
+                        return Err(ExtensiveGameError::DecisionActionsMismatch(*state));
+                    }
                     if actions.is_empty() {
                         return Err(ExtensiveGameError::NoActions(id));
                     }
@@ -135,6 +155,10 @@ impl ExtensiveNode {
 pub enum ExtensiveGameError {
     InformationStructure(crate::strategic_context::InformationStructureError),
     UnknownNode(DecisionStateId),
+    DuplicateNodeId(DecisionStateId),
+    DecisionStateMissingFromInformation(DecisionStateId),
+    DecisionPlayerMismatch { state: DecisionStateId, expected: PlayerId, actual: PlayerId },
+    DecisionActionsMismatch(DecisionStateId),
     DuplicateAction { node: DecisionStateId, action: ActionId },
     NoActions(DecisionStateId),
     NoChanceOutcomes(DecisionStateId),
