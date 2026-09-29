@@ -915,6 +915,47 @@ mod tests {
     }
 
     #[test]
+    fn test_provenance_family_does_not_collapse_memory_identity() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+
+        for (memory_id, family, text) in [
+            ("memory-a", "source-family-1", "representation a"),
+            ("memory-b", "source-family-1", "representation b"),
+            ("memory-c", "source-family-2", "independent source"),
+        ] {
+            let encoding = make_encoding(text, 0.8);
+            graph.import_fact_record(&super::super::persistence::FactRecord {
+                memory_id: memory_id.into(),
+                canonical_identity: None,
+                provenance_family: Some(family.into()),
+                vector_bytes: encoding.vector.0.to_vec(),
+                source_text: text.into(),
+                confidence: 0.8,
+                domain: None,
+                cycle: 1,
+                is_causal: false,
+            });
+        }
+
+        let records = graph.export_fact_records();
+        assert_eq!(records.len(), 3);
+
+        let same_family: Vec<_> = records
+            .iter()
+            .filter(|r| r.provenance_family.as_deref() == Some("source-family-1"))
+            .collect();
+        assert_eq!(same_family.len(), 2);
+        assert_ne!(same_family[0].memory_id, same_family[1].memory_id);
+
+        let independent: Vec<_> = records
+            .iter()
+            .filter(|r| r.provenance_family.as_deref() == Some("source-family-2"))
+            .collect();
+        assert_eq!(independent.len(), 1);
+        assert_ne!(same_family[0].memory_id, independent[0].memory_id);
+    }
+
+    #[test]
     fn test_canonical_identity_requires_explicit_admission() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
         let enc = make_encoding("admission boundary claim", 0.8);
