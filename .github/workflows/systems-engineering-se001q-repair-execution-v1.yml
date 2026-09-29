@@ -49,6 +49,9 @@ jobs:
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
           test "$actual" = "$EXPECTED_REPAIR_SHA"
+          test "$(git rev-parse "$EXPECTED_BASE_REF")" = "$FROZEN_SUBJECT_SHA"
+          test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
+          git merge-base --is-ancestor "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA"
           test -z "$(git status --porcelain)"
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             test "${{ github.event.pull_request.base.ref }}" = "$EXPECTED_BASE_REF"
@@ -90,6 +93,12 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum Cargo.lock | tee cargo-lock-sha256.txt
+          git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock" | tee cargo-lock-blob-sha.txt
+          test "$(cat cargo-lock-blob-sha.txt)" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          rustc --version | tee rustc-version.txt
+          cargo --version | tee cargo-version.txt
+          rustfmt --version | tee rustfmt-version.txt
+          cargo clippy --version | tee clippy-version.txt
           git status --short
           test -z "$(git status --porcelain)"
 
@@ -115,6 +124,11 @@ jobs:
             "base_sha": "$FROZEN_SUBJECT_SHA",
             "toolchain": "$EXPECTED_TOOLCHAIN",
             "lock_sha256": "$lock_sha",
+            "lock_blob_sha": "$(cat cargo-lock-blob-sha.txt)",
+            "rustc_version": "$(cat rustc-version.txt)",
+            "cargo_version": "$(cat cargo-version.txt)",
+            "rustfmt_version": "$(cat rustfmt-version.txt)",
+            "clippy_version": "$(cat clippy-version.txt)",
             "commands": {
               "format": "rustfmt --edition 2024 --check crates/domains/symthaea-se-model/src/lib.rs",
               "check": "cargo check -p symthaea-se-model --locked --all-targets",
@@ -158,6 +172,11 @@ jobs:
             base-ref.txt
             toolchain.txt
             cargo-lock-sha256.txt
+            cargo-lock-blob-sha.txt
+            rustc-version.txt
+            cargo-version.txt
+            rustfmt-version.txt
+            clippy-version.txt
             se001q-repair-primary-manifest.json
           if-no-files-found: error
           retention-days: 90
@@ -172,7 +191,6 @@ jobs:
     name: Independent repair-generation replay
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    needs: identity-and-gates
     steps:
       - name: Checkout repair generation independently
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -186,6 +204,9 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_REPAIR_SHA"
+          test "$(git rev-parse "$EXPECTED_BASE_REF")" = "$FROZEN_SUBJECT_SHA"
+          test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
+          git merge-base --is-ancestor "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA"
           test -z "$(git status --porcelain)"
 
       - name: Install pinned Rust + Clippy
@@ -282,6 +303,19 @@ jobs:
           test "${#files[@]}" -eq 1
           test "${files[0]}" = 'crates/domains/symthaea-se-model/src/lib.rs'
           test -z "$(git diff --name-only "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- Cargo.lock)"
+          test "$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)" = 
+            echo
+            echo "frozen_subject_sha=$FROZEN_SUBJECT_SHA"
+            echo "repair_sha=$EXPECTED_REPAIR_SHA"
+            echo "changed_file=${files[0]}"
+            echo
+            echo 'Observation class: reproduced'
+            echo
+            echo 'This workflow produces execution evidence only; it grants no qualification authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+48	13	crates/domains/symthaea-se-model/src/lib.rs'
+          test "$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
           {
             echo '### Repair identity'
             echo
