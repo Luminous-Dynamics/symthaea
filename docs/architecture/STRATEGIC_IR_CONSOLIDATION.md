@@ -512,3 +512,34 @@ This preserves a useful distinction for future adapters:
 - structural recall failure means the declared partition itself fails the finite-tree recall check.
 
 The next semantic increment should add explicit observation events, including stable chance-event identities, rather than using state IDs as a proxy for observations. OpenSpiel's current API similarly distinguishes information state from observation, with perfect-recall observations retaining enough action-observation history to reconstruct the information state. 
+
+### 2026-09-29 semantic observation and chance-event boundary
+
+The extensive-form boundary now gives semantic history two identities that must not be
+reconstructed from state IDs:
+
+- `ChanceOutcomeId` identifies the actual stochastic outcome taken at a chance node;
+- `ObservationId` identifies an observation token, with an explicit observer attached
+  to each observation event.
+
+`HistoryEvent` now carries decision, chance, and observation events. `ExtensiveGame`
+validates that a state cannot emit two observations for the same observer and that a
+chance node cannot reuse one outcome identity within its local distribution. The
+semantic information encoder therefore receives a history that can distinguish two
+histories reaching the same structural state for different stochastic or observational
+reasons.
+
+This is deliberately modeled after a useful ecosystem distinction: OpenSpiel separates
+perfect-recall information states from observations, and requires an action-observation
+history to retain enough information to reconstruct the information state. Its current
+API also treats chance outcomes as explicit actions/transitions rather than silently
+identifying them with destination states. citeturn0search3turn0search7
+
+The Symthaea boundary is intentionally narrower for now: observations are typed tokens,
+not yet decoded public/private feature tensors, and the encoder remains responsible for
+mapping semantic history to the canonical `InformationSetId`. This avoids prematurely
+claiming that every observation history is a complete perfect-recall representation.
+
+The distinction also matches current Rust MCCFR work, where `EmbeddedHistory` and
+`PerfectRecall` are separate attestations and replay consistency is made explicit rather
+than inferred from an opaque state identifier. citeturn0search0turn0search1
