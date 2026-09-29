@@ -178,7 +178,7 @@ impl CriterionEvidenceEligibility {
 
     fn digest(&self) -> String {
         let mut h = Sha256::new();
-        h.update(b"symthaea:criterion-evidence-eligibility:v1\0");
+        h.update(b"symthaea:criterion-evidence-eligibility:v2\0");
         for s in [
             self.evidence_id.as_str(), self.challenge_id.as_str(), self.criterion_id.as_str(),
             self.criterion_generation.as_str(), self.authority_id.as_str(),
