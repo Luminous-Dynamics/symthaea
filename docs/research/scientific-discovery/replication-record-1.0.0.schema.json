@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/scientific-discovery/replication-record-1.0.0.schema.json",
+  "title": "Symthaea Replication Record",
+  "description": "Versioned provenance envelope for a distinct replication attempt. It is not a truth claim, confidence score, or official criterion completion record.",
+  "type": "object",
+  "required": [
+    "replication_id",
+    "execution_id",
+    "observer_id",
+    "institution_id",
+    "independent_from_original_observer",
+    "independence_basis",
+    "replicated_at",
+    "outcome",
+    "observation_id",
+    "observation_record_digest",
+    "assessment_id",
+    "assessment_record_digest",
+    "commitment_event_id",
+    "candidate_id",
+    "binding_digest",
+    "replication_digest",
+    "record_digest"
+  ],
+  "properties": {
+    "replication_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "institution_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "independent_from_original_observer": {
+      "const": true
+    },
+    "independence_basis": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replicated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+    },
+    "outcome": {
+      "enum": [
+        "replicated_supportive",
+        "non_replicating_contradictory",
+        "null_result",
+        "inconclusive",
+        "procedural_invalid"
+      ]
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_record_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "assessment_record_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commitment_event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "binding_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replication_digest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_digest": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "x-authority": "replication_attempt_record_only",
+  "x-non-equivalences": [
+    "replication_record != replication_truth",
+    "replication_outcome != scientific_truth",
+    "replication_record != official_criterion_evidence",
+    "independence_attestation != authenticated_identity_or_institutional_independence",
+    "record_digest != digital_signature"
+  ],
+  "x-integrity": "The record digest is deterministic and tamper-evident relative to an anchored digest; this schema does not authenticate actors or institutions."
+}
