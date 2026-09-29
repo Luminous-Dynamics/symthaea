@@ -59,6 +59,7 @@ pub mod evidence_lineage_dkg_path;
 pub mod evidence_lineage_federation_merkle;
 pub mod cross_dkg_federation;
 pub mod cross_dkg_link_collection;
+pub mod cross_dkg_adapter;
 pub mod prospective;
 pub mod prospective_audit;
 pub mod seed_plan;
