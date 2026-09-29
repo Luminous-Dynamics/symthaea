@@ -63,9 +63,11 @@ pub struct MemoryRetrievalReceipt {
 /// Receipt integrity validation failures. Integrity is not semantic truth or authority.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReceiptVerificationError {
+    Canonicalization(ReceiptCanonicalizationError),
     DigestMismatch,
     DuplicateSelectedIdentity,
     DuplicateRepresentationBinding,
+    DuplicateExclusion,
     EmptyRepresentationDigest,
     UnselectedRepresentationIdentity,
 }
@@ -82,7 +84,10 @@ impl VerifiedRetrievalReceipt {
 impl MemoryRetrievalReceipt {
     /// Verify the receipt's canonical digest and basic referential integrity.
     pub fn verify(&self) -> Result<VerifiedRetrievalReceipt, ReceiptVerificationError> {
-        if !self.is_self_consistent() {
+        let expected_digest = self
+            .canonical_digest()
+            .map_err(ReceiptVerificationError::Canonicalization)?;
+        if self.receipt_digest.is_empty() || self.receipt_digest != expected_digest {
             return Err(ReceiptVerificationError::DigestMismatch);
         }
         let mut selected = self.selected.clone();
@@ -103,6 +108,15 @@ impl MemoryRetrievalReceipt {
         }
         if bindings.iter().any(|(identity, _)| !selected.contains(identity)) {
             return Err(ReceiptVerificationError::UnselectedRepresentationIdentity);
+        }
+        let mut exclusions = self.excluded.clone();
+        exclusions.sort_by(|a, b| {
+            a.canonical_identity
+                .cmp(&b.canonical_identity)
+                .then_with(|| (a.reason as u8).cmp(&(b.reason as u8)))
+        });
+        if exclusions.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(ReceiptVerificationError::DuplicateExclusion);
         }
         Ok(VerifiedRetrievalReceipt(self.clone()))
     }
@@ -320,6 +334,17 @@ mod tests {
         duplicated.selected_representation_digests.push(duplicated.selected_representation_digests[0].clone());
         duplicated.receipt_digest=duplicated.canonical_digest().unwrap();
         assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateRepresentationBinding));
+    }
+
+    #[test] fn duplicate_exclusion_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![
+            candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible),
+            candidate("new",MemoryKind::Semantic,"b",0.7,FrontierEligibility::Ineligible),
+        ]);
+        let mut duplicated=receipt;
+        duplicated.excluded.push(duplicated.excluded[0].clone());
+        duplicated.receipt_digest=duplicated.canonical_digest().unwrap();
+        assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateExclusion));
     }
 
     #[test] fn empty_representation_digest_is_rejected() {
