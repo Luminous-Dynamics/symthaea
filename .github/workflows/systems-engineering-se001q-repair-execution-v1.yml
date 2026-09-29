@@ -88,6 +88,7 @@ jobs:
         run: cargo clippy -p symthaea-se-model --locked --all-targets -- -D warnings
 
       - name: Record lock identity
+        if: always()
         id: lock
         shell: bash
         run: |
@@ -316,14 +317,61 @@ jobs:
 48	13	crates/domains/symthaea-se-model/src/lib.rs'
           test "$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
           test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
+          numstat="$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)"
+          lock_blob="$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")"
+          lock_sha256="$(git show "$EXPECTED_REPAIR_SHA:Cargo.lock" | sha256sum | awk '{print $1}')"
+          commit_count="$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")"
+          cat > se001q-repair-delta-manifest.json <<EOF
+          {
+            "schema": "se-repair-evidence-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "job": "${{ github.job }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "commit_count": "$commit_count",
+            "changed_file_count": "1",
+            "changed_file": "${files[0]}",
+            "numstat": "$numstat",
+            "cargo_lock_blob_sha": "$lock_blob",
+            "cargo_lock_sha256": "$lock_sha256",
+            "observation_class": "reproduced",
+            "authority_class": "execution_evidence_only",
+            "qualification_state": "not_granted"
+          }
+          EOF
+          cat se001q-repair-delta-manifest.json
           {
             echo '### Repair identity'
             echo
             echo "frozen_subject_sha=$FROZEN_SUBJECT_SHA"
             echo "repair_sha=$EXPECTED_REPAIR_SHA"
             echo "changed_file=${files[0]}"
+            echo "numstat=$numstat"
+            echo "commit_count=$commit_count"
             echo
             echo 'Observation class: reproduced'
             echo
             echo 'This workflow produces execution evidence only; it grants no qualification authority.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload delta audit capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload-delta
+        with:
+          name: se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}
+          path: se001q-repair-delta-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record delta artifact identity
+        if: always()
+        run: |
+          echo "artifact-id: ${{ steps.upload-delta.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "artifact-digest: ${{ steps.upload-delta.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
