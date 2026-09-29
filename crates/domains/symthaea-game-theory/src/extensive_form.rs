@@ -195,7 +195,13 @@ impl ExtensiveGame {
                         return Err(ExtensiveGameError::NoChanceOutcomes(id));
                     }
                     let mut total = 0.0;
-                    for outcome in outcomes {
+                    for (i, outcome) in outcomes.iter().enumerate() {
+                        if outcomes[..i].iter().any(|prior| prior.outcome == outcome.outcome) {
+                            return Err(ExtensiveGameError::DuplicateChanceOutcome {
+                                node: id,
+                                outcome: outcome.outcome,
+                            });
+                        }
                         if !outcome.probability.is_finite()
                             || !(0.0..=1.0).contains(&outcome.probability)
                         {
@@ -506,6 +512,7 @@ pub enum ExtensiveGameError {
     DuplicateAction { node: DecisionStateId, action: ActionId },
     NoActions(DecisionStateId),
     NoChanceOutcomes(DecisionStateId),
+    DuplicateChanceOutcome { node: DecisionStateId, outcome: ChanceOutcomeId },
     InvalidChanceProbability(DecisionStateId),
     ChanceProbabilitiesDoNotSumToOne { node: DecisionStateId, total: f64 },
     InvalidTerminalPayoffs(DecisionStateId),
@@ -585,7 +592,8 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information: info(),
-        };
+            observations: HashMap::new(),
+};
         assert_eq!(
             game.validate(),
             Err(ExtensiveGameError::DecisionActionsMismatch(DecisionStateId(0)))
@@ -649,7 +657,8 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information: info(),
-        };
+            observations: HashMap::new(),
+};
 
         assert_eq!(
             game.verify_perfect_recall(),
@@ -820,7 +829,8 @@ mod tests {
                     },
                 ],
             },
-        };
+            observations: HashMap::new(),
+};
 
         assert_eq!(
             game.validate(),
@@ -862,7 +872,8 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information: info(),
-        };
+            observations: HashMap::new(),
+};
 
         assert_eq!(game.verify_information_encoder(&Encoder), Ok(()));
     }
@@ -898,7 +909,8 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information: info(),
-        };
+            observations: HashMap::new(),
+};
 
         assert!(matches!(
             game.verify_information_encoder(&Encoder),
@@ -915,7 +927,8 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(0), payoffs: vec![0.0] },
             ],
             information: info(),
-        };
+            observations: HashMap::new(),
+};
         assert_eq!(
             game.validate(),
             Err(ExtensiveGameError::DuplicateNodeId(DecisionStateId(0)))
@@ -938,7 +951,8 @@ mod tests {
                 ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
             ],
             information: info(),
-        };
+            observations: HashMap::new(),
+};
         assert!(matches!(
             game.validate(),
             Err(ExtensiveGameError::ChanceProbabilitiesDoNotSumToOne { .. })
