@@ -2167,6 +2167,84 @@ mod tests {
     }
 
     #[test]
+    fn small_cartesian_domains_converge_across_representation_and_parameter_order() {
+        let a = ParameterIdV1::new("a").unwrap();
+        let b = ParameterIdV1::new("b").unwrap();
+
+        let cases = vec![
+            vec![
+                ExactDesignParameterDomainV1 {
+                    id: a.clone(),
+                    domain: ExactLengthDomainV1::Values(vec![
+                        C0LengthUmV1::new(10).unwrap(),
+                        C0LengthUmV1::new(20).unwrap(),
+                    ]),
+                },
+                ExactDesignParameterDomainV1 {
+                    id: b.clone(),
+                    domain: ExactLengthDomainV1::Values(vec![
+                        C0LengthUmV1::new(100).unwrap(),
+                        C0LengthUmV1::new(200).unwrap(),
+                    ]),
+                },
+            ],
+            vec![
+                ExactDesignParameterDomainV1 {
+                    id: b.clone(),
+                    domain: ExactLengthDomainV1::Range {
+                        lower: C0LengthUmV1::new(100).unwrap(),
+                        upper: C0LengthUmV1::new(200).unwrap(),
+                        step_um: 100,
+                    },
+                },
+                ExactDesignParameterDomainV1 {
+                    id: a.clone(),
+                    domain: ExactLengthDomainV1::Range {
+                        lower: C0LengthUmV1::new(10).unwrap(),
+                        upper: C0LengthUmV1::new(20).unwrap(),
+                        step_um: 10,
+                    },
+                },
+            ],
+        ];
+
+        let first = ExactDesignSearchDomainV1::new(cases[0].clone()).unwrap();
+        let second = ExactDesignSearchDomainV1::new(cases[1].clone()).unwrap();
+
+        assert_ne!(first.id().unwrap(), second.id().unwrap());
+        assert_eq!(
+            first.canonical_transcript()
+                .unwrap()
+                .iter()
+                .filter(|byte| **byte == 0)
+                .count(),
+            2
+        );
+
+        let first_candidates = first.enumerate().unwrap();
+        let second_candidates = second.enumerate().unwrap();
+        assert_eq!(first_candidates, second_candidates);
+        assert_eq!(first_candidates.len(), 4);
+
+        let candidate_ids = first_candidates
+            .iter()
+            .map(|candidate| candidate.id().unwrap())
+            .collect::<Vec<_>>();
+        let unique_candidate_ids = candidate_ids.iter().collect::<BTreeSet<_>>();
+        assert_eq!(unique_candidate_ids.len(), 4);
+
+        for candidate in first_candidates.iter().chain(second_candidates.iter()) {
+            let independent =
+                ExactDesignParameterSetV1::new(candidate.parameters.clone()).unwrap();
+            assert_eq!(candidate.id().unwrap(), independent.id().unwrap());
+            assert_eq!(
+                candidate.canonical_transcript().unwrap(),
+                independent.canonical_transcript().unwrap()
+            );
+        }
+    }
+
+    #[test]
     fn parameter_set_serde_permutation_preserves_identity() {
         let first = ExactDesignParameterSetV1::new(vec![
             ExactDesignLengthParameterV1 {
