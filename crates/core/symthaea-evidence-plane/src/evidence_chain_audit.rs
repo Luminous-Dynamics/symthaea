@@ -86,7 +86,7 @@ impl EvidenceChainAudit {
 
     fn compute_digest(&self) -> String {
         let mut h = Sha256::new();
-        h.update(b"symthaea:evidence-chain-audit:v1\\0");
+        h.update(b"symthaea:evidence-chain-audit:v1\0");
         put(&mut h, match self.status {
             EvidenceChainStatus::Complete => "complete",
             EvidenceChainStatus::Invalid => "invalid",
