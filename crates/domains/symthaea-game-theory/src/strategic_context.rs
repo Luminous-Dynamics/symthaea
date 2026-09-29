@@ -4,7 +4,7 @@
 //! They do not receive the full world state by default. This module defines
 //! representation and validation contracts; it does not implement a solver.
 
-use crate::strategic::{ActionId, PlayerId};
+use crate::strategic::{ActionId, PlayerId, SolverCapabilities};
 
 /// Stable identifier for a player's information set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -204,8 +204,8 @@ impl InformationStructure {
             }
         }
 
-        for state in &self.decision_states {
-            if membership[state.state.0].is_none() {
+        for (index, state) in self.decision_states.iter().enumerate() {
+            if membership[index].is_none() {
                 return Err(InformationStructureError::UnassignedDecisionState(state.state));
             }
         }
@@ -374,7 +374,10 @@ impl Strategy {
 
 /// A profile of complete contingent plans, one per player.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StrategyProfilePlan(pub Vec<Strategy>);\n\nimpl StrategyProfilePlan {\n    /// Validate every player plan against its own decision points.\n    pub fn validate(&self, points: &[(PlayerId, Vec<DecisionPoint>)]) -> Result<(), ContextError> {\n        if self.0.len() != points.len() {\n            return Err(ContextError::ProfilePlayerCount { expected: points.len(), actual: self.0.len() });\n        }\n        for (strategy, (player, decision_points)) in self.0.iter().zip(points) {\n            if strategy.player != *player {\n                return Err(ContextError::PlayerMismatch { information_set: InformationSetId(usize::MAX), expected: *player, actual: strategy.player });\n            }\n            strategy.validate(decision_points)?;\n        }\n        Ok(())\n    }\n}
+pub struct StrategyProfilePlan(pub Vec<Strategy>);
+
+impl StrategyProfilePlan {
+    /// Validate every player plan against its own decision points.\n    pub fn validate(&self, points: &[(PlayerId, Vec<DecisionPoint>)]) -> Result<(), ContextError> {\n        if self.0.len() != points.len() {\n            return Err(ContextError::ProfilePlayerCount { expected: points.len(), actual: self.0.len() });\n        }\n        for (strategy, (player, decision_points)) in self.0.iter().zip(points) {\n            if strategy.player != *player {\n                return Err(ContextError::PlayerMismatch { information_set: InformationSetId(usize::MAX), expected: *player, actual: strategy.player });\n            }\n            strategy.validate(decision_points)?;\n        }\n        Ok(())\n    }\n}
 
 /// Validation failures for information-aware decision contracts.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -382,7 +385,8 @@ pub enum ContextError {
     NoLegalActions,
     DuplicateLegalAction(ActionId),
     DuplicateInformationSet(InformationSetId),
-    PlayerMismatch { information_set: InformationSetId, expected: PlayerId, actual: PlayerId },\n    ProfilePlayerCount { expected: usize, actual: usize },
+    PlayerMismatch { information_set: InformationSetId, expected: PlayerId, actual: PlayerId },
+    ProfilePlayerCount { expected: usize, actual: usize },
     MissingDecision(InformationSetId),
     UnknownInformationSet(InformationSetId),
     IllegalAction { information_set: InformationSetId, action: ActionId },
