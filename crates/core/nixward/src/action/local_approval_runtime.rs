@@ -335,6 +335,126 @@ mod tests {
     }
 
     #[test]
+    fn restart_rejects_old_submission_after_new_runtime_takes_over() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime_path = parent.path().join("runtime");
+        let first = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        let now = wall_ms();
+        let installed = first
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let submission = LocalApprovalSubmissionV1::for_request(
+            installed.request(),
+            LocalApprovalDecisionKindV1::Approved,
+            UnixMillisV1::new(wall_ms()),
+        )
+        .unwrap();
+        let old_socket = first.socket_path().to_path_buf();
+        let first_transport = first.transport_instance_ref().to_string();
+        drop(first);
+
+        let second = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        assert_ne!(second.daemon_incarnation_ref(), installed.request().daemon_incarnation_id);
+        assert_eq!(second.socket_path(), old_socket.as_path());
+        assert_ne!(second.transport_instance_ref(), first_transport);
+
+        let new_socket = second.socket_path().to_path_buf();
+        let client = thread::spawn(move || submit_local_approval_v1(&new_socket, &submission));
+        let result = second.accept_and_consume();
+        let client_result = client.join().unwrap();
+
+        assert!(matches!(
+            result,
+            Err(LocalApprovalRuntimeErrorV1::Socket(
+                LocalApprovalSocketErrorV1::RequestStore(
+                    LocalApprovalRequestStoreErrorV1::RequestNotPending
+                )
+            ))
+        ));
+        assert!(client_result.is_err());
+        assert_eq!(second.pending_count().unwrap(), 0);
+    }
+
+    #[test]
+    fn superseded_submission_is_rejected_while_current_reissue_remains_consumable() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = Arc::new(
+            LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap(),
+        );
+        let now = wall_ms();
+        let action = intent("nginx.service");
+
+        let first = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let first_submission = LocalApprovalSubmissionV1::for_request(
+            first.request(),
+            LocalApprovalDecisionKindV1::Approved,
+            UnixMillisV1::new(wall_ms()),
+        )
+        .unwrap();
+
+        let second = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(500)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let second_submission = LocalApprovalSubmissionV1::for_request(
+            second.request(),
+            LocalApprovalDecisionKindV1::Approved,
+            UnixMillisV1::new(wall_ms()),
+        )
+        .unwrap();
+
+        assert_eq!(second.superseded_request_ids(), &[first.request_id().to_string()]);
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+
+        let stale_socket = runtime.socket_path().to_path_buf();
+        let stale_client =
+            thread::spawn(move || submit_local_approval_v1(&stale_socket, &first_submission));
+        let stale_result = runtime.accept_and_consume();
+        let stale_client_result = stale_client.join().unwrap();
+
+        assert!(matches!(
+            stale_result,
+            Err(LocalApprovalRuntimeErrorV1::Socket(
+                LocalApprovalSocketErrorV1::RequestStore(
+                    LocalApprovalRequestStoreErrorV1::RequestNotPending
+                )
+            ))
+        ));
+        assert!(stale_client_result.is_err());
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+
+        let current_socket = runtime.socket_path().to_path_buf();
+        let current_client =
+            thread::spawn(move || submit_local_approval_v1(&current_socket, &second_submission));
+        let current_result = runtime.accept_and_consume().unwrap();
+        let current_ack = current_client.join().unwrap();
+
+        assert_eq!(current_result.request_id(), second.request_id());
+        assert_eq!(current_result.decision_kind(), LocalApprovalDecisionKindV1::Approved);
+        assert_eq!(current_ack.request_id, second.request_id());
+        assert_eq!(runtime.pending_count().unwrap(), 0);
+    }
+
+    #[test]
     fn two_independent_runtimes_do_not_share_incarnation_or_transport_identity() {
         let first_parent = tempfile::tempdir().unwrap();
         let second_parent = tempfile::tempdir().unwrap();
