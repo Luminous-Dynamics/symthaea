@@ -46,5 +46,31 @@
     "version": "1",
     "content_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "identity_digest": "494fc61dbfa0ae3be0b7ab60d8fd026a88c3e92c27756bc94be5995b96476042"
+  },
+  "dependency_matrix": {
+    "schema": "symthaea.cp-04-dependency-matrix-v1",
+    "rules": [
+      {
+        "mutation": "identity",
+        "relation": "changed",
+        "projection": "changed",
+        "source_graph": "changed",
+        "artifact": "changed"
+      },
+      {
+        "mutation": "qualification_relation",
+        "relation": "changed",
+        "projection": "changed",
+        "source_graph": "changed",
+        "artifact": "changed"
+      },
+      {
+        "mutation": "epistemic_relation",
+        "relation": "changed",
+        "projection": "unchanged",
+        "source_graph": "changed",
+        "artifact": "changed"
+      }
+    ]
   }
 }
