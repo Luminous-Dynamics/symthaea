@@ -2333,21 +2333,6 @@ mod tests {
 
     #[test]
     fn cartesian_enumeration_fails_closed_on_cardinality_overflow() {
-        let first = ExactDesignParameterDomainV1 {
-            id: ParameterIdV1::new("a").unwrap(),
-            domain: ExactLengthDomainV1::Values(vec![
-                C0LengthUmV1::new(1).unwrap(),
-                C0LengthUmV1::new(2).unwrap(),
-            ]),
-        };
-        let second = ExactDesignParameterDomainV1 {
-            id: ParameterIdV1::new("b").unwrap(),
-            domain: ExactLengthDomainV1::Values(vec![
-                C0LengthUmV1::new(3).unwrap(),
-                C0LengthUmV1::new(4).unwrap(),
-            ]),
-        };
-
         // Build a domain whose mathematical Cartesian product exceeds usize::MAX
         // without requiring the test to materialize any candidates.
         let mut parameters = Vec::new();
@@ -2361,10 +2346,6 @@ mod tests {
             parameters.push(ExactDesignParameterDomainV1 { id, domain });
             value += 1;
         }
-
-        // Keep these ordinary dimensions referenced so the intended 2-value
-        // cardinality remains explicit in the regression setup.
-        assert_eq!(first.domain, second.domain);
 
         let domain = ExactDesignSearchDomainV1::new(parameters).unwrap();
         assert!(matches!(
