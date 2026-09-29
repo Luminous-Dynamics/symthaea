@@ -18,6 +18,7 @@ pub mod gc_manager;
 pub mod generation_manager;
 pub mod local_approval;
 pub mod local_approval_ipc;
+pub mod local_approval_projection;
 #[cfg(target_os = "linux")]
 pub mod local_approval_runtime;
 #[cfg(target_os = "linux")]
@@ -54,6 +55,9 @@ pub use local_approval::{
     PendingNixApprovalRequestV1, digest_display,
 };
 pub use local_approval_ipc::LocalApprovalIpcErrorV1;
+pub use local_approval_projection::{
+    LocalApprovalProjectionErrorV1, PendingNixApprovalProjectionV1,
+};
 #[cfg(target_os = "linux")]
 pub use local_approval_ipc::observe_linux_unix_peer_v1;
 #[cfg(target_os = "linux")]
