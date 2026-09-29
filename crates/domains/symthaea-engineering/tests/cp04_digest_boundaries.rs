@@ -166,6 +166,26 @@ fn source_graph_digest_mutation_cannot_preserve_artifact_integrity() {
 }
 
 #[test]
+fn recomputed_source_graph_tamper_is_rejected_only_at_source_binding_boundary() {
+    let graph = three_node_graph(EngineeringRelationKind::Requires);
+    let projection = graph.qualification_projection().unwrap();
+    let mut tampered = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
+
+    tampered.source_graph_digest = "0".repeat(64);
+    let mut digest_input = tampered.clone();
+    digest_input.artifact_digest.clear();
+    let bytes = serde_json::to_vec(&digest_input).unwrap();
+    use sha2::{Digest, Sha256};
+    tampered.artifact_digest = Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+
+    assert!(tampered.validate().is_ok());
+    assert!(tampered.validate_against_projection(&projection).is_err());
+}
+
+#[test]
 fn relation_digest_mutation_cannot_be_hidden_by_an_unchanged_artifact_digest() {
     let graph = three_node_graph(EngineeringRelationKind::Requires);
     let original = artifact_for_graph(&graph);
