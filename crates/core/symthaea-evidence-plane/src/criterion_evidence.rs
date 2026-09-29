@@ -205,7 +205,7 @@ impl CriterionEvidenceEligibility {
             self.assessment_id.as_str(), self.assessment_record_digest.as_str(),
             self.replication_id.as_str(), self.replication_record_digest.as_str(),
             self.commitment_event_id.as_str(), self.candidate_id.as_str(), self.binding_digest.as_str(),
-            self.authority_payload_digest.as_str(),
+            self.authority_payload_digest.as_str(), self.supersedes_evidence_id.as_deref().unwrap_or(""),
         ] {
             h.update((s.len() as u64).to_be_bytes());
             h.update(s.as_bytes());
