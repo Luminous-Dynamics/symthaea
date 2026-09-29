@@ -97,6 +97,17 @@ impl EvidenceView {
         }).collect::<Vec<_>>();
         items.sort_by(|a, b| a.canonical_identity.cmp(&b.canonical_identity));
 
+        // A view must describe exactly the selection attested by its retrieval receipt.
+        // Do not silently accept a stale/mismatched receipt as metadata.
+        let mut item_ids = items.iter().map(|item| item.canonical_identity.clone()).collect::<Vec<_>>();
+        item_ids.sort();
+        item_ids.dedup();
+        let mut receipt_ids = receipt.selected.clone();
+        receipt_ids.sort();
+        receipt_ids.dedup();
+        if item_ids != receipt_ids {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
         let mut view = Self {
             mode: receipt.mode,
             frontier_ref: receipt.frontier_ref.clone(),
