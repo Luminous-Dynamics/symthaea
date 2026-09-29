@@ -237,10 +237,30 @@ impl ScientificInvestigationTrace {
             }
         }
 
-        if self.stages.iter().any(|stage| {
-            stage.kind == InvestigationStageKind::CriterionEvidence && stage.kind.computational()
-        }) {
-            return Err(InvestigationTraceError::ComputationalCriterionEvidence);
+        if let Some(criterion) = self
+            .stages
+            .iter()
+            .find(|stage| stage.kind == InvestigationStageKind::CriterionEvidence)
+        {
+            let parent_kinds = criterion
+                .parent_stage_ids
+                .iter()
+                .filter_map(|parent| self.stages.iter().find(|stage| &stage.stage_id == parent))
+                .map(|stage| stage.kind)
+                .collect::<Vec<_>>();
+
+            if parent_kinds.iter().all(|kind| kind.computational())
+                || !parent_kinds.iter().any(|kind| {
+                    matches!(
+                        kind,
+                        InvestigationStageKind::Observation
+                            | InvestigationStageKind::IndependentAssessment
+                            | InvestigationStageKind::Replication
+                    )
+                })
+            {
+                return Err(InvestigationTraceError::ComputationalCriterionEvidence);
+            }
         }
 
         Ok(())
