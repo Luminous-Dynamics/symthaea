@@ -6,6 +6,7 @@ on:
     paths:
       - "docs/engineering/contracts/cp-04-compute-evidence-typed-dag-v1-1.md"
       - "docs/engineering/data/cp-04-compute-evidence-dag-v1-1.json"
+      - "docs/engineering/data/cp-04-compute-evidence-dag-mutation-manifest-v1-1.json"
       - "scripts/qualifiers/cp_04_compute_dag_qualifier.py"
       - ".github/workflows/cp-04-compute-dag-v1-1.yml"
 
