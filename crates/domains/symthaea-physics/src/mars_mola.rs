@@ -53,6 +53,8 @@ pub struct MolaMegdrMetadata {
     pub latitude_max_deg: f64,
     pub line_offset: u32,
     pub sample_offset: u32,
+    pub line_projection_offset: f64,
+    pub sample_projection_offset: f64,
     pub pixel_scale: f64,
     pub pixel_offset: f64,
     pub missing_value: Option<f64>,
@@ -258,6 +260,10 @@ impl MolaMegdrMetadata {
         let latitude_max_deg = parse_f64(kv, "MAXIMUM_LATITUDE")?;
         let line_offset = parse_u32_default(kv, "LABEL_RECORDS", 0)?;
         let sample_offset = 0;
+        let line_projection_offset =
+            parse_f64_default(kv, "LINE_PROJECTION_OFFSET", latitude_max_deg * resolution as f64 + 0.5)?;
+        let sample_projection_offset =
+            parse_f64_default(kv, "SAMPLE_PROJECTION_OFFSET", longitude_min_deg * resolution as f64 + 0.5)?;
         let pixel_scale = parse_f64_default(kv, "SCALING_FACTOR", 1.0)?;
         let pixel_offset = parse_f64_default(kv, "OFFSET", 0.0)?;
         let missing_value = kv.get("MISSING_CONSTANT").and_then(|v| parse_number(v).ok());
@@ -323,6 +329,8 @@ impl MolaMegdrMetadata {
             || !longitude_max_deg.is_finite()
             || !pixel_scale.is_finite()
             || !pixel_offset.is_finite()
+            || !line_projection_offset.is_finite()
+            || !sample_projection_offset.is_finite()
             || latitude_min_deg < -90.0
             || latitude_max_deg > 90.0
             || latitude_min_deg >= latitude_max_deg
@@ -372,6 +380,8 @@ impl MolaMegdrMetadata {
             latitude_max_deg,
             line_offset,
             sample_offset,
+            line_projection_offset,
+            sample_projection_offset,
             pixel_scale,
             pixel_offset,
             missing_value,
@@ -401,13 +411,17 @@ impl MolaMegdrMetadata {
                 "normalized longitude outside [0, 360)".into(),
             ));
         }
-        let x = ((lon - self.longitude_min_deg) * self.resolution_pixels_per_degree as f64)
-            .floor() as i64;
-        // MEGDR tiles are named from their upper-left latitude; line 0 is the
-        // northern edge and latitude decreases southward.
-        let y = ((self.latitude_max_deg - latitude_deg)
-            * self.resolution_pixels_per_degree as f64)
-            .floor() as i64;
+        // PDS simple-cylindrical projection coordinates are 1-based pixel
+        // coordinates whose centers are represented by the .5 projection
+        // offsets (e.g. 360.5/720.5 in the official 4 ppd label). Convert the
+        // center coordinate to a zero-based cell without assuming the tile's
+        // geographic bounds are themselves pixel-center coordinates.
+        let sample_coord = self.sample_projection_offset
+            + lon * self.resolution_pixels_per_degree as f64;
+        let line_coord = self.line_projection_offset
+            - latitude_deg * self.resolution_pixels_per_degree as f64;
+        let x = (sample_coord - 1.0).floor() as i64;
+        let y = (line_coord - 1.0).floor() as i64;
         if x < 0 || y < 0 || x as u32 >= self.samples || y as u32 >= self.lines {
             return Err(MolaError::OutOfBounds);
         }
@@ -619,6 +633,25 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(error, MolaError::Unsupported(_)));
+    }
+
+    #[test]
+    fn uses_projection_offsets_for_pixel_centers() {
+        let text = label()
+            .replace("LINES = 4", "LINES = 720")
+            .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 1440")
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -90.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 90.0")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 360.5")
+            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = 720.5");
+        let metadata = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap();
+        assert_eq!(metadata.cell_for(89.875, 0.125), Ok((0, 0)));
+        assert_eq!(metadata.cell_for(-89.875, 359.875), Ok((719, 1439)));
     }
 
     #[test]
