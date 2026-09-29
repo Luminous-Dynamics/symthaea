@@ -250,6 +250,8 @@ impl KnowledgePersistence {
         conn.execute_batch("BEGIN TRANSACTION").map_err(|e| e.to_string())?;
         let mut count = 0;
         for relation in relations {
+            let relation_for_validation = ProvenanceRelation::from(relation.clone());
+            relation_for_validation.validate().map_err(|e| format!("Invalid provenance relation: {e}"))?;
             let inserted = conn.execute(
                 "INSERT OR IGNORE INTO knowledge_provenance_relations (source_memory_id, target_memory_id, kind, created_at) VALUES (?1, ?2, ?3, ?4)",
                 rusqlite::params![relation.source_memory_id, relation.target_memory_id, format!("{:?}", relation.kind), relation.created_at],
