@@ -147,8 +147,8 @@ impl MolaMegdrProduct {
         let index = u64::from(line) * u64::from(self.metadata.samples)
             + u64::from(sample);
         let byte_offset = u64::from(self.metadata.record_bytes)
-            * u64::from(self.metadata.line_offset)
-            + index * 2
+            * (u64::from(line) + u64::from(self.metadata.line_offset))
+            + u64::from(sample) * 2
             + u64::from(self.metadata.sample_offset);
         let mut file = File::open(&self.img_path)?;
         file.seek(SeekFrom::Start(byte_offset))?;
@@ -398,8 +398,10 @@ fn normalize_lon(lon_deg: f64) -> f64 {
 
 fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<(), MolaError> {
     let len = std::fs::metadata(img_path)?.len();
-    let required = metadata.record_bytes * u64::from(metadata.line_offset.max(1))
-        + u64::from(metadata.lines) * u64::from(metadata.samples) * 2;
+    let row_payload = u64::from(metadata.samples) * 2;
+    let required = metadata.record_bytes * u64::from(metadata.line_offset)
+        + u64::from(metadata.lines.saturating_sub(1)) * metadata.record_bytes
+        + row_payload;
     if len < required {
         return Err(MolaError::InvalidMetadata(format!(
             "IMG is too small: {len} bytes, expected at least {required}"
