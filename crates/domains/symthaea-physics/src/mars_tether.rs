@@ -79,6 +79,147 @@ impl MarsTetherReference {
     }
 }
 
+/// A three-dimensional vector in an areocentric Mars frame.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Vec3 {
+    pub x_m: f64,
+    pub y_m: f64,
+    pub z_m: f64,
+}
+
+impl Vec3 {
+    pub const ZERO: Self = Self { x_m: 0.0, y_m: 0.0, z_m: 0.0 };
+
+    pub fn norm_m(self) -> f64 {
+        (self.x_m * self.x_m + self.y_m * self.y_m + self.z_m * self.z_m).sqrt()
+    }
+
+    pub fn scale(self, k: f64) -> Self {
+        Self { x_m: self.x_m * k, y_m: self.y_m * k, z_m: self.z_m * k }
+    }
+
+    pub fn add(self, other: Self) -> Self {
+        Self { x_m: self.x_m + other.x_m, y_m: self.y_m + other.y_m, z_m: self.z_m + other.z_m }
+    }
+
+    pub fn sub(self, other: Self) -> Self {
+        Self { x_m: self.x_m - other.x_m, y_m: self.y_m - other.y_m, z_m: self.z_m - other.z_m }
+    }
+
+    pub fn dot(self, other: Self) -> f64 {
+        self.x_m * other.x_m + self.y_m * other.y_m + self.z_m * other.z_m
+    }
+}
+
+/// Spherical surface anchor coordinates.
+///
+/// Longitude is positive east; latitude is areocentric. Radius includes
+/// elevation above the reference spherical Mars radius. This deliberately
+/// avoids conflating a DEM/areoid height with a structural anchor elevation.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MarsAnchor {
+    pub latitude_rad: f64,
+    pub longitude_rad: f64,
+    pub elevation_m: f64,
+}
+
+impl MarsAnchor {
+    pub fn position(self, reference: MarsTetherReference) -> Vec3 {
+        let r = reference.radius_m + self.elevation_m;
+        let clat = self.latitude_rad.cos();
+        Vec3 {
+            x_m: r * clat * self.longitude_rad.cos(),
+            y_m: r * clat * self.longitude_rad.sin(),
+            z_m: r * self.latitude_rad.sin(),
+        }
+    }
+
+    /// Local east, north, up basis vectors at the anchor.
+    pub fn enu_basis(self) -> (Vec3, Vec3, Vec3) {
+        let lat = self.latitude_rad;
+        let lon = self.longitude_rad;
+        (
+            Vec3 { x_m: -lon.sin(), y_m: lon.cos(), z_m: 0.0 },
+            Vec3 { x_m: -lat.sin() * lon.cos(), y_m: -lat.sin() * lon.sin(), z_m: lat.cos() },
+            Vec3 { x_m: lat.cos() * lon.cos(), y_m: lat.cos() * lon.sin(), z_m: lat.sin() },
+        )
+    }
+
+    /// Outward tether direction for azimuth measured east of north and
+    /// elevation measured above the local horizontal plane.
+    pub fn tether_direction(self, azimuth_rad: f64, elevation_rad: f64) -> Vec3 {
+        let (east, north, up) = self.enu_basis();
+        let ce = elevation_rad.cos();
+        north.scale(ce * azimuth_rad.cos())
+            .add(east.scale(ce * azimuth_rad.sin()))
+            .add(up.scale(elevation_rad.sin()))
+    }
+}
+
+/// Straight-line T0 rotating tether geometry.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RotatingTetherGeometry {
+    pub anchor_position_m: Vec3,
+    pub direction: Vec3,
+    pub endpoint_position_m: Vec3,
+    pub length_m: f64,
+    pub endpoint_rotating_velocity_m_s: Vec3,
+}
+
+impl RotatingTetherGeometry {
+    pub fn from_anchor(
+        reference: MarsTetherReference,
+        anchor: MarsAnchor,
+        azimuth_rad: f64,
+        elevation_rad: f64,
+        length_m: f64,
+    ) -> Self {
+        let anchor_position = anchor.position(reference);
+        let direction = anchor.tether_direction(azimuth_rad, elevation_rad);
+        let endpoint = anchor_position.add(direction.scale(length_m));
+        let omega = reference.omega_rad_s();
+        let velocity = Vec3 {
+            x_m: -omega * endpoint.y_m,
+            y_m: omega * endpoint.x_m,
+            z_m: 0.0,
+        };
+        Self {
+            anchor_position_m: anchor_position,
+            direction,
+            endpoint_position_m: endpoint,
+            length_m,
+            endpoint_rotating_velocity_m_s: velocity,
+        }
+    }
+
+    /// Forward intersection of the straight tether with a sphere centered on Mars.
+    ///
+    /// Returns the first positive distance along the tether and the
+    /// corresponding point. This is a geometric diagnostic only; it does not
+    /// establish structural equilibrium or dynamical stability.
+    pub fn sphere_intersection(&self, radius_m: f64) -> Option<(f64, Vec3)> {
+        let a = self.direction.dot(self.direction);
+        let b = 2.0 * self.anchor_position_m.dot(self.direction);
+        let c = self.anchor_position_m.dot(self.anchor_position_m) - radius_m * radius_m;
+        let discriminant = b * b - 4.0 * a * c;
+        if discriminant < 0.0 || a <= f64::MIN_POSITIVE {
+            return None;
+        }
+        let root = discriminant.sqrt();
+        let t1 = (-b - root) / (2.0 * a);
+        let t2 = (-b + root) / (2.0 * a);
+        let t = [t1, t2]
+            .into_iter()
+            .filter(|v| *v >= 0.0)
+            .fold(f64::INFINITY, f64::min);
+        if t.is_finite() {
+            Some((t, self.anchor_position_m.add(self.direction.scale(t))))
+        } else {
+            None
+        }
+    }
+}
+
 /// Effective material properties for the first-order tether model.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TetherMaterial {
