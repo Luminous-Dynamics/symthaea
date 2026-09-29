@@ -499,3 +499,16 @@ The encoder boundary is intentionally separate from verify_perfect_recall:
 - neither check is promoted to solver authority by itself.
 
 The migration-stage extensive-form representation also now rejects shared child states (MultipleParents). That prevents transposition-style state reuse from silently conflating distinct histories. If transpositions or repeated states are needed later, history must become a first-class IR object rather than weakening this tree invariant.
+
+
+### 2026-09-29 encoder contract hardening
+
+The semantic encoder boundary now uses a typed InformationEncodingError rather than an unstructured string. A negative-path fixture also proves that an encoder producing a different information-set identity is rejected as an explicit InformationEncodingMismatch.
+
+This preserves a useful distinction for future adapters:
+
+- encoder failure means the semantic mapping could not be produced;
+- encoder mismatch means the mapping was produced but contradicts the canonical IR;
+- structural recall failure means the declared partition itself fails the finite-tree recall check.
+
+The next semantic increment should add explicit observation events, including stable chance-event identities, rather than using state IDs as a proxy for observations. OpenSpiel's current API similarly distinguishes information state from observation, with perfect-recall observations retaining enough action-observation history to reconstruct the information state. 
