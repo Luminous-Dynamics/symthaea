@@ -571,10 +571,13 @@ mod tests {
         count_path.set_file_name(format!("mola_adapter_count_{}_label.lbl", std::process::id()));
         let mut count_img = count_path.clone();
         count_img.set_extension("img");
-        let count_label = label().replace("MEGT00N000HB", "MEGC00N000HB").replace("MAP_TYPE = T", "MAP_TYPE = C");
+        let count_label = label()
+            .replace("MEGT00N000HB", "MEGC00N000HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
         std::fs::write(&count_path, count_label).unwrap();
         let mut count_bytes = vec![0u8; 64];
-        count_bytes[1] = 1;
+        count_bytes[32] = 1;
         std::fs::write(&count_img, count_bytes).unwrap();
         let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
         let sample = product.sample_nearest_with_count(&counts, 0.0, 0.007, 3.0).unwrap();
