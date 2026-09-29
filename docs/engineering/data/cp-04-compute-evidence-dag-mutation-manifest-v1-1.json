@@ -40,6 +40,14 @@
     {
       "mutation_id": "add-cycle",
       "expected_guard_id": "CP-COMP-DAG-ACYCLIC"
+    },
+    {
+      "mutation_id": "invalid-source-for-edge-type",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
+    },
+    {
+      "mutation_id": "invalid-target-for-edge-type",
+      "expected_guard_id": "CP-COMP-DAG-TYPING"
     }
   ]
 }
