@@ -7,7 +7,8 @@ identity and provenance boundaries, not physical performance.
 ## Canonical lineage
 
 ```
-theorem --constrains--> simulation --instantiates--> physical_model
+theorem --constrains--> physical_model
+simulation --instantiates--> physical_model
 simulation --produces--> prediction --supports--> scientific_claim
 process --produces--> material --has_property--> predicted_property
 experiment --observes--> observation --quantifies--> uncertainty
@@ -83,3 +84,23 @@ CP-04 qualification / replay
 
 A projection digest is not physical-performance evidence and never grants
 operational authority.
+
+## CP-04 adapter boundary
+
+The `Cp04QualificationArtifact` is the explicit contract-neutral adapter from
+a validated `QualificationProjection` into the CP-04 typed evidence vocabulary.
+
+The adapter is intentionally conservative:
+
+- it validates the complete source projection before conversion;
+- it accepts only CP-04 node kinds and edge types with the CP-04 endpoint ontology;
+- it carries each original `EngineeringObjectId` and relation digest forward;
+- it preserves the source graph digest, projection digest, qualification policy,
+  and `synthetic-qualification` authority ceiling;
+- it rejects unsupported scientific relations rather than reinterpreting them
+  as compute-evidence dependencies;
+- it cannot introduce a node or edge that was absent from the source projection.
+
+This makes the adapter a semantic firewall: the scientific DKG may contain richer
+mathematical, physical, materials, or epistemic structure, while CP-04 receives
+only the explicitly admitted typed dependency projection.
