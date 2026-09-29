@@ -33,6 +33,7 @@
     "Class A path coverage is a versioned repository policy and does not prove all safety-sensitive code has been classified.",
     "Structural ADR presence does not establish scientific adequacy.",
     "Documented test evidence does not establish that tests executed successfully.",
-    "This policy does not establish full-CI success or merge authorization."
+    "This policy does not establish full-CI success or merge authorization.",
+    "Repository source code cannot attest that an external GitHub Actions event policy currently permits pull_request_target."
   ]
 }

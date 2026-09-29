@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -177,6 +178,8 @@ REQUIRED_ROOT_WORKFLOW_SNIPPETS = (
     'refs/pull/${PR_NUMBER}/head:refs/remotes/pr-governance/${PR_NUMBER}/head',
     'test "${fetched_head}" = "${PR_HEAD_SHA}"',
     "python3 .github/scripts/check-pr-governance.py",
+    "actions_event_policy_requirement=pull_request_target_must_be_explicitly_allowed",
+    "actions_event_policy_attestation=not_established_by_repository_code",
 )
 FORBIDDEN_ROOT_WORKFLOW_SNIPPETS = (
     "ref: ${{ github.event.pull_request.head.sha }}",
@@ -187,6 +190,7 @@ FORBIDDEN_ROOT_WORKFLOW_SNIPPETS = (
     "git checkout \\${PR_HEAD_SHA}",
     "git checkout refs/pull/",
     "actions/download-artifact",
+    "filter:",
 )
 
 def validate_root_workflow_text(text: str) -> None:
@@ -250,23 +254,150 @@ def parse_name_status(text: str) -> list[str]:
     return sorted(set(paths))
 
 
-def validate_exact_base_head_ancestry(base: str, head: str) -> None:
+def require_complete_object_graph(git_runner: Any = git) -> None:
+    """Reject external or substitutable object sources before topology validation."""
+    for variable in (
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+    ):
+        if os.environ.get(variable):
+            raise GovernanceError(
+                f"governance validation forbids {variable}; object authority must remain local and self-contained"
+            )
+
+    shallow = git_runner("rev-parse", "--is-shallow-repository", check=False)
+    if shallow.returncode != 0:
+        raise GovernanceError("unable to determine repository shallow state")
+    if shallow.stdout.strip().lower() != "false":
+        raise GovernanceError(
+            "governance validation requires a complete commit history; repository is shallow"
+        )
+
+    partial = git_runner("config", "--get", "extensions.partialClone", check=False)
+    if partial.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine Git partial-clone state")
+    if partial.returncode == 0 and partial.stdout.strip():
+        raise GovernanceError(
+            "governance validation requires a complete object graph; repository is a partial clone"
+        )
+
+    promisors = git_runner(
+        "config", "--get-regexp", r"^remote\..*\.promisor$", check=False
+    )
+    if promisors.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine Git promisor-remote state")
+    if promisors.returncode == 0:
+        for line in promisors.stdout.splitlines():
+            _key, _sep, value = line.partition(" ")
+            if value.strip().lower() == "true":
+                raise GovernanceError(
+                    "governance validation requires a complete object graph; "
+                    "repository has a promisor remote"
+                )
+
+    alternates_file = git_runner("rev-parse", "--git-path", "objects/info/alternates")
+    if alternates_file.returncode != 0:
+        raise GovernanceError("unable to determine Git alternate-object file")
+    alternates_path = Path(alternates_file.stdout.strip())
+    if alternates_path.exists():
+        try:
+            alternate_entries = [
+                line.strip()
+                for line in alternates_path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+        except OSError as exc:
+            raise GovernanceError(
+                f"unable to inspect Git alternate-object file: {exc}"
+            ) from exc
+        if alternate_entries:
+            raise GovernanceError(
+                "governance validation forbids objects/info/alternates; "
+                "object authority must remain local and self-contained"
+            )
+
+    alternates = git_runner(
+        "config", "--get", "core.alternateRefsCommand", check=False
+    )
+    if alternates.returncode not in {0, 1}:
+        raise GovernanceError("unable to determine alternate-ref command state")
+    if alternates.returncode == 0 and alternates.stdout.strip():
+        raise GovernanceError(
+            "governance validation forbids alternate-ref commands in the authority repository"
+        )
+
+    replace_refs = git_runner(
+        "for-each-ref", "--format=%(refname)", "refs/replace/"
+    )
+    if replace_refs.strip():
+        raise GovernanceError(
+            "governance validation forbids refs/replace because Git may substitute "
+            "replacement objects for ordinary object reads"
+        )
+
+
+def require_complete_history() -> None:
+    """Backward-compatible alias for the complete-object-graph guard."""
+    require_complete_object_graph()
+
+
+def validate_exact_base_head_ancestry(
+    base: str,
+    head: str,
+    git_runner: Any = git,
+) -> None:
     if base == head:
         raise GovernanceError("base_sha and head_sha must identify distinct commits")
-    if not git_ok("merge-base", "--is-ancestor", base, head):
-        merge_base = run_git("merge-base", base, head).strip() or "<none>"
+    ancestry = git_runner("merge-base", "--is-ancestor", base, head, check=False)
+    if ancestry.returncode != 0:
+        merge_base_proc = git_runner("merge-base", base, head, check=False)
+        merge_base = merge_base_proc.stdout.strip() or "<none>"
         raise GovernanceError(
             "head_sha must descend from base_sha for exact base-to-head governance; "
             f"merge_base={merge_base}"
         )
 
 
-def changed_paths(base: str, head: str) -> list[str]:
-    validate_exact_base_head_ancestry(base, head)
-    out = run_git(
+def changed_paths(
+    base: str,
+    head: str,
+    git_runner: Any = git,
+) -> list[str]:
+    validate_exact_base_head_ancestry(base, head, git_runner)
+    proc = git_runner(
         "diff", "--name-status", "-M", "--diff-filter=ACDMRT", base, head
     )
-    return parse_name_status(out)
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip()
+        raise GovernanceError(f"git diff: {detail or 'git exited nonzero'}")
+    return parse_name_status(proc.stdout)
+
+
+def require_exact_object_connectivity(
+    base: str,
+    head: str,
+    git_runner: Any = git,
+) -> None:
+    """Verify the exact authority endpoints have a self-contained object graph."""
+    proc = git_runner(
+        "--no-replace-objects",
+        "fsck",
+        "--no-full",
+        "--connectivity-only",
+        "--no-reflogs",
+        "--no-dangling",
+        "--no-progress",
+        base,
+        head,
+        check=False,
+    )
+    if proc.returncode != 0:
+        detail = proc.stderr.strip() or proc.stdout.strip() or "git fsck exited nonzero"
+        raise GovernanceError(
+            "exact base/head object connectivity is invalid: "
+            f"{detail}"
+        )
 
 
 def unique_non_merge_commits(base: str, head: str) -> list[str]:
@@ -280,6 +411,185 @@ def commit_changed_paths(commit: str) -> list[str]:
         "--diff-filter=ACDMRT", commit,
     )
     return parse_name_status(out)
+
+
+def history_topology_self_test() -> None:
+    """Exercise exact base/head authority against adversarial Git histories."""
+    with tempfile.TemporaryDirectory() as td:
+        worktree = Path(td)
+        def run_local(*args: str) -> str:
+            proc = subprocess.run(
+                ["git", *args], cwd=worktree, check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            if proc.returncode != 0:
+                detail = proc.stderr.strip() or proc.stdout.strip()
+                raise AssertionError(f"fixture git command failed: {args}: {detail}")
+            return proc.stdout.strip()
+
+        run_local("init", "--quiet")
+        run_local("config", "user.name", "Governance Self-Test")
+        run_local("config", "user.email", "governance-self-test@example.invalid")
+        (worktree / "tracked.txt").write_text("base\\n", encoding="utf-8")
+        run_local("add", "tracked.txt")
+        run_local("commit", "--quiet", "-m", "base")
+        base = run_local("rev-parse", "HEAD")
+
+        (worktree / "tracked.txt").write_text("feature\\n", encoding="utf-8")
+        run_local("commit", "--quiet", "-am", "feature")
+        feature = run_local("rev-parse", "HEAD")
+
+        def local_git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+            proc = subprocess.run(
+                ["git", *args], cwd=worktree, check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            if check and proc.returncode != 0:
+                detail = proc.stderr.strip() or proc.stdout.strip()
+                raise AssertionError(f"fixture git command failed: {args}: {detail}")
+            return proc
+
+        validate_exact_base_head_ancestry(base, feature, local_git)
+        assert require_exact_object_connectivity(base, feature, local_git) is None
+
+        try:
+            validate_exact_base_head_ancestry(base, base, local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("identical base/head must fail closed")
+
+        run_local("checkout", "--quiet", base)
+        (worktree / "side.txt").write_text("side\\n", encoding="utf-8")
+        run_local("add", "side.txt")
+        run_local("commit", "--quiet", "-m", "side")
+        side = run_local("rev-parse", "HEAD")
+        run_local("checkout", "--quiet", feature)
+        run_local("merge", "--quiet", "--no-ff", side, "-m", "merge")
+        merge = run_local("rev-parse", "HEAD")
+        validate_exact_base_head_ancestry(base, merge, local_git)
+        assert run_local("rev-parse", f"{merge}^1") == feature
+        assert run_local("rev-parse", f"{merge}^2") == side
+
+        try:
+            validate_exact_base_head_ancestry(feature, base, local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("reverse ancestry must fail closed")
+
+        (worktree / "tracked.txt").write_text("rebased\\n", encoding="utf-8")
+        run_local("commit", "--quiet", "-am", "rebased")
+        rebased = run_local("rev-parse", "HEAD")
+        try:
+            validate_exact_base_head_ancestry(side, rebased, local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("non-ancestor rewritten history must fail closed")
+
+        changed = run_local("diff", "--name-only", base, merge).splitlines()
+        assert "side.txt" in changed
+        assert "tracked.txt" in changed
+
+        # Shallow history must not be accepted as a substitute for complete
+        # ancestry. Git explicitly treats shallow commits as roots, so a
+        # topology-sensitive validator must detect that boundary and fail
+        # closed rather than silently reasoning over truncated history.
+        shallow = worktree / "shallow"
+        run_local("clone", "--quiet", "--depth", "1", f"file://{worktree}", str(shallow))
+        shallow_cmd = lambda *args: subprocess.run(
+            ["git", *args], cwd=shallow, check=False,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        )
+        proc = shallow_cmd("merge-base", "--is-ancestor", base, merge)
+        assert proc.returncode != 0
+        assert (shallow / ".git" / "shallow").exists()
+
+        assert require_complete_object_graph(local_git) is None
+        saved_env = {key: os.environ.get(key) for key in (
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_COMMON_DIR",
+        )}
+        try:
+            os.environ["GIT_ALTERNATE_OBJECT_DIRECTORIES"] = str(worktree / "objects")
+            try:
+                require_complete_object_graph(local_git)
+            except GovernanceError:
+                pass
+            else:
+                raise AssertionError("alternate object environment must fail closed")
+        finally:
+            for key, value in saved_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        run_local("config", "extensions.partialClone", "origin")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("partial-clone extension must fail closed")
+        run_local("config", "--unset", "extensions.partialClone")
+
+        run_local("remote", "add", "origin", "https://example.invalid/symthaea.git")
+        run_local("config", "remote.origin.promisor", "true")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("promisor remote must fail closed")
+        run_local("config", "--unset", "remote.origin.promisor")
+
+        alternates_file = Path(run_local("rev-parse", "--git-path", "objects/info/alternates"))
+        alternate_target = worktree / "alternate-objects"
+        alternate_target.mkdir()
+        alternates_file.parent.mkdir(parents=True, exist_ok=True)
+        alternates_file.write_text(str(alternate_target / "objects") + "\n", encoding="utf-8")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("objects/info/alternates must fail closed")
+        alternates_file.unlink()
+
+        run_local("config", "core.alternateRefsCommand", "echo refs/heads/main")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("alternate-ref command must fail closed")
+        run_local("config", "--unset", "core.alternateRefsCommand")
+
+        run_local("replace", base, feature)
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("replace refs must fail closed")
+        run_local("replace", "-d", base)
+
+        # Delete a reachable tree object. The endpoint SHAs remain unchanged,
+        # but the authority object graph is no longer self-contained.
+        feature_tree = run_local("rev-parse", f"{feature}^{{tree}}")
+        tree_object = worktree / ".git" / "objects" / feature_tree[:2] / feature_tree[2:]
+        if not tree_object.exists():
+            raise AssertionError("fixture expected a loose tree object for missing-object test")
+        tree_object.unlink()
+        try:
+            require_exact_object_connectivity(base, feature, local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("missing reachable tree object must fail closed")
 
 
 def read_at_commit(commit: str, path: str) -> str:
@@ -335,6 +645,8 @@ def approved_subject(subject: str, authorities: set[str]) -> bool:
 
 
 def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[str, Any]:
+    require_complete_history()
+    require_exact_object_connectivity(base, head)
     validate_declared_roots(base, head)
     validate_root_workflow_contract(base)
     validate_exact_base_head_ancestry(base, head)
@@ -413,6 +725,7 @@ def self_test() -> None:
     assert classify("src/cognitive_loop/thresholds/moral.rs", policy) == "safety"
     assert classify("ordinary.rs", policy) is None
     assert approved_subject("safety(core): tighten", {"safety"})
+    assert require_complete_object_graph() is None
     assert not approved_subject("governance(ci): wrong", {"safety"})
     assert approved_subject("governance(ci): tighten", {"governance"})
     assert approved_subject("emergency-safety(ci): coordinated", {"safety", "governance"})
@@ -480,7 +793,7 @@ def self_test() -> None:
         raise AssertionError("Class A change without changed ADR must fail closed")
     require_changed_adr(False, [])
 
-    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
+    history_topology_self_test()\n\n    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
     validate_root_workflow_text(trusted_workflow)
     for forbidden in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS:
         try:
