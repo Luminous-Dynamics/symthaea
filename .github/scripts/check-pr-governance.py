@@ -256,9 +256,13 @@ def validate_adr(path: str, text: str) -> None:
 
 def approved_subject(subject: str, authorities: set[str]) -> bool:
     subject = subject.strip().lower()
-    if "safety" in authorities:
+    if authorities == {"safety"}:
         return subject.startswith(SAFETY_PREFIXES)
-    return subject.startswith(GOVERNANCE_PREFIXES)
+    if authorities == {"governance"}:
+        return subject.startswith(GOVERNANCE_PREFIXES)
+    if authorities == {"safety", "governance"}:
+        return subject.startswith(("emergency-safety:", "emergency-safety("))
+    raise GovernanceError(f"unexpected Class A authority set: {sorted(authorities)}")
 
 
 def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[str, Any]:
