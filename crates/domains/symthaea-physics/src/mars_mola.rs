@@ -317,7 +317,13 @@ impl MolaMegdrMetadata {
                 "longitude direction must be positive east".into(),
             ));
         }
-        if latitude_min_deg < -90.0
+        if !latitude_min_deg.is_finite()
+            || !latitude_max_deg.is_finite()
+            || !longitude_min_deg.is_finite()
+            || !longitude_max_deg.is_finite()
+            || !pixel_scale.is_finite()
+            || !pixel_offset.is_finite()
+            || latitude_min_deg < -90.0
             || latitude_max_deg > 90.0
             || latitude_min_deg >= latitude_max_deg
             || longitude_min_deg < 0.0
@@ -325,8 +331,28 @@ impl MolaMegdrMetadata {
             || longitude_min_deg >= longitude_max_deg
         {
             return Err(MolaError::InvalidMetadata(
-                "invalid MEGDR geographic bounds".into(),
+                "invalid or non-finite MEGDR geographic/scaling metadata".into(),
             ));
+        }
+        if resolution >= 64 {
+            let coverage_limit = if resolution == 128 { 88.0 } else { 90.0 };
+            if latitude_min_deg < -coverage_limit || latitude_max_deg > coverage_limit {
+                return Err(MolaError::Unsupported(format!(
+                    "{resolution} ppd cylindrical MEGDR coverage cannot extend beyond ±{coverage_limit}°; polar products use a different projection"
+                )));
+            }
+        }
+        let expected_lat_rows =
+            (latitude_max_deg - latitude_min_deg) * resolution as f64;
+        let expected_lon_samples =
+            (longitude_max_deg - longitude_min_deg) * resolution as f64;
+        let row_tolerance = 1.0;
+        if (expected_lat_rows - lines as f64).abs() > row_tolerance
+            || (expected_lon_samples - samples as f64).abs() > row_tolerance
+        {
+            return Err(MolaError::InvalidMetadata(format!(
+                "grid dimensions do not match geographic extent at {resolution} ppd"
+            )));
         }
         Ok(Self {
             product_id,
@@ -361,10 +387,13 @@ impl MolaMegdrMetadata {
                 "query coordinates must be finite".into(),
             ));
         }
-        if !(-90.0..=90.0).contains(&latitude_deg) {
-            return Err(MolaError::InvalidMetadata(
-                "latitude outside [-90, 90] degrees".into(),
-            ));
+        let coverage_limit = if self.resolution_pixels_per_degree == 128 {
+            88.0
+        } else {
+            90.0
+        };
+        if !(-coverage_limit..=coverage_limit).contains(&latitude_deg) {
+            return Err(MolaError::OutOfBounds);
         }
         let lon = normalize_lon(longitude_deg);
         if !(0.0..360.0).contains(&lon) && lon != 0.0 {
@@ -433,27 +462,33 @@ fn parse_u32(
     kv: &std::collections::BTreeMap<String, String>,
     key: &str,
 ) -> Result<u32, MolaError> {
-    parse_number(&required(kv, key)?)
-        .map(|v| v as u32)
-        .map_err(|_| MolaError::InvalidMetadata(format!("invalid integer key {key}")))
+    let value = parse_number(&required(kv, key)?)?;
+    if value < 0.0 || !value.is_finite() || value.fract() != 0.0 || value > u32::MAX as f64 {
+        return Err(MolaError::InvalidMetadata(format!("invalid integer key {key}")));
+    }
+    Ok(value as u32)
 }
 
 fn parse_u64(
     kv: &std::collections::BTreeMap<String, String>,
     key: &str,
 ) -> Result<u64, MolaError> {
-    parse_number(&required(kv, key)?)
-        .map(|v| v as u64)
-        .map_err(|_| MolaError::InvalidMetadata(format!("invalid integer key {key}")))
+    let value = parse_number(&required(kv, key)?)?;
+    if value < 0.0 || !value.is_finite() || value.fract() != 0.0 || value > u64::MAX as f64 {
+        return Err(MolaError::InvalidMetadata(format!("invalid integer key {key}")));
+    }
+    Ok(value as u64)
 }
 
 fn parse_u16(
     kv: &std::collections::BTreeMap<String, String>,
     key: &str,
 ) -> Result<u16, MolaError> {
-    parse_number(&required(kv, key)?)
-        .map(|v| v as u16)
-        .map_err(|_| MolaError::InvalidMetadata(format!("invalid integer key {key}")))
+    let value = parse_number(&required(kv, key)?)?;
+    if value < 0.0 || !value.is_finite() || value.fract() != 0.0 || value > u16::MAX as f64 {
+        return Err(MolaError::InvalidMetadata(format!("invalid integer key {key}")));
+    }
+    Ok(value as u16)
 }
 
 fn parse_u32_default(
@@ -482,7 +517,8 @@ fn normalize_lon(lon_deg: f64) -> f64 {
 
 fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<(), MolaError> {
     let len = std::fs::metadata(img_path)?.len();
-    let row_payload = u64::from(metadata.samples) * 2;
+    let bytes_per_sample = u64::from(metadata.sample_bits / 8);
+    let row_payload = u64::from(metadata.samples) * bytes_per_sample;
     let required = metadata.record_bytes * u64::from(metadata.line_offset)
         + u64::from(metadata.lines.saturating_sub(1)) * metadata.record_bytes
         + row_payload;
