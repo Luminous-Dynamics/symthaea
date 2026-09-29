@@ -18,6 +18,8 @@ pub struct RetrievalExecutionProfile {
     pub normalization_version: String,
     /// Optional immutable source/index snapshot identifier. Its presence identifies
     /// a replay target; it does not by itself prove byte-for-byte reproducibility.
+    /// The value is stored without a `snapshot:` prefix; the receipt encoding adds
+    /// that namespace exactly once.
     pub snapshot_ref: Option<String>,
 }
 
@@ -44,28 +46,30 @@ impl RetrievalExecutionProfile {
             normalization_version: normalization_version.into(),
             snapshot_ref: None,
         };
-        if profile.algorithm_version.is_empty() {
+        if profile.algorithm_version.trim().is_empty() {
             return Err(RetrievalProfileError::EmptyAlgorithmVersion);
         }
-        if profile.ranking_profile_version.is_empty() {
+        if profile.ranking_profile_version.trim().is_empty() {
             return Err(RetrievalProfileError::EmptyRankingProfileVersion);
         }
-        if profile.frontier_semantics_version.is_empty() {
+        if profile.frontier_semantics_version.trim().is_empty() {
             return Err(RetrievalProfileError::EmptyFrontierSemanticsVersion);
         }
-        if profile.normalization_version.is_empty() {
+        if profile.normalization_version.trim().is_empty() {
             return Err(RetrievalProfileError::EmptyNormalizationVersion);
         }
         Ok(profile)
     }
 
-    /// Attach an immutable retrieval-source/index snapshot identifier.
+    /// Attach a retrieval-source/index snapshot identifier.
     ///
     /// This is deliberately separate from the algorithm/ranking versions: a stable
     /// algorithm can still produce different results against different snapshots.
+    /// This identifies the replay target only; callers must not interpret it as a
+    /// content hash or as proof that the same bytes can be reconstructed.
     pub fn with_snapshot_ref(mut self, snapshot_ref: impl Into<String>) -> Result<Self, RetrievalProfileError> {
         let snapshot_ref = snapshot_ref.into();
-        if snapshot_ref.is_empty() {
+        if snapshot_ref.trim().is_empty() {
             return Err(RetrievalProfileError::EmptySnapshotRef);
         }
         self.snapshot_ref = Some(snapshot_ref);
@@ -200,7 +204,33 @@ mod tests {
         let execution = RetrievalEngine::new(profile)
             .execute(&MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5), vec![candidate("claim:x")])
             .unwrap();
-        assert!(execution.receipt().retrieval_profile_versions.contains(&"snapshot:snapshot:2026-09-29T00:00:00Z".to_string()));
+        assert!(execution.receipt().retrieval_profile_versions.contains(&"snapshot:2026-09-29T00:00:00Z".to_string()));
+    }
+
+    #[test]
+    fn whitespace_only_profile_components_are_rejected() {
+        assert_eq!(
+            RetrievalExecutionProfile::new("  ", "ranking:v1", "frontier:v1", "normalization:v1"),
+            Err(RetrievalProfileError::EmptyAlgorithmVersion)
+        );
+        assert_eq!(
+            RetrievalExecutionProfile::new("algorithm:v1", "  ", "frontier:v1", "normalization:v1"),
+            Err(RetrievalProfileError::EmptyRankingProfileVersion)
+        );
+        assert_eq!(
+            RetrievalExecutionProfile::new("algorithm:v1", "ranking:v1", "\t", "normalization:v1"),
+            Err(RetrievalProfileError::EmptyFrontierSemanticsVersion)
+        );
+        assert_eq!(
+            RetrievalExecutionProfile::new("algorithm:v1", "ranking:v1", "frontier:v1", "\n"),
+            Err(RetrievalProfileError::EmptyNormalizationVersion)
+        );
+    }
+
+    #[test]
+    fn whitespace_only_snapshot_ref_is_rejected() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
+        assert_eq!(profile.with_snapshot_ref("   "), Err(RetrievalProfileError::EmptySnapshotRef));
     }
 
     #[test]
