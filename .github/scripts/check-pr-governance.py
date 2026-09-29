@@ -442,7 +442,7 @@ def self_test() -> None:
     assert not approved_subject("safety(root): coordinated", {"safety", "governance"})
     assert not approved_subject("governance(root): coordinated", {"safety", "governance"})
 
-    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS)
+    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
     validate_root_workflow_text(trusted_workflow)
     for forbidden in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS:
         try:
