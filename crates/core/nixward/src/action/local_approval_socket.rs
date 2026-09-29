@@ -28,7 +28,7 @@ use super::local_approval_store::{
     LocalApprovalRequestStoreV1,
 };
 use super::local_approval_submission::LocalApprovalSubmissionV1;
-use super::temporal::UnixMillisV1;
+use super::temporal::{AuthoritativeEvaluationV1, NixTimeErrorV1, UnixMillisV1};
 use blake3::Hasher;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -213,15 +213,16 @@ impl LocalApprovalSocketServerV1 {
 
         let request: LocalApprovalWireRequestV1 = read_json_frame_v1(&mut stream)?;
         request.validate_protocol()?;
-        let evaluated_at = system_unix_millis_v1()?;
-        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, evaluated_at)
+        let evaluation = AuthoritativeEvaluationV1::sample_from_system_clock()
+            .map_err(LocalApprovalSocketErrorV1::TemporalEvaluation)?;
+        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, evaluation)
     }
 
     fn accept_and_consume_at_v1(
         &self,
         store: &LocalApprovalRequestStoreV1,
         peer_observed_at: UnixMillisV1,
-        evaluated_at: UnixMillisV1,
+        evaluation: AuthoritativeEvaluationV1,
     ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalSocketErrorV1> {
         let (mut stream, _) = self
             .listener
@@ -235,7 +236,7 @@ impl LocalApprovalSocketServerV1 {
         )?;
         let request: LocalApprovalWireRequestV1 = read_json_frame_v1(&mut stream)?;
         request.validate_protocol()?;
-        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, evaluated_at)
+        self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(evaluated_at))
     }
 
     fn consume_and_ack_v1(
@@ -244,10 +245,10 @@ impl LocalApprovalSocketServerV1 {
         store: &LocalApprovalRequestStoreV1,
         request: LocalApprovalWireRequestV1,
         verified_peer: &super::approver_evidence::VerifiedLocalUnixPeerCredentialV1,
-        evaluated_at: UnixMillisV1,
+        evaluation: AuthoritativeEvaluationV1,
     ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalSocketErrorV1> {
         let consumed =
-            store.consume_verified_submission(&request.submission, verified_peer, evaluated_at)?;
+            store.consume_verified_submission(&request.submission, verified_peer, evaluation)?;
         let ack = LocalApprovalAckV1 {
             protocol: LOCAL_APPROVAL_PROTOCOL_V1.to_string(),
             request_id: consumed.request_id().to_string(),
@@ -772,6 +773,8 @@ pub enum LocalApprovalSocketErrorV1 {
     SessionIo(String),
     #[error("system wall clock unavailable: {0}")]
     SystemClock(String),
+    #[error("authoritative temporal evaluation failed: {0}")]
+    TemporalEvaluation(#[from] NixTimeErrorV1),
     #[error("system wall-clock milliseconds overflow u64")]
     SystemClockOverflow,
     #[error("operating-system randomness unavailable for socket incarnation: {0}")]
