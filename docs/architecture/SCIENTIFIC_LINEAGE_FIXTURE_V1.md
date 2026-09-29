@@ -7,7 +7,7 @@ identity and provenance boundaries, not physical performance.
 ## Canonical lineage
 
 ```
-theorem --constrains--> physical_model --instantiates--> simulation
+theorem --constrains--> simulation --instantiates--> physical_model
 simulation --produces--> prediction --supports--> scientific_claim
 process --produces--> material --has_property--> predicted_property
 experiment --observes--> observation --quantifies--> uncertainty
@@ -35,6 +35,8 @@ experiment --observes--> observation --quantifies--> uncertainty
 
 ## Next implementation step
 
-Encode this fixture in a graph-level test using the relation endpoint oracle,
-then add a projection test demonstrating that the scientific DKG can be richer
-than the bounded CP-04 qualification DAG without amplifying authority.
+The executable fixture now lives in `symthaea-engineering::scientific_lineage`.
+It validates the relation endpoint oracle and provides a bounded qualification
+projection whose invalidation closure excludes epistemic relations. The graph
+also deliberately permits epistemic cycles, demonstrating that recursive DKG
+knowledge and deterministic qualification topology are separate concerns.
