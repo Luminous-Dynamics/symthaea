@@ -105,6 +105,8 @@ jobs:
             echo "untrusted_head_code_executed=false"
             echo "permissions=contents_read_only"
             echo "secrets_consumed=false"
+            echo "actions_event_policy_requirement=pull_request_target_must_be_explicitly_allowed"
+            echo "actions_event_policy_attestation=not_established_by_repository_code"
             echo "pr_draft=${PR_DRAFT}"
             echo "governance_root_check=pass"
             echo "class_a_scientific_adequacy=not_established_by_this_check"
