@@ -535,3 +535,4 @@ mod tests {
 }
 
 pub mod scientific_investigation_trace;
+pub mod investigation_planning_bridge;
