@@ -194,8 +194,26 @@ pub fn best_integer_level() -> SimdLevel {
     }
 }
 
+/// Best available SIMD level for hardware popcount operations.
+///
+/// AVX-512 popcount is a distinct capability from AVX-512F/BW and must not
+/// be inferred from generic AVX-512 support.
+pub fn best_popcount_level() -> SimdLevel {
+    if has_avx512_vpopcntdq() {
+        SimdLevel::Avx512
+    } else if has_avx2() && has_popcnt() {
+        SimdLevel::Avx2
+    } else if has_popcnt() {
+        SimdLevel::Sse41
+    } else if has_neon() {
+        SimdLevel::Neon
+    } else {
+        SimdLevel::Scalar
+    }
+}
+
 /// Best available SIMD level for float operations (dot product, FMA, etc.)
-/// Best available SIMD level for hardware popcount operations.\n///\n/// AVX-512 popcount is a distinct capability from AVX-512F/BW and must not\n/// be inferred from generic AVX-512 support.\npub fn best_popcount_level() -> SimdLevel {\n    if has_avx512_vpopcntdq() {\n        SimdLevel::Avx512\n    } else if has_avx2() && has_popcnt() {\n        SimdLevel::Avx2\n    } else if has_popcnt() {\n        SimdLevel::Sse41\n    } else if has_neon() {\n        SimdLevel::Neon\n    } else {\n        SimdLevel::Scalar\n    }\n}\n\npub fn best_float_level() -> SimdLevel {
+pub fn best_float_level() -> SimdLevel {
     if has_avx2() && has_fma() {
         SimdLevel::Avx2Fma
     } else if has_avx2() {
