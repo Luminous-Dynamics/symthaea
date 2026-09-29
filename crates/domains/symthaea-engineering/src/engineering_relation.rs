@@ -48,6 +48,7 @@ pub enum EngineeringRelationKind {
     TracesTo,
     CurrentnessFor,
     ApplicableTo,
+    Derives,
     Supports,
     Contradicts,
     DerivedFrom,
@@ -71,6 +72,7 @@ impl EngineeringRelationKind {
             Self::Quantifies => "quantifies", Self::HasProperty => "has_property",
             Self::Summarizes => "summarizes", Self::TracesTo => "traces_to",
             Self::CurrentnessFor => "currentness_for", Self::ApplicableTo => "applicable_to",
+            Self::Derives => "derives",
             Self::Supports => "supports", Self::Contradicts => "contradicts",
             Self::DerivedFrom => "derived_from", Self::Equivalent => "equivalent",
             Self::Generalizes => "generalizes", Self::Specializes => "specializes",
@@ -100,6 +102,7 @@ impl EngineeringRelationKind {
             Self::TracesTo => Some(&[("observation", "provenance_reference")]),
             Self::CurrentnessFor => Some(&[("currentness", "runtime")]),
             Self::ApplicableTo => Some(&[("applicability", "execution_context")]),
+            Self::Derives => Some(&[("statistics", "disposition")]),
             Self::PartOf | Self::Contains | Self::DependsOn | Self::Supports | Self::Contradicts |
             Self::DerivedFrom | Self::Equivalent | Self::Generalizes | Self::Specializes => None,
         }
@@ -127,7 +130,8 @@ impl EngineeringRelationKind {
             | Self::Summarizes
             | Self::TracesTo
             | Self::CurrentnessFor
-            | Self::ApplicableTo => RelationFamily::Scientific,
+            | Self::ApplicableTo
+            | Self::Derives => RelationFamily::Scientific,
             Self::Supports
             | Self::Contradicts
             | Self::DerivedFrom
