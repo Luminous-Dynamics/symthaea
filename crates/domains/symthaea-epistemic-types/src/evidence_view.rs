@@ -113,7 +113,9 @@ impl EvidenceView {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
         let mut representation_digests = groups.iter()
-            .flat_map(|group| group.representations.iter().map(|candidate| candidate.projection.representation_digest.clone()))
+            .flat_map(|group| group.representations.iter().map(|candidate| {
+                (group.canonical_identity.clone(), candidate.projection.representation_digest.clone())
+            }))
             .collect::<Vec<_>>();
         representation_digests.sort();
         let mut receipt_representation_digests = receipt.selected_representation_digests.clone();
