@@ -250,6 +250,15 @@ def parse_name_status(text: str) -> list[str]:
     return sorted(set(paths))
 
 
+def require_complete_history() -> None:
+    """Reject repositories whose commit graph is explicitly shallow."""
+    proc = git("rev-parse", "--is-shallow-repository", check=False)
+    if proc.returncode != 0:
+        raise GovernanceError("unable to determine repository shallow state")
+    if proc.stdout.strip().lower() != "false":
+        raise GovernanceError("governance validation requires a complete commit history; repository is shallow")
+
+
 def validate_exact_base_head_ancestry(base: str, head: str) -> None:
     if base == head:
         raise GovernanceError("base_sha and head_sha must identify distinct commits")
@@ -417,6 +426,7 @@ def approved_subject(subject: str, authorities: set[str]) -> bool:
 
 
 def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[str, Any]:
+    require_complete_history()
     validate_declared_roots(base, head)
     validate_root_workflow_contract(base)
     validate_exact_base_head_ancestry(base, head)
@@ -495,6 +505,7 @@ def self_test() -> None:
     assert classify("src/cognitive_loop/thresholds/moral.rs", policy) == "safety"
     assert classify("ordinary.rs", policy) is None
     assert approved_subject("safety(core): tighten", {"safety"})
+    assert require_complete_history() is None
     assert not approved_subject("governance(ci): wrong", {"safety"})
     assert approved_subject("governance(ci): tighten", {"governance"})
     assert approved_subject("emergency-safety(ci): coordinated", {"safety", "governance"})
