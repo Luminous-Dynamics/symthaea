@@ -220,6 +220,129 @@ impl RotatingTetherGeometry {
     }
 }
 
+/// Provenance attached to a terrain observation; identifiers are opaque
+/// source/version labels, never interpreted as authority by this module.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerrainProvenance {
+    pub source_id: String,
+    pub source_revision: String,
+    pub coordinate_reference: String,
+}
+
+/// Quality state for a terrain sample.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerrainQuality {
+    Measured,
+    Interpolated,
+    Missing,
+    Invalid,
+}
+
+/// Terrain observation in the same areocentric, east-positive convention
+/// used by the MOLA MEGDR products. Elevation is relative to the supplied
+/// terrain product's vertical datum (typically its areoid), not automatically
+/// interchangeable with radius above the reference sphere.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TerrainSample {
+    pub latitude_rad: f64,
+    pub longitude_rad: f64,
+    pub elevation_m: Option<f64>,
+    pub elevation_uncertainty_m: Option<f64>,
+    pub slope_rad: Option<f64>,
+    pub roughness_m: Option<f64>,
+    pub quality: TerrainQuality,
+    pub provenance: TerrainProvenance,
+}
+
+impl TerrainSample {
+    pub fn is_usable(&self) -> bool {
+        self.quality != TerrainQuality::Missing
+            && self.quality != TerrainQuality::Invalid
+            && self.elevation_m.is_some_and(f64::is_finite)
+            && self.elevation_uncertainty_m.is_some_and(|v| v.is_finite() && v >= 0.0)
+            && self.latitude_rad.is_finite()
+            && self.longitude_rad.is_finite()
+            && self.slope_rad.is_none_or(|v| v.is_finite() && v >= 0.0)
+            && self.roughness_m.is_none_or(|v| v.is_finite() && v >= 0.0)
+    }
+}
+
+/// Terrain access is injected by a dataset-specific adapter. This core does
+/// not load, reinterpret, or silently interpolate a DEM.
+pub trait TerrainProvider {
+    fn sample(&self, latitude_rad: f64, longitude_rad: f64) -> TerrainSample;
+}
+
+/// Constraint state for an anchor candidate. These are descriptive states,
+/// not an overall ranking or a certification of engineering feasibility.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FeasibilityState {
+    FeasibleUnderModel,
+    InfeasibleUnderModel,
+    InsufficientEvidence,
+    HigherFidelityRequired,
+}
+
+/// Minimal site geometry assessment. It deliberately does not combine
+/// geotechnical, structural, logistics, or environmental constraints into a
+/// scalar score.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AnchorGeometryAssessment {
+    pub state: FeasibilityState,
+    pub terrain_usable: bool,
+    pub anchor_position_m: Option<Vec3>,
+    pub radial_distance_to_sync_m: Option<f64>,
+    pub reason: &'static str,
+}
+
+pub fn assess_anchor_geometry(
+    reference: MarsTetherReference,
+    anchor: MarsAnchor,
+    terrain: &TerrainSample,
+    minimum_anchor_radius_m: f64,
+) -> AnchorGeometryAssessment {
+    if !terrain.is_usable() {
+        return AnchorGeometryAssessment {
+            state: FeasibilityState::InsufficientEvidence,
+            terrain_usable: false,
+            anchor_position_m: None,
+            radial_distance_to_sync_m: None,
+            reason: "terrain sample missing, invalid, or uncertainty-unbounded",
+        };
+    }
+    if !anchor.latitude_rad.is_finite()
+        || !anchor.longitude_rad.is_finite()
+        || !anchor.elevation_m.is_finite()
+        || anchor.elevation_m < 0.0
+    {
+        return AnchorGeometryAssessment {
+            state: FeasibilityState::InfeasibleUnderModel,
+            terrain_usable: true,
+            anchor_position_m: None,
+            radial_distance_to_sync_m: None,
+            reason: "anchor coordinates or elevation are outside the supported domain",
+        };
+    }
+    let position = anchor.position(reference);
+    let radius = position.norm_m();
+    if radius < minimum_anchor_radius_m {
+        return AnchorGeometryAssessment {
+            state: FeasibilityState::InfeasibleUnderModel,
+            terrain_usable: true,
+            anchor_position_m: Some(position),
+            radial_distance_to_sync_m: Some(reference.synchronous_radius_m() - radius),
+            reason: "anchor lies inside the configured minimum radius",
+        };
+    }
+    AnchorGeometryAssessment {
+        state: FeasibilityState::HigherFidelityRequired,
+        terrain_usable: true,
+        anchor_position_m: Some(position),
+        radial_distance_to_sync_m: Some(reference.synchronous_radius_m() - radius),
+        reason: "geometry is representable; terrain datum, geology, tether dynamics, and safety remain unverified",
+    }
+}
+
 /// Effective material properties for the first-order tether model.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TetherMaterial {
