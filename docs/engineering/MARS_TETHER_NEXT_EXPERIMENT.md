@@ -208,3 +208,16 @@ We now have three clean fidelity boundaries:
 3. **T1+:** distributed mass, phase-aware ephemerides, flexible dynamics, environmental loads and operations.
 
 That ordering lets us test each layer independently instead of allowing a sophisticated simulator to conceal a coordinate or reference-frame error.
+
+
+## Terrain evidence contract and first site-assessment state machine
+
+The Rust kernel now defines `TerrainSample`, `TerrainProvenance`, `TerrainQuality`, a `TerrainProvider` adapter boundary, and `AnchorGeometryAssessment`. A geometry assessment with a usable terrain sample is intentionally marked `HigherFidelityRequired`, not certified feasible: terrain/geology, structural equilibrium, and tether dynamics are not solved by the spherical T0 geometry.
+
+The initial terrain adapter should use the MOLA MEGDR/DEM coordinate convention explicitly: areocentric (planetocentric) latitude and east-positive longitude. The USGS global MOLA DEM is commonly distributed at 128 pixels per degree (about 463 m/pixel at the equator); gaps between tracks are common and some grid values are interpolated. USGS reports total elevation uncertainty of at least about ±3 m for the cited product due to areoid and regional-shape uncertainty. These values describe that dataset/product, not a universal guarantee for all MOLA derivatives. The PDS archive also distinguishes planetary radius, areoid, topography, and observation count, so adapters must preserve the vertical datum and whether a sample is measured or interpolated.
+
+Consequently, the present kernel does **not** silently turn MOLA areoid-relative elevation into spherical radius. A future adapter must explicitly transform the selected terrain datum into the geometry model's radius convention and carry the transformation revision and uncertainty. Until then, a terrain sample is evidence that a location was queried—not proof that the structural anchor elevation is known.
+
+## Scope and verification status
+
+The repository change contains unit tests authored for geometry and evidence-state behavior, but this workflow has not run the Rust workspace test suite or compiler. Treat the implementation as committed source awaiting CI/compiler verification; do not describe the tests as passing until CI confirms them. No MOLA raster was ingested and no Valles latitude/longitude sweep has been executed in this iteration.
