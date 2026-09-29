@@ -902,14 +902,14 @@ mod tests {
 
         let mut restored = EnhancedKnowledgeGraph::new(100);
         restored.import_fact_record(&records[0]);
-        let restored_id = restored
-            .search(&restored.get_fact(restored.facts.keys().next().unwrap()).unwrap().encoding.vector, 1, 2)
-            [0]
-            .fact_id;
-        let round_trip = restored.provenance(restored_id).unwrap();
+        let restored_record = &restored.export_fact_records()[0];
 
-        assert_eq!(round_trip.memory_id, original.memory_id);
-        assert_eq!(round_trip.provenance_family, original.provenance_family);
+        assert_eq!(restored_record.memory_id, original.memory_id);
+        assert_eq!(restored_record.provenance_family, original.provenance_family);
+        assert_eq!(restored_record.source_text, "stable claim");
+
+        let restored_id = restored.facts.keys().next().copied().unwrap();
+        let round_trip = restored.provenance(restored_id).unwrap();
         assert_eq!(round_trip.retrieval_index_ref, Some(format!("fact-id:{restored_id}")));
         assert_ne!(restored_id, id);
     }
@@ -941,13 +941,12 @@ mod tests {
     fn test_eviction_does_not_reassign_surviving_identity() {
         let mut graph = EnhancedKnowledgeGraph::new(2);
         let (id_a, _) = graph.insert(make_encoding("claim a", 0.9), 1, None, false);
-        let (id_b, _) = graph.insert(make_encoding("claim b", 0.8), 2, None, false);
+        graph.insert(make_encoding("claim b", 0.8), 2, None, false);
         let memory_a = graph.provenance(id_a).unwrap().memory_id;
 
         graph.insert(make_encoding("claim c", 0.7), 3, None, false);
 
         assert_eq!(graph.provenance(id_a).unwrap().memory_id, memory_a);
-        assert_eq!(graph.provenance(id_b).unwrap().memory_id, graph.provenance(id_b).unwrap().memory_id);
     }
 
     #[test]
