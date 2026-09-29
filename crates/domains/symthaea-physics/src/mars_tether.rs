@@ -541,6 +541,52 @@ mod tests {
         assert!((hit.1.norm_m() - m.synchronous_radius_m()).abs() < 1e-6);
     }
 
+    fn fixture_terrain(quality: TerrainQuality) -> TerrainSample {
+        TerrainSample {
+            latitude_rad: 0.0,
+            longitude_rad: 0.0,
+            elevation_m: Some(1200.0),
+            elevation_uncertainty_m: Some(5.0),
+            slope_rad: Some(0.02),
+            roughness_m: Some(3.0),
+            quality,
+            provenance: TerrainProvenance {
+                source_id: "test-fixture".into(),
+                source_revision: "v1".into(),
+                coordinate_reference: "areocentric-east-positive".into(),
+            },
+        }
+    }
+
+    #[test]
+    fn terrain_contract_rejects_missing_and_unbounded_uncertainty() {
+        let mut sample = fixture_terrain(TerrainQuality::Measured);
+        assert!(sample.is_usable());
+        sample.elevation_uncertainty_m = None;
+        assert!(!sample.is_usable());
+        sample = fixture_terrain(TerrainQuality::Missing);
+        assert!(!sample.is_usable());
+    }
+
+    #[test]
+    fn anchor_assessment_never_calls_geometry_certified_feasible() {
+        let m = MarsTetherReference::MARS;
+        let anchor = MarsAnchor { latitude_rad: 0.0, longitude_rad: 0.0, elevation_m: 0.0 };
+        let assessed = assess_anchor_geometry(m, anchor, &fixture_terrain(TerrainQuality::Measured), m.radius_m);
+        assert_eq!(assessed.state, FeasibilityState::HigherFidelityRequired);
+        assert!(assessed.terrain_usable);
+        assert!(assessed.radial_distance_to_sync_m.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn invalid_terrain_produces_insufficient_evidence() {
+        let m = MarsTetherReference::MARS;
+        let anchor = MarsAnchor { latitude_rad: 0.0, longitude_rad: 0.0, elevation_m: 0.0 };
+        let assessed = assess_anchor_geometry(m, anchor, &fixture_terrain(TerrainQuality::Missing), m.radius_m);
+        assert_eq!(assessed.state, FeasibilityState::InsufficientEvidence);
+        assert!(assessed.anchor_position_m.is_none());
+    }
+
     #[test]
     fn effective_acceleration_changes_sign_at_sync() {
         let m = MarsTetherReference::MARS;
