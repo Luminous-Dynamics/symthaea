@@ -34,39 +34,96 @@ fn three_node_graph(kind: EngineeringRelationKind) -> ScientificLineageGraph {
     graph
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct NegativeContract {
+    schema: String,
+    vectors: Vec<NegativeVector>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct NegativeVector {
+    id: String,
+    mutation_path: String,
+    mutation_value: String,
+    digest_strategy: String,
+    expected_validate: String,
+    expected_source_binding: String,
+    first_boundary: String,
+}
+
+const NEGATIVE_CONTRACT: &str = include_str!(
+    "../../../../docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json"
+);
+
+fn set_mutation(value: &mut Value, path: &str, mutation_value: &str) {
+    match path {
+        "source_graph_digest" | "projection_digest" | "claim_ceiling" => {
+            value[path] = Value::String(if mutation_value.len() == 1 {
+                mutation_value.repeat(64)
+            } else {
+                mutation_value.to_owned()
+            });
+        }
+        "edges[0].relation_digest" => {
+            value["edges"][0]["relation_digest"] = Value::String(mutation_value.repeat(64));
+        }
+        "nodes[0].identity.canonical_identifier" => {
+            value["nodes"][0]["identity"]["canonical_identifier"] =
+                Value::String(mutation_value.to_owned());
+        }
+        _ => panic!("unknown negative contract mutation path: {path}"),
+    }
+}
+
+fn recompute_artifact_digest(value: &mut Value) {
+    value["artifact_digest"] = Value::String(String::new());
+    let bytes = serde_json::to_vec(value).unwrap();
+    value["artifact_digest"] = Value::String(
+        Sha256::digest(bytes)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect(),
+    );
+}
+
 #[test]
-fn mutation_matrix_rejects_tampering_at_the_intended_boundary() {
-    let projection = three_node_graph(EngineeringRelationKind::Requires).qualification_projection().unwrap();
+fn machine_readable_mutation_matrix_enforces_declared_boundaries() {
+    let contract: NegativeContract = serde_json::from_str(NEGATIVE_CONTRACT).unwrap();
+    assert_eq!(contract.schema, "symthaea.cp-04-qualification-adapter-negative-contract-v1");
+
+    let projection = three_node_graph(EngineeringRelationKind::Requires)
+        .qualification_projection()
+        .unwrap();
     let original = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
 
-    let cases = [
-        ("source_graph_digest", "source-binding", 0usize),
-        ("projection_digest", "source-binding", 0usize),
-        ("edge.relation_digest", "relation", 0usize),
-        ("node.identity.canonical_identifier", "identity", 0usize),
-        ("claim_ceiling", "envelope", 0usize),
-    ];
-
-    for (name, boundary, _) in cases {
+    for vector in contract.vectors {
         let mut value = serde_json::to_value(&original).unwrap();
-        match name {
-            "source_graph_digest" => value["source_graph_digest"] = Value::String("0".repeat(64)),
-            "projection_digest" => value["projection_digest"] = Value::String("1".repeat(64)),
-            "edge.relation_digest" => value["edges"][0]["relation_digest"] = Value::String("2".repeat(64)),
-            "node.identity.canonical_identifier" => value["nodes"][0]["identity"]["canonical_identifier"] = Value::String("tampered".into()),
-            "claim_ceiling" => value["claim_ceiling"] = Value::String("tampered".into()),
-            _ => unreachable!(),
+        set_mutation(&mut value, &vector.mutation_path, &vector.mutation_value);
+        if vector.digest_strategy == "recompute_artifact_digest" {
+            recompute_artifact_digest(&mut value);
         }
         let tampered: Cp04QualificationArtifact = serde_json::from_value(value).unwrap();
-        assert!(tampered.validate().is_err(), "{name} should fail standalone validation");
-        assert!(tampered.validate_against_projection(&projection).is_err(), "{name} should fail source binding");
-        assert_eq!(boundary, match name {
-            "source_graph_digest" | "projection_digest" => "source-binding",
-            "edge.relation_digest" => "relation",
-            "node.identity.canonical_identifier" => "identity",
-            "claim_ceiling" => "envelope",
-            _ => unreachable!(),
-        });
+        let validate_ok = tampered.validate().is_ok();
+        let source_binding_ok = tampered.validate_against_projection(&projection).is_ok();
+
+        assert_eq!(
+            validate_ok,
+            vector.expected_validate == "accept",
+            "{}: standalone validation boundary drifted",
+            vector.id
+        );
+        assert_eq!(
+            source_binding_ok,
+            vector.expected_source_binding == "accept",
+            "{}: source-binding boundary drifted",
+            vector.id
+        );
+        assert_eq!(
+            vector.first_boundary,
+            if validate_ok { "source-binding" } else { "artifact-integrity" },
+            "{}: first rejection boundary drifted",
+            vector.id
+        );
     }
 }
 
