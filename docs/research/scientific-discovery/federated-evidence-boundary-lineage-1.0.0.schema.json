@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Federated Evidence Boundary Lineage Receipt",
+  "description": "Content-addressed provenance receipt binding an evidence boundary to an exact closed projection ancestry. It does not qualify evidence, establish truth, authenticate actors, or satisfy a scientific criterion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "boundary_digest",
+    "projection_digest",
+    "ancestor_projection_digests",
+    "observation_record_digest",
+    "lineage_digest"
+  ],
+  "properties": {
+    "receipt_version": { "const": "1.0.0" },
+    "boundary_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "projection_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "ancestor_projection_digests": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+      "uniqueItems": true
+    },
+    "observation_record_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "lineage_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "x-symthaea-boundary": {
+    "semantic_role": "provenance_only",
+    "external_observation_is_evidence_bearing_ingress": true,
+    "scientific_qualification": false,
+    "truth_establishment": false,
+    "actor_authentication": false,
+    "criterion_completion": false
+  }
+}
