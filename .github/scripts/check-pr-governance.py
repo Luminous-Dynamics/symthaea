@@ -212,12 +212,23 @@ def validate_root_workflow_text(text: str) -> None:
 
 def validate_root_workflow_contract(base: str) -> None:
     validate_root_workflow_text(read_at_commit(base, ROOT_WORKFLOW_PATH))
-def validate_declared_roots(base: str, head: str) -> None:
+def validate_declared_roots(
+    base: str,
+    head: str,
+    exists_fn: Any = root_exists,
+) -> None:
     for match, path, _authority in REQUIRED_CLASS_A_ROOTS:
-        if not (root_exists(base, match, path) or root_exists(head, match, path)):
+        if not (exists_fn(base, match, path) or exists_fn(head, match, path)):
             raise GovernanceError(
                 f"required Class A root is absent from both event base and head: {match}:{path}"
             )
+
+
+def require_changed_adr(class_a_detected: bool, adr_paths: list[str]) -> None:
+    if class_a_detected and not adr_paths:
+        raise GovernanceError(
+            "Class A changes require a changed ADR-NNN*.md present in the PR head"
+        )
 
 
 def parse_name_status(text: str) -> list[str]:
@@ -350,8 +361,7 @@ def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[st
         path for path in paths
         if is_adr_path(path, policy) and object_exists(head, path)
     ]
-    if not adr_paths:
-        raise GovernanceError("Class A changes require a changed ADR-NNN*.md present in the PR head")
+    require_changed_adr(bool(class_a), adr_paths)
     for adr in adr_paths:
         validate_adr(adr, read_at_commit(head, adr))
 
@@ -441,6 +451,34 @@ def self_test() -> None:
     assert approved_subject("emergency-safety(root): coordinated", {"safety", "governance"})
     assert not approved_subject("safety(root): coordinated", {"safety", "governance"})
     assert not approved_subject("governance(root): coordinated", {"safety", "governance"})
+
+    # State-transition matrix: every protected root must exist on at least one
+    # side of the exact event boundary.
+    root = REQUIRED_CLASS_A_ROOTS[0]
+    states = ({"base"}, {"head"}, {"base", "head"})
+
+    def synthetic_exists(state: set[str]):
+        def exists(commit: str, match: str, path: str) -> bool:
+            return commit in state if (match, path) == (root[0], root[1]) else True
+        return exists
+
+    for state in states:
+        validate_declared_roots("base", "head", synthetic_exists(state))
+    try:
+        validate_declared_roots("base", "head", synthetic_exists(set()))
+    except GovernanceError:
+        pass
+    else:
+        raise AssertionError("protected root absent from both sides must fail closed")
+
+    require_changed_adr(True, ["docs/compliance/adr/ADR-002-state.md"])
+    try:
+        require_changed_adr(True, [])
+    except GovernanceError:
+        pass
+    else:
+        raise AssertionError("Class A change without changed ADR must fail closed")
+    require_changed_adr(False, [])
 
     trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
     validate_root_workflow_text(trusted_workflow)
