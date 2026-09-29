@@ -116,6 +116,10 @@ impl KnowledgePersistence {
             return Err("No database path configured".into());
         }
 
+        if facts.iter().any(|fact| fact.memory_id.trim().is_empty()) {
+            return Err("FactRecord memory_id must be non-empty".into());
+        }
+
         let conn = self.open_connection()?;
         self.ensure_schema(&conn)?;
 
