@@ -9,7 +9,7 @@
 //! ```text
 //! private Unix socket
 //! + kernel SO_PEERCRED
-//! + strict identity-free LocalApprovalSubmissionV1
+//! + strict identity-free LocalApprovalSubmissionV2
 //! + daemon-incarnation-bound LocalApprovalRequestStoreV1
 //! + atomic request consumption
 //! -> ConsumedLocalApprovalDecisionV1
@@ -27,7 +27,7 @@ use super::local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
     LocalApprovalRequestStoreV1,
 };
-use super::local_approval_submission::LocalApprovalSubmissionV1;
+use super::local_approval_submission::LocalApprovalSubmissionV2;
 use super::temporal::{AuthoritativeEvaluationV1, NixTimeErrorV1, UnixMillisV1};
 use blake3::Hasher;
 use serde::de::DeserializeOwned;
@@ -43,7 +43,7 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
-pub const LOCAL_APPROVAL_PROTOCOL_V1: &str = "nixward-local-approval-ipc-v1";
+pub const LOCAL_APPROVAL_PROTOCOL_V2: &str = "nixward-local-approval-ipc-v2";
 pub const LOCAL_APPROVAL_SOCKET_FILENAME_V1: &str = "approval-v1.sock";
 pub const LOCAL_APPROVAL_MAX_FRAME_BYTES_V1: usize = 16 * 1024;
 const RUNTIME_DIR_MODE_V1: u32 = 0o700;
@@ -53,21 +53,21 @@ const SOCKET_INSTANCE_DOMAIN_V1: &[u8] = b"nixward-local-approval-socket-instanc
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct LocalApprovalWireRequestV1 {
+pub struct LocalApprovalWireRequestV2 {
     pub protocol: String,
-    pub submission: LocalApprovalSubmissionV1,
+    pub submission: LocalApprovalSubmissionV2,
 }
 
-impl LocalApprovalWireRequestV1 {
-    pub fn new(submission: LocalApprovalSubmissionV1) -> Self {
+impl LocalApprovalWireRequestV2 {
+    pub fn new(submission: LocalApprovalSubmissionV2) -> Self {
         Self {
-            protocol: LOCAL_APPROVAL_PROTOCOL_V1.to_string(),
+            protocol: LOCAL_APPROVAL_PROTOCOL_V2.to_string(),
             submission,
         }
     }
 
     fn validate_protocol(&self) -> Result<(), LocalApprovalSocketErrorV1> {
-        if self.protocol == LOCAL_APPROVAL_PROTOCOL_V1 {
+        if self.protocol == LOCAL_APPROVAL_PROTOCOL_V2 {
             Ok(())
         } else {
             Err(LocalApprovalSocketErrorV1::ProtocolMismatch {
@@ -98,9 +98,9 @@ pub struct LocalApprovalAckV1 {
 impl LocalApprovalAckV1 {
     fn validate_for_submission(
         &self,
-        submission: &LocalApprovalSubmissionV1,
+        submission: &LocalApprovalSubmissionV2,
     ) -> Result<(), LocalApprovalSocketErrorV1> {
-        if self.protocol != LOCAL_APPROVAL_PROTOCOL_V1 {
+        if self.protocol != LOCAL_APPROVAL_PROTOCOL_V2 {
             return Err(LocalApprovalSocketErrorV1::ProtocolMismatch {
                 observed: self.protocol.clone(),
             });
@@ -211,7 +211,7 @@ impl LocalApprovalSocketServerV1 {
             peer_observed_at,
         )?;
 
-        let request: LocalApprovalWireRequestV1 = read_json_frame_v1(&mut stream)?;
+        let request: LocalApprovalWireRequestV2 = read_json_frame_v1(&mut stream)?;
         request.validate_protocol()?;
         let evaluation = AuthoritativeEvaluationV1::sample_from_system_clock()
             .map_err(LocalApprovalSocketErrorV1::TemporalEvaluation)?;
@@ -234,7 +234,7 @@ impl LocalApprovalSocketServerV1 {
             self.transport_instance_ref.clone(),
             peer_observed_at,
         )?;
-        let request: LocalApprovalWireRequestV1 = read_json_frame_v1(&mut stream)?;
+        let request: LocalApprovalWireRequestV2 = read_json_frame_v1(&mut stream)?;
         request.validate_protocol()?;
         self.consume_and_ack_v1(&mut stream, store, request, &verified_peer, evaluation)
     }
@@ -243,14 +243,14 @@ impl LocalApprovalSocketServerV1 {
         &self,
         stream: &mut UnixStream,
         store: &LocalApprovalRequestStoreV1,
-        request: LocalApprovalWireRequestV1,
+        request: LocalApprovalWireRequestV2,
         verified_peer: &super::approver_evidence::VerifiedLocalUnixPeerCredentialV1,
         evaluation: AuthoritativeEvaluationV1,
     ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalSocketErrorV1> {
         let consumed =
-            store.consume_verified_submission(&request.submission, verified_peer, evaluation)?;
+            store.consume_verified_submission_v2(&request.submission, verified_peer, evaluation)?;
         let ack = LocalApprovalAckV1 {
-            protocol: LOCAL_APPROVAL_PROTOCOL_V1.to_string(),
+            protocol: LOCAL_APPROVAL_PROTOCOL_V2.to_string(),
             request_id: consumed.request_id().to_string(),
             decision: consumed.decision_kind(),
             status: LocalApprovalAckStatusV1::DecisionConsumed,
@@ -300,9 +300,9 @@ impl Drop for LocalApprovalSocketServerV1 {
 }
 
 /// Same-UID V1 client helper for a future TUI integration.
-pub fn submit_local_approval_v1(
+pub fn submit_local_approval_v2(
     socket_path: &Path,
-    submission: &LocalApprovalSubmissionV1,
+    submission: &LocalApprovalSubmissionV2,
 ) -> Result<LocalApprovalAckV1, LocalApprovalSocketErrorV1> {
     validate_same_uid_client_endpoint_v1(socket_path)?;
     let mut stream = UnixStream::connect(socket_path)
@@ -310,7 +310,7 @@ pub fn submit_local_approval_v1(
     configure_session_timeouts_v1(&stream, socket_path)?;
     write_json_frame_v1(
         &mut stream,
-        &LocalApprovalWireRequestV1::new(submission.clone()),
+        &LocalApprovalWireRequestV2::new(submission.clone()),
     )?;
     let ack: LocalApprovalAckV1 = read_json_frame_v1(&mut stream)?;
     ack.validate_for_submission(submission)?;
@@ -834,6 +834,41 @@ mod tests {
             .unwrap()
     }
 
+    fn projection_for(
+        request: &PendingNixApprovalRequestV1,
+    ) -> super::super::local_approval_projection::PendingNixApprovalProjectionV1 {
+        super::super::local_approval_projection::PendingNixApprovalProjectionV1::from_request(
+            request,
+            "nixos-rebuild switch --flake .#workstation",
+        )
+        .unwrap()
+    }
+
+    fn install_request(
+        store: &LocalApprovalRequestStoreV1,
+        request: &PendingNixApprovalRequestV1,
+    ) {
+        let projection = projection_for(request);
+        store
+            .install_pending_with_projection(request.clone(), projection.projection_digest)
+            .unwrap();
+    }
+
+    fn submission_for(
+        request: &PendingNixApprovalRequestV1,
+        decision: LocalApprovalDecisionKindV1,
+        decided_at: UnixMillisV1,
+    ) -> LocalApprovalSubmissionV2 {
+        let projection = projection_for(request);
+        LocalApprovalSubmissionV2::for_request_and_projection(
+            request,
+            &projection,
+            decision,
+            decided_at,
+        )
+        .unwrap()
+    }
+
     fn private_runtime_path() -> (tempfile::TempDir, PathBuf) {
         let parent = tempfile::tempdir().unwrap();
         let runtime = parent.path().join("runtime");
@@ -945,18 +980,13 @@ mod tests {
     fn strict_wire_envelope_rejects_identity_fields() {
         let daemon = LiveDaemonIncarnationV1::generate().unwrap();
         let request = request_for(&daemon);
-        let submission = LocalApprovalSubmissionV1::for_request(
-            &request,
-            LocalApprovalDecisionKindV1::Approved,
-            ms(1_200),
-        )
-        .unwrap();
-        let mut value = serde_json::to_value(LocalApprovalWireRequestV1::new(submission)).unwrap();
+        let submission = submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
+        let mut value = serde_json::to_value(LocalApprovalWireRequestV2::new(submission)).unwrap();
         value
             .as_object_mut()
             .unwrap()
             .insert("uid".to_string(), serde_json::json!(0));
-        assert!(serde_json::from_value::<LocalApprovalWireRequestV1>(value).is_err());
+        assert!(serde_json::from_value::<LocalApprovalWireRequestV2>(value).is_err());
     }
 
     #[test]
@@ -965,19 +995,14 @@ mod tests {
         let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
         let request = request_for(&daemon);
         let request_id = request.request_id().unwrap();
-        store.install_pending(request.clone()).unwrap();
-        let submission = LocalApprovalSubmissionV1::for_request(
-            &request,
-            LocalApprovalDecisionKindV1::Approved,
-            ms(1_200),
-        )
-        .unwrap();
+        install_request(&store, &request);
+        let submission = submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
         let (_parent, runtime) = private_runtime_path();
         let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
         let socket_path = server.socket_path().to_path_buf();
         let client_submission = submission.clone();
         let client = thread::spawn(move || {
-            submit_local_approval_v1(&socket_path, &client_submission).unwrap()
+            submit_local_approval_v2(&socket_path, &client_submission).unwrap()
         });
 
         let consumed = server
@@ -1001,19 +1026,14 @@ mod tests {
         let request = request_for(&daemon);
         let request_id = request.request_id().unwrap();
         store.install_pending(request.clone()).unwrap();
-        let submission = LocalApprovalSubmissionV1::for_request(
-            &request,
-            LocalApprovalDecisionKindV1::Approved,
-            ms(1_200),
-        )
-        .unwrap();
+        let submission = submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
         let (_parent, runtime) = private_runtime_path();
         let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
         let socket_path = server.socket_path().to_path_buf();
         let hostile = thread::spawn(move || {
             let mut stream = UnixStream::connect(&socket_path).unwrap();
             let mut value =
-                serde_json::to_value(LocalApprovalWireRequestV1::new(submission)).unwrap();
+                serde_json::to_value(LocalApprovalWireRequestV2::new(submission)).unwrap();
             value
                 .as_object_mut()
                 .unwrap()
@@ -1035,7 +1055,7 @@ mod tests {
         let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
         let request = request_for(&daemon);
         let request_id = request.request_id().unwrap();
-        store.install_pending(request).unwrap();
+        install_request(&store, &request);
         let (_parent, runtime) = private_runtime_path();
         let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
         let socket_path = server.socket_path().to_path_buf();
@@ -1062,19 +1082,14 @@ mod tests {
         let store = Arc::new(LocalApprovalRequestStoreV1::new(&daemon));
         let request = request_for(&daemon);
         store.install_pending(request.clone()).unwrap();
-        let submission = LocalApprovalSubmissionV1::for_request(
-            &request,
-            LocalApprovalDecisionKindV1::Approved,
-            ms(1_200),
-        )
-        .unwrap();
+        let submission = submission_for(&request, LocalApprovalDecisionKindV1::Approved, ms(1_200));
         let (_parent, runtime) = private_runtime_path();
         let server = LocalApprovalSocketServerV1::bind_in(&runtime, &daemon).unwrap();
 
         let first_path = server.socket_path().to_path_buf();
         let first_submission = submission.clone();
         let first_client = thread::spawn(move || {
-            submit_local_approval_v1(&first_path, &first_submission).unwrap()
+            submit_local_approval_v2(&first_path, &first_submission).unwrap()
         });
         server
             .accept_and_consume_at_v1(&store, ms(1_100), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -1086,13 +1101,13 @@ mod tests {
             let mut stream = UnixStream::connect(&replay_path).unwrap();
             write_json_frame_v1(
                 &mut stream,
-                &LocalApprovalWireRequestV1::new(submission),
+                &LocalApprovalWireRequestV2::new(submission),
             )
             .unwrap();
             let _ = stream.shutdown(Shutdown::Both);
         });
         let err = server
-            .accept_and_consume_at_v1(&store, ms(1_301), ms(1_302))
+            .accept_and_consume_at_v1(&store, ms(1_301), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_302)))
             .unwrap_err();
         replay_client.join().unwrap();
         assert!(matches!(
