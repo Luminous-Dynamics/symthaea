@@ -1,0 +1,16 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema",
+ "title":"Frozen Prediction Outcome Receipt",
+ "type":"object","additionalProperties":false,
+ "required":["receipt_version","investigation_id","trace_digest","prediction_stage_id","prospective_commitment_digest","observation_stage_id","observation_artifact_digest","comparator_artifact_digest","disposition","receipt_digest"],
+ "properties":{
+  "receipt_version":{"const":"1.0.0"},"investigation_id":{"type":"string","minLength":1},
+  "trace_digest":{"$ref":"#/$defs/digest"},"prediction_stage_id":{"type":"string","minLength":1},
+  "prospective_commitment_digest":{"$ref":"#/$defs/digest"},
+  "observation_stage_id":{"type":"string","minLength":1},"observation_artifact_digest":{"$ref":"#/$defs/digest"},
+  "comparator_artifact_digest":{"$ref":"#/$defs/digest"},
+  "disposition":{"enum":["supports","contradicts","null","inconclusive","partial"]},
+  "receipt_digest":{"$ref":"#/$defs/digest"}
+ },
+ "$defs":{"digest":{"type":"string","pattern":"^sha256:[0-9a-fA-F]{64}$"}}
+}
