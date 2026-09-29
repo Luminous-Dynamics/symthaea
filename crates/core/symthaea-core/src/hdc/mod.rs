@@ -299,6 +299,7 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 pub mod config; // Centralized HDC configuration (runtime dimension management)
 pub mod adaptive_resolution; // Experimental 1K..64K packed resolution research surface
 pub mod resolution_projection; // Explicit resolution projection oracle
+pub mod resolution_metrics; // Observable geometry preservation metrics
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
