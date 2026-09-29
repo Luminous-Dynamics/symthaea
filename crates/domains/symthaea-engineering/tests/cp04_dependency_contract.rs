@@ -66,16 +66,22 @@ fn positive_dependency_matrix_is_executable_contract() {
     };
 
     let identity = rule("identity");
-    assert_eq!((&identity.relation, &identity.projection, &identity.source_graph, &identity.artifact),
-               (&"changed".into(), &"changed".into(), &"changed".into(), &"changed".into()));
+    assert_eq!(identity.relation, "changed");
+    assert_eq!(identity.projection, "changed");
+    assert_eq!(identity.source_graph, "changed");
+    assert_eq!(identity.artifact, "changed");
 
     let qualification = rule("qualification_relation");
-    assert_eq!((&qualification.relation, &qualification.projection, &qualification.source_graph, &qualification.artifact),
-               (&"changed".into(), &"changed".into(), &"changed".into(), &"changed".into()));
+    assert_eq!(qualification.relation, "changed");
+    assert_eq!(qualification.projection, "changed");
+    assert_eq!(qualification.source_graph, "changed");
+    assert_eq!(qualification.artifact, "changed");
 
     let epistemic = rule("epistemic_relation");
-    assert_eq!((&epistemic.relation, &epistemic.projection, &epistemic.source_graph, &epistemic.artifact),
-               (&"changed".into(), &"unchanged".into(), &"changed".into(), &"changed".into()));
+    assert_eq!(epistemic.relation, "changed");
+    assert_eq!(epistemic.projection, "unchanged");
+    assert_eq!(epistemic.source_graph, "changed");
+    assert_eq!(epistemic.artifact, "changed");
 
     let requirement = object("requirement", "r", "1", A);
     let representation = object("representation", "rep", "1", B);
