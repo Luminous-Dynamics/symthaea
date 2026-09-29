@@ -21,6 +21,7 @@
 use super::authorization::NixActionIntentV1;
 use super::daemon_incarnation::{DaemonApprovalContextErrorV1, LiveDaemonIncarnationV1};
 use super::local_approval::PendingNixApprovalRequestV1;
+use super::local_approval_projection::PendingNixApprovalProjectionV1;
 use super::local_approval_socket::{
     LocalApprovalSocketErrorV1, LocalApprovalSocketServerV1,
     default_local_approval_runtime_dir_v1,
@@ -158,7 +159,10 @@ impl LocalApprovalRuntimeV1 {
             created_at,
             expires_at,
         )?;
-        let install = self.request_store.install_pending(request.clone())?;
+        let projection = PendingNixApprovalProjectionV1::from_request(&request, displayed_action)?;
+        let install = self
+            .request_store
+            .install_pending_with_projection(request.clone(), projection.projection_digest.clone())?;
 
         debug_assert_eq!(request.daemon_incarnation_id, self.daemon_incarnation.reference());
         debug_assert_eq!(request.request_id().ok().as_deref(), Some(install.request_id.as_str()));
