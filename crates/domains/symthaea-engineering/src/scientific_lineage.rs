@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 pub const QUALIFICATION_PROJECTION_SCHEMA: &str = "symthaea.qualification-projection.v1";
 pub const QUALIFICATION_POLICY: &str = "symthaea.qualification-policy.v1";
+pub const QUALIFICATION_PROJECTION_ARTIFACT_SCHEMA: &str =
+    "symthaea.qualification-projection-artifact.v1";
 
 /// A recursive scientific graph. It permits cycles because the DKG/knowledge
 /// layer is not itself a qualification DAG.
@@ -276,6 +278,34 @@ impl QualificationProjection {
     /// Require an exact source knowledge snapshot before replay.
     pub fn source_graph_matches(&self, graph: &ScientificLineageGraph) -> bool {
         self.source_graph_digest == graph.graph_digest()
+    }
+
+    /// Deterministic bytes for durable storage or hand-off to CP-04.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(QUALIFICATION_PROJECTION_ARTIFACT_SCHEMA.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(self.schema.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(self.source_graph_digest.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(self.qualification_policy.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(self.projection_digest.as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(b"synthetic-qualification");
+        bytes.push(0);
+        for relation in &self.relations {
+            bytes.extend_from_slice(relation.relation_digest().as_bytes());
+            bytes.push(0);
+        }
+        bytes
+    }
+
+    /// Validate and return the artifact bytes used by a downstream consumer.
+    pub fn validated_canonical_bytes(&self) -> Result<Vec<u8>, QualificationProjectionError> {
+        self.validate()?;
+        Ok(self.canonical_bytes())
     }
 
     pub const fn schema(&self) -> &'static str {
@@ -558,6 +588,14 @@ mod tests {
         assert_eq!(before, graph.qualification_projection().unwrap().projection_digest());
     }
 
+
+    #[test]
+    fn canonical_artifact_bytes_are_deterministic_and_validation_gated() {
+        let graph = fixture();
+        let projection = graph.qualification_projection().unwrap();
+        assert_eq!(projection.canonical_bytes(), projection.canonical_bytes());
+        assert_eq!(projection.validated_canonical_bytes().unwrap(), projection.canonical_bytes());
+    }
 
     #[test]
     fn projection_is_serializable_and_validated_on_deserialization() {
