@@ -282,6 +282,73 @@ def commit_changed_paths(commit: str) -> list[str]:
     return parse_name_status(out)
 
 
+def history_topology_self_test() -> None:
+    """Exercise exact base/head authority against adversarial Git histories."""
+    with tempfile.TemporaryDirectory() as td:
+        worktree = Path(td)
+        def run_local(*args: str) -> str:
+            proc = subprocess.run(
+                ["git", *args], cwd=worktree, check=False,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            if proc.returncode != 0:
+                detail = proc.stderr.strip() or proc.stdout.strip()
+                raise AssertionError(f"fixture git command failed: {args}: {detail}")
+            return proc.stdout.strip()
+
+        run_local("init", "--quiet")
+        run_local("config", "user.name", "Governance Self-Test")
+        run_local("config", "user.email", "governance-self-test@example.invalid")
+        (worktree / "tracked.txt").write_text("base\\n", encoding="utf-8")
+        run_local("add", "tracked.txt")
+        run_local("commit", "--quiet", "-m", "base")
+        base = run_local("rev-parse", "HEAD")
+
+        (worktree / "tracked.txt").write_text("feature\\n", encoding="utf-8")
+        run_local("commit", "--quiet", "-am", "feature")
+        feature = run_local("rev-parse", "HEAD")
+        validate_exact_base_head_ancestry(base, feature)
+
+        try:
+            validate_exact_base_head_ancestry(base, base)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("identical base/head must fail closed")
+
+        (worktree / "side.txt").write_text("side\\n", encoding="utf-8")
+        run_local("add", "side.txt")
+        run_local("commit", "--quiet", "-m", "side")
+        side = run_local("rev-parse", "HEAD")
+        run_local("checkout", "--quiet", feature)
+        run_local("merge", "--quiet", "--no-ff", side, "-m", "merge")
+        merge = run_local("rev-parse", "HEAD")
+        validate_exact_base_head_ancestry(base, merge)
+        assert run_local("rev-parse", f"{merge}^1") == feature
+        assert run_local("rev-parse", f"{merge}^2") == side
+
+        try:
+            validate_exact_base_head_ancestry(feature, base)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("reverse ancestry must fail closed")
+
+        (worktree / "tracked.txt").write_text("rebased\\n", encoding="utf-8")
+        run_local("commit", "--quiet", "-am", "rebased")
+        rebased = run_local("rev-parse", "HEAD")
+        try:
+            validate_exact_base_head_ancestry(side, rebased)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("non-ancestor rewritten history must fail closed")
+
+        changed = run_local("diff", "--name-only", base, merge).splitlines()
+        assert "side.txt" in changed
+        assert "tracked.txt" in changed
+
+
 def read_at_commit(commit: str, path: str) -> str:
     return run_git("show", f"{commit}:{path}")
 
@@ -480,7 +547,7 @@ def self_test() -> None:
         raise AssertionError("Class A change without changed ADR must fail closed")
     require_changed_adr(False, [])
 
-    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
+    history_topology_self_test()\n\n    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
     validate_root_workflow_text(trusted_workflow)
     for forbidden in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS:
         try:
