@@ -166,6 +166,35 @@ def root_exists(commit: str, match: str, path: str) -> bool:
     return any(line.startswith(path) for line in out.splitlines())
 
 
+ROOT_WORKFLOW_PATH = ".github/workflows/pr-governance-root.yml"
+REQUIRED_ROOT_WORKFLOW_SNIPPETS = (
+    "pull_request_target:",
+    "permissions:",
+    "contents: read",
+    "ref: ${{ github.event.pull_request.base.sha }}",
+    "fetch-depth: 0",
+    "persist-credentials: false",
+    'refs/pull/${PR_NUMBER}/head:refs/remotes/pr-governance/${PR_NUMBER}/head',
+    'test "${fetched_head}" = "${PR_HEAD_SHA}"',
+    "python3 .github/scripts/check-pr-governance.py",
+)
+FORBIDDEN_ROOT_WORKFLOW_SNIPPETS = (
+    "ref: ${{ github.event.pull_request.head.sha }}",
+    "ref: refs/pull/${{ github.event.pull_request.number }}/merge",
+    "gh pr checkout",
+)
+
+def validate_root_workflow_contract(base: str) -> None:
+    text = read_at_commit(base, ROOT_WORKFLOW_PATH)
+    missing = [snippet for snippet in REQUIRED_ROOT_WORKFLOW_SNIPPETS if snippet not in text]
+    if missing:
+        raise GovernanceError(f"{ROOT_WORKFLOW_PATH}: trusted-base workflow contract missing: {missing}")
+    forbidden = [snippet for snippet in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS if snippet in text]
+    checkout_lines = [line.strip() for line in text.splitlines() if line.strip().startswith("uses: actions/checkout@")]
+    if any(not re.fullmatch(r"uses: actions/checkout@[0-9a-f]{40}", line) for line in checkout_lines):
+        raise GovernanceError(f"{ROOT_WORKFLOW_PATH}: actions/checkout must use a full commit SHA")
+    if forbidden:
+        raise GovernanceError(f"{ROOT_WORKFLOW_PATH}: forbidden untrusted-checkout/execution pattern: {forbidden}")
 def validate_declared_roots(base: str, head: str) -> None:
     for match, path, _authority in REQUIRED_CLASS_A_ROOTS:
         if not (root_exists(base, match, path) or root_exists(head, match, path)):
@@ -193,9 +222,21 @@ def parse_name_status(text: str) -> list[str]:
     return sorted(set(paths))
 
 
+def validate_exact_base_head_ancestry(base: str, head: str) -> None:
+    if base == head:
+        raise GovernanceError("base_sha and head_sha must identify distinct commits")
+    if not git_ok("merge-base", "--is-ancestor", base, head):
+        merge_base = run_git("merge-base", base, head).strip() or "<none>"
+        raise GovernanceError(
+            "head_sha must descend from base_sha for exact base-to-head governance; "
+            f"merge_base={merge_base}"
+        )
+
+
 def changed_paths(base: str, head: str) -> list[str]:
+    validate_exact_base_head_ancestry(base, head)
     out = run_git(
-        "diff", "--name-status", "-M", "--diff-filter=ACDMRT", f"{base}...{head}"
+        "diff", "--name-status", "-M", "--diff-filter=ACDMRT", base, head
     )
     return parse_name_status(out)
 
@@ -256,13 +297,19 @@ def validate_adr(path: str, text: str) -> None:
 
 def approved_subject(subject: str, authorities: set[str]) -> bool:
     subject = subject.strip().lower()
-    if "safety" in authorities:
+    if authorities == {"safety"}:
         return subject.startswith(SAFETY_PREFIXES)
-    return subject.startswith(GOVERNANCE_PREFIXES)
+    if authorities == {"governance"}:
+        return subject.startswith(GOVERNANCE_PREFIXES)
+    if authorities == {"safety", "governance"}:
+        return subject.startswith(("emergency-safety:", "emergency-safety("))
+    raise GovernanceError(f"unexpected Class A authority set: {sorted(authorities)}")
 
 
 def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[str, Any]:
     validate_declared_roots(base, head)
+    validate_root_workflow_contract(base)
+    validate_exact_base_head_ancestry(base, head)
     paths = changed_paths(base, head)
     class_a = [(path, classify(path, policy)) for path in paths]
     class_a = [(path, authority) for path, authority in class_a if authority is not None]
@@ -341,9 +388,21 @@ def self_test() -> None:
     assert approved_subject("safety(core): tighten", {"safety"})
     assert not approved_subject("governance(ci): wrong", {"safety"})
     assert approved_subject("governance(ci): tighten", {"governance"})
+    assert approved_subject("emergency-safety(ci): coordinated", {"safety", "governance"})
+    assert not approved_subject("safety(core): mixed", {"safety", "governance"})
+    assert not approved_subject("governance(ci): mixed", {"safety", "governance"})
     assert parse_name_status("M\ta.rs\nD\tb.rs\nR100\told.rs\tnew.rs\n") == [
         "a.rs", "b.rs", "new.rs", "old.rs"
     ]
+    assert parse_name_status("C100\tcopy-source.rs\tcopy-target.rs\nT\ttype-change.rs\n") == [
+        "copy-source.rs", "copy-target.rs", "type-change.rs"
+    ]
+    try:
+        parse_name_status("R100\tonly-one-path.rs\n")
+    except GovernanceError:
+        pass
+    else:
+        raise AssertionError("malformed rename records must be rejected")
 
     with tempfile.TemporaryDirectory() as td:
         policy_path = Path(td) / "policy.json"
