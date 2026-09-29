@@ -228,6 +228,23 @@ mod tests {
     }
 
     #[test]
+    fn swapped_identity_representation_binding_is_rejected() {
+        let (groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![
+                candidate("claim:a", 0.8, "family:a"),
+                candidate("claim:b", 0.7, "family:b"),
+            ],
+        );
+        receipt.selected_representation_digests.swap(0, 1);
+        receipt.receipt_digest = receipt.canonical_digest();
+        assert_eq!(
+            EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
+
+    #[test]
     fn mismatched_representation_digest_is_rejected() {
         let (groups, mut receipt) = retrieve(
             &MemoryRetrievalRequest::historical("f:1", "q", 5),
