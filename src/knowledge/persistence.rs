@@ -16,6 +16,8 @@
 
 use std::path::Path;
 
+use symthaea_epistemic_types::{MemoryKind, MemoryProvenance};
+
 /// Knowledge persistence layer backed by SQLite.
 ///
 /// Provides save/load for the full knowledge graph state.
@@ -33,6 +35,12 @@ pub struct KnowledgePersistence {
 /// A serializable fact record for persistence
 #[derive(Debug, Clone)]
 pub struct FactRecord {
+    /// Stable memory identity preserved across persistence/reload.
+    pub memory_id: String,
+    /// Optional canonical identity; absent until an external admission boundary assigns one.
+    pub canonical_identity: Option<String>,
+    /// Provenance family shared by representations of the same source lineage.
+    pub provenance_family: Option<String>,
     /// BinaryHV encoded as raw bytes (2048 bytes for 16,384 bits)
     pub vector_bytes: Vec<u8>,
     /// Source text of the fact
@@ -118,9 +126,12 @@ impl KnowledgePersistence {
         let mut count = 0;
         for fact in facts {
             conn.execute(
-                "INSERT INTO knowledge_facts (vector_blob, source_text, confidence, domain, cycle, is_causal)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                "INSERT INTO knowledge_facts (memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
                 rusqlite::params![
+                    fact.memory_id,
+                    fact.canonical_identity,
+                    fact.provenance_family,
                     fact.vector_bytes,
                     fact.source_text,
                     fact.confidence,
@@ -150,7 +161,7 @@ impl KnowledgePersistence {
 
         let mut stmt = conn
             .prepare(
-                "SELECT vector_blob, source_text, confidence, domain, cycle, is_causal
+                "SELECT id, memory_id, canonical_identity, provenance_family, vector_blob, source_text, confidence, domain, cycle, is_causal
                  FROM knowledge_facts ORDER BY cycle DESC",
             )
             .map_err(|e| e.to_string())?;
@@ -158,12 +169,15 @@ impl KnowledgePersistence {
         let facts: Vec<FactRecord> = stmt
             .query_map([], |row| {
                 Ok(FactRecord {
-                    vector_bytes: row.get(0)?,
-                    source_text: row.get(1)?,
-                    confidence: row.get(2)?,
-                    domain: row.get(3)?,
-                    cycle: row.get::<_, i64>(4)? as u64,
-                    is_causal: row.get(5)?,
+                    memory_id: row.get::<_, Option<String>>(1)?.unwrap_or_else(|| format!("legacy-fact:{}", row.get::<_, i64>(0).unwrap_or_default())),
+                    canonical_identity: row.get(2)?,
+                    provenance_family: row.get(3)?,
+                    vector_bytes: row.get(4)?,
+                    source_text: row.get(5)?,
+                    confidence: row.get(6)?,
+                    domain: row.get(7)?,
+                    cycle: row.get::<_, i64>(8)? as u64,
+                    is_causal: row.get(9)?,
                 })
             })
             .map_err(|e| e.to_string())?
@@ -346,6 +360,9 @@ impl KnowledgePersistence {
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS knowledge_facts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                memory_id TEXT,
+                canonical_identity TEXT,
+                provenance_family TEXT,
                 vector_blob BLOB NOT NULL,
                 source_text TEXT NOT NULL,
                 confidence REAL NOT NULL,
@@ -375,6 +392,21 @@ impl KnowledgePersistence {
         )
         .map_err(|e| format!("Schema init: {e}"))?;
 
+        // Backward-compatible migration for databases created before EPF-011.
+        let columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(knowledge_facts)")
+            .map_err(|e| format!("Schema inspect: {e}"))?
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| format!("Schema inspect query: {e}"))?
+            .filter_map(Result::ok)
+            .collect();
+        for (name, ty) in [("memory_id", "TEXT"), ("canonical_identity", "TEXT"), ("provenance_family", "TEXT")] {
+            if !columns.iter().any(|c| c == name) {
+                conn.execute(&format!("ALTER TABLE knowledge_facts ADD COLUMN {name} {ty}"), [])
+                    .map_err(|e| format!("Schema migration {name}: {e}"))?;
+            }
+        }
+
         self.initialized = true;
         Ok(())
     }
@@ -403,6 +435,9 @@ mod tests {
 
         let facts = vec![
             FactRecord {
+                memory_id: "memory-1".into(),
+                canonical_identity: Some("claim-1".into()),
+                provenance_family: Some("family-1".into()),
                 vector_bytes: vec![0u8; 2048],
                 source_text: "Test fact one".into(),
                 confidence: 0.9,
@@ -411,6 +446,9 @@ mod tests {
                 is_causal: false,
             },
             FactRecord {
+                memory_id: "memory-2".into(),
+                canonical_identity: None,
+                provenance_family: None,
                 vector_bytes: vec![1u8; 2048],
                 source_text: "Test fact two".into(),
                 confidence: 0.8,
@@ -427,6 +465,9 @@ mod tests {
         let loaded = p.load_facts().unwrap();
         assert_eq!(loaded.len(), 2);
         assert_eq!(loaded[0].source_text, "Test fact two"); // DESC order
+        assert_eq!(loaded[0].memory_id, "memory-2");
+        assert_eq!(loaded[1].memory_id, "memory-1");
+        assert_eq!(loaded[1].canonical_identity.as_deref(), Some("claim-1"));
         assert_eq!(loaded[1].source_text, "Test fact one");
 
         // Cleanup
