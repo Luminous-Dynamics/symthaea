@@ -283,6 +283,23 @@ pub enum FeasibilityState {
     HigherFidelityRequired,
 }
 
+/// Convert areoid-relative MOLA topography into radial elevation above the
+/// kernel's spherical reference radius. The caller must supply an areoid
+/// radius from a compatible body-fixed frame and epoch/product convention.
+/// This function does not infer an areoid from topography.
+pub fn radial_elevation_from_areoid(
+    reference: MarsTetherReference,
+    areoid_radius_m: f64,
+    topography_above_areoid_m: f64,
+) -> Option<f64> {
+    if !areoid_radius_m.is_finite() || !topography_above_areoid_m.is_finite() {
+        return None;
+    }
+    let radial_elevation = areoid_radius_m + topography_above_areoid_m - reference.radius_m;
+    (radial_elevation.is_finite() && radial_elevation > -reference.radius_m)
+        .then_some(radial_elevation)
+}
+
 /// Minimal site geometry assessment. It deliberately does not combine
 /// geotechnical, structural, logistics, or environmental constraints into a
 /// scalar score.
@@ -321,6 +338,18 @@ pub fn assess_anchor_geometry(
             anchor_position_m: None,
             radial_distance_to_sync_m: None,
             reason: "anchor coordinates or elevation are outside the supported domain",
+        };
+    }
+    let latitude_delta = (terrain.latitude_rad - anchor.latitude_rad).abs();
+    let raw_longitude_delta = (terrain.longitude_rad - anchor.longitude_rad).abs();
+    let longitude_delta = raw_longitude_delta.min(2.0 * PI - raw_longitude_delta);
+    if latitude_delta > 1.0e-8 || longitude_delta > 1.0e-8 {
+        return AnchorGeometryAssessment {
+            state: FeasibilityState::InsufficientEvidence,
+            terrain_usable: false,
+            anchor_position_m: None,
+            radial_distance_to_sync_m: None,
+            reason: "terrain sample coordinates do not match the requested anchor",
         };
     }
     let position = anchor.position(reference);
@@ -570,6 +599,24 @@ mod tests {
         assert!(!sample.is_usable());
         sample = fixture_terrain(TerrainQuality::Missing);
         assert!(!sample.is_usable());
+    }
+
+    #[test]
+    fn areoid_topography_conversion_is_explicit_and_validated() {
+        let m = MarsTetherReference::MARS;
+        assert_eq!(radial_elevation_from_areoid(m, m.radius_m + 120.0, 80.0), Some(200.0));
+        assert!(radial_elevation_from_areoid(m, f64::NAN, 1.0).is_none());
+    }
+
+    #[test]
+    fn terrain_coordinate_mismatch_is_insufficient_evidence() {
+        let m = MarsTetherReference::MARS;
+        let anchor = MarsAnchor { latitude_rad: 0.0, longitude_rad: 0.0, elevation_m: 0.0 };
+        let mut sample = fixture_terrain(TerrainQuality::Measured);
+        sample.longitude_rad = 0.1;
+        let assessed = assess_anchor_geometry(m, anchor, &sample, m.radius_m);
+        assert_eq!(assessed.state, FeasibilityState::InsufficientEvidence);
+        assert!(!assessed.terrain_usable);
     }
 
     #[test]
