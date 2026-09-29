@@ -981,7 +981,7 @@ mod tests {
         });
 
         let consumed = server
-            .accept_and_consume_at_v1(&store, ms(1_100), ms(1_300))
+            .accept_and_consume_at_v1(&store, ms(1_100), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         let ack = client.join().unwrap();
         assert_eq!(consumed.request_id(), request_id);
@@ -1022,7 +1022,7 @@ mod tests {
             let _ = stream.shutdown(Shutdown::Both);
         });
         let err = server
-            .accept_and_consume_at_v1(&store, ms(1_100), ms(1_300))
+            .accept_and_consume_at_v1(&store, ms(1_100), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap_err();
         hostile.join().unwrap();
         assert!(matches!(err, LocalApprovalSocketErrorV1::JsonDecode(_)));
@@ -1046,7 +1046,7 @@ mod tests {
             let _ = stream.shutdown(Shutdown::Both);
         });
         let err = server
-            .accept_and_consume_at_v1(&store, ms(1_100), ms(1_300))
+            .accept_and_consume_at_v1(&store, ms(1_100), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap_err();
         client.join().unwrap();
         assert!(matches!(
@@ -1077,7 +1077,7 @@ mod tests {
             submit_local_approval_v1(&first_path, &first_submission).unwrap()
         });
         server
-            .accept_and_consume_at_v1(&store, ms(1_100), ms(1_300))
+            .accept_and_consume_at_v1(&store, ms(1_100), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap();
         first_client.join().unwrap();
 
