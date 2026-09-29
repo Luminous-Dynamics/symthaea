@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
+      - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json"
       - "scripts/qualifiers/scientific_lineage_adapter_qualifier.py"
       - ".github/workflows/scientific-lineage-adapter.yml"
       - "crates/domains/symthaea-engineering/src/cp04_adapter.rs"
@@ -33,6 +34,8 @@ jobs:
         run: python3 scripts/qualifiers/scientific_lineage_adapter_qualifier.py
       - name: Verify Rust fixture round-trip
         run: cargo test -p symthaea-engineering checked_in_fixture_round_trips_through_rust_adapter --lib
+      - name: Verify digest boundary mutations
+        run: cargo test -p symthaea-engineering --test cp04_digest_boundaries
 
       - name: Verify fixture remains unchanged
-        run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py
+        run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py
