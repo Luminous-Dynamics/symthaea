@@ -35,7 +35,7 @@ pub struct MarsTetherReference {
 
 impl MarsTetherReference {
     pub const MARS: Self = Self {
-        mu_m3_s2: 4.2828e13,
+        mu_m3_s2: 4.2828372e13,
         radius_m: 3_396_200.0,
         rotation_period_s: 88_642.44,
         phobos_radius_m: 9_378_000.0,
