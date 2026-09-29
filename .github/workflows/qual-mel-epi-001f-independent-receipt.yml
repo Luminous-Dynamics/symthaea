@@ -380,9 +380,13 @@ jobs:
           const receiptBytes = fs.readFileSync(receiptPath);
           const receipt = JSON.parse(receiptBytes.toString('utf8'));
           const artifactDigest = process.env.RECEIPT_ARTIFACT_DIGEST;
+          const artifactId = process.env.RECEIPT_ARTIFACT_ID;
 
           if (!/^[0-9a-f]{64}$/.test(artifactDigest)) {
             throw new Error('receipt artifact digest is not a lowercase SHA-256 hex digest');
+          }
+          if (!/^[0-9]+$/.test(artifactId)) {
+            throw new Error('receipt artifact ID is not a decimal integer');
           }
 
           const manifest = {
@@ -397,7 +401,7 @@ jobs:
             },
             artifact: {
               name: process.env.RECEIPT_ARTIFACT_NAME,
-              id: Number(process.env.RECEIPT_ARTIFACT_ID),
+              id: Number(artifactId),
               url: process.env.RECEIPT_ARTIFACT_URL,
               digest: 'sha256:' + artifactDigest,
             },
