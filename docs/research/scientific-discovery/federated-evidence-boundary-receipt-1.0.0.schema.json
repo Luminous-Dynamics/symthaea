@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.ai/schema/federated-evidence-boundary-receipt-1.0.0.schema.json",
+  "title": "Federated Projection Evidence Boundary Receipt",
+  "description": "Provenance-only receipt binding one exact federated projection output to an independently ingested external observation. It does not qualify evidence, establish truth, authenticate actors, or satisfy an official criterion.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "receipt_version",
+    "projection_digest",
+    "output_record_id",
+    "output_record_digest",
+    "observation_id",
+    "observation_record_digest",
+    "execution_id",
+    "observer_id",
+    "institution_id",
+    "disposition",
+    "boundary_digest"
+  ],
+  "properties": {
+    "receipt_version": { "const": "1.0.0" },
+    "projection_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "output_record_id": { "type": "string", "minLength": 1 },
+    "output_record_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "observation_id": { "type": "string", "minLength": 1 },
+    "observation_record_digest": { "type": "string", "minLength": 1 },
+    "execution_id": { "type": "string", "minLength": 1 },
+    "observer_id": { "type": "string", "minLength": 1 },
+    "institution_id": { "type": "string", "minLength": 1 },
+    "disposition": { "const": "external_observation_backed" },
+    "boundary_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  }
+}
