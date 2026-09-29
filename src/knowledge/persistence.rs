@@ -281,7 +281,16 @@ impl KnowledgePersistence {
                 _ => return Err(rusqlite::Error::InvalidColumnType(2, "kind".into(), rusqlite::types::Type::Text)),
             };
             Ok(ProvenanceRelationRecord { source_memory_id: row.get(0)?, target_memory_id: row.get(1)?, kind, created_at: row.get(3)? })
-        }).map_err(|e| e.to_string())?.filter_map(|r| r.ok()).collect::<Vec<_>>();
+        }).map_err(|e| e.to_string())?;
+        let mut loaded = Vec::new();
+        for row in relations {
+            let record = row.map_err(|e| e.to_string())?;
+            ProvenanceRelation::from(record.clone())
+                .validate()
+                .map_err(|e| format!("Invalid persisted provenance relation: {e}"))?;
+            loaded.push(record);
+        }
+        let relations = loaded;
         self.total_loaded += relations.len() as u64;
         Ok(relations)
     }
