@@ -537,3 +537,4 @@ mod tests {
 pub mod scientific_investigation_trace;
 pub mod investigation_planning_bridge;
 pub mod frozen_prediction_outcome;
+pub mod scientific_information_gain_update;
