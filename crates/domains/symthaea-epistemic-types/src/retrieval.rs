@@ -54,6 +54,36 @@ pub struct MemoryRetrievalReceipt {
     pub selected: Vec<String>, pub excluded: Vec<ExcludedMemory>, pub provenance_families: Vec<String>,
 }
 
+
+impl MemoryRetrievalReceipt {
+    /// Canonical, deterministic encoding of the receipt's retrieval contract and selection.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut out = RETRIEVAL_RECEIPT_DOMAIN.to_vec();
+        out.push(match self.mode { RetrievalMode::Historical => 0, RetrievalMode::Live => 1 });
+        put_optional(&mut out, self.frontier_ref.as_deref());
+        put_string(&mut out, &self.query);
+        put_strings(&mut out, &self.selected);
+        put_strings(&mut out, &self.selected_representation_digests);
+        let mut excluded = self.excluded.clone();
+        excluded.sort_by(|a,b| a.canonical_identity.cmp(&b.canonical_identity).then_with(|| (a.reason as u8).cmp(&(b.reason as u8))));
+        put_u32(&mut out, excluded.len());
+        for item in excluded {
+            put_string(&mut out, &item.canonical_identity);
+            out.push(match item.reason { RetrievalExclusion::PostFrontier=>0, RetrievalExclusion::FrontierUnknown=>1, RetrievalExclusion::MissingHistoricalFrontier=>2 });
+        }
+        let mut families=self.provenance_families.clone(); families.sort(); families.dedup(); put_strings(&mut out,&families);
+        let mut profiles=self.retrieval_profile_versions.clone(); profiles.sort(); profiles.dedup(); put_strings(&mut out,&profiles);
+        out
+    }
+    pub fn canonical_digest(&self) -> String { sha256_hex(&self.canonical_bytes()) }
+    pub fn is_self_consistent(&self) -> bool { !self.receipt_digest.is_empty() && self.receipt_digest == self.canonical_digest() }
+}
+
+fn put_u32(out: &mut Vec<u8>, n: usize) { out.extend_from_slice(&(n as u32).to_be_bytes()); }
+fn put_string(out: &mut Vec<u8>, value: &str) { put_u32(out, value.len()); out.extend_from_slice(value.as_bytes()); }
+fn put_optional(out: &mut Vec<u8>, value: Option<&str>) { match value { Some(v)=>{out.push(1);put_string(out,v)},None=>out.push(0)} }
+fn put_strings(out: &mut Vec<u8>, values: &[String]) { put_u32(out, values.len()); for value in values { put_string(out,value); } }
+
 /// Fallible entry point for untrusted or externally constructed requests.
 pub fn try_retrieve(
     request: &MemoryRetrievalRequest,
@@ -147,6 +177,14 @@ mod tests {
         let r=MemoryRetrievalRequest{mode:RetrievalMode::Historical,frontier_ref:None,query:"x".into(),max_results:1};
         assert_eq!(try_retrieve(&r,Vec::new()),Err(RetrievalRequestError::MissingHistoricalFrontier));
         assert_eq!(MemoryRetrievalRequest::historical("","x",1).validate(),Err(RetrievalRequestError::EmptyHistoricalFrontier));
+    }
+    #[test] fn receipt_is_self_consistent_and_binds_selection_metadata() {
+        let (_g, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        assert!(receipt.is_self_consistent());
+        assert!(!receipt.selected_representation_digests.is_empty());
+        let mut tampered=receipt.clone();
+        tampered.query="tampered".into();
+        assert!(!tampered.is_self_consistent());
     }
     #[test] fn live_mode_needs_no_frontier() {
         let (g,r)=retrieve(&MemoryRetrievalRequest::live("x",10),vec![candidate("live",MemoryKind::Vector,"f",0.8,FrontierEligibility::Unknown)]);
