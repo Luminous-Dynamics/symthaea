@@ -12,6 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::candidate_commitment::CandidatePredictionCommitment;
 use crate::criterion_evidence::CriterionEvidenceEligibility;
+use crate::evidence_chain_audit::EvidenceChainAudit;
 use crate::external_observation::ExternalExperimentalObservation;
 use crate::independent_assessment::IndependentAssessment;
 use crate::replication::ReplicationRecord;
@@ -79,6 +80,55 @@ impl EvidenceLineageDkgProjection {
             replication,
             std::slice::from_ref(evidence),
         )
+    }
+
+    /// Derive a canonical graph with one content-addressed structural audit node.
+    ///
+    /// The audit is linked to the terminal evidence record in the closed history.
+    /// Audit completeness remains a provenance property only; it is not a scientific
+    /// truth assertion, criterion-completion decision, or authority authentication.
+    pub fn from_chain_history_with_audit(
+        commitment: &CandidatePredictionCommitment,
+        observation: &ExternalExperimentalObservation,
+        assessment: &IndependentAssessment,
+        replication: &ReplicationRecord,
+        evidence_history: &[CriterionEvidenceEligibility],
+        audit: &EvidenceChainAudit,
+    ) -> Result<Self, DkgProjectionError> {
+        let mut projection = Self::from_chain_history(
+            commitment, observation, assessment, replication, evidence_history,
+        )?;
+        if !audit.verify_integrity() {
+            return Err(DkgProjectionError::InvalidAudit);
+        }
+        let terminal_evidence = evidence_history.iter().find(|e| !evidence_history.iter().any(|child| {
+            child.supersedes_evidence_id.as_deref() == Some(e.evidence_id.as_str())
+        })).ok_or(DkgProjectionError::InvalidAuditLineage)?;
+        if audit.challenge_id != observation.challenge_id
+            || audit.criterion_id != observation.criterion_id
+            || audit.criterion_generation != observation.criterion_generation
+            || audit.observation_id != observation.observation_id
+            || audit.assessment_id != assessment.assessment_id
+            || audit.replication_id != replication.replication_id
+            || audit.evidence_id != terminal_evidence.evidence_id
+        {
+            return Err(DkgProjectionError::InvalidAuditLineage);
+        }
+        let audit_node_id = format!("audit:{}", audit.audit_digest);
+        projection.nodes.push(DkgNode {
+            node_id: audit_node_id.clone(),
+            node_type: DkgNodeType::EvidenceChainAudit,
+            record_digest: audit.audit_digest.clone(),
+            supersedes_node_id: None,
+        });
+        projection.edges.push(DkgEdge {
+            source_node_id: audit.evidence_id.clone(),
+            edge_type: DkgEdgeType::AuditedBy,
+            target_node_id: audit_node_id,
+        });
+        projection = Self::new(projection.nodes, projection.edges);
+        projection.verify_semantic_invariants().map_err(|_| DkgProjectionError::InvalidCanonicalTopology)?;
+        Ok(projection)
     }
 
     /// Derive a canonical graph from a closed criterion-evidence supersession
@@ -300,8 +350,8 @@ impl EvidenceLineageDkgProjection {
         if count(DkgNodeType::CriterionEvidence) == 0 {
             return Err(DkgSemanticError::WrongNodeCardinality("criterion_evidence"));
         }
-        if count(DkgNodeType::EvidenceChainAudit) != 0 {
-            return Err(DkgSemanticError::UnexpectedAuditNode);
+        if count(DkgNodeType::EvidenceChainAudit) > 1 {
+            return Err(DkgSemanticError::WrongNodeCardinality("evidence_chain_audit"));
         }
 
         let node_ids = |t: DkgNodeType| -> Vec<&str> {
@@ -312,6 +362,7 @@ impl EvidenceLineageDkgProjection {
         let assessment = node_ids(DkgNodeType::IndependentAssessment)[0];
         let replication = node_ids(DkgNodeType::Replication)[0];
         let evidence_ids = node_ids(DkgNodeType::CriterionEvidence);
+        let audit_ids = node_ids(DkgNodeType::EvidenceChainAudit);
 
         let exact_edge_count = |source: &str, kind: DkgEdgeType, target: &str| {
             self.edges.iter().filter(|e| {
@@ -338,6 +389,13 @@ impl EvidenceLineageDkgProjection {
         }
 
         let mut expected_edge_count = 3 + evidence_ids.len();
+        if let Some(audit_id) = audit_ids.first() {
+            let terminal_evidence = evidence_ids.iter().find(|evidence_id| !self.edges.iter().any(|e| {
+                e.edge_type == DkgEdgeType::Supersedes && e.target_node_id == **evidence_id
+            })).ok_or(DkgSemanticError::InvalidAuditLinkage)?;
+            require_exact(terminal_evidence, DkgEdgeType::AuditedBy, audit_id)?;
+            expected_edge_count += 1;
+        }
         for node in self.nodes.iter().filter(|n| n.node_type == DkgNodeType::CriterionEvidence) {
             match node.supersedes_node_id.as_deref() {
                 Some(parent) => {
@@ -357,6 +415,9 @@ impl EvidenceLineageDkgProjection {
             }
         }
 
+        if self.edges.iter().any(|e| e.edge_type == DkgEdgeType::AuditedBy && audit_ids.is_empty()) {
+            return Err(DkgSemanticError::InvalidAuditLinkage);
+        }
         if self.edges.len() != expected_edge_count {
             return Err(DkgSemanticError::UnexpectedEdge);
         }
@@ -430,6 +491,7 @@ pub enum DkgSemanticError {
     InvalidSupersessionTarget(String),
     SupersessionMetadataMismatch(String),
     UnexpectedEdge,
+    InvalidAuditLinkage,
 }
 
 fn put(h: &mut Sha256, s: &str) {
