@@ -498,6 +498,35 @@ mod tests {
     }
 
     #[test]
+    fn qualification_relation_mutation_changes_all_downstream_identities() {
+        let original = projection();
+        let mut changed_graph = crate::ScientificLineageGraph::new();
+        for (index, relation) in original.relations().cloned().enumerate() {
+            if index == 0 {
+                let changed_target = EngineeringObjectId::new(
+                    relation.target.namespace.clone(),
+                    relation.target.object_kind.clone(),
+                    relation.target.canonical_identifier.clone(),
+                    "2",
+                    relation.target.content_digest.clone(),
+                ).unwrap();
+                changed_graph.add_relation(EngineeringRelation::new(
+                    relation.source.clone(), changed_target, relation.kind,
+                ).unwrap());
+            } else {
+                changed_graph.add_relation(relation);
+            }
+        }
+        let changed = changed_graph.qualification_projection().unwrap();
+        let original_artifact = Cp04QualificationArtifact::try_from_projection(&original).unwrap();
+        let changed_artifact = Cp04QualificationArtifact::try_from_projection(&changed).unwrap();
+
+        assert_ne!(original.source_graph_digest(), changed.source_graph_digest());
+        assert_ne!(original.projection_digest(), changed.projection_digest());
+        assert_ne!(original_artifact.artifact_digest, changed_artifact.artifact_digest);
+    }
+
+    #[test]
     fn projection_relation_mutation_is_detected_at_source_boundary() {
         let projection = projection();
         let artifact = Cp04QualificationArtifact::try_from_projection(&projection).unwrap();
