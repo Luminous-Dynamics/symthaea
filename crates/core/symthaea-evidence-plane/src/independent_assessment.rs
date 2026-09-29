@@ -38,7 +38,7 @@ impl IndependentAssessment{
   if !i.independent_from_observer || i.assessor_id==o.observer_id {return Err(AssessmentError::NotIndependent);}
   if !valid_utc(&i.assessed_at){return Err(AssessmentError::InvalidTimestamp);}
   if i.assessment_payload.is_empty(){return Err(AssessmentError::EmptyPayload);}
-  let assessment_digest=hash(b"symthaea:independent-assessment-payload:v1\\0",&i.assessment_payload);
+  let assessment_digest=hash(b"symthaea:independent-assessment-payload:v1\0",&i.assessment_payload);
   let mut a=Self{assessment_id:i.assessment_id,assessor_id:i.assessor_id,assessor_institution_id:i.assessor_institution_id,
    independent_from_observer:i.independent_from_observer,independence_basis:i.independence_basis,assessed_at:i.assessed_at,
    outcome:i.outcome,observation_id:o.observation_id.clone(),observation_record_digest:o.record_digest.clone(),
@@ -52,7 +52,7 @@ impl IndependentAssessment{
    self.binding_digest.as_str(),self.assessment_digest.as_str()].iter().all(|s|!s.trim().is_empty())
    && self.independent_from_observer && valid_utc(&self.assessed_at)&&self.record_digest==self.digest()
  }
- fn digest(&self)->String{let mut h=Sha256::new();h.update(b"symthaea:independent-assessment-record:v1\\0");
+ fn digest(&self)->String{let mut h=Sha256::new();h.update(b"symthaea:independent-assessment-record:v1\0");
   for s in [self.assessment_id.as_str(),self.assessor_id.as_str(),self.assessor_institution_id.as_str(),
    if self.independent_from_observer{"true"}else{"false"},self.independence_basis.as_str(),self.assessed_at.as_str(),
    outcome_code(self.outcome),self.observation_id.as_str(),self.observation_record_digest.as_str(),self.commitment_event_id.as_str(),
