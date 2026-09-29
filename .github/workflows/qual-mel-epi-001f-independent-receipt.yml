@@ -6,6 +6,8 @@ on:
       - QUAL MEL-EPI-001F exact subject dispatcher
     types:
       - completed
+    branches:
+      - main
 
 permissions:
   actions: read
@@ -41,6 +43,17 @@ jobs:
             const workflowPath = process.env.WORKFLOW_PATH;
             const observerWorkflowSha = process.env.OBSERVER_WORKFLOW_SHA;
             const observerWorkflowRef = process.env.OBSERVER_WORKFLOW_REF;
+            const triggerAction = context.payload.action;
+
+            const actor = run.actor
+              ? { id: run.actor.id ?? null, login: run.actor.login ?? null }
+              : null;
+            const triggeringActor = run.triggering_actor
+              ? {
+                  id: run.triggering_actor.id ?? null,
+                  login: run.triggering_actor.login ?? null,
+                }
+              : null;
 
             const jobs = await github.paginate(
               github.rest.actions.listJobsForWorkflowRun,
@@ -72,6 +85,7 @@ jobs:
             });
 
             const workflowIdentityVerified =
+              triggerAction === 'completed' &&
               String(run.workflow_id) === String(dispatcherWorkflow.data.id) &&
               run.name === expectedWorkflowName &&
               dispatcherWorkflow.data.name === expectedWorkflowName &&
@@ -228,6 +242,7 @@ jobs:
               product_subject: subject,
               workflow_run: {
                 id: run.id,
+                trigger_action: triggerAction,
                 attempt: run.run_attempt,
                 conclusion: run.conclusion,
                 event: run.event,
@@ -242,6 +257,11 @@ jobs:
                 workflow_file_blob_sha: workflowFile.data.sha,
                 workflow_file_sha256: workflowSha256,
                 html_url: run.html_url,
+                created_at: run.created_at ?? null,
+                run_started_at: run.run_started_at ?? null,
+                updated_at: run.updated_at ?? null,
+                actor,
+                triggering_actor: triggeringActor,
               },
               workflow_contract: {
                 expected_workflow_name: expectedWorkflowName,
