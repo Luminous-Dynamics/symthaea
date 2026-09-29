@@ -5,7 +5,7 @@ use crate::{sha256_hex, MemoryKind, MemoryProjectionRef, MemoryProvenance};
 const RETRIEVAL_RECEIPT_DOMAIN: &[u8] = b"epistemic-retrieval-receipt:v1\0";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RetrievalRequestError { MissingHistoricalFrontier, EmptyHistoricalFrontier }
+pub enum RetrievalRequestError { MissingHistoricalFrontier, EmptyHistoricalFrontier, WhitespaceOnlyHistoricalFrontier }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetrievalMode { Historical, Live }
@@ -26,6 +26,9 @@ impl MemoryRetrievalRequest {
             match self.frontier_ref.as_deref() {
                 None => return Err(RetrievalRequestError::MissingHistoricalFrontier),
                 Some("") => return Err(RetrievalRequestError::EmptyHistoricalFrontier),
+                Some(frontier) if frontier.trim().is_empty() => {
+                    return Err(RetrievalRequestError::WhitespaceOnlyHistoricalFrontier)
+                }
                 Some(_) => {}
             }
         }
@@ -71,6 +74,7 @@ pub enum ReceiptVerificationError {
     DuplicateRetrievalProfileVersion,
     EmptyRepresentationDigest,
     EmptyRetrievalProfileVersion,
+    WhitespaceOnlyRetrievalProfileVersion,
     UnselectedRepresentationIdentity,
 }
 
@@ -123,6 +127,9 @@ impl MemoryRetrievalReceipt {
         let mut profiles = self.retrieval_profile_versions.clone();
         if profiles.iter().any(|profile| profile.is_empty()) {
             return Err(ReceiptVerificationError::EmptyRetrievalProfileVersion);
+        }
+        if profiles.iter().any(|profile| profile.trim().is_empty()) {
+            return Err(ReceiptVerificationError::WhitespaceOnlyRetrievalProfileVersion);
         }
         profiles.sort();
         if profiles.windows(2).any(|pair| pair[0] == pair[1]) {
