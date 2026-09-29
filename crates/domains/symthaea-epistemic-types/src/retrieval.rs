@@ -60,7 +60,41 @@ pub struct MemoryRetrievalReceipt {
 }
 
 
+/// Receipt integrity validation failures. Integrity is not semantic truth or authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReceiptVerificationError {
+    DigestMismatch,
+    DuplicateSelectedIdentity,
+    UnselectedRepresentationIdentity,
+}
+
+/// A receipt whose canonical digest and internal selection bindings were checked.
+/// This is an integrity marker only; it does not certify source authenticity or claim truth.
+#[derive(Debug, Clone, PartialEq)]
+pub struct VerifiedRetrievalReceipt(MemoryRetrievalReceipt);
+
+impl VerifiedRetrievalReceipt {
+    pub fn receipt(&self) -> &MemoryRetrievalReceipt { &self.0 }
+}
+
 impl MemoryRetrievalReceipt {
+    /// Verify the receipt's canonical digest and basic referential integrity.
+    pub fn verify(&self) -> Result<VerifiedRetrievalReceipt, ReceiptVerificationError> {
+        if !self.is_self_consistent() {
+            return Err(ReceiptVerificationError::DigestMismatch);
+        }
+        let mut selected = self.selected.clone();
+        selected.sort();
+        selected.dedup();
+        if selected.len() != self.selected.len() {
+            return Err(ReceiptVerificationError::DuplicateSelectedIdentity);
+        }
+        if self.selected_representation_digests.iter().any(|(identity, _)| !selected.contains(identity)) {
+            return Err(ReceiptVerificationError::UnselectedRepresentationIdentity);
+        }
+        Ok(VerifiedRetrievalReceipt(self.clone()))
+    }
+
     /// Canonical, deterministic encoding of the receipt's retrieval contract and selection.
     pub fn canonical_bytes(&self) -> Vec<u8> {
         let mut out = RETRIEVAL_RECEIPT_DOMAIN.to_vec();
@@ -221,10 +255,12 @@ mod tests {
     #[test] fn receipt_is_self_consistent_and_binds_selection_metadata() {
         let (_g, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
         assert!(receipt.is_self_consistent());
+        assert!(receipt.verify().is_ok());
         assert!(!receipt.selected_representation_digests.is_empty());
         let mut tampered=receipt.clone();
         tampered.query="tampered".into();
         assert!(!tampered.is_self_consistent());
+        assert_eq!(tampered.verify(), Err(ReceiptVerificationError::DigestMismatch));
         let profiled = receipt.clone().with_retrieval_profile_versions(vec!["retrieval-profile:v1".into()]);
         assert!(profiled.is_self_consistent());
         assert_ne!(profiled.receipt_digest, receipt.receipt_digest);
