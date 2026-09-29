@@ -479,3 +479,8 @@ Accordingly, the next IR boundary should introduce a typed history/observation
 encoder before adding CFR/MCCFR adapters. Until then, `verify_perfect_recall`
 should be understood as a strong finite-tree structural check, not a complete
 semantic observation proof.
+
+
+### 2026-09-29 semantic information encoder boundary
+
+The extensive-form layer now treats the declared information-set partition and the semantic mechanism that produces that partition as distinct contracts. A typed `HistoryEvent` stream and `InformationEncoder` boundary are the intended seam for public/private observation and recalled-history semantics. Structural `PerfectRecallEvidence` remains valid as finite-tree action/infoset evidence, while semantic observation consistency is verified separately against an encoder. The migration-stage state graph remains a true tree; shared children/transpositions are not admitted until history is first-class.
