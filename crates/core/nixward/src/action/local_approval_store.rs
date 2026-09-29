@@ -99,7 +99,7 @@ impl LocalApprovalRequestStoreV1 {
     /// The mutex remains held from lookup through admission and removal. Two
     /// concurrent consumers of the same request cannot both observe and remove
     /// the same pending request successfully.
-    pub fn consume_verified_submission(
+    pub(crate) fn consume_verified_submission(
         &self,
         submission: &LocalApprovalSubmissionV1,
         verified_peer: &VerifiedLocalUnixPeerCredentialV1,
