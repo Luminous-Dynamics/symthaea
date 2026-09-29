@@ -47,6 +47,7 @@
 //! at the monorepo root for the audit trail behind this crate.
 
 pub mod candidate_commitment;
+pub mod external_observation;
 pub mod prospective;
 pub mod prospective_audit;
 pub mod seed_plan;
