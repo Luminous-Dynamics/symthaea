@@ -186,3 +186,101 @@ fn resolution_ladder_has_expected_storage_order() {
         assert!(pair[0] < pair[1]);
     }
 }
+
+
+#[derive(Debug, Clone, Copy)]
+struct OperatorMetrics {
+    binding_error: f32,
+    bundle_error: f32,
+    permutation_error: f32,
+    round_trip_error: f32,
+}
+
+fn operator_metrics(source_dim: usize, target_dim: usize, seed: u64) -> OperatorMetrics {
+    let a = ContinuousHV::random(source_dim, seed);
+    let b = ContinuousHV::random(source_dim, seed.wrapping_add(1));
+    let c = ContinuousHV::random(source_dim, seed.wrapping_add(2));
+
+    let projected_a = a.dilate(target_dim);
+    let projected_b = b.dilate(target_dim);
+    let projected_c = c.dilate(target_dim);
+
+    let binding_error = normalized_l2_error(
+        &a.bind(&b).dilate(target_dim),
+        &projected_a.bind(&projected_b),
+    );
+
+    let bundle_error = normalized_l2_error(
+        &ContinuousHV::bundle(&[&a, &b, &c]).dilate(target_dim),
+        &ContinuousHV::bundle(&[&projected_a, &projected_b, &projected_c]),
+    );
+
+    let permutation_error = normalized_l2_error(
+        &a.permute(1).dilate(target_dim),
+        &projected_a.permute(1),
+    );
+
+    let round_trip_error = normalized_l2_error(&a, &projected_a.dilate(source_dim));
+
+    OperatorMetrics {
+        binding_error,
+        bundle_error,
+        permutation_error,
+        round_trip_error,
+    }
+}
+
+#[test]
+fn legacy_dilate_operator_matrix_covers_all_strict_resolution_transitions() {
+    // 7 resolutions produce 42 directed transitions. This is deliberately a
+    // characterization matrix, not a quality gate: no threshold is asserted.
+    // The matrix makes operator failures visible before a transition policy exists.
+    let mut observed = 0usize;
+
+    for (source_index, &source_dim) in DIMS.iter().enumerate() {
+        for (target_index, &target_dim) in DIMS.iter().enumerate() {
+            if source_index == target_index {
+                continue;
+            }
+
+            let metrics = operator_metrics(
+                source_dim,
+                target_dim,
+                SEED
+                    .wrapping_add((source_index as u64) << 32)
+                    .wrapping_add(target_index as u64),
+            );
+
+            assert!(metrics.binding_error.is_finite());
+            assert!(metrics.bundle_error.is_finite());
+            assert!(metrics.permutation_error.is_finite());
+            assert!(metrics.round_trip_error.is_finite());
+            observed += 1;
+        }
+    }
+
+    assert_eq!(observed, 42);
+}
+
+#[test]
+fn legacy_dilate_operator_matrix_is_deterministic() {
+    for &(source_dim, target_dim) in &[
+        (1_024, 2_048),
+        (2_048, 1_024),
+        (4_096, 16_384),
+        (16_384, 4_096),
+        (32_768, 8_192),
+        (65_536, 1_024),
+    ] {
+        let seed = SEED
+            .wrapping_add(source_dim as u64)
+            .wrapping_add((target_dim as u64) << 16);
+        let a = operator_metrics(source_dim, target_dim, seed);
+        let b = operator_metrics(source_dim, target_dim, seed);
+
+        assert_eq!(a.binding_error.to_bits(), b.binding_error.to_bits());
+        assert_eq!(a.bundle_error.to_bits(), b.bundle_error.to_bits());
+        assert_eq!(a.permutation_error.to_bits(), b.permutation_error.to_bits());
+        assert_eq!(a.round_trip_error.to_bits(), b.round_trip_error.to_bits());
+    }
+}
