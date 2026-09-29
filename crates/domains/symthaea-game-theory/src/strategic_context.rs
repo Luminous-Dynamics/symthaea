@@ -377,7 +377,30 @@ impl Strategy {
 pub struct StrategyProfilePlan(pub Vec<Strategy>);
 
 impl StrategyProfilePlan {
-    /// Validate every player plan against its own decision points.\n    pub fn validate(&self, points: &[(PlayerId, Vec<DecisionPoint>)]) -> Result<(), ContextError> {\n        if self.0.len() != points.len() {\n            return Err(ContextError::ProfilePlayerCount { expected: points.len(), actual: self.0.len() });\n        }\n        for (strategy, (player, decision_points)) in self.0.iter().zip(points) {\n            if strategy.player != *player {\n                return Err(ContextError::PlayerMismatch { information_set: InformationSetId(usize::MAX), expected: *player, actual: strategy.player });\n            }\n            strategy.validate(decision_points)?;\n        }\n        Ok(())\n    }\n}
+    /// Validate every player plan against its own decision points.
+    pub fn validate(
+        &self,
+        points: &[(PlayerId, Vec<DecisionPoint>)],
+    ) -> Result<(), ContextError> {
+        if self.0.len() != points.len() {
+            return Err(ContextError::ProfilePlayerCount {
+                expected: points.len(),
+                actual: self.0.len(),
+            });
+        }
+        for (strategy, (player, decision_points)) in self.0.iter().zip(points) {
+            if strategy.player != *player {
+                return Err(ContextError::PlayerMismatch {
+                    information_set: InformationSetId(usize::MAX),
+                    expected: *player,
+                    actual: strategy.player,
+                });
+            }
+            strategy.validate(decision_points)?;
+        }
+        Ok(())
+    }
+}
 
 /// Validation failures for information-aware decision contracts.
 #[derive(Debug, Clone, PartialEq, Eq)]
