@@ -11,6 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
+CONTRACT_VECTORS = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json"
 IDENTITY_SCHEMA = "symthaea.engineering-object-id.v1"
 RELATION_SCHEMA = "symthaea.engineering-relation.v1"
 PROJECTION_SCHEMA = "symthaea.qualification-projection.v1"
@@ -160,6 +161,9 @@ def self_test_wire_contracts():
 
 def main():
     self_test_wire_contracts()
+    contract = json.loads(CONTRACT_VECTORS.read_text(encoding="utf-8"))
+    require(contract["schema"] == "symthaea.cp-04-qualification-adapter-contract-v1",
+            "contract vector schema mismatch")
     artifact = json.loads(FIXTURE.read_text(encoding="utf-8"))
     require(set(artifact) == {
         "schema", "cp04_schema", "source_graph_digest", "projection_digest",
@@ -239,6 +243,24 @@ def main():
     expected_artifact = artifact_digest(artifact)
     require(artifact["artifact_digest"] == expected_artifact,
             "artifact digest does not match Rust serde_json compact struct serialization")
+
+    # The contract vector is an independent, machine-readable set of expected
+    # intermediate identities. It makes a divergence localizable without
+    # turning the fixture itself into the only oracle.
+    require(sorted(by_digest) == sorted(contract["identity_digests"]),
+            "contract vector identity digest set diverged")
+    require(sorted(relation_digests) == sorted(contract["relation_digests"]),
+            "contract vector relation digest set diverged")
+    require(artifact["source_graph_digest"] == contract["source_graph_digest"],
+            "contract vector source graph digest diverged")
+    require(artifact["projection_digest"] == contract["projection_digest"],
+            "contract vector projection digest diverged")
+    require(artifact["artifact_digest"] == contract["artifact_digest"],
+            "contract vector artifact digest diverged")
+
+    unicode_vector = contract["utf8_identity_vector"]
+    require(identity_digest(unicode_vector) == unicode_vector["identity_digest"],
+            "contract vector UTF-8 identity digest diverged")
 
     print("SCI-LINEAGE-ADAPTER: PASS (identity, relation, projection, graph, and artifact digests)")
     print("SCI-LINEAGE-ADAPTER: PASS (16 typed nodes, 15 typed edges, endpoint ontology, acyclicity, authority ceiling)")
