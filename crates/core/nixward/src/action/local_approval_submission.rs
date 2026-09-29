@@ -101,7 +101,7 @@ impl LocalApprovalSubmissionV1 {
 /// This is the preferred local daemon admission seam. The approver reference in
 /// the resulting audit record is derived exclusively from the verified peer
 /// evidence. No client-controlled identity string is accepted by this function.
-pub fn admit_verified_local_submission_v1(
+pub(crate) fn admit_verified_local_submission_v1(
     submission: &LocalApprovalSubmissionV1,
     request: &PendingNixApprovalRequestV1,
     verified_peer: &VerifiedLocalUnixPeerCredentialV1,
