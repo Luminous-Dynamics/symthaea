@@ -345,6 +345,7 @@ jobs:
             "qualification_state": "not_granted"
           }
           EOF
+          python -m json.tool se001q-repair-delta-manifest.json >/dev/null
           cat se001q-repair-delta-manifest.json
           {
             echo '### Repair identity'
