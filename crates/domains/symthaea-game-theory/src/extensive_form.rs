@@ -5,7 +5,8 @@
 //! Information-set validation remains in strategic_context.
 
 use crate::strategic::{ActionId, PlayerId};
-use crate::strategic_context::{DecisionStateId, InformationStructure};
+use crate::strategic_context::{DecisionStateId, InformationStructure, PerfectRecallEvidence};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExtensiveNode {
@@ -58,6 +59,30 @@ impl ExtensiveGame {
             }
         }
 
+        // Every information-bearing decision state must have exactly one
+        // corresponding decision node, and every decision node must be
+        // represented by the information structure. This prevents a solver
+        // from silently receiving an incomplete or partially detached infoset.
+        let decision_node_states: HashSet<_> = self
+            .nodes
+            .iter()
+            .filter_map(|node| match node {
+                ExtensiveNode::Decision { state, .. } => Some(*state),
+                _ => None,
+            })
+            .collect();
+
+        for state in &self.information.decision_states {
+            if !matches!(self.node(state.state), Some(ExtensiveNode::Decision { .. })) {
+                return Err(ExtensiveGameError::InformationStateMissingDecisionNode(state.state));
+            }
+        }
+        for state in &decision_node_states {
+            if self.information.state(*state).is_none() {
+                return Err(ExtensiveGameError::DecisionNodeMissingInformation(*state));
+            }
+        }
+
         let mut reachable = Vec::new();
         let mut stack = vec![self.root];
         while let Some(id) = stack.pop() {
@@ -81,8 +106,12 @@ impl ExtensiveGame {
                             actual: *player,
                         });
                     }
-                    let action_ids: Vec<_> = actions.iter().map(|action| action.action).collect();
-                    if action_ids != decision_state.legal_actions {
+                    let mut action_ids: Vec<_> =
+                        actions.iter().map(|action| action.action).collect();
+                    let mut legal_actions = decision_state.legal_actions.clone();
+                    action_ids.sort_unstable();
+                    legal_actions.sort_unstable();
+                    if action_ids != legal_actions {
                         return Err(ExtensiveGameError::DecisionActionsMismatch(*state));
                     }
                     if actions.is_empty() {
@@ -133,12 +162,172 @@ impl ExtensiveGame {
                 return Err(ExtensiveGameError::UnreachableNode(id));
             }
         }
+
+        // A finite extensive-form game is represented as an acyclic reachable
+        // state graph here. Repeated-state/transposition semantics need an
+        // explicit history model before they can safely share state IDs.
+        if let Some(cycle) = self.find_cycle() {
+            return Err(ExtensiveGameError::CycleDetected(cycle));
+        }
+
+        // Information-set members are required to be reachable decision
+        // states, not merely entries in the sidecar information structure.
+        for info_set in &self.information.information_sets {
+            for member in &info_set.members {
+                if !reachable.contains(member)
+                    || !matches!(self.node(*member), Some(ExtensiveNode::Decision { .. }))
+                {
+                    return Err(ExtensiveGameError::InformationMemberNotReachable(*member));
+                }
+            }
+        }
+
         Ok(())
     }
 
     pub fn node(&self, id: DecisionStateId) -> Option<&ExtensiveNode> {
         self.nodes.iter().find(|node| node.state() == id)
     }
+
+    /// Mechanically verify perfect recall from the reachable game histories.
+    ///
+    /// For every information set, all member states must induce the same
+    /// sequence of that player's earlier information sets and chosen actions.
+    /// Chance and opponent actions are intentionally omitted from the recalled
+    /// sequence: they may differ while remaining indistinguishable to the
+    /// acting player.
+    pub fn verify_perfect_recall(&self) -> Result<PerfectRecallEvidence, ExtensiveGameError> {
+        self.validate()?;
+
+        let mut histories: HashMap<DecisionStateId, Vec<Vec<RecallStep>>> = HashMap::new();
+        self.collect_histories(self.root, Vec::new(), &mut histories)?;
+
+        for info_set in &self.information.information_sets {
+            let mut expected: Option<Vec<RecallStep>> = None;
+            for member in &info_set.members {
+                let member_histories = histories
+                    .get(member)
+                    .ok_or(ExtensiveGameError::InformationMemberNotReachable(*member))?;
+                let mut own_histories = member_histories
+                    .iter()
+                    .map(|history| {
+                        history
+                            .iter()
+                            .filter(|step| step.player == info_set.player)
+                            .cloned()
+                            .collect::<Vec<_>>()
+                    })
+                    .collect::<Vec<_>>();
+                own_histories.sort();
+                own_histories.dedup();
+
+                if own_histories.len() != 1 {
+                    return Err(ExtensiveGameError::PerfectRecallViolation {
+                        information_set: info_set.id,
+                        state: *member,
+                    });
+                }
+
+                let actual = own_histories.pop().expect("one history after validation");
+                if let Some(expected) = &expected {
+                    if *expected != actual {
+                        return Err(ExtensiveGameError::PerfectRecallViolation {
+                            information_set: info_set.id,
+                            state: *member,
+                        });
+                    }
+                } else {
+                    expected = Some(actual);
+                }
+            }
+        }
+
+        Ok(PerfectRecallEvidence::Verified)
+    }
+
+    fn collect_histories(
+        &self,
+        state: DecisionStateId,
+        history: Vec<RecallStep>,
+        histories: &mut HashMap<DecisionStateId, Vec<Vec<RecallStep>>>,
+    ) -> Result<(), ExtensiveGameError> {
+        histories.entry(state).or_default().push(history.clone());
+
+        match self.node(state).ok_or(ExtensiveGameError::UnknownNode(state))? {
+            ExtensiveNode::Decision { player, state, actions } => {
+                let info_set = self
+                    .information
+                    .state(*state)
+                    .expect("decision node has information state after validation")
+                    .information_set;
+                for action in actions {
+                    let mut next_history = history.clone();
+                    next_history.push(RecallStep {
+                        player: *player,
+                        information_set: info_set,
+                        action: action.action,
+                    });
+                    self.collect_histories(action.next, next_history, histories)?;
+                }
+            }
+            ExtensiveNode::Chance { outcomes, .. } => {
+                for outcome in outcomes {
+                    self.collect_histories(outcome.next, history.clone(), histories)?;
+                }
+            }
+            ExtensiveNode::Terminal { .. } => {}
+        }
+
+        Ok(())
+    }
+
+    fn find_cycle(&self) -> Option<DecisionStateId> {
+        #[derive(Clone, Copy, PartialEq, Eq)]
+        enum Mark {
+            Visiting,
+            Done,
+        }
+
+        fn visit(
+            game: &ExtensiveGame,
+            state: DecisionStateId,
+            marks: &mut HashMap<DecisionStateId, Mark>,
+        ) -> Option<DecisionStateId> {
+            if matches!(marks.get(&state), Some(Mark::Visiting)) {
+                return Some(state);
+            }
+            if matches!(marks.get(&state), Some(Mark::Done)) {
+                return None;
+            }
+
+            marks.insert(state, Mark::Visiting);
+            let node = game.node(state)?;
+            let children = match node {
+                ExtensiveNode::Decision { actions, .. } =>
+                    actions.iter().map(|a| a.next).collect::<Vec<_>>(),
+                ExtensiveNode::Chance { outcomes, .. } =>
+                    outcomes.iter().map(|o| o.next).collect::<Vec<_>>(),
+                ExtensiveNode::Terminal { .. } => Vec::new(),
+            };
+
+            for child in children {
+                if let Some(cycle) = visit(game, child, marks) {
+                    return Some(cycle);
+                }
+            }
+            marks.insert(state, Mark::Done);
+            None
+        }
+
+        visit(self, self.root, &mut HashMap::new())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct RecallStep {
+    player: PlayerId,
+    information_set: crate::strategic_context::InformationSetId,
+    action: ActionId,
 }
 
 impl ExtensiveNode {
@@ -157,6 +346,8 @@ pub enum ExtensiveGameError {
     UnknownNode(DecisionStateId),
     DuplicateNodeId(DecisionStateId),
     DecisionStateMissingFromInformation(DecisionStateId),
+    InformationStateMissingDecisionNode(DecisionStateId),
+    DecisionNodeMissingInformation(DecisionStateId),
     DecisionPlayerMismatch { state: DecisionStateId, expected: PlayerId, actual: PlayerId },
     DecisionActionsMismatch(DecisionStateId),
     DuplicateAction { node: DecisionStateId, action: ActionId },
@@ -167,6 +358,12 @@ pub enum ExtensiveGameError {
     InvalidTerminalPayoffs(DecisionStateId),
     NoTerminalNode,
     UnreachableNode(DecisionStateId),
+    InformationMemberNotReachable(DecisionStateId),
+    CycleDetected(DecisionStateId),
+    PerfectRecallViolation {
+        information_set: crate::strategic_context::InformationSetId,
+        state: DecisionStateId,
+    },
 }
 
 #[cfg(test)]
@@ -247,6 +444,126 @@ mod tests {
             game.validate(),
             Err(ExtensiveGameError::DecisionPlayerMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn verifies_perfect_recall_for_single_decision() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information: info(),
+        };
+
+        assert_eq!(
+            game.verify_perfect_recall(),
+            Ok(PerfectRecallEvidence::Verified)
+        );
+    }
+
+    #[test]
+    fn rejects_information_member_without_decision_node() {
+        let mut information = info();
+        information.decision_states.push(DecisionState {
+            state: DecisionStateId(3),
+            player: PlayerId(0),
+            information_set: InformationSetId(0),
+            legal_actions: vec![ActionId(0), ActionId(1)],
+        });
+        information.information_sets[0].members.push(DecisionStateId(3));
+
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information,
+        };
+
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::InformationStateMissingDecisionNode(
+                DecisionStateId(3)
+            ))
+        );
+    }
+
+    #[test]
+    fn rejects_cycles() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(0) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information: InformationStructure {
+                decision_states: vec![
+                    DecisionState {
+                        state: DecisionStateId(0),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(0),
+                        legal_actions: vec![ActionId(0), ActionId(1)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(1),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(1),
+                        legal_actions: vec![ActionId(0), ActionId(1)],
+                    },
+                ],
+                information_sets: vec![
+                    InformationSet {
+                        id: InformationSetId(0),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(0)],
+                    },
+                    InformationSet {
+                        id: InformationSetId(1),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(1)],
+                    },
+                ],
+            },
+        };
+
+        assert_eq!(
+            game.validate(),
+            Err(ExtensiveGameError::CycleDetected(DecisionStateId(0)))
+        );
     }
 
     #[test]
