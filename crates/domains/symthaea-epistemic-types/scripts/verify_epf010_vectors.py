@@ -22,14 +22,25 @@ def canonical_bytes(receipt):
         out.extend(put_string(frontier))
     out.extend(put_string(receipt["query"]))
     out.extend(struct.pack(">I", receipt["max_results"]))
-    selected = sorted(set(receipt["selected"]))
+    selected = sorted(receipt["selected"])
+    if len(selected) != len(set(selected)):
+        raise ValueError("duplicate selected identity")
     out.extend(struct.pack(">I", len(selected)))
     for identity in selected: out.extend(put_string(identity))
-    bindings = sorted(receipt["selected_representation_digests"])
+    bindings = sorted(tuple(pair) for pair in receipt["selected_representation_digests"])
+    if len(bindings) != len(set(bindings)):
+        raise ValueError("duplicate representation binding")
+    if any(not digest for _, digest in bindings):
+        raise ValueError("empty representation digest")
+    if any(identity not in selected for identity, _ in bindings):
+        raise ValueError("unselected representation identity")
     out.extend(struct.pack(">I", len(bindings)))
     for identity, digest in bindings:
         out.extend(put_string(identity)); out.extend(put_string(digest))
     excluded = sorted(receipt["excluded"], key=lambda x: (x["canonical_identity"], x["reason"]))
+    excluded_keys = [(x["canonical_identity"], x["reason"]) for x in excluded]
+    if len(excluded_keys) != len(set(excluded_keys)):
+        raise ValueError("duplicate exclusion")
     out.extend(struct.pack(">I", len(excluded)))
     tags = {"PostFrontier": 0, "FrontierUnknown": 1, "MissingHistoricalFrontier": 2}
     for item in excluded:
