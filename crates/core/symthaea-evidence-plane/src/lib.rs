@@ -511,3 +511,5 @@ mod tests {
         assert_eq!(counters.get("never_touched"), 0.0);
     }
 }
+
+pub mod prediction_compiler;
