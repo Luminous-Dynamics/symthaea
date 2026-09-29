@@ -39,6 +39,28 @@ impl EventVisibility {
             Self::Players(players) => players.contains(&observer),
         }
     }
+
+    fn validate_for_event(&self, actor: Option<PlayerId>) -> Result<(), VisibilityValidationError> {
+        if matches!(self, Self::ActorOnly) && actor.is_none() {
+            return Err(VisibilityValidationError::ActorOnlyWithoutActor);
+        }
+
+        if let Self::Players(players) = self {
+            for (i, player) in players.iter().enumerate() {
+                if players[..i].contains(player) {
+                    return Err(VisibilityValidationError::DuplicatePlayer(*player));
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VisibilityValidationError {
+    ActorOnlyWithoutActor,
+    DuplicatePlayer(PlayerId),
 }
 
 /// Lossless transition/observation history for semantic information encoding.
@@ -213,6 +235,15 @@ impl ExtensiveGame {
 
             match node {
                 ExtensiveNode::Decision { state, player, actions } => {
+                    for action in actions {
+                        action
+                            .visibility
+                            .validate_for_event(Some(*player))
+                            .map_err(|error| ExtensiveGameError::InvalidActionVisibility {
+                                node: *state,
+                                error,
+                            })?;
+                    }
                     let Some(decision_state) = self.information.state(*state) else {
                         return Err(ExtensiveGameError::DecisionStateMissingFromInformation(*state));
                     };
@@ -244,7 +275,16 @@ impl ExtensiveGame {
                         stack.push(action.next);
                     }
                 }
-                ExtensiveNode::Chance { outcomes, .. } => {
+                ExtensiveNode::Chance { state, outcomes } => {
+                    for outcome in outcomes {
+                        outcome
+                            .visibility
+                            .validate_for_event(None)
+                            .map_err(|error| ExtensiveGameError::InvalidChanceVisibility {
+                                node: *state,
+                                error,
+                            })?;
+                    }
                     if outcomes.is_empty() {
                         return Err(ExtensiveGameError::NoChanceOutcomes(id));
                     }
@@ -632,6 +672,14 @@ pub enum ExtensiveGameError {
     CycleDetected(DecisionStateId),
     MultipleParents { child: DecisionStateId, parent: DecisionStateId },
     InformationEncodingFailed { state: DecisionStateId, message: String },
+    InvalidActionVisibility {
+        node: DecisionStateId,
+        error: VisibilityValidationError,
+    },
+    InvalidChanceVisibility {
+        node: DecisionStateId,
+        error: VisibilityValidationError,
+    },
     ObservationStateMissing(DecisionStateId),
     DuplicateObservationObserver { state: DecisionStateId, observer: PlayerId },
     InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
@@ -951,6 +999,86 @@ mod tests {
             game.validate(),
             Err(ExtensiveGameError::CycleDetected(DecisionStateId(0)))
         );
+    }
+
+    #[test]
+    fn rejects_actor_only_visibility_on_chance() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Chance {
+                    state: DecisionStateId(0),
+                    outcomes: vec![
+                        ChanceTransition {
+                            outcome: ChanceOutcomeId(0),
+                            probability: 1.0,
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::ActorOnly,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::new(),
+        };
+
+        assert!(matches!(
+            game.validate(),
+            Err(ExtensiveGameError::InvalidChanceVisibility {
+                error: VisibilityValidationError::ActorOnlyWithoutActor,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_visibility_players() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Players(vec![
+                                PlayerId(1),
+                                PlayerId(1),
+                            ]),
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::new(),
+        };
+
+        assert!(matches!(
+            game.validate(),
+            Err(ExtensiveGameError::InvalidActionVisibility {
+                error: VisibilityValidationError::DuplicatePlayer(PlayerId(1)),
+                ..
+            })
+        ));
     }
 
     #[test]
