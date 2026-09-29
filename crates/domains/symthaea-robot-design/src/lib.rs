@@ -2332,6 +2332,31 @@ mod tests {
     }
 
     #[test]
+    fn range_cardinality_at_u64_boundary_matches_enumeration() {
+        let id = ParameterIdV1::new("length").unwrap();
+        let max = u64::MAX;
+        let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id,
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(max - 1).unwrap(),
+                upper: C0LengthUmV1::new(max).unwrap(),
+                step_um: 1,
+            },
+        }])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|candidate| candidate.parameters[0].value.value_um())
+                .collect::<Vec<_>>(),
+            vec![max - 1, max]
+        );
+    }
+
+    #[test]
     fn range_enumeration_reaches_u64_max_without_wraparound() {
         let id = ParameterIdV1::new("length").unwrap();
         let max = u64::MAX;
