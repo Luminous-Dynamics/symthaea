@@ -2357,6 +2357,54 @@ mod tests {
     }
 
     #[test]
+    fn range_enumeration_handles_maximum_step_without_wraparound() {
+        let id = ParameterIdV1::new("length").unwrap();
+        let max = u64::MAX;
+        let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
+            id: id.clone(),
+            domain: ExactLengthDomainV1::Range {
+                lower: C0LengthUmV1::new(1).unwrap(),
+                upper: C0LengthUmV1::new(max).unwrap(),
+                step_um: max - 1,
+            },
+        }])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        let values = candidates
+            .iter()
+            .map(|candidate| candidate.parameter(&id).unwrap().value_um())
+            .collect::<Vec<_>>();
+
+        assert_eq!(values, vec![1, max]);
+        assert_eq!(candidates.len(), 2);
+        assert_eq!(
+            candidates[0].id().unwrap(),
+            ExactDesignParameterSetV1::new(vec![
+                ExactDesignLengthParameterV1 {
+                    id: id.clone(),
+                    value: C0LengthUmV1::new(1).unwrap(),
+                },
+            ])
+            .unwrap()
+            .id()
+            .unwrap()
+        );
+        assert_eq!(
+            candidates[1].id().unwrap(),
+            ExactDesignParameterSetV1::new(vec![
+                ExactDesignLengthParameterV1 {
+                    id,
+                    value: C0LengthUmV1::new(max).unwrap(),
+                },
+            ])
+            .unwrap()
+            .id()
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn range_enumeration_reaches_u64_max_without_wraparound() {
         let id = ParameterIdV1::new("length").unwrap();
         let max = u64::MAX;
