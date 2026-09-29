@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/scientific-discovery/evidence-lineage-dkg-query-receipt-1.0.0.schema.json",
+  "title": "Evidence Lineage DKG Query Receipt 1.0.0",
+  "description": "Content-addressed receipt proving membership or absence of a typed node in a specific canonical projection bound to a federation manifest.",
+  "type": "object",
+  "required": [
+    "receipt_version",
+    "projection_schema_version",
+    "canonicalization_id",
+    "digest_algorithm",
+    "manifest_digest",
+    "projection_digest",
+    "node_id",
+    "node_type",
+    "result",
+    "record_digest",
+    "receipt_digest"
+  ],
+  "properties": {
+    "receipt_version": { "const": "1.0.0" },
+    "projection_schema_version": { "const": "1.2.0" },
+    "canonicalization_id": { "const": "symthaea:dkg-node-edge-order:v1" },
+    "digest_algorithm": { "const": "sha256" },
+    "manifest_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "projection_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "node_id": { "type": "string", "minLength": 1 },
+    "node_type": {
+      "enum": ["candidate_commitment", "external_observation", "independent_assessment", "replication", "criterion_evidence", "evidence_chain_audit"]
+    },
+    "result": { "enum": ["present", "absent"] },
+    "record_digest": {
+      "type": ["string", "null"],
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "receipt_digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false,
+  "x-authority": "canonical-projection-membership-or-absence-receipt_only",
+  "x-non-equivalences": [
+    "present != scientific_truth",
+    "absent != scientific_disproof",
+    "receipt != consensus",
+    "receipt_digest != digital_signature",
+    "node_membership != criterion_completion"
+  ],
+  "x-absence-condition": "An absence receipt is meaningful only against the complete source_records set of the bound federation manifest and its exact projection digest.",
+  "x-content-addressing": "receipt_digest is SHA-256 over the receipt payload excluding receipt_digest itself.",
+  "x-source-of-truth": "immutable evidence records, append-only events, and the manifest-bound canonical projection"
+}
