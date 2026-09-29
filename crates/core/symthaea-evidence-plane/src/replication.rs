@@ -435,7 +435,7 @@ mod tests {
         let decoded: ReplicationRecord = serde_json::from_slice(&json).unwrap();
         assert_eq!(decoded, r);
         let mut tampered = r;
-        tampered.outcome = ReplicationOutcome::Contradictory;
+        tampered.outcome = ReplicationOutcome::NonReplicatingContradictory;
         assert!(!tampered.verify_integrity());
     }
 }
