@@ -16,6 +16,9 @@ pub struct RetrievalExecutionProfile {
     pub ranking_profile_version: String,
     pub frontier_semantics_version: String,
     pub normalization_version: String,
+    /// Optional immutable source/index snapshot identifier. Its presence identifies
+    /// a replay target; it does not by itself prove byte-for-byte reproducibility.
+    pub snapshot_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +27,7 @@ pub enum RetrievalProfileError {
     EmptyRankingProfileVersion,
     EmptyFrontierSemanticsVersion,
     EmptyNormalizationVersion,
+    EmptySnapshotRef,
 }
 
 impl RetrievalExecutionProfile {
@@ -38,6 +42,7 @@ impl RetrievalExecutionProfile {
             ranking_profile_version: ranking_profile_version.into(),
             frontier_semantics_version: frontier_semantics_version.into(),
             normalization_version: normalization_version.into(),
+            snapshot_ref: None,
         };
         if profile.algorithm_version.is_empty() {
             return Err(RetrievalProfileError::EmptyAlgorithmVersion);
@@ -54,13 +59,30 @@ impl RetrievalExecutionProfile {
         Ok(profile)
     }
 
+    /// Attach an immutable retrieval-source/index snapshot identifier.
+    ///
+    /// This is deliberately separate from the algorithm/ranking versions: a stable
+    /// algorithm can still produce different results against different snapshots.
+    pub fn with_snapshot_ref(mut self, snapshot_ref: impl Into<String>) -> Result<Self, RetrievalProfileError> {
+        let snapshot_ref = snapshot_ref.into();
+        if snapshot_ref.is_empty() {
+            return Err(RetrievalProfileError::EmptySnapshotRef);
+        }
+        self.snapshot_ref = Some(snapshot_ref);
+        Ok(self)
+    }
+
     fn receipt_versions(&self) -> Vec<String> {
-        vec![
+        let mut versions = vec![
             format!("algorithm:{}", self.algorithm_version),
             format!("ranking:{}", self.ranking_profile_version),
             format!("frontier-semantics:{}", self.frontier_semantics_version),
             format!("normalization:{}", self.normalization_version),
-        ]
+        ];
+        if let Some(snapshot_ref) = &self.snapshot_ref {
+            versions.push(format!("snapshot:{}", snapshot_ref));
+        }
+        versions
     }
 }
 
@@ -169,6 +191,22 @@ mod tests {
         assert!(execution.receipt().retrieval_profile_versions.contains(&"frontier-semantics:frontier:v2".to_string()));
         assert!(execution.receipt().retrieval_profile_versions.contains(&"normalization:utf8-v1".to_string()));
         assert!(execution.receipt.verify().is_ok());
+    }
+
+    #[test]
+    fn snapshot_ref_is_bound_when_present() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap()
+            .with_snapshot_ref("snapshot:2026-09-29T00:00:00Z").unwrap();
+        let execution = RetrievalEngine::new(profile)
+            .execute(&MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5), vec![candidate("claim:x")])
+            .unwrap();
+        assert!(execution.receipt().retrieval_profile_versions.contains(&"snapshot:snapshot:2026-09-29T00:00:00Z".to_string()));
+    }
+
+    #[test]
+    fn empty_snapshot_ref_is_rejected() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
+        assert_eq!(profile.with_snapshot_ref(""), Err(RetrievalProfileError::EmptySnapshotRef));
     }
 
     #[test]
