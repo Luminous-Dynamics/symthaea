@@ -569,7 +569,7 @@ mod tests {
             handles.push(thread::spawn(move || {
                 let peer = peer(uid, pid);
                 barrier.wait();
-                store.consume_verified_submission(&submission, &peer, ms(1_300))
+                store.consume_verified_submission(&submission, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             }));
         }
         barrier.wait();
