@@ -80,6 +80,11 @@ Changing a node does not rewrite historical nodes. Requalification produces a ne
 
 Currentness and applicability are dependency boundaries; they are not evidence of performance or execution.
 
+
+## Edge-level closure sensitivity
+
+The qualifier additionally verifies representative dependency edges at the closure boundary. Removing a dependency edge MUST remove exactly the downstream nodes reachable only through that edge from the edge's source closure; unrelated closure members MUST remain unchanged. This is a semantic sensitivity check, not a physical execution claim.
+
 ## Provenance boundary
 
 `provenance_reference` is a reference/derivation boundary. It may identify custody, generation, derivation or provenance context, but its presence cannot create an observation, benchmark result, performance claim, or physical execution authority.
