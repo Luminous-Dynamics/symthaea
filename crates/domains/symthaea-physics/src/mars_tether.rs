@@ -274,8 +274,12 @@ impl TerrainSample {
             && self.elevation_m.is_some_and(f64::is_finite)
             && self.elevation_uncertainty_m.is_some_and(|v| v.is_finite() && v >= 0.0)
             && self.latitude_rad.is_finite()
+            && (-PI / 2.0..=PI / 2.0).contains(&self.latitude_rad)
             && self.longitude_rad.is_finite()
-            && self.slope_rad.is_none_or(|v| v.is_finite() && v >= 0.0)
+            && !self.provenance.source_id.trim().is_empty()
+            && !self.provenance.source_revision.trim().is_empty()
+            && !self.provenance.coordinate_reference.trim().is_empty()
+            && self.slope_rad.is_none_or(|v| v.is_finite() && (0.0..=PI / 2.0).contains(&v))
             && self.roughness_m.is_none_or(|v| v.is_finite() && v >= 0.0)
     }
 }
@@ -682,6 +686,19 @@ mod tests {
         let m = MarsTetherReference::MARS;
         assert_eq!(radial_elevation_from_areoid(m, m.radius_m + 120.0, 80.0), Some(200.0));
         assert!(radial_elevation_from_areoid(m, f64::NAN, 1.0).is_none());
+    }
+
+    #[test]
+    fn terrain_contract_rejects_invalid_coordinates_and_missing_provenance() {
+        let mut sample = fixture_terrain(TerrainQuality::Measured);
+        sample.latitude_rad = PI;
+        assert!(!sample.is_usable());
+        sample = fixture_terrain(TerrainQuality::Measured);
+        sample.provenance.source_revision = "  ".into();
+        assert!(!sample.is_usable());
+        sample = fixture_terrain(TerrainQuality::Measured);
+        sample.slope_rad = Some(PI);
+        assert!(!sample.is_usable());
     }
 
     #[test]
