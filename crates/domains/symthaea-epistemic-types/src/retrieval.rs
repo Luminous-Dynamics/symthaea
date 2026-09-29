@@ -155,13 +155,30 @@ impl MemoryRetrievalReceipt {
     /// the execution profile and returns a verified receipt. This method remains public
     /// temporarily for migration of lower-level callers and must not be used as a
     /// reasoning authorization step.
-    #[deprecated(note = "prefer RetrievalEngine::execute so retrieval provenance is owned by the execution boundary")]
-    pub fn with_retrieval_profile_versions(mut self, versions: impl IntoIterator<Item = String>) -> Self {
+    /// Internal sealing operation used by the retrieval execution boundary.
+    ///
+    /// Keeping this fallible and crate-visible prevents the execution engine from
+    /// relying on a public compatibility API while preserving the legacy method
+    /// for lower-level migration callers.
+    pub(crate) fn seal_with_retrieval_profile_versions(
+        mut self,
+        versions: impl IntoIterator<Item = String>,
+    ) -> Result<Self, ReceiptCanonicalizationError> {
         self.retrieval_profile_versions = versions.into_iter().collect();
         self.retrieval_profile_versions.sort();
         self.retrieval_profile_versions.dedup();
-        self.receipt_digest = self.canonical_digest().expect("receipt canonicalization overflow");
-        self
+        self.receipt_digest = self.canonical_digest()?;
+        Ok(self)
+    }
+
+    /// Compatibility-only receipt enrichment. Prefer `RetrievalEngine::execute`, which owns
+    /// the execution profile and returns a verified receipt. This method remains public
+    /// temporarily for migration of lower-level callers and must not be used as a
+    /// reasoning authorization step.
+    #[deprecated(note = "prefer RetrievalEngine::execute so retrieval provenance is owned by the execution boundary")]
+    pub fn with_retrieval_profile_versions(self, versions: impl IntoIterator<Item = String>) -> Self {
+        self.seal_with_retrieval_profile_versions(versions)
+            .expect("receipt canonicalization overflow")
     }
     pub fn is_self_consistent(&self) -> bool { !self.receipt_digest.is_empty() && self.canonical_digest().map(|d| self.receipt_digest == d).unwrap_or(false) }
 }
