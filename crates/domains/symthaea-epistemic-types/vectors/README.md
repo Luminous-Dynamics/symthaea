@@ -34,6 +34,8 @@ A matching digest establishes byte-level integrity under this encoding. It does 
 - duplicate exclusions;
 - representation bindings referring to an unselected identity;
 - changed retrieval-profile versions with a stale receipt digest;
+- duplicate retrieval-profile versions;
+- empty retrieval-profile versions;
 - altered canonical bytes.
 
 Run `python3 scripts/verify_epf010_negative_vectors.py` to verify the negative fixtures independently. A conforming implementation should reject these cases for the stated reason rather than normalize them into a different valid receipt.
