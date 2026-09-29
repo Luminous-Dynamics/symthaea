@@ -53,6 +53,47 @@ impl ScientificLineageGraph {
         self.relations.iter().filter(|r| r.admissible_for_qualification())
     }
 
+    /// Validate that the qualification projection is acyclic.
+    ///
+    /// The full scientific/DKG graph may be cyclic. Only the explicitly
+    /// admitted qualification projection is subject to DAG topology.
+    pub fn validate_qualification_acyclic(&self) -> Result<(), QualificationCycle> {
+        let mut indegree: BTreeMap<EngineeringObjectId, usize> =
+            self.nodes.keys().cloned().map(|n| (n, 0)).collect();
+        let mut outgoing: BTreeMap<EngineeringObjectId, Vec<EngineeringObjectId>> =
+            BTreeMap::new();
+
+        for relation in self.qualification_relations() {
+            outgoing.entry(relation.source.clone()).or_default().push(relation.target.clone());
+            *indegree.entry(relation.target.clone()).or_default() += 1;
+        }
+
+        let mut queue: VecDeque<_> = indegree
+            .iter()
+            .filter_map(|(node, degree)| (*degree == 0).then_some(node.clone()))
+            .collect();
+        let mut visited = 0usize;
+
+        while let Some(node) = queue.pop_front() {
+            visited += 1;
+            if let Some(targets) = outgoing.get(&node) {
+                for target in targets {
+                    let degree = indegree.get_mut(target).expect("target exists in node set");
+                    *degree -= 1;
+                    if *degree == 0 {
+                        queue.push_back(target.clone());
+                    }
+                }
+            }
+        }
+
+        if visited == indegree.len() {
+            Ok(())
+        } else {
+            Err(QualificationCycle { node_count: indegree.len(), visited_count: visited })
+        }
+    }
+
     /// Compute deterministic downstream invalidation closure.
     ///
     /// Only qualification-admissible edges participate. Thus adding/removing
@@ -96,6 +137,20 @@ impl ScientificLineageGraph {
         Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct QualificationCycle {
+    pub node_count: usize,
+    pub visited_count: usize,
+}
+
+impl std::fmt::Display for QualificationCycle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "qualification projection contains a cycle: visited {} of {} nodes", self.visited_count, self.node_count)
+    }
+}
+
+impl std::error::Error for QualificationCycle {}
 
 #[cfg(test)]
 mod tests {
@@ -181,6 +236,11 @@ mod tests {
     }
 
     #[test]
+    fn qualification_projection_is_acyclic_for_scientific_fixture() {
+        assert!(fixture().validate_qualification_acyclic().is_ok());
+    }
+
+    #[test]
     fn dkg_graph_can_contain_epistemic_cycle_without_making_projection_cyclic() {
         let prediction = object("prediction", "p", A);
         let claim = object("scientific_claim", "c", B);
@@ -191,7 +251,22 @@ mod tests {
 
         assert_eq!(graph.relations().count(), 2);
         assert_eq!(graph.qualification_relations().count(), 0);
+        assert!(graph.validate_qualification_acyclic().is_ok());
         assert_eq!(graph.qualification_closure(&prediction).len(), 1);
+    }
+
+    #[test]
+    fn qualification_cycle_is_rejected_even_when_dkg_cycle_is_allowed() {
+        let simulation = object("simulation", "s", A);
+        let model = object("model", "m", B);
+        let parameters = object("model_parameters", "p", A);
+        let mut graph = ScientificLineageGraph::new();
+        graph.add_relation(rel(&simulation, &model, EngineeringRelationKind::Instantiates));
+        graph.add_relation(rel(&model, &parameters, EngineeringRelationKind::Parameterizes));
+        graph.add_relation(rel(&parameters, &simulation, EngineeringRelationKind::DependsOn));
+
+        let err = graph.validate_qualification_acyclic().unwrap_err();
+        assert!(err.visited_count < err.node_count);
     }
 
     #[test]
