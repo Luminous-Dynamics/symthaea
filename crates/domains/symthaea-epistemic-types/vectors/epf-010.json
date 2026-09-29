@@ -1,0 +1,26 @@
+{
+  "schema": "EPF-010",
+  "encoding_version": 1,
+  "hash": "SHA-256",
+  "domain_separator_hex": "6570697374656d69632d72657472696576616c2d726563656970743a763100",
+  "vectors": [
+    {
+      "name": "historical-single-selection",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": ["claim:x"],
+        "selected_representation_digests": [
+          ["claim:x", "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": []
+      },
+      "canonical_bytes_hex": "6570697374656d69632d72657472696576616c2d726563656970743a763100000100000003663a3100000001780000000a0000000100000007636c61696d3a780000000100000007636c61696d3a780000004032643731313634326237323662303434303136323763613966626163333266356338353330666231393033636334646230323235383731373932316134383831000000000000000000000000",
+      "receipt_digest": "7383b642700ff58dd4b18925cb056b3af235af6e05004011cf358bde2bcea997"
+    }
+  ]
+}
