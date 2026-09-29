@@ -42,6 +42,7 @@ pub struct EvidenceView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EvidenceViewError {
     NonFiniteRetrievalMetadata,
+    ReceiptMismatch,
     StringTooLong,
 }
 
@@ -106,6 +107,9 @@ impl EvidenceView {
         receipt_ids.sort();
         receipt_ids.dedup();
         if item_ids != receipt_ids {
+            return Err(EvidenceViewError::ReceiptMismatch);
+        }
+        if receipt.canonical_digest() != receipt.canonical_digest() {
             return Err(EvidenceViewError::ReceiptMismatch);
         }
         let mut view = Self {
