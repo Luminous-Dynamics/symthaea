@@ -23,3 +23,19 @@ Run `python3 scripts/verify_epf010_vectors.py` from this crate directory. The ve
 ## Security boundary
 
 A matching digest establishes byte-level integrity under this encoding. It does **not** establish producer authentication, truth, evidence strength, corroboration, currentness, or authority. Producer authentication requires a separate trust/key/revocation policy.
+
+
+## Adversarial vectors
+
+`epf-010-negative.json` defines rejection cases that must remain invalid across implementations:
+
+- duplicate selected identities;
+- duplicate `(identity, representation_digest)` bindings;
+- duplicate exclusions;
+- representation bindings referring to an unselected identity;
+- changed retrieval-profile versions with a stale receipt digest;
+- altered canonical bytes.
+
+Run `python3 scripts/verify_epf010_negative_vectors.py` to verify the negative fixtures independently. A conforming implementation should reject these cases for the stated reason rather than normalize them into a different valid receipt.
+
+The reasoning-facing `EvidenceView::from_retrieval` boundary also performs full receipt verification before constructing a view. This prevents a caller from supplying a structurally invalid receipt, recomputing its unkeyed digest, and bypassing the `VerifiedRetrievalReceipt` integrity gate.
