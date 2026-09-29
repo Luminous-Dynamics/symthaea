@@ -2332,6 +2332,48 @@ mod tests {
     }
 
     #[test]
+    fn cartesian_enumeration_fails_closed_on_cardinality_overflow() {
+        let first = ExactDesignParameterDomainV1 {
+            id: ParameterIdV1::new("a").unwrap(),
+            domain: ExactLengthDomainV1::Values(vec![
+                C0LengthUmV1::new(1).unwrap(),
+                C0LengthUmV1::new(2).unwrap(),
+            ]),
+        };
+        let second = ExactDesignParameterDomainV1 {
+            id: ParameterIdV1::new("b").unwrap(),
+            domain: ExactLengthDomainV1::Values(vec![
+                C0LengthUmV1::new(3).unwrap(),
+                C0LengthUmV1::new(4).unwrap(),
+            ]),
+        };
+
+        // Build a domain whose mathematical Cartesian product exceeds usize::MAX
+        // without requiring the test to materialize any candidates.
+        let mut parameters = Vec::new();
+        let mut value = 1u64;
+        while parameters.len() < usize::BITS as usize {
+            let id = ParameterIdV1::new(format!("p{value}")).unwrap();
+            let domain = ExactLengthDomainV1::Values(vec![
+                C0LengthUmV1::new(1).unwrap(),
+                C0LengthUmV1::new(2).unwrap(),
+            ]);
+            parameters.push(ExactDesignParameterDomainV1 { id, domain });
+            value += 1;
+        }
+
+        // Keep these ordinary dimensions referenced so the intended 2-value
+        // cardinality remains explicit in the regression setup.
+        assert_eq!(first.domain, second.domain);
+
+        let domain = ExactDesignSearchDomainV1::new(parameters).unwrap();
+        assert!(matches!(
+            domain.enumerate(),
+            Err(RobotDesignError::DomainEnumerationOverflow)
+        ));
+    }
+
+    #[test]
     fn multi_dimension_enumeration_is_deterministic_and_cartesian() {
         let z = ParameterIdV1::new("z").unwrap();
         let a = ParameterIdV1::new("a").unwrap();
