@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.dev/schema/cross-dkg-federation-link-1.0.0.schema.json",
+  "title": "Cross-DKG Federation Link",
+  "description": "Authority-neutral, content-addressed provenance reference between records owned by independent DKGs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "link_version",
+    "digest_algorithm",
+    "source_dkg_id",
+    "source_graph_digest",
+    "source_record_id",
+    "source_record_digest",
+    "relation",
+    "target_dkg_id",
+    "target_graph_digest",
+    "target_record_id",
+    "target_record_digest",
+    "link_digest"
+  ],
+  "properties": {
+    "link_version": { "const": "1.0.0" },
+    "digest_algorithm": { "const": "sha256" },
+    "source_dkg_id": { "type": "string", "minLength": 1 },
+    "source_graph_digest": { "type": "string", "minLength": 1 },
+    "source_record_id": { "type": "string", "minLength": 1 },
+    "source_record_digest": { "type": "string", "minLength": 1 },
+    "relation": {
+      "enum": ["references", "derived_from", "context_for", "same_as", "contradicts", "supersedes"]
+    },
+    "target_dkg_id": { "type": "string", "minLength": 1 },
+    "target_graph_digest": { "type": "string", "minLength": 1 },
+    "target_record_id": { "type": "string", "minLength": 1 },
+    "target_record_digest": { "type": "string", "minLength": 1 },
+    "link_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "x-authority": "federation_provenance_reference_only",
+  "x-non-equivalences": [
+    "a cross-DKG link is not a truth claim",
+    "a cross-DKG link is not evidence qualification",
+    "a cross-DKG link is not consensus",
+    "a cross-DKG link does not transfer authority between DKGs",
+    "a cross-DKG link does not authenticate identities or institutions",
+    "a link digest is not a digital signature"
+  ],
+  "x-source-of-truth": [
+    "the source DKG's immutable canonical record",
+    "the target DKG's immutable canonical record",
+    "the graph/projection digests named by this envelope"
+  ],
+  "x-interoperability": {
+    "supported_graphs": "any DKG with stable graph and record digests",
+    "recommended_initial_peers": [
+      "mycelix-knowledge",
+      "symthaea-evidence-lineage",
+      "sol-atlas"
+    ],
+    "semantic_promotion": "must occur through an explicit domain adapter; graph linkage alone never promotes a foreign record into evidence"
+  }
+}
