@@ -134,7 +134,32 @@ def artifact_digest(artifact):
     return sha256_hex(encoded)
 
 
+def self_test_wire_contracts():
+    # Regression vector: Rust str::len() is a UTF-8 byte count, not a Unicode
+    # code-point count. Keep this fixed vector to prevent accidental drift.
+    unicode_identity = {
+        "namespace": "cp04-fixture",
+        "object_kind": "model",
+        "canonical_identifier": "µ/模型",
+        "version": "1",
+        "content_digest": "a" * 64,
+    }
+    require(
+        identity_digest(unicode_identity)
+        == "494fc61dbfa0ae3be0b7ab60d8fd026a88c3e92c27756bc94be5995b96476042",
+        "UTF-8 byte-length identity regression vector changed",
+    )
+
+    # The Rust adapter hashes serde_json::to_vec on a struct, not JCS. Keep
+    # this distinction explicit so a future verifier rewrite cannot silently
+    # substitute property sorting for the repository's current wire contract.
+    sample = {"schema": "s", "artifact_digest": ""}
+    encoded = json.dumps(sample, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    require(encoded == b'{"schema":"s","artifact_digest":""}', "JSON compact serialization drift")
+
+
 def main():
+    self_test_wire_contracts()
     artifact = json.loads(FIXTURE.read_text(encoding="utf-8"))
     require(set(artifact) == {
         "schema", "cp04_schema", "source_graph_digest", "projection_digest",
