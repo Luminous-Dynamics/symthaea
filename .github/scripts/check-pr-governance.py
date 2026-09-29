@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -252,7 +253,17 @@ def parse_name_status(text: str) -> list[str]:
 
 
 def require_complete_object_graph(git_runner: Any = git) -> None:
-    """Reject shallow or partial repositories before topology-sensitive validation."""
+    """Reject external or substitutable object sources before topology validation."""
+    for variable in (
+        "GIT_OBJECT_DIRECTORY",
+        "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        "GIT_COMMON_DIR",
+    ):
+        if os.environ.get(variable):
+            raise GovernanceError(
+                f"governance validation forbids {variable}; object authority must remain local and self-contained"
+            )
+
     shallow = git_runner("rev-parse", "--is-shallow-repository", check=False)
     if shallow.returncode != 0:
         raise GovernanceError("unable to determine repository shallow state")
@@ -449,6 +460,26 @@ def history_topology_self_test() -> None:
             return proc
 
         assert require_complete_object_graph(local_git) is None
+        saved_env = {key: os.environ.get(key) for key in (
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+            "GIT_COMMON_DIR",
+        )}
+        try:
+            os.environ["GIT_ALTERNATE_OBJECT_DIRECTORIES"] = str(worktree / "objects")
+            try:
+                require_complete_object_graph(local_git)
+            except GovernanceError:
+                pass
+            else:
+                raise AssertionError("alternate object environment must fail closed")
+        finally:
+            for key, value in saved_env.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
         run_local("config", "extensions.partialClone", "origin")
         try:
             require_complete_object_graph(local_git)
@@ -476,15 +507,6 @@ def history_topology_self_test() -> None:
         else:
             raise AssertionError("alternate-ref command must fail closed")
         run_local("config", "--unset", "core.alternateRefsCommand")
-
-        run_local("config", "core.alternateObjectDirectories", str(worktree / "objects"))
-        try:
-            require_complete_object_graph(local_git)
-        except GovernanceError:
-            pass
-        else:
-            raise AssertionError("alternate object directories must fail closed")
-        run_local("config", "--unset", "core.alternateObjectDirectories")
 
         run_local("replace", base, feature)
         try:
