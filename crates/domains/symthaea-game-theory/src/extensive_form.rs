@@ -222,6 +222,23 @@ impl ExtensiveGame {
             .map_err(ExtensiveGameError::InformationStructure)
     }
 
+    /// Verify that a semantic information encoder agrees with the declared partition.
+    pub fn verify_information_encoder<E: InformationEncoder>(&self, encoder: &E) -> Result<(), ExtensiveGameError> {
+        self.validate()?;
+        let mut histories: HashMap<DecisionStateId, Vec<Vec<HistoryEvent>>> = HashMap::new();
+        self.collect_information_histories(self.root, Vec::new(), &mut histories)?;
+        for state in &self.information.decision_states {
+            let paths = histories.get(&state.state).ok_or(ExtensiveGameError::InformationMemberNotReachable(state.state))?;
+            for history in paths {
+                let encoded = encoder.encode(state.player, state.state, history).map_err(|message| ExtensiveGameError::InformationEncodingFailed { state: state.state, message })?;
+                if encoded != state.information_set {
+                    return Err(ExtensiveGameError::InformationEncodingMismatch { state: state.state, expected: state.information_set, actual: encoded });
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn verify_perfect_recall(&self) -> Result<PerfectRecallEvidence, ExtensiveGameError> {
         self.validate()?;
 
