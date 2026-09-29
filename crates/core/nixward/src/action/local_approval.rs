@@ -232,7 +232,7 @@ impl LocalNixApprovalDecisionV1 {
     /// Evaluate this persisted decision against the exact still-live request.
     ///
     /// A positive result is **approval evidence**, not execution authority.
-    pub fn evaluate_against(
+    pub(crate) fn evaluate_against(
         &self,
         request: &PendingNixApprovalRequestV1,
         evaluation: AuthoritativeEvaluationV1,
