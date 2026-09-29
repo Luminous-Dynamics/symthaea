@@ -141,3 +141,16 @@ The resulting machine-readable matrix must make it possible to answer, per workl
 > What is the lowest-cost liquid representation that preserves the declared trajectory-quality target?
 
 There is no universal winning dimension or conversion family.
+
+## Projection candidates
+
+The current baseline is `ContinuousHV::dilate`. It is intentionally treated as a negative-control characterization rather than a trusted semantic conversion.
+
+A second research candidate is now `HadamardTruncateV1`:
+1. apply a normalized Walsh-Hadamard transform;
+2. retain the deterministic low-index coefficients;
+3. reject expansion because no inverse semantics are defined.
+
+This gives the matrix an orthogonal-basis candidate without implying that orthogonality preserves HDC binding, bundling, permutation, or liquid dynamics. Those properties are measured independently.
+
+The candidate is restricted to the current 1K–64K power-of-two ladder and remains research-only.
