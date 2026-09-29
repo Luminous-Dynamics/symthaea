@@ -4,6 +4,7 @@
 //! This verifies provenance and ancestry only; it never evaluates scientific truth.
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use crate::external_observation::ExternalExperimentalObservation;
 use crate::independent_assessment::IndependentAssessment;
 use crate::replication::ReplicationRecord;
@@ -27,6 +28,8 @@ pub struct EvidenceChainAudit {
     pub replication_id: String,
     pub evidence_id: String,
     pub diagnostics: Vec<EvidenceChainDiagnostic>,
+    /// Content-addressing digest for this exact audit payload.
+    pub audit_digest: String,
 }
 
 impl EvidenceChainAudit {
@@ -49,8 +52,66 @@ impl EvidenceChainAudit {
         if evidence.replication_id != replication.replication_id || evidence.replication_record_digest != replication.record_digest { diagnostics.push(d("evidence_replication_mismatch", "criterion evidence does not point to the exact replication record")); }
         if evidence.commitment_event_id != observation.commitment_event_id || evidence.candidate_id != observation.candidate_id || evidence.binding_digest != observation.binding_digest { diagnostics.push(d("evidence_commitment_mismatch", "criterion evidence commitment/candidate/binding ancestry differs from observation")); }
         let status = if diagnostics.is_empty() { EvidenceChainStatus::Complete } else { EvidenceChainStatus::Invalid };
-        Self { status, challenge_id: observation.challenge_id.clone(), criterion_id: observation.criterion_id.clone(), criterion_generation: observation.criterion_generation.clone(), observation_id: observation.observation_id.clone(), assessment_id: assessment.assessment_id.clone(), replication_id: replication.replication_id.clone(), evidence_id: evidence.evidence_id.clone(), diagnostics }
+        let mut audit = Self {
+            status,
+            challenge_id: observation.challenge_id.clone(),
+            criterion_id: observation.criterion_id.clone(),
+            criterion_generation: observation.criterion_generation.clone(),
+            observation_id: observation.observation_id.clone(),
+            assessment_id: assessment.assessment_id.clone(),
+            replication_id: replication.replication_id.clone(),
+            evidence_id: evidence.evidence_id.clone(),
+            diagnostics,
+            audit_digest: String::new(),
+        };
+        audit.audit_digest = audit.compute_digest();
+        audit
     }
-    pub fn is_structurally_complete(&self) -> bool { self.status == EvidenceChainStatus::Complete }
+
+    /// Return the canonical content digest for this audit record.
+    pub fn audit_digest(&self) -> String { self.compute_digest() }
+
+    /// Verify the audit envelope and its content-addressing digest.
+    pub fn verify_integrity(&self) -> bool {
+        !self.challenge_id.trim().is_empty()
+            && !self.criterion_id.trim().is_empty()
+            && !self.criterion_generation.trim().is_empty()
+            && !self.observation_id.trim().is_empty()
+            && !self.assessment_id.trim().is_empty()
+            && !self.replication_id.trim().is_empty()
+            && !self.evidence_id.trim().is_empty()
+            && !self.audit_digest.trim().is_empty()
+            && self.audit_digest == self.compute_digest()
+    }
+
+    fn compute_digest(&self) -> String {
+        let mut h = Sha256::new();
+        h.update(b"symthaea:evidence-chain-audit:v1\\0");
+        put(&mut h, match self.status {
+            EvidenceChainStatus::Complete => "complete",
+            EvidenceChainStatus::Invalid => "invalid",
+        });
+        put(&mut h, &self.challenge_id);
+        put(&mut h, &self.criterion_id);
+        put(&mut h, &self.criterion_generation);
+        put(&mut h, &self.observation_id);
+        put(&mut h, &self.assessment_id);
+        put(&mut h, &self.replication_id);
+        put(&mut h, &self.evidence_id);
+        h.update((self.diagnostics.len() as u64).to_be_bytes());
+        for diagnostic in &self.diagnostics {
+            put(&mut h, &diagnostic.code);
+            put(&mut h, &diagnostic.detail);
+        }
+        format!("sha256:{:x}", h.finalize())
+    }
+}
+
+fn put(h: &mut Sha256, s: &str) {
+    h.update((s.len() as u64).to_be_bytes());
+    h.update(s.as_bytes());
+}
+
+fn d(code:&str, detail:&str)->EvidenceChainDiagnostic { EvidenceChainDiagnostic { code: code.into(), detail: detail.into() } }
 }
 fn d(code:&str, detail:&str)->EvidenceChainDiagnostic { EvidenceChainDiagnostic { code: code.into(), detail: detail.into() } }
