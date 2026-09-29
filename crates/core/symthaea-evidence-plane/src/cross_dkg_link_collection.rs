@@ -98,12 +98,21 @@ impl CrossDkgLinkCollection {
     }
 }
 
-fn link_key(link: &CrossDkgFederationLink) -> String {
-    format!("{}\0{}\0{}\0{}\0{}\0{}\0{}",
-        link.source_dkg_id, link.source_graph_digest, link.source_record_id,
-        link.source_record_digest, link.relation.as_str(),
-        link.target_dkg_id, link.target_record_id)
-        + &link.target_record_digest
+fn link_key(link: &CrossDkgFederationLink) -> (
+    &str, &str, &str, &str, &str, &str, &str, &str, &str, &str,
+) {
+    (
+        &link.source_dkg_id,
+        &link.source_graph_digest,
+        &link.source_record_id,
+        &link.source_record_digest,
+        link.relation.as_str(),
+        &link.target_dkg_id,
+        &link.target_graph_digest,
+        &link.target_record_id,
+        &link.target_record_digest,
+        &link.link_digest,
+    )
 }
 
 fn put(h: &mut Sha256, value: &str) {
@@ -161,6 +170,35 @@ mod tests {
         let mut c = CrossDkgLinkCollection::new(vec![a]).unwrap();
         c.source_dkg_ids = vec!["tampered".into()];
         assert_eq!(c.verify_integrity(), Err(CrossDkgCollectionError::SourceInventoryMismatch));
+    }
+
+    #[test]
+    #[test]
+    fn canonical_key_distinguishes_graph_and_record_digests() {
+        let a = CrossDkgFederationLink::new(
+            "mycelix", "sha256:g1", "claim:1", "sha256:r1", CrossDkgRelation::References,
+            "symthaea", "sha256:g2", "observation:1", "sha256:t1",
+        ).unwrap();
+        let b = CrossDkgFederationLink::new(
+            "mycelix", "sha256:g1", "claim:1", "sha256:r1", CrossDkgRelation::References,
+            "symthaea", "sha256:g3", "observation:1", "sha256:t1",
+        ).unwrap();
+        let c = CrossDkgLinkCollection::new(vec![b.clone(), a.clone()]).unwrap();
+        assert_ne!(a.link_digest, b.link_digest);
+        assert!(c.verify_integrity().is_ok());
+        assert_eq!(c.links[0], a);
+        assert_eq!(c.links[1], b);
+    }
+
+    #[test]
+    fn canonical_key_includes_link_digest() {
+        let a = link("claim:a");
+        let mut b = a.clone();
+        b.link_digest = "sha256:tampered".into();
+        assert_eq!(
+            CrossDkgLinkCollection::new(vec![a, b]),
+            Err(CrossDkgCollectionError::InvalidLink(CrossDkgLinkError::DigestMismatch))
+        );
     }
 
     #[test]
