@@ -408,6 +408,38 @@ mod tests {
     }
 
     #[test]
+    fn output_origin_is_digest_bound() {
+        let d = declaration();
+        let l = link();
+        let r = CrossDkgAdapterReceipt::derive_reference(
+            &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
+        ).unwrap();
+        let c = CrossDkgLinkCollection::new(vec![l]).unwrap();
+        let mut p = FederatedProjectionReceipt::new(
+            "projection:1", "1", &c, &[r], &["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        ).unwrap();
+        p.outputs[0].origin = FederatedProjectionOutputOrigin::SourceReference;
+        assert_eq!(p.verify_integrity(&c), Err(ProjectionReceiptError::ProjectionDigestMismatch));
+    }
+
+    #[test]
+    fn ancestry_rejects_tampered_receipt() {
+        let d = declaration();
+        let l = link();
+        let r = CrossDkgAdapterReceipt::derive_reference(
+            &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
+        ).unwrap();
+        let c = CrossDkgLinkCollection::new(vec![l]).unwrap();
+        let p = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]).unwrap();
+        let mut tampered = p.clone();
+        tampered.outputs[0].record_id = "changed".into();
+        assert_eq!(
+            FederatedProjectionReceipt::verify_ancestry(&[tampered]),
+            Err(ProjectionReceiptError::InvalidProjectionAncestryReceipt)
+        );
+    }
+
+    #[test]
     fn serde_roundtrip() {
         let d = declaration();
         let l = link();
