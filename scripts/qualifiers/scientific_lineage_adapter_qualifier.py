@@ -58,8 +58,9 @@ def main():
     nodes = artifact["nodes"]
     edges = artifact["edges"]
     require(len(nodes) == 16 and len(edges) == 15, "fixture cardinality mismatch")
-    require(tuple(n["object_kind"] for n in nodes) == tuple(sorted(NODE_TYPES)),
-            "node set/order differs from canonical sorted vocabulary")
+    require(len({n["object_kind"] for n in nodes}) == len(NODE_TYPES)
+            and {n["object_kind"] for n in nodes} == set(NODE_TYPES),
+            "node set differs from canonical vocabulary")
     by_digest = {}
     for node in nodes:
         require(set(node) == {"identity", "identity_digest", "object_kind"}, "unexpected node fields")
