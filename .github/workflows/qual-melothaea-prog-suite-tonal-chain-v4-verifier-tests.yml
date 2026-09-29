@@ -13,7 +13,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests-${{ github.event.pull_request.number || github.ref }}
+  # Qualification evidence is immutable per exact head; do not let a stale PR run block a newer head.\n  group: qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
