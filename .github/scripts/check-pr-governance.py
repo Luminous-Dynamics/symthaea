@@ -316,6 +316,7 @@ def history_topology_self_test() -> None:
         else:
             raise AssertionError("identical base/head must fail closed")
 
+        run_local("checkout", "--quiet", base)
         (worktree / "side.txt").write_text("side\\n", encoding="utf-8")
         run_local("add", "side.txt")
         run_local("commit", "--quiet", "-m", "side")
