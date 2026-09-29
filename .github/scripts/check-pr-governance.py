@@ -294,6 +294,27 @@ def require_complete_object_graph(git_runner: Any = git) -> None:
                     "repository has a promisor remote"
                 )
 
+    alternates_file = git_runner("rev-parse", "--git-path", "objects/info/alternates")
+    if alternates_file.returncode != 0:
+        raise GovernanceError("unable to determine Git alternate-object file")
+    alternates_path = Path(alternates_file.stdout.strip())
+    if alternates_path.exists():
+        try:
+            alternate_entries = [
+                line.strip()
+                for line in alternates_path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+            ]
+        except OSError as exc:
+            raise GovernanceError(
+                f"unable to inspect Git alternate-object file: {exc}"
+            ) from exc
+        if alternate_entries:
+            raise GovernanceError(
+                "governance validation forbids objects/info/alternates; "
+                "object authority must remain local and self-contained"
+            )
+
     alternates = git_runner(
         "config", "--get", "core.alternateRefsCommand", check=False
     )
@@ -360,7 +381,7 @@ def require_exact_object_connectivity(
     proc = git_runner(
         "--no-replace-objects",
         "fsck",
-        "--full",
+        "--no-full",
         "--connectivity-only",
         "--no-reflogs",
         "--no-dangling",
@@ -522,6 +543,19 @@ def history_topology_self_test() -> None:
         else:
             raise AssertionError("promisor remote must fail closed")
         run_local("config", "--unset", "remote.origin.promisor")
+
+        alternates_file = Path(run_local("rev-parse", "--git-path", "objects/info/alternates"))
+        alternate_target = worktree / "alternate-objects"
+        alternate_target.mkdir()
+        alternates_file.parent.mkdir(parents=True, exist_ok=True)
+        alternates_file.write_text(str(alternate_target / "objects") + "\n", encoding="utf-8")
+        try:
+            require_complete_object_graph(local_git)
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError("objects/info/alternates must fail closed")
+        alternates_file.unlink()
 
         run_local("config", "core.alternateRefsCommand", "echo refs/heads/main")
         try:
