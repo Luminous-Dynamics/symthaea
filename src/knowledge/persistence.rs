@@ -506,6 +506,34 @@ mod tests {
     }
 
     #[test]
+    fn test_save_facts_rejects_empty_memory_identity() {
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea_empty_memory_id_test_{}",
+            std::process::id()
+        ));
+        let db_path = dir.join("knowledge.db");
+        let _ = std::fs::create_dir_all(&dir);
+
+        let mut p = KnowledgePersistence::new(&db_path);
+        let fact = FactRecord {
+            memory_id: "   ".into(),
+            canonical_identity: None,
+            provenance_family: None,
+            vector_bytes: vec![0u8; 2048],
+            source_text: "invalid identity".into(),
+            confidence: 0.5,
+            domain: None,
+            cycle: 1,
+            is_causal: false,
+        };
+
+        let err = p.save_facts(&[fact]).unwrap_err();
+        assert!(err.contains("memory_id must be non-empty"));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn test_save_facts_is_idempotent_by_memory_id() {
         let dir = std::env::temp_dir().join(format!("symthaea_fact_upsert_test_{}", std::process::id()));
         let db_path = dir.join("knowledge.db");
