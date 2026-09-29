@@ -22,11 +22,13 @@ Add deterministic self-test coverage using a temporary Git repository. The topol
 - a partial clone or promisor-remote repository is rejected before topology-sensitive validation;
 - configured alternate-ref commands and external object-database environment overrides are rejected;
 - Git object-database environment overrides are rejected;
+- the exact base/head object graph passes a Git fsck connectivity check when intact;
+- deletion of a reachable tree object makes that exact object-graph check fail closed;
 - replacement refs under refs/replace/ are rejected;
 - the trusted Governance Root workflow contract rejects a checkout filter that could introduce a partial object graph;
 - the direct endpoint diff remains the changeset authority even when the head is a merge commit.
 
-Production validation first rejects an explicitly shallow or partial/promisor repository, alternate-ref commands, replacement refs, or Git object-database environment overrides, while the trusted workflow contract separately rejects a checkout filter; it then requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
+Production validation first rejects an explicitly shallow or partial/promisor repository, alternate-ref commands, replacement refs, or Git object-database environment overrides. It then runs `git --no-replace-objects fsck --full --connectivity-only --no-reflogs --no-dangling --no-progress <base> <head>` against the exact endpoint SHAs, requires the exact 40-hex event SHAs, requires the base to be an ancestor of the head, and computes the governed path set from the exact base/head endpoints. The connectivity-only mode is intentional: Git documents that it verifies reachable commit/tree connectivity and referenced-object presence while avoiding blob reads; therefore this control is not a claim to detect every possible blob-content corruption. Branch names, reflog-derived fork points, and merge-base substitutions are not authority inputs.
 
 ## Scientific Basis
 
@@ -42,7 +44,7 @@ The change addresses governance-integrity risk from merge topology, rewritten he
 
 ## Test Evidence
 
-The self-test now creates a temporary Git repository and exercises descendant, identical, merge, reverse, rewritten-history, shallow-history, partial-clone-extension, promisor-remote, alternate-object-environment, alternate-ref-command, and replacement-ref cases. It also checks that a merge head's exact endpoint diff contains changes introduced on both sides of the merge. GitHub Actions execution remains a separate evidence layer until an eligible hosted runner executes the workflow.
+The self-test now creates a temporary Git repository and exercises descendant, identical, merge, reverse, rewritten-history, shallow-history, partial-clone-extension, promisor-remote, alternate-object-environment, alternate-ref-command, replacement-ref, and missing-reachable-tree-object cases. The topology functions accept an injected Git runner in the fixture, so the self-test validates the temporary repository rather than accidentally consulting the authority repository's own object database. It also checks that a merge head's exact endpoint diff contains changes introduced on both sides of the merge. GitHub Actions execution remains a separate evidence layer until an eligible hosted runner executes the workflow.
 
 ## Rollback Plan
 
