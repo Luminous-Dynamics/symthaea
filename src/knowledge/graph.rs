@@ -392,6 +392,33 @@ impl EnhancedKnowledgeGraph {
         &self.provenance_relations
     }
 
+    /// Query provenance without assigning evidential weight.
+    pub fn provenance_relations_from(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
+        self.provenance_relations
+            .iter()
+            .filter(|relation| relation.source_memory_id == memory_id)
+            .collect()
+    }
+
+    /// Query incoming provenance without assigning evidential weight.
+    pub fn provenance_relations_to(&self, memory_id: &str) -> Vec<&ProvenanceRelation> {
+        self.provenance_relations
+            .iter()
+            .filter(|relation| relation.target_memory_id == memory_id)
+            .collect()
+    }
+
+    /// Query one provenance relation kind without assigning evidential weight.
+    pub fn provenance_relations_of_kind(
+        &self,
+        kind: ProvenanceRelationKind,
+    ) -> Vec<&ProvenanceRelation> {
+        self.provenance_relations
+            .iter()
+            .filter(|relation| relation.kind == kind)
+            .collect()
+    }
+
     pub fn import_provenance_relation(&mut self, relation: ProvenanceRelation) -> Result<bool, &'static str> {
         self.record_provenance_relation(relation)
     }
@@ -1086,6 +1113,26 @@ mod tests {
         };
         assert!(graph.record_provenance_relation(relation).is_ok());
         assert_eq!(graph.provenance_relations()[0].target_memory_id, a_id);
+    }
+
+    #[test]
+    fn test_provenance_queries_are_non_mutating() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (a, _) = graph.insert(make_encoding("a", 0.8), 1, None, false);
+        let (b, _) = graph.insert(make_encoding("b", 0.6), 2, None, false);
+        let a_id = graph.provenance(a).unwrap().memory_id;
+        let b_id = graph.provenance(b).unwrap().memory_id;
+        let before = graph.get_fact(b).unwrap().confidence;
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: b_id.clone(),
+            target_memory_id: a_id.clone(),
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:2".into(),
+        }).unwrap();
+        assert_eq!(graph.provenance_relations_from(&b_id).len(), 1);
+        assert_eq!(graph.provenance_relations_to(&a_id).len(), 1);
+        assert_eq!(graph.provenance_relations_of_kind(ProvenanceRelationKind::Corroborates).len(), 1);
+        assert_eq!(graph.get_fact(b).unwrap().confidence, before);
     }
 
     #[test]
