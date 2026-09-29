@@ -44,6 +44,10 @@ pub enum EngineeringRelationKind {
     Produces,
     Quantifies,
     HasProperty,
+    Summarizes,
+    TracesTo,
+    CurrentnessFor,
+    ApplicableTo,
     Supports,
     Contradicts,
     DerivedFrom,
@@ -65,6 +69,8 @@ impl EngineeringRelationKind {
             Self::Constrains => "constrains", Self::Formalizes => "formalizes",
             Self::Instantiates => "instantiates", Self::Produces => "produces",
             Self::Quantifies => "quantifies", Self::HasProperty => "has_property",
+            Self::Summarizes => "summarizes", Self::TracesTo => "traces_to",
+            Self::CurrentnessFor => "currentness_for", Self::ApplicableTo => "applicable_to",
             Self::Supports => "supports", Self::Contradicts => "contradicts",
             Self::DerivedFrom => "derived_from", Self::Equivalent => "equivalent",
             Self::Generalizes => "generalizes", Self::Specializes => "specializes",
@@ -90,6 +96,10 @@ impl EngineeringRelationKind {
             Self::Produces => Some(&[("simulation", "prediction"), ("process", "material"), ("experiment", "observation")]),
             Self::Quantifies => Some(&[("observation", "uncertainty"), ("observation", "statistics")]),
             Self::HasProperty => Some(&[("material", "property"), ("material", "measured_property"), ("material", "predicted_property")]),
+            Self::Summarizes => Some(&[("observation", "statistics")]),
+            Self::TracesTo => Some(&[("observation", "provenance_reference")]),
+            Self::CurrentnessFor => Some(&[("currentness", "runtime")]),
+            Self::ApplicableTo => Some(&[("applicability", "execution_context")]),
             Self::PartOf | Self::Contains | Self::DependsOn | Self::Supports | Self::Contradicts |
             Self::DerivedFrom | Self::Equivalent | Self::Generalizes | Self::Specializes => None,
         }
@@ -113,7 +123,11 @@ impl EngineeringRelationKind {
             | Self::Instantiates
             | Self::Produces
             | Self::Quantifies
-            | Self::HasProperty => RelationFamily::Scientific,
+            | Self::HasProperty
+            | Self::Summarizes
+            | Self::TracesTo
+            | Self::CurrentnessFor
+            | Self::ApplicableTo => RelationFamily::Scientific,
             Self::Supports
             | Self::Contradicts
             | Self::DerivedFrom
