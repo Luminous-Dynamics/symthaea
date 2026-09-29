@@ -921,6 +921,21 @@ mod tests {
     }
 
     #[test]
+    fn test_retrieval_repetition_does_not_create_corroboration() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (id, _) = graph.insert(make_encoding("retrieval-only claim", 0.8), 1, None, false);
+        let query = graph.get_fact(id).unwrap().encoding.vector.clone();
+
+        for cycle in 2..=10 {
+            let _ = graph.search(&query, 5, cycle);
+        }
+
+        let fact = graph.get_fact(id).unwrap();
+        assert_eq!(fact.corroboration_count, 0);
+        assert!((fact.confidence - 0.8).abs() < f32::EPSILON);
+    }
+
+    #[test]
     fn test_domain_search() {
         let mut graph = EnhancedKnowledgeGraph::new(100);
 
