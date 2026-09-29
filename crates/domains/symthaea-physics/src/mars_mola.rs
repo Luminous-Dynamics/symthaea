@@ -638,6 +638,7 @@ mod tests {
     #[test]
     fn uses_projection_offsets_for_pixel_centers() {
         let text = label()
+            .replace("MAP_RESOLUTION = 128", "MAP_RESOLUTION = 4")
             .replace("LINES = 4", "LINES = 720")
             .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 1440")
             .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -90.0")
