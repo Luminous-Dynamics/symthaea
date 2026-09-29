@@ -153,9 +153,10 @@ fn retrieve_validated(
     let mut selected = groups.iter().map(|g| g.canonical_identity.clone()).collect::<Vec<_>>(); selected.sort();
     let mut families = groups.iter().flat_map(|g| g.provenance_families.iter().cloned()).collect::<Vec<_>>(); families.sort(); families.dedup();
     excluded.sort_by(|a,b| a.canonical_identity.cmp(&b.canonical_identity).then_with(|| (a.reason as u8).cmp(&(b.reason as u8))));
-    let selected_representation_digests = groups.iter()
+    let mut selected_representation_digests = groups.iter()
         .flat_map(|g| g.representations.iter().map(|candidate| candidate.projection.representation_digest.clone()))
         .collect::<Vec<_>>();
+    selected_representation_digests.sort();
     let mut receipt = MemoryRetrievalReceipt {
         mode: request.mode,
         frontier_ref: request.frontier_ref.clone(),
