@@ -212,6 +212,9 @@ mod tests {
         let mut tampered=receipt.clone();
         tampered.query="tampered".into();
         assert!(!tampered.is_self_consistent());
+        let profiled = receipt.clone().with_retrieval_profile_versions(vec!["retrieval-profile:v1".into()]);
+        assert!(profiled.is_self_consistent());
+        assert_ne!(profiled.receipt_digest, receipt.receipt_digest);
     }
     #[test] fn live_mode_needs_no_frontier() {
         let (g,r)=retrieve(&MemoryRetrievalRequest::live("x",10),vec![candidate("live",MemoryKind::Vector,"f",0.8,FrontierEligibility::Unknown)]);
