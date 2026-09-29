@@ -212,12 +212,6 @@ impl CrossDkgAdapterReceipt {
     }
 }
 
-impl CrossDkgRelation {
-    fn as_str(self) -> &'static str {
-        super::cross_dkg_federation::CrossDkgRelation::as_str(self)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdapterReceiptError {
     MissingDeclarationField, NoAllowedRelations, DuplicateAllowedRelation,
