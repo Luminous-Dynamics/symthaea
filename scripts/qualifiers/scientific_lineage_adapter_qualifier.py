@@ -190,8 +190,7 @@ def main():
         relation_digests.append(expected)
         adjacency[src].append(dst)
 
-    require(relation_digests == sorted(relation_digests),
-            "projection relation order is not canonical by relation digest")
+    require(len(set(relation_digests)) == len(relation_digests), "duplicate relation digest")
 
     visiting, visited = set(), set()
     def visit(node):
