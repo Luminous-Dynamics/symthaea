@@ -32,7 +32,7 @@ fn normalized_l2(a: &ContinuousHV, b: &ContinuousHV) -> f32 {
     a.subtract(b).norm() / a.norm().max(1e-12)
 }
 
-fn row(source_dim: usize, target_dim: usize, seed: u64, family: &str) -> Row {
+fn row(source_dim: usize, target_dim: usize, seed: u64, family: &'static str) -> Row {
     let a = ContinuousHV::random(source_dim, seed);
     let b = ContinuousHV::random(source_dim, seed.wrapping_add(1));
     let c = ContinuousHV::random(source_dim, seed.wrapping_add(2));
