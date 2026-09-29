@@ -387,6 +387,112 @@ mod tests {
     }
 
     #[test]
+    fn projection_currentness_requires_exact_runtime_owned_projection() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
+        let now = wall_ms();
+        let installed = runtime
+            .create_pending_request(
+                &intent("nginx.service"),
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let projection = installed.operator_projection().unwrap();
+
+        assert_eq!(
+            runtime
+                .observe_installed_projection_currentness(
+                    &installed,
+                    &projection,
+                    UnixMillisV1::new(now),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::Current
+        );
+
+        let mut tampered = projection.clone();
+        tampered.machine_target_ref = "machine:other".to_string();
+        assert!(tampered.validate().is_err());
+        assert!(matches!(
+            runtime.observe_installed_projection_currentness(
+                &installed,
+                &tampered,
+                UnixMillisV1::new(now),
+            ),
+            Err(LocalApprovalRuntimeErrorV1::Projection(_))
+        ));
+        assert_eq!(runtime.pending_count().unwrap(), 1);
+    }
+
+    #[test]
+    fn projection_currentness_rejects_superseded_expired_and_restarted_requests() {
+        let parent = tempfile::tempdir().unwrap();
+        let runtime_path = parent.path().join("runtime");
+        let runtime = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        let now = wall_ms();
+        let action = intent("nginx.service");
+
+        let first = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(1_000)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let first_projection = first.operator_projection().unwrap();
+
+        let second = runtime
+            .create_pending_request(
+                &action,
+                "restart nginx.service",
+                "local-human-v1",
+                UnixMillisV1::new(now.saturating_sub(500)),
+                UnixMillisV1::new(now + 60_000),
+            )
+            .unwrap();
+        let second_projection = second.operator_projection().unwrap();
+
+        assert_eq!(
+            runtime
+                .observe_installed_projection_currentness(
+                    &first,
+                    &first_projection,
+                    UnixMillisV1::new(now),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+        assert_eq!(
+            runtime
+                .observe_installed_projection_currentness(
+                    &second,
+                    &second_projection,
+                    UnixMillisV1::new(now + 60_000),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::Expired
+        );
+
+        drop(runtime);
+        let restarted = LocalApprovalRuntimeV1::bind_in(&runtime_path).unwrap();
+        assert_eq!(
+            restarted
+                .observe_installed_projection_currentness(
+                    &second,
+                    &second_projection,
+                    UnixMillisV1::new(now),
+                )
+                .unwrap(),
+            PendingRequestCurrentnessV1::NotPending
+        );
+    }
+
+    #[test]
     fn composition_root_binds_store_socket_and_requests_to_one_incarnation() {
         let parent = tempfile::tempdir().unwrap();
         let runtime = LocalApprovalRuntimeV1::bind_in(&parent.path().join("runtime")).unwrap();
