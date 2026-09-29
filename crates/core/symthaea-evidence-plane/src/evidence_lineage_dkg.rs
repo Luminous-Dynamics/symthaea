@@ -526,11 +526,11 @@ mod tests {
 
     #[test]
     fn history_order_does_not_change_projection_digest() {
-        let (c, o, a, r, original, replacement) = evidence_chain();
-        let a = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &a, &r, &[original.clone(), replacement.clone()]).unwrap();
-        let b = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &a, &r, &[replacement, original]).unwrap();
-        assert_eq!(a, b);
-        assert!(b.verify_integrity());
+        let (c, o, assessment, r, original, replacement) = evidence_chain();
+        let first = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &assessment, &r, &[original.clone(), replacement.clone()]).unwrap();
+        let second = EvidenceLineageDkgProjection::from_chain_history(&c, &o, &assessment, &r, &[replacement, original]).unwrap();
+        assert_eq!(first, second);
+        assert!(second.verify_integrity());
     }
 
     #[test]
