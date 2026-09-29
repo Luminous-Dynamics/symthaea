@@ -238,10 +238,24 @@ pub enum ObservationRelationKind {
 
 /// Auditable edge between observations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceIndependence {
+    /// The observations have no declared shared upstream source.
+    Independent,
+    /// The observations share an upstream source, platform, or processing chain.
+    SharedUpstream,
+    /// The source observation is computationally derived from the target lineage.
+    Derived,
+    /// Independence has not been established.
+    Unknown,
+}
+
+/// Auditable edge between observations.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationRelation {
     pub source_observation_id: String,
     pub target_observation_id: String,
     pub kind: ObservationRelationKind,
+    pub independence: EvidenceIndependence,
 }
 
 impl ObservationRelation {
@@ -254,6 +268,11 @@ impl ObservationRelation {
         }
         if self.source_observation_id == self.target_observation_id {
             return Err(ObservationValidationError::SelfRelation);
+        }
+        if matches!(self.kind, ObservationRelationKind::DerivedFrom)
+            && !matches!(self.independence, EvidenceIndependence::Derived | EvidenceIndependence::SharedUpstream)
+        {
+            return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
         }
         Ok(())
     }
@@ -280,6 +299,8 @@ pub enum ObservationValidationError {
     EmptyRelationId,
     #[error("an observation relation cannot point to itself")]
     SelfRelation,
+    #[error("derived-from relations require derived or shared-upstream independence")]
+    DerivedRelationIndependenceMismatch,
 }
 
 #[cfg(test)]
@@ -376,6 +397,7 @@ mod tests {
             source_observation_id: String::new(),
             target_observation_id: "obs-2".into(),
             kind: ObservationRelationKind::Supports,
+            independence: EvidenceIndependence::Unknown,
         };
         assert_eq!(
             relation.validate(),
@@ -389,10 +411,25 @@ mod tests {
             source_observation_id: "obs-1".into(),
             target_observation_id: "obs-1".into(),
             kind: ObservationRelationKind::Corroborates,
+            independence: EvidenceIndependence::Independent,
         };
         assert_eq!(
             relation.validate(),
             Err(ObservationValidationError::SelfRelation)
+        );
+    }
+
+    #[test]
+    fn derived_relation_requires_lineage_independence_marker() {
+        let relation = ObservationRelation {
+            source_observation_id: "derived".into(),
+            target_observation_id: "source".into(),
+            kind: ObservationRelationKind::DerivedFrom,
+            independence: EvidenceIndependence::Independent,
+        };
+        assert_eq!(
+            relation.validate(),
+            Err(ObservationValidationError::DerivedRelationIndependenceMismatch)
         );
     }
 
