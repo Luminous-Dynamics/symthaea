@@ -6,7 +6,7 @@ ADRs document decisions about safety-critical parameters, consciousness metrics,
 
 | ADR | Title | Date | Status | Class |
 |-----|-------|------|--------|-------|
-| — | (none yet) | — | — | — |
+| ADR-001 | Exact PR Governance Evidence | 2026-09-21 | Proposed | A |
 
 ## When to Write an ADR
 
