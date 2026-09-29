@@ -16,7 +16,7 @@
 use super::approver_evidence::{
     required_profile_accepts_evidence_v1, ApproverEvidenceErrorV1,
     ApproverEvidenceProfileV1, RequiredApprovalProfileV1,
-    VerifiedApproverEvidenceProfileV1, VerifiedLocalUnixPeerCredentialV1,
+    VerifiedLocalUnixPeerCredentialV1,
 };
 use super::local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
@@ -627,6 +627,12 @@ mod tests {
                 ApproverEvidenceErrorV1::UnknownRequiredApprovalProfile
             ))
         ));
+    }
+
+    fn request_with_profile(profile: &str) -> PendingNixApprovalRequestV1 {
+        let mut request = request();
+        request.authority_profile_ref = profile.to_string();
+        request
     }
 
     fn projection(request: &PendingNixApprovalRequestV1) -> PendingNixApprovalProjectionV1 {
