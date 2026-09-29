@@ -213,7 +213,7 @@ mod tests {
             &intent,
             "daemon-incarnation:test",
             "nixos-rebuild switch --flake .#workstation",
-            "local-human-v1",
+            "same-uid-process-v1",
             crate::action::temporal::UnixMillisV1::new(1_000),
             crate::action::temporal::UnixMillisV1::new(2_000),
             [7; 32],

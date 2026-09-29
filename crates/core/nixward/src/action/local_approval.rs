@@ -13,6 +13,7 @@
 //! newtypes from `temporal`, so naked timestamp units do not cross the API boundary.
 
 use super::authorization::{NixActionIntentV1, NixAuthorizationErrorV1};
+use super::approver_evidence::RequiredApprovalProfileV1;
 use super::temporal::{
     AuthoritativeEvaluationV1,
     EvidenceCurrentnessV1, EvidenceTemporalEvaluationV1, EvidenceTemporalStatusV1,
@@ -81,6 +82,8 @@ impl PendingNixApprovalRequestV1 {
         validate_identifier(&self.machine_target_ref, "machine target ref")?;
         validate_digest(&self.displayed_action_digest, "displayed action digest")?;
         validate_identifier(&self.authority_profile_ref, "authority profile ref")?;
+        RequiredApprovalProfileV1::parse_ref(&self.authority_profile_ref)
+            .map_err(|_| LocalApprovalErrorV1::UnknownAuthorityProfile)?;
         self.currentness()?;
 
         if self.request_nonce == [0; 32] {

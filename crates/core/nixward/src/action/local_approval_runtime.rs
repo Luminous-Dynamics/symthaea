@@ -318,7 +318,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -344,7 +344,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -354,7 +354,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -386,7 +386,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -413,7 +413,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -457,7 +457,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -468,7 +468,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -520,7 +520,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -549,7 +549,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -575,7 +575,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -603,7 +603,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -614,7 +614,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -650,7 +650,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -682,7 +682,7 @@ mod tests {
             .create_pending_request(
                 &intent("nginx.service"),
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -727,7 +727,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(1_000)),
                 UnixMillisV1::new(now + 60_000),
             )
@@ -738,7 +738,7 @@ mod tests {
             .create_pending_request(
                 &action,
                 "restart nginx.service",
-                "local-human-v1",
+                "same-uid-process-v1",
                 UnixMillisV1::new(now.saturating_sub(500)),
                 UnixMillisV1::new(now + 60_000),
             )
