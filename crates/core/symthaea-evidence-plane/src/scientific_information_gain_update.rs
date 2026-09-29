@@ -315,10 +315,14 @@ mod tests {
         let mut t = trace();
         t.stages.insert(
             3,
-            stage("other-execution", InvestigationStageKind::ExternalExecution, 'x', &["selection"]),
+            stage(
+                "other-execution",
+                InvestigationStageKind::ExternalExecution,
+                'x',
+                &["selection"],
+            ),
         );
-        // The trace order remains canonical only if the observation is shifted after the
-        // inserted execution; the receipt still names the exact execution parent.
+        t.stages[4].parent_stage_ids = vec!["other-execution".into()];
         assert_eq!(
             receipt(&t).verify_against_trace(&t),
             Err(ScientificInformationGainUpdateError::ExecutionNotObservationParent)
