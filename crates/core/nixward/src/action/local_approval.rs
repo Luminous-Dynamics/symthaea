@@ -540,7 +540,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request_b, ms(1_200)).unwrap_err(),
+            decision.evaluate_against(&request_b, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_200))).unwrap_err(),
             LocalApprovalErrorV1::RequestMismatch
         );
     }
@@ -560,7 +560,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request_b, ms(1_200)).unwrap_err(),
+            decision.evaluate_against(&request_b, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_200))).unwrap_err(),
             LocalApprovalErrorV1::DaemonIncarnationMismatch
         );
     }
@@ -580,7 +580,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            decision.evaluate_against(&request_b, ms(1_200)).unwrap_err(),
+            decision.evaluate_against(&request_b, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_200))).unwrap_err(),
             LocalApprovalErrorV1::IntentMismatch
         );
     }
