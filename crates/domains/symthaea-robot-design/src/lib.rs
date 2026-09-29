@@ -2308,6 +2308,30 @@ mod tests {
     }
 
     #[test]
+    fn enumeration_orders_candidate_parameters_by_semantic_id() {
+        let z = ParameterIdV1::new("z").unwrap();
+        let a = ParameterIdV1::new("a").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: z.clone(),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(30).unwrap()]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: a.clone(),
+                domain: ExactLengthDomainV1::Values(vec![C0LengthUmV1::new(10).unwrap()]),
+            },
+        ])
+        .unwrap();
+
+        let candidate = domain.enumerate().unwrap().into_iter().next().unwrap();
+        assert_eq!(candidate.parameters.len(), 2);
+        assert_eq!(candidate.parameters[0].id, a);
+        assert_eq!(candidate.parameters[0].value.value_um(), 10);
+        assert_eq!(candidate.parameters[1].id, z);
+        assert_eq!(candidate.parameters[1].value.value_um(), 30);
+    }
+
+    #[test]
     fn parameter_set_serde_permutation_preserves_identity() {
         let first = ExactDesignParameterSetV1::new(vec![
             ExactDesignLengthParameterV1 {
