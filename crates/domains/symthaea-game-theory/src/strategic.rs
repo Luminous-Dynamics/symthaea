@@ -220,6 +220,15 @@ pub enum AnalysisError {
     UnsupportedTask(AnalysisTask),
 }
 
+/// Declares mathematical and information-structure assumptions required by a solver.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SolverCapabilities {
+    pub supports_imperfect_information: bool,
+    pub requires_perfect_recall: bool,
+    pub supports_chance: bool,
+    pub supports_general_sum: bool,
+}
+
 /// Solver interface for validated strategic models.
 pub trait StrategicSolver {
     fn method(&self) -> AnalysisMethod;
