@@ -27,6 +27,7 @@
 
 pub mod strategic;
 pub mod strategic_context;
+pub mod extensive_form;
 
 /// A two-player normal-form game.
 #[derive(Debug, Clone)]
