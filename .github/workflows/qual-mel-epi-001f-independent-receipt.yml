@@ -26,6 +26,7 @@ jobs:
           EXPECTED_WORKFLOW_NAME: QUAL MEL-EPI-001F exact subject dispatcher
           EXPECTED_WORKFLOW_BLOB_SHA: db2f1a9fcd612a1a462763bf763614c3f8612bdf
           WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-dispatch.yml
+          EXPECTED_OBSERVER_WORKFLOW_PATH: .github/workflows/qual-mel-epi-001f-independent-receipt.yml
           OBSERVER_WORKFLOW_SHA: ${{ github.workflow_sha }}
           OBSERVER_WORKFLOW_REF: ${{ github.workflow_ref }}
         with:
@@ -49,9 +50,35 @@ jobs:
                 '476c980d3d4d2e3254255f7259910fffebea7150',
             };
             const workflowPath = process.env.WORKFLOW_PATH;
+            const expectedObserverWorkflowPath = process.env.EXPECTED_OBSERVER_WORKFLOW_PATH;
             const observerWorkflowSha = process.env.OBSERVER_WORKFLOW_SHA;
             const observerWorkflowRef = process.env.OBSERVER_WORKFLOW_REF;
             const triggerAction = context.payload.action;
+
+            const observerWorkflowIdentityVerified =
+              /^[0-9a-f]{40}$/.test(observerWorkflowSha) &&
+              observerWorkflowRef ===
+                owner + '/' + repo + '/' + expectedObserverWorkflowPath + '@refs/heads/main';
+
+            const observerWorkflowFile = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: expectedObserverWorkflowPath,
+              ref: observerWorkflowSha,
+            });
+
+            if (Array.isArray(observerWorkflowFile.data)) {
+              throw new Error('observer workflow path resolved to a directory');
+            }
+
+            const observerWorkflowBytes = Buffer.from(
+              observerWorkflowFile.data.content,
+              observerWorkflowFile.data.encoding
+            );
+            const observerWorkflowSha256 = crypto
+              .createHash('sha256')
+              .update(observerWorkflowBytes)
+              .digest('hex');
 
             const actor = run.actor
               ? { id: run.actor.id ?? null, login: run.actor.login ?? null }
@@ -91,6 +118,8 @@ jobs:
               repo,
               workflow_id: workflowPath,
             });
+
+            const runAttemptVerified = run.run_attempt === 1;
 
             const workflowIdentityVerified =
               triggerAction === 'completed' &&
@@ -243,6 +272,8 @@ jobs:
 
             const qualificationResult =
               run.conclusion === 'success' &&
+              runAttemptVerified &&
+              observerWorkflowIdentityVerified &&
               workflowContractVerified &&
               ancestryVerified &&
               sourceSurfaceVerified &&
@@ -259,6 +290,7 @@ jobs:
                 id: run.id,
                 trigger_action: triggerAction,
                 attempt: run.run_attempt,
+                attempt_verified: runAttemptVerified,
                 conclusion: run.conclusion,
                 event: run.event,
                 name: run.name,
@@ -290,8 +322,12 @@ jobs:
                 verified: workflowContractVerified,
               },
               observer_context: {
+                workflow_file_path: expectedObserverWorkflowPath,
                 workflow_sha: observerWorkflowSha,
                 workflow_ref: observerWorkflowRef,
+                workflow_blob_sha: observerWorkflowFile.data.sha,
+                workflow_sha256: observerWorkflowSha256,
+                identity_verified: observerWorkflowIdentityVerified,
               },
               ancestry: {
                 expected: expectedAncestry,
