@@ -21,8 +21,8 @@ use super::local_approval::{
     PendingNixApprovalRequestV1,
 };
 use super::local_approval_submission::{
-    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1,
-    admit_verified_local_submission_v1,
+    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1, LocalApprovalSubmissionV2,
+    admit_verified_local_submission_v2,
 };
 use super::approver_evidence::VerifiedLocalUnixPeerCredentialV1;
 use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
@@ -34,9 +34,14 @@ use thiserror::Error;
 ///
 /// There is deliberately no constructor from a persisted incarnation reference,
 /// no Serialize/Deserialize implementation, and no Clone implementation.
+struct PendingApprovalRecordV1 {
+    request: PendingNixApprovalRequestV1,
+    projection_digest: String,
+}
+
 pub struct LocalApprovalRequestStoreV1 {
     daemon_incarnation_ref: String,
-    pending: Mutex<HashMap<String, PendingNixApprovalRequestV1>>,
+    pending: Mutex<HashMap<String, PendingApprovalRecordV1>>,
 }
 
 impl LocalApprovalRequestStoreV1 {
@@ -51,20 +56,18 @@ impl LocalApprovalRequestStoreV1 {
         &self.daemon_incarnation_ref
     }
 
-    /// Atomically install one pending request for its exact action intent.
-    ///
-    /// Any older request for the same `action_intent_digest` is superseded under
-    /// the same mutex before the new request becomes visible. A submission for a
-    /// superseded request therefore cannot race its way into a positive consume
-    /// after replacement has completed.
-    pub fn install_pending(
+    /// Atomically install one pending request together with the exact
+    /// projection commitment produced by the live runtime.
+    pub(crate) fn install_pending_with_projection(
         &self,
         request: PendingNixApprovalRequestV1,
+        projection_digest: String,
     ) -> Result<PendingRequestInstallV1, LocalApprovalRequestStoreErrorV1> {
         request.validate_shape()?;
         if request.daemon_incarnation_id != self.daemon_incarnation_ref {
             return Err(LocalApprovalRequestStoreErrorV1::DaemonIncarnationMismatch);
         }
+        validate_projection_digest_v1(&projection_digest)?;
 
         let request_id = request.request_id()?;
         let intent_digest = request.action_intent_digest.clone();
@@ -80,13 +83,19 @@ impl LocalApprovalRequestStoreV1 {
         let superseded_request_ids: Vec<String> = pending
             .iter()
             .filter_map(|(id, existing)| {
-                (existing.action_intent_digest == intent_digest).then(|| id.clone())
+                (existing.request.action_intent_digest == intent_digest).then(|| id.clone())
             })
             .collect();
         for id in &superseded_request_ids {
             pending.remove(id);
         }
-        pending.insert(request_id.clone(), request);
+        pending.insert(
+            request_id.clone(),
+            PendingApprovalRecordV1 {
+                request,
+                projection_digest,
+            },
+        );
 
         Ok(PendingRequestInstallV1 {
             request_id,
@@ -94,14 +103,22 @@ impl LocalApprovalRequestStoreV1 {
         })
     }
 
-    /// Atomically admit and consume one exact pending local approval request.
-    ///
-    /// The mutex remains held from lookup through admission and removal. Two
-    /// concurrent consumers of the same request cannot both observe and remove
-    /// the same pending request successfully.
-    pub(crate) fn consume_verified_submission(
+    /// Test-only installer for legacy pure-evidence unit coverage.
+    #[cfg(test)]
+    fn install_pending(
         &self,
-        submission: &LocalApprovalSubmissionV1,
+        request: PendingNixApprovalRequestV1,
+    ) -> Result<PendingRequestInstallV1, LocalApprovalRequestStoreErrorV1> {
+        self.install_pending_with_projection(request, "00".repeat(32))
+    }
+
+    /// Atomically admit and consume one exact V2 local approval request.
+    ///
+    /// Projection-digest comparison, temporal admission, and request removal all
+    /// occur while the same pending-state mutex is held.
+    pub(crate) fn consume_verified_submission_v2(
+        &self,
+        submission: &LocalApprovalSubmissionV2,
         verified_peer: &VerifiedLocalUnixPeerCredentialV1,
         evaluation: AuthoritativeEvaluationV1,
     ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1> {
@@ -111,17 +128,64 @@ impl LocalApprovalRequestStoreV1 {
             .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
 
         let decision = {
-            let request = pending
+            let record = pending
                 .get(&submission.request_id)
                 .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
-            admit_verified_local_submission_v1(submission, request, verified_peer, evaluation)?
+            admit_verified_local_submission_v2(
+                submission,
+                &record.request,
+                &record.projection_digest,
+                verified_peer,
+                evaluation,
+            )?
         };
 
         let removed = pending
             .remove(&submission.request_id)
             .ok_or(LocalApprovalRequestStoreErrorV1::RequestDisappearedDuringConsume)?;
-        debug_assert_eq!(removed.request_id().ok().as_deref(), Some(submission.request_id.as_str()));
+        debug_assert_eq!(
+            removed.request.request_id().ok().as_deref(),
+            Some(submission.request_id.as_str())
+        );
 
+        Ok(ConsumedLocalApprovalDecisionV1 {
+            request_id: submission.request_id.clone(),
+            decision_evidence: decision,
+            consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
+        })
+    }
+
+    /// Test-only legacy V1 admission, isolated from production callers.
+    #[cfg(test)]
+    fn consume_verified_submission_v1(
+        &self,
+        submission: &LocalApprovalSubmissionV1,
+        verified_peer: &VerifiedLocalUnixPeerCredentialV1,
+        evaluation: AuthoritativeEvaluationV1,
+    ) -> Result<ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1> {
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| LocalApprovalRequestStoreErrorV1::StorePoisoned)?;
+        let record = pending
+            .get(&submission.request_id)
+            .ok_or(LocalApprovalRequestStoreErrorV1::RequestNotPending)?;
+        let v2 = LocalApprovalSubmissionV2 {
+            request_id: submission.request_id.clone(),
+            daemon_incarnation_id: submission.daemon_incarnation_id.clone(),
+            action_intent_digest: submission.action_intent_digest.clone(),
+            projection_digest: "00".repeat(32),
+            decision: submission.decision,
+            decided_at_unix_ms: submission.decided_at_unix_ms,
+        };
+        let decision = admit_verified_local_submission_v2(
+            &v2,
+            &record.request,
+            &"00".repeat(32),
+            verified_peer,
+            evaluation,
+        )?;
+        pending.remove(&submission.request_id);
         Ok(ConsumedLocalApprovalDecisionV1 {
             request_id: submission.request_id.clone(),
             decision_evidence: decision,
@@ -166,13 +230,20 @@ impl LocalApprovalRequestStoreV1 {
             None => return Ok(PendingRequestCurrentnessV1::NotPending),
         };
 
-        if now.as_u64() >= request.expires_at_unix_ms {
+        if now.as_u64() >= request.request.expires_at_unix_ms {
             Ok(PendingRequestCurrentnessV1::Expired)
         } else {
             Ok(PendingRequestCurrentnessV1::Current)
         }
     }
 
+}
+
+fn validate_projection_digest_v1(value: &str) -> Result<(), LocalApprovalRequestStoreErrorV1> {
+    if value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(LocalApprovalRequestStoreErrorV1::InvalidProjectionDigest);
+    }
+    Ok(())
 }
 
 impl std::fmt::Debug for LocalApprovalRequestStoreV1 {
@@ -361,7 +432,7 @@ mod tests {
 
         assert_eq!(
             store
-                .consume_verified_submission(&old_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
+                .consume_verified_submission_v1(&old_submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
             .unwrap_err(),
             LocalApprovalRequestStoreErrorV1::RequestNotPending
         );
