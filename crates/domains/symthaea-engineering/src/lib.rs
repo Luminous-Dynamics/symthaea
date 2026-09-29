@@ -34,6 +34,11 @@ pub mod engineering_identity;
 pub mod engineering_relation;
 pub use engineering_identity::EngineeringObjectId;
 pub use engineering_relation::{EngineeringRelation, EngineeringRelationKind, RelationFamily};
+pub mod scientific_lineage;
+pub use scientific_lineage::{
+    AuthorityCeiling, QualificationProjection, QualificationProjectionError,
+    ScientificLineageGraph, QUALIFICATION_POLICY, QUALIFICATION_PROJECTION_SCHEMA,
+};
 
 /// Debug-friendly wrapper for the fabrication autonomy loop.
 pub struct DebugFabricationLoop(pub AutonomyLoop);
