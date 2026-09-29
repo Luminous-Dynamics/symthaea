@@ -99,6 +99,8 @@ jobs:
           set -euo pipefail
           : > /tmp/workflow-files.txt
           : > /tmp/github-shell-files.txt
+          : > /tmp/github-python-files.txt
+          : > /tmp/github-json-files.txt
 
           case "${GITHUB_EVENT_NAME}" in
             pull_request)
@@ -113,6 +115,14 @@ jobs:
                 "${PR_BASE_SHA}...${PR_HEAD_SHA}" -- \
                 '.github/scripts/*.sh' \
                 > /tmp/github-shell-files.txt
+              git diff --diff-filter=ACMRT --name-only \
+                "${PR_BASE_SHA}...${PR_HEAD_SHA}" -- \
+                '.github/scripts/*.py' \
+                > /tmp/github-python-files.txt
+              git diff --diff-filter=ACMRT --name-only \
+                "${PR_BASE_SHA}...${PR_HEAD_SHA}" -- \
+                '.github/*.json' \
+                > /tmp/github-json-files.txt
               ;;
             push)
               if git rev-parse HEAD^ >/dev/null 2>&1; then
@@ -122,6 +132,12 @@ jobs:
                 git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
                   '.github/scripts/*.sh' \
                   > /tmp/github-shell-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
+                  '.github/scripts/*.py' \
+                  > /tmp/github-python-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
+                  '.github/*.json' \
+                  > /tmp/github-json-files.txt
               else
                 find .github/workflows -maxdepth 1 -type f \
                   \( -name '*.yml' -o -name '*.yaml' \) -print \
@@ -129,7 +145,11 @@ jobs:
                 if [ -d .github/scripts ]; then
                   find .github/scripts -maxdepth 1 -type f -name '*.sh' -print \
                     | sed 's#^./##' | sort > /tmp/github-shell-files.txt
+                  find .github/scripts -maxdepth 1 -type f -name '*.py' -print \
+                    | sed 's#^./##' | sort > /tmp/github-python-files.txt
                 fi
+                find .github -maxdepth 1 -type f -name '*.json' -print \
+                  | sed 's#^./##' | sort > /tmp/github-json-files.txt
               fi
               ;;
             workflow_dispatch)
@@ -151,6 +171,10 @@ jobs:
           cat /tmp/workflow-files.txt
           echo "Selected .github shell files:"
           cat /tmp/github-shell-files.txt
+          echo "Selected .github Python files:"
+          cat /tmp/github-python-files.txt
+          echo "Selected .github JSON files:"
+          cat /tmp/github-json-files.txt
 
           if [ -s /tmp/workflow-files.txt ]; then
             echo "workflows=true" >> "$GITHUB_OUTPUT"
@@ -161,6 +185,16 @@ jobs:
             echo "shells=true" >> "$GITHUB_OUTPUT"
           else
             echo "shells=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -s /tmp/github-python-files.txt ]; then
+            echo "python=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "python=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -s /tmp/github-json-files.txt ]; then
+            echo "json=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "json=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Lint changed workflows
@@ -189,6 +223,31 @@ jobs:
           while IFS= read -r file; do
             bash -n "$file"
           done < /tmp/github-shell-files.txt
+
+      - name: Compile changed GitHub Python helpers
+        if: steps.changed.outputs.python == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            python3 -m py_compile "$file"
+          done < /tmp/github-python-files.txt
+
+      - name: Validate changed GitHub JSON manifests
+        if: steps.changed.outputs.json == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            python3 -m json.tool "$file" >/dev/null
+          done < /tmp/github-json-files.txt
+
+      - name: Self-test changed PR governance validator
+        if: steps.changed.outputs.python == 'true' && grep -Fxq '.github/scripts/check-pr-governance.py' /tmp/github-python-files.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-pr-governance.py --self-test
 
       - name: Self-test changed CI helpers with embedded contracts
         if: steps.changed.outputs.shells == 'true'
@@ -233,6 +292,9 @@ jobs:
             echo "changed_workflows_only_on_pr=true"
             echo "repository_wide_draft_runner_ratchet=true"
             echo "changed_github_shell_scripts_bash_n=true"
+            echo "changed_github_python_py_compile=true"
+            echo "changed_github_json_tool=true"
+            echo "check_pr_governance_self_test_when_changed=true"
             echo "showroom_hygiene_self_test_when_changed=true"
             echo "shellcheck_integration=false"
             echo "pyflakes_integration=false"
