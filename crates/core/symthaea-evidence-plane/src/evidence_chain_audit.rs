@@ -113,5 +113,3 @@ fn put(h: &mut Sha256, s: &str) {
 }
 
 fn d(code:&str, detail:&str)->EvidenceChainDiagnostic { EvidenceChainDiagnostic { code: code.into(), detail: detail.into() } }
-}
-fn d(code:&str, detail:&str)->EvidenceChainDiagnostic { EvidenceChainDiagnostic { code: code.into(), detail: detail.into() } }
