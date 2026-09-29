@@ -253,6 +253,31 @@ class ReceiptVerifierAdversarialTests(unittest.TestCase):
             result = self.verify(receipt)
             self.assertNotEqual(result.returncode, 0)
 
+    def test_duplicate_repeated_subject_surface_entry_is_rejected(self) -> None:
+        rendered = render(valid_values()).replace(
+            "subject_changed_file\t" + EXPECTED_FILES[1] + "\n",
+            "subject_changed_file\t" + EXPECTED_FILES[1] + "\n"
+            "subject_changed_file\t" + EXPECTED_FILES[1] + "\n",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = Path(tmp) / "receipt.tsv"
+            receipt.write_text(rendered, encoding="utf-8")
+            result = self.verify(receipt)
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_malformed_tsv_is_rejected(self) -> None:
+        rendered = render(valid_values()).replace(
+            "status\tPASS\n",
+            "status\tPASS\textra\n",
+            1,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = Path(tmp) / "receipt.tsv"
+            receipt.write_text(rendered, encoding="utf-8")
+            result = self.verify(receipt)
+            self.assertNotEqual(result.returncode, 0)
+
     def test_missing_scalar_is_rejected(self) -> None:
         lines = render(valid_values()).splitlines()
         rendered = "\n".join(line for line in lines if not line.startswith("status\t")) + "\n"
@@ -284,6 +309,14 @@ class ReceiptVerifierAdversarialTests(unittest.TestCase):
             receipt.write_text(render(values), encoding="utf-8")
             result = self.verify(receipt)
             self.assertEqual(result.returncode, 0, msg=result.stderr)
+
+    def test_github_provider_requires_numeric_attempt(self) -> None:
+        values = valid_values()
+        values["qualification_provider"] = "github-actions"
+        values["github_repository"] = "Luminous-Dynamics/symthaea"
+        values["github_run_id"] = "36518655785"
+        values["github_run_attempt"] = "not-a-number"
+        self.assert_rejected(values, "github-actions nonnumeric run attempt")
 
     def test_github_provider_requires_positive_run_identity(self) -> None:
         values = valid_values()
