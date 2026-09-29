@@ -17,7 +17,18 @@ pub enum HistoryEvent {
 
 /// Semantic mapping from a concrete history to a player's information set.
 pub trait InformationEncoder {
-    fn encode(&self, player: PlayerId, state: DecisionStateId, history: &[HistoryEvent]) -> Result<crate::strategic_context::InformationSetId, String>;
+    fn encode(
+        &self,
+        player: PlayerId,
+        state: DecisionStateId,
+        history: &[HistoryEvent],
+    ) -> Result<crate::strategic_context::InformationSetId, InformationEncodingError>;
+}
+
+/// Failure returned by a semantic information encoder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InformationEncodingError {
+    pub message: String,
 }
 
 
@@ -230,7 +241,10 @@ impl ExtensiveGame {
         for state in &self.information.decision_states {
             let paths = histories.get(&state.state).ok_or(ExtensiveGameError::InformationMemberNotReachable(state.state))?;
             for history in paths {
-                let encoded = encoder.encode(state.player, state.state, history).map_err(|message| ExtensiveGameError::InformationEncodingFailed { state: state.state, message })?;
+                let encoded = encoder.encode(state.player, state.state, history).map_err(|error| ExtensiveGameError::InformationEncodingFailed {
+                        state: state.state,
+                        message: error.message,
+                    })?;
                 if encoded != state.information_set {
                     return Err(ExtensiveGameError::InformationEncodingMismatch { state: state.state, expected: state.information_set, actual: encoded });
                 }
@@ -771,11 +785,11 @@ mod tests {
                 _player: PlayerId,
                 state: DecisionStateId,
                 _history: &[HistoryEvent],
-            ) -> Result<InformationSetId, String> {
+            ) -> Result<InformationSetId, InformationEncodingError> {
                 if state == DecisionStateId(0) {
                     Ok(InformationSetId(0))
                 } else {
-                    Err("unexpected state".into())
+                    Err(InformationEncodingError { message: "unexpected state".into() })
                 }
             }
         }
@@ -798,6 +812,45 @@ mod tests {
         };
 
         assert_eq!(game.verify_information_encoder(&Encoder), Ok(()));
+    }
+
+
+    #[test]
+    fn rejects_semantic_information_encoder_mismatch() {
+        struct Encoder;
+
+        impl InformationEncoder for Encoder {
+            fn encode(
+                &self,
+                _player: PlayerId,
+                _state: DecisionStateId,
+                _history: &[HistoryEvent],
+            ) -> Result<InformationSetId, InformationEncodingError> {
+                Ok(InformationSetId(99))
+            }
+        }
+
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition { action: ActionId(0), next: DecisionStateId(1) },
+                        Transition { action: ActionId(1), next: DecisionStateId(2) },
+                    ],
+                },
+                ExtensiveNode::Terminal { state: DecisionStateId(1), payoffs: vec![1.0] },
+                ExtensiveNode::Terminal { state: DecisionStateId(2), payoffs: vec![0.0] },
+            ],
+            information: info(),
+        };
+
+        assert!(matches!(
+            game.verify_information_encoder(&Encoder),
+            Err(ExtensiveGameError::InformationEncodingMismatch { .. })
+        ));
     }
 
     #[test]
