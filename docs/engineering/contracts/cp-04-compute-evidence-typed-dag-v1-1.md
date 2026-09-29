@@ -81,6 +81,17 @@ Changing a node does not rewrite historical nodes. Requalification produces a ne
 Currentness and applicability are dependency boundaries; they are not evidence of performance or execution.
 
 
+
+## Invalidation algebra invariants
+
+The qualifier MUST also preserve three closure-algebra properties over representative edge removals:
+
+- **Locality:** removing a dependency cannot unexpectedly alter an unrelated node's closure.
+- **Monotonicity:** removing dependencies cannot introduce new reachable downstream nodes.
+- **Compositionality:** applying two dependency removals sequentially MUST produce the same closure as applying the two removals together, independent of removal order.
+
+These are deterministic graph semantics only; they do not imply physical execution, performance, availability, or operational authority.
+
 ## Edge-level closure sensitivity
 
 The qualifier additionally verifies representative dependency edges at the closure boundary. Removing a dependency edge MUST remove exactly the downstream nodes reachable only through that edge from the edge's source closure; unrelated closure members MUST remain unchanged. This is a semantic sensitivity check, not a physical execution claim.
