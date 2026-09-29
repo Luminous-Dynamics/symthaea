@@ -2332,6 +2332,74 @@ mod tests {
     }
 
     #[test]
+    fn mixed_range_and_values_enumeration_is_deterministic_and_cartesian() {
+        let width = ParameterIdV1::new("width").unwrap();
+        let height = ParameterIdV1::new("height").unwrap();
+        let domain = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: height.clone(),
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(100).unwrap(),
+                    upper: C0LengthUmV1::new(300).unwrap(),
+                    step_um: 100,
+                },
+            },
+            ExactDesignParameterDomainV1 {
+                id: width.clone(),
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+        ])
+        .unwrap();
+
+        let candidates = domain.enumerate().unwrap();
+        let observed = candidates
+            .iter()
+            .map(|candidate| {
+                (
+                    candidate.parameter(&height).unwrap().value_um(),
+                    candidate.parameter(&width).unwrap().value_um(),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            observed,
+            vec![(100, 10), (200, 10), (300, 10), (100, 20), (200, 20), (300, 20)]
+        );
+        assert_eq!(candidates.len(), 6);
+
+        let unique_ids = candidates
+            .iter()
+            .map(|candidate| candidate.id().unwrap())
+            .collect::<BTreeSet<_>>();
+        assert_eq!(unique_ids.len(), candidates.len());
+
+        let reversed = ExactDesignSearchDomainV1::new(vec![
+            ExactDesignParameterDomainV1 {
+                id: width,
+                domain: ExactLengthDomainV1::Values(vec![
+                    C0LengthUmV1::new(10).unwrap(),
+                    C0LengthUmV1::new(20).unwrap(),
+                ]),
+            },
+            ExactDesignParameterDomainV1 {
+                id: height,
+                domain: ExactLengthDomainV1::Range {
+                    lower: C0LengthUmV1::new(100).unwrap(),
+                    upper: C0LengthUmV1::new(300).unwrap(),
+                    step_um: 100,
+                },
+            },
+        ])
+        .unwrap();
+
+        assert_eq!(reversed.enumerate().unwrap(), candidates);
+    }
+
+    #[test]
     fn cartesian_enumeration_fails_closed_on_cardinality_overflow() {
         // Build a domain whose mathematical Cartesian product exceeds usize::MAX
         // without requiring the test to materialize any candidates.
