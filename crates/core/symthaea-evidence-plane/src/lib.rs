@@ -48,6 +48,7 @@
 
 pub mod candidate_commitment;
 pub mod external_observation;
+pub mod independent_assessment;
 pub mod prospective;
 pub mod prospective_audit;
 pub mod seed_plan;
