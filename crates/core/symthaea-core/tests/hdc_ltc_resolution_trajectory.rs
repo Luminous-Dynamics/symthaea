@@ -133,6 +133,8 @@ fn legacy_dilate_with_fresh_low_parameters_is_a_negative_control() {
         // Deliberately keep the low-resolution neuron parameters freshly generated.
         // This is a negative control, not a valid resolution transition: the
         // current runtime has no public parameter-conversion contract yet.
+        let mut low = neuron(lo);
+        low.set_state(low_start);
 
         let mut converted_high = Vec::with_capacity(9);
         converted_high.push(high[0].clone());
