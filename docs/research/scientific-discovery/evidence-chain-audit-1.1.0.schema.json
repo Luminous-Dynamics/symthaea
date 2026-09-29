@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://symthaea.org/schemas/scientific-discovery/evidence-chain-audit-1.1.0.schema.json",
+  "title": "Symthaea Evidence Chain Audit 1.1.0",
+  "description": "Deterministic structural audit projection with typed diagnostics and content identity. Complete means structurally consistent only.",
+  "type": "object",
+  "required": ["status","challenge_id","criterion_id","criterion_generation","observation_id","assessment_id","replication_id","evidence_id","diagnostics","audit_digest"],
+  "properties": {
+    "status": {"enum":["complete","invalid"]},
+    "challenge_id":{"type":"string","minLength":1},
+    "criterion_id":{"type":"string","minLength":1},
+    "criterion_generation":{"type":"string","minLength":1},
+    "observation_id":{"type":"string","minLength":1},
+    "assessment_id":{"type":"string","minLength":1},
+    "replication_id":{"type":"string","minLength":1},
+    "evidence_id":{"type":"string","minLength":1},
+    "audit_digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},
+    "diagnostics":{
+      "type":"array",
+      "items":{
+        "type":"object",
+        "required":["code","detail"],
+        "properties":{
+          "code":{"enum":["invalid_observation","invalid_assessment","invalid_replication","invalid_criterion_evidence","assessment_observation_mismatch","assessment_commitment_mismatch","replication_observation_mismatch","replication_assessment_mismatch","replication_commitment_mismatch","criterion_lineage_mismatch","evidence_observation_mismatch","evidence_assessment_mismatch","evidence_replication_mismatch","evidence_commitment_mismatch"]},
+          "detail":{"type":"string","minLength":1}
+        },
+        "additionalProperties":false
+      }
+    }
+  },
+  "additionalProperties":false,
+  "x-authority":"structural_integrity_audit_only",
+  "x-non-equivalences":["complete != scientific_truth","complete != criterion_completed","complete != authenticated_authority","diagnostic != scientific_judgment","audit_digest != digital_signature"],
+  "x-dkg-role":"queryable provenance projection only; immutable evidence records/events remain authoritative."
+}
