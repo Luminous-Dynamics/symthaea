@@ -66,6 +66,9 @@ impl EvidenceLineageDkgFederationManifest {
         if !projection.verify_integrity() {
             return Err(FederationManifestError::InvalidProjection);
         }
+        if projection.verify_semantic_invariants().is_err() {
+            return Err(FederationManifestError::InvalidSemanticProjection);
+        }
         if projection.projection_version != PROJECTION_SCHEMA_VERSION {
             return Err(FederationManifestError::ProjectionVersionMismatch);
         }
@@ -118,6 +121,9 @@ impl EvidenceLineageDkgFederationManifest {
     ) -> Result<(), FederationManifestError> {
         if !projection.verify_integrity() {
             return Err(FederationManifestError::InvalidProjection);
+        }
+        if projection.verify_semantic_invariants().is_err() {
+            return Err(FederationManifestError::InvalidSemanticProjection);
         }
         if self.manifest_version != MANIFEST_VERSION {
             return Err(FederationManifestError::ManifestVersionMismatch);
@@ -219,6 +225,7 @@ impl EvidenceLineageDkgFederationManifest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FederationManifestError {
     InvalidProjection,
+    InvalidSemanticProjection,
     ManifestVersionMismatch,
     ProjectionVersionMismatch,
     CanonicalizationMismatch,
@@ -292,24 +299,18 @@ mod tests {
 
     fn projection(with_audit: bool) -> EvidenceLineageDkgProjection {
         let mut nodes = vec![
-            DkgNode {
-                node_id: "commitment:1".into(),
-                node_type: DkgNodeType::CandidateCommitment,
-                record_digest: "sha256:commitment".into(),
-                supersedes_node_id: None,
-            },
-            DkgNode {
-                node_id: "observation:1".into(),
-                node_type: DkgNodeType::ExternalObservation,
-                record_digest: "sha256:observation".into(),
-                supersedes_node_id: None,
-            },
+            DkgNode { node_id: "commitment:1".into(), node_type: DkgNodeType::CandidateCommitment, record_digest: "sha256:commitment".into(), supersedes_node_id: None },
+            DkgNode { node_id: "observation:1".into(), node_type: DkgNodeType::ExternalObservation, record_digest: "sha256:observation".into(), supersedes_node_id: None },
+            DkgNode { node_id: "assessment:1".into(), node_type: DkgNodeType::IndependentAssessment, record_digest: "sha256:assessment".into(), supersedes_node_id: None },
+            DkgNode { node_id: "replication:1".into(), node_type: DkgNodeType::Replication, record_digest: "sha256:replication".into(), supersedes_node_id: None },
+            DkgNode { node_id: "evidence:1".into(), node_type: DkgNodeType::CriterionEvidence, record_digest: "sha256:evidence".into(), supersedes_node_id: None },
         ];
-        let mut edges = vec![DkgEdge {
-            source_node_id: "observation:1".into(),
-            edge_type: DkgEdgeType::ObservedFrom,
-            target_node_id: "commitment:1".into(),
-        }];
+        let mut edges = vec![
+            DkgEdge { source_node_id: "observation:1".into(), edge_type: DkgEdgeType::ObservedFrom, target_node_id: "commitment:1".into() },
+            DkgEdge { source_node_id: "assessment:1".into(), edge_type: DkgEdgeType::Assesses, target_node_id: "observation:1".into() },
+            DkgEdge { source_node_id: "replication:1".into(), edge_type: DkgEdgeType::Replicates, target_node_id: "assessment:1".into() },
+            DkgEdge { source_node_id: "evidence:1".into(), edge_type: DkgEdgeType::EligibleFor, target_node_id: "replication:1".into() },
+        ];
         if with_audit {
             nodes.push(DkgNode {
                 node_id: "audit:sha256:a".into(),
@@ -318,7 +319,7 @@ mod tests {
                 supersedes_node_id: None,
             });
             edges.push(DkgEdge {
-                source_node_id: "observation:1".into(),
+                source_node_id: "evidence:1".into(),
                 edge_type: DkgEdgeType::AuditedBy,
                 target_node_id: "audit:sha256:a".into(),
             });
