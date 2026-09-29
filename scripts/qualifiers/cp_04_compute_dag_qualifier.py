@@ -223,17 +223,18 @@ def validate_closure_algebra(base):
     baseline = expected_closures(base)
     edges = [tuple(e) for e in base["edges"]]
 
-    # Locality: removing one edge cannot alter an unrelated source's closure.
+    # Locality: removing src -> dst can only affect closures that reach src.
+    # The baseline closure itself is the reachability oracle, so a node whose
+    # closure does not contain src is independent of this edge removal.
     for edge in CLOSURE_EDGE_MUTATIONS:
         _, removed = edge
         candidate = copy.deepcopy(base)
         candidate["edges"].remove(list(removed))
         observed = expected_closures(candidate)
-        src, _, dst = removed
+        src, _, _ = removed
         for node in base["node_types"]:
-            if node != src and node not in baseline[src]:
-                if observed[node] != baseline[node]:
-                    fail("edge removal escaped its affected closure", "CP-COMP-DAG-CLOSURE")
+            if src not in baseline[node] and observed[node] != baseline[node]:
+                fail("edge removal escaped its affected ancestor closure", "CP-COMP-DAG-CLOSURE")
 
     # Monotonicity: removing dependencies cannot introduce new reachable nodes.
     for edge in edges:
@@ -244,7 +245,8 @@ def validate_closure_algebra(base):
             if not set(observed[node]).issubset(set(baseline[node])):
                 fail("edge removal increased closure", "CP-COMP-DAG-CLOSURE")
 
-    # Compositionality: sequential removal of two edges must equal batch removal.
+    # Compositionality: sequential removal of two edges must equal batch removal
+    # in either order.
     pairs = [(CLOSURE_EDGE_MUTATIONS[0], CLOSURE_EDGE_MUTATIONS[1]),
              (CLOSURE_EDGE_MUTATIONS[2], CLOSURE_EDGE_MUTATIONS[4])]
     for left, right in pairs:
@@ -253,16 +255,16 @@ def validate_closure_algebra(base):
         candidate_a["edges"].remove(list(right[1]))
         batch = expected_closures(candidate_a)
 
-        candidate_b = copy.deepcopy(base)
-        candidate_b["edges"].remove(list(left[1]))
-        sequential = expected_closures(candidate_b)
-        candidate_b["edges"].remove(list(right[1]))
-        sequential = expected_closures(candidate_b)
-        if sequential != batch:
-            fail("closure composition is order-dependent", "CP-COMP-DAG-CLOSURE")
+        for first, second in ((left, right), (right, left)):
+            candidate_b = copy.deepcopy(base)
+            candidate_b["edges"].remove(list(first[1]))
+            candidate_b["edges"].remove(list(second[1]))
+            sequential = expected_closures(candidate_b)
+            if sequential != batch:
+                fail("closure composition is order-dependent", "CP-COMP-DAG-CLOSURE")
 
 def validate_edge_closure_sensitivity(base):
-    """Every dependency edge must contribute exactly its target closure."""
+    """Representative dependency edges contribute their reachable target closures."""
     baseline = expected_closures(base)
     for mutation_id, edge in CLOSURE_EDGE_MUTATIONS:
         candidate = copy.deepcopy(base)
