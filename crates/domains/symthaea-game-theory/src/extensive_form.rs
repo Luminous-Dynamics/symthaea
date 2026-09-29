@@ -353,8 +353,64 @@ impl ExtensiveGame {
         Ok(())
     }
 
+    /// Verify that each declared information set is stable under the player's
+    /// actual action-observation history.
+    ///
+    /// This is intentionally stronger than the legacy own-action-only recall
+    /// check: if a player can observe an opponent action, chance outcome, or
+    /// semantic observation, two histories that differ on that event cannot
+    /// silently collapse into one information set.
+    pub fn verify_information_history_consistency(&self) -> Result<(), ExtensiveGameError> {
+        self.validate()?;
+
+        let mut histories: HashMap<DecisionStateId, Vec<Vec<HistoryEvent>>> = HashMap::new();
+        self.collect_information_histories(self.root, Vec::new(), &mut histories)?;
+
+        for info_set in &self.information.information_sets {
+            let mut expected: Option<Vec<PlayerHistoryEvent>> = None;
+
+            for member in &info_set.members {
+                let member_histories = histories
+                    .get(member)
+                    .ok_or(ExtensiveGameError::InformationMemberNotReachable(*member))?;
+
+                let mut local_histories = member_histories
+                    .iter()
+                    .map(|history| project_player_history(info_set.player, history))
+                    .collect::<Vec<_>>();
+                local_histories.sort();
+                local_histories.dedup();
+
+                if local_histories.len() != 1 {
+                    return Err(ExtensiveGameError::InformationHistoryMismatch {
+                        information_set: info_set.id,
+                        state: *member,
+                    });
+                }
+
+                let actual = local_histories
+                    .pop()
+                    .expect("one history after semantic validation");
+
+                if let Some(expected) = &expected {
+                    if *expected != actual {
+                        return Err(ExtensiveGameError::InformationHistoryMismatch {
+                            information_set: info_set.id,
+                            state: *member,
+                        });
+                    }
+                } else {
+                    expected = Some(actual);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn verify_perfect_recall(&self) -> Result<PerfectRecallEvidence, ExtensiveGameError> {
         self.validate()?;
+        self.verify_information_history_consistency()?;
 
         // A caller cannot manufacture a Verified marker by constructing a
         // compatible-looking information structure: verification always runs
@@ -580,6 +636,10 @@ pub enum ExtensiveGameError {
     ObservationStateMissing(DecisionStateId),
     DuplicateObservationObserver { state: DecisionStateId, observer: PlayerId },
     InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
+    InformationHistoryMismatch {
+        information_set: crate::strategic_context::InformationSetId,
+        state: DecisionStateId,
+    },
     PerfectRecallViolation {
         information_set: crate::strategic_context::InformationSetId,
         state: DecisionStateId,
@@ -940,6 +1000,180 @@ mod tests {
             event,
             PlayerHistoryEvent::Observation { observation: ObservationId(7), .. }
         )));
+    }
+
+    #[test]
+    fn player_history_is_independent_of_omniscient_state_identity() {
+        let first = vec![
+            HistoryEvent::Decision {
+                state: DecisionStateId(10),
+                player: PlayerId(0),
+                information_set: InformationSetId(0),
+                action: ActionId(3),
+                visibility: EventVisibility::Public,
+            },
+            HistoryEvent::Chance {
+                state: DecisionStateId(11),
+                outcome: ChanceOutcomeId(5),
+                next: DecisionStateId(12),
+                visibility: EventVisibility::Public,
+            },
+        ];
+        let second = vec![
+            HistoryEvent::Decision {
+                state: DecisionStateId(100),
+                player: PlayerId(0),
+                information_set: InformationSetId(0),
+                action: ActionId(3),
+                visibility: EventVisibility::Public,
+            },
+            HistoryEvent::Chance {
+                state: DecisionStateId(101),
+                outcome: ChanceOutcomeId(5),
+                next: DecisionStateId(102),
+                visibility: EventVisibility::Public,
+            },
+        ];
+
+        assert_eq!(
+            project_player_history(PlayerId(0), &first),
+            project_player_history(PlayerId(0), &second)
+        );
+    }
+
+    #[test]
+    fn verifies_information_history_consistency() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(1),
+                    payoffs: vec![1.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(2),
+                    payoffs: vec![0.0],
+                },
+            ],
+            information: info(),
+            observations: HashMap::new(),
+        };
+
+        assert_eq!(game.verify_information_history_consistency(), Ok(()));
+    }
+
+    #[test]
+    fn semantic_information_history_rejects_observed_action_collapse() {
+        let game = ExtensiveGame {
+            root: DecisionStateId(0),
+            nodes: vec![
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(0),
+                    player: PlayerId(1),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(0),
+                            next: DecisionStateId(1),
+                            visibility: EventVisibility::Public,
+                        },
+                        Transition {
+                            action: ActionId(1),
+                            next: DecisionStateId(2),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(1),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(2),
+                            next: DecisionStateId(3),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Decision {
+                    state: DecisionStateId(2),
+                    player: PlayerId(0),
+                    actions: vec![
+                        Transition {
+                            action: ActionId(2),
+                            next: DecisionStateId(4),
+                            visibility: EventVisibility::Public,
+                        },
+                    ],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(3),
+                    payoffs: vec![1.0, 0.0],
+                },
+                ExtensiveNode::Terminal {
+                    state: DecisionStateId(4),
+                    payoffs: vec![0.0, 1.0],
+                },
+            ],
+            information: InformationStructure {
+                decision_states: vec![
+                    DecisionState {
+                        state: DecisionStateId(0),
+                        player: PlayerId(1),
+                        information_set: InformationSetId(1),
+                        legal_actions: vec![ActionId(0), ActionId(1)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(1),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(0),
+                        legal_actions: vec![ActionId(2)],
+                    },
+                    DecisionState {
+                        state: DecisionStateId(2),
+                        player: PlayerId(0),
+                        information_set: InformationSetId(0),
+                        legal_actions: vec![ActionId(2)],
+                    },
+                ],
+                information_sets: vec![
+                    InformationSet {
+                        id: InformationSetId(1),
+                        player: PlayerId(1),
+                        members: vec![DecisionStateId(0)],
+                    },
+                    InformationSet {
+                        id: InformationSetId(0),
+                        player: PlayerId(0),
+                        members: vec![DecisionStateId(1), DecisionStateId(2)],
+                    },
+                ],
+            },
+            observations: HashMap::new(),
+        };
+
+        assert!(matches!(
+            game.verify_information_history_consistency(),
+            Err(ExtensiveGameError::InformationHistoryMismatch {
+                information_set: InformationSetId(0),
+                ..
+            })
+        ));
     }
 
     #[test]
