@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GRAPH = ROOT / "docs/engineering/data/cp-04-compute-evidence-dag-v1-1.json"
+MANIFEST = ROOT / "docs/engineering/data/cp-04-compute-evidence-dag-mutation-manifest-v1-1.json"
 SCHEMA = "cp-04-compute-evidence-dag-v1-1"
 CLAIM_CEILING = "typed dependency and invalidation semantics over synthetic/reference workflows only; no physical execution, performance, compiler, accelerator, model, deployment, safety, or operational-authority claim"
 
@@ -171,6 +172,18 @@ MUTATIONS = (
     ("add-cycle", "CP-COMP-DAG-ACYCLIC", lambda g: g["edges"].append(["disposition", "derives", "model"])),
 )
 
+def validate_mutation_manifest():
+    try:
+        manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    except Exception as exc:
+        fail(f"cannot load mutation manifest: {exc}", "CP-COMP-DAG-MUTATION")
+    if set(manifest) != {"schema", "mutations"} or manifest["schema"] != "cp-04-compute-evidence-dag-mutation-manifest-v1-1":
+        fail("mutation manifest schema mismatch", "CP-COMP-DAG-MUTATION")
+    expected = [{"mutation_id": label, "expected_guard_id": guard} for label, guard, _ in MUTATIONS]
+    if manifest["mutations"] != expected:
+        fail("mutation manifest does not exactly bind executable mutation suite", "CP-COMP-DAG-MUTATION")
+    return digest(manifest)
+
 def validate(g):
     validate_shape(g)
     validate_acyclic(g)
@@ -210,6 +223,7 @@ def run_mutations(base):
 
 def main():
     source_audit()
+    manifest_identity = validate_mutation_manifest()
     graph = load()
     validate(graph)
 
@@ -238,6 +252,7 @@ def main():
     receipt = {
         "schema": "cp-04-compute-evidence-dag-qualification-receipt-v1-1",
         "graph_identity": identity,
+        "mutation_manifest_identity": manifest_identity,
         "mutation_results": results,
         "claim_ceiling": CLAIM_CEILING,
         "physical_execution_authority": False,
