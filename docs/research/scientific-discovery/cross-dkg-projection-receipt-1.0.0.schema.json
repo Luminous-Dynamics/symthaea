@@ -40,7 +40,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["record_id", "record_digest"],
+        "required": ["record_id", "record_digest", "origin"],
         "properties": {
           "record_id": { "type": "string", "minLength": 1 },
           "record_digest": {

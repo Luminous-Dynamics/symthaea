@@ -154,6 +154,15 @@ impl FederatedProjectionReceipt {
         }) {
             return Err(ProjectionReceiptError::NonCanonicalOutputOrder);
         }
+        if self.outputs.iter().any(|output| {
+            !matches!(
+                output.origin,
+                FederatedProjectionOutputOrigin::SourceReference
+                    | FederatedProjectionOutputOrigin::DerivedFromProjection
+            )
+        }) {
+            return Err(ProjectionReceiptError::InvalidOutputOrigin);
+        }
         if self.projection_digest != self.compute_digest() {
             return Err(ProjectionReceiptError::ProjectionDigestMismatch);
         }
@@ -165,6 +174,36 @@ impl FederatedProjectionReceipt {
     pub fn verify_ancestry(receipts: &[FederatedProjectionReceipt]) -> Result<(), ProjectionReceiptError> {
         let mut by_digest = std::collections::BTreeMap::new();
         for receipt in receipts {
+            if receipt.receipt_version != VERSION
+                || receipt.projection_id.trim().is_empty()
+                || receipt.projection_version.trim().is_empty()
+                || receipt.collection_digest.trim().is_empty()
+                || receipt.projection_digest.trim().is_empty()
+            {
+                return Err(ProjectionReceiptError::InvalidProjectionAncestryReceipt);
+            }
+            if receipt.parent_projection_digests.windows(2).any(|w| w[0] >= w[1])
+                || receipt.parent_projection_digests.iter().any(|d| !valid_digest(d))
+                || receipt.parent_projection_digests.iter().any(|d| d == &receipt.projection_digest)
+            {
+                return Err(ProjectionReceiptError::InvalidProjectionAncestryReceipt);
+            }
+            if receipt.adapter_receipt_digests.is_empty()
+                || receipt.adapter_receipt_digests.windows(2).any(|w| w[0] >= w[1])
+                || receipt.adapter_receipt_digests.iter().any(|d| !valid_digest(d))
+                || receipt.outputs.is_empty()
+                || receipt.outputs.windows(2).any(|w| {
+                    (w[0].record_id.as_str(), w[0].record_digest.as_str())
+                        >= (w[1].record_id.as_str(), w[1].record_digest.as_str())
+                })
+                || receipt.outputs.iter().any(|o| {
+                    o.record_id.trim().is_empty()
+                        || !valid_digest(&o.record_digest)
+                })
+                || receipt.projection_digest != receipt.compute_digest()
+            {
+                return Err(ProjectionReceiptError::InvalidProjectionAncestryReceipt);
+            }
             if by_digest.insert(receipt.projection_digest.clone(), receipt).is_some() {
                 return Err(ProjectionReceiptError::DuplicateProjectionDigest);
             }
@@ -198,7 +237,6 @@ impl FederatedProjectionReceipt {
             }
         }
         Ok(())
-    }
     }
 
     /// Verifies each receipt against its exact declaration/link pair, then
@@ -237,6 +275,10 @@ impl FederatedProjectionReceipt {
         for output in &self.outputs {
             put(&mut h, &output.record_id);
             put(&mut h, &output.record_digest);
+            put(&mut h, match output.origin {
+                FederatedProjectionOutputOrigin::SourceReference => "source_reference",
+                FederatedProjectionOutputOrigin::DerivedFromProjection => "derived_from_projection",
+            });
         }
         format!("sha256:{:x}", h.finalize())
     }
@@ -245,6 +287,12 @@ impl FederatedProjectionReceipt {
 fn put(h: &mut Sha256, value: &str) {
     h.update((value.len() as u64).to_be_bytes());
     h.update(value.as_bytes());
+}
+
+fn valid_digest(value: &str) -> bool {
+    value.len() == 71
+        && value.starts_with("sha256:")
+        && value.as_bytes()[7..].iter().all(|b| b.is_ascii_hexdigit())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -271,6 +319,8 @@ pub enum ProjectionReceiptError {
     DuplicateProjectionDigest,
     MissingParentProjection,
     CyclicParentProjection,
+    InvalidOutputOrigin,
+    InvalidProjectionAncestryReceipt,
 }
 
 impl From<CrossDkgCollectionError> for ProjectionReceiptError {
@@ -354,6 +404,38 @@ mod tests {
         assert_eq!(
             FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]),
             Err(ProjectionReceiptError::ReceiptNotInCollection)
+        );
+    }
+
+    #[test]
+    fn output_origin_is_digest_bound() {
+        let d = declaration();
+        let l = link();
+        let r = CrossDkgAdapterReceipt::derive_reference(
+            &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
+        ).unwrap();
+        let c = CrossDkgLinkCollection::new(vec![l]).unwrap();
+        let mut p = FederatedProjectionReceipt::new(
+            "projection:1", "1", &c, &[r], &["sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"],
+        ).unwrap();
+        p.outputs[0].origin = FederatedProjectionOutputOrigin::SourceReference;
+        assert_eq!(p.verify_integrity(&c), Err(ProjectionReceiptError::ProjectionDigestMismatch));
+    }
+
+    #[test]
+    fn ancestry_rejects_tampered_receipt() {
+        let d = declaration();
+        let l = link();
+        let r = CrossDkgAdapterReceipt::derive_reference(
+            &d, &l, AdapterDisposition::ReferenceOnly, "local:1", "sha256:o1"
+        ).unwrap();
+        let c = CrossDkgLinkCollection::new(vec![l]).unwrap();
+        let p = FederatedProjectionReceipt::new("projection:1", "1", &c, &[r], &[]).unwrap();
+        let mut tampered = p.clone();
+        tampered.outputs[0].record_id = "changed".into();
+        assert_eq!(
+            FederatedProjectionReceipt::verify_ancestry(&[tampered]),
+            Err(ProjectionReceiptError::InvalidProjectionAncestryReceipt)
         );
     }
 
