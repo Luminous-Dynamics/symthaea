@@ -212,7 +212,7 @@ class ReceiptVerifierAdversarialTests(unittest.TestCase):
             "source_state": "dirty",
             "expected_rust_release": "1.95.0",
             "rustc_release": "1.95.0",
-            "rustc_commit_hash": "8" * 40,
+            "rustc_commit_hash": "not-a-commit-hash",
             "cargo_version": "cargo 1.95.0 (fixture)",
             "cargo_lock_sha256": "9" * 64,
             "rust_toolchain_sha256": "a" * 64,
