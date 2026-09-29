@@ -63,11 +63,18 @@ jobs:
           echo "base_is_ancestor_of_checkout=true"
           echo "head_is_ancestor_of_checkout=true"
 
-      - name: Check for safety-critical changes
+      - name: Enforce exact PR governance policy
         shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          bash scripts/check-class-a-changes.sh --ci
+          python3 .github/scripts/check-pr-governance.py --self-test
+          python3 .github/scripts/check-pr-governance.py \
+            --base-sha "${PR_BASE_SHA}" \
+            --head-sha "${PR_HEAD_SHA}" \
+            | tee pr-governance-policy-receipt.txt
 
       - name: Preserve Showroom hygiene
         shell: bash
@@ -89,6 +96,7 @@ jobs:
           checkout_sha="$(git rev-parse HEAD)"
           {
             echo "execution_subject=PR_MERGE_CONTEXT"
+            echo "changeset_subject=EXACT_EVENT_BASE_HEAD"
             echo "pr_number=${PR_NUMBER}"
             echo "associated_head_sha=${PR_HEAD_SHA}"
             echo "associated_base_sha=${PR_BASE_SHA}"
@@ -99,6 +107,12 @@ jobs:
             echo "head_is_ancestor_of_checkout=true"
             echo "pr_draft=${PR_DRAFT}"
             echo "execution_identity_check=pass"
+            echo "exact_changeset_governance_check=pass"
+            echo "class_a_structural_policy=pass_or_not_applicable"
+            echo "class_a_scientific_adequacy=not_established_by_this_check"
+            echo "class_a_test_execution=not_established_by_this_check"
+            echo "class_b_fail_closed_policy=deferred_policy_reconciliation"
+            echo "legacy_class_a_helper_authority=local_hook_only"
             echo "governance_check=pass"
             echo "showroom_hygiene_check=pass"
             echo "draft_ci_gate_check=pass"
