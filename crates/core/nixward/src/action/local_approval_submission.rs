@@ -20,7 +20,7 @@ use super::local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
     PendingNixApprovalRequestV1,
 };
-use super::temporal::UnixMillisV1;
+use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -105,7 +105,7 @@ pub fn admit_verified_local_submission_v1(
     submission: &LocalApprovalSubmissionV1,
     request: &PendingNixApprovalRequestV1,
     verified_peer: &VerifiedLocalUnixPeerCredentialV1,
-    now: UnixMillisV1,
+    evaluation: AuthoritativeEvaluationV1,
 ) -> Result<LocalNixApprovalDecisionV1, LocalApprovalAdmissionErrorV1> {
     submission.validate_against(request)?;
 
@@ -119,7 +119,7 @@ pub fn admit_verified_local_submission_v1(
 
     // Re-evaluate immediately against the daemon's current view so a decision
     // from the future or an expired request cannot become admitted evidence.
-    let evaluated = decision.evaluate_against(request, now)?;
+    let evaluated = decision.evaluate_against(request, evaluation)?;
     debug_assert_eq!(evaluated, submission.decision);
 
     Ok(decision)
@@ -213,7 +213,7 @@ mod tests {
         let peer = peer(1000, 4242);
 
         let admitted =
-            admit_verified_local_submission_v1(&submission, &request, &peer, ms(1_300)).unwrap();
+            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
 
         assert_eq!(admitted.request_id, request.request_id().unwrap());
         assert_eq!(admitted.daemon_incarnation_id, request.daemon_incarnation_id);
@@ -245,9 +245,7 @@ mod tests {
         let err = admit_verified_local_submission_v1(
             &submission,
             &request,
-            &peer(1000, 1),
-            ms(1_300),
-        )
+            &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
         .unwrap_err();
         assert_eq!(
             err,
@@ -269,9 +267,7 @@ mod tests {
         let err = admit_verified_local_submission_v1(
             &submission,
             &request,
-            &peer(1000, 1),
-            ms(1_300),
-        )
+            &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
         .unwrap_err();
         assert_eq!(
             err,
@@ -295,9 +291,7 @@ mod tests {
         let err = admit_verified_local_submission_v1(
             &submission,
             &request,
-            &peer(1000, 1),
-            ms(1_300),
-        )
+            &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
         .unwrap_err();
         assert_eq!(
             err,
@@ -318,9 +312,7 @@ mod tests {
         let err = admit_verified_local_submission_v1(
             &submission,
             &request,
-            &peer(1000, 1),
-            ms(1_400),
-        )
+            &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
         .unwrap_err();
         assert_eq!(
             err,
@@ -341,9 +333,7 @@ mod tests {
         let err = admit_verified_local_submission_v1(
             &submission,
             &request,
-            &peer(1000, 1),
-            ms(2_001),
-        )
+            &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_001)))
         .unwrap_err();
         assert_eq!(
             err,
@@ -434,7 +424,7 @@ mod tests {
 
         assert_eq!(admitted.decision, LocalApprovalDecisionKindV1::Denied);
         assert_eq!(
-            admitted.evaluate_against(&request, ms(1_300)).unwrap(),
+            admitted.evaluate_against(&request, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap(),
             LocalApprovalDecisionKindV1::Denied
         );
     }
@@ -451,9 +441,9 @@ mod tests {
         let peer = peer(1000, 10);
 
         let first =
-            admit_verified_local_submission_v1(&submission, &request, &peer, ms(1_300)).unwrap();
+            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
         let second =
-            admit_verified_local_submission_v1(&submission, &request, &peer, ms(1_300)).unwrap();
+            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
 
         assert_eq!(first, second);
         assert_eq!(first.digest().unwrap(), second.digest().unwrap());
