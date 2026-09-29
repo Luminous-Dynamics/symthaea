@@ -104,3 +104,5 @@ The adapter is intentionally conservative:
 This makes the adapter a semantic firewall: the scientific DKG may contain richer
 mathematical, physical, materials, or epistemic structure, while CP-04 receives
 only the explicitly admitted typed dependency projection.
+
+A deterministic CP-04 hand-off fixture is checked in at `docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json`. Its source, projection, and artifact digests are fixed so the future CP-04 qualifier integration can consume a concrete cross-contract replay vector rather than reconstructing semantics independently.
