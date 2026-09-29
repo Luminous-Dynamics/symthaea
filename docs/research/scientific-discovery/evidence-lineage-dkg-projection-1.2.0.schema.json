@@ -6,7 +6,7 @@
   "type":"object",
   "required":["projection_version","nodes","edges","projection_digest"],
   "properties":{
-    "projection_version":{"const":"1.1.0"},
+    "projection_version":{"const":"1.2.0"},
     "nodes":{
       "type":"array",
       "items":{
