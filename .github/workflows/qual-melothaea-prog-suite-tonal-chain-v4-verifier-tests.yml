@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests-\${{ github.event.pull_request.number || github.ref }}
+  group: qual-melothaea-prog-suite-tonal-chain-v4-verifier-tests-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout verifier test branch
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: \${{ github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
 
