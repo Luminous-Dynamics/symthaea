@@ -66,17 +66,17 @@ pub use local_approval_runtime::{
 };
 #[cfg(target_os = "linux")]
 pub use local_approval_socket::{
-    LOCAL_APPROVAL_MAX_FRAME_BYTES_V1, LOCAL_APPROVAL_PROTOCOL_V1,
+    LOCAL_APPROVAL_MAX_FRAME_BYTES_V1, LOCAL_APPROVAL_PROTOCOL_V2,
     LOCAL_APPROVAL_SOCKET_FILENAME_V1, LocalApprovalAckStatusV1, LocalApprovalAckV1,
-    LocalApprovalSocketErrorV1, LocalApprovalSocketServerV1, LocalApprovalWireRequestV1,
-    default_local_approval_runtime_dir_v1, submit_local_approval_v1,
+    LocalApprovalSocketErrorV1, LocalApprovalSocketServerV1, LocalApprovalWireRequestV2,
+    default_local_approval_runtime_dir_v1, submit_local_approval_v2,
 };
 pub use local_approval_store::{
     ConsumedLocalApprovalDecisionV1, LocalApprovalRequestStoreErrorV1,
     LocalApprovalRequestStoreV1, PendingRequestCurrentnessV1, PendingRequestInstallV1,
 };
 pub use local_approval_submission::{
-    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1,
+    LocalApprovalAdmissionErrorV1, LocalApprovalSubmissionV1, LocalApprovalSubmissionV2,
 };
 pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};

@@ -20,6 +20,9 @@ use super::local_approval::{
     LocalApprovalDecisionKindV1, LocalApprovalErrorV1, LocalNixApprovalDecisionV1,
     PendingNixApprovalRequestV1,
 };
+use super::local_approval_projection::{
+    LocalApprovalProjectionErrorV1, PendingNixApprovalProjectionV1,
+};
 use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -40,6 +43,87 @@ pub struct LocalApprovalSubmissionV1 {
     pub action_intent_digest: String,
     pub decision: LocalApprovalDecisionKindV1,
     pub decided_at_unix_ms: u64,
+}
+
+
+/// Versioned local approval submission whose ceremony is bound to the exact
+/// sanitized operator-facing projection produced by the live runtime.
+///
+/// V1 submissions remain ordinary historical evidence, but are deliberately not
+/// accepted by the production socket/store admission path after CROSS-002.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LocalApprovalSubmissionV2 {
+    pub request_id: String,
+    pub daemon_incarnation_id: String,
+    pub action_intent_digest: String,
+    pub projection_digest: String,
+    pub decision: LocalApprovalDecisionKindV1,
+    pub decided_at_unix_ms: u64,
+}
+
+impl LocalApprovalSubmissionV2 {
+    pub fn for_request_and_projection(
+        request: &PendingNixApprovalRequestV1,
+        projection: &PendingNixApprovalProjectionV1,
+        decision: LocalApprovalDecisionKindV1,
+        decided_at: UnixMillisV1,
+    ) -> Result<Self, LocalApprovalAdmissionErrorV1> {
+        request.validate_shape()?;
+        projection.validate()?;
+        if projection.request_id != request.request_id()? {
+            return Err(LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch);
+        }
+        if projection.daemon_incarnation_ref != request.daemon_incarnation_id {
+            return Err(LocalApprovalAdmissionErrorV1::ProjectionDaemonIncarnationMismatch);
+        }
+        if projection.exact_action_intent_digest != request.action_intent_digest {
+            return Err(LocalApprovalAdmissionErrorV1::ProjectionIntentMismatch);
+        }
+        let submission = Self {
+            request_id: request.request_id()?,
+            daemon_incarnation_id: request.daemon_incarnation_id.clone(),
+            action_intent_digest: request.action_intent_digest.clone(),
+            projection_digest: projection.projection_digest.clone(),
+            decision,
+            decided_at_unix_ms: decided_at.as_u64(),
+        };
+        submission.validate_against(request, &projection.projection_digest)?;
+        Ok(submission)
+    }
+
+    fn validate_against(
+        &self,
+        request: &PendingNixApprovalRequestV1,
+        expected_projection_digest: &str,
+    ) -> Result<(), LocalApprovalAdmissionErrorV1> {
+        request.validate_shape()?;
+        if self.daemon_incarnation_id != request.daemon_incarnation_id {
+            return Err(LocalApprovalAdmissionErrorV1::Approval(
+                LocalApprovalErrorV1::DaemonIncarnationMismatch,
+            ));
+        }
+        if self.action_intent_digest != request.action_intent_digest {
+            return Err(LocalApprovalAdmissionErrorV1::Approval(
+                LocalApprovalErrorV1::IntentMismatch,
+            ));
+        }
+        if self.request_id != request.request_id()? {
+            return Err(LocalApprovalAdmissionErrorV1::Approval(
+                LocalApprovalErrorV1::RequestMismatch,
+            ));
+        }
+        if self.projection_digest != expected_projection_digest {
+            return Err(LocalApprovalAdmissionErrorV1::ProjectionDigestMismatch);
+        }
+        let _ = LocalNixApprovalDecisionV1::for_request(
+            request,
+            self.decision,
+            UnixMillisV1::new(self.decided_at_unix_ms),
+            "nixward-local-submission-v2-validation-v1",
+        )?;
+        Ok(())
+    }
 }
 
 impl LocalApprovalSubmissionV1 {
@@ -101,13 +185,14 @@ impl LocalApprovalSubmissionV1 {
 /// This is the preferred local daemon admission seam. The approver reference in
 /// the resulting audit record is derived exclusively from the verified peer
 /// evidence. No client-controlled identity string is accepted by this function.
-pub(crate) fn admit_verified_local_submission_v1(
-    submission: &LocalApprovalSubmissionV1,
+pub(crate) fn admit_verified_local_submission_v2(
+    submission: &LocalApprovalSubmissionV2,
     request: &PendingNixApprovalRequestV1,
+    expected_projection_digest: &str,
     verified_peer: &VerifiedLocalUnixPeerCredentialV1,
     evaluation: AuthoritativeEvaluationV1,
 ) -> Result<LocalNixApprovalDecisionV1, LocalApprovalAdmissionErrorV1> {
-    submission.validate_against(request)?;
+    submission.validate_against(request, expected_projection_digest)?;
 
     let approver_ref = local_verified_peer_approver_ref_v1(verified_peer)?;
     let decision = LocalNixApprovalDecisionV1::for_request(
@@ -152,6 +237,43 @@ pub enum LocalApprovalAdmissionErrorV1 {
     ApproverEvidence(#[from] ApproverEvidenceErrorV1),
     #[error("verified local peer carried a non-local approver evidence profile")]
     UnexpectedApproverEvidenceProfile,
+    #[error("projection request does not match the live approval request")]
+    ProjectionRequestMismatch,
+    #[error("projection daemon incarnation does not match the live approval request")]
+    ProjectionDaemonIncarnationMismatch,
+    #[error("projection intent does not match the live approval request")]
+    ProjectionIntentMismatch,
+    #[error("approval submission projection digest does not match the runtime-owned projection")]
+    ProjectionDigestMismatch,
+    #[error("projection validation failed: {0}")]
+    Projection(#[from] LocalApprovalProjectionErrorV1),
+}
+
+#[cfg(test)]
+fn admit_verified_local_submission_v1_test_adapter(
+    submission: &LocalApprovalSubmissionV1,
+    request: &PendingNixApprovalRequestV1,
+    verified_peer: &VerifiedLocalUnixPeerCredentialV1,
+    evaluation: UnixMillisV1,
+) -> Result<LocalNixApprovalDecisionV1, LocalApprovalAdmissionErrorV1> {
+    // Legacy unit coverage remains isolated from production admission. CROSS-002
+    // production callers must use V2 and a runtime-owned projection digest.
+    let projection_digest = "00".repeat(32);
+    let v2 = LocalApprovalSubmissionV2 {
+        request_id: submission.request_id.clone(),
+        daemon_incarnation_id: submission.daemon_incarnation_id.clone(),
+        action_intent_digest: submission.action_intent_digest.clone(),
+        projection_digest: projection_digest.clone(),
+        decision: submission.decision,
+        decided_at_unix_ms: submission.decided_at_unix_ms,
+    };
+    admit_verified_local_submission_v2(
+        &v2,
+        request,
+        &projection_digest,
+        verified_peer,
+        AuthoritativeEvaluationV1::from_unix_millis_for_test(evaluation),
+    )
 }
 
 #[cfg(test)]
@@ -213,7 +335,7 @@ mod tests {
         let peer = peer(1000, 4242);
 
         let admitted =
-            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
+            admit_verified_local_submission_v1_test_adapter(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
 
         assert_eq!(admitted.request_id, request.request_id().unwrap());
         assert_eq!(admitted.daemon_incarnation_id, request.daemon_incarnation_id);
@@ -242,7 +364,7 @@ mod tests {
         .unwrap();
         submission.request_id = "00".repeat(32);
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -264,7 +386,7 @@ mod tests {
         .unwrap();
         submission.daemon_incarnation_id = "another-daemon-incarnation".to_string();
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -288,7 +410,7 @@ mod tests {
         .unwrap();
         submission.action_intent_digest = "11".repeat(32);
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)))
@@ -309,7 +431,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_400)))
@@ -330,7 +452,7 @@ mod tests {
         )
         .unwrap();
 
-        let err = admit_verified_local_submission_v1(
+        let err = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_001)))
@@ -384,14 +506,14 @@ mod tests {
         )
         .unwrap();
 
-        let first = admit_verified_local_submission_v1(
+        let first = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 10),
             ms(1_300),
         )
         .unwrap();
-        let second = admit_verified_local_submission_v1(
+        let second = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1001, 11),
@@ -414,7 +536,7 @@ mod tests {
             ms(1_200),
         )
         .unwrap();
-        let admitted = admit_verified_local_submission_v1(
+        let admitted = admit_verified_local_submission_v1_test_adapter(
             &submission,
             &request,
             &peer(1000, 10),
@@ -441,14 +563,110 @@ mod tests {
         let peer = peer(1000, 10);
 
         let first =
-            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
+            admit_verified_local_submission_v1_test_adapter(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
         let second =
-            admit_verified_local_submission_v1(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
+            admit_verified_local_submission_v1_test_adapter(&submission, &request, &peer, AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))).unwrap();
 
         assert_eq!(first, second);
         assert_eq!(first.digest().unwrap(), second.digest().unwrap());
         // Atomic request consumption belongs to the owning request store / live
         // authority runtime. This pure evidence-admission layer intentionally has
         // no mutable nonce/request-consumption state and makes no single-use claim.
+    }    
+    fn projection(request: &PendingNixApprovalRequestV1) -> PendingNixApprovalProjectionV1 {
+        PendingNixApprovalProjectionV1::from_request(
+            request,
+            "nixos-rebuild switch --flake .#workstation",
+        )
+        .unwrap()
     }
+
+    #[test]
+    fn v2_submission_binds_exact_projection_digest() {
+        let request = request();
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request,
+            &projection,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        let admitted = admit_verified_local_submission_v2(
+            &submission,
+            &request,
+            &projection.projection_digest,
+            &peer(1000, 1),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap();
+        assert_eq!(admitted.decision, LocalApprovalDecisionKindV1::Approved);
+    }
+
+    #[test]
+    fn v2_wrong_projection_digest_is_rejected_before_admission() {
+        let request = request();
+        let projection = projection(&request);
+        let mut submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request,
+            &projection,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        submission.projection_digest = "11".repeat(32);
+        let err = admit_verified_local_submission_v2(
+            &submission,
+            &request,
+            &projection.projection_digest,
+            &peer(1000, 1),
+            AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300)),
+        )
+        .unwrap_err();
+        assert_eq!(err, LocalApprovalAdmissionErrorV1::ProjectionDigestMismatch);
+    }
+
+    #[test]
+    fn v2_projection_from_different_semantic_request_is_rejected() {
+        let request_a = request();
+        let mut request_b = request();
+        request_b.machine_target_ref = "machine:other".to_string();
+        let projection_b = PendingNixApprovalProjectionV1::from_request(
+            &request_b,
+            "nixos-rebuild switch --flake .#workstation",
+        )
+        .unwrap();
+        let err = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request_a,
+            &projection_b,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap_err();
+        assert_eq!(err, LocalApprovalAdmissionErrorV1::ProjectionRequestMismatch);
+    }
+
+    #[test]
+    fn v2_wire_shape_rejects_unknown_identity_and_authority_fields() {
+        let request = request();
+        let projection = projection(&request);
+        let submission = LocalApprovalSubmissionV2::for_request_and_projection(
+            &request,
+            &projection,
+            LocalApprovalDecisionKindV1::Approved,
+            ms(1_200),
+        )
+        .unwrap();
+        let mut object = serde_json::to_value(&submission)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone();
+        object.insert("uid".to_string(), serde_json::json!(0));
+        assert!(serde_json::from_value::<LocalApprovalSubmissionV2>(
+            serde_json::Value::Object(object)
+        )
+        .is_err());
+    }
+
 }
