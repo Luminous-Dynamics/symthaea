@@ -14,6 +14,7 @@
 use super::graph::FactSearchResult;
 use super::manager::{KnowledgeManager, KnowledgeSignals};
 use crate::cognitive_loop::thresholds;
+use symthaea_epistemic_types::MemoryProvenance;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,8 @@ pub struct ReasoningContext {
 /// A fact from the knowledge graph with provenance
 #[derive(Debug, Clone)]
 pub struct GroundedFact {
+    /// Stable provenance envelope; retrieval metadata remains separate from evidence assessment.
+    pub provenance: Option<MemoryProvenance>,
     /// Human-readable fact text
     pub text: String,
     /// Confidence score (decayed over time)
@@ -152,6 +155,7 @@ impl ReasoningContext {
         let relevant_facts: Vec<GroundedFact> = search_results
             .iter()
             .map(|r| GroundedFact {
+                provenance: manager.graph().provenance(r.fact_id),
                 text: format!("fact:{}", r.fact_id),
                 confidence: r.confidence,
                 similarity: r.similarity,
@@ -453,6 +457,7 @@ mod tests {
     fn test_grounded_fact_accessors() {
         let mut ctx = ReasoningContext::default();
         ctx.relevant_facts.push(GroundedFact {
+            provenance: None,
             text: "test".into(),
             confidence: 0.85,
             similarity: 0.6,
