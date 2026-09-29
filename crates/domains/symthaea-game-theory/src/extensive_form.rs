@@ -50,7 +50,7 @@ pub enum HistoryEvent {
 }
 
 /// Player-local action-observation history. Private world events are not exposed.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PlayerHistoryEvent {
     /// The player remembers their own action, but not an omniscient world-state identifier.
     OwnAction { action: ActionId },
