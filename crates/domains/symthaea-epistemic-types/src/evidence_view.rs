@@ -198,4 +198,17 @@ mod tests {
         let (groups, receipt) = retrieve(&MemoryRetrievalRequest::live("q", 5), vec![candidate("claim:x", f64::NAN, "family:a")]);
         assert_eq!(EvidenceView::from_retrieval(&groups, &receipt), Err(EvidenceViewError::NonFiniteRetrievalMetadata));
     }
+
+    #[test]
+    fn mismatched_receipt_selection_is_rejected() {
+        let (groups, mut receipt) = retrieve(
+            &MemoryRetrievalRequest::historical("f:1", "q", 5),
+            vec![candidate("claim:x", 0.7, "family:a")],
+        );
+        receipt.selected = vec!["claim:other".into()];
+        assert_eq!(
+            EvidenceView::from_retrieval(&groups, &receipt),
+            Err(EvidenceViewError::ReceiptMismatch)
+        );
+    }
 }
