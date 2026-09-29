@@ -61,6 +61,7 @@ pub mod cross_dkg_federation;
 pub mod cross_dkg_link_collection;
 pub mod cross_dkg_adapter;
 pub mod cross_dkg_projection;
+pub mod federated_evidence_boundary;
 pub mod prospective;
 pub mod prospective_audit;
 pub mod seed_plan;
