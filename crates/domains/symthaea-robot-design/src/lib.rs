@@ -2336,7 +2336,7 @@ mod tests {
         let id = ParameterIdV1::new("length").unwrap();
         let max = u64::MAX;
         let domain = ExactDesignSearchDomainV1::new(vec![ExactDesignParameterDomainV1 {
-            id,
+            id: id.clone(),
             domain: ExactLengthDomainV1::Range {
                 lower: C0LengthUmV1::new(max - 1).unwrap(),
                 upper: C0LengthUmV1::new(max).unwrap(),
@@ -2350,7 +2350,7 @@ mod tests {
         assert_eq!(
             candidates
                 .iter()
-                .map(|candidate| candidate.parameters[0].value.value_um())
+                .map(|candidate| candidate.parameter(&id).unwrap().value_um())
                 .collect::<Vec<_>>(),
             vec![max - 1, max]
         );
