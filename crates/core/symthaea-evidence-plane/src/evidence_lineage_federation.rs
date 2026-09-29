@@ -190,6 +190,43 @@ impl EvidenceLineageDkgFederationManifest {
         Ok(())
     }
 
+    /// Validate only the manifest's own canonical source-record envelope.
+    /// This intentionally avoids requiring a full DKG projection, enabling
+    /// compact proofs to be checked by a federation consumer that has the
+    /// manifest but not the complete graph payload.
+    pub fn verify_source_records(&self) -> Result<(), FederationManifestError> {
+        if self.manifest_version != MANIFEST_VERSION {
+            return Err(FederationManifestError::ManifestVersionMismatch);
+        }
+        if self.projection_schema_version != PROJECTION_SCHEMA_VERSION {
+            return Err(FederationManifestError::ProjectionVersionMismatch);
+        }
+        if self.canonicalization_id != CANONICALIZATION_ID {
+            return Err(FederationManifestError::CanonicalizationMismatch);
+        }
+        if self.digest_algorithm != DIGEST_ALGORITHM {
+            return Err(FederationManifestError::DigestAlgorithmMismatch);
+        }
+        if self.projection_digest_domain != PROJECTION_DIGEST_DOMAIN
+            || self.audit_digest_domain != AUDIT_DIGEST_DOMAIN
+        {
+            return Err(FederationManifestError::DigestDomainMismatch);
+        }
+        if has_duplicate_ids(&self.source_records) {
+            return Err(FederationManifestError::DuplicateSourceRecord);
+        }
+        if !is_canonical(&self.source_records) {
+            return Err(FederationManifestError::NonCanonicalSourceOrder);
+        }
+        if self.source_records.is_empty() {
+            return Err(FederationManifestError::SourceSetMismatch);
+        }
+        if self.manifest_digest != self.compute_digest() {
+            return Err(FederationManifestError::ManifestDigestMismatch);
+        }
+        Ok(())
+    }
+
     pub fn manifest_digest(&self) -> String {
         self.compute_digest()
     }
