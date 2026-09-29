@@ -44,6 +44,31 @@ Every dependency edge MUST carry one declared semantic type. v1.1 recognizes:
 
 An edge type is part of graph identity. Replacing an edge type with another type is therefore an evidence-dependency mutation.
 
+
+## Edge endpoint semantics
+
+The edge vocabulary is not merely a label set. Each edge type has an explicit endpoint contract: the source and target node classes it is permitted to connect. The qualifier MUST validate these endpoint pairs independently before applying the exact fixture edge oracle. This prevents a graph from relying on a semantically incorrect endpoint pair merely because the edge type itself is recognized.
+
+The v1.1 endpoint oracle is:
+
+- `requires`: requirement -> representation
+- `implements`: representation -> model
+- `parameterizes`: model -> model_parameters
+- `executes_with`: model -> runtime
+- `compiled_by`: runtime -> toolchain
+- `runs_on`: runtime -> accelerator
+- `deploys`: accelerator -> deployment artifact
+- `executes`: deployment artifact -> execution context
+- `observes`: execution context -> observation
+- `quantifies`: observation -> uncertainty
+- `summarizes`: observation -> statistics
+- `traces_to`: observation -> provenance reference
+- `currentness_for`: currentness -> runtime
+- `applicable_to`: applicability -> execution context
+- `derives`: statistics -> disposition
+
+Endpoint mutations are qualified directly against this semantic oracle and are bound into the persisted mutation manifest.
+
 ## Invalidation semantics
 
 If an evidence-relevant node changes, its direct and transitive downstream dependants become candidates for requalification.
