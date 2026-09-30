@@ -373,7 +373,8 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 // pub mod hd_ltc_codec;      // Bidirectional HDC ↔ LTC translation - THE THROAT
 // DISABLED: depends on hd_ltc_codec which is disabled
 // pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
-pub mod config; // Centralized HDC configuration (runtime dimension management)
+pub mod config;
+pub mod dimension_observatory; // Centralized HDC configuration (runtime dimension management)
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
