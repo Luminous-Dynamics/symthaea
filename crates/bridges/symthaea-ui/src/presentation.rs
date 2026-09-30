@@ -68,6 +68,7 @@ impl CognitiveState {
         coherence: f64,
         thermodynamic_load: f64,
         confidence: f64,
+        prediction_error: f64,
     ) -> Self {
         let presence = if !connected {
             PresenceState::Disconnected
@@ -87,7 +88,7 @@ impl CognitiveState {
             CognitiveMode::Responding
         } else if thermodynamic_load < 0.12 {
             CognitiveMode::Resting
-        } else if confidence < 0.45 {
+        } else if prediction_error > 0.5 {
             CognitiveMode::Exploring
         } else if coherence > 0.70 && thermodynamic_load > 0.45 {
             CognitiveMode::Integrating
@@ -111,27 +112,33 @@ mod tests {
 
     #[test]
     fn disconnected_state_is_explicit() {
-        let state = CognitiveState::from_observation(false, false, 0.8, 0.2, 0.7);
+        let state = CognitiveState::from_observation(false, false, 0.8, 0.2, 0.7, 0.1);
         assert_eq!(state.presence, PresenceState::Disconnected);
-        assert_eq!(state.mode, CognitiveMode::Exploring);
+        assert_eq!(state.mode, CognitiveMode::Uncertain);
     }
 
     #[test]
     fn low_confidence_maps_to_exploration() {
-        let state = CognitiveState::from_observation(true, false, 0.6, 0.3, 0.4);
+        let state = CognitiveState::from_observation(true, false, 0.6, 0.3, 0.4, 0.2);
         assert_eq!(state.presence, PresenceState::Available);
         assert_eq!(state.mode, CognitiveMode::Uncertain);
     }
 
     #[test]
     fn stable_low_load_maps_to_resting() {
-        let state = CognitiveState::from_observation(true, false, 0.8, 0.1, 0.05, 0.9);
+        let state = CognitiveState::from_observation(true, false, 0.8, 0.1, 0.05, 0.0);
         assert_eq!(state.mode, CognitiveMode::Resting);
     }
 
     #[test]
+    fn high_prediction_error_maps_to_exploration() {
+        let state = CognitiveState::from_observation(true, false, 0.6, 0.3, 0.8, 0.6);
+        assert_eq!(state.mode, CognitiveMode::Exploring);
+    }
+
+    #[test]
     fn values_are_clamped_for_display() {
-        let state = CognitiveState::from_observation(true, false, 2.0, 4.0, 3.0);
+        let state = CognitiveState::from_observation(true, false, 2.0, 4.0, 3.0, 2.0);
         assert_eq!(state.coherence, 1.0);
         assert_eq!(state.thermodynamic_load, 1.0);
         assert_eq!(state.confidence, 1.0);
