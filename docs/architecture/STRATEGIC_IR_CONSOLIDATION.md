@@ -394,6 +394,18 @@ A further ecosystem pattern is worth preserving: safe/depth-limited subgame solv
 These observations strengthen the existing architectural decision not to make an external CFR crate the canonical ontology. External solvers can be adapters once the IR can faithfully express their required game-state, action, information-set, and evidence contracts.
 
 
+## 2026-09-30 information-history determinism hardening
+
+The semantic information boundary now validates both directions of the history/partition relationship.
+
+For a declared information set, all member states must induce one identical player-local action/observation history. Conversely, the same `(player, player-local history)` cannot be assigned to multiple information-set identities.
+
+This reverse constraint is important because the encoder contract receives only the player and local history. Without it, two concrete states could carry indistinguishable semantic histories while declaring different information sets, leaving solver behavior dependent on world-state metadata that the encoder is explicitly forbidden to observe.
+
+The verifier therefore maintains a history-to-information-set map while checking the encoder and rejects conflicting assignments. `PlayerHistoryEvent` is hashable so the semantic history can serve directly as the validation key.
+
+This is aligned with the OpenSpiel information-state contract: action-observation history is intended to be sufficient to reconstruct information state, and consistency requires the equality/inequality structure of AOH to agree with information-state identity. See the OpenSpiel API documentation for the formal contract.
+
 ## 2026-09-30 extensive-form identity hardening
 
 The finite extensive-form boundary now treats player identity as part of validation rather than an implicit convention.
