@@ -298,3 +298,25 @@ The remaining scientific gate is therefore not merely “can we read a MOLA file
 The provenance boundary now extends beyond terrain. `TetherExperimentProvenance` requires an explicit experiment identifier, model revision, constants revision, configuration SHA-256, and cryptographically identified detached label and raster inputs. `is_reproducibly_pinned()` is deliberately fail-closed: an engineering run cannot describe itself as reproducibly pinned merely because a terrain reader succeeded.
 
 This mirrors the role of provenance and processing-history structures in the current PDS4 ecosystem while keeping Symthaea's engineering identity explicit and local to the model boundary. NASA's current PDS4 dictionaries include a dedicated Provenance dictionary and a Processing Information dictionary, and the current standards release is 1.26.0.0 (June 2026).
+
+
+## Count-map provenance closure
+
+The MOLA sampling path is count-gated: a topography value is admitted only after the companion observation-count raster is validated and the requested cell has a non-zero count. Provenance therefore follows the dependency graph, not merely the final numeric value.
+
+A returned TerrainSample now carries four cryptographic identities when produced by the MOLA count-gated adapter:
+
+- detached topography label;
+- topography raster;
+- detached counts label;
+- counts raster.
+
+This applies to both measured and missing samples because the counts raster participates in the observation decision even when the final result is TerrainQuality::Missing.
+
+TetherExperimentProvenance now exposes require_reproducibly_pinned() -> Result<(), String> in addition to the boolean convenience check. The reproducibility gate fails closed unless experiment/model/constants/configuration identity and all four MOLA content identities are present and valid SHA-256 values. The diagnostic form is intentional: an audit boundary should explain which identity is absent rather than collapsing every failure into false.
+
+This is aligned with the current PDS4 architecture, which provides dedicated Provenance and Processing Information dictionaries in the 1.26.0.0 data-dictionary release. The Symthaea representation remains deliberately smaller and domain-specific; it does not claim to be a complete PDS4 provenance serialization. NASA's current PDS4 standards are version 1.26.0.0 (June 2026).
+
+## Verification boundary after provenance closure
+
+The source changes above are committed to the research branch, but compiler/test execution remains a separate evidence state. No successful CI run is claimed unless GitHub reports one for the new head. The next verification step is therefore to compile and execute the physics-crate tests, followed by a fixture test that proves the four-artifact provenance closure through the actual MOLA sampling path.
