@@ -247,8 +247,15 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     for raw in lines:
         stripped = raw.strip()
         match = re.match(r"cache-mode:\s*(read|write|write-only|none)\s*$", stripped)
-        if match:
-            cache_modes.append(match.group(1))
+        if not match:
+            continue
+        indentation = _indent(raw)
+        if indentation not in {0, 4}:
+            raise InventoryError(
+                f"{path}: cache-mode is only supported at workflow or job scope; "
+                f"unsupported indentation {indentation}"
+            )
+        cache_modes.append(match.group(1))
     explicit_cache_write = any(mode in {"write", "write-only"} for mode in cache_modes)
     local_reusable_calls = []
     for raw in lines:
@@ -535,6 +542,18 @@ jobs:
         assert observed_reusable["cache_influence"] == "explicit_read_or_none"
         assert observed_reusable["cache_modes"] == ["read"]
         assert observed_reusable["local_reusable_workflow_calls"] == ["./.github/workflows/reusable.yml"]
+
+        step_cache = original.replace(
+            "        with:\n",
+            "        cache-mode: write\n        with:\n",
+        )
+        wf.write_text(step_cache, encoding="utf-8")
+        try:
+            parse_workflow(wf)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("step-scoped cache-mode must fail closed")
 
 def main() -> int:
     parser = argparse.ArgumentParser()
