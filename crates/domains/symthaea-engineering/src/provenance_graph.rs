@@ -24,6 +24,8 @@ pub enum NodeKind {
 pub struct Node {
     pub id: &'static str,
     pub kind: NodeKind,
+    /// Revision is part of provenance identity, not adapter-local metadata.
+    pub revision: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -162,15 +164,15 @@ impl ProvenanceSlice {
 pub fn reference_graph() -> ProvenanceGraph {
     ProvenanceGraph {
         nodes: vec![
-            Node { id: "claim-001", kind: NodeKind::Claim },
-            Node { id: "validation-001", kind: NodeKind::Evidence },
-            Node { id: "prediction-001", kind: NodeKind::Prediction },
-            Node { id: "model-001", kind: NodeKind::Model },
-            Node { id: "parameters-001", kind: NodeKind::Parameters },
-            Node { id: "scenario-001", kind: NodeKind::Scenario },
-            Node { id: "dataset-001", kind: NodeKind::Dataset },
-            Node { id: "context-001", kind: NodeKind::ContextOfUse },
-            Node { id: "unrelated-001", kind: NodeKind::Dataset },
+            Node { id: "claim-001", kind: NodeKind::Claim, revision: Some("claim@v1") },
+            Node { id: "validation-001", kind: NodeKind::Evidence, revision: Some("evidence@v1") },
+            Node { id: "prediction-001", kind: NodeKind::Prediction, revision: Some("prediction@v1") },
+            Node { id: "model-001", kind: NodeKind::Model, revision: Some("building-twin@fixture") },
+            Node { id: "parameters-001", kind: NodeKind::Parameters, revision: Some("parameters@v1") },
+            Node { id: "scenario-001", kind: NodeKind::Scenario, revision: Some("intervention-scenario@v1") },
+            Node { id: "dataset-001", kind: NodeKind::Dataset, revision: Some("dataset@v1") },
+            Node { id: "context-001", kind: NodeKind::ContextOfUse, revision: Some("context@v1") },
+            Node { id: "unrelated-001", kind: NodeKind::Dataset, revision: Some("unrelated@v1") },
         ],
         edges: vec![
             Edge { from: "claim-001", to: "validation-001", kind: EdgeKind::SupportedBy },
@@ -230,8 +232,8 @@ mod tests {
     #[test]
     fn contradiction_and_qualification_edges_remain_distinct() {
         let mut graph = reference_graph();
-        graph.nodes.push(Node { id: "counter-001", kind: NodeKind::Evidence });
-        graph.nodes.push(Node { id: "boundary-001", kind: NodeKind::Evidence });
+        graph.nodes.push(Node { id: "counter-001", kind: NodeKind::Evidence, revision: Some("counter@v1") });
+        graph.nodes.push(Node { id: "boundary-001", kind: NodeKind::Evidence, revision: Some("boundary@v1") });
         graph.edges.push(Edge {
             from: "claim-001",
             to: "counter-001",
