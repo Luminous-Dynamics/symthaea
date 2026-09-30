@@ -372,6 +372,23 @@ This pass does not:
 The purpose is to establish the reasoning boundary first, then increase mathematical and computational sophistication without creating another parallel architecture.
 
 
+## 2026-09-30 action-vocabulary semantic hardening
+
+OpenSpiel treats legal actions as a state-level contract and documents that legal-action lists are ordered canonically, while the strategic meaning is the set of actions that can be selected. citeturn0search0turn0search3
+
+Symthaea now makes the corresponding distinction explicit at the information-structure boundary:
+
+- action **membership** is semantic;
+- action **ordering** is representational;
+- all action lists are still required to be non-empty and duplicate-free;
+- information-set members must expose the same action vocabulary;
+- extensive-form transition validation continues to compare transition actions with declared legal actions as sets;
+- contingent strategy validation now applies the same duplicate-free action contract to its `DecisionPoint` inputs.
+
+This closes a subtle consistency gap: equivalent information sets could previously be rejected solely because two members serialized the same legal actions in different orders, even though the extensive-form validator already treated transition ordering as non-semantic.
+
+The invariant is intentionally **not** weakened to permit state-dependent availability inside one information set. That remains a separate `ActionAvailability` design problem: if availability can genuinely differ between indistinguishable states, the IR needs an explicit semantic representation rather than silently interpreting a missing action as unavailable.
+
 ## 2026-09-29 ecosystem review: information sets and solver evidence
 
 A current Rust ecosystem review reinforces two additional design constraints.
