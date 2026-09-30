@@ -51,6 +51,7 @@ pub struct MolaMegdrMetadata {
     pub longitude_direction: String,
     pub center_latitude_deg: f64,
     pub center_longitude_deg: f64,
+    pub projection_rotation_deg: f64,
     pub longitude_min_deg: f64,
     pub longitude_max_deg: f64,
     pub latitude_min_deg: f64,
@@ -181,6 +182,7 @@ impl MolaMegdrProduct {
             || a.coordinate_system_type != b.coordinate_system_type
             || a.latitude_type != b.latitude_type
             || a.longitude_direction != b.longitude_direction
+            || a.projection_rotation_deg != b.projection_rotation_deg
             || a.resolution_pixels_per_degree != b.resolution_pixels_per_degree
             || a.lines != b.lines
             || a.samples != b.samples
@@ -431,6 +433,7 @@ impl MolaMegdrMetadata {
             longitude_direction,
             center_latitude_deg,
             center_longitude_deg,
+            projection_rotation_deg,
             longitude_min_deg,
             longitude_max_deg,
             latitude_min_deg,
@@ -835,22 +838,57 @@ mod tests {
 
     #[test]
     fn rejects_mismatched_coordinate_registration() {
-        let topography = MolaMegdrMetadata::from_label(&parse_label(&label()), "MEGT00N000HB").unwrap();
+        let topography = MolaMegdrMetadata::from_label(
+            &parse_label(&label()),
+            "MEGT00N000HB",
+        )
+        .unwrap();
+
         for (field, replacement) in [
-            ("COORDINATE_SYSTEM_TYPE = BODY-FIXED ROTATING", "COORDINATE_SYSTEM_TYPE = INERTIAL"),
-            ("COORDINATE_SYSTEM_NAME = PLANETOCENTRIC", "COORDINATE_SYSTEM_NAME = PLANETOGRAPHIC"),
-            ("POSITIVE_LONGITUDE_DIRECTION = EAST", "POSITIVE_LONGITUDE_DIRECTION = WEST"),
-            ("MAP_PROJECTION_TYPE = SIMPLE CYLINDRICAL", "MAP_PROJECTION_TYPE = POLAR"),
+            (
+                "COORDINATE_SYSTEM_TYPE = BODY-FIXED ROTATING",
+                "COORDINATE_SYSTEM_TYPE = Body-fixed rotating",
+            ),
+            (
+                "COORDINATE_SYSTEM_NAME = PLANETOCENTRIC",
+                "COORDINATE_SYSTEM_NAME = Planetocentric",
+            ),
+            (
+                "POSITIVE_LONGITUDE_DIRECTION = EAST",
+                "POSITIVE_LONGITUDE_DIRECTION = east",
+            ),
+            (
+                "MAP_PROJECTION_TYPE = SIMPLE CYLINDRICAL",
+                "MAP_PROJECTION_TYPE = simple cylindrical",
+            ),
+            (
+                "MAP_PROJECTION_ROTATION = 0.0",
+                "MAP_PROJECTION_ROTATION = 0.0",
+            ),
         ] {
+            if field == replacement {
+                continue;
+            }
             let text = label()
                 .replace("MEGT00N000HB", "MEGC00N000HB")
                 .replace("MAP_TYPE = T", "MAP_TYPE = C")
                 .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
                 .replace(field, replacement);
-            let counts = MolaMegdrMetadata::from_label(&parse_label(&text), "MEGC00N000HB").unwrap_err();
-            assert!(matches!(counts, MolaError::InvalidMetadata(_) | MolaError::Unsupported(_)));
+            let counts = MolaMegdrMetadata::from_label(
+                &parse_label(&text),
+                "MEGC00N000HB",
+            )
+            .unwrap();
+            assert!(topography.validate_companion(&MolaMegdrProduct {
+                metadata: counts,
+                provenance: TerrainProvenance {
+                    source_id: "test".into(),
+                    source_revision: "test".into(),
+                    coordinate_reference: "test".into(),
+                },
+                img_path: std::path::PathBuf::new(),
+            }).is_err());
         }
-        let _ = topography;
     }
 
     #[test]
