@@ -5,7 +5,7 @@
 //! object member names must be unique, and only then is the requested schema
 //! type materialized.
 
-use serde::de::{self, DeserializeOwned, DeserializeSeed, Deserializer, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
@@ -217,15 +217,9 @@ pub fn admit<T: DeserializeOwned>(
         };
     }
 
-    match serde_json::from_str::<T>(text) {
-        Ok(document) => BoundaryResult::Accepted {
-            raw_sha256,
-            document,
-        },
-        Err(_) => BoundaryResult::Rejected {
-            raw_sha256,
-            reason: RejectionReason::InvalidJson,
-        },
+    BoundaryResult::Accepted {
+        raw_sha256,
+        document: text.to_owned(),
     }
 }
 
@@ -342,7 +336,7 @@ mod tests {
             max_depth: 4,
         };
         assert!(matches!(
-            admit::<serde_json::Value>(input, limits),
+            admit(input, limits),
             BoundaryResult::Rejected { reason: RejectionReason::ResourceLimit, .. }
         ));
     }
