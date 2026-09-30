@@ -102,19 +102,58 @@ pub fn config_hash<T: fmt::Debug>(config: &T) -> String {
 
 /// Stable semantic configuration identity.
 ///
-/// Unlike [`config_hash`], this hashes the explicit JSON serialization of a
-/// `Serialize` value with BLAKE3. The JSON bytes are the versioned semantic
-/// representation: callers that need a stronger compatibility contract must
-/// version their serialized configuration schema rather than relying on
-/// `Debug` output.
+/// The input is first converted to a JSON value, object keys are recursively
+/// sorted, and the canonical JSON bytes are hashed with BLAKE3. This avoids
+/// accidentally inheriting `HashMap` iteration order from a caller's
+/// serialization implementation.
+///
+/// The schema/domain tag is part of the bytes being hashed. Changing this
+/// canonicalization contract therefore requires an explicit version bump rather
+/// than silently producing a different meaning under the same identity scheme.
 ///
 /// This is an identity/determinism primitive, not an authorization primitive.
 /// Use the evidence/provenance contracts for security-sensitive commitments.
 pub fn stable_config_hash<T: Serialize>(config: &T) -> String {
-    let bytes = serde_json::to_vec(config).expect("stable config serialization must succeed");
+    const DOMAIN: &[u8] = b"symthaea:stable-config-identity:v1\0";
+    let value = serde_json::to_value(config)
+        .expect("stable config serialization must produce a JSON value");
+    let mut bytes = Vec::with_capacity(256);
+    bytes.extend_from_slice(DOMAIN);
+    write_canonical_json(&value, &mut bytes);
     blake3::hash(&bytes).to_hex().to_string()
 }
 
+/// Serialize a JSON value deterministically, recursively sorting object keys.
+fn write_canonical_json(value: &serde_json::Value, out: &mut Vec<u8>) {
+    match value {
+        serde_json::Value::Null => out.extend_from_slice(b"null"),
+        serde_json::Value::Bool(v) => out.extend_from_slice(if *v { b"true" } else { b"false" }),
+        serde_json::Value::Number(v) => out.extend_from_slice(v.to_string().as_bytes()),
+        serde_json::Value::String(v) => {
+            out.extend_from_slice(serde_json::to_string(v).expect("string serialization").as_bytes())
+        }
+        serde_json::Value::Array(values) => {
+            out.push(b'[');
+            for (index, value) in values.iter().enumerate() {
+                if index != 0 { out.push(b','); }
+                write_canonical_json(value, out);
+            }
+            out.push(b']');
+        }
+        serde_json::Value::Object(values) => {
+            let mut entries: Vec<_> = values.iter().collect();
+            entries.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+            out.push(b'{');
+            for (index, (key, value)) in entries.into_iter().enumerate() {
+                if index != 0 { out.push(b','); }
+                out.extend_from_slice(serde_json::to_string(key).expect("object-key serialization").as_bytes());
+                out.push(b':');
+                write_canonical_json(value, out);
+            }
+            out.push(b'}');
+        }
+    }
+}
 /// A named bag of measured evidence values.
 ///
 /// Backed by `f64` (not `u64`) so it can hold both integer call-counts
