@@ -158,6 +158,23 @@ mod tests {
     }
 
     #[test]
+    fn boundary_graph_digest_is_part_of_slice_commitment() {
+        let baseline = manifest().digest();
+        let mut changed = manifest();
+        changed.boundary.graph_digest =
+            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210".into();
+        assert_ne!(baseline, changed.digest());
+    }
+
+    #[test]
+    fn boundary_traversal_policy_is_part_of_slice_commitment() {
+        let baseline = manifest().digest();
+        let mut changed = manifest();
+        changed.boundary.traversal_policy = "different-policy@v1";
+        assert_ne!(baseline, changed.digest());
+    }
+
+    #[test]
     fn optional_revision_is_distinct_from_empty_revision() {
         let mut absent = manifest();
         absent.nodes[0].revision = None;
