@@ -327,6 +327,7 @@ fn bench_speedup_summary(c: &mut Criterion) {
 #[cfg(feature = "simd")]
 criterion_group!(
     benches,
+    bench_extended_resolution_scaling,
     bench_dot_product,
     bench_bind,
     bench_similarity,
