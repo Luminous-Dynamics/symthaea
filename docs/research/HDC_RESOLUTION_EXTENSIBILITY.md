@@ -63,6 +63,38 @@ The current HDC-LTC trajectory work treats 1K..64K as the controlled matrix. Thi
 As a reference point, current accelerator hardware can hold substantially larger working sets; AMD lists 192 GB HBM3 and 5.3 TB/s peak bandwidth for MI300X. Hardware capacity therefore does not by itself establish that larger HDC vectors are useful—the relevant question remains quality and cost per operation. 
 
 
+
+## Machine-readable operator evidence
+
+The scalar/SIMD gate is now represented by a versioned `OperatorEvidenceRecord`
+schema in `hdc/operator_evidence.rs`. Each record contains:
+
+- schema version and representation;
+- resolution and operator;
+- deterministic input seeds;
+- scalar reference and SIMD result;
+- aggregate and element-wise error measures;
+- tolerance and qualification status;
+- declared logical bytes for the operation.
+
+The current matrix covers dot, bind, bundle, norm, and similarity at 16K, 32K,
+64K, 128K, and 256K. Vector-valued operations retain both a deterministic
+checksum and maximum element-wise error so a checksum collision cannot by itself
+qualify an implementation.
+
+The qualification workflow executes the conformance emitter and archives its
+JSON output as an artifact. This is deliberately stronger than an assertion-only
+test: downstream trajectory experiments can consume the same schema rather than
+re-implementing their own scalar-oracle contract. JSON is a standard
+interchange format, and Serde provides typed serialization/deserialization for
+Rust structures. citeturn1search0turn1search9
+
+The emitted evidence is still **operator conformance**, not benchmark evidence.
+Logical bytes are accounting metadata, not measured cache traffic, DRAM traffic,
+or energy. Throughput claims remain gated on an actual benchmark run with
+declared hardware/toolchain provenance; `cargo bench --no-run` remains
+compile-only. citeturn0search0
+
 ## Resource admissibility is a separate contract
 
 `HdcResolution` answers whether a dimension is mathematically representable in
