@@ -92,7 +92,7 @@ The emitted evidence is still **operator conformance**, not benchmark evidence.
 Logical bytes are accounting metadata, not measured cache traffic, DRAM traffic,
 or energy. Throughput claims remain gated on an actual benchmark run with
 declared hardware/toolchain provenance; `cargo bench --no-run` remains
-compile-only. citeturn0search0
+compile-only.
 
 ## Resource admissibility is a separate contract
 
