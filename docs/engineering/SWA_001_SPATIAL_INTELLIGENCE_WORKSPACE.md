@@ -601,3 +601,44 @@ A valid projection is only structurally admissible under this fixture's local co
 SWA-018 closes the *mapping contract* seam only. The next step should be a focused Mycelix-side issue/patch proposal after inspecting the exact hApp DNA wiring and cross-zome identity conventions: select one destination record type, bind immutable source content identity and author, require addressable dependencies in integrity validation, preserve unresolved-dependency behavior, and add multi-agent tests for missing dependencies, tampered revisions, replay, and authorization separation. No DKG or chain-based replacement is warranted by this integration.
 
 The fixture's digest value is intentionally marked as a non-cryptographic placeholder. SWA-018 checks that a digest declaration is present; it does not compute, verify, sign, or claim a content commitment. A production adapter must canonicalize the exact serialized payload and use an approved cryptographic digest/signature implementation before treating the value as an integrity commitment.
+
+
+## Mycelix semantic-reference binding — SWA-019
+
+SWA-018 established the local receipt boundary. SWA-019 tightens the interoperability seam against the **observed** Mycelix interoperability candidate at commit `b55bc03d99d0e8c89201dca06a264d16d5e2efd6`, which defines transport-neutral `SchemaRef` / `SemanticRef` primitives in the candidate cross-repository interoperability layer.
+
+The Symthaea fixture does **not** import that repository or create a second authoritative semantic-reference implementation. It defines an adapter DTO whose fields deliberately mirror the observed transport shape:
+
+`namespace + schema name + schema version -> opaque object id + optional object version`
+
+The adapter then binds:
+
+- a Sol Atlas source semantic reference;
+- a distinct Mycelix governance-proposal target reference;
+- a separate author reference;
+- explicitly addressable dependency references;
+- the observed Mycelix source revision as provenance;
+- a separately declared authority reference, which is absent in the review fixture;
+- a digest declaration whose status remains explicitly non-cryptographic until a production adapter defines canonical bytes and approved cryptographic binding.
+
+SWA-019 adds deterministic checks for:
+
+- schema identity changing when namespace, name, or version changes;
+- source and target semantic identities remaining distinct;
+- duplicate dependency rejection;
+- missing required dependencies becoming `UnresolvedDependencies`;
+- authority references not aliasing source or target identities;
+- source-repository revision provenance not being interpreted as authority;
+- replay producing identical serialized projection bytes.
+
+This makes the integration chain more precise:
+
+`Sol Atlas evidence/provenance -> semantic source reference -> typed Mycelix projection -> addressable dependency validation -> separate governance authorization -> separately observed physical outcome`
+
+The observed Mycelix interoperability primitive itself is intentionally not treated as proof of a live deployed DNA, and the referenced commit is not treated as current runtime authority. Holochain validation remains the relevant distributed boundary: validation must be deterministic, dependencies must be addressable, and unavailable dependencies produce an unresolved result rather than an implicit pass. citeturn0search0turn0search1
+
+### Engineering correction discovered during SWA-019 review
+
+While inspecting the existing SWA-004 thermal counterfactual, the fixture contained a stale `hvac_max_kw` field in several `ZoneParameters` literals even though that field is not part of the struct and the intervention already owns HVAC capacity. SWA-019 work therefore also repaired SWA-004 by removing the invalid field and adding finite/positive input guards around the deterministic thermal step and comfort-band calculation.
+
+This is a source-level correction; hosted CI/test execution is still not claimed unless GitHub reports it for the exact new head.
