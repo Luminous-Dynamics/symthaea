@@ -471,3 +471,28 @@ to:
 `claim -> provenance slice -> completeness certificate -> integrity validation -> replay witness -> support/qualification/contradiction set`
 
 The next seam is **invalidation propagation**: when an upstream model, parameter, solver, dataset, or context revision changes, the system should deterministically propagate that dependency change to affected evidence, claims, replay witnesses, counterevidence branches, and decision contexts without mutating historical records.
+
+
+## Deterministic invalidation propagation — SWA-014
+
+SWA-014 turns the SWA-007 revalidation frontier into an explicit propagation record. A dependency revision is compared against the immutable historical dependency manifest of each downstream node. Only dependencies inside that node's declared closure can produce `RequiresRevalidation`.
+
+The propagation layer covers the next provenance surfaces:
+
+- validation evidence;
+- claims;
+- reproducibility witnesses;
+- counterevidence branches;
+- decision contexts.
+
+The important semantic distinction is **revalidation is not historical deletion**. If model revision `m7` becomes `m8`, a claim produced under `m7` remains a historical claim. Its current status changes to `RequiresRevalidation` only when its declared dependency closure includes the changed model. A counterevidence branch is not erased or automatically resolved, and a decision context is only affected when its closure explicitly includes the changed dependency.
+
+An incomplete historical dependency manifest produces `Unknown`, not `Current` and not `RequiresRevalidation`. This prevents missing provenance from masquerading as freshness.
+
+The resulting flow is:
+
+`dependency revision -> closure intersection -> deterministic propagation frontier -> downstream revalidation`
+
+This is consistent with W3C PROV's model of revision as a specialized derivation and invalidation as a distinct lifecycle event: provenance records what happened historically while the current system can determine whether an entity remains usable under a changed dependency context. citeturn0search0turn0search1
+
+SWA-014 deliberately does not convert stale evidence into false evidence. It also does not make a provenance result an authorization signal. The next useful seam is to connect this propagation frontier to the actual intervention/decision lineage so that a changed model can identify exactly which pending decision contexts require re-review without silently re-authorizing or rejecting anything.
