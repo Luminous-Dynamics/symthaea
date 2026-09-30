@@ -820,6 +820,46 @@ mod tests {
     }
 
     #[test]
+    fn pins_valles_128ppd_projection_offsets_and_cell_centers() {
+        // The published MEGT00N270HB label reproduces the 128 ppd 270E-360E
+        // tile as 5632 x 11520 pixels with LINE_PROJECTION_OFFSET=0.5 and
+        // SAMPLE_PROJECTION_OFFSET=-11519.5. Those values are the evidence
+        // needed to exercise the tile-local longitude convention without
+        // importing a generic planetary-map convention.
+        let text = label()
+            .replace("MEGT00N000HB", "MEGT00N270HB")
+            .replace("LINES = 4", "LINES = 5632")
+            .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 11520")
+            .replace("RECORD_BYTES = 16", "RECORD_BYTES = 23040")
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 0.5")
+            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = -11519.5")
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 270.0")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -44.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.0");
+
+        let metadata =
+            MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N270HB").unwrap();
+
+        assert_eq!(metadata.lines, 5632);
+        assert_eq!(metadata.samples, 11520);
+        assert_eq!(metadata.line_projection_offset, 0.5);
+        assert_eq!(metadata.sample_projection_offset, -11519.5);
+
+        // Pixel centers of the published tile footprint map to its first and
+        // last raster cells. The exact center coordinates avoid boundary
+        // ambiguity at 0/360 and -44/0.
+        assert_eq!(
+            metadata.cell_for(-0.00390625, 270.00390625).unwrap(),
+            (0, 0)
+        );
+        assert_eq!(
+            metadata.cell_for(-43.99609375, 359.99609375).unwrap(),
+            (5631, 11519)
+        );
+    }
+
+    #[test]
     fn validates_pinned_final_product_metadata() {
         let mut path = std::env::temp_dir();
         path.push(format!("mola_adapter_{}_label.lbl", std::process::id()));
