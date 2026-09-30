@@ -375,6 +375,7 @@ pub mod unified_network_phi; // Phi measurement and validation for HdcLtcUnified
 // pub mod ltc_generative_core; // Autoregressive primitive prediction - THE VOICE
 pub mod config;
 pub mod dimension_observatory; // Centralized HDC configuration (runtime dimension management)
+pub mod dimension_sweep; // Deterministic empirical dimension-scaling evidence
 pub mod projection;
 pub mod unified_hv; // Unified hypervector types (ContinuousHV) // Learned projection layers for dimension conversion
 
