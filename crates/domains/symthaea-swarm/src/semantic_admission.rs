@@ -118,6 +118,7 @@ pub enum StateInvariant {
     ResultMissingObservation { logical_delivery_id: Uuid },
     ResultObservationMismatch { logical_delivery_id: Uuid },
     ObservationKeyMismatch { observation_id: Uuid },
+    DeliveryKeyMismatch { logical_delivery_id: Uuid },
     DeliveryTombstoneOverlap { logical_delivery_id: Uuid },
     ObservationTombstoneOverlap { observation_id: Uuid },
     InvalidTombstoneHorizon,
@@ -167,6 +168,14 @@ pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvaria
         if !has_result {
             return Err(StateInvariant::DeliveryMissingResult {
                 logical_delivery_id: *logical_delivery_id,
+            });
+        }
+    }
+
+    for (logical_delivery_id, delivery) in &state.deliveries {
+        if delivery.logical_delivery_id != *logical_delivery_id {
+            return Err(StateInvariant::DeliveryKeyMismatch {
+                logical_delivery_id: delivery.logical_delivery_id,
             });
         }
     }
@@ -468,6 +477,23 @@ mod tests {
         assert_eq!(next_state.observations.len(), 2);
         assert_eq!(next_state.results.len(), 2);
         assert_eq!(validate_state(&next_state), Ok(()));
+    }
+
+    #[test]
+    fn delivery_record_key_mismatch_is_rejected() {
+        let (delivery, observation) = fixture();
+        let mut state = SemanticAdmissionState::default();
+        let map_key = delivery.logical_delivery_id;
+        let mut stored = delivery.clone();
+        stored.logical_delivery_id = Uuid::from_u128(55);
+        state.deliveries.insert(map_key, stored);
+        assert_eq!(
+            validate_state(&state),
+            Err(StateInvariant::DeliveryKeyMismatch {
+                logical_delivery_id: 55.into()
+            })
+        );
+        let _ = observation;
     }
 
     #[test]
