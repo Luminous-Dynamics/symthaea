@@ -225,33 +225,32 @@ struct ContentBindingPayload {
     actuation_performed: bool,
 }
 
-fn content_binding_payload() -> ContentBindingPayload {
-    let projection = envelope_without_digest();
+fn content_binding_payload(envelope: &MycelixProjectionEnvelope) -> ContentBindingPayload {
     ContentBindingPayload {
-        schema: projection.schema,
-        source: projection.source,
-        target: projection.target,
-        projection_target: projection.projection_target,
-        source_revision: projection.source_revision,
-        author_ref: projection.author_ref,
-        authority_ref: projection.authority_ref,
-        dependencies: projection.dependencies,
-        authority_granted: projection.authority_granted,
-        actuation_performed: projection.actuation_performed,
+        schema: envelope.schema,
+        source: envelope.source,
+        target: envelope.target,
+        projection_target: envelope.projection_target,
+        source_revision: envelope.source_revision,
+        author_ref: envelope.author_ref,
+        authority_ref: envelope.authority_ref,
+        dependencies: envelope.dependencies,
+        authority_granted: envelope.authority_granted,
+        actuation_performed: envelope.actuation_performed,
     }
 }
 
-fn canonical_content_bytes() -> Vec<u8> {
-    serde_json::to_vec(&content_binding_payload()).expect("content binding serializes")
+fn canonical_content_bytes(envelope: &MycelixProjectionEnvelope) -> Vec<u8> {
+    serde_json::to_vec(&content_binding_payload(envelope)).expect("content binding serializes")
 }
 
-fn content_digest() -> String {
-    blake3::hash(&canonical_content_bytes()).to_hex().to_string()
+fn content_digest(envelope: &MycelixProjectionEnvelope) -> String {
+    blake3::hash(&canonical_content_bytes(envelope)).to_hex().to_string()
 }
 
 fn envelope() -> MycelixProjectionEnvelope {
     let mut projection = envelope_without_digest();
-    projection.source_content_digest = content_digest();
+    projection.source_content_digest = content_digest(&projection);
     projection
 }
 
@@ -275,7 +274,7 @@ fn validate(envelope: &MycelixProjectionEnvelope) -> ValidationOutcome {
     }
 
     if envelope.digest_algorithm != "blake3-256"
-        || envelope.source_content_digest != content_digest()
+        || envelope.source_content_digest != content_digest(envelope)
     {
         return ValidationOutcome::Invalid;
     }
@@ -315,7 +314,7 @@ fn main() {
     // A digest declaration is not silently promoted to a cryptographic
     // commitment merely because the field is present.
     assert_eq!(first.digest_algorithm, "blake3-256");
-    assert_eq!(first.source_content_digest, content_digest());
+    assert_eq!(first.source_content_digest, content_digest(&first));
     assert_eq!(first.source_content_digest.len(), 64);
 }
 
@@ -444,8 +443,9 @@ mod tests {
 
     #[test]
     fn changing_bound_content_changes_digest() {
-        let baseline = content_digest();
-        let mut changed = content_binding_payload();
+        let baseline_projection = envelope();
+        let baseline = content_digest(&baseline_projection);
+        let mut changed = content_binding_payload(&baseline_projection);
         changed.authority_granted = true;
         let changed_bytes = serde_json::to_vec(&changed).unwrap();
         let changed_digest = blake3::hash(&changed_bytes).to_hex().to_string();
@@ -454,7 +454,7 @@ mod tests {
 
     #[test]
     fn canonical_payload_excludes_self_referential_digest() {
-        let payload = content_binding_payload();
+        let payload = content_binding_payload(&envelope());
         let json = serde_json::to_string(&payload).unwrap();
         assert!(!json.contains("source_content_digest"));
     }
