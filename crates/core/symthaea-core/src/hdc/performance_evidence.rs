@@ -232,3 +232,5 @@ mod tests {
         assert!(matches!(r.validate(), Err(PerformanceEvidenceError::EmptyProvenance("hardware"))));
     }
 }
+
+// Evidence schema remains measurement-only; no benchmark values are embedded here.
