@@ -331,6 +331,29 @@ impl TerrainProvenance {
     }
 
     /// Require cryptographic identity for a named source artifact.
+    /// Project the legacy flat digest envelope into artifact-scoped identities.
+    ///
+    /// This is a compatibility bridge: until callers provide artifact-local
+    /// metadata explicitly, each projected artifact inherits the envelope's
+    /// source and coordinate metadata. New multi-product callers should build
+    /// a `TerrainArtifactComposition` directly.
+    pub fn artifact_identities(&self) -> Result<TerrainArtifactComposition, String> {
+        self.validate()?;
+        TerrainArtifactComposition::from_artifacts(
+            self.content_digests
+                .iter()
+                .map(|(logical_file, algorithm, digest)| TerrainArtifactIdentity {
+                    logical_file: logical_file.clone(),
+                    source_id: self.source_id.clone(),
+                    source_revision: self.source_revision.clone(),
+                    coordinate_reference: self.coordinate_reference.clone(),
+                    algorithm: algorithm.clone(),
+                    digest: digest.clone(),
+                })
+                .collect(),
+        )
+    }
+
     pub fn require_sha256(&self, logical_file: &str) -> Result<(), String> {
         if self.has_sha256(logical_file) {
             Ok(())
