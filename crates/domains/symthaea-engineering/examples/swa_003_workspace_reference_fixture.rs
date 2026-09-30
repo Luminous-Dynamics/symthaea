@@ -49,15 +49,38 @@ const ADAPTED_B: BuildingReading = BuildingReading {
 };
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+enum EvidenceKind {
+    ScenarioAssumption,
+    ModelDerivedPrediction,
+    ObservedOutcome,
+    DerivedResidual,
+    UnresolvedEvidence,
+    UnknownUnmodeled,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+struct EvidenceProvenance {
+    kind: EvidenceKind,
+    source: &'static str,
+    lineage: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+struct DimensionValue {
+    value: Option<f64>,
+    provenance: EvidenceProvenance,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
 struct WorkspaceDimensions {
-    comfort: f64,
-    energy: f64,
-    resilience: f64,
-    lifecycle_cost: f64,
-    maintenance_burden: f64,
-    reversibility: f64,
-    privacy: f64,
-    agency: f64,
+    comfort: DimensionValue,
+    energy: DimensionValue,
+    resilience: DimensionValue,
+    lifecycle_cost: DimensionValue,
+    maintenance_burden: DimensionValue,
+    reversibility: DimensionValue,
+    privacy: DimensionValue,
+    agency: DimensionValue,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq)]
@@ -84,12 +107,26 @@ struct WorkspaceObservation {
 struct PredictionError {
     intervention_id: &'static str,
     zone_id: &'static str,
+    prediction_kind: EvidenceKind,
     predicted_comfort: f64,
     observed_comfort: f64,
     comfort_error: f64,
     predicted_energy: f64,
     observed_energy: f64,
     energy_error: f64,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq)]
+struct CounterfactualEvaluation {
+    intervention_id: &'static str,
+    comfort: DimensionValue,
+    energy: DimensionValue,
+    resilience: DimensionValue,
+    lifecycle_cost: DimensionValue,
+    maintenance_burden: DimensionValue,
+    reversibility: DimensionValue,
+    comparable: bool,
+    exclusion_reason: &'static str,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq)]
@@ -132,6 +169,7 @@ struct FixtureEvidence {
     building_free_energy: f64,
     building_action: String,
     interventions: [WorkspaceIntervention; 2],
+    counterfactual_evaluations: [CounterfactualEvaluation; 2],
     outcomes: [WorkspaceObservation; 2],
     prediction_errors: [PredictionError; 2],
     contradictory_evidence: ContradictoryEvidence,
@@ -185,6 +223,17 @@ fn fixture() -> FixtureEvidence {
     let baseline_output = run_building_twin(&BASELINE_A, &BASELINE_A);
     let adapted_output = run_building_twin(&BASELINE_A, &ADAPTED_A);
 
+    let scenario = EvidenceProvenance {
+        kind: EvidenceKind::ScenarioAssumption,
+        source: "SWA-003 authored fixture scenario",
+        lineage: "fixture-input",
+    };
+    let unmodeled = EvidenceProvenance {
+        kind: EvidenceKind::UnknownUnmodeled,
+        source: "no intervention-specific physical model",
+        lineage: "counterfactual-support-gap",
+    };
+
     let interventions = [
         WorkspaceIntervention {
             id: "workspace-intervention-modular-hvac",
@@ -197,14 +246,14 @@ fn fixture() -> FixtureEvidence {
             alternative_use_value: 900.0,
             downside_liquidity_exposure: 0.12,
             predicted: WorkspaceDimensions {
-                comfort: 0.90,
-                energy: 0.30,
-                resilience: 0.86,
-                lifecycle_cost: 0.68,
-                maintenance_burden: 0.18,
-                reversibility: 0.91,
-                privacy: 1.0,
-                agency: 1.0,
+                comfort: DimensionValue { value: Some(0.90), provenance: scenario },
+                energy: DimensionValue { value: Some(0.30), provenance: scenario },
+                resilience: DimensionValue { value: Some(0.86), provenance: scenario },
+                lifecycle_cost: DimensionValue { value: Some(0.68), provenance: scenario },
+                maintenance_burden: DimensionValue { value: Some(0.18), provenance: scenario },
+                reversibility: DimensionValue { value: Some(0.91), provenance: scenario },
+                privacy: DimensionValue { value: Some(1.0), provenance: scenario },
+                agency: DimensionValue { value: Some(1.0), provenance: scenario },
             },
         },
         WorkspaceIntervention {
@@ -218,14 +267,14 @@ fn fixture() -> FixtureEvidence {
             alternative_use_value: 8_000.0,
             downside_liquidity_exposure: 0.72,
             predicted: WorkspaceDimensions {
-                comfort: 0.93,
-                energy: 0.27,
-                resilience: 0.80,
-                lifecycle_cost: 0.41,
-                maintenance_burden: 0.44,
-                reversibility: 0.24,
-                privacy: 1.0,
-                agency: 0.86,
+                comfort: DimensionValue { value: Some(0.93), provenance: scenario },
+                energy: DimensionValue { value: Some(0.27), provenance: scenario },
+                resilience: DimensionValue { value: Some(0.80), provenance: scenario },
+                lifecycle_cost: DimensionValue { value: Some(0.41), provenance: scenario },
+                maintenance_burden: DimensionValue { value: Some(0.44), provenance: scenario },
+                reversibility: DimensionValue { value: Some(0.24), provenance: scenario },
+                privacy: DimensionValue { value: Some(1.0), provenance: scenario },
+                agency: DimensionValue { value: Some(0.86), provenance: scenario },
             },
         },
     ];
@@ -234,26 +283,42 @@ fn fixture() -> FixtureEvidence {
         PredictionError {
             intervention_id: interventions[0].id,
             zone_id: outcomes[0].zone_id,
-            predicted_comfort: interventions[0].predicted.comfort,
+            prediction_kind: interventions[0].predicted.comfort.provenance.kind,
+            predicted_comfort: interventions[0].predicted.comfort.value.expect("scenario value"),
             observed_comfort: outcomes[0].reading.comfort,
-            comfort_error: outcomes[0].reading.comfort - interventions[0].predicted.comfort,
-            predicted_energy: interventions[0].predicted.energy,
+            comfort_error: outcomes[0].reading.comfort
+                - interventions[0].predicted.comfort.value.expect("scenario value"),
+            predicted_energy: interventions[0].predicted.energy.value.expect("scenario value"),
             observed_energy: outcomes[0].reading.energy_consumption,
             energy_error: outcomes[0].reading.energy_consumption
-                - interventions[0].predicted.energy,
+                - interventions[0].predicted.energy.value.expect("scenario value"),
         },
         PredictionError {
             intervention_id: interventions[0].id,
             zone_id: outcomes[1].zone_id,
-            predicted_comfort: interventions[0].predicted.comfort,
+            prediction_kind: interventions[0].predicted.comfort.provenance.kind,
+            predicted_comfort: interventions[0].predicted.comfort.value.expect("scenario value"),
             observed_comfort: outcomes[1].reading.comfort,
-            comfort_error: outcomes[1].reading.comfort - interventions[0].predicted.comfort,
-            predicted_energy: interventions[0].predicted.energy,
+            comfort_error: outcomes[1].reading.comfort
+                - interventions[0].predicted.comfort.value.expect("scenario value"),
+            predicted_energy: interventions[0].predicted.energy.value.expect("scenario value"),
             observed_energy: outcomes[1].reading.energy_consumption,
             energy_error: outcomes[1].reading.energy_consumption
-                - interventions[0].predicted.energy,
+                - interventions[0].predicted.energy.value.expect("scenario value"),
         },
     ];
+
+    let counterfactual_evaluations = interventions.map(|intervention| CounterfactualEvaluation {
+        intervention_id: intervention.id,
+        comfort: DimensionValue { value: None, provenance: unmodeled },
+        energy: DimensionValue { value: None, provenance: unmodeled },
+        resilience: DimensionValue { value: None, provenance: unmodeled },
+        lifecycle_cost: DimensionValue { value: None, provenance: unmodeled },
+        maintenance_burden: DimensionValue { value: None, provenance: unmodeled },
+        reversibility: DimensionValue { value: None, provenance: unmodeled },
+        comparable: false,
+        exclusion_reason: "BuildingTwin currently supplies building behavior, not an intervention-specific workspace counterfactual for these dimensions",
+    });
 
     let contradictory_evidence = ContradictoryEvidence {
         subject: "zone-b comfort after adaptation",
@@ -279,13 +344,25 @@ fn fixture() -> FixtureEvidence {
         contestable: true,
     };
 
-    // The BuildingTwin result is evidence about physical prediction behavior,
-    // not an authorization. Both intervention paths remain explicit.
+    // BuildingTwin output is evidence about physical twin behavior, not an
+    // intervention counterfactual and never an authorization. Authored
+    // intervention values remain scenario assumptions until an intervention-
+    // specific model actually produces them.
     assert!(baseline_output.free_energy.is_finite());
     assert!(adapted_output.free_energy.is_finite());
     assert!(interventions.iter().all(WorkspaceIntervention::reversibility_cost_consistent));
     assert!(prediction_errors.iter().all(|e| e.comfort_error.is_finite()));
     assert!(prediction_errors.iter().all(|e| e.energy_error.is_finite()));
+    assert!(interventions.iter().all(|i| {
+        i.predicted.comfort.provenance.kind == EvidenceKind::ScenarioAssumption
+            && i.predicted.energy.provenance.kind == EvidenceKind::ScenarioAssumption
+    }));
+    assert!(counterfactual_evaluations.iter().all(|e| {
+        !e.comparable
+            && e.comfort.value.is_none()
+            && e.energy.value.is_none()
+            && e.resilience.value.is_none()
+    }));
     assert!(!contradictory_evidence.resolved);
     assert!(!constraint_candidate.adopted);
     assert!(!receipt_projection.authority_granted);
@@ -303,6 +380,7 @@ fn fixture() -> FixtureEvidence {
         building_free_energy: adapted_output.free_energy,
         building_action: format!("{:?}", adapted_output.recommended_action),
         interventions,
+        counterfactual_evaluations,
         outcomes,
         prediction_errors,
         contradictory_evidence,
@@ -336,8 +414,8 @@ fn main() {
 
     // Prediction is not observation; recommendation is not authorization.
     assert_ne!(
-        first.interventions[0].predicted.comfort,
-        first.outcomes[0].reading.comfort
+        first.interventions[0].predicted.comfort.value,
+        Some(first.outcomes[0].reading.comfort)
     );
     assert!(first.authorization_required);
     assert!(!first.actuation_performed);
@@ -348,10 +426,13 @@ fn main() {
 
     // Independent objectives remain inspectable rather than being collapsed
     // into a single opaque workspace score.
-    assert!(first.interventions[0].predicted.resilience.is_finite());
-    assert!(first.interventions[0].predicted.lifecycle_cost.is_finite());
-    assert!(first.interventions[0].predicted.reversibility.is_finite());
-    assert!(first.interventions[1].reversibility < first.interventions[0].reversibility);
+    assert!(first.interventions[0].predicted.resilience.value.is_some());
+    assert!(first.interventions[0].predicted.lifecycle_cost.value.is_some());
+    assert!(first.interventions[0].predicted.reversibility.value.is_some());
+    assert!(
+        first.interventions[1].predicted.reversibility.value
+            < first.interventions[0].predicted.reversibility.value
+    );
 
     println!(
         "{}",
