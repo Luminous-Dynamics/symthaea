@@ -241,6 +241,20 @@ jobs:
 """, encoding="utf-8")
         observed = parse_workflow(wf)["contract"]
         assert observed["trigger"] == {"event": "workflow_run", "types": ["completed"], "workflows": ["Trusted upstream"]}
+        original = wf.read_text(encoding="utf-8")
+        for malformed in (
+            original.replace("    types:\n      - completed\n", ""),
+            original.replace("      - Trusted upstream\n", ""),
+            original.replace("  workflow_run:", "  pull_request_target:\n    types: [opened]\n  workflow_run:"),
+            original.replace("    permissions:\n      actions: read\n      contents: read", "    permissions: read-all"),
+        ):
+            wf.write_text(malformed, encoding="utf-8")
+            try:
+                parse_workflow(wf)
+            except InventoryError:
+                continue
+            raise AssertionError("ambiguous privileged trigger/permission must fail closed")
+        wf.write_text(original, encoding="utf-8")
         assert observed["permissions"]["top_level"] == {"contents": "read"}
         assert observed["permissions"]["jobs"]["receipt"] == {"actions": "read", "contents": "read"}
         inv.write_text(json.dumps({"workflows": [{"path": "example.yml", **observed}]}), encoding="utf-8")
