@@ -275,10 +275,21 @@ impl TerrainProvenance {
             if digest.trim().is_empty() {
                 return Err(format!("content digest {index} has an empty digest"));
             }
+            if algorithm.eq_ignore_ascii_case("SHA-256")
+                && (digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            {
+                return Err(format!(
+                    "content digest {index} has an invalid SHA-256 value"
+                ));
+            }
             for (other_name, other_algorithm, other_digest) in self.content_digests.iter().skip(index + 1) {
-                if name == other_name
-                    && (algorithm != other_algorithm || digest != other_digest)
-                {
+                let same_identity = algorithm.eq_ignore_ascii_case(other_algorithm)
+                    && if algorithm.eq_ignore_ascii_case("SHA-256") {
+                        digest.eq_ignore_ascii_case(other_digest)
+                    } else {
+                        digest == other_digest
+                    };
+                if name == other_name && !same_identity {
                     return Err(format!(
                         "conflicting provenance identities for logical file {name}"
                     ));
@@ -291,8 +302,8 @@ impl TerrainProvenance {
     /// Merge another provenance set without allowing ambiguous artifact identity.
     /// Identical entries are deduplicated; conflicting identities fail closed.
     pub fn merged_with(&self, other: &Self) -> Result<Self, String> {
-        self.validate_content_digests()?;
-        other.validate_content_digests()?;
+        self.validate()?;
+        other.validate()?;
         let mut merged = self.clone();
         for entry in &other.content_digests {
             if let Some(existing) = merged
@@ -300,7 +311,13 @@ impl TerrainProvenance {
                 .iter()
                 .find(|(name, _, _)| name == &entry.0)
             {
-                if existing.1 != entry.1 || existing.2 != entry.2 {
+                let same_identity = existing.1.eq_ignore_ascii_case(&entry.1)
+                    && if existing.1.eq_ignore_ascii_case("SHA-256") {
+                        existing.2.eq_ignore_ascii_case(&entry.2)
+                    } else {
+                        existing.2 == entry.2
+                    };
+                if !same_identity {
                     return Err(format!(
                         "conflicting provenance identities for logical file {}",
                         entry.0
@@ -882,6 +899,22 @@ mod tests {
         };
         let merged = base.merged_with(&same).unwrap();
         assert_eq!(merged.content_digests.len(), 1);
+
+        let mixed_case = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![("raster".into(), "sha-256".into(), "A".repeat(64))],
+        };
+        assert_eq!(base.merged_with(&mixed_case).unwrap().content_digests.len(), 1);
+
+        let invalid_digest = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "ia2".into(),
+            content_digests: vec![("raster".into(), "SHA-256".into(), "not-hex".into())],
+        };
+        assert!(invalid_digest.validate().is_err());
 
         let conflict = TerrainProvenance {
             source_id: "mola".into(),
