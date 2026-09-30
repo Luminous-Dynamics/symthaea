@@ -583,6 +583,7 @@ jobs:
             "        with:\n"
             "          name: trusted-receipt-" + artifact_expr + "-" + "${" + "{ github.event.workflow_run.run_attempt }}\n"
             "          run-id: " + artifact_expr + "\n"
+            "          path: \\${{ runner.temp }}/trusted-receipt\\n"
         )
         artifact_valid = artifact_base.replace(
             "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
