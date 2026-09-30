@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-civ-place"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "CIV-PLACE deterministic dependency/currentness leaf kernel"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+
+[[bin]]
+name = "civ-place-001b-oracle"
+path = "src/bin/civ_place_001b_oracle.rs"
