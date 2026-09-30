@@ -112,6 +112,10 @@ impl MolaMegdrProduct {
             source_id: expected_product_id.to_string(),
             source_revision: expected_revision.to_string(),
             coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+            content_digests: vec![
+                ("detached-label".into(), "SHA-256".into(), label_sha256.clone()),
+                ("raster-image".into(), "SHA-256".into(), image_sha256.clone()),
+            ],
         };
         Ok(Self {
             metadata,
@@ -125,6 +129,15 @@ impl MolaMegdrProduct {
     /// Open a product and require exact SHA-256 identities for both the
     /// detached label and raster. This is the cryptographic provenance gate
     /// intended for reproducible engineering runs.
+    /// Return the provenance digest for a logical source file.
+    pub fn content_digest(&self, logical_file: &str) -> Option<&str> {
+        self.provenance
+            .content_digests
+            .iter()
+            .find(|(name, _, _)| name == logical_file)
+            .map(|(_, _, digest)| digest.as_str())
+    }
+
     pub fn open_verified(
         label_path: impl AsRef<Path>,
         img_path: impl AsRef<Path>,
