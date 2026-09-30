@@ -79,6 +79,41 @@ def _artifact_execution_evidence(lines: list[str], artifact_paths: list[str]) ->
                 break
     return sorted(set(evidence))
 
+def _artifact_indirect_sink_evidence(lines: list[str], artifact_paths: list[str]) -> list[str]:
+    """Detect simple variable/env indirection from artifact paths into execution sinks."""
+    if not artifact_paths:
+        return []
+    tainted_names: set[str] = set()
+    evidence: list[str] = []
+    artifact_exprs = tuple(artifact_paths) + ("runner.temp", "$RUNNER_TEMP")
+    assignment_re = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^#\n]+)")
+    env_re = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^#\n]+)")
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        for regex in (assignment_re, env_re):
+            for match in regex.finditer(stripped):
+                name, value = match.groups()
+                if any(expr in value for expr in artifact_exprs) or any(
+                    name == existing for existing in tainted_names
+                ):
+                    tainted_names.add(name)
+    if not tainted_names:
+        return []
+    shell_sink = re.compile(
+        r"\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua|source|eval|xargs)\b"
+    )
+    exec_file_sink = re.compile(r"\b(?:find|tar|unzip)\b[^#\n]*(?:-exec|--to-command|--use-compress-program)")
+    for raw in lines:
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if any(re.search(r"\b" + re.escape(name) + r"\b", stripped) for name in tainted_names):
+            if shell_sink.search(stripped) or exec_file_sink.search(stripped):
+                evidence.append(stripped)
+    return sorted(set(evidence))
+
 def _parse_inline_list(value: str) -> list[str]:
     value = value.strip()
     if not (value.startswith("[") and value.endswith("]")):
@@ -351,10 +386,11 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                 if "artifact-ids" in with_values:
                     raise InventoryError(f"{path}: artifact-id access is unsupported in privileged v1; bind to exact name + run-id")
             artifact_execution_evidence = _artifact_execution_evidence(lines, artifact_paths_observed)
+            artifact_indirect_sink_evidence = _artifact_indirect_sink_evidence(lines, artifact_paths_observed)
             artifact_action_sink_evidence = _artifact_action_sink_evidence(lines, artifact_paths_observed)
-            if artifact_execution_evidence or artifact_action_sink_evidence:
+            if artifact_execution_evidence or artifact_indirect_sink_evidence or artifact_action_sink_evidence:
                 raise InventoryError(
-                    f"{path}: downloaded workflow_run artifacts must not cross an unreviewed execution or action-processing boundary: commands={artifact_execution_evidence}; actions={artifact_action_sink_evidence}"
+                    f"{path}: downloaded workflow_run artifacts must not cross an unreviewed execution or action-processing boundary: commands={artifact_execution_evidence}; indirect={artifact_indirect_sink_evidence}; actions={artifact_action_sink_evidence}"
                 )
     for raw in lines:
         stripped = raw.strip()
@@ -392,6 +428,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
         "artifact_names": sorted(set(artifact_names_observed)),
         "artifact_extraction_paths": sorted(set(artifact_paths_observed)),
         "artifact_execution_evidence": artifact_execution_evidence,
+        "artifact_indirect_sink_evidence": artifact_indirect_sink_evidence,
         "artifact_action_sink_evidence": artifact_action_sink_evidence,
         "artifact_consumption_mode": "data_only" if download_artifact else "none",
         "explicit_cache_write_override_present": explicit_cache_write,
