@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn provenance_is_required {
+    fn provenance_is_required() {
         let mut r = record();
         r.provenance.hardware.clear();
         assert!(matches!(r.validate(), Err(PerformanceEvidenceError::EmptyProvenance("hardware"))));
