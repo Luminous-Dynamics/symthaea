@@ -8,6 +8,7 @@ use symthaea_engineering::provenance_graph::{reference_graph, Edge, EdgeKind, No
 
 fn main() {
     let graph = reference_graph();
+    assert_eq!(graph.validate(), Ok(()));
     let slice = graph.slice("claim-001").expect("claim exists");
 
     assert!(slice.contains("claim-001"));
