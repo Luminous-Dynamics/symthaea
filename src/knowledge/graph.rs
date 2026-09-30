@@ -433,7 +433,11 @@ impl EnhancedKnowledgeGraph {
     /// The returned view is a snapshot: mutating the cognitive graph afterwards cannot
     /// mutate the view. The view carries lineage plus structural validation only.
     pub fn provenance_view(&self) -> ProvenanceView {
-        ProvenanceView::from_relations(&self.provenance_relations)
+        ProvenanceView::from_relations(
+            &self.provenance_relations,
+            self.validate_provenance(),
+        )
+        .expect("graph provenance view must match its validation snapshot")
     }
 
     /// Validate the current provenance snapshot without mutating graph state.
