@@ -699,7 +699,7 @@ This also reinforces the semantic rule already present in Mycelix's interoperabi
 
 SWA-019 established semantic identity and dependency structure, but its digest was intentionally only a declaration. SWA-021 closes that gap at the local fixture boundary without pretending to be the final Mycelix cryptographic contract.
 
-The projection now derives a BLAKE3-256 digest from a deterministic serialized `ContentBindingPayload` containing the schema, source/target semantic references, projection target, observed Mycelix revision, author/authority references, dependency set, and authority/actuation state. The digest is computed over the payload **excluding the digest field itself**, avoiding a circular commitment. BLAKE3 provides a 32-byte default hash and deterministic hexadecimal representation in its Rust implementation. citeturn1search0turn1search1
+The projection now derives a BLAKE3-256 digest from a deterministic serialized `ContentBindingPayload` containing the schema, an explicit evidence-binding manifest, source/target semantic references, projection target, observed Mycelix revision, author/authority references, dependency set, and authority/actuation state. The digest is computed over the payload **excluding the digest field itself**, avoiding a circular commitment. BLAKE3 provides a 32-byte default hash and deterministic hexadecimal representation in its Rust implementation. citeturn1search0turn1search1
 
 This establishes three useful invariants:
 
@@ -712,3 +712,23 @@ The algorithm is explicitly labeled in the envelope. This is a **fixture-level c
 The resulting boundary is now:
 
 `Sol Atlas evidence identity -> semantic references -> canonical projection payload -> cryptographic content commitment -> Mycelix validation/governance boundary -> separately observed physical outcome`
+
+
+## Evidence-slice binding — SWA-022
+
+The next trust-boundary refinement is now explicit: a valid projection must identify the exact Sol Atlas evidence slice it claims to represent.
+
+SWA-022 adds an `EvidenceBinding` manifest containing semantic references for the provenance slice, claim, evidence, model, scenario, and dataset, plus the slice revision. The manifest receives its own BLAKE3-256 digest, and that digest is then included in the outer projection content commitment.
+
+This is deliberately a **manifest commitment**, not a second provenance implementation. The authoritative provenance graph remains owned by the existing SWA provenance fixtures. The adapter consumes the slice identity/revision contract and commits to the exact dependency set presented to Mycelix.
+
+That distinction matters:
+
+- a valid outer receipt can no longer silently point at a different model/scenario/dataset revision without changing its content commitment;
+- the evidence slice has an explicit identity rather than being represented only by a generic `evidence` dependency;
+- provenance integrity and Mycelix interoperability remain separate concerns;
+- the adapter still does not claim that a digest proves the underlying physical world state.
+
+Holochain's validation model strongly favors this structure: dependencies used for validation need deterministic, addressable identities, and unavailable dependencies are unresolved rather than silently accepted. citeturn0search0turn0search2
+
+The intended production evolution is therefore **not** to duplicate the provenance graph inside the Mycelix adapter. Instead, the Sol Atlas provenance layer should export a canonical slice identifier, exact dependency revisions, and an approved content commitment; the Mycelix adapter binds those references into its projection.
