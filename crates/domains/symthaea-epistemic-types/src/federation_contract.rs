@@ -130,7 +130,7 @@ mod tests {
     use super::*;
     use crate::{ProvenanceRelation, ProvenanceRelationKind, ProvenanceValidationReport};
 
-    fn receipt() -> CanonicalAdmissionReceipt {
+    fn receipt() -> (CanonicalAdmissionReceipt, ProvenanceValidationReport) {
         let relation = ProvenanceRelation {
             source_memory_id: "derived".into(),
             target_memory_id: "source".into(),
@@ -144,12 +144,13 @@ mod tests {
             validation.snapshot_digest,
             validation.validator_version,
             validation.snapshot_schema_version,
-        ).unwrap()
+        ).unwrap();
+        (receipt, validation)
     }
 
     #[test]
     fn federated_claim_preserves_admission_boundary() {
-        let r = receipt();
+        let (r, validation) = receipt();
         let claim = FederatedClaim::new(
             "claim:1",
             "canonical:1",
@@ -167,7 +168,7 @@ mod tests {
 
     #[test]
     fn federated_claim_rejects_snapshot_mismatch() {
-        let r = receipt();
+        let (r, _valid) = receipt();
         let validation = ProvenanceValidationReport::from_relations(&[]);
         assert_eq!(
             FederatedClaim::new(
@@ -180,9 +181,8 @@ mod tests {
 
     #[test]
     fn federated_claim_rejects_frontier_mismatch() {
-        let mut r = receipt();
+        let (mut r, validation) = receipt();
         r.frontier_ref = Some("frontier:other".into());
-        let validation = ProvenanceValidationReport::from_relations(&[]);
         assert_eq!(
             FederatedClaim::new(
                 "claim:1", "canonical:1", "family:1", "author:1", "statement:1",
