@@ -222,6 +222,11 @@ pub struct ProcessingActivity {
     pub activity_id: String,
     /// Stable identifier for the procedure or process definition.
     pub process_id: String,
+    /// Content fingerprint of the immutable process definition/plan.
+    ///
+    /// This is separate from activity_fingerprint, which identifies the
+    /// concrete code/configuration/parameter realization of this execution.
+    pub process_definition_fingerprint: Option<String>,
     pub started_at_unix_ns: Option<i128>,
     pub ended_at_unix_ns: Option<i128>,
     /// Agent identifier, such as a sensor, service, or analyst credential.
@@ -246,6 +251,10 @@ impl ProcessingActivity {
         hasher.update(b"symthaea:observation-processing-activity:v1\n");
         write_canonical_string(&mut hasher, &self.activity_id);
         write_canonical_string(&mut hasher, &self.process_id);
+        write_canonical_string_option(
+            &mut hasher,
+            self.process_definition_fingerprint.as_deref(),
+        );
         write_canonical_i128_option(&mut hasher, self.started_at_unix_ns);
         write_canonical_i128_option(&mut hasher, self.ended_at_unix_ns);
         write_canonical_string_option(&mut hasher, self.agent_id.as_deref());
@@ -267,6 +276,7 @@ impl ProcessingActivity {
     fn validate_without_execution_fingerprint(&self) -> Result<(), ObservationValidationError> {
         if self.activity_id.trim().is_empty() || self.process_id.trim().is_empty()
             || self.agent_id.as_deref().is_some_and(|id| id.trim().is_empty())
+            || self.process_definition_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
             || self.activity_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
             || self.input_observation_ids.iter().any(|id| id.trim().is_empty())
             || self.output_observation_ids.iter().any(|id| id.trim().is_empty())
@@ -834,6 +844,7 @@ mod tests {
         observation.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "orthorectify-v2".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: Some(20),
             ended_at_unix_ns: Some(10),
             agent_id: Some("worker-7".into()),
@@ -851,10 +862,52 @@ mod tests {
     }
 
     #[test]
+    fn processing_definition_fingerprint_is_bound_into_execution_identity() {
+        let mut activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into()),
+            started_at_unix_ns: Some(10),
+            ended_at_unix_ns: Some(20),
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+        };
+        let first = activity.compute_execution_fingerprint().unwrap();
+        activity.process_definition_fingerprint =
+            Some("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into());
+        let second = activity.compute_execution_fingerprint().unwrap();
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn processing_activity_rejects_malformed_definition_fingerprint() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: Some("not-a-fingerprint".into()),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["output".into()],
+        };
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::InvalidProcessingActivity)
+        );
+    }
+
+    #[test]
     fn processing_activity_execution_fingerprint_is_deterministic() {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: Some(10),
             ended_at_unix_ns: Some(20),
             agent_id: Some("worker-7".into()),
@@ -877,6 +930,7 @@ mod tests {
         let mut activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: Some(10),
             ended_at_unix_ns: Some(20),
             agent_id: Some("worker-7".into()),
@@ -896,6 +950,7 @@ mod tests {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -912,6 +967,7 @@ mod tests {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -928,6 +984,7 @@ mod tests {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: " ".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -1017,6 +1074,7 @@ mod tests {
         output.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -1037,6 +1095,7 @@ mod tests {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: Some(10),
             ended_at_unix_ns: Some(20),
             agent_id: Some("worker-7".into()),
@@ -1071,6 +1130,7 @@ mod tests {
         let activity_a = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: Some(10),
             ended_at_unix_ns: Some(20),
             agent_id: Some("worker-7".into()),
@@ -1108,6 +1168,7 @@ mod tests {
         let activity = ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -1140,6 +1201,7 @@ mod tests {
         output_a.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -1168,6 +1230,7 @@ mod tests {
         output.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -1189,6 +1252,7 @@ mod tests {
         observation.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
@@ -1213,6 +1277,7 @@ mod tests {
         observation.provenance.processing_activity = Some(ProcessingActivity {
             activity_id: "run-001".into(),
             process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
             started_at_unix_ns: None,
             ended_at_unix_ns: None,
             agent_id: None,
