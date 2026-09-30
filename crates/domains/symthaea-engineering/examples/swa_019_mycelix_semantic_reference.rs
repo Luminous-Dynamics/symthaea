@@ -313,7 +313,7 @@ fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
     blake3::hash(&bytes).to_hex().to_string()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct ContentBindingPayload {
     schema: SchemaRefProjection,
     evidence_binding: EvidenceBinding,
