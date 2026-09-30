@@ -54,10 +54,6 @@ pub enum ParetoFrontierError {
     DuplicatePointId(String),
     NoPoints,
     MissingDataPolicyMismatch,
-    MissingObjectiveValue {
-        point_id: String,
-        objective: String,
-    },
     DimensionMismatch {
         point_id: String,
         expected: usize,
@@ -83,7 +79,6 @@ impl std::fmt::Display for ParetoFrontierError {
             Self::DuplicatePointId(id) => write!(f, "Pareto point ID is duplicated: {id}"),
             Self::NoPoints => write!(f, "Pareto frontier requires at least one point"),
             Self::MissingDataPolicyMismatch => write!(f, "unsupported Pareto missing-data policy"),
-            Self::MissingObjectiveValue { point_id, objective } => write!(f, "point {point_id} is missing objective {objective} under complete-case policy"),
             Self::DimensionMismatch {
                 point_id,
                 expected,
@@ -148,15 +143,13 @@ pub fn apply_missing_data_policy(
                             point_id: point.point_id.clone(),
                             objective: objective.name.clone(),
                         }),
-                        None => return Err(ParetoFrontierError::MissingObjectiveValue {
-                            point_id: point.point_id.clone(),
-                            objective: objective.name.clone(),
-                        }),
+                        None => return Ok(None),
                     }
                 }
-                Ok(FrontierPoint { point_id: point.point_id.clone(), values })
+                Ok(Some(FrontierPoint { point_id: point.point_id.clone(), values }))
             })
-            .collect(),
+            .collect::<Result<Vec<_>, _>>()
+            .map(|points| points.into_iter().flatten().collect()),
     }
 }
 
@@ -289,18 +282,19 @@ mod tests {
     }
 
     #[test]
-    fn complete_case_policy_rejects_missing_values_without_imputation() {
+    fn complete_case_policy_excludes_missing_points_without_imputation() {
         let points = vec![
             PartialFrontierPoint { point_id: "a".into(), values: vec![Some(1.0), None] },
             PartialFrontierPoint { point_id: "b".into(), values: vec![Some(2.0), Some(0.9)] },
         ];
-        let error = apply_missing_data_policy(
+        let concrete = apply_missing_data_policy(
             PARETO_MISSING_DATA_POLICY_VERSION,
             MissingDataPolicy::CompleteCaseV1,
             &objectives(),
             &points,
-        ).expect_err("missing objective must not be silently imputed");
-        assert!(matches!(error, ParetoFrontierError::MissingObjectiveValue { point_id, objective } if point_id == "a" && objective == "quality"));
+        ).expect("missing point should be excluded, not imputed");
+        assert_eq!(concrete.len(), 1);
+        assert_eq!(concrete[0].point_id, "b");
     }
 
     #[test]
