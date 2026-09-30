@@ -18,7 +18,8 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 
 use crate::mars_tether::{
-    TerrainProvenance, TerrainQuality, TerrainSample, TerrainSamplingMethod,
+    TerrainArtifactComposition, TerrainProvenance, TerrainQuality, TerrainSample,
+    TerrainSamplingMethod,
     TerrainVerticalDatum,
 };
 
@@ -137,6 +138,20 @@ impl MolaMegdrProduct {
             .iter()
             .find(|(name, _, _)| name == logical_file)
             .map(|(_, _, digest)| digest.as_str())
+    }
+
+    /// Return the independently authenticated artifacts belonging to this
+    /// product. Unlike the legacy merged terrain provenance, this projection
+    /// retains this product's own source/revision envelope for both its
+    /// detached label and raster bytes.
+    ///
+    /// This is intentionally product-local: composing a topography product
+    /// with its observation-count companion must happen at the observation
+    /// boundary, where both independent source identities can be retained.
+    pub fn artifact_identities(&self) -> Result<TerrainArtifactComposition, MolaError> {
+        self.provenance
+            .artifact_identities()
+            .map_err(MolaError::InvalidMetadata)
     }
 
     pub fn open_verified(
@@ -1735,6 +1750,56 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(error, MolaError::InvalidMetadata(_)));
+    }
+
+    #[test]
+    fn artifact_identities_retain_product_local_source_identity() {
+        let topography = TerrainProvenance {
+            source_id: "MEGT00N000HB".into(),
+            source_revision: "pds4-v1".into(),
+            coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+            content_digests: vec![
+                ("detached-label".into(), "SHA-256".into(), "a".repeat(64)),
+                ("raster-image".into(), "SHA-256".into(), "b".repeat(64)),
+            ],
+        };
+        let counts = TerrainProvenance {
+            source_id: "MEGC00N000HB".into(),
+            source_revision: "pds4-v1".into(),
+            coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+            content_digests: vec![
+                ("detached-label".into(), "SHA-256".into(), "c".repeat(64)),
+                ("raster-image".into(), "SHA-256".into(), "d".repeat(64)),
+            ],
+        };
+        let topography = MolaMegdrProduct {
+            metadata: MolaMegdrMetadata::from_label(&parse_label(&label()), "MEGT00N000HB").unwrap(),
+            provenance: topography,
+            label_sha256: "a".repeat(64),
+            image_sha256: "b".repeat(64),
+            img_path: std::path::PathBuf::new(),
+        };
+        let counts = MolaMegdrProduct {
+            metadata: MolaMegdrMetadata::from_label(
+                &parse_label(
+                    &label()
+                        .replace("MEGT00N000HB", "MEGC00N000HB")
+                        .replace("MAP_TYPE = T", "MAP_TYPE = C")
+                        .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8"),
+                ),
+                "MEGC00N000HB",
+            ).unwrap(),
+            provenance: counts,
+            label_sha256: "c".repeat(64),
+            image_sha256: "d".repeat(64),
+            img_path: std::path::PathBuf::new(),
+        };
+
+        let topography_artifacts = topography.artifact_identities().unwrap();
+        let counts_artifacts = counts.artifact_identities().unwrap();
+        assert_eq!(topography_artifacts.artifacts[0].source_id, "MEGT00N000HB");
+        assert_eq!(counts_artifacts.artifacts[0].source_id, "MEGC00N000HB");
+        assert_ne!(topography_artifacts, counts_artifacts);
     }
 
     #[test]
