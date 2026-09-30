@@ -44,12 +44,20 @@ pub struct SemanticResult {
     pub observation: ObservationKey,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentityTombstone {
+    pub retired_at_ms: u64,
+    pub reusable_at_ms: u64,
+}
+
 /// State owned by the semantic admission layer.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SemanticAdmissionState {
     pub deliveries: HashMap<Uuid, DeliveryContract>,
     pub observations: HashMap<ObservationKey, ObservationRecord>,
     pub results: HashMap<ObservationKey, SemanticResult>,
+    pub delivery_tombstones: HashMap<Uuid, IdentityTombstone>,
+    pub observation_tombstones: HashMap<ObservationKey, IdentityTombstone>,
 }
 
 /// Explicit policy inputs. All time is supplied by the caller; the oracle never
@@ -62,6 +70,7 @@ pub struct AdmissionPolicy {
     pub max_observations: usize,
     /// Logical retention horizon for deduplication records.
     pub retention_ms: u64,
+    pub tombstone_retention_ms: u64,
 }
 
 impl Default for AdmissionPolicy {
@@ -71,6 +80,7 @@ impl Default for AdmissionPolicy {
             max_deliveries: 16_384,
             max_observations: 16_384,
             retention_ms: 24 * 60 * 60 * 1_000,
+            tombstone_retention_ms: 24 * 60 * 60 * 1_000,
         }
     }
 }
@@ -97,6 +107,8 @@ pub enum RejectReason {
     InvalidState(StateInvariant),
     Expired(ExpiryBoundary),
     NewObservationForbidden,
+    DeliveryTombstoned,
+    ObservationTombstoned,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -106,6 +118,9 @@ pub enum StateInvariant {
     ResultMissingObservation { logical_delivery_id: Uuid },
     ResultObservationMismatch { logical_delivery_id: Uuid },
     ObservationKeyMismatch { observation_id: Uuid },
+    DeliveryTombstoneOverlap { logical_delivery_id: Uuid },
+    ObservationTombstoneOverlap { observation_id: Uuid },
+    InvalidTombstoneHorizon,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -164,6 +179,16 @@ pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvaria
         }
     }
 
+    for logical_delivery_id in state.delivery_tombstones.keys() {
+        if state.deliveries.contains_key(logical_delivery_id) { return Err(StateInvariant::DeliveryTombstoneOverlap { logical_delivery_id: *logical_delivery_id }); }
+    }
+    for observation_key in state.observation_tombstones.keys() {
+        if state.observations.contains_key(observation_key) || state.results.contains_key(observation_key) { return Err(StateInvariant::ObservationTombstoneOverlap { observation_id: observation_key.observation_id }); }
+    }
+    for tombstone in state.delivery_tombstones.values().chain(state.observation_tombstones.values()) {
+        if tombstone.reusable_at_ms < tombstone.retired_at_ms { return Err(StateInvariant::InvalidTombstoneHorizon); }
+    }
+
     for (observation_key, result) in &state.results {
         if !state.deliveries.contains_key(&result.logical_delivery_id) {
             return Err(StateInvariant::ResultMissingDelivery {
@@ -183,6 +208,25 @@ pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvaria
     }
 
     Ok(())
+}
+
+/// Pure lifecycle transition that retires observations past retention and leaves
+/// bounded tombstones so GC cannot silently resurrect consumed identities.
+pub fn retire_expired(state: &SemanticAdmissionState, policy: AdmissionPolicy, now_ms: u64) -> Result<SemanticAdmissionState, StateInvariant> {
+    validate_state(state)?;
+    let mut next = state.clone();
+    let expired: Vec<_> = state.observations.iter().filter_map(|(key, observation)| (now_ms.saturating_sub(observation.observed_at_ms) > policy.retention_ms).then_some(key.clone())).collect();
+    for key in expired {
+        next.observations.remove(&key);
+        next.results.remove(&key);
+        next.observation_tombstones.insert(key, IdentityTombstone { retired_at_ms: now_ms, reusable_at_ms: now_ms.saturating_add(policy.tombstone_retention_ms) });
+    }
+    let retireable: Vec<_> = next.deliveries.keys().copied().filter(|id| !next.results.values().any(|result| result.logical_delivery_id == *id) && next.deliveries[id].expires_at_ms <= now_ms).collect();
+    for id in retireable {
+        next.deliveries.remove(&id);
+        next.delivery_tombstones.insert(id, IdentityTombstone { retired_at_ms: now_ms, reusable_at_ms: now_ms.saturating_add(policy.tombstone_retention_ms) });
+    }
+    Ok(next)
 }
 
 /// Pure transition oracle.
@@ -217,6 +261,13 @@ pub fn decide(
         return AdmissionOutcome::Rejected {
             reason: RejectReason::InvalidObservationNamespace,
         };
+    }
+
+    if let Some(tombstone) = state.delivery_tombstones.get(&delivery.logical_delivery_id) {
+        if now_ms < tombstone.reusable_at_ms { return AdmissionOutcome::Rejected { reason: RejectReason::DeliveryTombstoned }; }
+    }
+    if let Some(tombstone) = state.observation_tombstones.get(&observation.key) {
+        if now_ms < tombstone.reusable_at_ms { return AdmissionOutcome::Rejected { reason: RejectReason::ObservationTombstoned }; }
     }
 
     if let Some(existing) = state.deliveries.get(&delivery.logical_delivery_id) {
@@ -307,6 +358,9 @@ pub fn decide(
     }
 
     let mut next = state.clone();
+    if next.delivery_tombstones.get(&delivery.logical_delivery_id).is_some_and(|t| now_ms >= t.reusable_at_ms) { next.delivery_tombstones.remove(&delivery.logical_delivery_id); }
+    if next.observation_tombstones.get(&observation.key).is_some_and(|t| now_ms >= t.reusable_at_ms) { next.observation_tombstones.remove(&observation.key); }
+
     next.deliveries
         .entry(delivery.logical_delivery_id)
         .or_insert_with(|| delivery.clone());
