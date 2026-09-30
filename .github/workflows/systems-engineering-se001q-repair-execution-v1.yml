@@ -305,7 +305,8 @@ jobs:
           test "${#files[@]}" -eq 1
           test "${files[0]}" = 'crates/domains/symthaea-se-model/src/lib.rs'
           test -z "$(git diff --name-only "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- Cargo.lock)"
-          test "$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)" = 
+          expected_numstat="$(printf '48\\t13\\tcrates/domains/symthaea-se-model/src/lib.rs')"
+          test "$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)" = "$expected_numstat"
           test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
           numstat="$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)"
           lock_blob="$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")"
