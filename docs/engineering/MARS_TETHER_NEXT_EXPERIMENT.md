@@ -264,6 +264,13 @@ The raster adapter now rejects coordinate queries outside the geographic footpri
 A second evidence boundary is now explicit: published downstream MOLA processing reports that LINE_PROJECTION_OFFSET and SAMPLE_PROJECTION_OFFSET are off by one pixel in several MEGDR label files and were corrected in derived processing. That is strong evidence that projection offsets cannot be treated as self-validating merely because they parse, but it does not identify the correction for the Valles tile itself. The adapter therefore remains conservative: exact Valles label bytes and image/count bytes must still be pinned before changing the current longitude transform. citeturn2search0
 
 
+
+
+### MOLA detached-label pointer semantics gate (2026-09-30)
+
+The PDS3 standards clarify an important boundary in the raster adapter: a bare numeric `^IMAGE = n` pointer identifies a record in the same file as an attached label, while a detached label must identify the external data file and may optionally supply a record/byte offset. Because `MolaMegdrProduct::open` explicitly accepts a separate label path and IMG path, the adapter must not reinterpret a bare numeric pointer as an offset into the external IMG. The adapter now rejects bare numeric `^IMAGE` values and continues to accept the detached filename form used by MOLA MEGDR products. This closes a subtle class of silent row-shift bugs while preserving the documented detached-label convention.
+
+The regression suite now exercises this boundary: bare numeric pointers fail closed, while detached filename pointers resolve to byte zero. This is a standards-backed correction to the earlier synthetic numeric-pointer fixture; no real MOLA product bytes were assumed.
 ### MOLA archive provenance gate (2026-09-30)
 
 The PDS Geosciences archive now exposes the migrated PDS4 MEGDR bundle and the legacy PDS3 products for the 128-pixels/degree collection. The archive identifies the Valles-containing megt00n270hb.img as a 129,761,280-byte product and its companion PDS3 label as 4,822 bytes. The NASA PDS collection identifies the migrated 128-ppd collection as urn:nasa:pds:mgs_mola_topography_derived:data_meg128::1.0, under bundle DOI 10.17189/1z1b-kv84.
