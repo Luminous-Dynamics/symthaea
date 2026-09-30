@@ -647,7 +647,13 @@ impl ExtensiveGame {
                 let info_set = self.information.state(*state).expect("validated decision state").information_set;
                 for action in actions {
                     let mut next = history.clone();
-                    next.push(HistoryEvent::Decision { state: *state, player: *player, information_set: info_set, action: action.action });
+                    next.push(HistoryEvent::Decision {
+                        state: *state,
+                        player: *player,
+                        information_set: info_set,
+                        action: action.action,
+                        visibility: action.visibility.clone(),
+                    });
                     self.collect_information_histories(action.next, next, histories)?;
                 }
             }
