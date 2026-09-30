@@ -108,7 +108,8 @@ impl CanonicalAdmissionReceipt {
     /// provenance validation snapshot. This binds admission to a concrete,
     /// schema-versioned structural state without assigning epistemic weight.
     pub fn binds_validation(&self, validation: &ProvenanceValidationReport) -> bool {
-        self.provenance_snapshot_digest == validation.snapshot_digest
+        validation.conforms
+            && self.provenance_snapshot_digest == validation.snapshot_digest
             && self.validator_version == validation.validator_version
             && self.snapshot_schema_version == validation.snapshot_schema_version
     }
@@ -394,6 +395,7 @@ mod tests {
             created_at: "cycle:2".into(),
         };
         let validation = ProvenanceValidationReport::from_relations(std::slice::from_ref(&relation));
+        assert!(validation.conforms);
         let receipt = CanonicalAdmissionReceipt::new(
             "admission:event-1",
             Some("frontier:1".into()),
@@ -402,6 +404,10 @@ mod tests {
             validation.snapshot_schema_version,
         ).unwrap();
         assert!(receipt.binds_validation(&validation));
+
+        let mut nonconforming = validation.clone();
+        nonconforming.conforms = false;
+        assert!(!receipt.binds_validation(&nonconforming));
 
         let mut changed = validation.clone();
         changed.snapshot_schema_version += 1;
