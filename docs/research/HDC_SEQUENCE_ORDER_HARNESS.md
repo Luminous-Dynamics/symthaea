@@ -8,7 +8,7 @@ The experiment varies:
 
 `dimension × sequence length × query corruption → position-retrieval accuracy + margin + order discrimination`
 
-Permutation is a standard HDC mechanism for encoding order, while bundling/superposition creates the distributed memory that must be decoded. citeturn0search1turn0search2
+Permutation is a standard HDC mechanism for encoding order, while bundling/superposition creates the distributed memory that must be decoded.
 
 ## Protocol
 
@@ -46,4 +46,4 @@ The fixture seed, dimension ladder, sequence-length ladder, noise ladder, query 
 
 ## Research basis
 
-Recent HDC work continues to treat permutation as a core operation for sequence/order representation, alongside binding and bundling. citeturn0search6
+Recent HDC work continues to treat permutation as a core operation for sequence/order representation, alongside binding and bundling.
