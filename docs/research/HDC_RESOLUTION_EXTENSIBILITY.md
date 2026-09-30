@@ -84,9 +84,9 @@ This separation is deliberate:
 | Can this workload fit the declared resource envelope? | `ResolutionBudget` |
 | Is the dimension preferable for a task? | future quality/cost evidence |
 
-Rust's checked integer multiplication returns `None` on overflow, which is the
-required behavior for converting an open resolution space into bounded working
-set accounting. citeturn0search0
+Rust's checked integer multiplication returns `None` on overflow. The budget
+uses that checked operation when converting an open resolution space into bounded
+working-set accounting.
 
 The budget is research infrastructure, not a production adaptive policy.
 Future adaptive selection should consume measured quality and cost evidence
