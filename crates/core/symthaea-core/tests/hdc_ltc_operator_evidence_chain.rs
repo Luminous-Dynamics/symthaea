@@ -30,7 +30,7 @@ fn resource_record() -> ResourceEvidenceRecord {
         conversion_bytes: Some(0),
         provenance_id: "e2e-resource-v1".to_owned(),
         qualification_status: RESOURCE_QUALIFIED_STATUS.to_owned(),
-        budget: ResourceBudget::new(512 * 1024, 2 * 1024 * 1024, Some(64 * 1024)),
+        budget: Some(ResourceBudget::new(512 * 1024, 2 * 1024 * 1024, Some(64 * 1024))),
         workload,
     }
 }
@@ -101,7 +101,7 @@ fn trajectory_chain_rejects_resource_budget_excess() {
 
     let resource = resource_record();
     let mut resource = resource;
-    resource.budget.max_resident_bytes -= 1;
+    resource.budget.as_mut().unwrap().max_resident_bytes -= 1;
     let resource_dependency = ResourceEvidenceDependency {
         schema_version: resource.schema_version,
         resolution: resource.workload.resolution,
