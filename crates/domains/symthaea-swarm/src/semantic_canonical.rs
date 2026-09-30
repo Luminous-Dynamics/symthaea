@@ -205,6 +205,141 @@ mod tests {
     }
 
     #[test]
+    fn canonical_witness_is_exact_alias_for_canonical_state_bytes() {
+        let state = admitted_state();
+        assert_eq!(
+            canonical_witness(&state).unwrap(),
+            canonical_state_bytes(&state).unwrap()
+        );
+    }
+
+    #[test]
+    fn every_delivery_field_is_witnessed() {
+        let state = admitted_state();
+        let base = canonical_state_bytes(&state).unwrap();
+
+        let mut changed = state.clone();
+        changed.deliveries.values_mut().next().unwrap().schema_version += 1;
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = state.clone();
+        changed.deliveries.values_mut().next().unwrap().expires_at_ms += 1;
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = state.clone();
+        changed.deliveries.values_mut().next().unwrap().payload.push(0);
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+    }
+
+    #[test]
+    fn every_observation_field_is_witnessed() {
+        let state = admitted_state();
+        let base = canonical_state_bytes(&state).unwrap();
+
+        let mut changed = state.clone();
+        changed.observations.values_mut().next().unwrap().source_id = Uuid::from_u128(99);
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = state.clone();
+        changed.observations.values_mut().next().unwrap().observed_at_ms += 1;
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = state.clone();
+        changed.observations.values_mut().next().unwrap().payload.push(0);
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+    }
+
+    #[test]
+    fn every_result_field_is_witnessed() {
+        let state = admitted_state();
+        let base = canonical_state_bytes(&state).unwrap();
+        let key = ObservationKey {
+            namespace: "test".into(),
+            observation_id: Uuid::from_u128(2),
+        };
+
+        let mut changed = state.clone();
+        changed.results.get_mut(&key).unwrap().logical_delivery_id = Uuid::from_u128(99);
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = state.clone();
+        changed.results.get_mut(&key).unwrap().observation.namespace = "other".into();
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = state.clone();
+        changed.results.get_mut(&key).unwrap().observation.observation_id = Uuid::from_u128(99);
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+    }
+
+    #[test]
+    fn tombstone_fields_and_keys_are_witnessed() {
+        let state = admitted_state();
+        let (_, observation) = fixture();
+        let gc = retire_expired(
+            &state,
+            AdmissionPolicy {
+                retention_ms: 10,
+                tombstone_retention_ms: 100,
+                ..AdmissionPolicy::default()
+            },
+            111,
+        )
+        .unwrap();
+        let base = canonical_state_bytes(&gc).unwrap();
+
+        let mut changed = gc.clone();
+        changed.observation_tombstones.get_mut(&observation.key).unwrap().retired_at_ms += 1;
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = gc.clone();
+        changed.observation_tombstones.get_mut(&observation.key).unwrap().reusable_at_ms += 1;
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+
+        let mut changed = gc.clone();
+        let tombstone = changed.observation_tombstones.remove(&observation.key).unwrap();
+        let different_key = ObservationKey {
+            namespace: "other".into(),
+            observation_id: observation.key.observation_id,
+        };
+        changed.observation_tombstones.insert(different_key, tombstone);
+        assert_ne!(base, canonical_state_bytes(&changed).unwrap());
+    }
+
+    #[test]
+    fn collection_membership_and_order_are_witnessed() {
+        let state = admitted_state();
+        let (delivery, observation) = fixture();
+        let mut expanded = state.clone();
+        let mut second = observation.clone();
+        second.key.observation_id = Uuid::from_u128(22);
+        second.payload = b"second".to_vec();
+        expanded.observations.insert(second.key.clone(), second.clone());
+        expanded.results.insert(
+            second.key.clone(),
+            SemanticResult {
+                logical_delivery_id: delivery.logical_delivery_id,
+                observation: second.key.clone(),
+            },
+        );
+        let base = canonical_state_bytes(&expanded).unwrap();
+
+        let mut reordered = SemanticAdmissionState::default();
+        for (key, value) in expanded.observations.iter().rev() {
+            reordered.observations.insert(key.clone(), value.clone());
+        }
+        for (key, value) in expanded.results.iter().rev() {
+            reordered.results.insert(key.clone(), value.clone());
+        }
+        for (key, value) in expanded.deliveries.iter().rev() {
+            reordered.deliveries.insert(*key, value.clone());
+        }
+        assert_eq!(base, canonical_state_bytes(&reordered).unwrap());
+
+        reordered.results.remove(&second.key);
+        assert_ne!(base, canonical_state_bytes(&reordered).unwrap());
+    }
+
+    #[test]
     fn canonicalization_is_insertion_order_independent() {
         let state = admitted_state();
         let (delivery, observation) = fixture();
