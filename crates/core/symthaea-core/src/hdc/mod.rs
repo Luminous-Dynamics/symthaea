@@ -93,6 +93,12 @@ pub mod resolution_budget;
 #[cfg(feature = "simd")]
 pub mod operator_evidence;
 
+/// Feature-neutral operator evidence contract consumed by trajectory qualification.
+pub mod operator_evidence_contract;
+
+/// Fail-closed dependency gate from operator evidence into trajectory evidence.
+pub mod trajectory_evidence;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
