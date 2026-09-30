@@ -484,7 +484,7 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
         "Number of HVs must match number of weights"
     );
 
-    let dim = hvs[0].dim();
+    let dim = hvs[0].len();
     for hv in hvs.iter() {
         assert_eq!(hv.len(), dim, "All HVs must have same dimension");
     }
