@@ -394,6 +394,20 @@ A further ecosystem pattern is worth preserving: safe/depth-limited subgame solv
 These observations strengthen the existing architectural decision not to make an external CFR crate the canonical ontology. External solvers can be adapters once the IR can faithfully express their required game-state, action, information-set, and evidence contracts.
 
 
+## 2026-09-30 extensive-form identity hardening
+
+The finite extensive-form boundary now treats player identity as part of validation rather than an implicit convention.
+
+- `PlayerId` is interpreted as an index into terminal utility vectors, so valid player identities are exactly `0..payoff_arity`.
+- Decision nodes, declared decision states, and information sets must reference known players.
+- `EventVisibility::Players` may only name known players.
+- `ObservationScope::Private` may only name a known player.
+- Invalid identities fail before solver-facing information analysis can treat them as authoritative.
+
+This closes a subtle semantic gap: visibility and observation metadata are part of the information model, so an out-of-range observer must not be representable as if it were a legitimate participant. The validation layer therefore derives the participant domain from terminal payoff arity and checks every player-bearing reference against it.
+
+The hardening is deliberately structural; it does not infer players from visibility metadata or silently add missing participants.
+
 ## 2026-09-29 information-structure hardening
 
 The next implementation tranche now makes the information-set boundary executable rather than documentary.
