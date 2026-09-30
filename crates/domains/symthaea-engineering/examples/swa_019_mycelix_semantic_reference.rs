@@ -272,7 +272,7 @@ fn envelope_without_digest() -> MycelixProjectionEnvelope {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct EvidenceBinding {
     slice_ref: SemanticRefProjection,
     claim_ref: SemanticRefProjection,
@@ -284,7 +284,7 @@ struct EvidenceBinding {
     provenance_digest: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct EvidenceBindingPayload {
     slice_ref: SemanticRefProjection,
     claim_ref: SemanticRefProjection,
@@ -331,7 +331,7 @@ struct ContentBindingPayload {
 fn content_binding_payload(envelope: &MycelixProjectionEnvelope) -> ContentBindingPayload {
     ContentBindingPayload {
         schema: envelope.schema,
-        evidence_binding: envelope.evidence_binding,
+        evidence_binding: envelope.evidence_binding.clone(),
         source: envelope.source,
         target: envelope.target,
         projection_target: envelope.projection_target,
