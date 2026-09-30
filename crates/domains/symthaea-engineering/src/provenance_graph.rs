@@ -198,7 +198,7 @@ pub struct ProvenanceSlice {
     pub boundary: SliceBoundaryCertificate,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SliceBoundaryCertificate {
     pub root: &'static str,
     /// Versioned identity of the authoritative graph representation.
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn duplicate_node_identity_is_rejected() {
         let mut graph = reference_graph();
-        graph.nodes.push(Node { id: "claim-001", kind: NodeKind::Evidence });
+        graph.nodes.push(Node { id: "claim-001", kind: NodeKind::Evidence, revision: None });
         assert_eq!(
             graph.validate(),
             Err(ProvenanceGraphError::DuplicateNodeId)
