@@ -821,7 +821,10 @@ mod tests {
             &request,
             LocalApprovalDecisionKindV1::Approved,
             ms(1_200),
-            "nixward-approver-evidence-v1:local-unix-peer-credential-v1:            00".repeat(32),
+            format!(
+                "nixward-approver-evidence-v1:local-unix-peer-credential-v1:{}",
+                "00".repeat(32)
+            ),
         )
         .unwrap();
         let err = ConsumedLocalApprovalDecisionV1::from_admitted_parts(
