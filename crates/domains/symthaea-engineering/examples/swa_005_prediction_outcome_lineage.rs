@@ -192,12 +192,13 @@ fn residual(prediction: PredictionInterval, outcome: SyntheticOutcome) -> Residu
 }
 
 fn calibrate_internal_gain(
-    current: ZoneParameters,
+    low: ZoneParameters,
+    high: ZoneParameters,
     observed: SyntheticOutcome,
     predicted: PredictionInterval,
     residual_id: &'static str,
     calibration_activity_id: &'static str,
-) -> (ZoneParameters, CalibrationActivity) {
+) -> (ZoneParameters, ZoneParameters, CalibrationActivity) {
     let predicted_energy_mid =
         (predicted.energy_min_kwh + predicted.energy_max_kwh) / 2.0;
     let energy_error = observed.energy_kwh - predicted_energy_mid;
@@ -205,8 +206,12 @@ fn calibrate_internal_gain(
 
     (
         ZoneParameters {
-            internal_gain_kw: (current.internal_gain_kw + adjustment).max(0.0),
-            ..current
+            internal_gain_kw: (low.internal_gain_kw + adjustment).max(0.0),
+            ..low
+        },
+        ZoneParameters {
+            internal_gain_kw: (high.internal_gain_kw + adjustment).max(0.0),
+            ..high
         },
         CalibrationActivity {
             activity_id: calibration_activity_id,
@@ -296,15 +301,9 @@ fn main() {
     // Start calibration from the original, intentionally biased predictor.
     // Calibration therefore demonstrates learning rather than simply
     // restating the synthetic world's parameters.
-    let initial_calibration_params = ZoneParameters {
-        thermal_mass_kwh_per_c: 9.0,
-        envelope_u_kw_per_c: 0.23,
-        internal_gain_kw: 0.35,
-        setpoint_c: 21.0,
-        comfort_band_c: 2.0,
-    };
-    let (calibrated_params, calibration) = calibrate_internal_gain(
-        initial_calibration_params,
+    let (calibrated_low, calibrated_high, calibration) = calibrate_internal_gain(
+        predictor_low,
+        predictor_high,
         training_outcome,
         prediction_v1,
         "residual-swa-005-training",
@@ -329,8 +328,8 @@ fn main() {
     let prediction_v2 = predict(
         "swa-005-rc-v2",
         initial,
-        calibrated_params,
-        calibrated_params,
+        calibrated_low,
+        calibrated_high,
         intervention,
         30.0,
         8,
@@ -423,10 +422,29 @@ mod tests {
             setpoint_c: 21.0,
             comfort_band_c: 2.0,
         };
-        let (calibrated, activity) =
-            calibrate_internal_gain(params, outcome, prediction, "residual-test-001", "calibration-test-001");
+        let (calibrated_low, calibrated_high, activity) = calibrate_internal_gain(
+            ZoneParameters {
+                thermal_mass_kwh_per_c: 8.0,
+                envelope_u_kw_per_c: 0.20,
+                internal_gain_kw: 0.30,
+                setpoint_c: 21.0,
+                comfort_band_c: 2.0,
+            },
+            ZoneParameters {
+                thermal_mass_kwh_per_c: 10.0,
+                envelope_u_kw_per_c: 0.26,
+                internal_gain_kw: 0.40,
+                setpoint_c: 21.0,
+                comfort_band_c: 2.0,
+            },
+            outcome,
+            prediction,
+            "residual-test-001",
+            "calibration-test-001",
+        );
 
-        assert_ne!(calibrated.internal_gain_kw, params.internal_gain_kw);
+        assert_ne!(calibrated_low.internal_gain_kw, 0.30);
+        assert_ne!(calibrated_high.internal_gain_kw, 0.40);
         assert_eq!(prediction.model_id, "swa-005-rc-v1");
         assert_eq!(activity.source_residual_id, "residual-test-001");
         assert_eq!(activity.source_model_id, prediction.model_id);
@@ -436,15 +454,23 @@ mod tests {
     #[test]
     fn holdout_is_separate_from_training_lineage() {
         let (prediction_v1, training_outcome, training_residual) = fixture();
-        let params = ZoneParameters {
-            thermal_mass_kwh_per_c: 9.0,
-            envelope_u_kw_per_c: 0.23,
-            internal_gain_kw: 0.35,
+        let low = ZoneParameters {
+            thermal_mass_kwh_per_c: 8.0,
+            envelope_u_kw_per_c: 0.20,
+            internal_gain_kw: 0.30,
             setpoint_c: 21.0,
             comfort_band_c: 2.0,
         };
-        let (calibrated, _) = calibrate_internal_gain(
-            params,
+        let high = ZoneParameters {
+            thermal_mass_kwh_per_c: 10.0,
+            envelope_u_kw_per_c: 0.26,
+            internal_gain_kw: 0.40,
+            setpoint_c: 21.0,
+            comfort_band_c: 2.0,
+        };
+        let (calibrated_low, calibrated_high, _) = calibrate_internal_gain(
+            low,
+            high,
             training_outcome,
             prediction_v1,
             "residual-training-holdout-001",
@@ -453,8 +479,8 @@ mod tests {
         let holdout_prediction = predict(
             "swa-005-rc-v2",
             ZoneState { indoor_c: 21.0 },
-            calibrated,
-            calibrated,
+            calibrated_low,
+            calibrated_high,
             Intervention {
                 id: "zone-a-reversible-hvac",
                 hvac_capacity_kw: 2.0,
