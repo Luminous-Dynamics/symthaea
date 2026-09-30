@@ -151,6 +151,11 @@ impl LocalApprovalRequestStoreV1 {
         Ok(ConsumedLocalApprovalDecisionV1 {
             request_id: submission.request_id.clone(),
             decision_evidence: decision,
+            projection_digest: removed.projection_digest,
+            required_approval_profile: removed.request.authority_profile_ref.clone(),
+            approver_evidence_ref: verified_peer.evidence_ref().clone(),
+            transport_instance_ref: verified_peer.audit_evidence().transport_instance_ref.clone(),
+            peer_observed_at_unix_ms: verified_peer.audit_evidence().observed_at_unix_ms,
             consumed_at_unix_ms: evaluation.evaluated_at().as_u64(),
         })
     }
