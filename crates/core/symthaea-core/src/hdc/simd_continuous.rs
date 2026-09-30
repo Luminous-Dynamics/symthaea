@@ -1525,6 +1525,70 @@ mod tests {
     // ===== Capabilities =====
 
     #[test]
+    fn test_extended_resolution_operator_conformance_matrix() {
+        // This is an operator-fidelity gate, not a performance claim. The
+        // exploratory tiers must preserve scalar semantics before they enter
+        // trajectory or cost/quality studies.
+        for &dim in &[16_384usize, 32_768, 65_536, 131_072, 262_144] {
+            let a = random_vec(dim, 42);
+            let b = random_vec(dim, 43);
+
+            let scalar_dot = scalar_dot_product(&a, &b);
+            let simd_dot = dot_product_simd(&a, &b);
+            let dot_scale = scalar_dot.abs().max(1.0);
+            assert!(
+                (simd_dot - scalar_dot).abs() / dot_scale < 1e-4,
+                "dot mismatch at dim={dim}: SIMD={simd_dot}, scalar={scalar_dot}"
+            );
+
+            let simd_bind = bind_simd(&a, &b);
+            assert_eq!(simd_bind.len(), dim, "bind dimension changed at dim={dim}");
+            for (i, (&x, &y)) in simd_bind.iter().zip(a.iter().zip(b.iter())).enumerate() {
+                assert!(
+                    (x - y).abs() < 1e-5,
+                    "bind mismatch at dim={dim}, index={i}: SIMD={x}, expected={}"
+                    , y
+                );
+            }
+
+            let refs = vec![a.as_slice(), b.as_slice()];
+            let weights = [1.0f32, 2.0];
+            let simd_bundle = bundle_simd(&refs, &weights);
+            assert_eq!(simd_bundle.len(), dim, "bundle dimension changed at dim={dim}");
+            for (i, (&x, (&av, &bv))) in simd_bundle
+                .iter()
+                .zip(a.iter().zip(b.iter()))
+                .enumerate()
+            {
+                let expected = (av + 2.0 * bv) / 3.0;
+                assert!(
+                    (x - expected).abs() < 1e-5,
+                    "bundle mismatch at dim={dim}, index={i}: SIMD={x}, expected={expected}"
+                );
+            }
+
+            let scalar_norm = a.iter().map(|&x| x * x).sum::<f32>().sqrt();
+            let simd_norm = norm_simd(&a);
+            assert!(
+                (simd_norm - scalar_norm).abs() / scalar_norm.max(1.0) < 1e-4,
+                "norm mismatch at dim={dim}: SIMD={simd_norm}, scalar={scalar_norm}"
+            );
+
+            let scalar_similarity = {
+                let dot_ab = scalar_dot_product(&a, &b);
+                let dot_aa = scalar_dot_product(&a, &a);
+                let dot_bb = scalar_dot_product(&b, &b);
+                (dot_ab / (dot_aa * dot_bb).sqrt()).clamp(-1.0, 1.0)
+            };
+            let simd_similarity = similarity_simd(&a, &b);
+            assert!(
+                (simd_similarity - scalar_similarity).abs() < 1e-4,
+                "similarity mismatch at dim={dim}: SIMD={simd_similarity}, scalar={scalar_similarity}"
+            );
+        }
+    }
+
+    #[test]
     fn test_capabilities_report() {
         let report = simd_capabilities_report();
         println!("{}", report);
