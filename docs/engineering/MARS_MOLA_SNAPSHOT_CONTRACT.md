@@ -62,6 +62,14 @@ The reproducible API should reject:
 
 It should never silently re-hash and continue against a replacement artifact, because that would change the experiment input while preserving the appearance of a pinned run.
 
+## Storage integration direction
+
+A useful deployment backend for Luminous Dynamics is a Nix store path or an equivalent content-addressed artifact store. Nix store paths are designed as opaque identities for exactly one store object, which aligns naturally with the snapshot contract's requirement that an experiment refer to a stable artifact identity rather than a mutable source pathname.
+
+The physics crate should **not** depend directly on Nix semantics. Instead, the snapshot abstraction should represent the generic contract and allow a caller/integration layer to supply an artifact from a content-addressed immutable store. A Nix-backed implementation can then map a verified store artifact into that generic abstraction without making the scientific model Nix-specific.
+
+This distinction matters because content addressing and filesystem immutability are related but separate properties: the artifact identity says which bytes are intended, while the storage boundary must prevent or detect post-verification replacement. Nix documentation likewise treats store paths as unique references to store objects and documents read-only filesystem requirements for stronger read-only guarantees.
+
 ## Verification plan
 
 Implementation should add regression coverage for:
