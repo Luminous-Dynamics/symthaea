@@ -21,6 +21,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Check formatting
+        run: cargo fmt --all -- --check
       - name: Test CIV-PLACE kernel and adapter
         run: cargo test -p symthaea-civ-place
       - name: Differential qualification
