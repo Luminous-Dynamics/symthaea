@@ -281,10 +281,22 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     with_values[key] = value_text
                 artifact_name = with_values.get("name")
                 run_id = with_values.get("run-id")
+                artifact_path = with_values.get("path")
                 if artifact_name:
                     artifact_names_observed.append(artifact_name)
                 if not artifact_name:
                     raise InventoryError(f"{path}: workflow_run artifact access requires an exact 'name' input")
+                if not artifact_path:
+                    raise InventoryError(
+                        f"{path}: workflow_run artifact access requires an explicit temporary extraction path"
+                    )
+                if not (
+                    artifact_path.startswith("${{ runner.temp }}/")
+                    or artifact_path.startswith("$RUNNER_TEMP/")
+                ):
+                    raise InventoryError(
+                        f"{path}: workflow_run artifacts must extract under runner.temp, not the workspace"
+                    )
                 if not run_id or run_id != "${{ github.event.workflow_run.id }}":
                     raise InventoryError(f"{path}: workflow_run artifact access must use the triggering workflow_run id")
                 if "pattern" in with_values:
