@@ -803,3 +803,22 @@ The resulting chain is:
 `authoritative provenance graph -> deterministic selected slice -> canonical evidence manifest -> BLAKE3-256 commitment -> semantic Mycelix projection -> Mycelix validation/governance -> independently observed outcome`
 
 SWA-025 does **not** introduce a second provenance graph or a second governance system. It makes the existing provenance graph the single source for the cross-system evidence topology.
+
+
+## SWA-026 — authoritative identity and revision binding
+
+SWA-025 removed duplicated provenance topology. SWA-026 closes the remaining identity gap: provenance nodes now carry their own revision as part of the authoritative graph representation.
+
+The Mycelix projection consumes that revision when constructing its canonical evidence manifest. The adapter no longer decides which revision belongs to a provenance node. A changed authoritative node revision therefore changes the evidence commitment directly.
+
+The graph validator now rejects empty, surrounding-whitespace, or control-character node identities/revisions, as well as duplicate node IDs and dangling or duplicate edges.
+
+Canonical evidence framing also uses 64-bit length fields rather than narrowing collection or byte lengths to 32 bits. The encoding remains explicitly versioned and length-delimited before BLAKE3 hashing.
+
+This keeps three concerns separate:
+
+1. **Authoritative identity** — owned by the provenance graph.
+2. **Canonical commitment** — owned by the evidence-binding layer.
+3. **Interoperability mapping** — owned by the Mycelix projection.
+
+Holochain's current validation guidance makes this separation particularly useful: validation must be deterministic, dependencies must be addressable, and missing dependencies are an unresolved condition rather than an implicit success. citeturn0search1turn0search0
