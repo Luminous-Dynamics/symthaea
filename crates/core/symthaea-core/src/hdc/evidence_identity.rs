@@ -8,7 +8,7 @@
 
 use super::cost_quality_join::JoinIdentity;
 use super::performance_evidence::PerformanceEvidenceRecord;
-use super::resource_evidence::ResourceEvidenceRecord;
+use super::resource_evidence::{qualify_resource, ResourceEvidenceRecord, RESOURCE_QUALIFIED_STATUS};
 use super::task_quality_evidence::TaskQualityEvidenceRecord;
 use super::trajectory_evidence::TrajectoryEvidenceRecord;
 
@@ -112,10 +112,12 @@ pub fn derive_experiment_key(
     performance
         .validate()
         .map_err(|e| EvidenceIdentityError::InvalidPerformance(e.to_string()))?;
-    resource
-        .workload
-        .validate()
-        .map_err(|e| EvidenceIdentityError::InvalidResource(e.to_string()))?;
+    qualify_resource(
+        resource,
+        resource.workload.resolution,
+        &resource.workload.representation,
+    )
+    .map_err(|e| EvidenceIdentityError::InvalidResource(e.to_string()))?;
 
     require_resolution(
         "resolution",
@@ -178,14 +180,32 @@ pub fn verify_trajectory_target(
     key: &ExperimentKey,
     trajectory: &TrajectoryEvidenceRecord,
 ) -> Result<(), EvidenceIdentityError> {
-    if trajectory.schema_version == 0 {
-        return Err(EvidenceIdentityError::InvalidTrajectory("schema version is zero".into()));
+    if trajectory.schema_version != super::trajectory_evidence::TRAJECTORY_EVIDENCE_SCHEMA_VERSION {
+        return Err(EvidenceIdentityError::InvalidTrajectory(
+            format!("unsupported schema version: {}", trajectory.schema_version),
+        ));
+    }
+    if trajectory.qualification_disposition != RESOURCE_QUALIFIED_STATUS {
+        return Err(EvidenceIdentityError::InvalidTrajectory(format!(
+            "trajectory is not qualified: {}",
+            trajectory.qualification_disposition
+        )));
     }
     require_resolution("trajectory.target_resolution", key.resolution, trajectory.target_resolution)?;
     require_equal(
         "trajectory.representation",
         &key.representation,
         &trajectory.operator_dependency.representation,
+    )?;
+    require_resolution(
+        "trajectory.resource_dependency.resolution",
+        key.resolution,
+        trajectory.resource_dependency.resolution,
+    )?;
+    require_equal(
+        "trajectory.resource_dependency.representation",
+        &key.representation,
+        &trajectory.resource_dependency.representation,
     )?;
     Ok(())
 }
@@ -281,6 +301,26 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn unqualified_resource_is_rejected() {
+        let mut r = resource();
+        r.qualification_status = "rejected".into();
+        assert!(matches!(
+            derive_experiment_key(&task(), &performance(), &r),
+            Err(EvidenceIdentityError::InvalidResource(_))
+        ));
+    }
+
+    #[test]
+    fn resource_qualification_requires_budget_consistency() {
+        let mut r = resource();
+        r.resident_bytes += 1;
+        assert!(matches!(
+            derive_experiment_key(&task(), &performance(), &r),
+            Err(EvidenceIdentityError::InvalidResource(_))
+        ));
+    }
+
     fn resource_resolution_mismatch_is_rejected() {
         let mut r = resource();
         r.workload.resolution = 65_536;
