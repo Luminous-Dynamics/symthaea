@@ -7,6 +7,8 @@
 use blake3;
 use serde::Serialize;
 
+const CANONICAL_ENCODING_VERSION: &[u8] = b"symthaea:evidence-slice:v1";
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CanonicalNodeRef {
     pub id: String,
@@ -46,12 +48,52 @@ impl EvidenceSliceManifest {
         self
     }
 
+    /// Versioned, length-delimited canonical bytes. JSON is intentionally not
+    /// part of the commitment format so field framing cannot become ambiguous
+    /// if the representation evolves.
     pub fn canonical_bytes(&self) -> Vec<u8> {
-        serde_json::to_vec(&self.canonicalize()).expect("manifest serializes")
+        let canonical = self.clone().canonicalize();
+        let mut bytes = Vec::new();
+        append_bytes(&mut bytes, CANONICAL_ENCODING_VERSION);
+        append_bytes(&mut bytes, canonical.slice_ref.as_bytes());
+        append_bytes(&mut bytes, canonical.claim_ref.as_bytes());
+        append_bytes(&mut bytes, canonical.slice_revision.as_bytes());
+        append_u32(&mut bytes, canonical.nodes.len());
+        for node in canonical.nodes {
+            append_bytes(&mut bytes, node.id.as_bytes());
+            append_bytes(&mut bytes, node.kind.as_bytes());
+            append_optional_bytes(&mut bytes, node.revision.as_deref().map(str::as_bytes));
+        }
+        append_u32(&mut bytes, canonical.edges.len());
+        for edge in canonical.edges {
+            append_bytes(&mut bytes, edge.from.as_bytes());
+            append_bytes(&mut bytes, edge.to.as_bytes());
+            append_bytes(&mut bytes, edge.kind.as_bytes());
+        }
+        bytes
     }
 
     pub fn digest(&self) -> String {
         blake3::hash(&self.canonical_bytes()).to_hex().to_string()
+    }
+}
+
+fn append_u32(out: &mut Vec<u8>, value: usize) {
+    out.extend_from_slice(&(value as u32).to_be_bytes());
+}
+
+fn append_bytes(out: &mut Vec<u8>, value: &[u8]) {
+    append_u32(out, value.len());
+    out.extend_from_slice(value);
+}
+
+fn append_optional_bytes(out: &mut Vec<u8>, value: Option<&[u8]>) {
+    match value {
+        Some(value) => {
+            out.push(1);
+            append_bytes(out, value);
+        }
+        None => out.push(0),
     }
 }
 
@@ -82,6 +124,23 @@ mod tests {
                 kind: "DerivedFrom".into(),
             }],
         }
+    }
+
+    #[test]
+    fn canonical_encoding_is_versioned_and_framed() {
+        let bytes = manifest().canonical_bytes();
+        assert!(bytes.starts_with(&(CANONICAL_ENCODING_VERSION.len() as u32).to_be_bytes()));
+        assert!(bytes.windows(CANONICAL_ENCODING_VERSION.len()).any(|w| w == CANONICAL_ENCODING_VERSION));
+        assert_ne!(manifest().digest(), blake3::hash(b"{}").to_hex().to_string());
+    }
+
+    #[test]
+    fn optional_revision_is_distinct_from_empty_revision() {
+        let mut absent = manifest();
+        absent.nodes[0].revision = None;
+        let mut empty = manifest();
+        empty.nodes[0].revision = Some(String::new());
+        assert_ne!(absent.digest(), empty.digest());
     }
 
     #[test]
