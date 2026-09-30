@@ -7,6 +7,8 @@
 use blake3;
 use serde::Serialize;
 
+use crate::provenance_graph::SliceBoundaryCertificate;
+
 const CANONICAL_ENCODING_VERSION: &[u8] = b"symthaea:evidence-slice:v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -28,6 +30,7 @@ pub struct EvidenceSliceManifest {
     pub slice_ref: String,
     pub claim_ref: String,
     pub slice_revision: String,
+    pub boundary: SliceBoundaryCertificate,
     pub nodes: Vec<CanonicalNodeRef>,
     pub edges: Vec<CanonicalEdgeRef>,
 }
@@ -58,6 +61,15 @@ impl EvidenceSliceManifest {
         append_bytes(&mut bytes, canonical.slice_ref.as_bytes());
         append_bytes(&mut bytes, canonical.claim_ref.as_bytes());
         append_bytes(&mut bytes, canonical.slice_revision.as_bytes());
+        append_bytes(&mut bytes, canonical.boundary.root.as_bytes());
+        append_bytes(&mut bytes, canonical.boundary.graph_revision.as_bytes());
+        append_bytes(&mut bytes, canonical.boundary.graph_digest.as_bytes());
+        append_bytes(&mut bytes, canonical.boundary.traversal_policy.as_bytes());
+        append_u64(&mut bytes, canonical.boundary.graph_node_count);
+        append_u64(&mut bytes, canonical.boundary.graph_edge_count);
+        append_u64(&mut bytes, canonical.boundary.slice_node_count);
+        append_u64(&mut bytes, canonical.boundary.slice_edge_count);
+        bytes.push(u8::from(canonical.boundary.frontier_exhausted));
         append_u64(&mut bytes, canonical.nodes.len());
         for node in canonical.nodes {
             append_bytes(&mut bytes, node.id.as_bytes());
@@ -106,6 +118,17 @@ mod tests {
             slice_ref: "slice-001".into(),
             claim_ref: "claim-001".into(),
             slice_revision: "slice@v1".into(),
+            boundary: SliceBoundaryCertificate {
+                root: "claim-001",
+                graph_revision: "sol-atlas-reference-graph@v1",
+                graph_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into(),
+                traversal_policy: "outgoing-reachability-bfs@v1",
+                graph_node_count: 2,
+                graph_edge_count: 1,
+                slice_node_count: 2,
+                slice_edge_count: 1,
+                frontier_exhausted: true,
+            },
             nodes: vec![
                 CanonicalNodeRef {
                     id: "model-001".into(),
