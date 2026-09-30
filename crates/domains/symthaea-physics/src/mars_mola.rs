@@ -801,16 +801,6 @@ fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<()
         )));
     }
 
-    // For the detached MEGDR images this is an especially useful invariant:
-    // FILE_RECORDS describes exactly the image records, while the label carries
-    // the image separately. Reject a file whose physical size cannot contain
-    // all declared records rather than relying only on the last sampled row.
-    let declared_file_bytes = metadata.record_bytes * u64::from(metadata.file_records);
-    if len < declared_file_bytes {
-        return Err(MolaError::InvalidMetadata(format!(
-            "IMG is smaller than FILE_RECORDS: {len} bytes, expected at least {declared_file_bytes}"
-        )));
-    }
     Ok(())
 }
 
