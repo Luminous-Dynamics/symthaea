@@ -476,6 +476,9 @@ fn image_data_record_offset(
                 // to the label file and must not be applied to the companion IMG.
                 return Ok(0);
             }
+            if pointer.to_ascii_lowercase().ends_with(".img") {
+                return Ok(0);
+            }
             let records = pointer
                 .parse::<u32>()
                 .map_err(|_| MolaError::InvalidMetadata("invalid ^IMAGE pointer".into()))?;
@@ -653,6 +656,30 @@ mod tests {
         assert_eq!(product.metadata.map_kind, 'T');
         let _ = std::fs::remove_file(path);
         let _ = std::fs::remove_file(img);
+    }
+
+    #[test]
+    fn detached_image_pointer_does_not_apply_label_records() {
+        let text = format!(
+            "{}\nLABEL_RECORDS = 99\n^IMAGE = \"MEGT00N270HB.IMG\"",
+            label()
+        );
+        let metadata = MolaMegdrMetadata::from_label(
+            &parse_label(&text),
+            "MEGT00N000HB",
+        )
+        .unwrap();
+        assert_eq!(metadata.line_offset, 0);
+    }
+
+    #[test]
+    fn rejects_malformed_creation_time() {
+        let text = label().replace(
+            "PRODUCT_CREATION_TIME = 2003-03-21T00:00:00",
+            "PRODUCT_CREATION_TIME = 2003/03/21 01:00:00",
+        );
+        let error = MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+        assert!(matches!(error, MolaError::InvalidMetadata(_)));
     }
 
     #[test]
