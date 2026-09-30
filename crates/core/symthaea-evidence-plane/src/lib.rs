@@ -353,6 +353,21 @@ impl RunEvidence {
 mod tests {
     use super::*;
 
+    #[test]
+    fn stable_config_hash_is_deterministic() {
+        let a = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
+        let b = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 64, "BLAKE3 hex digest must be 256 bits");
+    }
+
+    #[test]
+    fn stable_config_hash_changes_with_semantic_input() {
+        let a = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
+        let b = stable_config_hash(&(vec![100_u64, 101, 103], vec![1_u64, 2]));
+        assert_ne!(a, b);
+    }
+
     /// Reproduces `TemporalStateMode::HdcLtc`'s requirement: the active
     /// mechanism's predict counter must be positive. A passing case.
     #[test]
