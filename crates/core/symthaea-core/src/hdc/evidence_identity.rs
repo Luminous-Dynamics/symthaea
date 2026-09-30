@@ -117,6 +117,29 @@ pub fn derive_experiment_key(
         .validate()
         .map_err(|e| EvidenceIdentityError::InvalidResource(e.to_string()))?;
 
+    require_resolution(
+        "resolution",
+        task_quality.identity.resolution,
+        performance.identity.resolution,
+    )
+    .map_err(|error| error)?;
+    require_resolution(
+        "resolution",
+        task_quality.identity.resolution,
+        resource.workload.resolution,
+    )
+    .map_err(|error| error)?;
+    require_equal(
+        "representation",
+        &task_quality.identity.representation,
+        &performance.identity.representation,
+    )?;
+    require_equal(
+        "representation",
+        &task_quality.identity.representation,
+        &resource.workload.representation,
+    )?;
+
     Ok(ExperimentKey {
         task: task_quality.identity.task.clone(),
         scenario_set: task_quality.identity.scenario_set.clone(),
