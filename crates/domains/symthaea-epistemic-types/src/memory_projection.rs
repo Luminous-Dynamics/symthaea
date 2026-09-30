@@ -132,7 +132,10 @@ pub struct ProvenanceValidationReport {
 }
 
 impl ProvenanceValidationReport {
-    pub fn from_relations(relations: &[ProvenanceRelation]) -> Self {
+    fn snapshot_digest_for(
+        relations: &[ProvenanceRelation],
+        schema_version: u16,
+    ) -> String {
         let mut canonical = relations.to_vec();
         canonical.sort_by(|a, b| {
             (&a.source_memory_id, &a.target_memory_id, a.kind.stable_code(), &a.created_at)
@@ -140,7 +143,7 @@ impl ProvenanceValidationReport {
         });
 
         // Hash an explicitly tagged snapshot envelope. The schema version is part of
-        // the digest so a future encoding change cannot silently reuse a v1 digest.
+        // the digest so a future encoding change cannot silently reuse a prior digest.
         // Relation tuples use stable wire codes rather than Rust enum discriminants/encoding.
         let canonical_fields: Vec<(&str, &str, &str, &str)> = canonical
             .iter()
@@ -151,12 +154,15 @@ impl ProvenanceValidationReport {
                 relation.created_at.as_str(),
             ))
             .collect();
-        let canonical_snapshot = (
-            PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
-            canonical_fields,
-        );
+        let canonical_snapshot = (schema_version, canonical_fields);
         let bytes = serde_json::to_vec(&canonical_snapshot)
             .expect("canonical provenance snapshot is serializable");
+        sha256_hex(&bytes)
+    }
+
+    pub fn from_relations(relations: &[ProvenanceRelation]) -> Self {
+        let snapshot_digest =
+            Self::snapshot_digest_for(relations, PROVENANCE_SNAPSHOT_SCHEMA_VERSION);
         Self {
             snapshot_schema_version: PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
             validator_version: PROVENANCE_VALIDATOR_VERSION.to_owned(),
@@ -306,6 +312,13 @@ mod tests {
         let empty = ProvenanceValidationReport::from_relations(&[]);
         let singleton = ProvenanceValidationReport::from_relations(&[a, b]);
         assert_ne!(empty.snapshot_digest, singleton.snapshot_digest);
+        assert_ne!(
+            singleton.snapshot_digest,
+            ProvenanceValidationReport::snapshot_digest_for(
+                &[a, b],
+                PROVENANCE_SNAPSHOT_SCHEMA_VERSION + 1,
+            )
+        );
     }
 
     #[test]
