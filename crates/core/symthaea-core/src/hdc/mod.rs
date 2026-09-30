@@ -99,6 +99,9 @@ pub mod operator_evidence_contract;
 /// Fail-closed dependency gate from operator evidence into trajectory evidence.
 pub mod trajectory_evidence;
 
+/// Feature-neutral resource admissibility contract.
+pub mod resource_evidence;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
