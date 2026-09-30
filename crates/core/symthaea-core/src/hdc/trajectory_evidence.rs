@@ -204,9 +204,9 @@ mod tests {
                 ["dot", "bind", "bundle", "norm", "similarity"].into_iter().map(
                     move |operation| OperatorEvidenceRecord {
                         schema_version: OPERATOR_EVIDENCE_SCHEMA_VERSION,
-                        representation: CONTINUOUS_F32_REPRESENTATION,
+                        representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
                         resolution,
-                        operation,
+                        operation: operation.to_owned(),
                         seed_a: 42,
                         seed_b: 43,
                         scalar_reference: 0.0,
@@ -217,7 +217,7 @@ mod tests {
                         max_relative_error: 0.0,
                         tolerance: 1e-4,
                         logical_bytes: 1,
-                        qualification_status: QUALIFIED_STATUS,
+                        qualification_status: QUALIFIED_STATUS.to_owned(),
                     },
                 )
             })
