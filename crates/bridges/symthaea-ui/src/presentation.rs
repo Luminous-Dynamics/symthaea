@@ -63,6 +63,14 @@ pub struct CognitiveState {
 }
 
 impl CognitiveState {
+    fn finite_unit(value: f64) -> f64 {
+        if value.is_finite() {
+            value.clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+
     pub fn from_observation(
         connected: bool,
         processing: bool,
@@ -101,10 +109,10 @@ impl CognitiveState {
         Self {
             presence,
             mode,
-            coherence: coherence.clamp(0.0, 1.0),
-            thermodynamic_load: thermodynamic_load.clamp(0.0, 1.0),
-            confidence: confidence.clamp(0.0, 1.0),
-            prediction_error: prediction_error.clamp(0.0, 1.0),
+            coherence: Self::finite_unit(coherence),
+            thermodynamic_load: Self::finite_unit(thermodynamic_load),
+            confidence: Self::finite_unit(confidence),
+            prediction_error: Self::finite_unit(prediction_error),
         }
     }
 }
@@ -268,6 +276,26 @@ mod tests {
         assert_eq!(value.thermodynamic_load, 1.0);
         assert_eq!(value.confidence, 1.0);
         assert_eq!(value.prediction_error, 1.0);
+    }
+
+    #[test]
+    fn non_finite_values_are_safely_normalized() {
+        let value = CognitiveState::from_observation(
+            true,
+            false,
+            f64::NAN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        );
+        assert_eq!(value.coherence, 0.0);
+        assert_eq!(value.thermodynamic_load, 0.0);
+        assert_eq!(value.confidence, 0.0);
+        assert_eq!(value.prediction_error, 0.0);
+        assert!(value.coherence.is_finite());
+        assert!(value.thermodynamic_load.is_finite());
+        assert!(value.confidence.is_finite());
+        assert!(value.prediction_error.is_finite());
     }
 
     #[test]
