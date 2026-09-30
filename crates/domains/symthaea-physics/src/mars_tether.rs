@@ -256,6 +256,34 @@ impl TerrainProvenance {
     }
 }
 
+/// Immutable input identity for a reproducible tether-engineering run.
+///
+/// The caller supplies the model/constants/configuration revisions because
+/// this kernel deliberately does not infer source-control state or silently
+/// hash an unspecified runtime configuration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TetherExperimentProvenance {
+    pub experiment_id: String,
+    pub model_revision: String,
+    pub constants_revision: String,
+    pub configuration_sha256: String,
+    pub terrain: TerrainProvenance,
+}
+
+impl TetherExperimentProvenance {
+    /// A run is reproducibly attributable only when its configuration,
+    /// model/constants revisions, and both primary MOLA artifacts are pinned.
+    pub fn is_reproducibly_pinned(&self) -> bool {
+        !self.experiment_id.is_empty()
+            && !self.model_revision.is_empty()
+            && !self.constants_revision.is_empty()
+            && self.configuration_sha256.len() == 64
+            && self.configuration_sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+            && self.terrain.has_sha256("detached-label")
+            && self.terrain.has_sha256("raster-image")
+    }
+}
+
 /// Quality state for a terrain sample.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerrainQuality {
@@ -696,6 +724,31 @@ mod tests {
                 coordinate_reference: "areocentric-east-positive".into(),
             },
         }
+    }
+
+    #[test]
+    fn tether_experiment_identity_requires_all_pinned_inputs() {
+        let terrain = TerrainProvenance {
+            source_id: "mola".into(),
+            source_revision: "v2".into(),
+            coordinate_reference: "areocentric-east-positive".into(),
+            content_digests: vec![
+                ("detached-label".into(), "SHA-256".into(), "a".repeat(64)),
+                ("raster-image".into(), "SHA-256".into(), "b".repeat(64)),
+            ],
+        };
+        let pinned = TetherExperimentProvenance {
+            experiment_id: "valles-tether-t0".into(),
+            model_revision: "model-v1".into(),
+            constants_revision: "mars-reference-v1".into(),
+            configuration_sha256: "c".repeat(64),
+            terrain: terrain.clone(),
+        };
+        assert!(pinned.is_reproducibly_pinned());
+
+        let mut unpinned = pinned;
+        unpinned.configuration_sha256 = "not-pinned".into();
+        assert!(!unpinned.is_reproducibly_pinned());
     }
 
     #[test]
