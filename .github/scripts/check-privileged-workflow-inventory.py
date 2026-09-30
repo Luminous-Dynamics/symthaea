@@ -245,6 +245,49 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     f"{path}: artifact-consuming workflow_run must bind artifact access to runtime provenance: "
                     f"{missing_artifact_provenance}"
                 )
+            # A workflow_run consumer executes in a new run. Artifact retrieval
+            # must explicitly select the triggering upstream run.
+            for line_index, raw in enumerate(lines):
+                if "actions/download-artifact@" not in raw.strip():
+                    continue
+                step_indent = _indent(raw)
+                step_end = line_index + 1
+                while step_end < len(lines) and (
+                    not lines[step_end].strip() or _indent(lines[step_end]) > step_indent
+                ):
+                    step_end += 1
+                step_lines = lines[line_index:step_end]
+                with_indices = [i for i, value in enumerate(step_lines) if value.strip() == "with:"]
+                if len(with_indices) != 1:
+                    raise InventoryError(f"{path}: each download-artifact step must have exactly one structured with block")
+                with_start = with_indices[0]
+                with_end = with_start + 1
+                while with_end < len(step_lines) and (
+                    not step_lines[with_end].strip() or _indent(step_lines[with_end]) > _indent(step_lines[with_start])
+                ):
+                    with_end += 1
+                with_values = {}
+                for value in step_lines[with_start + 1:with_end]:
+                    if not value.strip():
+                        continue
+                    match = KEY_RE.match(value.strip())
+                    if not match:
+                        raise InventoryError(f"{path}: unsupported download-artifact input syntax: {value.strip()}")
+                    key, value_text = match.groups()
+                    value_text = _strip_comment(value_text or "").strip().strip("'\"")
+                    if key in with_values:
+                        raise InventoryError(f"{path}: duplicate download-artifact input: {key}")
+                    with_values[key] = value_text
+                artifact_name = with_values.get("name")
+                run_id = with_values.get("run-id")
+                if not artifact_name:
+                    raise InventoryError(f"{path}: workflow_run artifact access requires an exact 'name' input")
+                if not run_id or run_id != "${{ github.event.workflow_run.id }}":
+                    raise InventoryError(f"{path}: workflow_run artifact access must use the triggering workflow_run id")
+                if "pattern" in with_values:
+                    raise InventoryError(f"{path}: broad artifact pattern access is unsupported in privileged v1")
+                if "artifact-ids" in with_values:
+                    raise InventoryError(f"{path}: artifact-id access is unsupported in privileged v1; bind to exact name + run-id")
     for raw in lines:
         stripped = raw.strip()
         match = re.match(r"cache-mode:\s*(read|write|write-only|none)\s*$", stripped)
