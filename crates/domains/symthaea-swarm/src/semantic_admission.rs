@@ -396,6 +396,48 @@ mod tests {
     }
 
     #[test]
+    fn observation_record_key_mismatch_is_rejected() {
+        let (delivery, observation) = fixture();
+        let mut state = SemanticAdmissionState::default();
+        state.deliveries.insert(delivery.logical_delivery_id, delivery.clone());
+        let mut stored = observation.clone();
+        stored.key.observation_id = Uuid::from_u128(55);
+        state.observations.insert(observation.key.clone(), stored);
+        state.results.insert(
+            observation.key.clone(),
+            SemanticResult {
+                logical_delivery_id: delivery.logical_delivery_id,
+                observation: observation.key.clone(),
+            },
+        );
+        assert_eq!(
+            validate_state(&state),
+            Err(StateInvariant::ObservationKeyMismatch { observation_id: 55 })
+        );
+    }
+
+    #[test]
+    fn same_observation_key_cannot_be_owned_by_another_delivery() {
+        let (state, delivery, observation) = admitted_state();
+        let mut other_delivery = delivery.clone();
+        other_delivery.logical_delivery_id = Uuid::from_u128(44);
+        other_delivery.payload = b"other".to_vec();
+        let outcome = decide(
+            &state,
+            &other_delivery,
+            &observation,
+            AdmissionPolicy::default(),
+            100,
+        );
+        assert_eq!(
+            outcome,
+            AdmissionOutcome::Conflict {
+                identity_kind: ConflictKind::DeliveryContract
+            }
+        );
+    }
+
+    #[test]
     fn result_pointing_to_missing_observation_is_rejected() {
         let (delivery, observation) = fixture();
         let mut state = SemanticAdmissionState::default();
