@@ -1174,6 +1174,51 @@ mod tests {
     }
 
     #[test]
+    fn detached_image_pointer_must_match_supplied_raster_filename() {
+        let matching = label().replace(
+            "MAP_TYPE = T",
+            "MAP_TYPE = T\n^IMAGE = (\"MEGT00N000HB.IMG\",1)",
+        );
+        let kv = parse_label(&matching);
+        assert!(validate_image_pointer_filename(
+            &kv,
+            Path::new("/tmp/MEGT00N000HB.IMG"),
+        )
+        .is_ok());
+
+        let mismatched = matching.replace("MEGT00N000HB.IMG", "MEGT00N270HB.IMG");
+        let kv = parse_label(&mismatched);
+        assert!(matches!(
+            validate_image_pointer_filename(&kv, Path::new("/tmp/MEGT00N000HB.IMG")),
+            Err(MolaError::InvalidMetadata(_))
+        ));
+    }
+
+    #[test]
+    fn detached_image_pointer_dirlist_cannot_redirect_supplied_path() {
+        let text = label().replace(
+            "MAP_TYPE = T",
+            "MAP_TYPE = T\n^IMAGE = (\"[DATA]MEGT00N000HB.IMG\",1)",
+        );
+        let kv = parse_label(&text);
+        assert!(validate_image_pointer_filename(
+            &kv,
+            Path::new("/archive/MEGT00N000HB.IMG"),
+        )
+        .is_ok());
+
+        let traversal = label().replace(
+            "MAP_TYPE = T",
+            "MAP_TYPE = T\n^IMAGE = (\"../MEGT00N000HB.IMG\",1)",
+        );
+        let kv = parse_label(&traversal);
+        assert!(matches!(
+            validate_image_pointer_filename(&kv, Path::new("/archive/MEGT00N000HB.IMG")),
+            Err(MolaError::InvalidMetadata(_))
+        ));
+    }
+
+    #[test]
     fn rejects_malformed_detached_image_pointers() {
         for pointer in [
             r#"("MEGT00N000HB.IMG",0)"#,
