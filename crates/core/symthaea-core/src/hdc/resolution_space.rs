@@ -20,6 +20,7 @@ pub enum ResolutionError {
     Zero,
     NotPowerOfTwo(usize),
     ByteSizeOverflow { dimensions: usize, element_size: usize },
+    NotByteAligned(usize),
 }
 
 impl fmt::Display for ResolutionError {
@@ -29,6 +30,7 @@ impl fmt::Display for ResolutionError {
             Self::NotPowerOfTwo(dim) => write!(f, "HDC resolution {dim} is not a power of two"),
             Self::ByteSizeOverflow { dimensions, element_size } =>
                 write!(f, "byte size overflow for {dimensions} dimensions at {element_size}-byte elements"),
+            Self::NotByteAligned(dim) => write!(f, "binary HDC resolution {dim} is not byte-aligned"),
         }
     }
 }
@@ -53,7 +55,10 @@ impl HdcResolution {
         if !dimensions.is_power_of_two() {
             return Err(ResolutionError::NotPowerOfTwo(dimensions));
         }
-        Ok(Self(unsafe { NonZeroUsize::new_unchecked(dimensions) }))
+        match NonZeroUsize::new(dimensions) {
+            Some(value) => Ok(Self(value)),
+            None => Err(ResolutionError::Zero),
+        }
     }
 
     pub const fn dimensions(self) -> usize {
@@ -96,8 +101,8 @@ impl HdcResolution {
     }
 
     pub const fn binary_bytes(self) -> Result<usize, ResolutionError> {
-        if self.dimensions() < 8 {
-            return Err(ResolutionError::NotPowerOfTwo(self.dimensions()));
+        if self.dimensions() % 8 != 0 {
+            return Err(ResolutionError::NotByteAligned(self.dimensions()));
         }
         Ok(self.dimensions() / 8)
     }
