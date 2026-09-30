@@ -321,3 +321,6 @@ This gives Sol Atlas a more useful primitive than a generic confidence score: it
 This follows the same provenance direction as W3C PROV, which models entities, activities, derivations, revisions, and invalidation explicitly rather than relying on mutable metadata. ASME's current VVUQ portfolio likewise treats verification, validation, uncertainty quantification, and model lifecycle as distinct credibility concerns rather than collapsing them into a single result.
 
 The next natural seam is **provenance slicing**: given a downstream claim, compute the minimal reproducible chain of evidence and dependencies required to reproduce or challenge that claim.
+
+
+SWA-008 also makes claim freshness closure-specific rather than using the entire validation fingerprint. A solver change therefore stales a prediction-validation claim that depends on solver output, while leaving an applicability claim untouched when its declared closure does not include the solver. This preserves the same completeness/minimality principle established by SWA-007 at the claim layer.
