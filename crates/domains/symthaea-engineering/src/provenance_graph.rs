@@ -278,6 +278,20 @@ mod tests {
     }
 
     #[test]
+    fn invalid_graph_cannot_produce_a_slice() {
+        let mut graph = reference_graph();
+        graph.edges.push(Edge {
+            from: "claim-001",
+            to: "missing-001",
+            kind: EdgeKind::DerivedFrom,
+        });
+        assert_eq!(
+            graph.slice("claim-001"),
+            Err(ProvenanceGraphError::MissingEdgeEndpoint)
+        );
+    }
+
+    #[test]
     fn missing_root_is_not_an_empty_slice() {
         assert_eq!(reference_graph().slice("missing"), Err(ProvenanceGraphError::MissingRoot));
     }
