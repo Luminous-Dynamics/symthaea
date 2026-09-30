@@ -1,0 +1,103 @@
+name: HDC Resolution Qualification
+
+on:
+  pull_request:
+    paths:
+      - "crates/core/symthaea-core/src/hdc/resolution_space.rs"
+      - "crates/core/symthaea-core/src/hdc/resolution_budget.rs"
+      - "crates/core/symthaea-core/benches/simd_continuous.rs"
+      - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
+      - "rust-toolchain.toml"
+      - ".github/workflows/hdc-resolution-qualify.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: hdc-resolution-qualify-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Exact-head HDC resolution qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+
+      - name: Record exact head
+        id: head
+        run: |
+          ACTUAL_SHA="$(git rev-parse HEAD)"
+          echo "sha=$ACTUAL_SHA" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            test "$ACTUAL_SHA" = "${{ github.event.pull_request.head.sha }}"
+          fi
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt,clippy
+
+      - name: Capture toolchain provenance
+        run: |
+          {
+            echo "commit=$(git rev-parse HEAD)"
+            rustc --version --verbose
+            cargo --version --verbose
+          } | tee toolchain.txt
+
+      - name: Diff hygiene
+        run: git diff --check
+
+      - name: Focused formatting
+        run: |
+          rustfmt --check --edition 2024             crates/core/symthaea-core/src/hdc/resolution_space.rs             crates/core/symthaea-core/src/hdc/resolution_budget.rs             crates/core/symthaea-core/benches/simd_continuous.rs
+
+      - name: Focused HDC resolution tests
+        run: |
+          cargo test -p symthaea-core --lib resolution_space
+          cargo test -p symthaea-core --lib resolution_budget
+
+      - name: Compile SIMD benchmark matrix
+        run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
+
+      - name: Enforce evidence-boundary documentation
+        run: |
+          test "$(grep -c "Canonical: 1K, 2K, 4K, 8K, 16K, 32K, 64K." docs/research/HDC_RESOLUTION_EXTENSIBILITY.md)" -eq 1
+          test "$(grep -c "Exploratory: 128K, 256K." docs/research/HDC_RESOLUTION_EXTENSIBILITY.md)" -eq 1
+          ! grep -q "cite" docs/research/HDC_RESOLUTION_EXTENSIBILITY.md
+
+      - name: Write qualification receipt
+        if: always()
+        run: |
+          cat > hdc-resolution-qualification.txt <<EOF
+          HDC Resolution Qualification
+          =============================
+          exact_head=${{ steps.head.outputs.sha }}
+          workflow_event=${{ github.event_name }}
+          rust_toolchain=1.96.0
+          resolution_space=focused-tests
+          resolution_budget=focused-tests
+          simd_benchmark=compile-only
+          benchmark_execution=not-claimed
+          production_default_changed=false
+          exploratory_tiers=128K,256K
+          canonical_tiers=1K,2K,4K,8K,16K,32K,64K
+          EOF
+
+      - name: Upload qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdc-resolution-qualification-${{ steps.head.outputs.sha }}
+          path: |
+            hdc-resolution-qualification.txt
+            toolchain.txt
