@@ -12,7 +12,6 @@
 //! This measures whether the representation preserves a controlled signal as
 //! dimensionality changes without importing external data or user state.
 
-use super::cost_quality_join::EvidenceReference as JoinEvidenceReference;
 use super::performance_evidence::{
     BenchmarkIdentity, ExecutionProvenance as PerformanceProvenance, Measurement,
     PerformanceEvidenceRecord, PERFORMANCE_EVIDENCE_SCHEMA_VERSION,
@@ -262,6 +261,7 @@ fn run_row(
     let logical_bytes_per_query = (CLASS_COUNT + 1)
         .checked_mul(resolution)
         .and_then(|n| n.checked_mul(std::mem::size_of::<f32>()))
+        .and_then(|n| u64::try_from(n).ok())
         .ok_or(DimensionTaskError::InvalidDimension(resolution))?;
     let start = Instant::now();
 
@@ -515,7 +515,12 @@ mod tests {
             a.rows.iter().map(|r| r.task_quality_digest).collect::<Vec<_>>(),
             b.rows.iter().map(|r| r.task_quality_digest).collect::<Vec<_>>()
         );
-        assert_eq!(a.frontier.artifact_digest(), b.frontier.artifact_digest());
+        // Performance digests intentionally include wall-clock measurements;
+        // semantic task-quality evidence and scores must remain deterministic.
+        assert_eq!(
+            a.rows.iter().map(|r| r.correct).collect::<Vec<_>>(),
+            b.rows.iter().map(|r| r.correct).collect::<Vec<_>>()
+        );
     }
 
     #[test]
