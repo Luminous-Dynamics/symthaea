@@ -250,14 +250,42 @@ impl MolaMegdrProduct {
         }
     }
 
+    fn raster_byte_offset(
+        &self,
+        line: u32,
+        sample: u32,
+        bytes_per_sample: u64,
+    ) -> Result<u64, MolaError> {
+        if line >= self.metadata.lines || sample >= self.metadata.samples {
+            return Err(MolaError::OutOfBounds);
+        }
+        if bytes_per_sample == 0 {
+            return Err(MolaError::InvalidMetadata(
+                "raster sample width must be non-zero".into(),
+            ));
+        }
+        let row = u64::from(line)
+            .checked_add(u64::from(self.metadata.line_offset))
+            .ok_or_else(|| MolaError::InvalidMetadata("raster row offset overflow".into()))?;
+        let row_offset = u64::from(self.metadata.record_bytes)
+            .checked_mul(row)
+            .ok_or_else(|| MolaError::InvalidMetadata("raster byte offset overflow".into()))?;
+        let sample_offset = u64::from(sample)
+            .checked_mul(bytes_per_sample)
+            .and_then(|offset| offset.checked_add(u64::from(self.metadata.sample_offset)))
+            .ok_or_else(|| MolaError::InvalidMetadata("raster byte offset overflow".into()))?;
+        self.metadata
+            .image_byte_offset
+            .checked_add(row_offset)
+            .and_then(|offset| offset.checked_add(sample_offset))
+            .ok_or_else(|| MolaError::InvalidMetadata("raster byte offset overflow".into()))
+    }
+
     fn read_i16(&self, line: u32, sample: u32) -> Result<i16, MolaError> {
         if line >= self.metadata.lines || sample >= self.metadata.samples {
             return Err(MolaError::OutOfBounds);
         }
-        let byte_offset = u64::from(self.metadata.record_bytes)
-            * (u64::from(line) + u64::from(self.metadata.line_offset))
-            + u64::from(sample) * 2
-            + u64::from(self.metadata.sample_offset);
+        let byte_offset = self.raster_byte_offset(line, sample, 2)?;
         let mut file = File::open(&self.img_path)?;
         file.seek(SeekFrom::Start(byte_offset))?;
         let mut bytes = [0u8; 2];
