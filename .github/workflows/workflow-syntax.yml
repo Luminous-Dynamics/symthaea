@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: workflow-syntax-$${{ github.ref }}
+  group: workflow-syntax-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -40,13 +40,13 @@ jobs:
         run: |
           set -euo pipefail
           version="1.7.12"
-          archive="actionlint_$\{version\}_linux_amd64.tar.gz"
+          archive="actionlint_${version}_linux_amd64.tar.gz"
           expected="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
-          curl -fsSLo "/tmp/$\{archive\}" \
-            "https://github.com/rhysd/actionlint/releases/download/v$\{version\}/$\{archive\}"
-          echo "$\{expected\}  /tmp/$\{archive\}" | sha256sum -c -
+          curl -fsSLo "/tmp/${archive}" \
+            "https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          echo "${expected}  /tmp/${archive}" | sha256sum -c -
           mkdir -p /tmp/actionlint
-          tar -xzf "/tmp/$\{archive\}" -C /tmp/actionlint actionlint
+          tar -xzf "/tmp/${archive}" -C /tmp/actionlint actionlint
           /tmp/actionlint/actionlint -version
 
       - name: Select CI-definition files for this event
@@ -59,16 +59,16 @@ jobs:
           : > /tmp/github-python-files.txt
           : > /tmp/github-json-files.txt
 
-          case "$\{GITHUB_EVENT_NAME\}" in
+          case "${GITHUB_EVENT_NAME}" in
             pull_request)
-              git fetch --no-tags origin "$\{GITHUB_BASE_REF\}"
-              git diff --diff-filter=ACMRT --name-only "origin/$\{GITHUB_BASE_REF\}...HEAD" -- \
+              git fetch --no-tags origin "${GITHUB_BASE_REF}"
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
                 '.github/workflows/*.yml' '.github/workflows/*.yaml' > /tmp/workflow-files.txt
-              git diff --diff-filter=ACMRT --name-only "origin/$\{GITHUB_BASE_REF\}...HEAD" -- \
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
                 '.github/scripts/*.sh' > /tmp/github-shell-files.txt
-              git diff --diff-filter=ACMRT --name-only "origin/$\{GITHUB_BASE_REF\}...HEAD" -- \
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
                 '.github/scripts/*.py' > /tmp/github-python-files.txt
-              git diff --diff-filter=ACMRT --name-only "origin/$\{GITHUB_BASE_REF\}...HEAD" -- \
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
                 '.github/*.json' > /tmp/github-json-files.txt
               ;;
             push)
@@ -91,7 +91,7 @@ jobs:
               find .github -maxdepth 1 -type f -name '*.json' -print | sed 's#^./##' | sort > /tmp/github-json-files.txt
               ;;
             *)
-              echo "unexpected event: $\{GITHUB_EVENT_NAME\}" >&2
+              echo "unexpected event: ${GITHUB_EVENT_NAME}" >&2
               exit 1
               ;;
           esac
@@ -111,7 +111,7 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < /tmp/workflow-files.txt
-          /tmp/actionlint/actionlint -color -shellcheck "" -pyflakes "" "$\{files[@]\}"
+          /tmp/actionlint/actionlint -color -shellcheck "" -pyflakes "" "${files[@]}"
 
       - name: Enforce repository-wide draft runner admission
         shell: bash
@@ -166,13 +166,13 @@ jobs:
       - name: Record workflow-syntax evidence
         shell: bash
         env:
-          PR_HEAD_SHA: $${{ github.event.pull_request.head.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           {
-            echo "event_name=$\{GITHUB_EVENT_NAME\}"
-            echo "checkout_sha=$\{GITHUB_SHA\}"
-            if [ "$\{GITHUB_EVENT_NAME\}" = "pull_request" ]; then echo "pr_head_sha=$\{PR_HEAD_SHA\}"; fi
+            echo "event_name=${GITHUB_EVENT_NAME}"
+            echo "checkout_sha=${GITHUB_SHA}"
+            if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then echo "pr_head_sha=${PR_HEAD_SHA}"; fi
             echo "actionlint_version=1.7.12"
             echo "actionlint_archive_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
             echo "changed_workflows_only_on_pr=true"
