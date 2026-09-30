@@ -61,6 +61,7 @@ impl EvidenceSliceManifest {
         append_bytes(&mut bytes, canonical.slice_ref.as_bytes());
         append_bytes(&mut bytes, canonical.claim_ref.as_bytes());
         append_bytes(&mut bytes, canonical.slice_revision.as_bytes());
+        append_bytes(&mut bytes, canonical.boundary.schema.as_bytes());
         append_bytes(&mut bytes, canonical.boundary.root.as_bytes());
         append_bytes(&mut bytes, canonical.boundary.graph_revision.as_bytes());
         append_bytes(&mut bytes, canonical.boundary.graph_digest.as_bytes());
@@ -120,6 +121,7 @@ mod tests {
             slice_revision: "slice@v1".into(),
             boundary: SliceBoundaryCertificate {
                 root: "claim-001",
+                schema: "sol-atlas/provenance-slice-boundary/v1",
                 graph_revision: "sol-atlas-reference-graph@v1",
                 graph_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into(),
                 traversal_policy: "outgoing-reachability-bfs@v1",
