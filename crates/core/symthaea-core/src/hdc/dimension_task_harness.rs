@@ -512,6 +512,26 @@ mod tests {
     }
 
     #[test]
+    fn spec_identity_commits_to_seed_sample_count_and_dimension_ladder() {
+        let base = DimensionTaskSpec::default();
+        let changed_seed = DimensionTaskSpec {
+            seed: base.seed + 1,
+            ..base
+        };
+        let changed_samples = DimensionTaskSpec {
+            queries_per_class: base.queries_per_class + 1,
+            ..base
+        };
+        let changed_dimensions = DimensionTaskSpec {
+            dimensions: &[1_024, 2_048],
+            ..base
+        };
+        assert_ne!(base.identity_digest(), changed_seed.identity_digest());
+        assert_ne!(base.identity_digest(), changed_samples.identity_digest());
+        assert_ne!(base.identity_digest(), changed_dimensions.identity_digest());
+    }
+
+    #[test]
     fn task_is_deterministic() {
         let spec = DimensionTaskSpec {
             dimensions: &[1_024, 2_048],
