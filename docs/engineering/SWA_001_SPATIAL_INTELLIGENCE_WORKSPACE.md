@@ -280,3 +280,44 @@ This gives the revalidation frontier a more precise meaning:
 The system consequently preserves both **completeness** and **minimality**: all changed dependencies remain visible, while unrelated changes do not create unnecessary revalidation work.
 
 This is also closer to the provenance semantics of W3C PROV, where derivation expresses how a generated entity depends on prior entities and revision/invalidation are explicit provenance relations rather than implicit mutable state.
+
+
+## Claim-level provenance — SWA-008
+
+SWA-007 establishes dependency closure for validation evidence. SWA-008 moves the same discipline one semantic layer upward: a system should not merely know that evidence exists; it should know **which exact statement that evidence supports**.
+
+An EvidenceClaim therefore records:
+
+- a stable claim identity;
+- the kind of claim being made;
+- explicit links to supporting, contradicting, or qualifying evidence;
+- the dependency fingerprint from which the claim was derived;
+- an explicit non-authorization boundary.
+
+The relation types are intentionally distinct:
+
+- **Supports** means the evidence provides positive support for the claim;
+- **Contradicts** means the evidence provides counterevidence;
+- **Qualifies** means the evidence narrows the conditions under which the claim applies, without asserting that the underlying claim is false.
+
+This prevents a common provenance failure where a boundary condition is incorrectly treated as either proof or refutation.
+
+Claim status is derived rather than stored as mutable truth:
+
+claim provenance -> current dependency comparison -> claim status
+
+The fixture distinguishes:
+
+- Valid — supporting evidence exists and the provenance remains current;
+- Stale — the claim's dependency frontier changed;
+- Unknown — provenance identity is incomplete or cannot be reconciled;
+- Unsupported — no supporting evidence is linked;
+- Contested — support and contradiction coexist.
+
+Critically, Contested does not select a winner and Qualifies does not erase support. The graph preserves the epistemic state so a later decision process can inspect the underlying evidence.
+
+This gives Sol Atlas a more useful primitive than a generic confidence score: it can eventually answer **what exactly are we claiming, what evidence supports it, what evidence challenges it, under which dependency revisions, and what changed since the claim was established?**
+
+This follows the same provenance direction as W3C PROV, which models entities, activities, derivations, revisions, and invalidation explicitly rather than relying on mutable metadata. ASME's current VVUQ portfolio likewise treats verification, validation, uncertainty quantification, and model lifecycle as distinct credibility concerns rather than collapsing them into a single result.
+
+The next natural seam is **provenance slicing**: given a downstream claim, compute the minimal reproducible chain of evidence and dependencies required to reproduce or challenge that claim.
