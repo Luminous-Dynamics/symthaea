@@ -1449,6 +1449,8 @@ mod tests {
         let mut count_img = count_path.clone();
         count_img.set_extension("img");
         let count_label = label()
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 179.9")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 180.1")
             .replace("MEGT00N000HB", "MEGC00N000HB")
             .replace("MAP_TYPE = T", "MAP_TYPE = C")
             .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8");
@@ -1457,7 +1459,7 @@ mod tests {
         count_bytes[17] = 1;
         std::fs::write(&count_img, count_bytes).unwrap();
         let counts = MolaMegdrProduct::open(&count_path, &count_img, "MEGC00N000HB", "pds4-v1").unwrap();
-        let sample = product.sample_nearest_with_count(&counts, 0.0, 0.007, 3.0).unwrap();
+        let sample = product.sample_nearest_with_count(&counts, 0.0, 179.984375, 3.0).unwrap();
         assert_eq!(sample.elevation_m, Some(1000.0));
         assert!(sample.is_usable());
         let _ = std::fs::remove_file(count_path);
