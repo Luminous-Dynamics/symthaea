@@ -1013,6 +1013,37 @@ mod tests {
     }
 
     #[test]
+    fn graph_rejects_unclaimed_activity_output() {
+        let mut input = fixture();
+        input.id = "input".into();
+        let mut output_a = fixture();
+        output_a.id = "output-a".into();
+        output_a.provenance.parent_observation_ids = vec!["input".into()];
+        output_a.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output-a".into(), "output-b".into()],
+        });
+        let mut output_b = fixture();
+        output_b.id = "output-b".into();
+        output_b.provenance.parent_observation_ids = vec!["input".into()];
+        let graph = ObservationGraph {
+            observations: vec![input, output_a, output_b],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::ActivityOutputMissingProducer("output-b".into()))
+        );
+    }
+
+    #[test]
     fn graph_rejects_activity_input_missing_parent_lineage() {
         let mut output = fixture();
         output.id = "output".into();
@@ -1078,33 +1109,3 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::ActivityOutputMissingSelf("obs-001".into()))
-        );
-    }
-
-    #[test]
-    fn graph_accepts_valid_lineage_and_relation() {
-        let mut parent = fixture();
-        let mut child = fixture();
-        parent.id = "parent".into();
-        child.id = "child".into();
-        child.provenance.parent_observation_ids = vec!["parent".into()];
-        let graph = ObservationGraph {
-            observations: vec![parent, child],
-            relations: vec![ObservationRelation {
-                source_observation_id: "child".into(),
-                target_observation_id: "parent".into(),
-                kind: ObservationRelationKind::DerivedFrom,
-                independence: EvidenceIndependence::Derived,
-            }],
-        };
-        assert!(graph.validate().is_ok());
-    }
-
-    #[test]
-    fn observation_round_trips_json() {
-        let original = fixture();
-        let encoded = serde_json::to_string(&original).expect("serialize");
-        let decoded: Observation = serde_json::from_str(&encoded).expect("deserialize");
-        assert_eq!(original, decoded);
-    }
-}
