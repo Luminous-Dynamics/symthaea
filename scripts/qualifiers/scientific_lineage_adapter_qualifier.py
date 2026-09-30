@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
 CONTRACT_VECTORS = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json"
 NEGATIVE_CONTRACT_VECTORS = ROOT / "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json"
+SOURCE_SNAPSHOT = ROOT / "docs/engineering/data/cp-04-scientific-lineage-source-snapshot-v1.json"
 IDENTITY_SCHEMA = "symthaea.engineering-object-id.v1"
 RELATION_SCHEMA = "symthaea.engineering-relation.v1"
 PROJECTION_SCHEMA = "symthaea.qualification-projection.v1"
@@ -159,6 +160,84 @@ def self_test_wire_contracts():
     encoded = json.dumps(sample, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     require(encoded == b'{"schema":"s","artifact_digest":""}', "JSON compact serialization drift")
 
+
+
+def verify_source_snapshot(snapshot, artifact):
+    require(snapshot.get("schema") == "symthaea.cp-04-scientific-lineage-source-snapshot-v1",
+            "source snapshot schema mismatch")
+    require(snapshot.get("artifact_fixture") == str(FIXTURE.relative_to(ROOT)),
+            "source snapshot artifact fixture binding changed")
+
+    nodes = snapshot.get("nodes")
+    relations = snapshot.get("relations")
+    require(isinstance(nodes, list) and len(nodes) == 16, "source snapshot node cardinality mismatch")
+    require(isinstance(relations, list) and len(relations) == 15, "source snapshot relation cardinality mismatch")
+
+    source_by_digest = {}
+    for identity in nodes:
+        require(set(identity) == set(IDENTITY_FIELDS), "source snapshot identity fields diverged")
+        digest = identity_digest(identity)
+        require(digest not in source_by_digest, "source snapshot contains duplicate identities")
+        source_by_digest[digest] = identity
+
+    source_relation_digests = []
+    qualification_relation_digests = []
+    for relation in relations:
+        require(set(relation) == {
+            "source_identity_digest", "edge_type", "target_identity_digest", "relation_digest"
+        }, "source snapshot relation fields diverged")
+        src = relation["source_identity_digest"]
+        dst = relation["target_identity_digest"]
+        kind = relation["edge_type"]
+        require(src in source_by_digest and dst in source_by_digest,
+                "source snapshot contains a dangling endpoint")
+        expected = relation_digest(src, kind, dst)
+        require(relation["relation_digest"] == expected,
+                "source snapshot relation digest does not match canonical relation bytes")
+        source_relation_digests.append(expected)
+        require(kind in ENDPOINTS, "baseline source snapshot must contain only qualification-admissible relations")
+        require(
+            (source_by_digest[src]["object_kind"], source_by_digest[dst]["object_kind"]) == ENDPOINTS[kind],
+            "source snapshot endpoint ontology mismatch",
+        )
+        qualification_relation_digests.append(expected)
+
+    require(len(set(source_relation_digests)) == len(source_relation_digests),
+            "source snapshot contains duplicate relation digests")
+    source_graph = graph_digest(source_by_digest.keys(), source_relation_digests)
+    source_projection = projection_digest(qualification_relation_digests)
+    require(source_graph == snapshot["source_graph_digest"],
+            "source snapshot graph digest does not match reconstructed graph")
+    require(source_projection == snapshot["projection_digest"],
+            "source snapshot projection digest does not match reconstructed qualification projection")
+    require(source_graph == artifact["source_graph_digest"],
+            "source snapshot does not bind to the CP-04 artifact source graph")
+    require(source_projection == artifact["projection_digest"],
+            "source snapshot does not bind to the CP-04 projection")
+
+    mutation = snapshot.get("epistemic_mutation")
+    require(isinstance(mutation, dict), "source snapshot epistemic mutation missing")
+    require(set(mutation) == {
+        "source_identity_digest", "edge_type", "target_identity_digest"
+    }, "source snapshot epistemic mutation fields diverged")
+    src, kind, dst = (
+        mutation["source_identity_digest"],
+        mutation["edge_type"],
+        mutation["target_identity_digest"],
+    )
+    require(src in source_by_digest and dst in source_by_digest,
+            "source snapshot epistemic mutation endpoint missing")
+    require(kind == "supports", "source snapshot epistemic mutation must exercise Supports")
+    epistemic_digest = relation_digest(src, kind, dst)
+    mutated_source_graph = graph_digest(
+        source_by_digest.keys(), [*source_relation_digests, epistemic_digest]
+    )
+    require(mutated_source_graph != source_graph,
+            "epistemic source mutation must change source graph identity")
+    require(
+        projection_digest(qualification_relation_digests) == source_projection,
+        "epistemic source mutation must leave qualification projection identity unchanged",
+    )
 
 def verify_machine_readable_contracts(contract, artifact, by_digest, relation_digests):
     dependency = contract.get("dependency_matrix")
@@ -346,6 +425,7 @@ def main():
     require(artifact["artifact_digest"] == contract["artifact_digest"],
             "contract vector artifact digest diverged")
 
+    verify_source_snapshot(json.loads(SOURCE_SNAPSHOT.read_text(encoding="utf-8")), artifact)
     verify_machine_readable_contracts(contract, artifact, by_digest, relation_digests)
 
     unicode_vector = contract["utf8_identity_vector"]
@@ -354,6 +434,7 @@ def main():
 
     print("SCI-LINEAGE-ADAPTER: PASS (identity, relation, projection, graph, and artifact digests)")
     print("SCI-LINEAGE-ADAPTER: PASS (16 typed nodes, 15 typed edges, endpoint ontology, acyclicity, authority ceiling)")
+    print("SCI-LINEAGE-ADAPTER: PASS (independent source snapshot replay + epistemic mutation boundary)")
     print("NOTE: fixture graph is reconstructed from adapter nodes/edges; this does not prove physical execution.")
 
 
