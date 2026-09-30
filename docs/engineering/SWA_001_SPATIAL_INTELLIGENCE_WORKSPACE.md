@@ -356,3 +356,27 @@ The architectural progression is now:
 validation evidence -> dependency closure -> evidence claim -> provenance slice
 
 The next useful constraint is **slice completeness**: the system should be able to prove that a purported minimal slice contains every dependency required by the claim's declared closure, and reject a slice that omits a required upstream entity.
+
+
+## Provenance-slice completeness — SWA-010
+
+SWA-009 establishes reachability. SWA-010 adds a second invariant: **reachability is not sufficient evidence of reproducibility**.
+
+A provenance slice must pass two tests:
+
+- **Completeness:** every dependency kind required by the claim is present.
+- **Minimality:** the slice contains no dependency kind outside the claim's declared closure.
+
+The fixture emits a deterministic completeness certificate with explicit missing and unrelated dependency sets.
+
+This gives the provenance layer a fail-closed property:
+
+- missing model/parameter/scenario/dataset/context provenance is a failed completeness check;
+- unrelated provenance cannot silently inflate the justification for a claim;
+- the certificate itself remains evidence about the slice, not authorization.
+
+The resulting architecture is now a small epistemic build system:
+
+claim -> provenance slice -> completeness certificate -> dependency frontier
+
+A future implementation can replace the fixture's simple node-kind closure with the actual typed dependency graph while preserving the same contract.
