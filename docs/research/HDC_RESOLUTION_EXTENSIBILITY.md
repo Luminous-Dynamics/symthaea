@@ -50,6 +50,7 @@ Moving a tier from exploratory to canonical requires evidence across:
 4. deterministic conversion and round-trip behavior;
 5. resident working-set and allocation cost;
 6. scalar/SIMD numerical conformance;
+   The current SIMD qualification matrix exercises 16K, 32K, 64K, 128K, and 256K for dot, bind, bundle, norm, and similarity against scalar reference semantics.
 7. throughput and logical byte traffic;
 8. task quality per byte and, where telemetry is available, per joule.
 
@@ -89,6 +90,14 @@ uses that checked operation when converting an open resolution space into bounde
 working-set accounting.
 
 The budget is research infrastructure, not a production adaptive policy.
+
+## Qualification claim ceiling
+
+The dedicated exact-head workflow validates formatting, focused resolution/budget tests,
+SIMD operator conformance, and benchmark compilation. `cargo bench --no-run` compiles
+benchmark executables without executing them, so the workflow intentionally does not
+claim measured throughput or speedup. Runtime performance claims require a completed
+benchmark run with declared hardware and toolchain provenance.
 Future adaptive selection should consume measured quality and cost evidence
 alongside such a resource envelope rather than treating a valid resolution as
 automatically admissible.
