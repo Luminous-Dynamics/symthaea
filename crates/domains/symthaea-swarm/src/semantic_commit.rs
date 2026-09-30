@@ -6,7 +6,7 @@
 //! and a fresh decision rather than overwriting a concurrent admission.
 
 use crate::semantic_admission::{
-    decide, AdmissionOutcome, AdmissionPolicy, DeliveryContract, ObservationRecord,
+    decide, retire_expired, AdmissionOutcome, AdmissionPolicy, DeliveryContract, ObservationRecord,
     SemanticAdmissionState, SemanticResult,
 };
 
@@ -40,6 +40,46 @@ pub enum AtomicAdmissionOutcome<E> {
     CapacityExceeded { outcome: AdmissionOutcome, observed_version: u64 },
     ConcurrentConflict { observed_version: u64 },
     StorageError(E),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AtomicLifecycleOutcome<E> {
+    Retired { committed_version: u64 },
+    NoChange { observed_version: u64 },
+    ConcurrentConflict { observed_version: u64 },
+    StorageError(E),
+}
+
+/// Linearizable semantic GC publication. Lifecycle retirement uses the same CAS
+/// boundary as admission so a collector cannot resurrect or overwrite a concurrent
+/// semantic transition.
+pub fn retire_expired_atomically<S: SemanticCommitStore>(
+    store: &mut S,
+    policy: AdmissionPolicy,
+    now_ms: u64,
+    max_retries: usize,
+) -> AtomicLifecycleOutcome<S::Error> {
+    let mut last_observed_version = None;
+    for _attempt in 0..=max_retries {
+        let loaded = match store.load() {
+            Ok(value) => value,
+            Err(error) => return AtomicLifecycleOutcome::StorageError(error),
+        };
+        last_observed_version = Some(loaded.version);
+        let next = match retire_expired(&loaded.state, policy, now_ms) {
+            Ok(value) => value,
+            Err(_) => return AtomicLifecycleOutcome::NoChange { observed_version: loaded.version },
+        };
+        if next == loaded.state {
+            return AtomicLifecycleOutcome::NoChange { observed_version: loaded.version };
+        }
+        match store.compare_and_swap(loaded.version, next) {
+            Ok(true) => return AtomicLifecycleOutcome::Retired { committed_version: loaded.version.saturating_add(1) },
+            Ok(false) => continue,
+            Err(error) => return AtomicLifecycleOutcome::StorageError(error),
+        }
+    }
+    AtomicLifecycleOutcome::ConcurrentConflict { observed_version: last_observed_version.unwrap_or(0) }
 }
 
 fn classify_non_admit<E>(outcome: AdmissionOutcome, version: u64) -> AtomicAdmissionOutcome<E> {
@@ -179,6 +219,27 @@ mod tests {
                 payload: b"alpha".to_vec(),
             },
         )
+    }
+
+    #[test]
+    fn lifecycle_gc_publishes_tombstones_atomically() {
+        let (delivery, observation) = fixture();
+        let outcome = admit_atomically(&mut TestStore::default(), &delivery, &observation, AdmissionPolicy::default(), 100, 1);
+        let AtomicAdmissionOutcome::Admitted { .. } = outcome else { panic!("fixture admission should succeed"); };
+        let mut store = TestStore::default();
+        let _ = admit_atomically(&mut store, &delivery, &observation, AdmissionPolicy::default(), 100, 1);
+        let policy = AdmissionPolicy { retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
+        let outcome = retire_expired_atomically(&mut store, policy, 101, 1);
+        assert!(matches!(outcome, AtomicLifecycleOutcome::Retired { committed_version: 2 }));
+        assert!(store.state.observation_tombstones.contains_key(&observation.key));
+    }
+
+    #[test]
+    fn lifecycle_gc_noops_without_semantic_change() {
+        let mut store = TestStore::default();
+        let outcome = retire_expired_atomically(&mut store, AdmissionPolicy::default(), 100, 1);
+        assert_eq!(outcome, AtomicLifecycleOutcome::NoChange { observed_version: 0 });
+        assert_eq!(store.version, 0);
     }
 
     #[test]
