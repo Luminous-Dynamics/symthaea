@@ -195,6 +195,7 @@ pub struct SolAtlasServiceBindingV1 {
     pub id: String,
     pub root_element_id: String,
     pub currentness_required: bool,
+    pub dependency_discovery: String,
     pub included_dependency_classes: Vec<String>,
     pub required_dependency_classes: Vec<String>,
 }
@@ -321,6 +322,7 @@ pub fn project(input: &SolAtlasQualificationInputV1) -> Result<(Vec<NodeV1>, Vec
         services.push(ServiceQuestionV1 {
             id: s.id.clone(),
             currentness_required: s.currentness_required,
+            dependency_discovery: s.dependency_discovery.clone(),
             included_dependency_classes: included,
             required_dependency_classes: required,
             root: s.root_element_id.clone(),
