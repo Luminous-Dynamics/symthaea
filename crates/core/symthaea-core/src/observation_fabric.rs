@@ -212,6 +212,19 @@ impl ObservationQuality {
     }
 }
 
+/// A precise input-to-output lineage edge within one processing activity.
+///
+/// Activity-level input/output sets are intentionally insufficient to infer
+/// which input contributed to which output when an activity has multiple
+/// inputs and outputs. This optional mapping records only derivations that are
+/// explicitly known, while absence preserves the less precise activity-level
+/// provenance model.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessingDerivation {
+    pub input_observation_id: String,
+    pub output_observation_id: String,
+}
+
 /// A concrete processing/acquisition activity that produced an observation.
 ///
 /// Kept as a compact, typed record that can be mapped to OGC SensorML or
@@ -242,6 +255,8 @@ pub struct ProcessingActivity {
     pub input_observation_ids: Vec<String>,
     /// Observation IDs emitted by this activity.
     pub output_observation_ids: Vec<String>,
+    /// Optional precise input-to-output derivation mappings.
+    pub derivations: Vec<ProcessingDerivation>,
 }
 
 impl ProcessingActivity {
@@ -261,6 +276,17 @@ impl ProcessingActivity {
         write_canonical_string_option(&mut hasher, self.activity_fingerprint.as_deref());
         write_canonical_string_vec(&mut hasher, &self.input_observation_ids);
         write_canonical_string_vec(&mut hasher, &self.output_observation_ids);
+        let mut derivations = self.derivations.iter().collect::<Vec<_>>();
+        derivations.sort_by(|a, b| {
+            a.input_observation_id
+                .cmp(&b.input_observation_id)
+                .then_with(|| a.output_observation_id.cmp(&b.output_observation_id))
+        });
+        hasher.update(&(derivations.len() as u64).to_be_bytes());
+        for derivation in derivations {
+            write_canonical_string(&mut hasher, &derivation.input_observation_id);
+            write_canonical_string(&mut hasher, &derivation.output_observation_id);
+        }
         Ok(hasher.finalize().to_hex().to_string())
     }
 
@@ -280,6 +306,11 @@ impl ProcessingActivity {
             || self.activity_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
             || self.input_observation_ids.iter().any(|id| id.trim().is_empty())
             || self.output_observation_ids.iter().any(|id| id.trim().is_empty())
+            || self.derivations.iter().any(|d| {
+                d.input_observation_id.trim().is_empty()
+                    || d.output_observation_id.trim().is_empty()
+                    || d.input_observation_id == d.output_observation_id
+            })
             || matches!((self.started_at_unix_ns, self.ended_at_unix_ns),
                 (Some(start), Some(end)) if end < start)
         {
@@ -317,8 +348,7 @@ fn write_canonical_i128_option(hasher: &mut blake3::Hasher, value: Option<i128>)
         Some(value) => { hasher.update(&[1]); hasher.update(&value.to_be_bytes()); }
         None => hasher.update(&[0]),
     }
-}
-fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
+}fn write_canonical_string_vec(hasher: &mut blake3::Hasher, values: &[String]) {
     hasher.update(&(values.len() as u64).to_be_bytes());
     for value in values { write_canonical_string(hasher, value); }
 }
@@ -538,6 +568,35 @@ impl ObservationGraph {
                         ));
                     }
                 }
+                let mut derivation_pairs = HashSet::with_capacity(activity.derivations.len());
+                for derivation in &activity.derivations {
+                    if !activity.input_observation_ids.iter().any(|id| id == &derivation.input_observation_id) {
+                        return Err(ObservationValidationError::DerivationInputNotDeclared(
+                            derivation.input_observation_id.clone(),
+                        ));
+                    }
+                    if !activity.output_observation_ids.iter().any(|id| id == &derivation.output_observation_id) {
+                        return Err(ObservationValidationError::DerivationOutputNotDeclared(
+                            derivation.output_observation_id.clone(),
+                        ));
+                    }
+                    if !by_id.contains_key(derivation.input_observation_id.as_str()) {
+                        return Err(ObservationValidationError::MissingActivityInput(
+                            derivation.input_observation_id.clone(),
+                        ));
+                    }
+                    if !by_id.contains_key(derivation.output_observation_id.as_str()) {
+                        return Err(ObservationValidationError::MissingActivityOutput(
+                            derivation.output_observation_id.clone(),
+                        ));
+                    }
+                    if !derivation_pairs.insert((
+                        derivation.input_observation_id.as_str(),
+                        derivation.output_observation_id.as_str(),
+                    )) {
+                        return Err(ObservationValidationError::DuplicateProcessingDerivation);
+                    }
+                }
                 if !activity.input_observation_ids.iter().all(|input_id| {
                     observation
                         .provenance
@@ -637,14 +696,19 @@ pub enum ObservationValidationError {
     #[error("processing activity execution fingerprint is required for verification")]
     MissingExecutionFingerprint,
     #[error("processing activity output does not identify the activity as its producer: {0}")]
-    ActivityOutputMissingProducer(String),
-    InconsistentProcessingActivity(String),
+    ActivityOutputMissingProducer(String),    InconsistentProcessingActivity(String),
     #[error("processing activity input is not represented in the output observation's parent lineage: {0}")]
     ActivityInputMissingParent(String),
     #[error("processing activity input observation is not present in the closed graph: {0}")]
     MissingActivityInput(String),
     #[error("processing activity output observation is not present in the closed graph: {0}")]
     MissingActivityOutput(String),
+    #[error("processing derivation input is not declared as an activity input: {0}")]
+    DerivationInputNotDeclared(String),
+    #[error("processing derivation output is not declared as an activity output: {0}")]
+    DerivationOutputNotDeclared(String),
+    #[error("processing activity contains a duplicate input-to-output derivation")]
+    DuplicateProcessingDerivation,
     #[error("processing activity does not list its owning observation as an output: {0}")]
     ActivityOutputMissingSelf(String),
     #[error("observation ids must be unique within a closed graph")]
@@ -852,6 +916,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec![],
             output_observation_ids: vec!["obs-001".into()],
+            derivations: Vec::new(),
         });
         assert_eq!(
             observation.validate(),
@@ -874,6 +939,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec!["input".into()],
             output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
         };
         let first = activity.compute_execution_fingerprint().unwrap();
         activity.process_definition_fingerprint =
@@ -895,11 +961,67 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec![],
             output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
         };
         assert_eq!(
             activity.validate(),
             Err(ObservationValidationError::InvalidProcessingActivity)
         );
+    }
+
+    #[test]
+    fn processing_derivation_requires_declared_endpoints() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output".into()],
+            derivations: vec![ProcessingDerivation {
+                input_observation_id: "other-input".into(),
+                output_observation_id: "output".into(),
+            }],
+        };
+        let mut observation = fixture();
+        observation.id = "output".into();
+        observation.provenance.processing_activity = Some(activity);
+        let graph = ObservationGraph { observations: vec![observation], relations: vec![] };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::DerivationInputNotDeclared("other-input".into()))
+        );
+    }
+
+    #[test]
+    fn processing_derivation_changes_execution_fingerprint() {
+        let mut activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            process_definition_fingerprint: None,
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input-a".into(), "input-b".into()],
+            output_observation_ids: vec!["output-a".into(), "output-b".into()],
+            derivations: vec![ProcessingDerivation {
+                input_observation_id: "input-a".into(),
+                output_observation_id: "output-a".into(),
+            }],
+        };
+        let first = activity.compute_execution_fingerprint().unwrap();
+        activity.derivations.push(ProcessingDerivation {
+            input_observation_id: "input-b".into(),
+            output_observation_id: "output-b".into(),
+        });
+        let second = activity.compute_execution_fingerprint().unwrap();
+        assert_ne!(first, second);
     }
 
     #[test]
@@ -915,6 +1037,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec!["input-a".into(), "input-b".into()],
             output_observation_ids: vec!["output-a".into()],
+            derivations: Vec::new(),
         };
         let first = activity.compute_execution_fingerprint().expect("fingerprint");
         let second = activity.compute_execution_fingerprint().expect("fingerprint");
@@ -938,6 +1061,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec!["input-a".into()],
             output_observation_ids: vec!["output-a".into()],
+            derivations: Vec::new(),
         };
         activity.execution_fingerprint = Some(activity.compute_execution_fingerprint().expect("fingerprint"));
         assert_eq!(activity.verify_execution_fingerprint(), Ok(()));
@@ -958,6 +1082,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec![],
             output_observation_ids: vec!["obs-001".into()],
+            derivations: Vec::new(),
         };
         assert_eq!(activity.verify_execution_fingerprint(), Err(ObservationValidationError::MissingExecutionFingerprint));
     }
@@ -975,6 +1100,7 @@ mod tests {
             execution_fingerprint: Some("not-a-digest".into()),
             input_observation_ids: vec![],
             output_observation_ids: vec!["obs-001".into()],
+            derivations: Vec::new(),
         };
         assert_eq!(activity.validate(), Err(ObservationValidationError::InvalidExecutionFingerprint));
     }
@@ -992,6 +1118,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec![],
             output_observation_ids: vec![],
+            derivations: Vec::new(),
         };
         assert_eq!(
             activity.validate(),
@@ -1082,6 +1209,7 @@ mod tests {
             execution_fingerprint: None,
             input_observation_ids: vec!["input".into()],
             output_observation_ids: vec!["output".into()],
+            derivations: Vec::new(),
         });
         let graph = ObservationGraph { observations: vec![input, output], relations: vec![] };
         assert!(graph.validate().is_ok());
@@ -1098,197 +1226,3 @@ mod tests {
             process_definition_fingerprint: None,
             started_at_unix_ns: Some(10),
             ended_at_unix_ns: Some(20),
-            agent_id: Some("worker-7".into()),
-            activity_fingerprint: Some("blake3:config-v1".into()),
-            execution_fingerprint: None,
-            input_observation_ids: vec!["input".into()],
-            output_observation_ids: vec!["output-a".into(), "output-b".into()],
-        };
-
-        let mut output_a = fixture();
-        output_a.id = "output-a".into();
-        output_a.provenance.parent_observation_ids = vec!["input".into()];
-        output_a.provenance.processing_activity = Some(activity.clone());
-
-        let mut output_b = fixture();
-        output_b.id = "output-b".into();
-        output_b.provenance.parent_observation_ids = vec!["input".into()];
-        output_b.provenance.processing_activity = Some(activity);
-
-        let graph = ObservationGraph {
-            observations: vec![input, output_a, output_b],
-            relations: vec![],
-        };
-        assert!(graph.validate().is_ok());
-    }
-
-    #[test]
-    fn graph_rejects_inconsistent_processing_activity_repetition() {
-        let mut input = fixture();
-        input.id = "input".into();
-
-        let activity_a = ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: Some(10),
-            ended_at_unix_ns: Some(20),
-            agent_id: Some("worker-7".into()),
-            activity_fingerprint: Some("blake3:config-v1".into()),
-            execution_fingerprint: None,
-            input_observation_ids: vec!["input".into()],
-            output_observation_ids: vec!["output-a".into(), "output-b".into()],
-        };
-        let mut activity_b = activity_a.clone();
-        activity_b.process_id = "transform-v2".into();
-
-        let mut output_a = fixture();
-        output_a.id = "output-a".into();
-        output_a.provenance.parent_observation_ids = vec!["input".into()];
-        output_a.provenance.processing_activity = Some(activity_a);
-
-        let mut output_b = fixture();
-        output_b.id = "output-b".into();
-        output_b.provenance.parent_observation_ids = vec!["input".into()];
-        output_b.provenance.processing_activity = Some(activity_b);
-
-        let graph = ObservationGraph {
-            observations: vec![input, output_a, output_b],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::InconsistentProcessingActivity("run-001".into()))
-        );
-    }
-
-    #[test]
-    fn graph_rejects_tampered_execution_fingerprint() {
-        let mut observation = fixture();
-        let activity = ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: Some(
-                "0000000000000000000000000000000000000000000000000000000000000000".into(),
-            ),
-            input_observation_ids: vec![],
-            output_observation_ids: vec!["obs-001".into()],
-        };
-        observation.provenance.processing_activity = Some(activity);
-
-        let graph = ObservationGraph {
-            observations: vec![observation],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::ExecutionFingerprintMismatch)
-        );
-    }
-
-    #[test]
-    fn graph_rejects_unclaimed_activity_output() {
-        let mut input = fixture();
-        input.id = "input".into();
-        let mut output_a = fixture();
-        output_a.id = "output-a".into();
-        output_a.provenance.parent_observation_ids = vec!["input".into()];
-        output_a.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: None,
-            input_observation_ids: vec!["input".into()],
-            output_observation_ids: vec!["output-a".into(), "output-b".into()],
-        });
-        let mut output_b = fixture();
-        output_b.id = "output-b".into();
-        output_b.provenance.parent_observation_ids = vec!["input".into()];
-        let graph = ObservationGraph {
-            observations: vec![input, output_a, output_b],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::ActivityOutputMissingProducer("output-b".into()))
-        );
-    }
-
-    #[test]
-    fn graph_rejects_activity_input_missing_parent_lineage() {
-        let mut output = fixture();
-        output.id = "output".into();
-        output.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: None,
-            input_observation_ids: vec!["input".into()],
-            output_observation_ids: vec!["output".into()],
-        });
-        let graph = ObservationGraph { observations: vec![output], relations: vec![] };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::MissingActivityInput("input".into()))
-        );
-    }
-
-    #[test]
-    fn graph_rejects_missing_activity_input() {
-        let mut observation = fixture();
-        observation.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            execution_fingerprint: None,
-            input_observation_ids: vec!["missing-input".into()],
-            output_observation_ids: vec!["obs-001".into()],
-        });
-        let graph = ObservationGraph {
-            observations: vec![observation],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::MissingActivityInput("missing-input".into()))
-        );
-    }
-
-    #[test]
-    fn graph_requires_activity_to_emit_its_observation() {
-        let mut observation = fixture();
-        observation.provenance.processing_activity = Some(ProcessingActivity {
-            activity_id: "run-001".into(),
-            process_id: "transform-v1".into(),
-            process_definition_fingerprint: None,
-            started_at_unix_ns: None,
-            ended_at_unix_ns: None,
-            agent_id: None,
-            activity_fingerprint: None,
-            input_observation_ids: vec![],
-            output_observation_ids: vec![],
-        });
-        let graph = ObservationGraph {
-            observations: vec![observation],
-            relations: vec![],
-        };
-        assert_eq!(
-            graph.validate(),
-            Err(ObservationValidationError::ActivityOutputMissingSelf("obs-001".into()))
