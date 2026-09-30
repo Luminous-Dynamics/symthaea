@@ -14,6 +14,7 @@ on:
       - "crates/core/symthaea-core/src/hdc/task_quality_evidence.rs"
       - "crates/core/symthaea-core/src/hdc/cost_quality_join.rs"
       - "crates/core/symthaea-core/src/hdc/evidence_identity.rs"
+      - "crates/core/symthaea-core/src/hdc/evidence_manifest.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
       - "crates/core/symthaea-core/examples/hdc_operator_evidence.rs"
@@ -84,6 +85,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/task_quality_evidence.rs \
             crates/core/symthaea-core/src/hdc/cost_quality_join.rs \
             crates/core/symthaea-core/src/hdc/evidence_identity.rs \
+            crates/core/symthaea-core/src/hdc/evidence_manifest.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
             crates/core/symthaea-core/benches/simd_continuous.rs
@@ -101,6 +103,7 @@ jobs:
           cargo test -p symthaea-core --lib task_quality_evidence
           cargo test -p symthaea-core --lib cost_quality_join
           cargo test -p symthaea-core --lib evidence_identity
+          cargo test -p symthaea-core --lib evidence_manifest
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
 
