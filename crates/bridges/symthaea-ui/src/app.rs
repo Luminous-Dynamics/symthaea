@@ -252,6 +252,9 @@ pub fn App() -> impl IntoView {
                     ws_connected.set(true);
                     events.update(|items| {
                         items.push(CognitiveEvent::lifecycle(CognitiveEventKind::Connected, 0));
+                        if items.len() > 32 {
+                            items.remove(0);
+                        }
                     });
                 },
             )
