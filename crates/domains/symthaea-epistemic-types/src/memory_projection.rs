@@ -139,8 +139,9 @@ impl ProvenanceValidationReport {
                 .cmp(&(&b.source_memory_id, &b.target_memory_id, b.kind.stable_code(), &b.created_at))
         });
 
-        // Hash a version-independent canonical tuple representation rather than
-        // serde's enum encoding, so Rust variant renames cannot silently alter digests.
+        // Hash an explicitly tagged snapshot envelope. The schema version is part of
+        // the digest so a future encoding change cannot silently reuse a v1 digest.
+        // Relation tuples use stable wire codes rather than Rust enum discriminants/encoding.
         let canonical_fields: Vec<(&str, &str, &str, &str)> = canonical
             .iter()
             .map(|relation| (
@@ -150,8 +151,12 @@ impl ProvenanceValidationReport {
                 relation.created_at.as_str(),
             ))
             .collect();
-        let bytes = serde_json::to_vec(&canonical_fields)
-            .expect("canonical provenance fields are serializable");
+        let canonical_snapshot = (
+            PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
+            canonical_fields,
+        );
+        let bytes = serde_json::to_vec(&canonical_snapshot)
+            .expect("canonical provenance snapshot is serializable");
         Self {
             snapshot_schema_version: PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
             validator_version: PROVENANCE_VALIDATOR_VERSION.to_owned(),
@@ -296,6 +301,11 @@ mod tests {
         assert!(first.violations.is_empty());
         assert_eq!(first.validator_version, PROVENANCE_VALIDATOR_VERSION);
         assert_eq!(first.snapshot_schema_version, PROVENANCE_SNAPSHOT_SCHEMA_VERSION);
+
+        // The schema tag is part of the digest input, not merely report metadata.
+        let empty = ProvenanceValidationReport::from_relations(&[]);
+        let singleton = ProvenanceValidationReport::from_relations(&[a, b]);
+        assert_ne!(empty.snapshot_digest, singleton.snapshot_digest);
     }
 
     #[test]
