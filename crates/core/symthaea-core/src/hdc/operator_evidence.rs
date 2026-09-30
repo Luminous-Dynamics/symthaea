@@ -121,6 +121,70 @@ pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     records
 }
 
+/// Summary produced by the operator evidence gate.
+///
+/// A trajectory experiment may consume operator evidence only when
+/// `qualified == true`. Missing and duplicate matrix cells are treated as
+/// failures rather than silently ignored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperatorEvidenceSummary {
+    pub schema_version: u32,
+    pub expected_records: usize,
+    pub observed_records: usize,
+    pub qualified_records: usize,
+    pub failed_records: usize,
+    pub missing_records: usize,
+    pub duplicate_records: usize,
+    pub qualified: bool,
+}
+
+/// Validate that a complete operator/resolution matrix exists and every cell
+/// passed its declared numerical tolerance.
+pub fn qualify_operator_matrix(records: &[OperatorEvidenceRecord]) -> OperatorEvidenceSummary {
+    use std::collections::HashSet;
+
+    let expected = EXTENDED_DIMS.len() * 5;
+    let mut seen = HashSet::with_capacity(records.len());
+    let mut qualified_records = 0;
+    let mut failed_records = 0;
+    let mut duplicate_records = 0;
+
+    for record in records {
+        let key = (record.resolution, record.operation);
+        if !seen.insert(key) {
+            duplicate_records += 1;
+        }
+        if record.schema_version == EVIDENCE_SCHEMA_VERSION
+            && record.representation == "continuous_f32"
+            && record.qualification_status == "qualified"
+        {
+            qualified_records += 1;
+        } else {
+            failed_records += 1;
+        }
+    }
+
+    let observed_records = seen.len();
+    let missing_records = expected.saturating_sub(observed_records);
+    let qualified = records.len() == expected
+        && observed_records == expected
+        && qualified_records == expected
+        && failed_records == 0
+        && duplicate_records == 0
+        && missing_records == 0;
+
+    OperatorEvidenceSummary {
+        schema_version: EVIDENCE_SCHEMA_VERSION,
+        expected_records: expected,
+        observed_records,
+        qualified_records,
+        failed_records,
+        missing_records,
+        duplicate_records,
+        qualified,
+    }
+}
+
 /// Serialize the current evidence matrix as deterministic pretty JSON.
 pub fn extended_resolution_evidence_json() -> String {
     serde_json::to_string_pretty(&generate_extended_resolution_evidence())
@@ -287,6 +351,53 @@ mod tests {
         let records: Vec<OperatorEvidenceRecord> =
             serde_json::from_str(&json).expect("evidence JSON should deserialize");
         assert_eq!(records, generate_extended_resolution_evidence());
+    }
+
+    #[test]
+    fn evidence_gate_accepts_complete_matrix() {
+        let records = generate_extended_resolution_evidence();
+        let summary = qualify_operator_matrix(&records);
+        assert_eq!(
+            summary,
+            OperatorEvidenceSummary {
+                schema_version: EVIDENCE_SCHEMA_VERSION,
+                expected_records: 25,
+                observed_records: 25,
+                qualified_records: 25,
+                failed_records: 0,
+                missing_records: 0,
+                duplicate_records: 0,
+                qualified: true,
+            }
+        );
+    }
+
+    #[test]
+    fn evidence_gate_rejects_missing_record() {
+        let mut records = generate_extended_resolution_evidence();
+        records.pop();
+        let summary = qualify_operator_matrix(&records);
+        assert_eq!(summary.expected_records, 25);
+        assert_eq!(summary.observed_records, 24);
+        assert_eq!(summary.missing_records, 1);
+        assert!(!summary.qualified);
+    }
+
+    #[test]
+    fn evidence_gate_rejects_failed_and_duplicate_record() {
+        let mut records = generate_extended_resolution_evidence();
+        let mut failed = records[0].clone();
+        failed.qualification_status = "failed";
+        records[1] = failed;
+        records.push(records[2].clone());
+
+        let summary = qualify_operator_matrix(&records);
+        assert_eq!(summary.expected_records, 25);
+        assert_eq!(summary.observed_records, 24);
+        assert_eq!(summary.failed_records, 1);
+        assert_eq!(summary.duplicate_records, 1);
+        assert_eq!(summary.missing_records, 1);
+        assert!(!summary.qualified);
     }
 
     #[test]
