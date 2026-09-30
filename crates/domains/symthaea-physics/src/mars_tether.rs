@@ -233,6 +233,21 @@ pub struct TerrainProvenance {
 }
 
 impl TerrainProvenance {
+    /// Validate the complete provenance envelope, including source identity and
+    /// the conflict-free content-artifact set.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.source_id.trim().is_empty() {
+            return Err("provenance source id must be non-empty".into());
+        }
+        if self.source_revision.trim().is_empty() {
+            return Err("provenance source revision must be non-empty".into());
+        }
+        if self.coordinate_reference.trim().is_empty() {
+            return Err("provenance coordinate reference must be non-empty".into());
+        }
+        self.validate_content_digests()
+    }
+
     /// Returns true only when the provenance carries a valid SHA-256 digest
     /// for the named logical source artifact.
     pub fn has_sha256(&self, logical_file: &str) -> bool {
@@ -343,6 +358,7 @@ impl TetherExperimentProvenance {
         {
             return Err("configuration must be a 64-character hexadecimal SHA-256 digest".into());
         }
+        self.terrain.validate()?;
         for logical_file in [
             "detached-label",
             "raster-image",
@@ -388,6 +404,8 @@ pub enum TerrainVerticalDatum {
 pub struct TerrainSample {
     pub latitude_rad: f64,
     pub longitude_rad: f64,
+    /// Exact derivation procedure used to obtain the observation.
+    pub sampling_method: TerrainSamplingMethod,
     pub elevation_m: Option<f64>,
     pub elevation_uncertainty_m: Option<f64>,
     pub vertical_datum: TerrainVerticalDatum,
@@ -395,6 +413,14 @@ pub struct TerrainSample {
     pub roughness_m: Option<f64>,
     pub quality: TerrainQuality,
     pub provenance: TerrainProvenance,
+}
+
+/// Deterministic observation procedure recorded alongside a terrain sample.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerrainSamplingMethod {
+    /// Select the single registered grid cell containing the requested point;
+    /// no interpolation is performed.
+    NearestCellWithObservationCount,
 }
 
 impl TerrainSample {
