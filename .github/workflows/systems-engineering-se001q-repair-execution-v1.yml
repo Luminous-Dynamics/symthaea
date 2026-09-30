@@ -305,7 +305,465 @@ jobs:
           test "${#files[@]}" -eq 1
           test "${files[0]}" = 'crates/domains/symthaea-se-model/src/lib.rs'
           test -z "$(git diff --name-only "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- Cargo.lock)"
-          test "$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)" =           test "$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)" = 
+          test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
+          numstat="$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)"
+          lock_blob="$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")"
+          lock_sha256="$(git show "$EXPECTED_REPAIR_SHA:Cargo.lock" | sha256sum | awk '{print $1}')"
+          commit_count="$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")"
+          cat > se001q-repair-delta-manifest.json <<EOF
+          {
+            "schema": "se-repair-evidence-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "job": "${{ github.job }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "commit_count": "$commit_count",
+            "changed_file_count": "1",
+            "changed_file": "${files[0]}",
+            "numstat": "$numstat",
+            "cargo_lock_blob_sha": "$lock_blob",
+            "cargo_lock_sha256": "$lock_sha256",
+            "observation_class": "reproduced",
+            "authority_class": "execution_evidence_only",
+            "qualification_state": "not_granted"
+          }
+          EOF
+          python -m json.tool se001q-repair-delta-manifest.json >/dev/null
+          cat se001q-repair-delta-manifest.json
+          {
+            echo '### Repair identity'
+            echo
+            echo "frozen_subject_sha=$FROZEN_SUBJECT_SHA"
+            echo "repair_sha=$EXPECTED_REPAIR_SHA"
+            echo "changed_file=${files[0]}"
+            echo "numstat=$numstat"
+            echo "commit_count=$commit_count"
+            echo
+            echo 'Observation class: reproduced'
+            echo
+            echo 'This workflow produces execution evidence only; it grants no qualification authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload delta audit capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload-delta
+        with:
+          name: se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}
+          path: se001q-repair-delta-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record delta artifact identity
+        if: always()
+        run: |
+          echo "artifact-id: ${{ steps.upload-delta.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "artifact-digest: ${{ steps.upload-delta.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  evidence-consistency:
+    name: Cross-artifact evidence consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - identity-and-gates
+      - independent-replay
+      - delta-audit
+    if: always()
+    steps:
+      - name: Download this run's evidence capsules
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: se001q-repair-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence
+
+      - name: Verify cross-artifact evidence identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_PRIMARY_RESULT: ${{ needs.identity-and-gates.result }}
+          EXPECTED_REPLAY_RESULT: ${{ needs.independent-replay.result }}
+          EXPECTED_DELTA_RESULT: ${{ needs.delta-audit.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_PRIMARY_RESULT" = success
+          test "$EXPECTED_REPLAY_RESULT" = success
+          test "$EXPECTED_DELTA_RESULT" = success
+
+          primary_dir="evidence/se001q-repair-primary-${{ github.run_id }}-${{ github.run_attempt }}"
+          replay_dir="evidence/se001q-repair-replay-${{ github.run_id }}-${{ github.run_attempt }}"
+          delta_dir="evidence/se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}"
+          test -f "$primary_dir/se001q-repair-primary-manifest.json"
+          test -f "$replay_dir/se001q-repair-replay-manifest.json"
+          test -f "$delta_dir/se001q-repair-delta-manifest.json"
+
+          primary="$primary_dir/se001q-repair-primary-manifest.json"
+          replay="$replay_dir/se001q-repair-replay-manifest.json"
+          delta="$delta_dir/se001q-repair-delta-manifest.json"
+
+          for manifest in "$primary" "$replay" "$delta"; do
+            python -m json.tool "$manifest" >/dev/null
+            test "$(jq -r '.schema' "$manifest")" = "se-repair-evidence-v1"
+            test "$(jq -r '.repository' "$manifest")" = "${{ github.repository }}"
+            test "$(jq -r '.workflow' "$manifest")" = "${{ github.workflow }}"
+            test "$(jq -r '.workflow_sha' "$manifest")" = "${{ github.workflow_sha }}"
+            test "$(jq -r '.run_id' "$manifest")" = "${{ github.run_id }}"
+            test "$(jq -r '.run_attempt' "$manifest")" = "${{ github.run_attempt }}"
+            test "$(jq -r '.experiment_subject_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
+            test "$(jq -r '.repair_sha' "$manifest")" = "$EXPECTED_REPAIR_SHA"
+            test "$(jq -r '.base_ref' "$manifest")" = "$EXPECTED_BASE_REF"
+            test "$(jq -r '.base_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
+            test "$(jq -r '.qualification_state' "$manifest")" = "not_granted"
+          done
+
+          test "$(jq -r '.authority_class' "$primary")" = "execution_evidence_only"
+          test "$(jq -r '.authority_class' "$replay")" = "independent_execution_evidence"
+          test "$(jq -r '.authority_class' "$delta")" = "execution_evidence_only"
+          test "$(jq -r '.observation_class' "$primary")" = "reproduced"
+          test "$(jq -r '.observation_class' "$replay")" = "reproduced"
+          test "$(jq -r '.observation_class' "$delta")" = "reproduced"
+
+          for key in format check semantic_test test clippy lock; do
+            test "$(jq -r ".outcomes.$key" "$primary")" = success
+          done
+          for key in semantic_test test check clippy; do
+            test "$(jq -r ".outcomes.$key" "$replay")" = success
+          done
+
+          test "$(jq -r '.toolchain' "$primary")" = "$EXPECTED_TOOLCHAIN"
+          test "$(jq -r '.toolchain' "$replay")" = "$EXPECTED_TOOLCHAIN"
+          test "$(jq -r '.lock_sha256' "$primary")" = "$(jq -r '.lock_sha256' "$replay")"
+          test "$(jq -r '.lock_sha256' "$primary")" = "$(jq -r '.cargo_lock_sha256' "$delta")"
+          test "$(jq -r '.lock_blob_sha' "$primary")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(jq -r '.cargo_lock_blob_sha' "$delta")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(jq -r '.changed_file_count' "$delta")" = "1"
+          test "$(jq -r '.changed_file' "$delta")" = "crates/domains/symthaea-se-model/src/lib.rs"
+          test "$(jq -r '.numstat' "$delta")" = $'48	13	crates/domains/symthaea-se-model/src/lib.rs'
+          test "$(jq -r '.commit_count' "$delta")" = "2"
+
+          api="https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api/jobs?per_page=100" > jobs.json
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api/artifacts?per_page=100" > artifacts.json
+
+          primary_job_id="$(jq -r '.jobs[] | select(.name == "Repair generation identity + gates") | .id' jobs.json | head -n1)"
+          replay_job_id="$(jq -r '.jobs[] | select(.name == "Independent repair-generation replay") | .id' jobs.json | head -n1)"
+          delta_job_id="$(jq -r '.jobs[] | select(.name == "Verify repair remains minimal") | .id' jobs.json | head -n1)"
+          test -n "$primary_job_id"
+          test -n "$replay_job_id"
+          test -n "$delta_job_id"
+
+          primary_name="se001q-repair-primary-${{ github.run_id }}-${{ github.run_attempt }}"
+          replay_name="se001q-repair-replay-${{ github.run_id }}-${{ github.run_attempt }}"
+          delta_name="se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}"
+          for name in "$primary_name" "$replay_name" "$delta_name"; do
+            test "$(jq --arg n "$name" '[.artifacts[] | select(.name == $n)] | length' artifacts.json)" = "1"
+            test "$(jq --arg n "$name" -r '.artifacts[] | select(.name == $n) | .expired' artifacts.json)" = "false"
+          done
+
+          primary_artifact_id="$(jq --arg n "$primary_name" -r '.artifacts[] | select(.name == $n) | .id' artifacts.json)"
+          replay_artifact_id="$(jq --arg n "$replay_name" -r '.artifacts[] | select(.name == $n) | .id' artifacts.json)"
+          delta_artifact_id="$(jq --arg n "$delta_name" -r '.artifacts[] | select(.name == $n) | .id' artifacts.json)"
+          primary_digest="$(jq --arg n "$primary_name" -r '.artifacts[] | select(.name == $n) | .digest' artifacts.json)"
+          replay_digest="$(jq --arg n "$replay_name" -r '.artifacts[] | select(.name == $n) | .digest' artifacts.json)"
+          delta_digest="$(jq --arg n "$delta_name" -r '.artifacts[] | select(.name == $n) | .digest' artifacts.json)"
+          test "$primary_digest" != "null"
+          test "$replay_digest" != "null"
+          test "$delta_digest" != "null"
+
+          cat > se001q-repair-evidence-index.json <<EOF
+          {
+            "schema": "se-repair-evidence-index-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "toolchain": "$EXPECTED_TOOLCHAIN",
+            "jobs": {
+              "primary": "$primary_job_id",
+              "replay": "$replay_job_id",
+              "delta": "$delta_job_id"
+            },
+            "artifacts": {
+              "primary": { "id": "$primary_artifact_id", "name": "$primary_name", "digest": "$primary_digest" },
+              "replay": { "id": "$replay_artifact_id", "name": "$replay_name", "digest": "$replay_digest" },
+              "delta": { "id": "$delta_artifact_id", "name": "$delta_name", "digest": "$delta_digest" }
+            },
+            "cross_artifact_invariants": [
+              "all manifests share one experiment subject SHA",
+              "all manifests share one repair SHA",
+              "all manifests share one frozen base SHA",
+              "all manifests share one workflow SHA and run identity",
+              "primary and replay share the same Cargo.lock SHA-256",
+              "delta lock identity matches primary and replay",
+              "all three artifacts belong to this workflow run and are unexpired",
+              "numeric job IDs are bound to the named evidence jobs"
+            ],
+            "observation_class": "reproduced",
+            "authority_class": "cross_artifact_execution_evidence_only",
+            "qualification_state": "not_granted"
+          }
+          EOF
+          python -m json.tool se001q-repair-evidence-index.json >/dev/null
+          cat se001q-repair-evidence-index.json
+
+      - name: Upload cross-artifact evidence index
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: se001q-repair-index-${{ github.run_id }}-${{ github.run_attempt }}
+          path: se001q-repair-evidence-index.json
+          if-no-files-found: error
+          retention-days: 90
+48\t13\tcrates/domains/symthaea-se-model/src/lib.rs'
+          test "$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
+          numstat="$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)"
+          lock_blob="$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")"
+          lock_sha256="$(git show "$EXPECTED_REPAIR_SHA:Cargo.lock" | sha256sum | awk '{print $1}')"
+          commit_count="$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")"
+          cat > se001q-repair-delta-manifest.json <<EOF
+          {
+            "schema": "se-repair-evidence-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "job": "${{ github.job }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "commit_count": "$commit_count",
+            "changed_file_count": "1",
+            "changed_file": "${files[0]}",
+            "numstat": "$numstat",
+            "cargo_lock_blob_sha": "$lock_blob",
+            "cargo_lock_sha256": "$lock_sha256",
+            "observation_class": "reproduced",
+            "authority_class": "execution_evidence_only",
+            "qualification_state": "not_granted"
+          }
+          EOF
+          python -m json.tool se001q-repair-delta-manifest.json >/dev/null
+          cat se001q-repair-delta-manifest.json
+          {
+            echo '### Repair identity'
+            echo
+            echo "frozen_subject_sha=$FROZEN_SUBJECT_SHA"
+            echo "repair_sha=$EXPECTED_REPAIR_SHA"
+            echo "changed_file=${files[0]}"
+            echo "numstat=$numstat"
+            echo "commit_count=$commit_count"
+            echo
+            echo 'Observation class: reproduced'
+            echo
+            echo 'This workflow produces execution evidence only; it grants no qualification authority.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload delta audit capsule
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload-delta
+        with:
+          name: se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}
+          path: se001q-repair-delta-manifest.json
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Record delta artifact identity
+        if: always()
+        run: |
+          echo "artifact-id: ${{ steps.upload-delta.outputs.artifact-id }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "artifact-digest: ${{ steps.upload-delta.outputs.artifact-digest }}" >> "$GITHUB_STEP_SUMMARY"
+
+  evidence-consistency:
+    name: Cross-artifact evidence consistency
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - identity-and-gates
+      - independent-replay
+      - delta-audit
+    if: always()
+    steps:
+      - name: Download this run's evidence capsules
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          pattern: se001q-repair-*-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence
+
+      - name: Verify cross-artifact evidence identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_PRIMARY_RESULT: ${{ needs.identity-and-gates.result }}
+          EXPECTED_REPLAY_RESULT: ${{ needs.independent-replay.result }}
+          EXPECTED_DELTA_RESULT: ${{ needs.delta-audit.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_PRIMARY_RESULT" = success
+          test "$EXPECTED_REPLAY_RESULT" = success
+          test "$EXPECTED_DELTA_RESULT" = success
+
+          primary_dir="evidence/se001q-repair-primary-${{ github.run_id }}-${{ github.run_attempt }}"
+          replay_dir="evidence/se001q-repair-replay-${{ github.run_id }}-${{ github.run_attempt }}"
+          delta_dir="evidence/se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}"
+          test -f "$primary_dir/se001q-repair-primary-manifest.json"
+          test -f "$replay_dir/se001q-repair-replay-manifest.json"
+          test -f "$delta_dir/se001q-repair-delta-manifest.json"
+
+          primary="$primary_dir/se001q-repair-primary-manifest.json"
+          replay="$replay_dir/se001q-repair-replay-manifest.json"
+          delta="$delta_dir/se001q-repair-delta-manifest.json"
+
+          for manifest in "$primary" "$replay" "$delta"; do
+            python -m json.tool "$manifest" >/dev/null
+            test "$(jq -r '.schema' "$manifest")" = "se-repair-evidence-v1"
+            test "$(jq -r '.repository' "$manifest")" = "${{ github.repository }}"
+            test "$(jq -r '.workflow' "$manifest")" = "${{ github.workflow }}"
+            test "$(jq -r '.workflow_sha' "$manifest")" = "${{ github.workflow_sha }}"
+            test "$(jq -r '.run_id' "$manifest")" = "${{ github.run_id }}"
+            test "$(jq -r '.run_attempt' "$manifest")" = "${{ github.run_attempt }}"
+            test "$(jq -r '.experiment_subject_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
+            test "$(jq -r '.repair_sha' "$manifest")" = "$EXPECTED_REPAIR_SHA"
+            test "$(jq -r '.base_ref' "$manifest")" = "$EXPECTED_BASE_REF"
+            test "$(jq -r '.base_sha' "$manifest")" = "$FROZEN_SUBJECT_SHA"
+            test "$(jq -r '.qualification_state' "$manifest")" = "not_granted"
+          done
+
+          test "$(jq -r '.authority_class' "$primary")" = "execution_evidence_only"
+          test "$(jq -r '.authority_class' "$replay")" = "independent_execution_evidence"
+          test "$(jq -r '.authority_class' "$delta")" = "execution_evidence_only"
+          test "$(jq -r '.observation_class' "$primary")" = "reproduced"
+          test "$(jq -r '.observation_class' "$replay")" = "reproduced"
+          test "$(jq -r '.observation_class' "$delta")" = "reproduced"
+
+          for key in format check semantic_test test clippy lock; do
+            test "$(jq -r ".outcomes.$key" "$primary")" = success
+          done
+          for key in semantic_test test check clippy; do
+            test "$(jq -r ".outcomes.$key" "$replay")" = success
+          done
+
+          test "$(jq -r '.toolchain' "$primary")" = "$EXPECTED_TOOLCHAIN"
+          test "$(jq -r '.toolchain' "$replay")" = "$EXPECTED_TOOLCHAIN"
+          test "$(jq -r '.lock_sha256' "$primary")" = "$(jq -r '.lock_sha256' "$replay")"
+          test "$(jq -r '.lock_sha256' "$primary")" = "$(jq -r '.cargo_lock_sha256' "$delta")"
+          test "$(jq -r '.lock_blob_sha' "$primary")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(jq -r '.cargo_lock_blob_sha' "$delta")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
+          test "$(jq -r '.changed_file_count' "$delta")" = "1"
+          test "$(jq -r '.changed_file' "$delta")" = "crates/domains/symthaea-se-model/src/lib.rs"
+          test "$(jq -r '.numstat' "$delta")" = $'48	13	crates/domains/symthaea-se-model/src/lib.rs'
+          test "$(jq -r '.commit_count' "$delta")" = "2"
+
+          api="https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api/jobs?per_page=100" > jobs.json
+          curl --fail --silent --show-error \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "$api/artifacts?per_page=100" > artifacts.json
+
+          primary_job_id="$(jq -r '.jobs[] | select(.name == "Repair generation identity + gates") | .id' jobs.json | head -n1)"
+          replay_job_id="$(jq -r '.jobs[] | select(.name == "Independent repair-generation replay") | .id' jobs.json | head -n1)"
+          delta_job_id="$(jq -r '.jobs[] | select(.name == "Verify repair remains minimal") | .id' jobs.json | head -n1)"
+          test -n "$primary_job_id"
+          test -n "$replay_job_id"
+          test -n "$delta_job_id"
+
+          primary_name="se001q-repair-primary-${{ github.run_id }}-${{ github.run_attempt }}"
+          replay_name="se001q-repair-replay-${{ github.run_id }}-${{ github.run_attempt }}"
+          delta_name="se001q-repair-delta-${{ github.run_id }}-${{ github.run_attempt }}"
+          for name in "$primary_name" "$replay_name" "$delta_name"; do
+            test "$(jq --arg n "$name" '[.artifacts[] | select(.name == $n)] | length' artifacts.json)" = "1"
+            test "$(jq --arg n "$name" -r '.artifacts[] | select(.name == $n) | .expired' artifacts.json)" = "false"
+          done
+
+          primary_artifact_id="$(jq --arg n "$primary_name" -r '.artifacts[] | select(.name == $n) | .id' artifacts.json)"
+          replay_artifact_id="$(jq --arg n "$replay_name" -r '.artifacts[] | select(.name == $n) | .id' artifacts.json)"
+          delta_artifact_id="$(jq --arg n "$delta_name" -r '.artifacts[] | select(.name == $n) | .id' artifacts.json)"
+          primary_digest="$(jq --arg n "$primary_name" -r '.artifacts[] | select(.name == $n) | .digest' artifacts.json)"
+          replay_digest="$(jq --arg n "$replay_name" -r '.artifacts[] | select(.name == $n) | .digest' artifacts.json)"
+          delta_digest="$(jq --arg n "$delta_name" -r '.artifacts[] | select(.name == $n) | .digest' artifacts.json)"
+          test "$primary_digest" != "null"
+          test "$replay_digest" != "null"
+          test "$delta_digest" != "null"
+
+          cat > se001q-repair-evidence-index.json <<EOF
+          {
+            "schema": "se-repair-evidence-index-v1",
+            "repository": "${{ github.repository }}",
+            "workflow": "${{ github.workflow }}",
+            "workflow_sha": "${{ github.workflow_sha }}",
+            "run_id": "${{ github.run_id }}",
+            "run_attempt": "${{ github.run_attempt }}",
+            "experiment_subject_sha": "$FROZEN_SUBJECT_SHA",
+            "repair_sha": "$EXPECTED_REPAIR_SHA",
+            "base_ref": "$EXPECTED_BASE_REF",
+            "base_sha": "$FROZEN_SUBJECT_SHA",
+            "toolchain": "$EXPECTED_TOOLCHAIN",
+            "jobs": {
+              "primary": "$primary_job_id",
+              "replay": "$replay_job_id",
+              "delta": "$delta_job_id"
+            },
+            "artifacts": {
+              "primary": { "id": "$primary_artifact_id", "name": "$primary_name", "digest": "$primary_digest" },
+              "replay": { "id": "$replay_artifact_id", "name": "$replay_name", "digest": "$replay_digest" },
+              "delta": { "id": "$delta_artifact_id", "name": "$delta_name", "digest": "$delta_digest" }
+            },
+            "cross_artifact_invariants": [
+              "all manifests share one experiment subject SHA",
+              "all manifests share one repair SHA",
+              "all manifests share one frozen base SHA",
+              "all manifests share one workflow SHA and run identity",
+              "primary and replay share the same Cargo.lock SHA-256",
+              "delta lock identity matches primary and replay",
+              "all three artifacts belong to this workflow run and are unexpired",
+              "numeric job IDs are bound to the named evidence jobs"
+            ],
+            "observation_class": "reproduced",
+            "authority_class": "cross_artifact_execution_evidence_only",
+            "qualification_state": "not_granted"
+          }
+          EOF
+          python -m json.tool se001q-repair-evidence-index.json >/dev/null
+          cat se001q-repair-evidence-index.json
+
+      - name: Upload cross-artifact evidence index
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: se001q-repair-index-${{ github.run_id }}-${{ github.run_attempt }}
+          path: se001q-repair-evidence-index.json
+          if-no-files-found: error
+          retention-days: 90
+48\t13\tcrates/domains/symthaea-se-model/src/lib.rs'
+          test "$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")" = "1d5b6c3dffb474fabef0f8237c6741b4f252bc62"
           test "$(git rev-list --count "$FROZEN_SUBJECT_SHA".."$EXPECTED_REPAIR_SHA")" -eq 2
           numstat="$(git diff --numstat "$FROZEN_SUBJECT_SHA" "$EXPECTED_REPAIR_SHA" -- crates/domains/symthaea-se-model/src/lib.rs)"
           lock_blob="$(git rev-parse "$EXPECTED_REPAIR_SHA:Cargo.lock")"
