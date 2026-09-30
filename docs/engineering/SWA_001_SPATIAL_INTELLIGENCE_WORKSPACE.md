@@ -671,3 +671,25 @@ The architecture is now:
 `Sol Atlas intervention + evidence -> semantic reference -> Mycelix review projection -> existing housing governance resolution -> independently validated authority -> separately observed maintenance/physical outcome`
 
 This is materially better than projecting directly into a generic "authorization receipt": the distributed system's existing domain semantics remain authoritative, while Sol Atlas remains responsible for evidence, provenance, model replay, and intervention identity.
+
+
+### SWA-019 refinement: reuse the actual Mycelix semantic-reference contract
+
+A deeper inspection found that the referenced Mycelix interoperability layer is not merely a proposal-shaped concept: at the inspected revision it already contains concrete `SchemaRef` and `SemanticRef` Rust types in `crates/mycelix-core-types/src/interoperability.rs`.
+
+Those types explicitly establish:
+
+- namespace + schema name + schema version as schema identity;
+- opaque object identifiers;
+- optional object-local versions;
+- rejection of empty components;
+- rejection of surrounding whitespace;
+- rejection of control characters;
+- bounded wire lengths;
+- no implicit claims about authenticity, trust, authority, semantic equivalence, evidence quality, verification, or content binding.
+
+SWA-019 now mirrors those **validation invariants** in its local adapter fixture rather than merely mirroring field names. This is important because an interoperability boundary is weaker if two systems agree on structure but disagree on what constitutes a valid identifier.
+
+The adapter still does not duplicate the Mycelix implementation. The actual Mycelix types remain authoritative once a production adapter can depend on the appropriate published/workspace contract. The Symthaea fixture exists to make the boundary deterministic and testable without introducing a cross-repository runtime dependency into this engineering reference fixture.
+
+This also reinforces the semantic rule already present in Mycelix's interoperability documentation: overlapping labels do not imply schema equivalence. A consumer must retain namespace, schema identity, and version rather than collapsing them into a shared ordinal or display label.
