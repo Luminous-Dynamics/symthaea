@@ -14,7 +14,7 @@ use thiserror::Error;
 const SERVICE_STATE_DOMAIN_V1: &[u8] = b"nixward-service-observed-state-v1";
 const MAX_SUB_STATE_BYTES: usize = 128;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct NixServiceOperationCapabilitiesV1 {
     can_start: bool,
     can_stop: bool,
@@ -211,14 +211,58 @@ impl NixServiceObservedStateV1 {
         })
     }
 
-    /// Parse the exact five properties used for the governed pre-state
-    /// observation. Unknown or omitted properties fail closed.
+    /// Parse the exact five properties used for the governed pre-state.
+    /// Capability facts are parsed only by the complete-observation parser.
     pub fn parse_systemd_properties(
         requested_unit: impl Into<String>,
         properties: &str,
     ) -> Result<Self, NixServiceStateErrorV1> {
-        let (state, _) = Self::parse_systemd_observation(requested_unit, properties)?;
-        Ok(state)
+        Self::parse_state_properties(requested_unit, properties)
+    }
+
+    fn parse_state_properties(
+        requested_unit: impl Into<String>,
+        properties: &str,
+    ) -> Result<Self, NixServiceStateErrorV1> {
+        let requested_unit = canonical_service_unit(requested_unit.into())?;
+        let mut observed_id = None;
+        let mut load_state = None;
+        let mut active_state = None;
+        let mut sub_state = None;
+        let mut unit_file_state = None;
+
+        for line in properties.lines() {
+            if line.is_empty() { continue; }
+            let (key, value) = line.split_once('=')
+                .ok_or(NixServiceStateErrorV1::MalformedPropertyLine)?;
+            if value.chars().any(|c| c == '\0') {
+                return Err(NixServiceStateErrorV1::MalformedPropertyLine);
+            }
+            match key {
+                "Id" if observed_id.is_none() => observed_id = Some(value.to_string()),
+                "LoadState" if load_state.is_none() => load_state = Some(ServiceLoadStateV1::parse(value)?),
+                "ActiveState" if active_state.is_none() => active_state = Some(ServiceActiveStateV1::parse(value)?),
+                "SubState" if sub_state.is_none() => sub_state = Some(value.to_string()),
+                "UnitFileState" if unit_file_state.is_none() => unit_file_state = Some(ServiceUnitFileStateV1::parse(value)?),
+                "Id" | "LoadState" | "ActiveState" | "SubState" | "UnitFileState" => {
+                    return Err(NixServiceStateErrorV1::DuplicateProperty);
+                }
+                _ => return Err(NixServiceStateErrorV1::UnexpectedProperty),
+            }
+        }
+
+        let observed_id = observed_id.ok_or(NixServiceStateErrorV1::MissingId)?;
+        if observed_id != requested_unit {
+            return Err(NixServiceStateErrorV1::IdentityMismatch);
+        }
+
+        Self::new(
+            requested_unit,
+            load_state.ok_or(NixServiceStateErrorV1::MissingLoadState)?,
+            active_state.ok_or(NixServiceStateErrorV1::MissingActiveState)?,
+            unit_file_state.ok_or(NixServiceStateErrorV1::MissingUnitFileState)?,
+            sub_state.ok_or(NixServiceStateErrorV1::MissingSubState)?,
+        )
     }
 
     /// Parse the complete governed observation atomically. Capability facts are
