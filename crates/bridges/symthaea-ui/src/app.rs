@@ -14,6 +14,8 @@ use base64::Engine as _;
 use leptos::prelude::*;
 use leptos::task::spawn_local;
 use serde_json::Value;
+use std::cell::Cell;
+use std::rc::Rc;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
@@ -210,6 +212,12 @@ pub fn App() -> impl IntoView {
         ws_connected.set(false);
         spawn_local(async move {
             let mut previous_state: Option<CognitiveState> = None;
+            let event_sequence = Rc::new(Cell::new(0_u64));
+            let next_event_sequence = || {
+                let next = event_sequence.get().saturating_add(1);
+                event_sequence.set(next);
+                next
+            };
             api::stream_telemetry(
                 &gw,
                 move |payload| {
@@ -226,6 +234,7 @@ pub fn App() -> impl IntoView {
                     if let Some(event) = event_between(
                         previous_state,
                         current_state,
+                        next_event_sequence(),
                         cycle,
                         v.surprise_triggered,
                         v.gwt_broadcast,
@@ -250,8 +259,9 @@ pub fn App() -> impl IntoView {
                 },
                 move || {
                     ws_connected.set(true);
+                    let sequence = next_event_sequence();
                     events.update(|items| {
-                        items.push(CognitiveEvent::lifecycle(CognitiveEventKind::Connected, 0));
+                        items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Connected, 0));
                         if items.len() > 32 {
                             items.remove(0);
                         }
@@ -260,9 +270,10 @@ pub fn App() -> impl IntoView {
             )
             .await;
             ws_connected.set(false);
+            let sequence = next_event_sequence();
             let cycle = telemetry_count.get_untracked();
             events.update(|items| {
-                items.push(CognitiveEvent::lifecycle(CognitiveEventKind::Disconnected, cycle));
+                items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Disconnected, cycle));
                 if items.len() > 32 {
                     items.remove(0);
                 }
@@ -488,7 +499,7 @@ pub fn App() -> impl IntoView {
                         } else {
                             events.get().into_iter().rev().enumerate().collect::<Vec<_>>()
                         }
-                        key=|(_, event)| format!("{}-{}", event.cycle, event.kind.label())
+                        key=|(_, event)| event.sequence
                         children=move |(_, event)| {
                             view! {
                                 <div class="timeline-event">
