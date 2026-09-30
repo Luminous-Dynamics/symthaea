@@ -125,6 +125,8 @@ mod tests {
 
         assert_eq!(slice.boundary.root, "claim-001");
         assert_eq!(slice.boundary.graph_revision, "sol-atlas-reference-graph@v1");
+        assert_eq!(slice.boundary.graph_digest, reference_graph().identity_digest());
+        assert_eq!(slice.boundary.graph_digest.len(), 64);
         assert_eq!(slice.boundary.traversal_policy, "outgoing-reachability-bfs@v1");
         assert_eq!(slice.boundary.graph_node_count, 9);
         assert_eq!(slice.boundary.graph_edge_count, 7);
