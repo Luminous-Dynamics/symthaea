@@ -892,6 +892,33 @@ mod tests {
     }
 
     #[test]
+    fn rejects_companion_projection_rotation_mismatch() {
+        let topography = MolaMegdrMetadata::from_label(
+            &parse_label(&label()),
+            "MEGT00N000HB",
+        ).unwrap();
+        let mut counts = MolaMegdrMetadata::from_label(
+            &parse_label(
+                &label()
+                    .replace("MEGT00N000HB", "MEGC00N000HB")
+                    .replace("MAP_TYPE = T", "MAP_TYPE = C")
+                    .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8"),
+            ),
+            "MEGC00N000HB",
+        ).unwrap();
+        counts.projection_rotation_deg = 0.001;
+        assert!(topography.validate_companion(&MolaMegdrProduct {
+            metadata: counts,
+            provenance: TerrainProvenance {
+                source_id: "test".into(),
+                source_revision: "test".into(),
+                coordinate_reference: "test".into(),
+            },
+            img_path: std::path::PathBuf::new(),
+        }).is_err());
+    }
+
+    #[test]
     fn rejects_mismatched_projection_registration() {
         let topography = MolaMegdrMetadata::from_label(&parse_label(&label()), "MEGT00N000HB").unwrap();
         let count_label = label()
