@@ -28,6 +28,13 @@ pub struct DeclaredExperimentIdentity {
     pub digest: String,
 }
 
+fn validate_sha256_identity(digest: &str) -> bool {
+    let Some(hex) = digest.strip_prefix(EXPERIMENT_IDENTITY_PREFIX) else {
+        return false;
+    };
+    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 impl DeclaredExperimentIdentity {
     pub fn from_key(key: &ExperimentKey) -> Self {
         Self {
@@ -44,6 +51,11 @@ impl DeclaredExperimentIdentity {
             return Err(EvidenceManifestError::UnsupportedIdentitySchema(
                 self.schema_version,
             ));
+        }
+        if !validate_sha256_identity(&self.digest) {
+            return Err(EvidenceManifestError::InvalidIdentity(EvidenceIdentityError::InvalidTaskQuality(
+                "identity digest must be sha256: followed by exactly 64 hexadecimal characters".into(),
+            )));
         }
         let expected = format!("{EXPERIMENT_IDENTITY_PREFIX}{}", key.identity_digest());
         if self.digest != expected {
@@ -128,6 +140,11 @@ impl EvidenceManifest {
         if self.experiment_identity.digest.is_empty() {
             return Err(EvidenceManifestError::EmptyIdentityDigest);
         }
+        if !validate_sha256_identity(&self.experiment_identity.digest) {
+            return Err(EvidenceManifestError::InvalidIdentity(EvidenceIdentityError::InvalidTaskQuality(
+                "identity digest must be sha256: followed by exactly 64 hexadecimal characters".into(),
+            )));
+        }
         self.join
             .validate()
             .map_err(|error| EvidenceManifestError::Join(error.to_string()))
@@ -208,6 +225,18 @@ mod tests {
         let mut manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
         manifest.experiment_identity.digest = "sha256:attacker-selected".into();
         assert!(matches!(manifest.validate_against_evidence(&task, &performance, &resource, &trajectory), Err(EvidenceManifestError::IdentityMismatch { .. })));
+    }
+
+    #[test]
+    fn malformed_digest_fails_closed() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let mut manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        manifest.experiment_identity.digest = "sha256:not-a-digest".into();
+        assert!(matches!(
+            manifest.validate_against_evidence(&task, &performance, &resource, &trajectory),
+            Err(EvidenceManifestError::InvalidIdentity(_))
+        ));
     }
 
     #[test]
