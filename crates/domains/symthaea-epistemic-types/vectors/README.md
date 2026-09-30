@@ -11,6 +11,7 @@ These vectors define the byte-level contract for canonical retrieval receipts.
 - `mode` is a fixed one-byte tag: Historical=0, Live=1.
 - Collections that are semantically sets are sorted and deduplicated before encoding.
 - Representation bindings are sorted by identity then representation digest.
+- Projection-identity bindings are sorted by identity then projection-identity digest and bind the projection semantics exposed to reasoning, not just its representation bytes.
 - Exclusions are sorted by canonical identity then reason tag.
 - No JSON serialization, field ordering, platform endianness, or Rust enum representation participates in the digest.
 
