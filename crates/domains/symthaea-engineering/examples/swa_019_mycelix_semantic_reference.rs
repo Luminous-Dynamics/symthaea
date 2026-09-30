@@ -352,12 +352,7 @@ fn evidence_binding_digest_from_slice(
     let nodes = slice
         .nodes
         .iter()
-        .map(|node| {
-            canonical_node(
-                graph_reference(binding, node.id),
-                graph_node_kind(node.kind),
-            )
-        })
+        .map(|node| canonical_node(node, graph_reference(binding, node.id)))
         .collect();
 
     let edges = slice
@@ -416,11 +411,19 @@ fn graph_edge_kind(kind: EdgeKind) -> &'static str {
     }
 }
 
-fn canonical_node(reference: &SemanticRefProjection, kind: &str) -> CanonicalNodeRef {
+fn canonical_node(
+    node: &symthaea_engineering::provenance_graph::Node,
+    reference: &SemanticRefProjection,
+) -> CanonicalNodeRef {
+    assert_eq!(
+        node.revision,
+        reference.object_version,
+        "semantic projection must not invent a provenance revision"
+    );
     CanonicalNodeRef {
         id: reference.object_id.into(),
-        kind: kind.into(),
-        revision: reference.object_version.map(str::to_string),
+        kind: graph_node_kind(node.kind).into(),
+        revision: node.revision.map(str::to_string),
     }
 }
 
@@ -677,6 +680,19 @@ mod tests {
         let changed_bytes = serde_json::to_vec(&changed).unwrap();
         let changed_digest = blake3::hash(&changed_bytes).to_hex().to_string();
         assert_ne!(baseline, changed_digest);
+    }
+
+    #[test]
+    fn changing_authoritative_node_revision_changes_projection_digest() {
+        let binding = evidence_binding();
+        let graph = reference_graph();
+        let baseline_slice = graph.slice("claim-001").expect("claim exists");
+        let mut changed_graph = graph.clone();
+        changed_graph.nodes.iter_mut().find(|node| node.id == "model-001").unwrap().revision = Some("building-twin@v2");
+        let changed_slice = changed_graph.slice("claim-001").expect("claim exists");
+        let baseline = evidence_binding_digest_from_slice(&binding, &baseline_slice);
+        let changed = evidence_binding_digest_from_slice(&binding, &changed_slice);
+        assert_ne!(baseline, changed);
     }
 
     #[test]
