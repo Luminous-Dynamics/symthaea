@@ -170,6 +170,33 @@ pub struct MolaTerrainObservation {
     pub identity: TerrainObservationIdentity,
 }
 
+impl MolaTerrainObservation {
+    /// Validate that the evidence object is internally self-consistent.
+    ///
+    /// The artifact composition is canonicalized before identity recomputation,
+    /// so producer-side algorithm/digest casing cannot create a second identity
+    /// for the same authenticated bytes. The legacy sample provenance remains
+    /// validated as a compatibility projection, but it is not the authority for
+    /// the observation identity.
+    pub fn validate(&self) -> Result<(), MolaError> {
+        self.artifacts
+            .validate()
+            .map_err(MolaError::InvalidMetadata)?;
+        self.sample
+            .provenance
+            .validate()
+            .map_err(MolaError::InvalidMetadata)?;
+        let expected = TerrainObservationIdentity::from_sample(&self.artifacts, &self.sample)
+            .map_err(MolaError::InvalidMetadata)?;
+        if expected != self.identity {
+            return Err(MolaError::InvalidMetadata(
+                "terrain observation identity does not match its sample and artifacts".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 impl MolaMegdrProduct {
     /// Open and validate a MOLA MEGDR PDS label against the raster.
     ///
@@ -2157,6 +2184,69 @@ mod tests {
     }
 
     #[test]
+    fn observation_validation_rejects_tampered_identity() {
+        let observation = observation_fixture_for_validation();
+        assert!(observation.validate().is_ok());
+
+        let mut tampered = observation.clone();
+        tampered.identity.sha256 = "0".repeat(64);
+        let error = tampered.validate().unwrap_err();
+        assert!(error.to_string().contains("identity"));
+    }
+
+    #[test]
+    fn observation_validation_rejects_tampered_artifacts() {
+        let observation = observation_fixture_for_validation();
+        let mut tampered = observation.clone();
+        tampered.artifacts.artifacts[0].digest = "c".repeat(64);
+        let error = tampered.validate().unwrap_err();
+        assert!(error.to_string().contains("identity"));
+    }
+
+    fn observation_fixture_for_validation() -> MolaTerrainObservation {
+        let sample = TerrainSample {
+            latitude_rad: 0.0,
+            longitude_rad: 0.0,
+            sampling_method: TerrainSamplingMethod::NearestCellWithObservationCount,
+            source_grid_cell: Some((1, 1)),
+            elevation_m: Some(1000.0),
+            elevation_uncertainty_m: Some(5.0),
+            vertical_datum: TerrainVerticalDatum::AreoidRelative,
+            slope_rad: None,
+            roughness_m: None,
+            quality: TerrainQuality::Measured,
+            provenance: TerrainProvenance {
+                source_id: "MEGT00N000HB".into(),
+                source_revision: "v1".into(),
+                coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+                content_digests: vec![
+                    ("detached-label".into(), "SHA-256".into(), "a".repeat(64)),
+                    ("raster-image".into(), "SHA-256".into(), "b".repeat(64)),
+                ],
+            },
+        };
+        let artifacts = TerrainArtifactComposition::from_artifacts(vec![
+            TerrainArtifactIdentity {
+                logical_file: "detached-label".into(),
+                source_id: "MEGT00N000HB".into(),
+                source_revision: "v1".into(),
+                coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+                algorithm: "SHA-256".into(),
+                digest: "a".repeat(64),
+            },
+            TerrainArtifactIdentity {
+                logical_file: "raster-image".into(),
+                source_id: "MEGT00N000HB".into(),
+                source_revision: "v1".into(),
+                coordinate_reference: "IAU-2000 planetocentric latitude, east-positive longitude".into(),
+                algorithm: "SHA-256".into(),
+                digest: "b".repeat(64),
+            },
+        ]).unwrap();
+        let identity = TerrainObservationIdentity::from_sample(&artifacts, &sample).unwrap();
+        MolaTerrainObservation { sample, artifacts, identity }
+    }
+
     fn artifact_identities_retain_product_local_source_identity() {
         let topography = TerrainProvenance {
             source_id: "MEGT00N000HB".into(),
