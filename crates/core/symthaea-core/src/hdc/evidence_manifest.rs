@@ -392,6 +392,18 @@ mod tests {
     }
 
     #[test]
+    fn uppercase_identity_digest_fails_closed() {
+        let (task, performance, resource, trajectory) = evidence();
+        let key = derive_experiment_key(&task, &performance, &resource).unwrap();
+        let mut manifest = EvidenceManifest::from_join_and_key(join(&key), &key);
+        manifest.experiment_identity.digest = manifest.experiment_identity.digest.to_uppercase();
+        assert!(matches!(
+            manifest.validate_against_evidence(&task, &performance, &resource, &trajectory),
+            Err(EvidenceManifestError::InvalidIdentity(_))
+        ));
+    }
+
+    #[test]
     fn envelope_subject_is_independently_derived() {
         let (task, performance, resource, trajectory) = evidence();
         let key = derive_experiment_key(&task, &performance, &resource).unwrap();
