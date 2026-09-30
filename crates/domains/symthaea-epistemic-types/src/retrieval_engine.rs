@@ -121,6 +121,18 @@ impl VerifiedRetrievalExecution {
     pub fn receipt(&self) -> &MemoryRetrievalReceipt {
         self.receipt.receipt()
     }
+
+    /// Check that the retained execution profile still agrees with the sealed receipt.
+    ///
+    /// The profile remains public for migration compatibility, so callers that retain
+    /// or serialize it separately can use this guard before treating the pair as one
+    /// provenance statement.
+    pub fn profile_matches_receipt(&self) -> bool {
+        let mut expected = self.profile.receipt_versions();
+        expected.sort();
+        expected.dedup();
+        expected == self.receipt().retrieval_profile_versions
+    }
 }
 
 /// Retrieval authority: execution metadata is owned by the engine, not callers.
@@ -270,6 +282,20 @@ mod tests {
         };
         let result = RetrievalEngine::new(profile).execute(&request, Vec::<MemoryRetrievalCandidate>::new());
         assert_eq!(result, Err(RetrievalExecutionError::Request(RetrievalRequestError::MissingHistoricalFrontier)));
+    }
+
+    #[test]
+    fn profile_must_continue_to_match_sealed_receipt() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
+        let mut execution = RetrievalEngine::new(profile)
+            .execute(
+                &MemoryRetrievalRequest::historical("frontier:1", "claim:x", 5),
+                vec![candidate("claim:x")],
+            )
+            .unwrap();
+        assert!(execution.profile_matches_receipt());
+        execution.profile.algorithm_version = "tampered".into();
+        assert!(!execution.profile_matches_receipt());
     }
 
     #[test]
