@@ -187,7 +187,7 @@ impl MolaMegdrProduct {
         }
         let value = self.read_i16(line, sample)? as f64;
         if self.metadata.missing_value.is_some_and(|m| value == m) {
-            return Ok(self.missing_sample(latitude_deg, longitude_deg, provenance));
+            return Ok(self.missing_sample(latitude_deg, longitude_deg, line, sample, provenance));
         }
         let elevation = value * self.metadata.pixel_scale + self.metadata.pixel_offset;
         if !elevation.is_finite() {
