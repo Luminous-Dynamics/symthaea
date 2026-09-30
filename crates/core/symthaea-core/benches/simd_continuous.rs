@@ -14,7 +14,7 @@
 //! Run with:
 //!   CARGO_TARGET_DIR=/tmp/symthaea-target cargo bench --bench simd_continuous --features simd
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 
 const HDC_DIM: usize = 16_384;
 
@@ -97,7 +97,7 @@ fn scalar_norm(x: &[f32]) -> f32 {
 fn bench_dot_product(c: &mut Criterion) {
     let mut group = c.benchmark_group("dot_product");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -123,7 +123,7 @@ fn bench_dot_product(c: &mut Criterion) {
 fn bench_bind(c: &mut Criterion) {
     let mut group = c.benchmark_group("bind");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -149,7 +149,7 @@ fn bench_bind(c: &mut Criterion) {
 fn bench_similarity(c: &mut Criterion) {
     let mut group = c.benchmark_group("similarity");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -211,7 +211,7 @@ fn bench_bundle(c: &mut Criterion) {
 fn bench_norm(c: &mut Criterion) {
     let mut group = c.benchmark_group("norm");
 
-    for dim in [1024, 4096, HDC_DIM, 32768] {
+    for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
 
         group.bench_with_input(BenchmarkId::new("scalar", dim), &a, |bench, a| {
