@@ -18,8 +18,8 @@
 //! - the candidate Mycelix source revision is provenance, not a live authority;
 //! - deterministic serialization/replay preserves the exact projection.
 
-use serde::Serialize;
 use blake3;
+use serde::Serialize;
 
 const OBSERVED_MYCELIX_INTEROP_COMMIT: &str =
     "b55bc03d99d0e8c89201dca06a264d16d5e2efd6";
@@ -274,6 +274,12 @@ fn validate(envelope: &MycelixProjectionEnvelope) -> ValidationOutcome {
         return ValidationOutcome::Invalid;
     }
 
+    if envelope.digest_algorithm != "blake3-256"
+        || envelope.source_content_digest != content_digest()
+    {
+        return ValidationOutcome::Invalid;
+    }
+
     let mut seen = Vec::new();
     for dependency in envelope.dependencies {
         if dependency.required && dependency.semantic_ref.object_id.is_empty() {
@@ -308,7 +314,9 @@ fn main() {
 
     // A digest declaration is not silently promoted to a cryptographic
     // commitment merely because the field is present.
-    assert!(first.source_content_digest.contains("not-yet-computed"));
+    assert_eq!(first.digest_algorithm, "blake3-256");
+    assert_eq!(first.source_content_digest, content_digest());
+    assert_eq!(first.source_content_digest.len(), 64);
 }
 
 #[cfg(test)]
@@ -425,6 +433,13 @@ mod tests {
         assert_eq!(projection.source_content_digest, content_digest());
         assert_eq!(projection.digest_algorithm, "blake3-256");
         assert_eq!(projection.source_content_digest.len(), 64);
+    }
+
+    #[test]
+    fn tampering_with_bound_content_invalidates_projection() {
+        let mut projection = envelope();
+        projection.authority_granted = true;
+        assert_eq!(validate(&projection), ValidationOutcome::Invalid);
     }
 
     #[test]
