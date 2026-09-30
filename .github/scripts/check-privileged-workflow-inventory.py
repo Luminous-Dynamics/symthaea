@@ -191,6 +191,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
         "third_party_actions": sorted(uses, key=lambda x: (x["uses"], x["sha"])),
     }
     download_artifact = False
+    artifact_names_observed: list[str] = []
     cache_modes: list[str] = []
     if event == "workflow_run":
         contract["trigger"]["workflows"] = events[event]["workflows"]
@@ -280,6 +281,8 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                     with_values[key] = value_text
                 artifact_name = with_values.get("name")
                 run_id = with_values.get("run-id")
+                if artifact_name:
+                    artifact_names_observed.append(artifact_name)
                 if not artifact_name:
                     raise InventoryError(f"{path}: workflow_run artifact access requires an exact 'name' input")
                 if not run_id or run_id != "${{ github.event.workflow_run.id }}":
@@ -321,6 +324,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     contract["local_reusable_workflow_calls"] = sorted(set(local_reusable_calls))
     contract["cross_workflow_dataflow_observed"] = {
         "artifact_download_action_present": download_artifact,
+        "artifact_names": sorted(set(artifact_names_observed)),
         "explicit_cache_write_override_present": explicit_cache_write,
     }
     return {"path": path.as_posix(), "privileged": True, "contract": contract}
@@ -407,6 +411,9 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
                     mismatches.append(f"{path}: artifact download is present but artifacts_consumed is false")
                 if dataflow.get("artifacts_consumed"):
                     artifact_names = dataflow.get("artifact_names")
+                    observed_artifact_names = observed_contract["cross_workflow_dataflow_observed"].get("artifact_names", [])
+                    if artifact_names != observed_artifact_names:
+                        mismatches.append(f"{path}: cross_workflow_dataflow artifact_names differs from observed exact names")
                     if not isinstance(artifact_names, list) or not artifact_names or not all(isinstance(name, str) and name.strip() for name in artifact_names):
                         mismatches.append(f"{path}: artifact-consuming workflow_run requires a non-empty exact artifact_names allowlist")
                     if dataflow.get("artifact_extraction") in {None, "", "none"}:
