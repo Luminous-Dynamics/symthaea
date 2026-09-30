@@ -874,6 +874,55 @@ mod tests {
     }
 
     #[test]
+    fn valles_128ppd_geometry_matches_published_archive_sizes() {
+        let topography = label()
+            .replace("MEGT00N000HB", "MEGT00N270HB")
+            .replace("LINES = 4", "LINES = 5632")
+            .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 11520")
+            .replace("RECORD_BYTES = 16", "RECORD_BYTES = 23040")
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 0.5")
+            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = -11519.5")
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 270.0")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -44.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.0");
+        let topography =
+            MolaMegdrMetadata::from_label(&parse_label(&topography), "MEGT00N270HB").unwrap();
+
+        let counts = label()
+            .replace("MEGT00N000HB", "MEGC00N270HB")
+            .replace("MAP_TYPE = T", "MAP_TYPE = C")
+            .replace("SAMPLE_BITS = 16", "SAMPLE_BITS = 8")
+            .replace("LINES = 4", "LINES = 5632")
+            .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 11520")
+            .replace("RECORD_BYTES = 16", "RECORD_BYTES = 11520")
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 0.5")
+            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = -11519.5")
+            .replace("WESTERNMOST_LONGITUDE = 0.0", "WESTERNMOST_LONGITUDE = 270.0")
+            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+            .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -44.0")
+            .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 0.0");
+        let counts =
+            MolaMegdrMetadata::from_label(&parse_label(&counts), "MEGC00N270HB").unwrap();
+
+        let topography_bytes =
+            u64::from(topography.lines) * topography.record_bytes;
+        let count_bytes = u64::from(counts.lines) * counts.record_bytes;
+
+        // These are the exact byte sizes listed by the maintained legacy PDS3 archive.
+        assert_eq!(topography_bytes, 129_761_280);
+        assert_eq!(count_bytes, 64_880_640);
+        assert_eq!(
+            u64::from(topography.lines) * u64::from(topography.samples) * 2,
+            topography_bytes
+        );
+        assert_eq!(
+            u64::from(counts.lines) * u64::from(counts.samples),
+            count_bytes
+        );
+    }
+
+    #[test]
     fn pins_valles_128ppd_projection_offsets_and_cell_centers() {
         // The published MEGT00N270HB label reproduces the 128 ppd 270E-360E
         // tile as 5632 x 11520 pixels with LINE_PROJECTION_OFFSET=0.5 and
