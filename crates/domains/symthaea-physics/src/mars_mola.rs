@@ -389,7 +389,7 @@ impl MolaMegdrMetadata {
             || !pixel_offset.is_finite()
             || !line_projection_offset.is_finite()
             || !sample_projection_offset.is_finite()
-            || !missing_value.is_none_and(f64::is_finite)
+            || missing_value.is_some_and(|value| !value.is_finite())
             || !tile_origin_lat_deg.is_finite()
             || !tile_origin_lon_deg.is_finite()
             || latitude_min_deg < -90.0
