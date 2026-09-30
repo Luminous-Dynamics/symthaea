@@ -40,7 +40,7 @@ def _reject_yaml_meta(value: str, context: str) -> None:
 ARTIFACT_EXECUTION_PATTERNS = (
     re.compile(r"\b(?:bash|sh|zsh|fish|dash|ksh|pwsh|powershell|python(?:3)?|node|ruby|perl|php|lua)\s+[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
     re.compile(r"\b(?:source|\.)\s+[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
-    re.compile(r"\b(?:cargo|rustc|make|cmake|ninja|nix-build|nix\s+build|npm|pnpm|yarn|pip|pip3|gem|bundle|go\s+run)\\b[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
+    re.compile(r"\b(?:cargo|rustc|make|cmake|ninja|nix-build|nix\s+build|npm|pnpm|yarn|pip|pip3|gem|bundle|go\s+run)\b[^#\n]*?(?:\$RUNNER_TEMP|runner\.temp)"),
     re.compile(r"\bchmod\s+[^#\n]*(?:\$RUNNER_TEMP|runner\.temp)"),
     re.compile(r"\b(?:cp|mv|install)\s+[^#\n]*(?:\$RUNNER_TEMP|runner\.temp)[^#\n]*(?:\$GITHUB_WORKSPACE|\$PATH|/usr/local/bin|/usr/bin|/bin)"),
     re.compile(r"(?:\$RUNNER_TEMP|runner\.temp)[^#\n]*?(?:\$GITHUB_WORKSPACE|\$PATH|/usr/local/bin|/usr/bin|/bin)"),
