@@ -164,6 +164,7 @@ pub fn App() -> impl IntoView {
     let ws_connected = RwSignal::new(false);
     let vitals = RwSignal::new(Vitals::default());
     let telemetry_count = RwSignal::new(0_u64);
+    let last_cycle = RwSignal::new(0_u64);
 
     let history = RwSignal::new(Vec::<Turn>::new());
     let draft = RwSignal::new(String::new());
@@ -249,6 +250,7 @@ pub fn App() -> impl IntoView {
                         });
                     }
                     previous_state = Some(current_state);
+                    last_cycle.set(cycle);
                     vitals.set(v);
                     telemetry_count.update(|n| *n += 1);
                     if let Some(svg) = portrait_from_json(&payload) {
@@ -275,7 +277,7 @@ pub fn App() -> impl IntoView {
             ws_connected.set(false);
             let sequence = disconnect_sequence.get().saturating_add(1);
             disconnect_sequence.set(sequence);
-            let cycle = telemetry_count.get_untracked();
+            let cycle = last_cycle.get_untracked();
             events.update(|items| {
                 items.push(CognitiveEvent::lifecycle(sequence, CognitiveEventKind::Disconnected, cycle));
                 if items.len() > 32 {
