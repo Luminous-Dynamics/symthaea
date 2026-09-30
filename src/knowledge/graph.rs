@@ -34,6 +34,55 @@ pub type FactId = u64;
 pub struct CanonicalAdmission {
     canonical_identity: String,
     provenance_family: Option<String>,
+    /// Optional immutable context proving which validated provenance snapshot and
+    /// admission event this capability was derived from. Holochain adapters can
+    /// require this context without coupling the cognitive core to Holochain types.
+    receipt: Option<CanonicalAdmissionReceipt>,
+}
+
+/// Context bound to an explicit canonical admission. This is not an assertion of
+/// truth; it records the software-level boundary at which a canonical identity
+/// was admitted from a particular provenance snapshot/frontier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalAdmissionReceipt {
+    pub admission_event: String,
+    pub frontier_ref: Option<String>,
+    pub provenance_snapshot_digest: String,
+    pub validator_version: String,
+    pub snapshot_schema_version: u16,
+}
+
+impl CanonicalAdmissionReceipt {
+    pub fn new(
+        admission_event: impl Into<String>,
+        frontier_ref: Option<String>,
+        provenance_snapshot_digest: impl Into<String>,
+        validator_version: impl Into<String>,
+        snapshot_schema_version: u16,
+    ) -> Result<Self, &'static str> {
+        let admission_event = admission_event.into();
+        let provenance_snapshot_digest = provenance_snapshot_digest.into();
+        let validator_version = validator_version.into();
+        if admission_event.trim().is_empty() {
+            return Err("admission event must be non-empty");
+        }
+        if frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err("frontier reference must be non-empty when present");
+        }
+        if provenance_snapshot_digest.trim().is_empty() {
+            return Err("provenance snapshot digest must be non-empty");
+        }
+        if validator_version.trim().is_empty() {
+            return Err("validator version must be non-empty");
+        }
+        Ok(Self {
+            admission_event,
+            frontier_ref,
+            provenance_snapshot_digest,
+            validator_version,
+            snapshot_schema_version,
+        })
+    }
 }
 
 impl CanonicalAdmission {
@@ -51,7 +100,18 @@ impl CanonicalAdmission {
         {
             return Err("provenance family must be non-empty when present");
         }
-        Ok(Self { canonical_identity, provenance_family })
+        Ok(Self { canonical_identity, provenance_family, receipt: None })
+    }
+
+    /// Bind the admission to the immutable provenance snapshot that justified the
+    /// software-level admission. The receipt carries no confidence/evidence weight.
+    pub fn with_receipt(mut self, receipt: CanonicalAdmissionReceipt) -> Self {
+        self.receipt = Some(receipt);
+        self
+    }
+
+    pub fn receipt(&self) -> Option<&CanonicalAdmissionReceipt> {
+        self.receipt.as_ref()
     }
 }
 
@@ -1186,6 +1246,38 @@ mod tests {
         let after = graph.provenance(id).unwrap();
         assert_eq!(after.canonical_identity.as_deref(), Some("canonical:claim-1"));
         assert_eq!(after.provenance_family.as_deref(), Some("source-family-1"));
+    }
+
+    fn canonical_admission_rejects_empty_identity() {    #[test]
+    fn canonical_admission_receipt_binds_snapshot_context_without_evidence_weight() {
+        let graph = EnhancedKnowledgeGraph::new(100);
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:7".into()),
+            "digest-abc",
+            "melothaea-provenance-structural-v1",
+            1,
+        )
+        .unwrap();
+        let admission = graph
+            .admit_canonical_identity("canonical:claim-1", Some("family-1".into()))
+            .unwrap()
+            .with_receipt(receipt.clone());
+        assert_eq!(admission.receipt(), Some(&receipt));
+        assert_eq!(admission.canonical_identity, "canonical:claim-1");
+        assert_eq!(admission.provenance_family.as_deref(), Some("family-1"));
+    }
+
+    #[test]
+    fn canonical_admission_receipt_rejects_missing_context() {
+        assert_eq!(
+            CanonicalAdmissionReceipt::new(" ", None, "digest", "validator", 1).unwrap_err(),
+            "admission event must be non-empty"
+        );
+        assert_eq!(
+            CanonicalAdmissionReceipt::new("event", None, " ", "validator", 1).unwrap_err(),
+            "provenance snapshot digest must be non-empty"
+        );
     }
 
     #[test]
