@@ -299,6 +299,162 @@ impl EvidenceManifestEnvelope {
     }
 }
 
+
+/// Versioned claim describing the relationship between a manifest artifact and
+/// the semantic experiment/evidence artifacts it binds.
+///
+/// This is intentionally an unsigned statement. A future attestation envelope
+/// can sign these canonical bytes without changing the evidence model itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceAttestationStatement {
+    pub schema_version: u32,
+    pub subject_digest: String,
+    pub predicate_type: String,
+    pub experiment_identity: String,
+    pub references: Vec<super::cost_quality_join::EvidenceReference>,
+}
+
+pub const EVIDENCE_ATTESTATION_STATEMENT_SCHEMA_VERSION: u32 = 1;
+pub const EVIDENCE_ATTESTATION_PREDICATE_TYPE: &str =
+    "https://github.com/Luminous-Dynamics/symthaea/attestation/evidence/v1";
+const EVIDENCE_ATTESTATION_STATEMENT_DOMAIN: &[u8] = b"symthaea:evidence-attestation";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceAttestationError {
+    UnsupportedSchema(u32),
+    InvalidSubjectDigest,
+    InvalidExperimentIdentity,
+    InvalidPredicateType,
+    InvalidReference(String),
+    SubjectMismatch { expected: String, observed: String },
+    ReferenceCountMismatch { expected: usize, observed: usize },
+}
+
+impl std::fmt::Display for EvidenceAttestationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedSchema(v) => write!(f, "unsupported evidence attestation schema: {v}"),
+            Self::InvalidSubjectDigest => write!(f, "invalid attestation subject digest"),
+            Self::InvalidExperimentIdentity => write!(f, "invalid attestation experiment identity"),
+            Self::InvalidPredicateType => write!(f, "invalid evidence attestation predicate type"),
+            Self::InvalidReference(error) => write!(f, "invalid attestation reference: {error}"),
+            Self::SubjectMismatch { expected, observed } => {
+                write!(f, "attestation subject mismatch: expected {expected}, observed {observed}")
+            }
+            Self::ReferenceCountMismatch { expected, observed } => {
+                write!(f, "attestation reference count mismatch: expected {expected}, observed {observed}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for EvidenceAttestationError {}
+
+impl EvidenceAttestationStatement {
+    pub fn from_envelope(envelope: &EvidenceManifestEnvelope) -> Self {
+        let manifest = &envelope.manifest;
+        Self {
+            schema_version: EVIDENCE_ATTESTATION_STATEMENT_SCHEMA_VERSION,
+            subject_digest: envelope.subject_digest.clone(),
+            predicate_type: EVIDENCE_ATTESTATION_PREDICATE_TYPE.into(),
+            experiment_identity: manifest.experiment_identity.digest.clone(),
+            references: vec![
+                manifest.join.trajectory.clone(),
+                manifest.join.resource.clone(),
+                manifest.join.performance.clone(),
+                manifest.join.task_quality.clone(),
+            ],
+        }
+    }
+
+    /// Canonical bytes for the unsigned claim that a signer would attest.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        fn push_field(bytes: &mut Vec<u8>, value: &[u8]) {
+            bytes.extend_from_slice(&(value.len() as u64).to_be_bytes());
+            bytes.extend_from_slice(value);
+        }
+
+        fn push_reference(bytes: &mut Vec<u8>, reference: &super::cost_quality_join::EvidenceReference) {
+            push_field(bytes, reference.kind.as_bytes());
+            bytes.extend_from_slice(&reference.schema_version.to_be_bytes());
+            push_field(bytes, reference.artifact_digest.as_bytes());
+            push_field(bytes, reference.artifact_id.as_bytes());
+        }
+
+        let mut bytes = Vec::with_capacity(1024);
+        bytes.extend_from_slice(EVIDENCE_ATTESTATION_STATEMENT_DOMAIN);
+        bytes.extend_from_slice(&self.schema_version.to_be_bytes());
+        push_field(&mut bytes, self.subject_digest.as_bytes());
+        push_field(&mut bytes, self.predicate_type.as_bytes());
+        push_field(&mut bytes, self.experiment_identity.as_bytes());
+        bytes.extend_from_slice(&(self.references.len() as u64).to_be_bytes());
+        for reference in &self.references {
+            push_reference(&mut bytes, reference);
+        }
+        bytes
+    }
+
+    pub fn statement_digest(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(self.canonical_bytes());
+        format!("{EXPERIMENT_IDENTITY_PREFIX}{}", digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>())
+    }
+
+    /// Verify that this claim exactly describes the supplied manifest envelope.
+    pub fn validate_against_envelope(
+        &self,
+        envelope: &EvidenceManifestEnvelope,
+    ) -> Result<(), EvidenceAttestationError> {
+        if self.schema_version != EVIDENCE_ATTESTATION_STATEMENT_SCHEMA_VERSION {
+            return Err(EvidenceAttestationError::UnsupportedSchema(self.schema_version));
+        }
+        if !validate_sha256_identity(&self.subject_digest) {
+            return Err(EvidenceAttestationError::InvalidSubjectDigest);
+        }
+        if !validate_sha256_identity(&self.experiment_identity) {
+            return Err(EvidenceAttestationError::InvalidExperimentIdentity);
+        }
+        if self.predicate_type != EVIDENCE_ATTESTATION_PREDICATE_TYPE {
+            return Err(EvidenceAttestationError::InvalidPredicateType);
+        }
+
+        let expected_subject = envelope.manifest.subject_digest();
+        if self.subject_digest != expected_subject {
+            return Err(EvidenceAttestationError::SubjectMismatch {
+                expected: expected_subject,
+                observed: self.subject_digest.clone(),
+            });
+        }
+        if self.experiment_identity != envelope.manifest.experiment_identity.digest {
+            return Err(EvidenceAttestationError::SubjectMismatch {
+                expected: envelope.manifest.experiment_identity.digest.clone(),
+                observed: self.experiment_identity.clone(),
+            });
+        }
+
+        if self.references.len() != 4 {
+            return Err(EvidenceAttestationError::ReferenceCountMismatch {
+                expected: 4,
+                observed: self.references.len(),
+            });
+        }
+        let expected = [
+            &envelope.manifest.join.trajectory,
+            &envelope.manifest.join.resource,
+            &envelope.manifest.join.performance,
+            &envelope.manifest.join.task_quality,
+        ];
+        for (actual, expected) in self.references.iter().zip(expected) {
+            if actual != expected {
+                return Err(EvidenceAttestationError::InvalidReference(
+                    "attestation reference differs from manifest".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
