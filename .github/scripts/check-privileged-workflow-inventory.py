@@ -192,6 +192,18 @@ def parse_workflow(path: Path) -> dict[str, Any]:
     }
     if event == "workflow_run":
         contract["trigger"]["workflows"] = events[event]["workflows"]
+        download_artifact = any(
+            "actions/download-artifact@" in raw.strip()
+            for raw in lines
+        )
+        cache_write = any(
+            re.search(r"(^|\\s)cache-mode:\\s*(write|write-only)\\s*$", raw.strip())
+            for raw in lines
+        )
+        contract["cross_workflow_dataflow_observed"] = {
+            "artifact_download_action_present": download_artifact,
+            "explicit_cache_write_override_present": cache_write,
+        }
     return {"path": path.as_posix(), "privileged": True, "contract": contract}
 
 def load_inventory(path: Path) -> dict[str, Any]:
@@ -228,6 +240,32 @@ def validate_inventory(workflows_dir: Path, inventory_path: Path) -> None:
         for field in ("trigger", "permissions", "third_party_actions"):
             if entry.get(field) != observed_contract.get(field):
                 mismatches.append(f"{path}: {field} differs")
+        if observed_contract["trigger"]["event"] == "workflow_run":
+            dataflow = entry.get("cross_workflow_dataflow")
+            if not isinstance(dataflow, dict):
+                mismatches.append(f"{path}: cross_workflow_dataflow is required for workflow_run")
+            else:
+                required = {
+                    "upstream_workflow_names",
+                    "artifacts_consumed",
+                    "artifact_names",
+                    "artifact_extraction",
+                    "artifact_execution",
+                    "upstream_identity_checks",
+                    "cache_influence",
+                    "privileged_side_effects",
+                }
+                missing = sorted(required - set(dataflow))
+                if missing:
+                    mismatches.append(f"{path}: cross_workflow_dataflow missing {missing}")
+                if dataflow.get("upstream_workflow_names") != observed_contract["trigger"]["workflows"]:
+                    mismatches.append(f"{path}: cross_workflow_dataflow upstream_workflow_names differs")
+                if observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and not dataflow.get("artifacts_consumed"):
+                    mismatches.append(f"{path}: artifact download is present but artifacts_consumed is false")
+                if not observed_contract["cross_workflow_dataflow_observed"]["artifact_download_action_present"] and dataflow.get("artifacts_consumed"):
+                    mismatches.append(f"{path}: artifacts_consumed is true but no download-artifact action is present")
+                if observed_contract["cross_workflow_dataflow_observed"]["explicit_cache_write_override_present"] and dataflow.get("cache_influence") != "explicit_write_override":
+                    mismatches.append(f"{path}: cache write override requires explicit_write_override disposition")
     if mismatches:
         raise InventoryError("privileged inventory mismatch: " + "; ".join(mismatches))
 
@@ -284,7 +322,21 @@ jobs:
         wf.write_text(original, encoding="utf-8")
         assert observed["permissions"]["top_level"] == {"contents": "read"}
         assert observed["permissions"]["jobs"]["receipt"] == {"actions": "read", "contents": "read"}
-        inv.write_text(json.dumps({"workflows": [{"path": "example.yml", **observed}]}), encoding="utf-8")
+        inv_entry = {
+            "path": "example.yml",
+            **observed,
+            "cross_workflow_dataflow": {
+                "upstream_workflow_names": ["Trusted upstream"],
+                "artifacts_consumed": False,
+                "artifact_names": [],
+                "artifact_extraction": "none",
+                "artifact_execution": False,
+                "upstream_identity_checks": ["configured_workflow_name", "head_branch", "head_sha", "conclusion"],
+                "cache_influence": "none_observed",
+                "privileged_side_effects": ["none"],
+            },
+        }
+        inv.write_text(json.dumps({"workflows": [inv_entry]}), encoding="utf-8")
         validate_inventory(root, inv)
         data = json.loads(inv.read_text(encoding="utf-8"))
         data["workflows"][0]["trigger"]["types"] = ["requested"]
@@ -295,6 +347,25 @@ jobs:
             pass
         else:
             raise AssertionError("trigger mismatch must fail closed")
+        data = json.loads(inv.read_text(encoding="utf-8"))
+        data["workflows"][0]["trigger"]["types"] = ["completed"]
+        data["workflows"][0]["cross_workflow_dataflow"]["artifacts_consumed"] = True
+        inv.write_text(json.dumps(data), encoding="utf-8")
+        try:
+            validate_inventory(root, inv)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("artifact trust contract must reject false artifact-consumption declaration")
+        data["workflows"][0]["cross_workflow_dataflow"]["artifacts_consumed"] = False
+        data["workflows"][0]["cross_workflow_dataflow"].pop("upstream_workflow_names")
+        inv.write_text(json.dumps(data), encoding="utf-8")
+        try:
+            validate_inventory(root, inv)
+        except InventoryError:
+            pass
+        else:
+            raise AssertionError("artifact trust contract must require upstream workflow identity")
         wf.write_text(wf.read_text(encoding="utf-8").replace("workflow_run:", "workflow_dispatch:"), encoding="utf-8")
         try:
             validate_inventory(root, inv)
