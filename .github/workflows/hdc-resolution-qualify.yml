@@ -246,6 +246,31 @@ jobs:
           PY
           sha256sum dimension-task-evidence.json | tee dimension-task-evidence.sha256
 
+      - name: Emit deterministic noise robustness surface
+        run: cargo run -p symthaea-core --example hdc_noise_robustness > hdc-noise-robustness-evidence.json
+
+      - name: Validate noise robustness surface
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("hdc-noise-robustness-evidence.json").read_text())
+          expected_dimensions = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+          expected_noise = [0.10, 0.20, 0.35, 0.50, 0.65, 0.80]
+          cells = evidence["cells"]
+          assert evidence["schema_version"] == 1
+          assert evidence["task"] == "hdc_noise_robustness_prototype_retrieval"
+          assert len(cells) == len(expected_dimensions) * len(expected_noise)
+          assert [c["resolution"] for c in cells[::len(expected_noise)]] == expected_dimensions
+          assert [round(c["noise_weight"], 2) for c in cells[:len(expected_noise)]] == expected_noise
+          assert all(c["total"] == 128 for c in cells)
+          assert all(0.0 <= c["accuracy"] <= 1.0 for c in cells)
+          assert all(c["mean_margin"] == c["mean_margin"] for c in cells)
+          assert evidence["spec_identity"].startswith("sha256:")
+          PY
+          sha256sum hdc-noise-robustness-evidence.json | tee hdc-noise-robustness-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -291,3 +316,5 @@ jobs:
             dimension-sweep-evidence.sha256
             dimension-task-evidence.json
             dimension-task-evidence.sha256
+            hdc-noise-robustness-evidence.json
+            hdc-noise-robustness-evidence.sha256
