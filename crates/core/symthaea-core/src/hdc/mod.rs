@@ -105,6 +105,7 @@ pub mod resource_evidence;
 /// Feature-neutral measured performance evidence contract.
 pub mod performance_evidence;
 pub mod cost_quality_join;
+pub mod pareto_frontier;
 
 /// HDC dimensionality configuration for runtime selection
 ///
