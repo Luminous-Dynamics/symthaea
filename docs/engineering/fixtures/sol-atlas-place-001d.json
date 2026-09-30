@@ -298,9 +298,9 @@
     {"id":"proj:nominal","completeness":"Complete","contradiction":"None","convergence":"Converged"}
   ],
   "services": [
-    {"id":"svc:home-01:electric","root_element_id":"home-01","currentness_required":true,"included_dependency_classes":["Electricity"],"required_dependency_classes":["Electricity"]},
-    {"id":"svc:block-a:electric","root_element_id":"block-a","currentness_required":true,"included_dependency_classes":["Electricity"],"required_dependency_classes":["Electricity"]},
-    {"id":"svc:home-01:water","root_element_id":"home-01","currentness_required":true,"included_dependency_classes":["Water"],"required_dependency_classes":["Water"]}
+    {"id":"svc:home-01:electric","root_element_id":"home-01","currentness_required":true,"dependency_discovery":"Complete","included_dependency_classes":["Electricity"],"required_dependency_classes":["Electricity"]},
+    {"id":"svc:block-a:electric","root_element_id":"block-a","currentness_required":true,"dependency_discovery":"Complete","included_dependency_classes":["Electricity"],"required_dependency_classes":["Electricity"]},
+    {"id":"svc:home-01:water","root_element_id":"home-01","currentness_required":true,"dependency_discovery":"Complete","included_dependency_classes":["Water"],"required_dependency_classes":["Water"]}
   ],
   "independence_witnesses": []
 }
