@@ -87,10 +87,10 @@ impl CognitiveState {
             CognitiveMode::Uncertain
         } else if processing {
             CognitiveMode::Responding
-        } else if thermodynamic_load < 0.12 {
-            CognitiveMode::Resting
         } else if prediction_error > 0.5 {
             CognitiveMode::Exploring
+        } else if thermodynamic_load < 0.12 {
+            CognitiveMode::Resting
         } else if coherence > 0.70 && thermodynamic_load > 0.45 {
             CognitiveMode::Integrating
         } else {
@@ -103,7 +103,7 @@ impl CognitiveState {
             coherence: coherence.clamp(0.0, 1.0),
             thermodynamic_load: thermodynamic_load.clamp(0.0, 1.0),
             confidence: confidence.clamp(0.0, 1.0),
-            prediction_error: prediction_error.max(0.0),
+            prediction_error: prediction_error.clamp(0.0, 1.0),
         }
     }
 }
