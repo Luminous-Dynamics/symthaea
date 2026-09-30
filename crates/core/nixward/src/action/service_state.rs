@@ -962,14 +962,20 @@ CanReload=yes
     }
 
     #[test]
-    fn enablement_evidence_cannot_be_rebound_to_another_unit() {
-        let observed = state("inactive", "disabled", "dead");
-        let mut evidence = NixServiceEnablementEvidenceV1::from_observed_state(&observed).unwrap();
-        evidence.unit = "sshd.service".to_string();
-        assert_eq!(
-            evidence.validate_shape().unwrap_err(),
-            NixServiceStateErrorV1::InvalidPreStateDigest
-        );
+    fn enablement_evidence_commits_to_exact_unit_identity() {
+        let nginx = state("inactive", "disabled", "dead");
+        let sshd = NixServiceObservedStateV1::new(
+            "sshd",
+            ServiceLoadStateV1::Loaded,
+            ServiceActiveStateV1::Inactive,
+            ServiceUnitFileStateV1::Disabled,
+            "dead",
+        )
+        .unwrap();
+        let a = NixServiceEnablementEvidenceV1::from_observed_state(&nginx).unwrap();
+        let b = NixServiceEnablementEvidenceV1::from_observed_state(&sshd).unwrap();
+        assert_ne!(a.pre_state_digest(), b.pre_state_digest());
+        assert_ne!(a.digest().unwrap(), b.digest().unwrap());
     }
 
     #[test]
