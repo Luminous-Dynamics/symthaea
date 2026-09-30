@@ -120,13 +120,24 @@ pub const STABLE_CONFIG_IDENTITY_SCHEMA: &str = "symthaea:stable-config-identity
 /// This is an identity/determinism primitive, not an authorization primitive.
 /// Use the evidence/provenance contracts for security-sensitive commitments.
 pub fn stable_config_hash<T: Serialize>(config: &T) -> String {
+    stable_config_hash_result(config)
+        .expect("stable config serialization must produce a JSON value")
+}
+
+/// Fallible form of the stable semantic configuration identity.
+///
+/// Use this at persistence, ingestion, or externally supplied configuration
+/// boundaries where serialization failure must remain an explicit validation
+/// result rather than becoming a panic.
+pub fn stable_config_hash_result<T: Serialize>(
+    config: &T,
+) -> Result<String, serde_json::Error> {
     const DOMAIN: &[u8] = b"symthaea:stable-config-identity:v1\0";
-    let value = serde_json::to_value(config)
-        .expect("stable config serialization must produce a JSON value");
+    let value = serde_json::to_value(config)?;
     let mut bytes = Vec::with_capacity(256);
     bytes.extend_from_slice(DOMAIN);
     write_canonical_json(&value, &mut bytes);
-    blake3::hash(&bytes).to_hex().to_string()
+    Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
 /// Serialize a JSON value deterministically, recursively sorting object keys.
@@ -435,6 +446,16 @@ mod tests {
         assert_eq!(a.len(), 64, "BLAKE3 hex digest must be 256 bits");
     }
 
+    #[test]
+    fn stable_config_hash_result_rejects_non_json_numbers() {
+        #[derive(Serialize)]
+        struct Unsupported {
+            value: f64,
+        }
+
+        assert!(stable_config_hash_result(&Unsupported { value: f64::NAN }).is_err());
+        assert!(stable_config_hash_result(&Unsupported { value: f64::INFINITY }).is_err());
+    }
     #[test]
     fn stable_config_hash_changes_with_semantic_input() {
         let a = stable_config_hash(&(vec![100_u64, 101, 102], vec![1_u64, 2]));
