@@ -29,6 +29,7 @@ pub mod phi_gate;
 pub mod plan_executor;
 pub mod service_manager;
 pub mod service_domain;
+pub mod service_state;
 pub mod temporal;
 
 pub use approver_evidence::{
@@ -83,6 +84,10 @@ pub use phi_gate::{classify_command_destructiveness, get_nixos_rollback};
 pub use plan_executor::{PlanExecutionResult, PlanExecutor, PlanStep, StepStatus};
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use service_domain::{NixServiceOperationErrorV1, NixServiceOperationKindV1, NixServiceOperationV1};
+pub use service_state::{
+    NixServiceObservedStateV1, NixServiceStateErrorV1, ServiceActiveStateV1,
+    ServiceUnitFileStateV1,
+};
 pub use temporal::{
     EvidenceCurrentnessV1, EvidenceTemporalEvaluationV1, EvidenceTemporalStatusV1,
     EvidenceWindowMillisV1, NixTimeErrorV1, UnixMillisV1, UnixSecondsV1,
