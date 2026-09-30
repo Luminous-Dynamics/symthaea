@@ -8,6 +8,9 @@
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+pub const PROVENANCE_GRAPH_REVISION: &str = "sol-atlas-reference-graph@v1";
+pub const PROVENANCE_SLICE_TRAVERSAL_POLICY: &str = "outgoing-reachability-bfs@v1";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum NodeKind {
     Claim,
@@ -137,6 +140,8 @@ impl ProvenanceGraph {
 
         let boundary = SliceBoundaryCertificate {
             root,
+            graph_revision: PROVENANCE_GRAPH_REVISION,
+            traversal_policy: PROVENANCE_SLICE_TRAVERSAL_POLICY,
             graph_node_count: self.nodes.len(),
             graph_edge_count: self.edges.len(),
             slice_node_count: nodes.len(),
@@ -167,6 +172,9 @@ pub struct ProvenanceSlice {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct SliceBoundaryCertificate {
     pub root: &'static str,
+    /// Versioned identity of the authoritative graph representation.
+    pub graph_revision: &'static str,
+    pub traversal_policy: &'static str,
     pub graph_node_count: usize,
     pub graph_edge_count: usize,
     pub slice_node_count: usize,
@@ -177,6 +185,9 @@ pub struct SliceBoundaryCertificate {
 impl SliceBoundaryCertificate {
     pub fn is_complete(&self) -> bool {
         self.frontier_exhausted
+            && self.graph_revision == PROVENANCE_GRAPH_REVISION
+            && self.traversal_policy == PROVENANCE_SLICE_TRAVERSAL_POLICY
+
             && self.slice_node_count <= self.graph_node_count
             && self.slice_edge_count <= self.graph_edge_count
     }
