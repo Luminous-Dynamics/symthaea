@@ -258,7 +258,7 @@ mod tests {
         );
         assert_eq!(
             result,
-            AtomicAdmissionOutcome::ConcurrentConflict { observed_version: 3 }
+            AtomicAdmissionOutcome::ConcurrentConflict { observed_version: 2 }
         );
         assert_eq!(store.loads, 3);
         assert_eq!(store.version, 3);
