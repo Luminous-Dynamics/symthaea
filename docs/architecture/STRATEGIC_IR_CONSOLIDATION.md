@@ -695,3 +695,6 @@ observation histories. citeturn0search0turn0search1
 Regression coverage now verifies both repeated-scope delivery and order sensitivity:
 permutation of two otherwise identical public observation events produces a different
 player-local history, while private events remain visible only to their named observer.
+A second fixture exercises the complete replay path and verifies that the ordered stream
+reaches the `InformationEncoder` unchanged rather than merely testing the projection
+helper in isolation.
