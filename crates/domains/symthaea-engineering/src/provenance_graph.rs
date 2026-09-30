@@ -47,7 +47,40 @@ pub struct ProvenanceGraph {
     pub edges: Vec<Edge>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProvenanceGraphError {
+    DuplicateNodeId,
+    DuplicateEdge,
+    MissingEdgeEndpoint,
+}
+
 impl ProvenanceGraph {
+    /// Validate graph identity before any downstream projection consumes it.
+    ///
+    /// Node IDs are semantic identities, so duplicates are ambiguous. Edges
+    /// must be unique and must reference nodes in the same graph.
+    pub fn validate(&self) -> Result<(), ProvenanceGraphError> {
+        let mut node_ids = BTreeSet::new();
+        for node in &self.nodes {
+            if !node_ids.insert(node.id) {
+                return Err(ProvenanceGraphError::DuplicateNodeId);
+            }
+        }
+
+        let mut edges = BTreeSet::new();
+        for edge in &self.edges {
+            if !node_ids.contains(edge.from) || !node_ids.contains(edge.to) {
+                return Err(ProvenanceGraphError::MissingEdgeEndpoint);
+            }
+            if !edges.insert(*edge) {
+                return Err(ProvenanceGraphError::DuplicateEdge);
+            }
+        }
+
+        Ok(())
+    }
+
+
     pub fn slice(&self, root: &'static str) -> Option<ProvenanceSlice> {
         if !self.nodes.iter().any(|node| node.id == root) {
             return None;
@@ -154,6 +187,35 @@ pub fn reference_graph() -> ProvenanceGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reference_graph_is_well_formed() {
+        assert_eq!(reference_graph().validate(), Ok(()));
+    }
+
+    #[test]
+    fn duplicate_node_identity_is_rejected() {
+        let mut graph = reference_graph();
+        graph.nodes.push(Node { id: "claim-001", kind: NodeKind::Evidence });
+        assert_eq!(
+            graph.validate(),
+            Err(ProvenanceGraphError::DuplicateNodeId)
+        );
+    }
+
+    #[test]
+    fn dangling_edge_is_rejected() {
+        let mut graph = reference_graph();
+        graph.edges.push(Edge {
+            from: "claim-001",
+            to: "missing-001",
+            kind: EdgeKind::DerivedFrom,
+        });
+        assert_eq!(
+            graph.validate(),
+            Err(ProvenanceGraphError::MissingEdgeEndpoint)
+        );
+    }
 
     #[test]
     fn reference_slice_is_deterministic_and_excludes_unrelated_nodes() {
