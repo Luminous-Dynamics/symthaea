@@ -462,8 +462,6 @@ pub enum ObservationRelationKind {
     PossibleSameEntity,
 }
 
-/// Auditable edge between observations.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// The concrete provenance basis for an independence assessment.
 ///
 /// This keeps an independence classification auditable instead of collapsing
@@ -495,8 +493,8 @@ impl IndependenceAssessment {
     const VERIFIER_VERSION: &'static str = "observation-fabric-independence-v1";
 }
 
-pub enum EvidenceIndependence {
-    /// The producer declares no known shared upstream source.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum EvidenceIndependence {    /// The producer declares no known shared upstream source.
     ///
     /// This is an assertion, not a verification result. Consumers must not
     /// treat it as independently established evidence without an explicit
