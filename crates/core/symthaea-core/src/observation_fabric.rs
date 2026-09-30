@@ -426,6 +426,10 @@ impl Observation {
         if self.provenance.parent_observation_ids.iter().any(|parent| parent.trim().is_empty() || parent == &self.id) {
             return Err(ObservationValidationError::InvalidParentObservation);
         }
+        let mut parent_ids = HashSet::with_capacity(self.provenance.parent_observation_ids.len());
+        if self.provenance.parent_observation_ids.iter().any(|parent| !parent_ids.insert(parent)) {
+            return Err(ObservationValidationError::DuplicateParentObservation);
+        }
         if let Some(activity) = &self.provenance.processing_activity {
             activity.validate()?;
         }
@@ -497,8 +501,7 @@ impl ObservationRelation {
             return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
         }
         if matches!(self.kind, ObservationRelationKind::Corroborates)
-            && matches!(self.independence, EvidenceIndependence::Derived)
-        {
+            && matches!(self.independence, EvidenceIndependence::Derived)        {
             return Err(ObservationValidationError::CorroborationDerivedMismatch);
         }
         Ok(())
@@ -716,6 +719,8 @@ pub enum ObservationValidationError {
     MissingVerificationAttestation,
     #[error("parent observation ids must be non-empty and cannot reference the observation itself")]
     InvalidParentObservation,
+    #[error("parent observation ids must be unique within an observation")]
+    DuplicateParentObservation,
     #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
     InvalidProcessingActivity,
     #[error("processing activity input observations must be unique")]
@@ -946,6 +951,16 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_parent_reference_fails_closed() {
+        let mut observation = fixture();
+        observation.provenance.parent_observation_ids = vec!["parent".into(), "parent".into()];
+        assert_eq!(
+            observation.validate(),
+            Err(ObservationValidationError::DuplicateParentObservation)
+        );
+    }
+
+    #[test]
     fn parent_cannot_self_reference() {
         let mut observation = fixture();
         observation.provenance.parent_observation_ids = vec!["obs-001".into()];
@@ -997,7 +1012,6 @@ mod tests {
         let second = activity.compute_execution_fingerprint().unwrap();
         assert_ne!(first, second);
     }
-
     #[test]
     fn processing_activity_rejects_malformed_definition_fingerprint() {
         let activity = ProcessingActivity {
