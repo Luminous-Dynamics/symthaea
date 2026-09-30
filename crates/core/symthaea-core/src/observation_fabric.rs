@@ -1030,6 +1030,107 @@ mod tests {
     }
 
     #[test]
+    fn graph_accepts_repeated_processing_activity_with_same_execution() {
+        let mut input = fixture();
+        input.id = "input".into();
+
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: Some(10),
+            ended_at_unix_ns: Some(20),
+            agent_id: Some("worker-7".into()),
+            activity_fingerprint: Some("blake3:config-v1".into()),
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output-a".into(), "output-b".into()],
+        };
+
+        let mut output_a = fixture();
+        output_a.id = "output-a".into();
+        output_a.provenance.parent_observation_ids = vec!["input".into()];
+        output_a.provenance.processing_activity = Some(activity.clone());
+
+        let mut output_b = fixture();
+        output_b.id = "output-b".into();
+        output_b.provenance.parent_observation_ids = vec!["input".into()];
+        output_b.provenance.processing_activity = Some(activity);
+
+        let graph = ObservationGraph {
+            observations: vec![input, output_a, output_b],
+            relations: vec![],
+        };
+        assert!(graph.validate().is_ok());
+    }
+
+    #[test]
+    fn graph_rejects_inconsistent_processing_activity_repetition() {
+        let mut input = fixture();
+        input.id = "input".into();
+
+        let activity_a = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: Some(10),
+            ended_at_unix_ns: Some(20),
+            agent_id: Some("worker-7".into()),
+            activity_fingerprint: Some("blake3:config-v1".into()),
+            execution_fingerprint: None,
+            input_observation_ids: vec!["input".into()],
+            output_observation_ids: vec!["output-a".into(), "output-b".into()],
+        };
+        let mut activity_b = activity_a.clone();
+        activity_b.process_id = "transform-v2".into();
+
+        let mut output_a = fixture();
+        output_a.id = "output-a".into();
+        output_a.provenance.parent_observation_ids = vec!["input".into()];
+        output_a.provenance.processing_activity = Some(activity_a);
+
+        let mut output_b = fixture();
+        output_b.id = "output-b".into();
+        output_b.provenance.parent_observation_ids = vec!["input".into()];
+        output_b.provenance.processing_activity = Some(activity_b);
+
+        let graph = ObservationGraph {
+            observations: vec![input, output_a, output_b],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::InconsistentProcessingActivity("run-001".into()))
+        );
+    }
+
+    #[test]
+    fn graph_rejects_tampered_execution_fingerprint() {
+        let mut observation = fixture();
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            execution_fingerprint: Some(
+                "0000000000000000000000000000000000000000000000000000000000000000".into(),
+            ),
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["obs-001".into()],
+        };
+        observation.provenance.processing_activity = Some(activity);
+
+        let graph = ObservationGraph {
+            observations: vec![observation],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::ExecutionFingerprintMismatch)
+        );
+    }
+
+    #[test]
     fn graph_rejects_unclaimed_activity_output() {
         let mut input = fixture();
         input.id = "input".into();
