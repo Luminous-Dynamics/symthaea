@@ -290,10 +290,43 @@ mod tests {
         }
     }
 
+    fn resource_record() -> ResourceEvidenceRecord {
+        let workload = super::super::resource_evidence::ResourceWorkload {
+            resolution: 131_072,
+            representation: CONTINUOUS_F32_REPRESENTATION.to_owned(),
+            element_size_bytes: 4,
+            resident_vectors: 4,
+        };
+        ResourceEvidenceRecord {
+            schema_version: RESOURCE_EVIDENCE_SCHEMA_VERSION,
+            vector_bytes: workload.vector_bytes().unwrap(),
+            resident_bytes: workload.resident_bytes().unwrap(),
+            peak_temporary_bytes: Some(64 * 1024),
+            conversion_bytes: Some(0),
+            provenance_id: "trajectory-fixture-resource-v1".to_owned(),
+            qualification_status: super::super::resource_evidence::RESOURCE_QUALIFIED_STATUS.to_owned(),
+            budget: super::super::resource_evidence::ResourceBudget::new(
+                512 * 1024,
+                2 * 1024 * 1024,
+                Some(64 * 1024),
+            ),
+            workload,
+        }
+    }
+
+    fn resource_dependency(record: &ResourceEvidenceRecord) -> ResourceEvidenceDependency {
+        ResourceEvidenceDependency {
+            schema_version: RESOURCE_EVIDENCE_SCHEMA_VERSION,
+            resolution: record.workload.resolution,
+            representation: record.workload.representation.clone(),
+            provenance_id: record.provenance_id.clone(),
+        }
+    }
+
     #[test]
     fn qualified_operator_matrix_unlocks_transition() {
         let artifact = artifact();
-        qualify_transition(&artifact, &dependency(&artifact)).expect("transition should qualify");
+        qualify_transition(&artifact, &dependency(&artifact), &resource_record(), &resource_dependency(&resource_record())).expect("transition should qualify");
     }
 
     #[test]
@@ -345,7 +378,7 @@ mod tests {
         let artifact = artifact();
         let mut dependency = dependency(&artifact);
         dependency.artifact_sha256 = "different".to_owned();
-        let error = qualify_transition(&artifact, &dependency).expect_err("digest must reject");
+        let error = qualify_transition(&artifact, &dependency, &resource_record(), &resource_dependency(&resource_record())).expect_err("digest must reject");
         assert!(matches!(
             error,
             TrajectoryQualificationError::ArtifactDigestMismatch { .. }
@@ -372,6 +405,7 @@ mod tests {
             65_536,
             131_072,
             dependency.clone(),
+            resource_dependency(&resource_record()),
             TrajectoryMetrics {
                 terminal_state_error: Some(0.01),
                 mean_state_error: Some(0.005),
@@ -400,6 +434,6 @@ mod tests {
                 operation: "dot".to_owned(),
             }],
         };
-        qualify_transition(&artifact, &dependency).expect("digest reference qualifies");
+        qualify_transition(&artifact, &dependency, &resource_record(), &resource_dependency(&resource_record())).expect("digest reference qualifies");
     }
 }
