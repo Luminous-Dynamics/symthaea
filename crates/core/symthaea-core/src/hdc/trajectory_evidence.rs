@@ -57,6 +57,7 @@ pub enum TrajectoryQualificationError {
         expected: String,
         observed: String,
     },
+    UnsupportedDigestAlgorithm(String),
     MissingOperator {
         resolution: usize,
         operation: String,
@@ -80,6 +81,9 @@ impl std::fmt::Display for TrajectoryQualificationError {
             }
             Self::ArtifactDigestMismatch { expected, observed } => {
                 write!(f, "operator artifact digest mismatch: expected {expected}, observed {observed}")
+            }
+            Self::UnsupportedDigestAlgorithm(algorithm) => {
+                write!(f, "unsupported operator evidence digest algorithm: {algorithm}")
             }
             Self::MissingOperator { resolution, operation } => {
                 write!(f, "required operator evidence missing: {resolution}/{operation}")
@@ -121,6 +125,12 @@ pub fn qualify_transition(
                 dependency.representation.clone()
             },
         });
+    }
+
+    if artifact.digest.algorithm != "sha256" {
+        return Err(TrajectoryQualificationError::UnsupportedDigestAlgorithm(
+            artifact.digest.algorithm.clone(),
+        ));
     }
 
     let observed_digest = &artifact.digest.value;
@@ -305,6 +315,18 @@ mod tests {
         assert!(matches!(
             error,
             TrajectoryQualificationError::ArtifactDigestMismatch { .. }
+        ));
+    }
+
+    #[test]
+    fn unsupported_digest_algorithm_fails_closed() {
+        let mut artifact = artifact();
+        artifact.digest.algorithm = "sha1".to_owned();
+        let error = qualify_transition(&artifact, &dependency(&artifact))
+            .expect_err("unsupported algorithm must reject");
+        assert!(matches!(
+            error,
+            TrajectoryQualificationError::UnsupportedDigestAlgorithm(_)
         ));
     }
 
