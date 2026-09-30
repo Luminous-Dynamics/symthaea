@@ -337,7 +337,9 @@ fn evidence_binding_payload(binding: &EvidenceBinding) -> EvidenceBindingPayload
 }
 
 fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
-    let slice = reference_graph()
+    let graph = reference_graph();
+    assert_eq!(graph.validate(), Ok(()));
+    let slice = graph
         .slice("claim-001")
         .expect("authoritative reference claim exists");
     evidence_binding_digest_from_slice(binding, &slice)
