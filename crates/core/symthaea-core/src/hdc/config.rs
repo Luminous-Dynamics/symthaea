@@ -184,7 +184,10 @@ impl HdcConfig {
         self.dimension * 4 // f32 = 4 bytes
     }
 
-    /// Get memory usage per binary vector in bytes
+    /// Get the packed-bit memory estimate for a binary representation at this dimension.
+    ///
+    /// This is representation accounting only; it does not change BinaryHV's
+    /// established fixed 16,384-bit layout.
     pub const fn memory_per_binary_vec(&self) -> usize {
         self.dimension / 8 // 8 bits per byte
     }
