@@ -209,7 +209,6 @@ pub fn App() -> impl IntoView {
         let gw = gateway.get_untracked();
         ws_connected.set(false);
         spawn_local(async move {
-            ws_connected.set(true);
             api::stream_telemetry(&gw, move |payload| {
                 vitals.set(Vitals::from_json(&payload));
                 telemetry_count.update(|n| *n += 1);
@@ -220,7 +219,7 @@ pub fn App() -> impl IntoView {
                     movie.set(Some(m));
                     movie_frame.set(0);
                 }
-            })
+            }, move || ws_connected.set(true))
             .await;
             ws_connected.set(false);
         });
