@@ -805,6 +805,55 @@ mod tests {
     }
 
     #[test]
+    fn retention_gc_leaves_observation_tombstone() {
+        let (state, delivery, observation) = admitted_state();
+        let policy = AdmissionPolicy { retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
+        let next = retire_expired(&state, policy, 101).expect("valid lifecycle transition");
+        assert!(!next.observations.contains_key(&observation.key));
+        assert!(!next.results.contains_key(&observation.key));
+        assert!(next.observation_tombstones.contains_key(&observation.key));
+        assert!(next.deliveries.contains_key(&delivery.logical_delivery_id));
+        assert_eq!(validate_state(&next), Ok(()));
+    }
+
+    #[test]
+    fn tombstone_blocks_reuse_until_horizon() {
+        let (state, delivery, observation) = admitted_state();
+        let policy = AdmissionPolicy { retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
+        let retired = retire_expired(&state, policy, 101).expect("valid lifecycle transition");
+        assert_eq!(
+            decide(&retired, &delivery, &observation, policy, 150),
+            AdmissionOutcome::Rejected { reason: RejectReason::ObservationTombstoned }
+        );
+    }
+
+    #[test]
+    fn expired_tombstone_can_be_reused_only_by_explicit_time_progression() {
+        let (state, delivery, observation) = admitted_state();
+        let policy = AdmissionPolicy { retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
+        let retired = retire_expired(&state, policy, 101).expect("valid lifecycle transition");
+        let outcome = decide(&retired, &delivery, &observation, policy, 201);
+        let AdmissionOutcome::Admitted { next_state, .. } = outcome else { panic!("identity should be reusable after tombstone horizon"); };
+        assert!(!next_state.observation_tombstones.contains_key(&observation.key));
+        assert!(next_state.observations.contains_key(&observation.key));
+    }
+
+    #[test]
+    fn delivery_is_retired_only_after_its_last_observation_is_collected() {
+        let (state, delivery, mut second) = admitted_state();
+        second.key.observation_id = Uuid::from_u128(9_999);
+        let policy = AdmissionPolicy { allow_new_observation: true, retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
+        let AdmissionOutcome::Admitted { next_state, .. } = decide(&state, &delivery, &second, policy, 100) else { panic!("second observation should admit"); };
+        let partially_collected = retire_expired(&next_state, policy, 101).expect("valid lifecycle transition");
+        assert!(partially_collected.deliveries.contains_key(&delivery.logical_delivery_id));
+        assert!(partially_collected.observations.contains_key(&second.key));
+        let fully_collected = retire_expired(&partially_collected, policy, 111).expect("valid lifecycle transition");
+        assert!(!fully_collected.deliveries.contains_key(&delivery.logical_delivery_id));
+        assert!(fully_collected.delivery_tombstones.contains_key(&delivery.logical_delivery_id));
+        assert_eq!(validate_state(&fully_collected), Ok(()));
+    }
+
+    #[test]
     fn decision_does_not_depend_on_wall_clock() {
         let (delivery, observation) = fixture();
         let a = decide(
