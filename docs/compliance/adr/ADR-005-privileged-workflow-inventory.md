@@ -42,7 +42,7 @@ The inventory and detector explicitly separate:
 
 This prevents a workflow with ordinary write permissions, such as a trusted deployment workflow, from being incorrectly classified solely because it has a write permission.
 
-The detector compares mechanically observable fields: trigger/event configuration, workflow-run upstream workflow names, declared permissions, pinned third-party action references, and the presence of artifact-download/cache-write override surfaces. For `workflow_run`, the inventory must additionally declare a cross-workflow data-flow contract. The detector fails closed when that contract is absent or inconsistent with the observed trigger/action surface. Human-purpose, guard, secret-consumption, and untrusted-code claims remain declarative evidence and are not silently inferred by the detector.
+The detector compares mechanically observable fields: trigger/event configuration, workflow-run upstream workflow names, declared permissions, pinned third-party action references, and the presence of artifact-download/cache-write override surfaces. For `workflow_run`, the inventory must additionally declare a cross-workflow data-flow contract and the workflow source must explicitly bind runtime provenance: repository identity, configured workflow name, main-branch identity, expected subject SHA, conclusion, and run identity (`id` + `run_attempt`). The detector fails closed when that contract is absent, inconsistent with the observed trigger/action surface, or when the privileged consumer lacks these explicit runtime guards. Human-purpose, guard, secret-consumption, and untrusted-code claims remain declarative evidence and are not silently inferred by the detector.
 
 ## External policy boundary
 
@@ -58,7 +58,8 @@ The detector has a deterministic self-test covering:
 - stale inventory after privileged-trigger removal;
 - missing cross-workflow data-flow contract;
 - false artifact-consumption declaration;
-- missing upstream workflow identity in the data-flow contract.
+- missing upstream workflow identity in the data-flow contract;
+- missing runtime provenance guards in a privileged `workflow_run` consumer.
 
 The Workflow Syntax gate compiles changed `.github/scripts/*.py`, executes the detector self-test, validates the current privileged inventory, and JSON-parses changed `.github/*.json` files.
 
