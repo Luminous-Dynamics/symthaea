@@ -19,10 +19,12 @@ on:
       - "crates/core/symthaea-core/src/hdc/dimension_observatory.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_sweep.rs"
       - "crates/core/symthaea-core/src/hdc/dimension_frontier.rs"
+      - "crates/core/symthaea-core/src/hdc/dimension_task_harness.rs"
       - "crates/core/symthaea-core/src/hdc/mod.rs"
       - "crates/core/symthaea-core/src/hdc/pareto_frontier.rs"
       - "crates/core/symthaea-core/tests/hdc_ltc_operator_evidence_chain.rs"
       - "crates/core/symthaea-core/examples/hdc_operator_evidence.rs"
+      - "crates/core/symthaea-core/examples/hdc_dimension_task.rs"
       - "crates/core/symthaea-core/benches/simd_continuous.rs"
       - "docs/research/HDC_RESOLUTION_EXTENSIBILITY.md"
       - "docs/research/HDC_DIMENSION_SWEEP.md"
@@ -118,6 +120,7 @@ jobs:
           cargo test -p symthaea-core --lib dimension_observatory
           cargo test -p symthaea-core --lib dimension_sweep
           cargo test -p symthaea-core --lib dimension_frontier
+          cargo test -p symthaea-core --lib dimension_task_harness
           cargo test -p symthaea-core --lib pareto_frontier
           cargo test -p symthaea-core --test hdc_ltc_operator_evidence_chain --features simd
 
@@ -207,6 +210,34 @@ jobs:
           PY
           sha256sum dimension-sweep-evidence.json | tee dimension-sweep-evidence.sha256
 
+
+      - name: Emit deterministic task-quality dimension frontier
+        run: cargo run -p symthaea-core --example hdc_dimension_task > dimension-task-evidence.json
+
+      - name: Validate task-quality dimension frontier
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          evidence = json.loads(Path("dimension-task-evidence.json").read_text())
+          expected = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144]
+          rows = evidence["rows"]
+          assert evidence["schema_version"] == 1
+          assert [r["resolution"] for r in rows] == expected
+          assert [r["resolution"] for r in evidence["frontier"]["rows"]] == expected
+          assert all(r["task_quality"]["execution_status"] == "executed" for r in rows)
+          assert all(r["performance"]["execution_status"] == "executed" for r in rows)
+          assert all(r["resource"]["qualification_status"] == "qualified" for r in rows)
+          assert all(0.0 <= r["accuracy"] <= 1.0 for r in rows)
+          assert all(r["total"] == 16 for r in rows)
+          assert all(r["logical_bytes"] > 0 for r in rows)
+          assert all(ref["artifact_digest"].startswith("sha256:")
+                     for fr in evidence["frontier"]["rows"]
+                     for ref in (fr["task_quality"], fr["performance"], fr["resource"]))
+          PY
+          sha256sum dimension-task-evidence.json | tee dimension-task-evidence.sha256
+
       - name: Compile SIMD benchmark matrix
         run: cargo bench -p symthaea-core --bench simd_continuous --no-run --features simd
 
@@ -250,3 +281,5 @@ jobs:
             operator-evidence-provenance.json
             dimension-sweep-evidence.json
             dimension-sweep-evidence.sha256
+            dimension-task-evidence.json
+            dimension-task-evidence.sha256
