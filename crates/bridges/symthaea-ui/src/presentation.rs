@@ -57,7 +57,6 @@ pub struct CognitiveState {
     pub presence: PresenceState,
     pub mode: CognitiveMode,
     pub coherence: f64,
-    pub prediction_error: f64,
     pub thermodynamic_load: f64,
     pub confidence: f64,
 }
@@ -67,7 +66,6 @@ impl CognitiveState {
         connected: bool,
         processing: bool,
         coherence: f64,
-        prediction_error: f64,
         thermodynamic_load: f64,
         confidence: f64,
     ) -> Self {
@@ -75,8 +73,7 @@ impl CognitiveState {
             PresenceState::Disconnected
         } else if processing {
             PresenceState::Processing
-        } else if prediction_error.is_nan()
-            || coherence.is_nan()
+        } else if coherence.is_nan()
             || thermodynamic_load.is_nan()
         {
             PresenceState::Degraded
@@ -88,9 +85,9 @@ impl CognitiveState {
             CognitiveMode::Uncertain
         } else if processing {
             CognitiveMode::Responding
-        } else if thermodynamic_load < 0.12 && prediction_error < 0.15 {
+        } else if thermodynamic_load < 0.12 {
             CognitiveMode::Resting
-        } else if prediction_error > 0.55 {
+        } else if confidence < 0.45 {
             CognitiveMode::Exploring
         } else if coherence > 0.70 && thermodynamic_load > 0.45 {
             CognitiveMode::Integrating
@@ -102,7 +99,6 @@ impl CognitiveState {
             presence,
             mode,
             coherence: coherence.clamp(0.0, 1.0),
-            prediction_error: prediction_error.clamp(0.0, 1.0),
             thermodynamic_load: thermodynamic_load.clamp(0.0, 1.0),
             confidence: confidence.clamp(0.0, 1.0),
         }
@@ -124,7 +120,7 @@ mod tests {
     fn high_prediction_error_maps_to_exploration() {
         let state = CognitiveState::from_observation(true, false, 0.6, 0.8, 0.3, 0.5);
         assert_eq!(state.presence, PresenceState::Available);
-        assert_eq!(state.mode, CognitiveMode::Exploring);
+        assert_eq!(state.mode, CognitiveMode::Uncertain);
     }
 
     #[test]
@@ -135,9 +131,8 @@ mod tests {
 
     #[test]
     fn values_are_clamped_for_display() {
-        let state = CognitiveState::from_observation(true, false, 2.0, -1.0, 4.0, 3.0);
+        let state = CognitiveState::from_observation(true, false, 2.0, 4.0, 3.0);
         assert_eq!(state.coherence, 1.0);
-        assert_eq!(state.prediction_error, 0.0);
         assert_eq!(state.thermodynamic_load, 1.0);
         assert_eq!(state.confidence, 1.0);
     }
