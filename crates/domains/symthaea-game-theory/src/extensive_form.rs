@@ -80,7 +80,7 @@ pub enum HistoryEvent {
 }
 
 /// Player-local action-observation history. Private world events are not exposed.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum PlayerHistoryEvent {
     /// The player remembers their own action, but not an omniscient world-state identifier.
     OwnAction { action: ActionId },
@@ -437,10 +437,36 @@ impl ExtensiveGame {
         self.validate()?;
         let mut histories: HashMap<DecisionStateId, Vec<Vec<HistoryEvent>>> = HashMap::new();
         self.collect_information_histories(self.root, Vec::new(), &mut histories)?;
+
+        // The encoder is a function of player-local history, not concrete world
+        // state. Therefore identical local histories must resolve to one declared
+        // information set. This also prevents an interiorly-mutable/stateful
+        // encoder from making the same semantic input encode differently.
+        let mut history_to_information_set: HashMap<
+            (PlayerId, Vec<PlayerHistoryEvent>),
+            crate::strategic_context::InformationSetId,
+        > = HashMap::new();
+
         for state in &self.information.decision_states {
-            let paths = histories.get(&state.state).ok_or(ExtensiveGameError::InformationMemberNotReachable(state.state))?;
+            let paths = histories
+                .get(&state.state)
+                .ok_or(ExtensiveGameError::InformationMemberNotReachable(state.state))?;
             for history in paths {
                 let local_history = project_player_history(state.player, history);
+                if let Some(previous) = history_to_information_set.insert(
+                    (state.player, local_history.clone()),
+                    state.information_set,
+                ) {
+                    if previous != state.information_set {
+                        return Err(ExtensiveGameError::InformationHistoryMapsToMultipleInformationSets {
+                            player: state.player,
+                            state: state.state,
+                            expected: previous,
+                            actual: state.information_set,
+                        });
+                    }
+                }
+
                 let encoded = encoder.encode(state.player, &local_history).map_err(|error| ExtensiveGameError::InformationEncodingFailed {
                         state: state.state,
                         message: error.message,
@@ -744,6 +770,12 @@ pub enum ExtensiveGameError {
     ObservationStateMissing(DecisionStateId),
     DuplicateObservationScope { state: DecisionStateId, scope: ObservationScope },
     InformationEncodingMismatch { state: DecisionStateId, expected: crate::strategic_context::InformationSetId, actual: crate::strategic_context::InformationSetId },
+    InformationHistoryMapsToMultipleInformationSets {
+        player: PlayerId,
+        state: DecisionStateId,
+        expected: crate::strategic_context::InformationSetId,
+        actual: crate::strategic_context::InformationSetId,
+    },
     InformationHistoryMismatch {
         information_set: crate::strategic_context::InformationSetId,
         state: DecisionStateId,
