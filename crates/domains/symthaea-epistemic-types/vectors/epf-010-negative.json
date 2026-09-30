@@ -23,7 +23,13 @@
         "excluded": [],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "0a1313e924e3e9fdc00a9c6abc07afe661a855fec1a5629d875f89287a4cbf97"
+        "receipt_digest": "0a1313e924e3e9fdc00a9c6abc07afe661a855fec1a5629d875f89287a4cbf97",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -50,7 +56,13 @@
         "excluded": [],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "3040c74d117b3ba13e4589a55cc71c9a6e796784e513cb2041d36a742008160f"
+        "receipt_digest": "3040c74d117b3ba13e4589a55cc71c9a6e796784e513cb2041d36a742008160f",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -82,7 +94,13 @@
         ],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "59b3a145c5db1d0701baedbdae7437f92bcf95b2f3c75d6995732e6e43c22136"
+        "receipt_digest": "59b3a145c5db1d0701baedbdae7437f92bcf95b2f3c75d6995732e6e43c22136",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -105,7 +123,13 @@
         "excluded": [],
         "provenance_families": [],
         "retrieval_profile_versions": [],
-        "receipt_digest": "225a1e40b414d04ca74af4cb21c8b53555bdee763ae83f51c4d821d90081a3dc"
+        "receipt_digest": "225a1e40b414d04ca74af4cb21c8b53555bdee763ae83f51c4d821d90081a3dc",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -130,7 +154,13 @@
         "retrieval_profile_versions": [
           "retrieval-profile:v2"
         ],
-        "receipt_digest": "7383b642700ff58dd4b18925cb056b3af235af6e05004011cf358bde2bcea997"
+        "receipt_digest": "7383b642700ff58dd4b18925cb056b3af235af6e05004011cf358bde2bcea997",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -154,7 +184,13 @@
         "provenance_families": [],
         "retrieval_profile_versions": [],
         "canonical_bytes_hex_override": "6570697374656d69632d72657472696576616c2d726563656970743a763100000100000003663a3100000001780000000a0000000100000007636c61696d3a780000000100000007636c61696d3a7800000040326437313136343262373236623034343031363237636139666261633332663563383533306662313930336363346462303232353837313739323161343838310000000000000000000000000001",
-        "receipt_digest": "7383b642700ff58dd4b18925cb056b3af235af6e05004011cf358bde2bcea997"
+        "receipt_digest": "7383b642700ff58dd4b18925cb056b3af235af6e05004011cf358bde2bcea997",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -180,7 +216,13 @@
           "algorithm:v1",
           "algorithm:v1"
         ],
-        "receipt_digest": "a99bf4c2e5494f39f364c434b7f1eb3b2773173574956a0f8425b6a95de0607d"
+        "receipt_digest": "a99bf4c2e5494f39f364c434b7f1eb3b2773173574956a0f8425b6a95de0607d",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -205,7 +247,13 @@
         "retrieval_profile_versions": [
           ""
         ],
-        "receipt_digest": "bc32520d3de7496bf62394bb217739dc755ce842d2739a6185576ef470cbd03f"
+        "receipt_digest": "bc32520d3de7496bf62394bb217739dc755ce842d2739a6185576ef470cbd03f",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     },
     {
@@ -230,7 +278,13 @@
         "retrieval_profile_versions": [
           " \t\n"
         ],
-        "receipt_digest": ""
+        "receipt_digest": "",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
       }
     }
   ]
