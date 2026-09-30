@@ -421,6 +421,63 @@ mod tests {
     }
 
     #[test]
+    fn parses_operation_capability_facts_and_binds_pre_state() {
+        let (state, capabilities) = NixServiceObservedStateV1::parse_systemd_observation(
+            "nginx",
+            "Id=nginx.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=no
+",
+        )
+        .unwrap();
+        assert!(capabilities.can_start());
+        assert!(capabilities.can_stop());
+        assert!(!capabilities.can_reload());
+        assert_eq!(capabilities.pre_state_digest(), state.digest().unwrap());
+        assert_ne!(capabilities.digest().unwrap(), "");
+    }
+
+    #[test]
+    fn rejects_unknown_or_missing_operation_capability_values() {
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=maybe
+CanStop=yes
+CanReload=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::InvalidCapabilityValue
+        );
+        assert_eq!(
+            NixServiceObservedStateV1::parse_systemd_observation(
+                "nginx",
+                "Id=nginx.service
+LoadState=loaded
+ActiveState=active
+SubState=running
+UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+",
+            )
+            .unwrap_err(),
+            NixServiceStateErrorV1::MissingCanReload
+        );
+    }
+
+    #[test]
     fn parses_complete_systemd_observation() {
         let value = NixServiceObservedStateV1::parse_systemd_properties(
             "nginx",
@@ -429,6 +486,9 @@ LoadState=loaded
 ActiveState=active
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
         )
         .unwrap();
@@ -466,6 +526,9 @@ ActiveState=active
 ActiveState=inactive
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
@@ -479,6 +542,9 @@ LoadState=loaded
 ActiveState=active
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 MainPID=42
 ",
             )
@@ -497,6 +563,9 @@ LoadState=loaded
 ActiveState=unknown
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
@@ -510,6 +579,9 @@ LoadState=loaded
 ActiveState=active
 SubState=running state
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
@@ -522,6 +594,9 @@ UnitFileState=enabled
 ActiveState=active
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
@@ -556,6 +631,9 @@ LoadState=loaded
 ActiveState=active
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
@@ -573,6 +651,9 @@ LoadState=future
 ActiveState=active
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
@@ -585,6 +666,9 @@ UnitFileState=enabled
 ActiveState=active
 SubState=running
 UnitFileState=enabled
+CanStart=yes
+CanStop=yes
+CanReload=yes
 ",
             )
             .unwrap_err(),
