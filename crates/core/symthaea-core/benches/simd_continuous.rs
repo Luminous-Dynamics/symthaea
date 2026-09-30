@@ -100,6 +100,7 @@ fn bench_dot_product(c: &mut Criterion) {
     for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (2 * dim * std::mem::size_of::<f32>()) as u64 });
 
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
@@ -126,6 +127,7 @@ fn bench_bind(c: &mut Criterion) {
     for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (3 * dim * std::mem::size_of::<f32>()) as u64 });
 
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
@@ -152,6 +154,7 @@ fn bench_similarity(c: &mut Criterion) {
     for dim in [1024, 4096, HDC_DIM, 32768, 131072, 262144] {
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (2 * dim * std::mem::size_of::<f32>()) as u64 });
 
         group.bench_with_input(
             BenchmarkId::new("scalar", dim),
