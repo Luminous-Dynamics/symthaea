@@ -460,6 +460,9 @@ mod tests {
         let artifact: Cp04QualificationArtifact =
             serde_json::from_str(fixture).expect("checked-in CP-04 fixture must deserialize");
         artifact.validate().expect("checked-in CP-04 fixture must validate");
+        artifact
+            .validate_against_projection(&projection())
+            .expect("checked-in CP-04 fixture must bind to its source projection");
 
         let generated = Cp04QualificationArtifact::try_from_projection(
             &projection(),
