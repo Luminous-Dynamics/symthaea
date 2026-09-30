@@ -92,8 +92,17 @@ pub enum RejectReason {
     InvalidDeliveryId,
     InvalidObservationId,
     InvalidObservationNamespace,
+    InvalidState(StateInvariant),
     Expired(ExpiryBoundary),
     NewObservationForbidden,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateInvariant {
+    DeliveryMissingResult { logical_delivery_id: Uuid },
+    ResultMissingDelivery { logical_delivery_id: Uuid },
+    ResultMissingObservation { logical_delivery_id: Uuid },
+    ResultObservationMismatch { logical_delivery_id: Uuid },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -137,6 +146,12 @@ pub fn decide(
     policy: AdmissionPolicy,
     now_ms: u64,
 ) -> AdmissionOutcome {
+    if let Err(invariant) = validate_state(state) {
+        return AdmissionOutcome::Rejected {
+            reason: RejectReason::InvalidState(invariant),
+        };
+    }
+
     if delivery.logical_delivery_id.is_nil() {
         return AdmissionOutcome::Rejected {
             reason: RejectReason::InvalidDeliveryId,
@@ -283,6 +298,52 @@ mod tests {
             panic!("fixture must admit");
         };
         (next_state, delivery, observation)
+    }
+
+    #[test]
+    #[test]
+    fn valid_admitted_state_satisfies_invariants() {
+        let (state, _, _) = admitted_state();
+        assert_eq!(validate_state(&state), Ok(()));
+    }
+
+    #[test]
+    fn delivery_without_result_is_rejected_without_mutation() {
+        let (delivery, observation) = fixture();
+        let mut state = SemanticAdmissionState::default();
+        state.deliveries.insert(delivery.logical_delivery_id, delivery.clone());
+        let before = state.clone();
+        assert_eq!(
+            decide(&state, &delivery, &observation, AdmissionPolicy::default(), 100),
+            AdmissionOutcome::Rejected {
+                reason: RejectReason::InvalidState(
+                    StateInvariant::DeliveryMissingResult {
+                        logical_delivery_id: delivery.logical_delivery_id
+                    }
+                )
+            }
+        );
+        assert_eq!(state, before);
+    }
+
+    #[test]
+    fn result_pointing_to_missing_observation_is_rejected() {
+        let (delivery, observation) = fixture();
+        let mut state = SemanticAdmissionState::default();
+        state.deliveries.insert(delivery.logical_delivery_id, delivery.clone());
+        state.results.insert(
+            delivery.logical_delivery_id,
+            SemanticResult {
+                logical_delivery_id: delivery.logical_delivery_id,
+                observation: observation.key.clone(),
+            },
+        );
+        assert_eq!(
+            validate_state(&state),
+            Err(StateInvariant::ResultMissingObservation {
+                logical_delivery_id: delivery.logical_delivery_id
+            })
+        );
     }
 
     #[test]
