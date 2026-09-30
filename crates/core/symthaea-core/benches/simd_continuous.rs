@@ -203,7 +203,7 @@ fn bench_bundle(c: &mut Criterion) {
 
             group.bench_with_input(
                 BenchmarkId::new(format!("scalar_{}d", dim), n_vecs),
-            &(&refs, &weights),
+                &(&refs, &weights),
                 |bench, (refs, weights)| bench.iter(|| black_box(scalar_bundle(refs, weights))),
             );
 
