@@ -214,6 +214,12 @@ def verify_machine_readable_contracts(contract, artifact, by_digest, relation_di
             mutated["edges"][0]["relation_digest"] = vector["mutation_value"] * 64
         elif path == "nodes[0].identity.canonical_identifier":
             mutated["nodes"][0]["identity"]["canonical_identifier"] = vector["mutation_value"]
+        elif path == "nodes[0].identity.content_digest":
+            mutated["nodes"][0]["identity"]["content_digest"] = vector["mutation_value"] * 64
+        elif path == "edges[0].target_identity_digest":
+            mutated["edges"][0]["target_identity_digest"] = vector["mutation_value"] * 64
+        elif path == "edges[0].edge_type":
+            mutated["edges"][0]["edge_type"] = vector["mutation_value"]
         else:
             raise AssertionError("[SCI-LINEAGE-ADAPTER] unsupported negative mutation path: " + path)
 
