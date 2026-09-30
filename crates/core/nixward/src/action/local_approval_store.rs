@@ -25,7 +25,7 @@ use super::local_approval_submission::{
     admit_verified_local_submission_v2,
 };
 use super::approver_evidence::{
-    required_profile_accepts_evidence_v1, RequiredApprovalProfileV1,
+    required_profile_accepts_evidence_v1, ApproverEvidenceErrorV1, RequiredApprovalProfileV1,
     VerifiedApproverEvidenceProfileV1, VerifiedLocalUnixPeerCredentialV1,
 };
 use super::temporal::{AuthoritativeEvaluationV1, UnixMillisV1};
@@ -430,6 +430,8 @@ pub enum LocalApprovalRequestStoreErrorV1 {
     Request(#[from] LocalApprovalErrorV1),
     #[error("approval submission admission failed: {0}")]
     Admission(#[from] LocalApprovalAdmissionErrorV1),
+    #[error("approver evidence validation failed: {0}")]
+    ApproverEvidence(#[from] ApproverEvidenceErrorV1),
     #[error("pending approval store mutex is poisoned")]
     StorePoisoned,
     #[error("request belongs to another daemon incarnation")]
