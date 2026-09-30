@@ -152,7 +152,7 @@ jobs:
           test -f historical-oracle/evidence/focused-format/classification.json
 
       - name: Verify cross-generation contract
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
         env:
           UPSTREAM_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
