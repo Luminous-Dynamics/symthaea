@@ -732,3 +732,27 @@ That distinction matters:
 Holochain's validation model strongly favors this structure: dependencies used for validation need deterministic, addressable identities, and unavailable dependencies are unresolved rather than silently accepted. citeturn0search0turn0search2
 
 The intended production evolution is therefore **not** to duplicate the provenance graph inside the Mycelix adapter. Instead, the Sol Atlas provenance layer should export a canonical slice identifier, exact dependency revisions, and an approved content commitment; the Mycelix adapter binds those references into its projection.
+
+
+## Evidence-slice canonicalization — SWA-023
+
+SWA-022 exposed an important precision gap: a manifest commitment is only useful if the manifest is itself canonicalized from the provenance slice rather than assembled as an adapter-local list.
+
+SWA-023 moves that canonicalization primitive into the `symthaea-engineering` library as `provenance_binding::EvidenceSliceManifest`. It is intentionally narrower than a provenance graph:
+
+- the provenance graph remains the semantic source of truth;
+- the binding layer accepts the already-selected slice members and relationships;
+- node and edge ordering is canonicalized before serialization;
+- node identity, kind, revision, edge endpoints, and edge relation are all committed;
+- changing a dependency revision or edge relation changes the digest;
+- removing contradictory evidence changes the digest rather than allowing it to disappear into an aggregate result.
+
+The SWA-019 Mycelix fixture now binds its evidence digest to the complete reference slice represented by SWA-009's current fixture topology: claim, evidence, prediction, model, parameters, scenario, dataset, and context, including their directed provenance relationships.
+
+This closes the main weakness in SWA-022 without creating a second provenance system. The production path should eventually have the provenance exporter construct the `EvidenceSliceManifest` mechanically from the authoritative graph, so the Mycelix adapter never interprets or reconstructs provenance semantics itself.
+
+The trust boundary is now:
+
+`authoritative provenance graph -> canonical evidence-slice manifest -> BLAKE3-256 commitment -> semantic Mycelix projection -> Mycelix validation/governance -> independently observed outcome`
+
+This also matches Holochain's validation model: validation should be deterministic, dependencies should be addressable, and unavailable dependencies should remain unresolved rather than becoming implicit approval. citeturn1search0turn1search2
