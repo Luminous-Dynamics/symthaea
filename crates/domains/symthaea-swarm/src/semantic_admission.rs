@@ -842,6 +842,7 @@ mod tests {
     fn delivery_is_retired_only_after_its_last_observation_is_collected() {
         let (state, delivery, mut second) = admitted_state();
         second.key.observation_id = Uuid::from_u128(9_999);
+        second.observed_at_ms = 100;
         let policy = AdmissionPolicy { allow_new_observation: true, retention_ms: 10, tombstone_retention_ms: 100, ..AdmissionPolicy::default() };
         let AdmissionOutcome::Admitted { next_state, .. } = decide(&state, &delivery, &second, policy, 100) else { panic!("second observation should admit"); };
         let partially_collected = retire_expired(&next_state, policy, 101).expect("valid lifecycle transition");
