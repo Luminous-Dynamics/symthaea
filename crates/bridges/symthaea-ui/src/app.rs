@@ -17,7 +17,7 @@ use serde_json::Value;
 use wasm_bindgen::JsCast;
 
 use crate::api::{self};
-use crate::presentation::CognitiveState;
+use crate::presentation::{event_between, CognitiveEvent, CognitiveEventKind, CognitiveState};
 
 const DEFAULT_GATEWAY: &str = "http://127.0.0.1:8090";
 
@@ -48,6 +48,10 @@ struct Vitals {
 }
 
 impl Vitals {
+    fn cycle(&self) -> u64 {
+        0
+    }
+
     /// `CycleMetadata`'s sub-structs (`consciousness`, `embodied`, `temporal`,
     /// `attention`, `memory`, `harmonics`, `ethics`, `neuromod`, ...) are ALL
     /// `#[serde(flatten)]`, so despite the nested Rust field access used
@@ -168,6 +172,7 @@ pub fn App() -> impl IntoView {
     let sending = RwSignal::new(false);
     let last_error = RwSignal::new(Option::<String>::None);
     let daemon_status = RwSignal::new(Option::<Value>::None);
+    let events = RwSignal::new(Vec::<CognitiveEvent>::new());
     let semantic_announcement = RwSignal::new(String::new());
     let last_semantic_key = RwSignal::new(String::new());
 
@@ -209,20 +214,61 @@ pub fn App() -> impl IntoView {
         let gw = gateway.get_untracked();
         ws_connected.set(false);
         spawn_local(async move {
-            ws_connected.set(true);
-            api::stream_telemetry(&gw, move |payload| {
-                vitals.set(Vitals::from_json(&payload));
-                telemetry_count.update(|n| *n += 1);
-                if let Some(svg) = portrait_from_json(&payload) {
-                    portrait.set(Some(svg));
-                }
-                if let Some(m) = Movie::from_json(&payload) {
-                    movie.set(Some(m));
-                    movie_frame.set(0);
-                }
-            })
+            let mut previous_state: Option<CognitiveState> = None;
+            api::stream_telemetry(
+                &gw,
+                move |payload| {
+                    let v = Vitals::from_json(&payload);
+                    let cycle = payload["cycle"].as_u64().unwrap_or(0);
+                    let current_state = CognitiveState::from_observation(
+                        true,
+                        sending.get_untracked(),
+                        v.coherence,
+                        v.thermodynamic_load,
+                        v.reasoning_confidence as f64,
+                        v.prediction_error as f64,
+                    );
+                    if let Some(event) = event_between(
+                        previous_state,
+                        current_state,
+                        cycle,
+                        v.surprise_triggered,
+                        v.gwt_broadcast,
+                    ) {
+                        events.update(|items| {
+                            items.push(event);
+                            if items.len() > 32 {
+                                items.remove(0);
+                            }
+                        });
+                    }
+                    previous_state = Some(current_state);
+                    vitals.set(v);
+                    telemetry_count.update(|n| *n += 1);
+                    if let Some(svg) = portrait_from_json(&payload) {
+                        portrait.set(Some(svg));
+                    }
+                    if let Some(m) = Movie::from_json(&payload) {
+                        movie.set(Some(m));
+                        movie_frame.set(0);
+                    }
+                },
+                move || {
+                    ws_connected.set(true);
+                    events.update(|items| {
+                        items.push(CognitiveEvent::lifecycle(CognitiveEventKind::Connected, 0));
+                    });
+                },
+            )
             .await;
             ws_connected.set(false);
+            let cycle = telemetry_count.get_untracked();
+            events.update(|items| {
+                items.push(CognitiveEvent::lifecycle(CognitiveEventKind::Disconnected, cycle));
+                if items.len() > 32 {
+                    items.remove(0);
+                }
+            });
         });
     });
 
@@ -415,6 +461,47 @@ pub fn App() -> impl IntoView {
                     "(--experience-bridge) and a query has been sent — it is turn-synchronous, "
                     "not an idle clock."
                 </p>
+            </section>
+
+            <section class="cognitive-timeline" aria-label="Cognitive timeline">
+                <div class="timeline-header">
+                    <h2>"recent events"</h2>
+                    <span class="timeline-count">{move || events.get().len().to_string()}</span>
+                </div>
+                <div class="timeline-list" role="log" aria-live="off">
+                    <For
+                        each=move || events.get().into_iter().rev().enumerate()
+                        key=|(i, event)| format!("{}-{}-{}", event.cycle, event.kind.label(), i)
+                        children=move |(_, event)| {
+                            view! {
+                                <div class="timeline-event">
+                                    <span class="timeline-kind">{event.kind.label()}</span>
+                                    <span class="timeline-cycle">{format!("cycle {}", event.cycle)}</span>
+                                    {move || match event.kind {
+                                        CognitiveEventKind::SurpriseDetected => Some(view! {
+                                            <span class="timeline-evidence">
+                                                {format!("prediction error {:.2}", event.prediction_error)}
+                                            </span>
+                                        }),
+                                        CognitiveEventKind::EnteredRest | CognitiveEventKind::ExitedRest => Some(view! {
+                                            <span class="timeline-evidence">
+                                                {format!("load {:.2}", event.thermodynamic_load)}
+                                            </span>
+                                        }),
+                                        _ => None,
+                                    }}
+                                </div>
+                            }
+                        }
+                    />
+                    {move || if events.with(|items| items.is_empty()) {
+                        Some(view! {
+                            <p class="timeline-empty">"No semantic events yet."</p>
+                        })
+                    } else {
+                        None
+                    }}
+                </div>
             </section>
 
             // Projections: what she renders of herself. Panes appear only
