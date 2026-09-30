@@ -70,6 +70,20 @@ pub enum ProvenanceRelationKind {
     RepresentationOf,
 }
 
+impl ProvenanceRelationKind {
+    /// Stable wire/digest label. Do not derive snapshot ordering from Rust enum discriminants.
+    pub const fn stable_code(self) -> &'static str {
+        match self {
+            Self::DerivedFrom => "derived_from",
+            Self::RevisedFrom => "revised_from",
+            Self::Supersedes => "supersedes",
+            Self::Contradicts => "contradicts",
+            Self::Corroborates => "corroborates",
+            Self::RepresentationOf => "representation_of",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ProvenanceRelation {
     pub source_memory_id: String,
@@ -118,8 +132,8 @@ impl ProvenanceValidationReport {
     pub fn from_relations(relations: &[ProvenanceRelation]) -> Self {
         let mut canonical = relations.to_vec();
         canonical.sort_by(|a, b| {
-            (&a.source_memory_id, &a.target_memory_id, a.kind as u8, &a.created_at)
-                .cmp(&(&b.source_memory_id, &b.target_memory_id, b.kind as u8, &b.created_at))
+            (&a.source_memory_id, &a.target_memory_id, a.kind.stable_code(), &a.created_at)
+                .cmp(&(&b.source_memory_id, &b.target_memory_id, b.kind.stable_code(), &b.created_at))
         });
 
         let bytes = serde_json::to_vec(&canonical).expect("provenance relations are serializable");
@@ -265,6 +279,22 @@ mod tests {
         assert!(first.conforms);
         assert!(first.violations.is_empty());
         assert_eq!(first.validator_version, PROVENANCE_VALIDATOR_VERSION);
+    }
+
+    #[test]
+    fn provenance_relation_codes_are_explicit_and_unique() {
+        let codes = [
+            ProvenanceRelationKind::DerivedFrom.stable_code(),
+            ProvenanceRelationKind::RevisedFrom.stable_code(),
+            ProvenanceRelationKind::Supersedes.stable_code(),
+            ProvenanceRelationKind::Contradicts.stable_code(),
+            ProvenanceRelationKind::Corroborates.stable_code(),
+            ProvenanceRelationKind::RepresentationOf.stable_code(),
+        ];
+        let unique: std::collections::HashSet<_> = codes.into_iter().collect();
+        assert_eq!(unique.len(), 6);
+        assert_eq!(ProvenanceRelationKind::DerivedFrom.stable_code(), "derived_from");
+        assert_eq!(ProvenanceRelationKind::RevisedFrom.stable_code(), "revised_from");
     }
 
     #[test]
