@@ -232,7 +232,7 @@ jobs:
           assert all(r["performance"]["execution_status"] == "executed" for r in rows)
           assert all(r["resource"]["qualification_status"] == "qualified" for r in rows)
           assert all(0.0 <= r["accuracy"] <= 1.0 for r in rows)
-          assert all(r["total"] == 16 for r in rows)
+          assert all(r["total"] == 128 for r in rows)
           assert all(r["logical_bytes"] > 0 for r in rows)
           assert all(ref["artifact_digest"].startswith("sha256:")
                      for fr in evidence["frontier"]["rows"]
