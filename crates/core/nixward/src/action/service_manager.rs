@@ -15,7 +15,11 @@ use super::systemd_transport::observe_service_properties;
 /// Manages systemd services: start, stop, restart, enable, disable.
 pub struct ServiceManager;
 
-/// Result of a service query.
+/// Compatibility/diagnostic result of a service query.
+///
+/// This lossy representation is not governed pre-state evidence and must not
+/// be used to authorize, bind, or execute a Nix service effect. Governed
+/// pre-state uses `NixServiceObservedStateV1` instead.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServiceStatus {
     /// Unit name.
@@ -88,7 +92,11 @@ impl ServiceManager {
         }
     }
 
-    /// Query the current status of a service (read-only, runs directly).
+    /// Query compatibility/diagnostic status of a service (read-only).
+    ///
+    /// This API intentionally remains lossy for existing CLI consumers. Its
+    /// result is not valid governed pre-state and must not cross into the
+    /// authorization/effect-binding path.
     pub fn status(service: &str) -> Result<ServiceStatus, std::io::Error> {
         let unit = Self::normalize_name(service);
 
