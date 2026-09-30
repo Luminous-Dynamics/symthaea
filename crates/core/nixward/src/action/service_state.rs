@@ -22,6 +22,8 @@ pub enum ServiceActiveStateV1 {
     Failed,
     Activating,
     Deactivating,
+    Maintenance,
+    Refreshing,
 }
 
 impl ServiceActiveStateV1 {
@@ -33,6 +35,8 @@ impl ServiceActiveStateV1 {
             "failed" => Ok(Self::Failed),
             "activating" => Ok(Self::Activating),
             "deactivating" => Ok(Self::Deactivating),
+            "maintenance" => Ok(Self::Maintenance),
+            "refreshing" => Ok(Self::Refreshing),
             _ => Err(NixServiceStateErrorV1::UnknownActiveState),
         }
     }
@@ -45,6 +49,8 @@ impl ServiceActiveStateV1 {
             Self::Failed => 3,
             Self::Activating => 4,
             Self::Deactivating => 5,
+            Self::Maintenance => 6,
+            Self::Refreshing => 7,
         }
     }
 }
@@ -60,6 +66,7 @@ pub enum ServiceUnitFileStateV1 {
     Static,
     Disabled,
     Invalid,
+    Indirect,
 }
 
 impl ServiceUnitFileStateV1 {
@@ -74,6 +81,7 @@ impl ServiceUnitFileStateV1 {
             "static" => Ok(Self::Static),
             "disabled" => Ok(Self::Disabled),
             "invalid" => Ok(Self::Invalid),
+            "indirect" => Ok(Self::Indirect),
             _ => Err(NixServiceStateErrorV1::UnknownUnitFileState),
         }
     }
@@ -89,6 +97,7 @@ impl ServiceUnitFileStateV1 {
             Self::Static => 6,
             Self::Disabled => 7,
             Self::Invalid => 8,
+            Self::Indirect => 9,
         }
     }
 }
@@ -224,17 +233,20 @@ mod tests {
     }
 
     #[test]
-    fn accepts_documented_active_states() {
-        for value in ["active", "reloading", "inactive", "failed", "activating", "deactivating"] {
+    fn accepts_current_active_state_vocabulary() {
+        for value in [
+            "active", "reloading", "inactive", "failed",
+            "activating", "deactivating", "maintenance", "refreshing",
+        ] {
             assert!(ServiceActiveStateV1::parse(value).is_ok());
         }
     }
 
     #[test]
-    fn accepts_documented_unit_file_states() {
+    fn accepts_current_unit_file_state_vocabulary() {
         for value in [
             "enabled", "enabled-runtime", "linked", "linked-runtime",
-            "masked", "masked-runtime", "static", "disabled", "invalid",
+            "masked", "masked-runtime", "static", "disabled", "invalid", "indirect",
         ] {
             assert!(ServiceUnitFileStateV1::parse(value).is_ok());
         }
