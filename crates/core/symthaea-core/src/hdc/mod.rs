@@ -81,6 +81,11 @@ pub const HDC_DIMENSION_32K: usize = 32_768;
 /// **64K dimensions** for extreme precision requirements
 pub const HDC_DIMENSION_64K: usize = 65_536;
 
+/// Validated, extensible resolution metadata for research paths.
+///
+/// The finite empirical ladder remains separate from the open resolution space.
+pub mod resolution_space;
+
 /// HDC dimensionality configuration for runtime selection
 ///
 /// Supports both predefined tiers and custom arbitrary dimensions.
