@@ -183,6 +183,8 @@ impl MolaMegdrProduct {
             || a.latitude_max_deg != b.latitude_max_deg
             || a.longitude_min_deg != b.longitude_min_deg
             || a.longitude_max_deg != b.longitude_max_deg
+            || a.center_latitude_deg != b.center_latitude_deg
+            || a.center_longitude_deg != b.center_longitude_deg
             || a.line_projection_offset != b.line_projection_offset
             || a.sample_projection_offset != b.sample_projection_offset
             || a.tile_origin_lat_deg != b.tile_origin_lat_deg
