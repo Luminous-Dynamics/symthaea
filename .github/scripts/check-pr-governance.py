@@ -255,11 +255,12 @@ WORKFLOW_SYNTAX_CONTRACT_MARKERS = (
     "python3 .github/scripts/check-privileged-workflow-inventory.py",
 )
 
-def validate_privileged_governance_contract(base: str) -> None:
-    """Bind the Governance Root to the expected enforcement-source topology."""
-    detector = read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[0])
-    inventory = read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[1])
-    workflow_syntax = read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[3])
+def validate_privileged_governance_texts(
+    detector: str,
+    inventory: str,
+    workflow_syntax: str,
+) -> None:
+    """Validate the cross-surface privileged enforcement contract."""
     missing_detector = [m for m in PRIVILEGED_DETECTOR_CONTRACT_MARKERS if m not in detector]
     if missing_detector:
         raise GovernanceError(
@@ -275,6 +276,15 @@ def validate_privileged_governance_contract(base: str) -> None:
         raise GovernanceError(
             f"trusted Workflow Syntax privileged enforcement is weakened or incomplete: {missing_workflow_syntax}"
         )
+
+
+def validate_privileged_governance_contract(base: str) -> None:
+    """Bind the Governance Root to the expected enforcement-source topology."""
+    validate_privileged_governance_texts(
+        read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[0]),
+        read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[1]),
+        read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[3]),
+    )
 def validate_declared_roots(
     base: str,
     head: str,
@@ -872,25 +882,49 @@ def self_test() -> None:
     require_changed_adr(False, [])
 
     history_topology_self_test()\n\n
-    # Cross-surface adversarial matrix: detector, inventory, and Workflow Syntax
-    # are independently required; coordinated weakening is not accepted.
-    for markers, label in (
-        (PRIVILEGED_DETECTOR_CONTRACT_MARKERS, "detector"),
-        (PRIVILEGED_INVENTORY_CONTRACT_MARKERS, "inventory"),
-        (WORKFLOW_SYNTAX_CONTRACT_MARKERS, "workflow-syntax"),
-    ):
-        fixture = "\n".join(markers)
-        assert all(marker in fixture for marker in markers)
-        weakened = fixture.replace(markers[-1], "")
-        assert markers[-1] not in weakened, f"{label} weakening fixture is not adversarial"
-    coordinated = (
-        "\n".join(PRIVILEGED_DETECTOR_CONTRACT_MARKERS[:-1])
-        + "\n" + "\n".join(PRIVILEGED_INVENTORY_CONTRACT_MARKERS[:-1])
-        + "\n" + "\n".join(WORKFLOW_SYNTAX_CONTRACT_MARKERS[:-1])
+    # Cross-surface adversarial matrix: weakening any single enforcement
+    # surface, or all three together, must fail closed.
+    detector_fixture = "\n".join(PRIVILEGED_DETECTOR_CONTRACT_MARKERS)
+    inventory_fixture = "\n".join(PRIVILEGED_INVENTORY_CONTRACT_MARKERS)
+    workflow_fixture = "\n".join(WORKFLOW_SYNTAX_CONTRACT_MARKERS)
+    validate_privileged_governance_texts(
+        detector_fixture, inventory_fixture, workflow_fixture
     )
-    assert PRIVILEGED_DETECTOR_CONTRACT_MARKERS[-1] not in coordinated
-    assert PRIVILEGED_INVENTORY_CONTRACT_MARKERS[-1] not in coordinated
-    assert WORKFLOW_SYNTAX_CONTRACT_MARKERS[-1] not in coordinated
+    fixtures = [
+        ("detector", detector_fixture, inventory_fixture, workflow_fixture,
+         PRIVILEGED_DETECTOR_CONTRACT_MARKERS[-1]),
+        ("inventory", detector_fixture, inventory_fixture, workflow_fixture,
+         PRIVILEGED_INVENTORY_CONTRACT_MARKERS[-1]),
+        ("workflow-syntax", detector_fixture, inventory_fixture, workflow_fixture,
+         WORKFLOW_SYNTAX_CONTRACT_MARKERS[-1]),
+    ]
+    for label, detector_text, inventory_text, workflow_text, removed in fixtures:
+        if label == "detector":
+            detector_text = detector_text.replace(removed, "")
+        elif label == "inventory":
+            inventory_text = inventory_text.replace(removed, "")
+        else:
+            workflow_text = workflow_text.replace(removed, "")
+        try:
+            validate_privileged_governance_texts(
+                detector_text, inventory_text, workflow_text
+            )
+        except GovernanceError:
+            pass
+        else:
+            raise AssertionError(
+                f"single-surface privileged governance weakening must fail closed: {label}"
+            )
+    try:
+        validate_privileged_governance_texts(
+            detector_fixture.replace(PRIVILEGED_DETECTOR_CONTRACT_MARKERS[-1], ""),
+            inventory_fixture.replace(PRIVILEGED_INVENTORY_CONTRACT_MARKERS[-1], ""),
+            workflow_fixture.replace(WORKFLOW_SYNTAX_CONTRACT_MARKERS[-1], ""),
+        )
+    except GovernanceError:
+        pass
+    else:
+        raise AssertionError("coordinated detector/inventory/Workflow Syntax weakening must fail closed")
 
     trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
     validate_root_workflow_text(trusted_workflow)
