@@ -307,6 +307,22 @@ impl KnowledgeManager {
                     if loaded_relations > 0 {
                         tracing::info!(count = loaded_relations, "Knowledge: loaded provenance relations from SQLite");
                     }
+                    let report = graph.validate_provenance();
+                    if report.conforms {
+                        tracing::debug!(
+                            relation_count = report.relation_count,
+                            snapshot_digest = %report.snapshot_digest,
+                            validator_version = %report.validator_version,
+                            "Knowledge: provenance snapshot structurally conforms"
+                        );
+                    } else {
+                        tracing::warn!(
+                            relation_count = report.relation_count,
+                            violation_count = report.violations.len(),
+                            snapshot_digest = %report.snapshot_digest,
+                            "Knowledge: persisted provenance snapshot is structurally non-conforming"
+                        );
+                    }
                 }
                 Err(error) => tracing::warn!(%error, "Knowledge: failed to load provenance relations from SQLite"),
             }
