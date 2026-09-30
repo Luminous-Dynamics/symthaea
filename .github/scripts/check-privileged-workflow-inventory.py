@@ -105,6 +105,11 @@ def parse_workflow(path: Path) -> dict[str, Any]:
         raise InventoryError(
             f"{path}: v1 requires one privileged trigger per workflow; found {sorted(privileged)}"
         )
+    for event in privileged:
+        if not events[event]["types"]:
+            raise InventoryError(f"{path}: {event} must declare activity types explicitly")
+        if event == "workflow_run" and not events[event]["workflows"]:
+            raise InventoryError(f"{path}: workflow_run must declare upstream workflow names")
     for raw in lines:
         stripped = raw.strip()
         if stripped.startswith(("&", "*", "<<:")):
