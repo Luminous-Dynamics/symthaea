@@ -90,7 +90,7 @@ SpatialAccessDependency
 
 The place layer owns the relationship; the canonical domain owner defines the meaning of the underlying resource or authority.
 
-### Common-mode law
+### Common-mode and independence law
 
 ```
 three feeds
@@ -99,6 +99,15 @@ three feeds
 ```
 
 Common-mode groups are therefore first-class rather than an afterthought.
+
+Independence is also a positive claim, not an absence-of-evidence inference:
+
+```
+no discovered shared dependency
+    != Independent
+```
+
+The A1 oracle therefore distinguishes `NotIndependent`, `CommonModeRetained`, and `IndependenceUnknown`. A future qualified dependency engine must require a scoped positive independence witness before emitting an independence claim.
 
 ### Spatial law
 
@@ -232,7 +241,7 @@ The independent oracle must:
 Fixture SHA-256:
 
 ```
-89fc3954b8c99e7ea7e38041bb4dac24594dedc45b12e1609a7f3ec9156665b7
+380d4ed23eeaa360cf0b80d445771edd0fbf46c35421ab6ab184c1560a371667
 ```
 
 ## Claim ceiling
