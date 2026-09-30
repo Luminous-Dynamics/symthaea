@@ -845,19 +845,30 @@ fn shortest_lon_delta(lon_deg: f64, center_deg: f64) -> f64 {
 fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<(), MolaError> {
     let len = std::fs::metadata(img_path)?.len();
     let bytes_per_sample = u64::from(metadata.sample_bits / 8);
-    let row_payload = u64::from(metadata.samples) * bytes_per_sample;
-    if u64::from(metadata.sample_offset) + row_payload > metadata.record_bytes {
+    let row_payload = u64::from(metadata.samples)
+        .checked_mul(bytes_per_sample)
+        .ok_or_else(|| MolaError::InvalidMetadata("IMG row size calculation overflow".into()))?;
+    let row_end = u64::from(metadata.sample_offset)
+        .checked_add(row_payload)
+        .ok_or_else(|| MolaError::InvalidMetadata("IMG row size calculation overflow".into()))?;
+    if row_end > metadata.record_bytes {
         return Err(MolaError::InvalidMetadata(
             "sample payload exceeds the declared record size".into(),
         ));
     }
+    let first_row_offset = metadata
+        .record_bytes
+        .checked_mul(u64::from(metadata.line_offset))
+        .ok_or_else(|| MolaError::InvalidMetadata("IMG size calculation overflow".into()))?;
+    let preceding_rows = metadata
+        .record_bytes
+        .checked_mul(u64::from(metadata.lines.saturating_sub(1)))
+        .ok_or_else(|| MolaError::InvalidMetadata("IMG size calculation overflow".into()))?;
     let required = metadata
         .image_byte_offset
-        .checked_add(metadata.record_bytes * u64::from(metadata.line_offset))
-        .and_then(|offset| offset.checked_add(
-            u64::from(metadata.lines.saturating_sub(1)) * metadata.record_bytes
-        ))
-        .and_then(|offset| offset.checked_add(row_payload))
+        .checked_add(first_row_offset)
+        .and_then(|offset| offset.checked_add(preceding_rows))
+        .and_then(|offset| offset.checked_add(row_end))
         .ok_or_else(|| MolaError::InvalidMetadata("IMG size calculation overflow".into()))?;
     if len < required {
         return Err(MolaError::InvalidMetadata(format!(
