@@ -383,6 +383,24 @@ mod tests {
         assert_ne!(profiled.receipt_digest, receipt.receipt_digest);
     }
     #[test]
+    fn projection_identity_bindings_are_sealed() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        assert_eq!(receipt.selected_projection_identity_digests.len(), 1);
+        assert_eq!(receipt.selected_projection_identity_digests[0].0, "x");
+        assert!(!receipt.selected_projection_identity_digests[0].1.is_empty());
+        assert!(receipt.verify().is_ok());
+    }
+
+    #[test]
+    fn duplicate_projection_identity_binding_is_rejected_even_if_digest_is_recomputed() {
+        let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
+        let mut duplicated=receipt;
+        duplicated.selected_projection_identity_digests.push(duplicated.selected_projection_identity_digests[0].clone());
+        duplicated.receipt_digest=duplicated.canonical_digest().unwrap();
+        assert_eq!(duplicated.verify(), Err(ReceiptVerificationError::DuplicateProjectionIdentityBinding));
+    }
+
+    #[test]
     fn duplicate_profile_versions_are_rejected_even_if_digest_is_recomputed() {
         let (_groups, receipt)=retrieve(&MemoryRetrievalRequest::historical("f:1","x",10), vec![candidate("x",MemoryKind::Semantic,"a",0.8,FrontierEligibility::Eligible)]);
         let mut duplicated=receipt;
