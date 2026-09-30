@@ -237,6 +237,13 @@ mod tests {
     }
 
     #[test]
+    fn typed_snapshot_ref_is_retained_exactly() {
+        let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap()
+            .with_snapshot_ref("snapshot:2026-09-29").unwrap();
+        assert_eq!(profile.snapshot_ref.as_ref().unwrap().as_str(), "snapshot:2026-09-29");
+    }
+
+    #[test]
     fn empty_snapshot_ref_is_rejected() {
         let profile = RetrievalExecutionProfile::new("a", "b", "c", "d").unwrap();
         assert_eq!(profile.with_snapshot_ref(""), Err(RetrievalProfileError::EmptySnapshotRef));
