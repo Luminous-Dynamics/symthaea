@@ -389,12 +389,19 @@ impl MolaMegdrMetadata {
             || !pixel_offset.is_finite()
             || !line_projection_offset.is_finite()
             || !sample_projection_offset.is_finite()
+            || !missing_value.is_none_and(f64::is_finite)
+            || !tile_origin_lat_deg.is_finite()
+            || !tile_origin_lon_deg.is_finite()
             || latitude_min_deg < -90.0
             || latitude_max_deg > 90.0
             || latitude_min_deg >= latitude_max_deg
             || longitude_min_deg < 0.0
             || longitude_max_deg > 360.0
             || longitude_min_deg >= longitude_max_deg
+            || tile_origin_lat_deg < latitude_min_deg
+            || tile_origin_lat_deg > latitude_max_deg
+            || tile_origin_lon_deg < longitude_min_deg
+            || tile_origin_lon_deg > longitude_max_deg
         {
             return Err(MolaError::InvalidMetadata(
                 "invalid or non-finite MEGDR geographic/scaling metadata".into(),
@@ -961,6 +968,36 @@ mod tests {
             let error =
                 MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
             assert!(matches!(error, MolaError::InvalidMetadata(_)), "{}", replacement.1);
+        }
+    }
+
+    #[test]
+    fn rejects_non_finite_optional_georeferencing_values() {
+        for (key, value) in [
+            ("MISSING_CONSTANT", "NaN"),
+            ("MISSING_CONSTANT", "INF"),
+            ("TILE_ORIGIN_LATITUDE", "NaN"),
+            ("TILE_ORIGIN_LATITUDE", "INF"),
+            ("TILE_ORIGIN_LONGITUDE", "NaN"),
+            ("TILE_ORIGIN_LONGITUDE", "INF"),
+        ] {
+            let text = format!("{}\n{} = {}", label(), key, value);
+            let error =
+                MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+            assert!(matches!(error, MolaError::InvalidMetadata(_)), "{key}={value}");
+        }
+    }
+
+    #[test]
+    fn rejects_tile_origin_outside_declared_footprint() {
+        for (key, value) in [
+            ("TILE_ORIGIN_LATITUDE", "1.0"),
+            ("TILE_ORIGIN_LONGITUDE", "1.0"),
+        ] {
+            let text = format!("{}\n{} = {}", label(), key, value);
+            let error =
+                MolaMegdrMetadata::from_label(&parse_label(&text), "MEGT00N000HB").unwrap_err();
+            assert!(matches!(error, MolaError::InvalidMetadata(_)), "{key}={value}");
         }
     }
 
