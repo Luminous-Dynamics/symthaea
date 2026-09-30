@@ -217,6 +217,18 @@ fn fixture_seed(seed: u64, class_index: usize, query_index: usize) -> u64 {
     x ^ (x >> 31)
 }
 
+fn wilson_95(correct: u64, total: u64) -> (f64, f64) {
+    let n = total as f64;
+    let z = 1.959_963_984_540_054;
+    let p = correct as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width =
+        z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
+    ((center - half_width).max(0.0), (center + half_width).min(1.0))
+}
+
 fn make_query(prototype: &ContinuousHV, seed: u64) -> ContinuousHV {
     let noise = ContinuousHV::random(prototype.dim(), seed);
     let values = prototype
@@ -308,7 +320,14 @@ fn run_row(
         measurement: QualityMeasurement {
             score: accuracy,
             sample_count: total_queries as u64,
-            uncertainty: None,
+            uncertainty: Some({
+                let (lower, upper) = wilson_95(correct, total_queries as u64);
+                UncertaintyInterval {
+                    method: "wilson-95".to_owned(),
+                    lower,
+                    upper,
+                }
+            }),
         },
         provenance: provenance(),
         upstream_evidence: Vec::new(),
@@ -518,7 +537,7 @@ mod tests {
         let evidence = run_dimension_task(spec).unwrap();
         assert_eq!(evidence.rows[0].total, 8);
         assert!(evidence.rows[0].accuracy.is_finite());
-        assert!(evidence.rows[0].task_quality.measurement.uncertainty.is_none());
+        assert!(evidence.rows[0].task_quality.measurement.uncertainty.is_some());
     }
 
     #[test]
