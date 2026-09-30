@@ -48,6 +48,7 @@ pub struct MolaMegdrMetadata {
     pub map_projection: String,
     pub latitude_type: String,
     pub longitude_direction: String,
+    pub center_latitude_deg: f64,
     pub center_longitude_deg: f64,
     pub longitude_min_deg: f64,
     pub longitude_max_deg: f64,
@@ -261,6 +262,7 @@ impl MolaMegdrMetadata {
         let map_projection = required(kv, "MAP_PROJECTION_TYPE")?;
         let latitude_type = required(kv, "COORDINATE_SYSTEM_NAME")?;
         let longitude_direction = required(kv, "POSITIVE_LONGITUDE_DIRECTION")?;
+        let center_latitude_deg = parse_f64_default(kv, "CENTER_LATITUDE", 0.0)?;
         let center_longitude_deg = parse_f64(kv, "CENTER_LONGITUDE")?;
         let longitude_min_deg = parse_f64(kv, "WESTERNMOST_LONGITUDE")?;
         let longitude_max_deg = parse_f64(kv, "EASTERNMOST_LONGITUDE")?;
@@ -287,6 +289,7 @@ impl MolaMegdrMetadata {
                 "PRODUCT_ID map-kind prefix does not match MAP_TYPE".into(),
             ));
         }
+        validate_optional_raster_layout(kv, lines, samples, record_bytes)?;
         let tile_origin_lat_deg = parse_f64_default(kv, "TILE_ORIGIN_LATITUDE", latitude_max_deg)?;
         let tile_origin_lon_deg = parse_f64_default(kv, "TILE_ORIGIN_LONGITUDE", longitude_min_deg)?;
 
@@ -342,7 +345,9 @@ impl MolaMegdrMetadata {
                 "longitude direction must be positive east".into(),
             ));
         }
-        if !center_longitude_deg.is_finite()
+        if !center_latitude_deg.is_finite()
+            || center_latitude_deg != 0.0
+            || !center_longitude_deg.is_finite()
             || center_longitude_deg < 0.0
             || center_longitude_deg >= 360.0
             || !latitude_min_deg.is_finite()
@@ -397,6 +402,7 @@ impl MolaMegdrMetadata {
             map_projection,
             latitude_type,
             longitude_direction,
+            center_latitude_deg,
             center_longitude_deg,
             longitude_min_deg,
             longitude_max_deg,
@@ -601,6 +607,75 @@ fn parse_f64_default(
         .unwrap_or(Ok(default))
 }
 
+fn validate_optional_raster_layout(
+    kv: &std::collections::BTreeMap<String, String>,
+    lines: u32,
+    samples: u32,
+    record_bytes: u64,
+) -> Result<(), MolaError> {
+    if let Some(record_type) = kv.get("RECORD_TYPE") {
+        if !record_type.eq_ignore_ascii_case("FIXED_LENGTH") {
+            return Err(MolaError::Unsupported(
+                "MEGDR raster records must be FIXED_LENGTH".into(),
+            ));
+        }
+    }
+    if let Some(pds_version) = kv.get("PDS_VERSION_ID") {
+        if !pds_version.eq_ignore_ascii_case("PDS3") {
+            return Err(MolaError::Unsupported(
+                "this adapter expects PDS3 MEGDR labels".into(),
+            ));
+        }
+    }
+    if let Some(file_records) = kv.get("FILE_RECORDS") {
+        let value = parse_number(file_records)?;
+        if !value.is_finite() || value.fract() != 0.0 || value < 0.0 || value > u32::MAX as f64 {
+            return Err(MolaError::InvalidMetadata(
+                "FILE_RECORDS must be a non-negative integer".into(),
+            ));
+        }
+        if value as u32 != lines {
+            return Err(MolaError::InvalidMetadata(
+                "FILE_RECORDS must match LINES for fixed-length MEGDR images".into(),
+            ));
+        }
+    }
+    if let Some(first) = kv.get("LINE_FIRST_PIXEL") {
+        if parse_number(first)? != 1.0 {
+            return Err(MolaError::InvalidMetadata(
+                "LINE_FIRST_PIXEL must be 1".into(),
+            ));
+        }
+    }
+    if let Some(first) = kv.get("SAMPLE_FIRST_PIXEL") {
+        if parse_number(first)? != 1.0 {
+            return Err(MolaError::InvalidMetadata(
+                "SAMPLE_FIRST_PIXEL must be 1".into(),
+            ));
+        }
+    }
+    if let Some(last) = kv.get("LINE_LAST_PIXEL") {
+        if parse_number(last)? != lines as f64 {
+            return Err(MolaError::InvalidMetadata(
+                "LINE_LAST_PIXEL must match LINES".into(),
+            ));
+        }
+    }
+    if let Some(last) = kv.get("SAMPLE_LAST_PIXEL") {
+        if parse_number(last)? != samples as f64 {
+            return Err(MolaError::InvalidMetadata(
+                "SAMPLE_LAST_PIXEL must match LINE_SAMPLES".into(),
+            ));
+        }
+    }
+    if record_bytes == 0 {
+        return Err(MolaError::InvalidMetadata(
+            "RECORD_BYTES must be non-zero".into(),
+        ));
+    }
+    Ok(())
+}
+
 fn normalize_lon(lon_deg: f64) -> f64 {
     lon_deg.rem_euclid(360.0)
 }
@@ -643,7 +718,10 @@ mod tests {
             "MAP_PROJECTION_TYPE = SIMPLE CYLINDRICAL",
             "COORDINATE_SYSTEM_NAME = PLANETOCENTRIC",
             "POSITIVE_LONGITUDE_DIRECTION = EAST",
+            "CENTER_LATITUDE = 0.0",
             "CENTER_LONGITUDE = 180.0",
+            "LINE_PROJECTION_OFFSET = 2.5",
+            "SAMPLE_PROJECTION_OFFSET = 4.5",
             "WESTERNMOST_LONGITUDE = 0.0",
             "EASTERNMOST_LONGITUDE = 0.0625",
             "MINIMUM_LATITUDE = -0.015625",
@@ -788,9 +866,7 @@ mod tests {
             .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 90.0")
 .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
             .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = 720.5")
-            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 360.5")
-            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 360.5")
-            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = 720.5");
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 360.5");
         let metadata = MolaMegdrMetadata::from_label(
             &parse_label(&text),
             "MEGT00N000HB",
@@ -798,6 +874,7 @@ mod tests {
         .unwrap();
         assert_eq!(metadata.cell_for(89.875, 0.125), Ok((0, 0)));
         assert_eq!(metadata.cell_for(-89.875, 359.875), Ok((719, 1439)));
+        assert_eq!(metadata.center_latitude_deg, 0.0);
     }
 
     #[test]
