@@ -31,6 +31,12 @@ def _block(lines: list[str], start: int) -> tuple[list[tuple[int, str]], int]:
         i += 1
     return out, i
 
+def _reject_yaml_meta(value: str, context: str) -> None:
+    if re.search(r"(^|\\s)[&*][A-Za-z0-9_.-]+", value) or re.search(r"(^|\\s)!!?[A-Za-z0-9_.-]+", value):
+        raise InventoryError(f"{context}: YAML anchors, aliases, or tags are unsupported")
+    if re.search(r"(^|\\s)<<\\s*:", value):
+        raise InventoryError(f"{context}: YAML merge-key syntax is unsupported")
+
 def _parse_inline_list(value: str) -> list[str]:
     value = value.strip()
     if not (value.startswith("[") and value.endswith("]")):
@@ -128,7 +134,9 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                 if not m:
                     raise InventoryError(f"{path}: unsupported permissions syntax: {text}")
                 key, value = m.groups()
-                permissions["top_level"][key] = _strip_comment(value or "")
+                permission = _strip_comment(value or "")
+                _reject_yaml_meta(permission, f"{path}: top-level permission {key}")
+                permissions["top_level"][key] = permission
 
     if "jobs" in top_keys:
         jobs, _ = _block(lines, top_keys["jobs"])
@@ -150,7 +158,9 @@ def parse_workflow(path: Path) -> dict[str, Any]:
                             if not m:
                                 raise InventoryError(f"{path}: unsupported job permissions syntax: {pt}")
                             key, value = m.groups()
-                            values[key] = _strip_comment(value or "")
+                            permission = _strip_comment(value or "")
+                            _reject_yaml_meta(permission, f"{path}: job permission {job}.{key}")
+                            values[key] = permission
                     permissions["jobs"][job] = values
 
     uses = []
@@ -247,6 +257,8 @@ jobs:
             original.replace("      - Trusted upstream\n", ""),
             original.replace("  workflow_run:", "  pull_request_target:\n    types: [opened]\n  workflow_run:"),
             original.replace("    permissions:\n      actions: read\n      contents: read", "    permissions: read-all"),
+            original.replace("      - completed", "      - *activity_type"),
+            original.replace("      - Trusted upstream", "      - &upstream Trusted upstream"),
         ):
             wf.write_text(malformed, encoding="utf-8")
             try:
