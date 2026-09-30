@@ -73,7 +73,7 @@ impl MolaRasterSnapshot {
         let path = path.as_ref();
         let file = File::open(path)?;
         let byte_len = file.metadata()?.len();
-        let actual_sha256 = sha256_file(path)?;
+        let actual_sha256 = sha256_open_file(&file)?;
         verify_sha256("raster snapshot", &actual_sha256, expected_sha256)?;
         Ok(Self {
             file,
@@ -802,6 +802,20 @@ fn verify_sha256(
         )));
     }
     Ok(())
+}
+
+fn sha256_open_file(file: &File) -> Result<String, MolaError> {
+    let mut reader = file.try_clone()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = reader.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(sha256_hex(&hasher.finalize()))
 }
 
 fn sha256_file(path: &Path) -> Result<String, MolaError> {
