@@ -90,6 +90,7 @@ impl MolaMegdrProduct {
         let label_text = std::fs::read_to_string(label_path)?;
         let kv = parse_label(&label_text);
         let metadata = MolaMegdrMetadata::from_label(&kv, expected_product_id)?;
+        validate_image_pointer_filename(&kv, img_path.as_ref())?;
         if expected_revision.trim().is_empty() {
             return Err(MolaError::InvalidMetadata(
                 "expected revision must be non-empty".into(),
@@ -612,6 +613,69 @@ fn image_data_pointer(
     }
 
     Err(MolaError::InvalidMetadata("invalid detached ^IMAGE pointer".into()))
+}
+
+fn validate_image_pointer_filename(
+    kv: &std::collections::BTreeMap<String, String>,
+    img_path: &Path,
+) -> Result<(), MolaError> {
+    let pointer = match kv.get("^IMAGE") {
+        None => return Ok(()),
+        Some(pointer) => pointer.trim(),
+    };
+
+    let filename = if pointer.starts_with('(') && pointer.ends_with(')') {
+        let inner = pointer[1..pointer.len() - 1].trim();
+        let (filename, _) = inner.split_once(',').ok_or_else(|| {
+            MolaError::InvalidMetadata(
+                "detached ^IMAGE tuple must contain filename and offset".into(),
+            )
+        })?;
+        filename.trim()
+    } else if pointer.starts_with('"') && pointer.ends_with('"') {
+        pointer
+    } else if pointer.to_ascii_lowercase().ends_with(".img") {
+        pointer
+    } else {
+        return Ok(());
+    };
+
+    let filename = filename
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(filename)
+        .trim();
+
+    // MOLA's detached-label SIS permits an optional [dirlist] prefix. The
+    // caller supplies the actual raster path, so only the referenced terminal
+    // filename is authoritative here; the directory list must not redirect
+    // filesystem access outside the caller-selected path.
+    let terminal = filename
+        .rsplit_once(']')
+        .map(|(_, name)| name)
+        .unwrap_or(filename);
+
+    if terminal.is_empty()
+        || terminal.contains('/')
+        || terminal.contains('\\')
+        || Path::new(terminal).file_name().and_then(|name| name.to_str()) != Some(terminal)
+    {
+        return Err(MolaError::InvalidMetadata(
+            "detached ^IMAGE filename is not a valid terminal filename".into(),
+        ));
+    }
+
+    let actual = img_path.file_name().and_then(|name| name.to_str()).ok_or_else(|| {
+        MolaError::InvalidMetadata("IMG path has no valid filename".into())
+    })?;
+
+    if !terminal.eq_ignore_ascii_case(actual) {
+        return Err(MolaError::InvalidMetadata(format!(
+            "detached ^IMAGE references {terminal}, but caller supplied {actual}"
+        )));
+    }
+
+    Ok(())
 }
 
 fn parse_positive_pointer(value: &str, field: &str) -> Result<u64, MolaError> {
