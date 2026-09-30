@@ -1,0 +1,32 @@
+name: CIV-PLACE-001B-B Rust differential
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-civ-place/**"
+      - "scripts/diff_civ_place_001b.py"
+      - "scripts/validate_civ_place_001b.py"
+      - "docs/engineering/CIV_PLACE_001B_B.md"
+      - "docs/engineering/fixtures/civ-place-001b.json"
+      - ".github/workflows/civ-place-001b-b.yml"
+  push:
+    branches:
+      - "agency/civ-place-001b-rust-v0.1"
+
+permissions:
+  contents: read
+
+jobs:
+  differential:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run Rust unit tests
+        run: cargo test -p symthaea-civ-place
+      - name: Run Python/Rust differential
+        run: python3 scripts/diff_civ_place_001b.py
