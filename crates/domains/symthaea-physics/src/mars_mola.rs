@@ -38,6 +38,74 @@ impl From<io::Error> for MolaError {
     }
 }
 
+/// Storage guarantee supplied by the caller for a verified raster snapshot.
+///
+/// The adapter can verify byte identity and retain a stable read handle, but
+/// it cannot prove that the underlying filesystem object will remain unchanged
+/// after verification. CallerAttestedImmutable therefore represents an
+/// explicit storage-layer contract rather than a property inferred from File
+/// alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MolaSnapshotStorage {
+    CallerAttestedImmutable,
+}
+
+/// A byte-verified, random-access handle for one MOLA raster snapshot.
+///
+/// The snapshot never reopens the original pathname while reading. The caller
+/// must supply an immutable storage guarantee separately; hashing at open time
+/// is not itself an immutability proof.
+#[derive(Debug)]
+pub struct MolaRasterSnapshot {
+    file: File,
+    byte_len: u64,
+    sha256: String,
+}
+
+impl MolaRasterSnapshot {
+    /// Open a raster, verify its complete SHA-256 identity, and retain the
+    /// opened file for subsequent random-access reads.
+    pub fn open(
+        path: impl AsRef<Path>,
+        expected_sha256: &str,
+        _storage: MolaSnapshotStorage,
+    ) -> Result<Self, MolaError> {
+        let path = path.as_ref();
+        let file = File::open(path)?;
+        let byte_len = file.metadata()?.len();
+        let actual_sha256 = sha256_file(path)?;
+        verify_sha256("raster snapshot", &actual_sha256, expected_sha256)?;
+        Ok(Self {
+            file,
+            byte_len,
+            sha256: actual_sha256,
+        })
+    }
+
+    pub fn byte_len(&self) -> u64 {
+        self.byte_len
+    }
+
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+
+    /// Read an exact byte range from the already-open snapshot.
+    pub fn read_exact_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<(), MolaError> {
+        let len = u64::try_from(buf.len())
+            .map_err(|_| MolaError::InvalidMetadata("snapshot read length overflow".into()))?;
+        let end = offset
+            .checked_add(len)
+            .ok_or_else(|| MolaError::InvalidMetadata("snapshot read offset overflow".into()))?;
+        if end > self.byte_len {
+            return Err(MolaError::OutOfBounds);
+        }
+        self.file.seek(SeekFrom::Start(offset))?;
+        self.file.read_exact(buf)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MolaMegdrMetadata {
     pub product_id: String,
@@ -1765,6 +1833,62 @@ mod tests {
         )
         .unwrap_err();
         assert!(matches!(error, MolaError::InvalidMetadata(_)));
+    }
+
+    #[test]
+    fn verified_snapshot_reads_from_open_handle() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("mola_snapshot_{}_raster.img", std::process::id()));
+        let bytes: Vec<u8> = (0u8..32).collect();
+        std::fs::write(&path, &bytes).unwrap();
+        let expected = sha256_hex(&bytes);
+        let mut snapshot = MolaRasterSnapshot::open(
+            &path,
+            &expected,
+            MolaSnapshotStorage::CallerAttestedImmutable,
+        ).unwrap();
+
+        let mut read = [0u8; 4];
+        snapshot.read_exact_at(7, &mut read).unwrap();
+        assert_eq!(read, [7, 8, 9, 10]);
+        assert_eq!(snapshot.byte_len(), 32);
+        assert_eq!(snapshot.sha256(), expected);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn verified_snapshot_rejects_wrong_identity() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("mola_snapshot_bad_{}_raster.img", std::process::id()));
+        std::fs::write(&path, b"snapshot").unwrap();
+        let error = MolaRasterSnapshot::open(
+            &path,
+            &"0".repeat(64),
+            MolaSnapshotStorage::CallerAttestedImmutable,
+        ).unwrap_err();
+        assert!(matches!(error, MolaError::InvalidMetadata(_)));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn verified_snapshot_rejects_out_of_bounds_reads() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("mola_snapshot_bounds_{}_raster.img", std::process::id()));
+        let bytes = b"snapshot";
+        std::fs::write(&path, bytes).unwrap();
+        let expected = sha256_hex(bytes);
+        let mut snapshot = MolaRasterSnapshot::open(
+            &path,
+            &expected,
+            MolaSnapshotStorage::CallerAttestedImmutable,
+        ).unwrap();
+        let mut read = [0u8; 2];
+        assert!(matches!(
+            snapshot.read_exact_at(7, &mut read),
+            Err(MolaError::OutOfBounds)
+        ));
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
