@@ -799,7 +799,9 @@ mod domain_tests {
     }
 }
 
-pub mod semantic_admission;\n\npub mod fault;
+pub mod semantic_admission;
+
+pub mod fault;
 #[cfg(feature = "networking")]
 pub mod networking;
 
