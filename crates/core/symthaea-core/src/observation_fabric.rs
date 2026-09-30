@@ -228,6 +228,10 @@ pub struct ProcessingActivity {
     pub agent_id: Option<String>,
     /// Fingerprint of code, configuration, and parameters used by this run.
     pub activity_fingerprint: Option<String>,
+    /// Observation IDs consumed by this activity.
+    pub input_observation_ids: Vec<String>,
+    /// Observation IDs emitted by this activity.
+    pub output_observation_ids: Vec<String>,
 }
 
 impl ProcessingActivity {
@@ -235,6 +239,8 @@ impl ProcessingActivity {
         if self.activity_id.trim().is_empty() || self.process_id.trim().is_empty()
             || self.agent_id.as_deref().is_some_and(|id| id.trim().is_empty())
             || self.activity_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
+            || self.input_observation_ids.iter().any(|id| id.trim().is_empty())
+            || self.output_observation_ids.iter().any(|id| id.trim().is_empty())
             || matches!((self.started_at_unix_ns, self.ended_at_unix_ns),
                 (Some(start), Some(end)) if end < start)
         {
@@ -423,6 +429,26 @@ impl ObservationGraph {
             }
         }
 
+        for observation in &self.observations {
+            if let Some(activity) = &observation.provenance.processing_activity {
+                for input_id in &activity.input_observation_ids {
+                    if !by_id.contains_key(input_id.as_str()) {
+                        return Err(ObservationValidationError::MissingActivityInput(input_id.clone()));
+                    }
+                }
+                for output_id in &activity.output_observation_ids {
+                    if !by_id.contains_key(output_id.as_str()) {
+                        return Err(ObservationValidationError::MissingActivityOutput(output_id.clone()));
+                    }
+                }
+                if !activity.output_observation_ids.iter().any(|id| id == &observation.id) {
+                    return Err(ObservationValidationError::ActivityOutputMissingSelf(
+                        observation.id.clone(),
+                    ));
+                }
+            }
+        }
+
         for relation in &self.relations {
             relation.validate()?;
             if !by_id.contains_key(relation.source_observation_id.as_str()) {
@@ -496,6 +522,12 @@ pub enum ObservationValidationError {
     InvalidParentObservation,
     #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
     InvalidProcessingActivity,
+    #[error("processing activity input observation is not present in the closed graph: {0}")]
+    MissingActivityInput(String),
+    #[error("processing activity output observation is not present in the closed graph: {0}")]
+    MissingActivityOutput(String),
+    #[error("processing activity does not list its owning observation as an output: {0}")]
+    ActivityOutputMissingSelf(String),
     #[error("observation ids must be unique within a closed graph")]
     DuplicateObservationId,
     #[error("parent observation is not present in the closed graph: {0}")]
@@ -697,6 +729,8 @@ mod tests {
             ended_at_unix_ns: Some(10),
             agent_id: Some("worker-7".into()),
             activity_fingerprint: Some("sha256:config".into()),
+            input_observation_ids: vec![],
+            output_observation_ids: vec!["obs-001".into()],
         });
         assert_eq!(
             observation.validate(),
@@ -715,6 +749,8 @@ mod tests {
             ended_at_unix_ns: None,
             agent_id: None,
             activity_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec![],
         };
         assert_eq!(
             activity.validate(),
@@ -784,6 +820,52 @@ mod tests {
         assert_eq!(
             graph.validate(),
             Err(ObservationValidationError::MissingRelationEndpoint("missing".into()))
+        );
+    }
+
+    #[test]
+    fn graph_rejects_missing_activity_input() {
+        let mut observation = fixture();
+        observation.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            input_observation_ids: vec!["missing-input".into()],
+            output_observation_ids: vec!["obs-001".into()],
+        });
+        let graph = ObservationGraph {
+            observations: vec![observation],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::MissingActivityInput("missing-input".into()))
+        );
+    }
+
+    #[test]
+    fn graph_requires_activity_to_emit_its_observation() {
+        let mut observation = fixture();
+        observation.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "transform-v1".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+            input_observation_ids: vec![],
+            output_observation_ids: vec![],
+        });
+        let graph = ObservationGraph {
+            observations: vec![observation],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.validate(),
+            Err(ObservationValidationError::ActivityOutputMissingSelf("obs-001".into()))
         );
     }
 
