@@ -590,11 +590,11 @@ The local history contract is therefore now state-free:
 - visible chance events carry only `ChanceOutcomeId`;
 - observations carry only `ObservationId`.
 
-Concrete `DecisionStateId` values remain available to the encoder through the separate
-`state` argument only for validating the current model boundary; they are not embedded
-in the player's recalled information sequence. Two world histories with different
-internal state IDs but identical player-visible events therefore produce identical
-local histories.
+Concrete `DecisionStateId` values remain internal to world-history replay and are not
+provided to the information encoder at all. The encoder receives only the player identity
+and player-local event sequence, preventing it from deriving an information-set identity
+from an omniscient state identifier. Two world histories with different internal state IDs
+but identical player-visible events therefore produce identical encoder inputs.
 
 The extensive-form verifier also now checks semantic information-history consistency
 separately. For every declared information set, all member states must induce the same
@@ -633,3 +633,8 @@ Visibility remains a transport/observation rule, not an information-set identity
 Observations now carry an explicit `ObservationScope`: `Public` or `Private(PlayerId)`. This removes the need to model a public observation by duplicating identical observer-tagged entries and makes public/private delivery part of the type contract. The player-local projection broadcasts public observation tokens to every player and includes private tokens only for their named observer. The privacy regression now verifies both paths.
 
 This follows the OpenSpiel distinction between observations and perfect-recall information states: observations may be partial, public/private information is an explicit dimension, and the complete action-observation history is the basis for reconstructing an information state. The IR keeps that reconstruction in the `InformationEncoder` rather than conflating a raw observation token with an information-set identity. <Cite refs={["turn986240search0","turn986240search1","turn986240search4"]} />
+
+
+### 2026-09-30 encoder world-state isolation
+
+The information encoder no longer receives `DecisionStateId` as an argument. The earlier state-free `PlayerHistoryEvent` change removed state IDs from the history payload, but a follow-up audit found that the encoder's separate `state` parameter still allowed world-state-dependent information-set identity. The contract is now restricted to `(player, player-local action-observation history) -> InformationSetId`. This makes the information partition a function of player-visible history by construction, consistent with OpenSpiel's AOH/information-state consistency rule. Model replay still retains concrete state IDs internally to associate histories with declared decision states and report precise validation errors; those identifiers do not cross the encoder boundary. <Cite refs={["turn986240search0","turn986240search1"]} />
