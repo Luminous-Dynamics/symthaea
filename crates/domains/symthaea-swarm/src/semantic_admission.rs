@@ -613,6 +613,49 @@ mod tests {
     }
 
     #[test]
+    fn exact_retention_boundary_is_still_admissible() {
+        let (mut delivery, mut observation) = fixture();
+        delivery.expires_at_ms = 10_000;
+        observation.observed_at_ms = 90;
+        let policy = AdmissionPolicy {
+            retention_ms: 10,
+            ..AdmissionPolicy::default()
+        };
+        assert!(matches!(
+            decide(&SemanticAdmissionState::default(), &delivery, &observation, policy, 100),
+            AdmissionOutcome::Admitted { .. }
+        ));
+    }
+
+    #[test]
+    fn equivalent_observation_admissions_are_order_independent() {
+        let (delivery, first) = fixture();
+        let mut second = first.clone();
+        second.key.observation_id = Uuid::from_u128(9_999);
+        second.payload = b"beta".to_vec();
+        let policy = AdmissionPolicy {
+            allow_new_observation: true,
+            ..AdmissionPolicy::default()
+        };
+
+        let AdmissionOutcome::Admitted { next_state: first_then_base, .. } =
+            decide(&SemanticAdmissionState::default(), &delivery, &first, policy, 100)
+        else { panic!("first admission should succeed"); };
+        let AdmissionOutcome::Admitted { next_state: first_then_second, .. } =
+            decide(&first_then_base, &delivery, &second, policy, 100)
+        else { panic!("second admission should succeed"); };
+
+        let AdmissionOutcome::Admitted { next_state: second_then_base, .. } =
+            decide(&SemanticAdmissionState::default(), &delivery, &second, policy, 100)
+        else { panic!("second admission should succeed"); };
+        let AdmissionOutcome::Admitted { next_state: second_then_first, .. } =
+            decide(&second_then_base, &delivery, &first, policy, 100)
+        else { panic!("first admission should succeed"); };
+
+        assert_eq!(first_then_second, second_then_first);
+    }
+
+    #[test]
     fn future_observation_timestamp_is_rejected() {
         let (delivery, mut observation) = fixture();
         observation.observed_at_ms = 101;
