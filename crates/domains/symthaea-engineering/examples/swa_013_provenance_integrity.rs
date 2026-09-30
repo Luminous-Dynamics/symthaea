@@ -242,7 +242,7 @@ fn required_dependencies(
         edge.from == claim.id
             && matches!(
                 edge.kind,
-                EdgeKind::DerivedFrom | EdgeKind::SupportedByFallback
+                EdgeKind::DerivedFrom
             )
     });
 
