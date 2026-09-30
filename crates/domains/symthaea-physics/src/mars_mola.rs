@@ -15,6 +15,8 @@ use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::Path;
 
+use sha2::{Digest, Sha256};
+
 use crate::mars_tether::{
     TerrainProvenance, TerrainQuality, TerrainSample, TerrainVerticalDatum,
 };
@@ -73,6 +75,10 @@ pub struct MolaMegdrMetadata {
 pub struct MolaMegdrProduct {
     pub metadata: MolaMegdrMetadata,
     pub provenance: TerrainProvenance,
+    /// SHA-256 of the exact detached label bytes consumed by this adapter.
+    pub label_sha256: String,
+    /// SHA-256 of the exact raster bytes sampled by this adapter.
+    pub image_sha256: String,
     img_path: std::path::PathBuf,
 }
 
@@ -87,10 +93,15 @@ impl MolaMegdrProduct {
         expected_product_id: &str,
         expected_revision: &str,
     ) -> Result<Self, MolaError> {
-        let label_text = std::fs::read_to_string(label_path)?;
-        let kv = parse_label(&label_text);
+        let label_bytes = std::fs::read(label_path)?;
+        let label_text = std::str::from_utf8(&label_bytes).map_err(|_| {
+            MolaError::InvalidMetadata("PDS label is not valid UTF-8".into())
+        })?;
+        let kv = parse_label(label_text);
         let metadata = MolaMegdrMetadata::from_label(&kv, expected_product_id)?;
         validate_image_pointer_filename(&kv, img_path.as_ref())?;
+        let label_sha256 = sha256_hex(&label_bytes);
+        let image_sha256 = sha256_file(img_path.as_ref())?;
         if expected_revision.trim().is_empty() {
             return Err(MolaError::InvalidMetadata(
                 "expected revision must be non-empty".into(),
@@ -105,6 +116,8 @@ impl MolaMegdrProduct {
         Ok(Self {
             metadata,
             provenance,
+            label_sha256,
+            image_sha256,
             img_path: img_path.as_ref().to_path_buf(),
         })
     }
@@ -613,6 +626,25 @@ fn image_data_pointer(
     }
 
     Err(MolaError::InvalidMetadata("invalid detached ^IMAGE pointer".into()))
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn sha256_file(path: &Path) -> Result<String, MolaError> {
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(sha256_hex(&hasher.finalize()))
 }
 
 fn validate_image_pointer_filename(
