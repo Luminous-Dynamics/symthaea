@@ -92,6 +92,7 @@ pub enum RejectReason {
     InvalidDeliveryId,
     InvalidObservationId,
     InvalidObservationNamespace,
+    ObservationTimestampInFuture,
     InvalidState(StateInvariant),
     Expired(ExpiryBoundary),
     NewObservationForbidden,
@@ -264,6 +265,12 @@ pub fn decide(
         }
         return AdmissionOutcome::Conflict {
             identity_kind: ConflictKind::ObservationRecord,
+        };
+    }
+
+    if observation.observed_at_ms > now_ms {
+        return AdmissionOutcome::Rejected {
+            reason: RejectReason::ObservationTimestampInFuture,
         };
     }
 
@@ -601,6 +608,24 @@ mod tests {
             ),
             AdmissionOutcome::Expired {
                 boundary: ExpiryBoundary::Retention
+            }
+        );
+    }
+
+    #[test]
+    fn future_observation_timestamp_is_rejected() {
+        let (delivery, mut observation) = fixture();
+        observation.observed_at_ms = 101;
+        assert_eq!(
+            decide(
+                &SemanticAdmissionState::default(),
+                &delivery,
+                &observation,
+                AdmissionPolicy::default(),
+                100,
+            ),
+            AdmissionOutcome::Rejected {
+                reason: RejectReason::ObservationTimestampInFuture
             }
         );
     }
