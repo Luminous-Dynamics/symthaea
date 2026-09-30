@@ -251,6 +251,19 @@ mod tests {
         assert_eq!(e["svc:block-a:electric"].status,"FullService");
         assert_eq!(e["svc:block-a:electric"].closure.common_mode_groups,vec!["cm:feeder-001","cm:transformer-001"]);
     }
+    #[test] fn incomplete_dependency_discovery_is_not_promoted() {
+        let mut f=fixture();
+        f.services[0].dependency_discovery="Partial".into();
+        let e=evaluate_fixture(&f).unwrap();
+        assert_eq!(e["svc:block-a:electric"].status,"FullService");
+        assert_eq!(e["svc:block-a:electric"].reasons.len(), 0);
+        let mut block_service=f.services.iter_mut().find(|s| s.id=="svc:block-a:electric").unwrap();
+        block_service.dependency_discovery="Partial".into();
+        let e=evaluate_fixture(&f).unwrap();
+        assert_eq!(e["svc:block-a:electric"].status,"UnresolvedDependencies");
+        assert!(e["svc:block-a:electric"].reasons.iter().any(|r| r=="DependencyDiscovery:Partial"));
+    }
+
     #[test] fn dependency_order_is_invariant(){
         let f=fixture();let mut r=f.clone();r.dependencies.reverse();
         assert_eq!(evaluate_fixture(&f).unwrap(),evaluate_fixture(&r).unwrap());
