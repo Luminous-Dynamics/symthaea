@@ -122,10 +122,10 @@ jobs:
           digest = hashlib.sha256(evidence).hexdigest()
           manifest = {
               "schema_version": 1,
-              "exact_head": "$" + "{{ steps.head.outputs.sha }}",
-              "workflow": "$" + "{{ github.workflow }}",
-              "workflow_run_id": "$" + "{{ github.run_id }}",
-              "workflow_event": "$" + "{{ github.event_name }}",
+              "exact_head": "${{ steps.head.outputs.sha }}",
+              "workflow": "${{ github.workflow }}",
+              "workflow_run_id": "${{ github.run_id }}",
+              "workflow_event": "${{ github.event_name }}",
               "rust_toolchain": "1.96.0",
               "operator_evidence_sha256": digest,
               "operator_evidence_records": 25,
