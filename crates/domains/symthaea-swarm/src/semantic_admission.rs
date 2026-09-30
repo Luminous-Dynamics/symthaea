@@ -134,6 +134,42 @@ pub enum CapacityBound {
     Observations,
 }
 
+/// Validate the semantic state's internal referential invariants.
+///
+/// Every admitted delivery has one retained result, and every result points
+/// to an existing delivery and observation. Observations may remain indexed
+/// independently so retention/GC can be implemented without changing
+/// delivery identity semantics.
+pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvariant> {
+    for logical_delivery_id in state.deliveries.keys() {
+        if !state.results.contains_key(logical_delivery_id) {
+            return Err(StateInvariant::DeliveryMissingResult {
+                logical_delivery_id: *logical_delivery_id,
+            });
+        }
+    }
+
+    for (logical_delivery_id, result) in &state.results {
+        if !state.deliveries.contains_key(logical_delivery_id) {
+            return Err(StateInvariant::ResultMissingDelivery {
+                logical_delivery_id: *logical_delivery_id,
+            });
+        }
+        if !state.observations.contains_key(&result.observation) {
+            return Err(StateInvariant::ResultMissingObservation {
+                logical_delivery_id: *logical_delivery_id,
+            });
+        }
+        if result.logical_delivery_id != *logical_delivery_id {
+            return Err(StateInvariant::ResultObservationMismatch {
+                logical_delivery_id: *logical_delivery_id,
+            });
+        }
+    }
+
+    Ok(())
+}
+
 /// Pure transition oracle.
 ///
 /// Precedence is deliberately explicit:
