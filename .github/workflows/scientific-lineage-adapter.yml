@@ -49,4 +49,4 @@ jobs:
       - name: Verify positive dependency contract
         run: cargo test -p symthaea-engineering --test cp04_dependency_contract
       - name: Verify fixture remains unchanged
-        run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py
+        run: git diff --exit-code -- docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json docs/engineering/data/cp-04-scientific-lineage-source-snapshot-v1.json scripts/qualifiers/scientific_lineage_adapter_qualifier.py
