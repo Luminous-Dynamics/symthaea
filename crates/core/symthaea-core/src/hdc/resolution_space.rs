@@ -168,6 +168,15 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn binary_alignment_error_is_distinct() {
+        let resolution = HdcResolution::new(4).unwrap();
+        assert_eq!(
+            resolution.binary_bytes(),
+            Err(ResolutionError::NotByteAligned(4))
+        );
+    }
+
     fn extended_memory_sizes_are_exact() {
         let d64 = HdcResolution::new(65_536).unwrap();
         let d128 = HdcResolution::new(131_072).unwrap();
