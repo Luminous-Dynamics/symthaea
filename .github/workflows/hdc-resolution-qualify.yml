@@ -98,6 +98,7 @@ jobs:
             crates/core/symthaea-core/src/hdc/evidence_manifest.rs \
             crates/core/symthaea-core/src/hdc/config.rs \
             crates/core/symthaea-core/src/hdc/dimension_observatory.rs \
+            crates/core/symthaea-core/src/hdc/dimension_task_harness.rs \
             crates/core/symthaea-core/src/hdc/mod.rs \
             crates/core/symthaea-core/src/hdc/pareto_frontier.rs \
             crates/core/symthaea-core/examples/hdc_operator_evidence.rs \
