@@ -71,6 +71,17 @@ fn set_mutation(value: &mut Value, path: &str, mutation_value: &str) {
             value["nodes"][0]["identity"]["canonical_identifier"] =
                 Value::String(mutation_value.to_owned());
         }
+        "nodes[0].identity.content_digest" => {
+            value["nodes"][0]["identity"]["content_digest"] =
+                Value::String(mutation_value.repeat(64));
+        }
+        "edges[0].target_identity_digest" => {
+            value["edges"][0]["target_identity_digest"] =
+                Value::String(mutation_value.repeat(64));
+        }
+        "edges[0].edge_type" => {
+            value["edges"][0]["edge_type"] = Value::String(mutation_value.to_owned());
+        }
         _ => panic!("unknown negative contract mutation path: {path}"),
     }
 }
