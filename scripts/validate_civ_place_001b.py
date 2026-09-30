@@ -8,7 +8,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "docs/engineering/fixtures/civ-place-001b.json"
 DIGEST_FILE = ROOT / "docs/engineering/fixtures/civ-place-001b.sha256"
-EXPECTED_DIGEST = "38bd385f1bd7a53daf46ff4f9af3cefaf0542d1348d588fdc1c46bca90d8f46a"
+EXPECTED_DIGEST = "0831a68ce6b171edcf508705d1f5e18552cca9285110f5cbcb79cc910412294d"
 CURRENTNESS = {"Current","Historical","Stale","Unknown","Blocked","Conflicted","PartiallyAvailable"}
 INDEPENDENCE = {"SharedDependency","IndependentWitnessed","IndependenceUnknown"}
 SERVICE_STATES = {"FullService","DegradedService","Unavailable","Unknown","Blocked","Conflicted"}
