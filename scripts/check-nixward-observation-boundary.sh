@@ -98,7 +98,7 @@ run_self_test() {
   if scan_direct_systemctl "${tmp}/systemctl.rs"; then
     :
   else
-    echo "ERROR: CROSS-015 self-test failed to detect direct systemctl use" >&2
+    echo "ERROR: CROSS-015 self-test failed to detect direct systemctl command use" >&2
     return 1
   fi
 
