@@ -53,7 +53,10 @@ pub struct OperatorEvidenceRecord {
 pub fn generate_extended_resolution_evidence() -> Vec<OperatorEvidenceRecord> {
     let mut records = Vec::with_capacity(EXTENDED_DIMS.len() * 5);
 
-    for &dim in EXTENDED_DIMS {
+    for &raw_dim in EXTENDED_DIMS {
+        let dim = HdcResolution::new(raw_dim)
+            .expect("extended evidence dimensions must be valid power-of-two resolutions")
+            .dimensions();
         let a = deterministic_vec(dim, DEFAULT_SEED_A);
         let b = deterministic_vec(dim, DEFAULT_SEED_B);
 
