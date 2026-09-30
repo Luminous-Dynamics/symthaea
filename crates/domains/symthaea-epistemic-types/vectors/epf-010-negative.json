@@ -286,6 +286,97 @@
           ]
         ]
       }
+    },
+    {
+      "name": "duplicate-projection-identity-binding",
+      "expected_failure": "DuplicateProjectionIdentityBinding",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ],
+          [
+            "claim:x",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "unselected-projection-identity-binding",
+      "expected_failure": "UnselectedProjectionIdentity",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "",
+        "selected_projection_identity_digests": [
+          [
+            "claim:other",
+            "c8e253026f8e46489ab5f2ceb6b4d0ef030a8f0f9e31f0f11f98880e3e13e57b"
+          ]
+        ]
+      }
+    },
+    {
+      "name": "empty-projection-identity-digest",
+      "expected_failure": "EmptyProjectionIdentityDigest",
+      "receipt": {
+        "mode": "Historical",
+        "frontier_ref": "f:1",
+        "query": "x",
+        "max_results": 10,
+        "selected": [
+          "claim:x"
+        ],
+        "selected_representation_digests": [
+          [
+            "claim:x",
+            "2d711642b726b04401627ca9fbac32f5c8530fb1903cc4db02258717921a4881"
+          ]
+        ],
+        "excluded": [],
+        "provenance_families": [],
+        "retrieval_profile_versions": [],
+        "receipt_digest": "",
+        "selected_projection_identity_digests": [
+          [
+            "claim:x",
+            ""
+          ]
+        ]
+      }
     }
   ]
 }
