@@ -90,6 +90,25 @@
         "event": "workflow_run",
         "repository_can_self_attest": false,
         "required_attestation": "record any applicable enterprise/org/repository Actions event restriction affecting workflow_run"
+      },
+      "cross_workflow_dataflow": {
+        "upstream_workflow_names": [
+          "QUAL MEL-EPI-001F exact subject dispatcher"
+        ],
+        "artifacts_consumed": false,
+        "artifact_names": [],
+        "artifact_extraction": "none",
+        "artifact_execution": false,
+        "upstream_identity_checks": [
+          "configured_workflow_name",
+          "head_branch",
+          "head_sha",
+          "conclusion"
+        ],
+        "cache_influence": "none_observed",
+        "privileged_side_effects": [
+          "none"
+        ]
       }
     }
   ],
