@@ -20,6 +20,7 @@
 
 use blake3;
 use serde::Serialize;
+use symthaea_engineering::provenance_binding::{CanonicalEdgeRef, CanonicalNodeRef, EvidenceSliceManifest};
 
 const OBSERVED_MYCELIX_INTEROP_COMMIT: &str =
     "b55bc03d99d0e8c89201dca06a264d16d5e2efd6";
@@ -246,6 +247,21 @@ fn evidence_binding() -> EvidenceBinding {
             object_id: "SWA-003-BUILDING-001/dataset",
             object_version: Some("dataset@v1"),
         },
+        prediction_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/prediction",
+            object_version: Some("prediction@v1"),
+        },
+        parameters_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/parameters",
+            object_version: Some("parameters@v1"),
+        },
+        context_ref: SemanticRefProjection {
+            schema: SOL_ATLAS_SCHEMA,
+            object_id: "SWA-003-BUILDING-001/context",
+            object_version: Some("context@v1"),
+        },
         slice_revision: "provenance-slice@v1",
         provenance_digest: String::new(),
     };
@@ -280,6 +296,9 @@ struct EvidenceBinding {
     model_ref: SemanticRefProjection,
     scenario_ref: SemanticRefProjection,
     dataset_ref: SemanticRefProjection,
+    prediction_ref: SemanticRefProjection,
+    parameters_ref: SemanticRefProjection,
+    context_ref: SemanticRefProjection,
     slice_revision: &'static str,
     provenance_digest: String,
 }
@@ -292,6 +311,9 @@ struct EvidenceBindingPayload {
     model_ref: SemanticRefProjection,
     scenario_ref: SemanticRefProjection,
     dataset_ref: SemanticRefProjection,
+    prediction_ref: SemanticRefProjection,
+    parameters_ref: SemanticRefProjection,
+    context_ref: SemanticRefProjection,
     slice_revision: &'static str,
 }
 
@@ -303,14 +325,47 @@ fn evidence_binding_payload(binding: &EvidenceBinding) -> EvidenceBindingPayload
         model_ref: binding.model_ref,
         scenario_ref: binding.scenario_ref,
         dataset_ref: binding.dataset_ref,
+        prediction_ref: binding.prediction_ref,
+        parameters_ref: binding.parameters_ref,
+        context_ref: binding.context_ref,
         slice_revision: binding.slice_revision,
     }
 }
 
 fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
-    let bytes = serde_json::to_vec(&evidence_binding_payload(binding))
-        .expect("evidence binding serializes");
-    blake3::hash(&bytes).to_hex().to_string()
+    let manifest = EvidenceSliceManifest {
+        slice_ref: binding.slice_ref.object_id.to_string(),
+        claim_ref: binding.claim_ref.object_id.to_string(),
+        slice_revision: binding.slice_revision.to_string(),
+        nodes: vec![
+            canonical_node(&binding.claim_ref, "Claim"),
+            canonical_node(&binding.evidence_ref, "Evidence"),
+            canonical_node(&binding.prediction_ref, "Prediction"),
+            canonical_node(&binding.model_ref, "Model"),
+            canonical_node(&binding.parameters_ref, "Parameters"),
+            canonical_node(&binding.scenario_ref, "Scenario"),
+            canonical_node(&binding.dataset_ref, "Dataset"),
+            canonical_node(&binding.context_ref, "ContextOfUse"),
+        ],
+        edges: vec![
+            CanonicalEdgeRef { from: binding.claim_ref.object_id.into(), to: binding.evidence_ref.object_id.into(), kind: "SupportedBy".into() },
+            CanonicalEdgeRef { from: binding.evidence_ref.object_id.into(), to: binding.prediction_ref.object_id.into(), kind: "DerivedFrom".into() },
+            CanonicalEdgeRef { from: binding.evidence_ref.object_id.into(), to: binding.context_ref.object_id.into(), kind: "DerivedFrom".into() },
+            CanonicalEdgeRef { from: binding.prediction_ref.object_id.into(), to: binding.model_ref.object_id.into(), kind: "DerivedFrom".into() },
+            CanonicalEdgeRef { from: binding.prediction_ref.object_id.into(), to: binding.parameters_ref.object_id.into(), kind: "DerivedFrom".into() },
+            CanonicalEdgeRef { from: binding.prediction_ref.object_id.into(), to: binding.scenario_ref.object_id.into(), kind: "DerivedFrom".into() },
+            CanonicalEdgeRef { from: binding.evidence_ref.object_id.into(), to: binding.dataset_ref.object_id.into(), kind: "DerivedFrom".into() },
+        ],
+    };
+    manifest.digest()
+}
+
+fn canonical_node(reference: &SemanticRefProjection, kind: &str) -> CanonicalNodeRef {
+    CanonicalNodeRef {
+        id: reference.object_id.into(),
+        kind: kind.into(),
+        revision: reference.object_version.map(str::to_string),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
