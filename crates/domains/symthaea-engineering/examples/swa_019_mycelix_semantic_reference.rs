@@ -301,16 +301,10 @@ mod tests {
     }
 
     #[test]
-    fn overlong_object_identity_is_rejected() {
+    fn overlong_reference_component_is_rejected() {
         let long_id = "x".repeat(MAX_OBJECT_ID_BYTES + 1);
-        let leaked: &'static str = Box::leak(long_id.into_boxed_str());
-        let reference = SemanticRefProjection {
-            schema: SOL_ATLAS_SCHEMA,
-            object_id: leaked,
-            object_version: None,
-        };
         assert_eq!(
-            validate_semantic_ref(&reference),
+            validate_component(&long_id, MAX_OBJECT_ID_BYTES),
             Err(ReferenceValidationError::TooLong)
         );
     }
