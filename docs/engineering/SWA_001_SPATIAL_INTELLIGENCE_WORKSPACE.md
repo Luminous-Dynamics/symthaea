@@ -821,4 +821,4 @@ This keeps three concerns separate:
 2. **Canonical commitment** — owned by the evidence-binding layer.
 3. **Interoperability mapping** — owned by the Mycelix projection.
 
-Holochain's current validation guidance makes this separation particularly useful: validation must be deterministic, dependencies must be addressable, and missing dependencies are an unresolved condition rather than an implicit success. citeturn0search1turn0search0
+Holochain's current validation guidance makes this separation particularly useful: validation must be deterministic, dependencies must be addressable, and missing dependencies are an unresolved condition rather than an implicit success.
