@@ -556,13 +556,14 @@ jobs:
         else:
             raise AssertionError("stale inventory must fail closed")
 
+        wf.write_text(original, encoding="utf-8")
         artifact_base = wf.read_text(encoding="utf-8")
         artifact_expr = "${" + "{ github.event.workflow_run.id }}"
         artifact_step = (
-            "      - uses: actions/download-artifact@0123456789abcdef0123456789abcdef01234567\\n"
-            "        with:\\n"
-            "          name: trusted-receipt-" + artifact_expr + "-" + "${" + "{ github.event.workflow_run.run_attempt }}\\n"
-            "          run-id: " + artifact_expr + "\\n"
+            "      - uses: actions/download-artifact@0123456789abcdef0123456789abcdef01234567\n"
+            "        with:\n"
+            "          name: trusted-receipt-" + artifact_expr + "-" + "${" + "{ github.event.workflow_run.run_attempt }}\n"
+            "          run-id: " + artifact_expr + "\n"
         )
         artifact_valid = artifact_base.replace(
             "      - uses: actions/github-script@0123456789abcdef0123456789abcdef01234567",
