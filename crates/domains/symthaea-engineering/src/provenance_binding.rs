@@ -58,13 +58,13 @@ impl EvidenceSliceManifest {
         append_bytes(&mut bytes, canonical.slice_ref.as_bytes());
         append_bytes(&mut bytes, canonical.claim_ref.as_bytes());
         append_bytes(&mut bytes, canonical.slice_revision.as_bytes());
-        append_u32(&mut bytes, canonical.nodes.len());
+        append_u64(&mut bytes, canonical.nodes.len());
         for node in canonical.nodes {
             append_bytes(&mut bytes, node.id.as_bytes());
             append_bytes(&mut bytes, node.kind.as_bytes());
             append_optional_bytes(&mut bytes, node.revision.as_deref().map(str::as_bytes));
         }
-        append_u32(&mut bytes, canonical.edges.len());
+        append_u64(&mut bytes, canonical.edges.len());
         for edge in canonical.edges {
             append_bytes(&mut bytes, edge.from.as_bytes());
             append_bytes(&mut bytes, edge.to.as_bytes());
@@ -78,12 +78,12 @@ impl EvidenceSliceManifest {
     }
 }
 
-fn append_u32(out: &mut Vec<u8>, value: usize) {
-    out.extend_from_slice(&(value as u32).to_be_bytes());
+fn append_u64(out: &mut Vec<u8>, value: usize) {
+    out.extend_from_slice(&(value as u64).to_be_bytes());
 }
 
 fn append_bytes(out: &mut Vec<u8>, value: &[u8]) {
-    append_u32(out, value.len());
+    append_u64(out, value.len());
     out.extend_from_slice(value);
 }
 
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn canonical_encoding_is_versioned_and_framed() {
         let bytes = manifest().canonical_bytes();
-        assert!(bytes.starts_with(&(CANONICAL_ENCODING_VERSION.len() as u32).to_be_bytes()));
+        assert!(bytes.starts_with(&(CANONICAL_ENCODING_VERSION.len() as u64).to_be_bytes()));
         assert!(bytes.windows(CANONICAL_ENCODING_VERSION.len()).any(|w| w == CANONICAL_ENCODING_VERSION));
         assert_ne!(manifest().digest(), blake3::hash(b"{}").to_hex().to_string());
     }
