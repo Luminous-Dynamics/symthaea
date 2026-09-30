@@ -266,6 +266,7 @@ pub struct SimdCapabilities {
     pub popcnt: bool,
     pub neon: bool,
     pub best_integer: SimdLevel,
+    pub best_popcount: SimdLevel,
     pub best_float: SimdLevel,
 }
 
@@ -282,6 +283,7 @@ impl SimdCapabilities {
             popcnt: has_popcnt(),
             neon: has_neon(),
             best_integer: best_integer_level(),
+            best_popcount: best_popcount_level(),
             best_float: best_float_level(),
         }
     }
@@ -334,9 +336,11 @@ mod tests {
     #[test]
     fn test_best_level_returns_valid() {
         let int_level = best_integer_level();
+        let popcount_level = best_popcount_level();
         let float_level = best_float_level();
         assert!(int_level >= SimdLevel::Scalar);
-        assert!(popcount_level >= SimdLevel::Scalar);\n        assert!(float_level >= SimdLevel::Scalar);
+        assert!(popcount_level >= SimdLevel::Scalar);
+        assert!(float_level >= SimdLevel::Scalar);
     }
 
     #[test]
