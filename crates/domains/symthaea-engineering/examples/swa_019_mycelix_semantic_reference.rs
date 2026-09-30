@@ -20,6 +20,7 @@
 
 use blake3;
 use serde::Serialize;
+use std::collections::BTreeMap;
 use symthaea_engineering::provenance_binding::{CanonicalEdgeRef, CanonicalNodeRef, EvidenceSliceManifest};
 use symthaea_engineering::provenance_graph::{reference_graph, EdgeKind, ProvenanceSlice};
 
@@ -203,7 +204,7 @@ fn dependency_refs() -> [DependencyRef; 2] {
         DependencyRef {
             semantic_ref: SemanticRefProjection {
                 schema: SOL_ATLAS_SCHEMA,
-                object_id: "SWA-003-BUILDING-001/model",
+                object_id: "model-001",
                 object_version: Some("building-twin@fixture"),
             },
             required: true,
@@ -211,7 +212,7 @@ fn dependency_refs() -> [DependencyRef; 2] {
         DependencyRef {
             semantic_ref: SemanticRefProjection {
                 schema: SOL_ATLAS_SCHEMA,
-                object_id: "SWA-003-BUILDING-001/evidence",
+                object_id: "validation-001",
                 object_version: Some("provenance-slice@v1"),
             },
             required: true,
@@ -228,42 +229,42 @@ fn evidence_binding() -> EvidenceBinding {
         },
         claim_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/claim",
+            object_id: "claim-001",
             object_version: Some("claim@v1"),
         },
         evidence_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/evidence",
+            object_id: "validation-001",
             object_version: Some("evidence@v1"),
         },
         model_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/model",
+            object_id: "model-001",
             object_version: Some("building-twin@fixture"),
         },
         scenario_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/scenario",
+            object_id: "scenario-001",
             object_version: Some("intervention-scenario@v1"),
         },
         dataset_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/dataset",
+            object_id: "dataset-001",
             object_version: Some("dataset@v1"),
         },
         prediction_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/prediction",
+            object_id: "prediction-001",
             object_version: Some("prediction@v1"),
         },
         parameters_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/parameters",
+            object_id: "parameters-001",
             object_version: Some("parameters@v1"),
         },
         context_ref: SemanticRefProjection {
             schema: SOL_ATLAS_SCHEMA,
-            object_id: "SWA-003-BUILDING-001/context",
+            object_id: "context-001",
             object_version: Some("context@v1"),
         },
         slice_revision: "provenance-slice@v1",
@@ -343,50 +344,116 @@ fn evidence_binding_digest(binding: &EvidenceBinding) -> String {
         .slice("claim-001")
         .expect("authoritative reference claim exists");
     evidence_binding_digest_from_slice(binding, &slice)
+        .expect("authoritative provenance slice has a complete semantic binding registry")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BindingRegistryError {
+    DuplicateAuthoritativeIdentity,
+    MissingAuthoritativeMapping,
+    ExtraMapping,
+    SemanticIdentityMismatch,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SemanticBinding {
+    authoritative_id: &'static str,
+    semantic_ref: SemanticRefProjection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SemanticBindingRegistry {
+    entries: BTreeMap<&'static str, SemanticRefProjection>,
+}
+
+impl SemanticBindingRegistry {
+    fn from_bindings(bindings: impl IntoIterator<Item = SemanticBinding>) -> Result<Self, BindingRegistryError> {
+        let mut entries = BTreeMap::new();
+        for binding in bindings {
+            if entries.insert(binding.authoritative_id, binding.semantic_ref).is_some() {
+                return Err(BindingRegistryError::DuplicateAuthoritativeIdentity);
+            }
+        }
+        Ok(Self { entries })
+    }
+
+    fn from_evidence_binding(binding: &EvidenceBinding) -> Result<Self, BindingRegistryError> {
+        Self::from_bindings([
+            SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
+            SemanticBinding { authoritative_id: "validation-001", semantic_ref: binding.evidence_ref },
+            SemanticBinding { authoritative_id: "prediction-001", semantic_ref: binding.prediction_ref },
+            SemanticBinding { authoritative_id: "model-001", semantic_ref: binding.model_ref },
+            SemanticBinding { authoritative_id: "parameters-001", semantic_ref: binding.parameters_ref },
+            SemanticBinding { authoritative_id: "scenario-001", semantic_ref: binding.scenario_ref },
+            SemanticBinding { authoritative_id: "dataset-001", semantic_ref: binding.dataset_ref },
+            SemanticBinding { authoritative_id: "context-001", semantic_ref: binding.context_ref },
+        ])
+    }
+
+    fn validate_against(&self, slice: &ProvenanceSlice) -> Result<(), BindingRegistryError> {
+        let slice_ids = slice.nodes.iter().map(|node| node.id).collect::<Vec<_>>();
+        if self.entries.len() != slice_ids.len() {
+            return Err(if self.entries.len() < slice_ids.len() {
+                BindingRegistryError::MissingAuthoritativeMapping
+            } else {
+                BindingRegistryError::ExtraMapping
+            });
+        }
+
+        for node in &slice.nodes {
+            let reference = self.entries.get(node.id)
+                .ok_or(BindingRegistryError::MissingAuthoritativeMapping)?;
+            if reference.object_id != node.id {
+                return Err(BindingRegistryError::SemanticIdentityMismatch);
+            }
+        }
+
+        if self.entries.keys().any(|id| !slice_ids.contains(id)) {
+            return Err(BindingRegistryError::ExtraMapping);
+        }
+
+        Ok(())
+    }
+
+    fn reference_for(&self, authoritative_id: &str) -> Result<&SemanticRefProjection, BindingRegistryError> {
+        self.entries.get(authoritative_id)
+            .ok_or(BindingRegistryError::MissingAuthoritativeMapping)
+    }
 }
 
 fn evidence_binding_digest_from_slice(
     binding: &EvidenceBinding,
     slice: &ProvenanceSlice,
-) -> String {
+) -> Result<String, BindingRegistryError> {
+    let registry = SemanticBindingRegistry::from_evidence_binding(binding)?;
+    registry.validate_against(slice)?;
+
     let nodes = slice
         .nodes
         .iter()
-        .map(|node| canonical_node(node, graph_reference(binding, node.id)))
-        .collect();
+        .map(|node| canonical_node(node, registry.reference_for(node.id)?))
+        .collect::<Result<Vec<_>, BindingRegistryError>>()?;
 
     let edges = slice
         .edges
         .iter()
-        .map(|edge| CanonicalEdgeRef {
-            from: graph_reference(binding, edge.from).object_id.into(),
-            to: graph_reference(binding, edge.to).object_id.into(),
-            kind: graph_edge_kind(edge.kind).into(),
+        .map(|edge| {
+            Ok(CanonicalEdgeRef {
+                from: registry.reference_for(edge.from)?.object_id.into(),
+                to: registry.reference_for(edge.to)?.object_id.into(),
+                kind: graph_edge_kind(edge.kind).into(),
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, BindingRegistryError>>()?;
 
-    EvidenceSliceManifest {
+    Ok(EvidenceSliceManifest {
         slice_ref: binding.slice_ref.object_id.to_string(),
         claim_ref: binding.claim_ref.object_id.to_string(),
         slice_revision: binding.slice_revision.to_string(),
         nodes,
         edges,
     }
-    .digest()
-}
-
-fn graph_reference<'a>(binding: &'a EvidenceBinding, id: &str) -> &'a SemanticRefProjection {
-    match id {
-        "claim-001" => &binding.claim_ref,
-        "validation-001" => &binding.evidence_ref,
-        "prediction-001" => &binding.prediction_ref,
-        "model-001" => &binding.model_ref,
-        "parameters-001" => &binding.parameters_ref,
-        "scenario-001" => &binding.scenario_ref,
-        "dataset-001" => &binding.dataset_ref,
-        "context-001" => &binding.context_ref,
-        _ => panic!("authoritative provenance node is not bound: {id}"),
-    }
+    .digest())
 }
 
 fn graph_node_kind(kind: symthaea_engineering::provenance_graph::NodeKind) -> &'static str {
@@ -685,8 +752,8 @@ mod tests {
         let mut changed_graph = graph.clone();
         changed_graph.nodes.iter_mut().find(|node| node.id == "model-001").unwrap().revision = Some("building-twin@v2");
         let changed_slice = changed_graph.slice("claim-001").expect("claim exists");
-        let baseline = evidence_binding_digest_from_slice(&binding, &baseline_slice);
-        let changed = evidence_binding_digest_from_slice(&binding, &changed_slice);
+        let baseline = evidence_binding_digest_from_slice(&binding, &baseline_slice).unwrap();
+        let changed = evidence_binding_digest_from_slice(&binding, &changed_slice).unwrap();
         assert_ne!(baseline, changed);
     }
 
@@ -703,6 +770,115 @@ mod tests {
         let baseline = evidence_binding_digest_from_slice(&binding, &baseline_slice);
         let changed = evidence_binding_digest_from_slice(&binding, &changed_slice);
         assert_ne!(baseline, changed);
+    }
+
+    #[test]
+    fn complete_binding_registry_covers_authoritative_slice() {
+        let binding = evidence_binding();
+        let registry = SemanticBindingRegistry::from_evidence_binding(&binding).unwrap();
+        let slice = reference_graph().slice("claim-001").unwrap();
+        assert_eq!(registry.validate_against(&slice), Ok(()));
+    }
+
+    #[test]
+    fn missing_authoritative_mapping_is_rejected() {
+        let binding = evidence_binding();
+        let registry = SemanticBindingRegistry::from_bindings([
+            SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
+            SemanticBinding { authoritative_id: "validation-001", semantic_ref: binding.evidence_ref },
+            SemanticBinding { authoritative_id: "prediction-001", semantic_ref: binding.prediction_ref },
+            SemanticBinding { authoritative_id: "model-001", semantic_ref: binding.model_ref },
+            SemanticBinding { authoritative_id: "parameters-001", semantic_ref: binding.parameters_ref },
+            SemanticBinding { authoritative_id: "scenario-001", semantic_ref: binding.scenario_ref },
+            SemanticBinding { authoritative_id: "dataset-001", semantic_ref: binding.dataset_ref },
+        ]).unwrap();
+        assert_eq!(
+            registry.validate_against(&reference_graph().slice("claim-001").unwrap()),
+            Err(BindingRegistryError::MissingAuthoritativeMapping)
+        );
+    }
+
+    #[test]
+    fn duplicate_authoritative_identity_is_rejected() {
+        let binding = evidence_binding();
+        assert_eq!(
+            SemanticBindingRegistry::from_bindings([
+                SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
+                SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
+            ]),
+            Err(BindingRegistryError::DuplicateAuthoritativeIdentity)
+        );
+    }
+
+    #[test]
+    fn semantic_object_identity_must_match_authoritative_node_identity() {
+        let mut binding = evidence_binding();
+        binding.model_ref.object_id = "wrong-model";
+        let registry = SemanticBindingRegistry::from_evidence_binding(&binding).unwrap();
+        assert_eq!(
+            registry.validate_against(&reference_graph().slice("claim-001").unwrap()),
+            Err(BindingRegistryError::SemanticIdentityMismatch)
+        );
+    }
+
+    #[test]
+    fn extra_registry_mapping_is_rejected() {
+        let binding = evidence_binding();
+        let registry = SemanticBindingRegistry::from_bindings([
+            SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
+            SemanticBinding { authoritative_id: "validation-001", semantic_ref: binding.evidence_ref },
+            SemanticBinding { authoritative_id: "prediction-001", semantic_ref: binding.prediction_ref },
+            SemanticBinding { authoritative_id: "model-001", semantic_ref: binding.model_ref },
+            SemanticBinding { authoritative_id: "parameters-001", semantic_ref: binding.parameters_ref },
+            SemanticBinding { authoritative_id: "scenario-001", semantic_ref: binding.scenario_ref },
+            SemanticBinding { authoritative_id: "dataset-001", semantic_ref: binding.dataset_ref },
+            SemanticBinding { authoritative_id: "context-001", semantic_ref: binding.context_ref },
+            SemanticBinding { authoritative_id: "extra-001", semantic_ref: binding.context_ref },
+        ]).unwrap();
+        assert_eq!(
+            registry.validate_against(&reference_graph().slice("claim-001").unwrap()),
+            Err(BindingRegistryError::ExtraMapping)
+        );
+    }
+
+    #[test]
+    fn registry_input_permutation_is_digest_invariant() {
+        let binding = evidence_binding();
+        let forward = SemanticBindingRegistry::from_evidence_binding(&binding).unwrap();
+        let reverse = SemanticBindingRegistry::from_bindings([
+            SemanticBinding { authoritative_id: "context-001", semantic_ref: binding.context_ref },
+            SemanticBinding { authoritative_id: "dataset-001", semantic_ref: binding.dataset_ref },
+            SemanticBinding { authoritative_id: "scenario-001", semantic_ref: binding.scenario_ref },
+            SemanticBinding { authoritative_id: "parameters-001", semantic_ref: binding.parameters_ref },
+            SemanticBinding { authoritative_id: "model-001", semantic_ref: binding.model_ref },
+            SemanticBinding { authoritative_id: "prediction-001", semantic_ref: binding.prediction_ref },
+            SemanticBinding { authoritative_id: "validation-001", semantic_ref: binding.evidence_ref },
+            SemanticBinding { authoritative_id: "claim-001", semantic_ref: binding.claim_ref },
+        ]).unwrap();
+        let slice = reference_graph().slice("claim-001").unwrap();
+        let forward_digest = EvidenceSliceManifest {
+            slice_ref: binding.slice_ref.object_id.to_string(),
+            claim_ref: binding.claim_ref.object_id.to_string(),
+            slice_revision: binding.slice_revision.to_string(),
+            nodes: slice.nodes.iter().map(|n| canonical_node(n, forward.reference_for(n.id).unwrap())).collect(),
+            edges: slice.edges.iter().map(|e| CanonicalEdgeRef {
+                from: forward.reference_for(e.from).unwrap().object_id.into(),
+                to: forward.reference_for(e.to).unwrap().object_id.into(),
+                kind: graph_edge_kind(e.kind).into(),
+            }).collect(),
+        }.digest();
+        let reverse_digest = EvidenceSliceManifest {
+            slice_ref: binding.slice_ref.object_id.to_string(),
+            claim_ref: binding.claim_ref.object_id.to_string(),
+            slice_revision: binding.slice_revision.to_string(),
+            nodes: slice.nodes.iter().map(|n| canonical_node(n, reverse.reference_for(n.id).unwrap())).collect(),
+            edges: slice.edges.iter().map(|e| CanonicalEdgeRef {
+                from: reverse.reference_for(e.from).unwrap().object_id.into(),
+                to: reverse.reference_for(e.to).unwrap().object_id.into(),
+                kind: graph_edge_kind(e.kind).into(),
+            }).collect(),
+        }.digest();
+        assert_eq!(forward_digest, reverse_digest);
     }
 
     #[test]
