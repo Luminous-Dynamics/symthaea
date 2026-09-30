@@ -48,6 +48,7 @@ pub struct MolaMegdrMetadata {
     pub map_projection: String,
     pub latitude_type: String,
     pub longitude_direction: String,
+    pub center_longitude_deg: f64,
     pub longitude_min_deg: f64,
     pub longitude_max_deg: f64,
     pub latitude_min_deg: f64,
@@ -260,6 +261,7 @@ impl MolaMegdrMetadata {
         let map_projection = required(kv, "MAP_PROJECTION_TYPE")?;
         let latitude_type = required(kv, "COORDINATE_SYSTEM_NAME")?;
         let longitude_direction = required(kv, "POSITIVE_LONGITUDE_DIRECTION")?;
+        let center_longitude_deg = parse_f64(kv, "CENTER_LONGITUDE")?;
         let longitude_min_deg = parse_f64(kv, "WESTERNMOST_LONGITUDE")?;
         let longitude_max_deg = parse_f64(kv, "EASTERNMOST_LONGITUDE")?;
         let latitude_min_deg = parse_f64(kv, "MINIMUM_LATITUDE")?;
@@ -340,7 +342,10 @@ impl MolaMegdrMetadata {
                 "longitude direction must be positive east".into(),
             ));
         }
-        if !latitude_min_deg.is_finite()
+        if !center_longitude_deg.is_finite()
+            || center_longitude_deg < 0.0
+            || center_longitude_deg >= 360.0
+            || !latitude_min_deg.is_finite()
             || !latitude_max_deg.is_finite()
             || !longitude_min_deg.is_finite()
             || !longitude_max_deg.is_finite()
@@ -392,6 +397,7 @@ impl MolaMegdrMetadata {
             map_projection,
             latitude_type,
             longitude_direction,
+            center_longitude_deg,
             longitude_min_deg,
             longitude_max_deg,
             latitude_min_deg,
@@ -435,7 +441,8 @@ impl MolaMegdrMetadata {
         // center coordinate to a zero-based cell without assuming the tile's
         // geographic bounds are themselves pixel-center coordinates.
         let sample_coord = self.sample_projection_offset
-            + lon * self.resolution_pixels_per_degree as f64;
+            + shortest_lon_delta(lon, self.center_longitude_deg)
+                * self.resolution_pixels_per_degree as f64;
         let line_coord = self.line_projection_offset
             - latitude_deg * self.resolution_pixels_per_degree as f64;
         let x = (sample_coord - 1.0).floor() as i64;
@@ -598,6 +605,10 @@ fn normalize_lon(lon_deg: f64) -> f64 {
     lon_deg.rem_euclid(360.0)
 }
 
+fn shortest_lon_delta(lon_deg: f64, center_deg: f64) -> f64 {
+    (lon_deg - center_deg + 180.0).rem_euclid(360.0) - 180.0
+}
+
 fn validate_img_size(metadata: &MolaMegdrMetadata, img_path: &Path) -> Result<(), MolaError> {
     let len = std::fs::metadata(img_path)?.len();
     let bytes_per_sample = u64::from(metadata.sample_bits / 8);
@@ -632,6 +643,7 @@ mod tests {
             "MAP_PROJECTION_TYPE = SIMPLE CYLINDRICAL",
             "COORDINATE_SYSTEM_NAME = PLANETOCENTRIC",
             "POSITIVE_LONGITUDE_DIRECTION = EAST",
+            "CENTER_LONGITUDE = 180.0",
             "WESTERNMOST_LONGITUDE = 0.0",
             "EASTERNMOST_LONGITUDE = 0.0625",
             "MINIMUM_LATITUDE = -0.015625",
@@ -774,7 +786,9 @@ mod tests {
             .replace("LINE_SAMPLES = 8", "LINE_SAMPLES = 1440")
             .replace("MINIMUM_LATITUDE = -0.015625", "MINIMUM_LATITUDE = -90.0")
             .replace("MAXIMUM_LATITUDE = 0.015625", "MAXIMUM_LATITUDE = 90.0")
-            .replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+.replace("EASTERNMOST_LONGITUDE = 0.0625", "EASTERNMOST_LONGITUDE = 360.0")
+            .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = 720.5")
+            .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 360.5")
             .replace("LINE_PROJECTION_OFFSET = 2.5", "LINE_PROJECTION_OFFSET = 360.5")
             .replace("SAMPLE_PROJECTION_OFFSET = 4.5", "SAMPLE_PROJECTION_OFFSET = 720.5");
         let metadata = MolaMegdrMetadata::from_label(
