@@ -9,6 +9,20 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub const PARETO_FRONTIER_SCHEMA_VERSION: u32 = 1;
+pub const PARETO_MISSING_DATA_POLICY_VERSION: u32 = 1;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MissingDataPolicy {
+    /// Retain only points with every selected objective observed.
+    /// Missing values are never imputed, coerced, or treated as zero.
+    CompleteCaseV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PartialFrontierPoint {
+    pub point_id: String,
+    pub values: Vec<Option<f64>>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ObjectiveDirection {
@@ -37,7 +51,9 @@ pub enum ParetoFrontierError {
     EmptyObjectiveUnit,
     DuplicateObjectiveName(String),
     EmptyPointId,
+    DuplicatePointId(String),
     NoPoints,
+    MissingDataPolicyMismatch,
     DimensionMismatch {
         point_id: String,
         expected: usize,
@@ -60,7 +76,9 @@ impl std::fmt::Display for ParetoFrontierError {
                 write!(f, "Pareto objective name is duplicated: {name}")
             }
             Self::EmptyPointId => write!(f, "Pareto point ID must not be empty"),
+            Self::DuplicatePointId(id) => write!(f, "Pareto point ID is duplicated: {id}"),
             Self::NoPoints => write!(f, "Pareto frontier requires at least one point"),
+            Self::MissingDataPolicyMismatch => write!(f, "unsupported Pareto missing-data policy"),
             Self::DimensionMismatch {
                 point_id,
                 expected,
@@ -84,6 +102,57 @@ impl std::error::Error for ParetoFrontierError {}
 /// reduction, not a benchmark kernel, and the explicit pairwise definition is
 /// easy to audit. A future optimized implementation must preserve this exact
 /// semantic contract.
+/// Apply an explicit missing-data policy before Pareto analysis.
+///
+/// Complete-case analysis is deliberately conservative: a point missing any
+/// selected objective is excluded rather than imputed. The policy is part of
+/// the analysis contract so downstream consumers cannot silently change the
+/// population being compared.
+pub fn apply_missing_data_policy(
+    policy_version: u32,
+    policy: MissingDataPolicy,
+    objectives: &[Objective],
+    points: &[PartialFrontierPoint],
+) -> Result<Vec<FrontierPoint>, ParetoFrontierError> {
+    if policy_version != PARETO_MISSING_DATA_POLICY_VERSION {
+        return Err(ParetoFrontierError::MissingDataPolicyMismatch);
+    }
+    if objectives.is_empty() {
+        return Err(ParetoFrontierError::EmptyObjectives);
+    }
+
+    match policy {
+        MissingDataPolicy::CompleteCaseV1 => points
+            .iter()
+            .map(|point| {
+                if point.point_id.is_empty() {
+                    return Err(ParetoFrontierError::EmptyPointId);
+                }
+                if point.values.len() != objectives.len() {
+                    return Err(ParetoFrontierError::DimensionMismatch {
+                        point_id: point.point_id.clone(),
+                        expected: objectives.len(),
+                        observed: point.values.len(),
+                    });
+                }
+                let mut values = Vec::with_capacity(point.values.len());
+                for (value, objective) in point.values.iter().zip(objectives) {
+                    match value {
+                        Some(value) if value.is_finite() => values.push(*value),
+                        Some(_) => return Err(ParetoFrontierError::NonFiniteValue {
+                            point_id: point.point_id.clone(),
+                            objective: objective.name.clone(),
+                        }),
+                        None => return Ok(None),
+                    }
+                }
+                Ok(Some(FrontierPoint { point_id: point.point_id.clone(), values }))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(|points| points.into_iter().flatten().collect()),
+    }
+}
+
 pub fn nondominated_indices(
     schema_version: u32,
     objectives: &[Objective],
@@ -113,6 +182,16 @@ fn validate(
     }
     if objectives.is_empty() {
         return Err(ParetoFrontierError::EmptyObjectives);
+    }
+
+    let mut point_ids = HashSet::with_capacity(points.len());
+    for point in points {
+        if point.point_id.is_empty() {
+            return Err(ParetoFrontierError::EmptyPointId);
+        }
+        if !point_ids.insert(&point.point_id) {
+            return Err(ParetoFrontierError::DuplicatePointId(point.point_id.clone()));
+        }
     }
 
     let mut names = HashSet::with_capacity(objectives.len());
@@ -200,6 +279,46 @@ mod tests {
             point_id: id.into(),
             values: vec![elapsed, quality],
         }
+    }
+
+    #[test]
+    fn complete_case_policy_excludes_missing_points_without_imputation() {
+        let points = vec![
+            PartialFrontierPoint { point_id: "a".into(), values: vec![Some(1.0), None] },
+            PartialFrontierPoint { point_id: "b".into(), values: vec![Some(2.0), Some(0.9)] },
+        ];
+        let concrete = apply_missing_data_policy(
+            PARETO_MISSING_DATA_POLICY_VERSION,
+            MissingDataPolicy::CompleteCaseV1,
+            &objectives(),
+            &points,
+        ).expect("missing point should be excluded, not imputed");
+        assert_eq!(concrete.len(), 1);
+        assert_eq!(concrete[0].point_id, "b");
+    }
+
+    #[test]
+    fn complete_case_policy_preserves_only_observed_points() {
+        let points = vec![
+            PartialFrontierPoint { point_id: "a".into(), values: vec![Some(1.0), Some(0.8)] },
+            PartialFrontierPoint { point_id: "b".into(), values: vec![Some(2.0), Some(0.9)] },
+        ];
+        let concrete = apply_missing_data_policy(
+            PARETO_MISSING_DATA_POLICY_VERSION,
+            MissingDataPolicy::CompleteCaseV1,
+            &objectives(),
+            &points,
+        ).expect("complete cases should pass");
+        assert_eq!(concrete.len(), 2);
+    }
+
+    #[test]
+    fn duplicate_point_ids_fail_closed() {
+        let points = vec![point("a", 1.0, 0.8), point("a", 2.0, 0.9)];
+        assert!(matches!(
+            nondominated_indices(PARETO_FRONTIER_SCHEMA_VERSION, &objectives(), &points),
+            Err(ParetoFrontierError::DuplicatePointId(_))
+        ));
     }
 
     #[test]
