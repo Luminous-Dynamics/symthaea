@@ -250,6 +250,7 @@ impl MolaMegdrMetadata {
         let product_id = required(kv, "PRODUCT_ID")?;
         let product_version = required(kv, "PRODUCT_VERSION_ID")?;
         let product_creation_time = required(kv, "PRODUCT_CREATION_TIME")?;
+        validate_creation_time(&product_creation_time)?;
         let resolution = parse_u32(kv, "MAP_RESOLUTION")?;
         let lines = parse_u32(kv, "LINES")?;
         let samples = parse_u32(kv, "LINE_SAMPLES")?;
@@ -263,7 +264,7 @@ impl MolaMegdrMetadata {
         let longitude_max_deg = parse_f64(kv, "EASTERNMOST_LONGITUDE")?;
         let latitude_min_deg = parse_f64(kv, "MINIMUM_LATITUDE")?;
         let latitude_max_deg = parse_f64(kv, "MAXIMUM_LATITUDE")?;
-        let line_offset = parse_u32_default(kv, "LABEL_RECORDS", 0)?;
+        let line_offset = image_data_record_offset(kv)?;
         let sample_offset = 0;
         let line_projection_offset =
             parse_f64_default(kv, "LINE_PROJECTION_OFFSET", latitude_max_deg * resolution as f64 + 0.5)?;
@@ -450,17 +451,42 @@ fn parse_label(text: &str) -> std::collections::BTreeMap<String, String> {
     let mut out = std::collections::BTreeMap::new();
     for raw in text.lines() {
         let line = raw.trim();
-        if line.is_empty() || line.starts_with("/*") || line.starts_with("END") {
+        if line.is_empty() || line.starts_with("/*") || line.eq_ignore_ascii_case("END") {
             continue;
         }
         if let Some((key, value)) = line.split_once('=') {
             let key = key.trim().to_ascii_uppercase();
-            let value = value.trim().trim_matches('"').trim().to_string();
-            let value = value.split("/*").next().unwrap_or(&value).trim().to_string();
+            let value = value.split("/*").next().unwrap_or(value).trim();
+            let value = value.trim_matches('"').trim().to_string();
             out.insert(key, value);
         }
     }
     out
+}
+
+fn image_data_record_offset(
+    kv: &std::collections::BTreeMap<String, String>,
+) -> Result<u32, MolaError> {
+    match kv.get("^IMAGE") {
+        None => Ok(0),
+        Some(pointer) => {
+            let pointer = pointer.trim();
+            if pointer.starts_with('"') {
+                // Detached IMAGE files begin at byte zero; LABEL_RECORDS belongs
+                // to the label file and must not be applied to the companion IMG.
+                return Ok(0);
+            }
+            let records = pointer
+                .parse::<u32>()
+                .map_err(|_| MolaError::InvalidMetadata("invalid ^IMAGE pointer".into()))?;
+            if records == 0 {
+                return Err(MolaError::InvalidMetadata(
+                    "^IMAGE record pointer must be positive".into(),
+                ));
+            }
+            Ok(records - 1)
+        }
+    }
 }
 
 fn required(
@@ -471,6 +497,29 @@ fn required(
         .filter(|v| !v.trim().is_empty())
         .cloned()
         .ok_or_else(|| MolaError::InvalidMetadata(format!("missing required label key {key}")))
+}
+
+fn validate_creation_time(value: &str) -> Result<(), MolaError> {
+    let b = value.as_bytes();
+    if b.len() < 19
+        || b[4] != b'-'
+        || b[7] != b'-'
+        || b[10] != b'T'
+        || b[13] != b':'
+        || b[16] != b':'
+        || !b[..19].iter().enumerate().all(|(i, c)| {
+            matches!(i, 4 | 7) && *c == b'-'
+                || i == 10 && *c == b'T'
+                || matches!(i, 13 | 16) && *c == b':'
+                || matches!(i, 0..=3 | 5..=6 | 8..=9 | 11..=12 | 14..=15 | 17..=18)
+                    && c.is_ascii_digit()
+        })
+    {
+        return Err(MolaError::InvalidMetadata(
+            "PRODUCT_CREATION_TIME must use YYYY-MM-DDThh:mm:ss format".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn parse_number(value: &str) -> Result<f64, MolaError> {
