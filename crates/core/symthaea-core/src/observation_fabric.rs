@@ -211,6 +211,38 @@ impl ObservationQuality {
     }
 }
 
+/// A concrete processing/acquisition activity that produced an observation.
+///
+/// Kept as a compact, typed record that can be mapped to OGC SensorML or
+/// W3C PROV by boundary adapters without introducing ontology dependencies.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessingActivity {
+    /// Stable identifier for this execution, not merely the algorithm name.
+    pub activity_id: String,
+    /// Stable identifier for the procedure or process definition.
+    pub process_id: String,
+    pub started_at_unix_ns: Option<i128>,
+    pub ended_at_unix_ns: Option<i128>,
+    /// Agent identifier, such as a sensor, service, or analyst credential.
+    pub agent_id: Option<String>,
+    /// Fingerprint of code, configuration, and parameters used by this run.
+    pub activity_fingerprint: Option<String>,
+}
+
+impl ProcessingActivity {
+    pub fn validate(&self) -> Result<(), ObservationValidationError> {
+        if self.activity_id.trim().is_empty() || self.process_id.trim().is_empty()
+            || self.agent_id.as_deref().is_some_and(|id| id.trim().is_empty())
+            || self.activity_fingerprint.as_deref().is_some_and(|id| id.trim().is_empty())
+            || matches!((self.started_at_unix_ns, self.ended_at_unix_ns),
+                (Some(start), Some(end)) if end < start)
+        {
+            return Err(ObservationValidationError::InvalidProcessingActivity);
+        }
+        Ok(())
+    }
+}
+
 /// Provenance linking an observation to its producer and processing lineage.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ObservationProvenance {
@@ -221,6 +253,9 @@ pub struct ObservationProvenance {
     pub acquired_by: Option<String>,
     pub parent_observation_ids: Vec<String>,
     pub processing_fingerprint: Option<String>,
+    /// Optional explicit execution record; parent IDs alone do not describe
+    /// which operation transformed the inputs into this observation.
+    pub processing_activity: Option<ProcessingActivity>,
 }
 
 /// Modality-neutral observation envelope.
@@ -267,6 +302,9 @@ impl Observation {
         }
         if self.provenance.parent_observation_ids.iter().any(|parent| parent.trim().is_empty() || parent == &self.id) {
             return Err(ObservationValidationError::InvalidParentObservation);
+        }
+        if let Some(activity) = &self.provenance.processing_activity {
+            activity.validate()?;
         }
         if let Some(asset) = &self.asset {
             asset.validate()?;
@@ -370,6 +408,8 @@ pub enum ObservationValidationError {
     MissingVerificationAttestation,
     #[error("parent observation ids must be non-empty and cannot reference the observation itself")]
     InvalidParentObservation,
+    #[error("processing activity has invalid identifiers, fingerprints, or time bounds")]
+    InvalidProcessingActivity,
 }
 
 #[cfg(test)]
@@ -402,6 +442,7 @@ mod tests {
                 acquired_by: None,
                 parent_observation_ids: Vec::new(),
                 processing_fingerprint: Some("proc-v1".into()),
+                processing_activity: None,
             },
             asset: Some(AssetRef::blake3(b"frame-bytes")),
             disclosure: DisclosurePolicy::restricted(),
@@ -550,6 +591,41 @@ mod tests {
         let mut observation = fixture();
         observation.provenance.parent_observation_ids = vec!["obs-001".into()];
         assert_eq!(observation.validate(), Err(ObservationValidationError::InvalidParentObservation));
+    }
+
+    #[test]
+    fn processing_activity_validates_time_bounds_and_identity() {
+        let mut observation = fixture();
+        observation.provenance.processing_activity = Some(ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: "orthorectify-v2".into(),
+            started_at_unix_ns: Some(20),
+            ended_at_unix_ns: Some(10),
+            agent_id: Some("worker-7".into()),
+            activity_fingerprint: Some("sha256:config".into()),
+        });
+        assert_eq!(
+            observation.validate(),
+            Err(ObservationValidationError::InvalidProcessingActivity)
+        );
+        observation.provenance.processing_activity.as_mut().unwrap().ended_at_unix_ns = Some(25);
+        assert!(observation.validate().is_ok());
+    }
+
+    #[test]
+    fn processing_activity_rejects_blank_process_id() {
+        let activity = ProcessingActivity {
+            activity_id: "run-001".into(),
+            process_id: " ".into(),
+            started_at_unix_ns: None,
+            ended_at_unix_ns: None,
+            agent_id: None,
+            activity_fingerprint: None,
+        };
+        assert_eq!(
+            activity.validate(),
+            Err(ObservationValidationError::InvalidProcessingActivity)
+        );
     }
 
     #[test]
