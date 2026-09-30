@@ -573,7 +573,7 @@ mod tests {
         // The atomic consume boundary re-evaluates time itself. The stale
         // observation cannot authorize a consume at the exact expiry instant.
         assert!(matches!(
-            store.consume_verified_submission_v1(&submission, &peer(1000, 1), ms(2_000)),
+            store.consume_verified_submission_v1(&submission, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(2_000))),
             Err(LocalApprovalRequestStoreErrorV1::Admission(_))
         ));
         assert!(store.is_pending(&request_id).unwrap());
@@ -664,7 +664,7 @@ mod tests {
         store.install_pending(request).unwrap();
 
         assert!(matches!(
-            store.consume_verified_submission_v1(&hostile, &peer(1000, 1), ms(1_300)),
+            store.consume_verified_submission_v1(&hostile, &peer(1000, 1), AuthoritativeEvaluationV1::from_unix_millis_for_test(ms(1_300))),
             Err(LocalApprovalRequestStoreErrorV1::Admission(
                 LocalApprovalAdmissionErrorV1::Approval(LocalApprovalErrorV1::IntentMismatch)
             ))
