@@ -434,11 +434,20 @@ impl TerrainSample {
             && self.latitude_rad.is_finite()
             && (-PI / 2.0..=PI / 2.0).contains(&self.latitude_rad)
             && self.longitude_rad.is_finite()
-            && !self.provenance.source_id.trim().is_empty()
-            && !self.provenance.source_revision.trim().is_empty()
-            && !self.provenance.coordinate_reference.trim().is_empty()
+            && self.observation_trace_is_valid()
+            && self.provenance.validate().is_ok()
             && self.slope_rad.is_none_or(|v| v.is_finite() && (0.0..=PI / 2.0).contains(&v))
             && self.roughness_m.is_none_or(|v| v.is_finite() && v >= 0.0)
+    }
+
+    /// Verify that the sample records enough information to reproduce the
+    /// observation selection performed by its adapter.
+    pub fn observation_trace_is_valid(&self) -> bool {
+        match self.sampling_method {
+            TerrainSamplingMethod::NearestCellWithObservationCount => {
+                self.source_grid_cell.is_some()
+            }
+        }
     }
 }
 
@@ -833,6 +842,19 @@ mod tests {
                 ],
             },
         }
+    }
+
+    #[test]
+    fn usable_sample_requires_valid_observation_trace_and_provenance() {
+        let mut sample = fixture_terrain(TerrainQuality::Measured);
+        assert!(sample.is_usable());
+
+        sample.source_grid_cell = None;
+        assert!(!sample.is_usable());
+
+        let mut sample = fixture_terrain(TerrainQuality::Measured);
+        sample.provenance.content_digests[0].2 = "not-a-digest".into();
+        assert!(!sample.is_usable());
     }
 
     #[test]
