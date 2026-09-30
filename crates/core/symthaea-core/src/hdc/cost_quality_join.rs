@@ -215,7 +215,7 @@ mod tests {
         EvidenceReference {
             kind: kind.to_owned(),
             schema_version: 1,
-            artifact_digest: "sha256:fixture".to_owned(),
+            artifact_digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
             artifact_id: format!("{kind}-fixture-v1"),
         }
     }
