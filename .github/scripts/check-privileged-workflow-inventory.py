@@ -197,7 +197,7 @@ def parse_workflow(path: Path) -> dict[str, Any]:
             for raw in lines
         )
         cache_write = any(
-            re.search(r"(^|\\s)cache-mode:\\s*(write|write-only)\\s*$", raw.strip())
+            re.search(r"(^|\s)cache-mode:\s*(write|write-only)\s*$", raw.strip())
             for raw in lines
         )
         contract["cross_workflow_dataflow_observed"] = {
