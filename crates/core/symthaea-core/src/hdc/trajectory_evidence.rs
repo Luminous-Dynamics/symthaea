@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::resource_evidence::{qualify_resource, ResourceEvidenceError, ResourceEvidenceRecord, RESOURCE_EVIDENCE_SCHEMA_VERSION};
 use super::operator_evidence_contract::{
     OperatorEvidenceArtifact, OperatorEvidenceRecord, OPERATOR_EVIDENCE_SCHEMA_VERSION,
     QUALIFIED_STATUS, CONTINUOUS_F32_REPRESENTATION,
@@ -37,11 +38,20 @@ pub struct TrajectoryMetrics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResourceEvidenceDependency {
+    pub schema_version: u32,
+    pub resolution: usize,
+    pub representation: String,
+    pub provenance_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrajectoryEvidenceRecord {
     pub schema_version: u32,
     pub source_resolution: usize,
     pub target_resolution: usize,
     pub operator_dependency: OperatorEvidenceDependency,
+    pub resource_dependency: ResourceEvidenceDependency,
     pub qualification_disposition: String,
     pub metrics: TrajectoryMetrics,
 }
@@ -70,6 +80,8 @@ pub enum TrajectoryQualificationError {
         resolution: usize,
         operation: String,
     },
+    Resource(ResourceEvidenceError),
+    ResourceDependencyMismatch,
 }
 
 impl std::fmt::Display for TrajectoryQualificationError {
@@ -94,6 +106,10 @@ impl std::fmt::Display for TrajectoryQualificationError {
             Self::FailedOperator { resolution, operation } => {
                 write!(f, "required operator evidence failed: {resolution}/{operation}")
             }
+            Self::Resource(error) => write!(f, "resource evidence rejected: {error}"),
+            Self::ResourceDependencyMismatch => {
+                write!(f, "trajectory resource dependency does not match verified resource evidence")
+            }
         }
     }
 }
@@ -103,6 +119,8 @@ impl std::error::Error for TrajectoryQualificationError {}
 pub fn qualify_transition(
     artifact: &OperatorEvidenceArtifact,
     dependency: &OperatorEvidenceDependency,
+    resource: &ResourceEvidenceRecord,
+    resource_dependency: &ResourceEvidenceDependency,
 ) -> Result<(), TrajectoryQualificationError> {
     if dependency.schema_version != OPERATOR_EVIDENCE_SCHEMA_VERSION {
         return Err(TrajectoryQualificationError::UnsupportedOperatorSchema(
@@ -126,6 +144,20 @@ pub fn qualify_transition(
             },
         });
     }
+
+    if resource_dependency.schema_version != RESOURCE_EVIDENCE_SCHEMA_VERSION
+        || resource_dependency.resolution != resource.workload.resolution
+        || resource_dependency.representation != resource.workload.representation
+        || resource_dependency.provenance_id != resource.provenance_id
+    {
+        return Err(TrajectoryQualificationError::ResourceDependencyMismatch);
+    }
+    qualify_resource(
+        resource,
+        resource_dependency.resolution,
+        &resource_dependency.representation,
+    )
+    .map_err(TrajectoryQualificationError::Resource)?;
 
     if artifact.digest.algorithm != "sha256" {
         return Err(TrajectoryQualificationError::UnsupportedDigestAlgorithm(
@@ -188,6 +220,7 @@ pub fn transition_record(
     source_resolution: usize,
     target_resolution: usize,
     dependency: OperatorEvidenceDependency,
+    resource_dependency: ResourceEvidenceDependency,
     metrics: TrajectoryMetrics,
 ) -> TrajectoryEvidenceRecord {
     TrajectoryEvidenceRecord {
@@ -195,6 +228,7 @@ pub fn transition_record(
         source_resolution,
         target_resolution,
         operator_dependency: dependency,
+        resource_dependency,
         qualification_disposition: "qualified".to_owned(),
         metrics,
     }
