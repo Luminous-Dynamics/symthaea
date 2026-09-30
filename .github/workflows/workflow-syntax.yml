@@ -6,11 +6,13 @@ on:
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
+      - ".github/*.json"
   push:
     branches: [main]
     paths:
       - ".github/workflows/**"
       - ".github/scripts/**"
+      - ".github/*.json"
   workflow_dispatch:
 
 permissions:
@@ -54,45 +56,39 @@ jobs:
           set -euo pipefail
           : > /tmp/workflow-files.txt
           : > /tmp/github-shell-files.txt
+          : > /tmp/github-python-files.txt
+          : > /tmp/github-json-files.txt
 
           case "${GITHUB_EVENT_NAME}" in
             pull_request)
               git fetch --no-tags origin "${GITHUB_BASE_REF}"
-              git diff --diff-filter=ACMRT --name-only \
-                "origin/${GITHUB_BASE_REF}...HEAD" -- \
-                '.github/workflows/*.yml' '.github/workflows/*.yaml' \
-                > /tmp/workflow-files.txt
-              git diff --diff-filter=ACMRT --name-only \
-                "origin/${GITHUB_BASE_REF}...HEAD" -- \
-                '.github/scripts/*.sh' \
-                > /tmp/github-shell-files.txt
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/workflows/*.yml' '.github/workflows/*.yaml' > /tmp/workflow-files.txt
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/scripts/*.sh' > /tmp/github-shell-files.txt
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/scripts/*.py' > /tmp/github-python-files.txt
+              git diff --diff-filter=ACMRT --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- \
+                '.github/*.json' > /tmp/github-json-files.txt
               ;;
             push)
               if git rev-parse HEAD^ >/dev/null 2>&1; then
-                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
-                  '.github/workflows/*.yml' '.github/workflows/*.yaml' \
-                  > /tmp/workflow-files.txt
-                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- \
-                  '.github/scripts/*.sh' \
-                  > /tmp/github-shell-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- '.github/workflows/*.yml' '.github/workflows/*.yaml' > /tmp/workflow-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- '.github/scripts/*.sh' > /tmp/github-shell-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- '.github/scripts/*.py' > /tmp/github-python-files.txt
+                git diff --diff-filter=ACMRT --name-only HEAD^ HEAD -- '.github/*.json' > /tmp/github-json-files.txt
               else
-                find .github/workflows -maxdepth 1 -type f \
-                  \( -name '*.yml' -o -name '*.yaml' \) -print \
-                  | sed 's#^./##' | sort > /tmp/workflow-files.txt
-                if [ -d .github/scripts ]; then
-                  find .github/scripts -maxdepth 1 -type f -name '*.sh' -print \
-                    | sed 's#^./##' | sort > /tmp/github-shell-files.txt
-                fi
+                find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sed 's#^./##' | sort > /tmp/workflow-files.txt
+                find .github/scripts -maxdepth 1 -type f -name '*.sh' -print 2>/dev/null | sed 's#^./##' | sort > /tmp/github-shell-files.txt
+                find .github/scripts -maxdepth 1 -type f -name '*.py' -print 2>/dev/null | sed 's#^./##' | sort > /tmp/github-python-files.txt
+                find .github -maxdepth 1 -type f -name '*.json' -print | sed 's#^./##' | sort > /tmp/github-json-files.txt
               fi
               ;;
             workflow_dispatch)
-              find .github/workflows -maxdepth 1 -type f \
-                \( -name '*.yml' -o -name '*.yaml' \) -print \
-                | sed 's#^./##' | sort > /tmp/workflow-files.txt
-              if [ -d .github/scripts ]; then
-                find .github/scripts -maxdepth 1 -type f -name '*.sh' -print \
-                  | sed 's#^./##' | sort > /tmp/github-shell-files.txt
-              fi
+              find .github/workflows -maxdepth 1 -type f \( -name '*.yml' -o -name '*.yaml' \) -print | sed 's#^./##' | sort > /tmp/workflow-files.txt
+              find .github/scripts -maxdepth 1 -type f -name '*.sh' -print 2>/dev/null | sed 's#^./##' | sort > /tmp/github-shell-files.txt
+              find .github/scripts -maxdepth 1 -type f -name '*.py' -print 2>/dev/null | sed 's#^./##' | sort > /tmp/github-python-files.txt
+              find .github -maxdepth 1 -type f -name '*.json' -print | sed 's#^./##' | sort > /tmp/github-json-files.txt
               ;;
             *)
               echo "unexpected event: ${GITHUB_EVENT_NAME}" >&2
@@ -100,21 +96,14 @@ jobs:
               ;;
           esac
 
-          echo "Selected workflow files:"
-          cat /tmp/workflow-files.txt
-          echo "Selected .github shell files:"
-          cat /tmp/github-shell-files.txt
-
-          if [ -s /tmp/workflow-files.txt ]; then
-            echo "workflows=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "workflows=false" >> "$GITHUB_OUTPUT"
-          fi
-          if [ -s /tmp/github-shell-files.txt ]; then
-            echo "shells=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "shells=false" >> "$GITHUB_OUTPUT"
-          fi
+          for pair in \
+            "workflows /tmp/workflow-files.txt" \
+            "shells /tmp/github-shell-files.txt" \
+            "python /tmp/github-python-files.txt" \
+            "json /tmp/github-json-files.txt"; do
+            set -- $pair
+            if [ -s "$2" ]; then echo "$1=true" >> "$GITHUB_OUTPUT"; else echo "$1=false" >> "$GITHUB_OUTPUT"; fi
+          done
 
       - name: Lint changed workflows
         if: steps.changed.outputs.workflows == 'true'
@@ -122,11 +111,7 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < /tmp/workflow-files.txt
-          /tmp/actionlint/actionlint \
-            -color \
-            -shellcheck "" \
-            -pyflakes "" \
-            "${files[@]}"
+          /tmp/actionlint/actionlint -color -shellcheck "" -pyflakes "" "${files[@]}"
 
       - name: Enforce repository-wide draft runner admission
         shell: bash
@@ -139,9 +124,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          while IFS= read -r file; do
-            bash -n "$file"
-          done < /tmp/github-shell-files.txt
+          while IFS= read -r file; do bash -n "$file"; done < /tmp/github-shell-files.txt
+
+      - name: Parse-check changed GitHub Python helpers
+        if: steps.changed.outputs.python == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do python3 -m py_compile "$file"; done < /tmp/github-python-files.txt
+
+      - name: Self-test privileged workflow inventory detector
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-privileged-workflow-inventory.py --self-test
+
+      - name: Validate privileged workflow inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/check-privileged-workflow-inventory.py
+
+      - name: Validate changed repository JSON
+        if: steps.changed.outputs.json == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do python3 -m json.tool "$file" >/dev/null; done < /tmp/github-json-files.txt
 
       - name: Self-test changed CI helpers with embedded contracts
         if: steps.changed.outputs.shells == 'true'
@@ -150,9 +159,7 @@ jobs:
           set -euo pipefail
           while IFS= read -r file; do
             case "$file" in
-              .github/scripts/check-showroom-hygiene.sh)
-                bash "$file" --self-test
-                ;;
+              .github/scripts/check-showroom-hygiene.sh) bash "$file" --self-test ;;
             esac
           done < /tmp/github-shell-files.txt
 
@@ -165,15 +172,16 @@ jobs:
           {
             echo "event_name=${GITHUB_EVENT_NAME}"
             echo "checkout_sha=${GITHUB_SHA}"
-            if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-              echo "pr_head_sha=${PR_HEAD_SHA}"
-            fi
+            if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then echo "pr_head_sha=${PR_HEAD_SHA}"; fi
             echo "actionlint_version=1.7.12"
             echo "actionlint_archive_sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
             echo "changed_workflows_only_on_pr=true"
             echo "repository_wide_draft_runner_ratchet=true"
             echo "changed_github_shell_scripts_bash_n=true"
-            echo "showroom_hygiene_self_test_when_changed=true"
+            echo "changed_github_python_scripts_py_compile=true"
+            echo "privileged_workflow_inventory_self_test=true"
+            echo "privileged_workflow_inventory_validation=true"
+            echo "changed_github_json_json_tool=true"
             echo "shellcheck_integration=false"
             echo "pyflakes_integration=false"
           } | tee workflow-syntax-receipt.txt
