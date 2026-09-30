@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "docs" / "engineering" / "fixtures" / "civ-place-001a.json"
 DIGEST_FILE = ROOT / "docs" / "engineering" / "fixtures" / "civ-place-001a.sha256"
 
-EXPECTED_DIGEST = "89fc3954b8c99e7ea7e38041bb4dac24594dedc45b12e1609a7f3ec9156665b7"
+EXPECTED_DIGEST = "380d4ed23eeaa360cf0b80d445771edd0fbf46c35421ab6ab184c1560a371667"
 
 def canonical(obj: object) -> bytes:
     return json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -49,6 +49,10 @@ def derive(case: dict[str, object]) -> str:
         # share one upstream source; a larger declared group retains the
         # common-mode relation as the claim-bearing disposition.
         return "NotIndependent" if len(value["members"]) == 2 else "CommonModeRetained"
+        # Absence of a discovered common upstream is not positive proof of independence.
+        # The graph may be incomplete, partitioned, or missing a hidden dependency.
+        if value["shared_upstream"] is None:
+            return "IndependenceUnknown"
     if kind == "service":
         return "ServiceUnresolved" if value["quality"] == "Unknown" else "ServiceResolved"
     if kind == "currentness":
@@ -175,10 +179,10 @@ def main() -> int:
             if interface["source"] not in known_ids or interface["target"] not in known_ids:
                 fail(f"unresolved interface reference: {interface['id']}")
 
-    if len(data["hostile_cases"]) != 20:
+    if len(data["hostile_cases"]) != 21:
         fail("hostile corpus count changed")
     case_ids = [case["id"] for case in data["hostile_cases"]]
-    if case_ids != [f"H{i:02d}" for i in range(1, 21)]:
+    if case_ids != [f"H{i:02d}" for i in range(1, 22)]:
         fail("hostile case ordering/identity changed")
 
     # Independent identity mutation check.
