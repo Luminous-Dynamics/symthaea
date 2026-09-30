@@ -1167,6 +1167,68 @@ mod tests {
         assert!(error.contains("conflicting artifact identities"));
     }
 
+    fn observation_fixture() -> (TerrainArtifactComposition, TerrainSample) {
+        let artifacts = TerrainArtifactComposition::from_artifacts(vec![
+            TerrainArtifactIdentity {
+                logical_file: "counts-raster".into(),
+                source_id: "mola-counts".into(),
+                source_revision: "v7".into(),
+                coordinate_reference: "ia2".into(),
+                algorithm: "SHA-256".into(),
+                digest: "b".repeat(64),
+            },
+            TerrainArtifactIdentity {
+                logical_file: "raster-image".into(),
+                source_id: "mola-topography".into(),
+                source_revision: "v2".into(),
+                coordinate_reference: "ia2".into(),
+                algorithm: "SHA-256".into(),
+                digest: "a".repeat(64),
+            },
+        ]).unwrap();
+        (artifacts, fixture_terrain(TerrainQuality::Measured))
+    }
+
+    #[test]
+    fn observation_identity_is_stable_for_equivalent_artifact_order() {
+        let (composition, sample) = observation_fixture();
+        let reversed = TerrainArtifactComposition::from_artifacts(
+            composition.artifacts.iter().rev().cloned().collect(),
+        ).unwrap();
+        let a = TerrainObservationIdentity::from_sample(&composition, &sample).unwrap();
+        let b = TerrainObservationIdentity::from_sample(&reversed, &sample).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.sha256.len(), 64);
+    }
+
+    #[test]
+    fn observation_identity_changes_when_observed_cell_changes() {
+        let (composition, sample) = observation_fixture();
+        let mut changed = sample.clone();
+        changed.source_grid_cell = Some((1, 0));
+        let a = TerrainObservationIdentity::from_sample(&composition, &sample).unwrap();
+        let b = TerrainObservationIdentity::from_sample(&composition, &changed).unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn observation_identity_changes_when_artifact_bytes_change() {
+        let (composition, sample) = observation_fixture();
+        let mut changed = composition.clone();
+        changed.artifacts[1].digest = "c".repeat(64);
+        let a = TerrainObservationIdentity::from_sample(&composition, &sample).unwrap();
+        let b = TerrainObservationIdentity::from_sample(&changed, &sample).unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn observation_identity_rejects_non_finite_observations() {
+        let (composition, mut sample) = observation_fixture();
+        sample.elevation_m = Some(f64::NAN);
+        let error = TerrainObservationIdentity::from_sample(&composition, &sample).unwrap_err();
+        assert!(error.contains("non-finite"));
+    }
+
     #[test]
     fn legacy_provenance_projection_is_deterministic() {
         let provenance = TerrainProvenance {
