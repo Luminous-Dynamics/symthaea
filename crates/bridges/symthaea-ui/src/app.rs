@@ -44,6 +44,7 @@ struct Vitals {
     dream_insights: usize,
     surprise_triggered: bool,
     reasoning_confidence: f32,
+    prediction_error: f32,
 }
 
 impl Vitals {
@@ -68,6 +69,7 @@ impl Vitals {
             dream_insights: v["dream_insights"].as_u64().unwrap_or(0) as usize,
             surprise_triggered: v["surprise_triggered"].as_bool().unwrap_or(false),
             reasoning_confidence: f64_at("reasoning_confidence") as f32,
+            prediction_error: f64_at("prediction_error") as f32,
         }
     }
 }
@@ -166,6 +168,31 @@ pub fn App() -> impl IntoView {
     let sending = RwSignal::new(false);
     let last_error = RwSignal::new(Option::<String>::None);
     let daemon_status = RwSignal::new(Option::<Value>::None);
+    let semantic_announcement = RwSignal::new(String::new());
+    let last_semantic_key = RwSignal::new(String::new());
+
+    // Announce only meaningful semantic transitions. Continuous telemetry
+    // must not become a screen-reader interrupt stream.
+    Effect::new(move |_| {
+        let v = vitals.get();
+        let state = CognitiveState::from_observation(
+            ws_connected.get(),
+            sending.get(),
+            v.coherence,
+            v.thermodynamic_load,
+            v.reasoning_confidence as f64,
+            v.prediction_error as f64,
+        );
+        let key = format!("{}:{}", state.presence.label(), state.mode.label());
+        if last_semantic_key.get_untracked() != key {
+            last_semantic_key.set(key);
+            semantic_announcement.set(format!(
+                "Symthaea is {} and {}.",
+                state.presence.label(),
+                state.mode.label()
+            ));
+        }
+    });
 
     // Projection exits (VISION_PROJECTION_REVIEW_2026-07-15.md P1.2): the
     // live cognitive self-portrait and the imagination decode, previously
@@ -333,18 +360,20 @@ pub fn App() -> impl IntoView {
                         sending.get(),
                         v.coherence,
                         v.thermodynamic_load,
-                        v.reasoning_confidence,
+                        v.reasoning_confidence as f64,
+                        v.prediction_error as f64,
                     );
                     view! {
-                        <div class="state-presence" role="status">
+                        <span class="sr-only" aria-live="polite">{move || semantic_announcement.get()}</span>
+                        <div class="state-presence">
                             <span class="state-mode">{state.mode.label()}</span>
                             <span class="state-separator">" · "</span>
                             <span class="state-presence-label">{state.presence.label()}</span>
                         </div>
                         <p class="state-description">
                             {format!(
-                                "coherence {:.2} · load {:.2} · confidence {:.2}",
-                                state.coherence, state.thermodynamic_load, state.confidence
+                                "coherence {:.2} · load {:.2} · confidence {:.2} · prediction error {:.2}",
+                                state.coherence, state.thermodynamic_load, state.confidence, state.prediction_error
                             )}
                         </p>
                     }
@@ -375,6 +404,7 @@ pub fn App() -> impl IntoView {
                     <div><dt>"moral score"</dt><dd>{move || format!("{:.2}", vitals.get().moral_score)}</dd></div>
                     <div><dt>"coherence"</dt><dd>{move || format!("{:.2}", vitals.get().coherence)}</dd></div>
                     <div><dt>"reasoning confidence"</dt><dd>{move || format!("{:.2}", vitals.get().reasoning_confidence)}</dd></div>
+                    <div><dt>"prediction error"</dt><dd>{move || format!("{:.2}", vitals.get().prediction_error)}</dd></div>
                     <div><dt>"gwt broadcast"</dt><dd>{move || if vitals.get().gwt_broadcast { "yes" } else { "no" }}</dd></div>
                     <div><dt>"dream insights"</dt><dd>{move || vitals.get().dream_insights.to_string()}</dd></div>
                     <div><dt>"surprise"</dt><dd>{move || if vitals.get().surprise_triggered { "triggered" } else { "—" }}</dd></div>
