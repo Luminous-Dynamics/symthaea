@@ -515,8 +515,8 @@ jobs:
         assert observed_cache_write["cache_modes"] == ["write"]
 
         reusable_without_cap = original.replace(
-            "permissions:\n  contents: read\n",
-            "permissions:\n  contents: read\njobs:\n  call:\n    uses: ./.github/workflows/reusable.yml\n",
+            "    runs-on: ubuntu-latest\n",
+            "    uses: ./.github/workflows/reusable.yml\n",
         )
         wf.write_text(reusable_without_cap, encoding="utf-8")
         try:
