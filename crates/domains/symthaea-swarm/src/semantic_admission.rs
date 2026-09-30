@@ -103,6 +103,7 @@ pub enum StateInvariant {
     ResultMissingDelivery { logical_delivery_id: Uuid },
     ResultMissingObservation { logical_delivery_id: Uuid },
     ResultObservationMismatch { logical_delivery_id: Uuid },
+    ObservationKeyMismatch { observation_id: Uuid },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,6 +150,14 @@ pub fn validate_state(state: &SemanticAdmissionState) -> Result<(), StateInvaria
         if !has_result {
             return Err(StateInvariant::DeliveryMissingResult {
                 logical_delivery_id: *logical_delivery_id,
+            });
+        }
+    }
+
+    for (observation_key, observation) in &state.observations {
+        if observation.key != *observation_key {
+            return Err(StateInvariant::ObservationKeyMismatch {
+                observation_id: observation.key.observation_id,
             });
         }
     }
@@ -392,7 +401,7 @@ mod tests {
         let mut state = SemanticAdmissionState::default();
         state.deliveries.insert(delivery.logical_delivery_id, delivery.clone());
         state.results.insert(
-            delivery.logical_delivery_id,
+            observation.key.clone(),
             SemanticResult {
                 logical_delivery_id: delivery.logical_delivery_id,
                 observation: observation.key.clone(),
