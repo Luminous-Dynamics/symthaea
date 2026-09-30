@@ -413,6 +413,16 @@ impl EnhancedKnowledgeGraph {
         id: FactId,
         admission: CanonicalAdmission,
     ) -> bool {
+        if let Some(receipt) = admission.receipt() {
+            // A receipt is only meaningful if it binds this graph's exact current
+            // structural provenance snapshot. Reject stale or non-conforming admission
+            // context rather than allowing a canonical identity to bypass the boundary.
+            let validation = self.validate_provenance();
+            if !receipt.binds_validation(&validation) {
+                return false;
+            }
+        }
+
         if let Some(fact) = self.facts.get_mut(&id) {
             fact.canonical_identity = Some(admission.canonical_identity);
             fact.provenance_family = admission.provenance_family;
@@ -1179,6 +1189,54 @@ mod tests {
             .collect();
         assert_eq!(independent.len(), 1);
         assert_ne!(same_family[0].memory_id, independent[0].memory_id);
+    }
+
+    #[test]
+    fn test_admission_receipt_must_bind_current_conforming_snapshot() {
+        let mut graph = EnhancedKnowledgeGraph::new(100);
+        let (id, _) = graph.insert(make_encoding("receipt-bound fact", 0.8), 1, None, false);
+
+        let validation = graph.validate_provenance();
+        let receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-1",
+            Some("frontier:1".into()),
+            validation.snapshot_digest.clone(),
+            validation.validator_version.clone(),
+            validation.snapshot_schema_version,
+        ).unwrap();
+        let admission = graph
+            .admit_canonical_identity("claim:receipt-bound", Some("family:1".into()))
+            .unwrap()
+            .with_receipt(receipt);
+        assert!(graph.attach_admitted_provenance(id, admission));
+        assert_eq!(
+            graph.get_fact(id).unwrap().canonical_identity.as_deref(),
+            Some("claim:receipt-bound")
+        );
+
+        let (id2, _) = graph.insert(make_encoding("stale receipt fact", 0.8), 2, None, false);
+        let stale = graph.validate_provenance();
+        let stale_receipt = CanonicalAdmissionReceipt::new(
+            "admission:event-stale",
+            Some("frontier:1".into()),
+            stale.snapshot_digest,
+            stale.validator_version,
+            stale.snapshot_schema_version,
+        ).unwrap();
+
+        graph.record_provenance_relation(ProvenanceRelation {
+            source_memory_id: graph.provenance(id2).unwrap().memory_id,
+            target_memory_id: graph.provenance(id).unwrap().memory_id,
+            kind: ProvenanceRelationKind::Corroborates,
+            created_at: "cycle:3".into(),
+        }).unwrap();
+
+        let stale_admission = graph
+            .admit_canonical_identity("claim:must-not-bypass", Some("family:2".into()))
+            .unwrap()
+            .with_receipt(stale_receipt);
+        assert!(!graph.attach_admitted_provenance(id2, stale_admission));
+        assert!(graph.get_fact(id2).unwrap().canonical_identity.is_none());
     }
 
     #[test]
