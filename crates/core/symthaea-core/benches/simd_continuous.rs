@@ -127,6 +127,7 @@ fn bench_bind(c: &mut Criterion) {
     let mut group = c.benchmark_group("bind");
 
     for &dim in RESOLUTION_DIMS {
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (3 * dim * std::mem::size_of::<f32>()) as u64 });
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -153,6 +154,7 @@ fn bench_similarity(c: &mut Criterion) {
     let mut group = c.benchmark_group("similarity");
 
     for &dim in RESOLUTION_DIMS {
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (2 * dim * std::mem::size_of::<f32>()) as u64 });
         let a = random_vec(dim, 42);
         let b = random_vec(dim, 43);
 
@@ -181,6 +183,7 @@ fn bench_bundle(c: &mut Criterion) {
     // Keep the vector-count sweep, but also sweep the full adaptive dimension ladder.
     for &dim in RESOLUTION_DIMS {
         for n_vecs in [3, 10, 50] {
+            group.throughput(Throughput::ElementsAndBytes { elements: (dim * n_vecs) as u64, bytes: ((n_vecs + 1) * dim * std::mem::size_of::<f32>()) as u64 });
             let vecs: Vec<Vec<f32>> =
                 (0..n_vecs).map(|i| random_vec(dim, i as u64 + 100)).collect();
             let refs: Vec<&[f32]> = vecs.iter().map(|v| v.as_slice()).collect();
@@ -218,6 +221,7 @@ fn bench_norm(c: &mut Criterion) {
     let mut group = c.benchmark_group("norm");
 
     for &dim in RESOLUTION_DIMS {
+        group.throughput(Throughput::ElementsAndBytes { elements: dim as u64, bytes: (dim * std::mem::size_of::<f32>()) as u64 });
         let a = random_vec(dim, 42);
 
         group.bench_with_input(BenchmarkId::new("scalar", dim), &a, |bench, a| {
