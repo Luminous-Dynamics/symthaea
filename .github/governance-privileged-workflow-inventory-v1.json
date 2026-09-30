@@ -80,6 +80,10 @@
       ],
       "guards": [
         "github.event.workflow_run.head_branch == 'main'",
+        "workflow_run repository identity is checked against EXPECTED_REPOSITORY",
+        "workflow_run workflow identity is checked against EXPECTED_WORKFLOW_NAME",
+        "workflow_run head SHA is checked against EXPECTED_SUBJECT",
+        "workflow_run run id and run attempt are required",
         "dispatcher workflow content is inspected at workflow_run.head_sha",
         "expected ancestry is checked",
         "expected source surface is checked",
@@ -101,10 +105,22 @@
         "artifact_execution": false,
         "upstream_identity_checks": [
           "configured_workflow_name",
+          "repository_full_name",
           "head_branch",
           "head_sha",
-          "conclusion"
+          "conclusion",
+          "run_id",
+          "run_attempt"
         ],
+        "provenance_binding": {
+          "repository": "run.repository.full_name === EXPECTED_REPOSITORY",
+          "workflow_name": "run.name === EXPECTED_WORKFLOW_NAME",
+          "head_branch": "run.head_branch === main",
+          "head_sha": "run.head_sha === EXPECTED_SUBJECT",
+          "conclusion": "run.conclusion === success for PASS",
+          "run_identity": "run.id + run.run_attempt",
+          "pr_association": "not_required_for_current_main-only consumer"
+        },
         "cache_influence": "none_observed",
         "privileged_side_effects": [
           "none"
