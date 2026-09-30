@@ -9,7 +9,9 @@
 //! execute commands directly.
 
 use super::executor::{NixOSCommand, SafetyLevel};
-use super::service_state::{NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1};
+use super::service_state::{
+    NixServiceEnablementEvidenceV1, NixServiceObservedStateV1, NixServiceOperationCapabilitiesV1,
+};
 use super::systemd_transport::observe_service_properties;
 
 /// Manages systemd services: start, stop, restart, enable, disable.
@@ -142,6 +144,21 @@ impl ServiceManager {
                 "invalid governed systemd observation for '{}': {error}",
                 unit
             )))
+    }
+
+    /// Observe unit-file enablement evidence from the same exact
+    /// governed pre-state. This remains distinct from lifecycle capability
+    /// facts and carries no operation authorization.
+    pub fn observed_state_with_enablement_evidence(
+        service: &str,
+    ) -> Result<(NixServiceObservedStateV1, NixServiceEnablementEvidenceV1), std::io::Error> {
+        let state = Self::observed_state(service)?;
+        let evidence = NixServiceEnablementEvidenceV1::from_observed_state(&state)
+            .map_err(|error| std::io::Error::other(format!(
+                "invalid governed enablement evidence for '{}': {error}",
+                state.unit()
+            )))?;
+        Ok((state, evidence))
     }
 
     /// Observe operation capability facts from the same atomic systemd
