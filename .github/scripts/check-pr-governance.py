@@ -224,6 +224,57 @@ def validate_root_workflow_text(text: str) -> None:
 
 def validate_root_workflow_contract(base: str) -> None:
     validate_root_workflow_text(read_at_commit(base, ROOT_WORKFLOW_PATH))
+
+
+PRIVILEGED_GOVERNANCE_PATHS = (
+    ".github/scripts/check-privileged-workflow-inventory.py",
+    ".github/governance-privileged-workflow-inventory-v1.json",
+    "docs/compliance/adr/ADR-005-privileged-workflow-inventory.md",
+    ".github/workflows/workflow-syntax.yml",
+)
+
+PRIVILEGED_DETECTOR_CONTRACT_MARKERS = (
+    'PRIVILEGED_EVENTS = {"pull_request_target", "workflow_run"}',
+    "def validate_inventory(",
+    "workflow_run",
+    "cache-mode:",
+    "run.repository?.full_name",
+    "run.run_attempt",
+    "PINNED_USE_RE =",
+)
+PRIVILEGED_INVENTORY_CONTRACT_MARKERS = (
+    '"schema": "symthaea-privileged-workflow-inventory-v1"',
+    '"path": ".github/workflows/draft-ci-governor.yml"',
+    '"event": "pull_request_target"',
+    '"path": ".github/workflows/qual-mel-epi-001f-independent-receipt.yml"',
+    '"event": "workflow_run"',
+)
+WORKFLOW_SYNTAX_CONTRACT_MARKERS = (
+    "python3 .github/scripts/check-pr-governance.py --self-test",
+    "python3 .github/scripts/check-privileged-workflow-inventory.py --self-test",
+    "python3 .github/scripts/check-privileged-workflow-inventory.py",
+)
+
+def validate_privileged_governance_contract(base: str) -> None:
+    """Bind the Governance Root to the expected enforcement-source topology."""
+    detector = read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[0])
+    inventory = read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[1])
+    workflow_syntax = read_at_commit(base, PRIVILEGED_GOVERNANCE_PATHS[3])
+    missing_detector = [m for m in PRIVILEGED_DETECTOR_CONTRACT_MARKERS if m not in detector]
+    if missing_detector:
+        raise GovernanceError(
+            f"trusted privileged detector contract is weakened or incomplete: {missing_detector}"
+        )
+    missing_inventory = [m for m in PRIVILEGED_INVENTORY_CONTRACT_MARKERS if m not in inventory]
+    if missing_inventory:
+        raise GovernanceError(
+            f"trusted privileged inventory contract is weakened or incomplete: {missing_inventory}"
+        )
+    missing_workflow_syntax = [m for m in WORKFLOW_SYNTAX_CONTRACT_MARKERS if m not in workflow_syntax]
+    if missing_workflow_syntax:
+        raise GovernanceError(
+            f"trusted Workflow Syntax privileged enforcement is weakened or incomplete: {missing_workflow_syntax}"
+        )
 def validate_declared_roots(
     base: str,
     head: str,
@@ -657,6 +708,7 @@ def validate_change_set(base: str, head: str, policy: dict[str, Any]) -> dict[st
     require_exact_object_connectivity(base, head)
     validate_declared_roots(base, head)
     validate_root_workflow_contract(base)
+    validate_privileged_governance_contract(base)
     validate_exact_base_head_ancestry(base, head)
     paths = changed_paths(base, head)
     class_a = [(path, classify(path, policy)) for path in paths]
@@ -819,7 +871,28 @@ def self_test() -> None:
         raise AssertionError("Class A change without changed ADR must fail closed")
     require_changed_adr(False, [])
 
-    history_topology_self_test()\n\n    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
+    history_topology_self_test()\n\n
+    # Cross-surface adversarial matrix: detector, inventory, and Workflow Syntax
+    # are independently required; coordinated weakening is not accepted.
+    for markers, label in (
+        (PRIVILEGED_DETECTOR_CONTRACT_MARKERS, "detector"),
+        (PRIVILEGED_INVENTORY_CONTRACT_MARKERS, "inventory"),
+        (WORKFLOW_SYNTAX_CONTRACT_MARKERS, "workflow-syntax"),
+    ):
+        fixture = "\n".join(markers)
+        assert all(marker in fixture for marker in markers)
+        weakened = fixture.replace(markers[-1], "")
+        assert markers[-1] not in weakened, f"{label} weakening fixture is not adversarial"
+    coordinated = (
+        "\n".join(PRIVILEGED_DETECTOR_CONTRACT_MARKERS[:-1])
+        + "\n" + "\n".join(PRIVILEGED_INVENTORY_CONTRACT_MARKERS[:-1])
+        + "\n" + "\n".join(WORKFLOW_SYNTAX_CONTRACT_MARKERS[:-1])
+    )
+    assert PRIVILEGED_DETECTOR_CONTRACT_MARKERS[-1] not in coordinated
+    assert PRIVILEGED_INVENTORY_CONTRACT_MARKERS[-1] not in coordinated
+    assert WORKFLOW_SYNTAX_CONTRACT_MARKERS[-1] not in coordinated
+
+    trusted_workflow = "\n".join(REQUIRED_ROOT_WORKFLOW_SNIPPETS) + "\nuses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
     validate_root_workflow_text(trusted_workflow)
     for forbidden in FORBIDDEN_ROOT_WORKFLOW_SNIPPETS:
         try:
