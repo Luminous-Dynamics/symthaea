@@ -166,7 +166,7 @@ impl ProvenanceValidationReport {
         Self {
             snapshot_schema_version: PROVENANCE_SNAPSHOT_SCHEMA_VERSION,
             validator_version: PROVENANCE_VALIDATOR_VERSION.to_owned(),
-            snapshot_digest: sha256_hex(&bytes),
+            snapshot_digest,
             relation_count: relations.len(),
             conforms: true,
             violations: Vec::new(),
