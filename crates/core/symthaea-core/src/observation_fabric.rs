@@ -448,7 +448,7 @@ pub enum ObservationRelationKind {
     Supports,
     /// The source observation provides evidence against the target.
     Contradicts,
-    /// The source independently agrees with the target observation.
+    /// The source agrees with the target observation; independence is tracked separately.
     Corroborates,
     /// The source was computationally derived from the target.
     DerivedFrom,
@@ -495,6 +495,11 @@ impl ObservationRelation {
             && !matches!(self.independence, EvidenceIndependence::Derived | EvidenceIndependence::SharedUpstream)
         {
             return Err(ObservationValidationError::DerivedRelationIndependenceMismatch);
+        }
+        if matches!(self.kind, ObservationRelationKind::Corroborates)
+            && matches!(self.independence, EvidenceIndependence::Derived)
+        {
+            return Err(ObservationValidationError::CorroborationDerivedMismatch);
         }
         Ok(())
     }
@@ -705,6 +710,8 @@ pub enum ObservationValidationError {
     SelfRelation,
     #[error("derived-from relations require derived or shared-upstream independence")]
     DerivedRelationIndependenceMismatch,
+    #[error("corroboration relations cannot classify the source as derived evidence")]
+    CorroborationDerivedMismatch,
     #[error("verified provenance requires an attestation reference")]
     MissingVerificationAttestation,
     #[error("parent observation ids must be non-empty and cannot reference the observation itself")]
@@ -904,6 +911,20 @@ mod tests {
         assert_eq!(
             relation.validate(),
             Err(ObservationValidationError::DerivedRelationIndependenceMismatch)
+        );
+    }
+
+    #[test]
+    fn corroboration_rejects_derived_independence() {
+        let relation = ObservationRelation {
+            source_observation_id: "derived".into(),
+            target_observation_id: "source".into(),
+            kind: ObservationRelationKind::Corroborates,
+            independence: EvidenceIndependence::Derived,
+        };
+        assert_eq!(
+            relation.validate(),
+            Err(ObservationValidationError::CorroborationDerivedMismatch)
         );
     }
 
