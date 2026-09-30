@@ -291,3 +291,10 @@ This creates three deliberately distinct evidence states:
 The external manifest is intentionally not invented by the adapter. It should come from the archive/curation record or a separately controlled engineering artifact. NASA's current PDS4 model includes checksum manifests and file-level checksum metadata, making this separation consistent with the archive's provenance architecture.
 
 The remaining scientific gate is therefore not merely “can we read a MOLA file?” but “which exact archived byte artifacts are authorized inputs to this engineering run, and can the run reproduce that authorization later?”
+
+
+## Experiment-level provenance closure
+
+The provenance boundary now extends beyond terrain. `TetherExperimentProvenance` requires an explicit experiment identifier, model revision, constants revision, configuration SHA-256, and cryptographically identified detached label and raster inputs. `is_reproducibly_pinned()` is deliberately fail-closed: an engineering run cannot describe itself as reproducibly pinned merely because a terrain reader succeeded.
+
+This mirrors the role of provenance and processing-history structures in the current PDS4 ecosystem while keeping Symthaea's engineering identity explicit and local to the model boundary. NASA's current PDS4 dictionaries include a dedicated Provenance dictionary and a Processing Information dictionary, and the current standards release is 1.26.0.0 (June 2026).
