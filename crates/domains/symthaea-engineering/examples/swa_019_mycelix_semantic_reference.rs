@@ -829,6 +829,13 @@ mod tests {
     }
 
     #[test]
+    fn malformed_binding_registry_is_invalid_not_a_panic() {
+        let mut projection = envelope();
+        projection.evidence_binding.model_ref.object_id = "wrong-model";
+        assert_eq!(validate(&projection), ValidationOutcome::Invalid);
+    }
+
+    #[test]
     fn extra_registry_mapping_is_rejected() {
         let binding = evidence_binding();
         let registry = SemanticBindingRegistry::from_bindings([
