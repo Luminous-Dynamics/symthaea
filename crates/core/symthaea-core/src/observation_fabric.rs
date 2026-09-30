@@ -464,6 +464,37 @@ pub enum ObservationRelationKind {
 
 /// Auditable edge between observations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// The concrete provenance basis for an independence assessment.
+///
+/// This keeps an independence classification auditable instead of collapsing
+/// every non-independent result into an opaque SharedUpstream label.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IndependenceBasis {
+    SharedSensor { sensor_id: String },
+    SharedPlatform { platform_id: String },
+    SharedAncestor { observation_id: String },
+    SharedProcessingActivity { activity_id: String },
+    IdenticalAsset { hash_algorithm: String, content_hash: String },
+    NoSharedProvenance,
+}
+
+/// Result of a bounded provenance-independence assessment.
+///
+/// VerifiedIndependent remains scoped to the supplied closed-world graph:
+/// it means the verifier found no shared provenance basis in that graph, not
+/// that the observations are substantively true or independent in reality.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct IndependenceAssessment {
+    pub classification: EvidenceIndependence,
+    pub basis: IndependenceBasis,
+    pub examined_observation_ids: Vec<String>,
+    pub verifier_version: &'static str,
+}
+
+impl IndependenceAssessment {
+    const VERIFIER_VERSION: &'static str = "observation-fabric-independence-v1";
+}
+
 pub enum EvidenceIndependence {
     /// The producer declares no known shared upstream source.
     ///
@@ -550,18 +581,13 @@ pub struct ObservationGraph {
 }
 
 impl ObservationGraph {
-    /// Assess whether two observations have independent provenance within this
-    /// closed-world graph.
-    ///
-    /// VerifiedIndependent means only that the supplied provenance graph
-    /// exposes no shared upstream observation, producer platform, processing
-    /// activity, or exact asset hash. It is deliberately not a claim about
-    /// substantive truth or real-world independence outside the graph.
-    pub fn assess_independence(
+    /// Assess provenance independence and retain the concrete basis used.
+    pub fn assess_independence_detailed(
         &self,
         source_observation_id: &str,
         target_observation_id: &str,
-    ) -> Result<EvidenceIndependence, ObservationValidationError> {
+    ) -> Result<IndependenceAssessment, ObservationValidationError> {
+        self.validate()?;
         if source_observation_id == target_observation_id {
             return Err(ObservationValidationError::SelfRelation);
         }
@@ -583,17 +609,53 @@ impl ObservationGraph {
                 target_observation_id.to_string(),
             ))?;
 
-        if source.provenance.source.sensor_id == target.provenance.source.sensor_id
-            || source.provenance.source.platform_id.is_some()
-                && source.provenance.source.platform_id == target.provenance.source.platform_id
-        {
-            return Ok(EvidenceIndependence::SharedUpstream);
+        let examined_observation_ids = self
+            .observations
+            .iter()
+            .map(|observation| observation.id.clone())
+            .collect::<Vec<_>>();
+        let assessment = |classification, basis| IndependenceAssessment {
+            classification,
+            basis,
+            examined_observation_ids: examined_observation_ids.clone(),
+            verifier_version: IndependenceAssessment::VERIFIER_VERSION,
+        };
+
+        if source.provenance.source.sensor_id == target.provenance.source.sensor_id {
+            return Ok(assessment(
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedSensor {
+                    sensor_id: source.provenance.source.sensor_id.clone(),
+                },
+            ));
+        }
+
+        if let (Some(source_platform), Some(target_platform)) = (
+            source.provenance.source.platform_id.as_ref(),
+            target.provenance.source.platform_id.as_ref(),
+        ) {
+            if source_platform == target_platform {
+                return Ok(assessment(
+                    EvidenceIndependence::SharedUpstream,
+                    IndependenceBasis::SharedPlatform {
+                        platform_id: source_platform.clone(),
+                    },
+                ));
+            }
         }
 
         let source_ancestors = Self::ancestor_ids(source_observation_id, &by_id)?;
         let target_ancestors = Self::ancestor_ids(target_observation_id, &by_id)?;
-        if source_ancestors.intersection(&target_ancestors).next().is_some() {
-            return Ok(EvidenceIndependence::SharedUpstream);
+        if let Some(shared_ancestor) = source_ancestors
+            .intersection(&target_ancestors)
+            .next()
+        {
+            return Ok(assessment(
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedAncestor {
+                    observation_id: shared_ancestor.clone(),
+                },
+            ));
         }
 
         let source_activities = source_ancestors
@@ -601,7 +663,10 @@ impl ObservationGraph {
             .filter_map(|id| by_id.get(id.as_str()))
             .chain(std::iter::once(source))
             .filter_map(|observation| {
-                observation.provenance.processing_activity.as_ref()
+                observation
+                    .provenance
+                    .processing_activity
+                    .as_ref()
                     .map(|activity| activity.activity_id.as_str())
             })
             .collect::<HashSet<_>>();
@@ -610,24 +675,59 @@ impl ObservationGraph {
             .filter_map(|id| by_id.get(id.as_str()))
             .chain(std::iter::once(target))
             .filter_map(|observation| {
-                observation.provenance.processing_activity.as_ref()
+                observation
+                    .provenance
+                    .processing_activity
+                    .as_ref()
                     .map(|activity| activity.activity_id.as_str())
             })
             .collect::<HashSet<_>>();
-        if source_activities.intersection(&target_activities).next().is_some() {
-            return Ok(EvidenceIndependence::SharedUpstream);
+        if let Some(shared_activity) = source_activities
+            .intersection(&target_activities)
+            .next()
+        {
+            return Ok(assessment(
+                EvidenceIndependence::SharedUpstream,
+                IndependenceBasis::SharedProcessingActivity {
+                    activity_id: (*shared_activity).to_string(),
+                },
+            ));
         }
 
-        if source.asset.as_ref().zip(target.asset.as_ref()).is_some_and(
-            |(source_asset, target_asset)| {
-                source_asset.hash_algorithm == target_asset.hash_algorithm
-                    && source_asset.content_hash == target_asset.content_hash
-            },
-        ) {
-            return Ok(EvidenceIndependence::SharedUpstream);
+        if let Some((source_asset, target_asset)) =
+            source.asset.as_ref().zip(target.asset.as_ref())
+        {
+            if source_asset.hash_algorithm == target_asset.hash_algorithm
+                && source_asset.content_hash == target_asset.content_hash
+            {
+                return Ok(assessment(
+                    EvidenceIndependence::SharedUpstream,
+                    IndependenceBasis::IdenticalAsset {
+                        hash_algorithm: source_asset.hash_algorithm.clone(),
+                        content_hash: source_asset.content_hash.clone(),
+                    },
+                ));
+            }
         }
 
-        Ok(EvidenceIndependence::VerifiedIndependent)
+        Ok(assessment(
+            EvidenceIndependence::VerifiedIndependent,
+            IndependenceBasis::NoSharedProvenance,
+        ))
+    }
+
+    /// Assess whether two observations have independent provenance within this
+    /// closed-world graph. The returned classification is retained for callers
+    /// that only need the legacy enum; use assess_independence_detailed when
+    /// the audit basis should be preserved.
+    pub fn assess_independence(
+        &self,
+        source_observation_id: &str,
+        target_observation_id: &str,
+    ) -> Result<EvidenceIndependence, ObservationValidationError> {
+        Ok(self
+            .assess_independence_detailed(source_observation_id, target_observation_id)?
+            .classification)
     }
 
     fn ancestor_ids(
@@ -1564,6 +1664,38 @@ mod tests {
             Ok(EvidenceIndependence::VerifiedIndependent)
         );
     }
+
+    #[test]
+    fn graph_detailed_independence_records_audit_basis() {
+        let mut second = fixture();
+        second.id = "obs-002".into();
+        second.provenance.source.sensor_id = "camera-2".into();
+        let assessment = ObservationGraph {
+            observations: vec![fixture(), second],
+            relations: vec![],
+        }
+        .assess_independence_detailed("obs-001", "obs-002")
+        .expect("assessment");
+        assert_eq!(assessment.classification, EvidenceIndependence::VerifiedIndependent);
+        assert_eq!(assessment.basis, IndependenceBasis::NoSharedProvenance);
+        assert_eq!(assessment.examined_observation_ids, vec!["obs-001", "obs-002"]);
+        assert_eq!(assessment.verifier_version, "observation-fabric-independence-v1");
+    }
+
+    #[test]
+    fn detailed_independence_rejects_invalid_closed_graph() {
+        let mut observation = fixture();
+        observation.provenance.parent_observation_ids = vec!["missing".into()];
+        let graph = ObservationGraph {
+            observations: vec![observation],
+            relations: vec![],
+        };
+        assert_eq!(
+            graph.assess_independence_detailed("obs-001", "missing"),
+            Err(ObservationValidationError::MissingParentObservation("missing".into()))
+        );
+    }
+
 
     #[test]
     fn graph_assesses_shared_ancestor_as_non_independent() {
