@@ -6,6 +6,7 @@ on:
       - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1.json"
       - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-contract-vectors.json"
       - "docs/engineering/data/cp-04-scientific-lineage-adapter-v1-negative-contract-vectors.json"
+      - "docs/engineering/data/cp-04-scientific-lineage-source-snapshot-v1.json"
       - "scripts/qualifiers/scientific_lineage_adapter_qualifier.py"
       - ".github/workflows/scientific-lineage-adapter.yml"
       - "crates/domains/symthaea-engineering/src/cp04_adapter.rs"
@@ -15,6 +16,7 @@ on:
       - "crates/domains/symthaea-engineering/Cargo.toml"
       - "crates/domains/symthaea-engineering/tests/cp04_digest_boundaries.rs"
       - "crates/domains/symthaea-engineering/tests/cp04_negative_contract_vectors.rs"
+      - "crates/domains/symthaea-engineering/tests/cp04_source_snapshot_replay.rs"
       - "crates/domains/symthaea-engineering/tests/cp04_dependency_contract.rs"
   workflow_dispatch:
 
@@ -42,6 +44,8 @@ jobs:
         run: cargo test -p symthaea-engineering --test cp04_digest_boundaries
       - name: Verify negative contract vectors
         run: cargo test -p symthaea-engineering --test cp04_negative_contract_vectors
+      - name: Verify source snapshot replay contract
+        run: cargo test -p symthaea-engineering --test cp04_source_snapshot_replay
       - name: Verify positive dependency contract
         run: cargo test -p symthaea-engineering --test cp04_dependency_contract
       - name: Verify fixture remains unchanged
