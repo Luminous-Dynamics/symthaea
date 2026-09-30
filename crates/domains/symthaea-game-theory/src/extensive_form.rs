@@ -1105,6 +1105,11 @@ mod tests {
                 scope: ObservationScope::Private(PlayerId(0)),
                 observation: ObservationId(7),
             },
+            HistoryEvent::Observation {
+                state: DecisionStateId(1),
+                scope: ObservationScope::Public,
+                observation: ObservationId(8),
+            },
             HistoryEvent::Chance {
                 state: DecisionStateId(2),
                 outcome: ChanceOutcomeId(42),
@@ -1124,6 +1129,10 @@ mod tests {
         )));
         assert!(player_zero.iter().any(|event| matches!(
             event,
+            PlayerHistoryEvent::Observation { observation: ObservationId(8), .. }
+        )));
+        assert!(player_zero.iter().any(|event| matches!(
+            event,
             PlayerHistoryEvent::ChanceOutcome { outcome: ChanceOutcomeId(42), .. }
         )));
 
@@ -1135,6 +1144,10 @@ mod tests {
         assert!(!player_one.iter().any(|event| matches!(
             event,
             PlayerHistoryEvent::Observation { observation: ObservationId(7), .. }
+        )));
+        assert!(player_one.iter().any(|event| matches!(
+            event,
+            PlayerHistoryEvent::Observation { observation: ObservationId(8), .. }
         )));
     }
 
