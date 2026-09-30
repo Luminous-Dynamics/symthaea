@@ -189,7 +189,7 @@ fn scalar_record(
         schema_version: EVIDENCE_SCHEMA_VERSION,
         representation: "continuous_f32",
         resolution: dim,
-        operation,
+        operation: operation.to_owned(),
         seed_a: DEFAULT_SEED_A,
         seed_b: DEFAULT_SEED_B,
         scalar_reference: f64::from(scalar),
@@ -200,7 +200,7 @@ fn scalar_record(
         max_relative_error: relative_error,
         tolerance,
         logical_bytes,
-        qualification_status: status,
+        qualification_status: status.to_owned(),
     }
 }
 
@@ -317,7 +317,7 @@ mod tests {
             let ops: Vec<_> = generate_extended_resolution_evidence()
                 .into_iter()
                 .filter(|record| record.resolution == dim)
-                .map(|record| record.operation)
+                .map(|record| record.operation.as_str())
                 .collect();
             assert_eq!(ops, vec!["dot", "bind", "bundle", "norm", "similarity"]);
         }
