@@ -33,7 +33,7 @@ fn validate_sha256_identity(digest: &str) -> bool {
     let Some(hex) = digest.strip_prefix(EXPERIMENT_IDENTITY_PREFIX) else {
         return false;
     };
-    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit())
+    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 impl DeclaredExperimentIdentity {
