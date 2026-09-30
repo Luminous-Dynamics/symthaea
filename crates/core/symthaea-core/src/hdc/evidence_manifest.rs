@@ -215,6 +215,90 @@ impl EvidenceManifest {
     }
 }
 
+/// Stable content-addressed subject for publishing or attesting a manifest.
+///
+/// The envelope intentionally carries the manifest digest separately from the
+/// manifest bytes. This avoids circular self-hashing while still making the
+/// subject claim independently verifiable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceManifestEnvelope {
+    pub schema_version: u32,
+    pub subject_digest: String,
+    pub manifest: EvidenceManifest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceManifestEnvelopeError {
+    UnsupportedSchema(u32),
+    InvalidSubjectDigest,
+    SubjectMismatch { expected: String, observed: String },
+    Manifest(EvidenceManifestError),
+}
+
+impl std::fmt::Display for EvidenceManifestEnvelopeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnsupportedSchema(v) => write!(f, "unsupported evidence manifest envelope schema: {v}"),
+            Self::InvalidSubjectDigest => write!(f, "subject digest must be sha256: followed by exactly 64 hexadecimal characters"),
+            Self::SubjectMismatch { expected, observed } => {
+                write!(f, "manifest subject digest mismatch: expected {expected}, observed {observed}")
+            }
+            Self::Manifest(error) => write!(f, "manifest validation failed: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for EvidenceManifestEnvelopeError {}
+
+pub const EVIDENCE_MANIFEST_ENVELOPE_SCHEMA_VERSION: u32 = 1;
+
+impl EvidenceManifest {
+    /// Canonical subject digest used by external attestations.
+    pub fn subject_digest(&self) -> String {
+        format!("{EXPERIMENT_IDENTITY_PREFIX}{}", self.artifact_digest())
+    }
+}
+
+impl EvidenceManifestEnvelope {
+    pub fn from_manifest(manifest: EvidenceManifest) -> Self {
+        let subject_digest = manifest.subject_digest();
+        Self {
+            schema_version: EVIDENCE_MANIFEST_ENVELOPE_SCHEMA_VERSION,
+            subject_digest,
+            manifest,
+        }
+    }
+
+    /// Validate the envelope's declared subject against independently derived
+    /// manifest content, then validate the manifest against source evidence.
+    pub fn validate(
+        &self,
+        task_quality: &TaskQualityEvidenceRecord,
+        performance: &PerformanceEvidenceRecord,
+        resource: &ResourceEvidenceRecord,
+        trajectory: &TrajectoryEvidenceRecord,
+    ) -> Result<(), EvidenceManifestEnvelopeError> {
+        if self.schema_version != EVIDENCE_MANIFEST_ENVELOPE_SCHEMA_VERSION {
+            return Err(EvidenceManifestEnvelopeError::UnsupportedSchema(self.schema_version));
+        }
+        if !validate_sha256_identity(&self.subject_digest) {
+            return Err(EvidenceManifestEnvelopeError::InvalidSubjectDigest);
+        }
+
+        let expected = self.manifest.subject_digest();
+        if self.subject_digest != expected {
+            return Err(EvidenceManifestEnvelopeError::SubjectMismatch {
+                expected,
+                observed: self.subject_digest.clone(),
+            });
+        }
+
+        self.manifest
+            .validate_against_evidence(task_quality, performance, resource, trajectory)
+            .map_err(EvidenceManifestEnvelopeError::Manifest)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
