@@ -621,7 +621,13 @@ pub struct AblationResult {
 pub struct ButlinEvidenceBundle {
     pub schema_version: u32,
     pub commit_sha: String,
+    /// Legacy field name retained for serialized compatibility. New producers should
+    /// treat this value as the stable semantic configuration identity.
     pub config_hash: String,
+    /// Explicit schema for the stable identity carried in `config_hash` by
+    /// current producers. Historical bundles may omit this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_identity_schema: Option<String>,
     pub seeds: Vec<u64>,
     pub generated_at: String,
     pub ablations: Vec<AblationResult>,
@@ -1147,6 +1153,7 @@ mod tests {
             schema_version: REPORT_SCHEMA_VERSION,
             commit_sha: "test".into(),
             config_hash: "test".into(),
+            config_identity_schema: None,
             seeds: vec![1],
             generated_at: "test".into(),
             ablations: vec![stub_ablation_result("AE-1", true, false, false)],
