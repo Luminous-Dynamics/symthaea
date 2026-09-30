@@ -274,9 +274,9 @@ fn main() {
 
     // Training data are used to create v2. They are not reused as the
     // validation scenario.
-    let prediction_v1 = predict("swa-005-rc-v1", initial, predictor_low, predictor_high, intervention, 35.0, 8);
+    let prediction_v1 = predict("swa-005-rc-v1", initial, predictor_low, predictor_high, intervention, 27.0, 8);
     let training_outcome =
-        synthetic_world(initial, training_world, intervention, 35.0, 8);
+        synthetic_world(initial, training_world, intervention, 27.0, 8);
     let training_residual = residual(prediction_v1, training_outcome);
 
     let lineage = Lineage {
@@ -378,8 +378,8 @@ mod tests {
             id: "zone-a-reversible-hvac",
             hvac_capacity_kw: 2.0,
         };
-        let prediction = predict("swa-005-rc-v1", initial, low, high, intervention, 35.0, 8);
-        let outcome = synthetic_world(initial, world, intervention, 35.0, 8);
+        let prediction = predict("swa-005-rc-v1", initial, low, high, intervention, 27.0, 8);
+        let outcome = synthetic_world(initial, world, intervention, 27.0, 8);
         let residual = residual(prediction, outcome);
         (prediction, outcome, residual)
     }
@@ -415,13 +415,6 @@ mod tests {
     #[test]
     fn calibration_creates_new_revision_without_rewriting_prediction() {
         let (prediction, outcome, residual) = fixture();
-        let params = ZoneParameters {
-            thermal_mass_kwh_per_c: 9.0,
-            envelope_u_kw_per_c: 0.23,
-            internal_gain_kw: 0.35,
-            setpoint_c: 21.0,
-            comfort_band_c: 2.0,
-        };
         let (calibrated_low, calibrated_high, activity) = calibrate_internal_gain(
             ZoneParameters {
                 thermal_mass_kwh_per_c: 8.0,
@@ -443,8 +436,11 @@ mod tests {
             "calibration-test-001",
         );
 
-        assert_ne!(calibrated_low.internal_gain_kw, 0.30);
-        assert_ne!(calibrated_high.internal_gain_kw, 0.40);
+        assert!(activity.parameter_adjustment.abs() > 0.0);
+        assert_eq!(
+            calibrated_high.internal_gain_kw - calibrated_low.internal_gain_kw,
+            0.10
+        );
         assert_eq!(prediction.model_id, "swa-005-rc-v1");
         assert_eq!(activity.source_residual_id, "residual-test-001");
         assert_eq!(activity.source_model_id, prediction.model_id);
