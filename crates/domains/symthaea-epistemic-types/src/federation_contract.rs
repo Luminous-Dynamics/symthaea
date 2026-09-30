@@ -161,6 +161,9 @@ impl FederatedClaim {
         if self.admission_receipt.admission_event.trim().is_empty() {
             return Err("admission event must be non-empty");
         }
+        if self.admission_receipt.frontier_ref.as_deref().is_some_and(|v| v.trim().is_empty()) {
+            return Err("admission receipt frontier reference must be non-empty when present");
+        }
         if !self.provenance_validation.conforms {
             return Err("federated claim provenance validation does not conform");
         }
@@ -390,6 +393,17 @@ mod digest_tests {
         claim.admission_receipt.admission_event = "admission:event-tampered".into();
         assert_ne!(claim.canonical_digest(), original);
         assert!(claim.validate_structure().is_ok());
+    }
+
+    #[test]
+    fn federated_claim_rejects_empty_receipt_frontier() {
+        let mut claim = base_claim();
+        claim.admission_receipt.frontier_ref = Some("".into());
+        claim.frontier_ref = Some("".into());
+        assert_eq!(
+            claim.validate_structure().unwrap_err(),
+            "admission receipt frontier reference must be non-empty when present"
+        );
     }
 
     #[test]
