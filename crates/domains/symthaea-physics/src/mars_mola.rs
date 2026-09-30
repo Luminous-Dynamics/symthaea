@@ -209,21 +209,8 @@ impl MolaMegdrProduct {
         if line >= self.metadata.lines || sample >= self.metadata.samples {
             return Err(MolaError::OutOfBounds);
         }
-        let byte_offset = self
-            .metadata
-            .image_byte_offset
-            .checked_add(
-                u64::from(self.metadata.record_bytes)
-                    .checked_mul(u64::from(line) + u64::from(self.metadata.line_offset))
-                    .ok_or_else(|| MolaError::InvalidMetadata("raster byte offset overflow".into()))?,
-            )
-            .and_then(|offset| {
-                offset.checked_add(
-                    u64::from(sample) * u64::from(self.metadata.sample_bits / 8)
-                        + u64::from(self.metadata.sample_offset),
-                )
-            })
-            .ok_or_else(|| MolaError::InvalidMetadata("raster byte offset overflow".into()))?;
+        let bytes_per_sample = u64::from(self.metadata.sample_bits / 8);
+        let byte_offset = self.raster_byte_offset(line, sample, bytes_per_sample)?;
         let mut file = File::open(&self.img_path)?;
         file.seek(SeekFrom::Start(byte_offset))?;
         match self.metadata.sample_bits {
